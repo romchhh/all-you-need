@@ -1,0 +1,182 @@
+// Prisma schema для AYN Marketplace
+// Спільна база даних для бота та міні-додатку
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Користувачі
+model User {
+  id            Int      @id @default(autoincrement())
+  telegramId    BigInt   @unique
+  username      String?
+  firstName     String?
+  lastName      String?
+  phone         String?
+  avatar        String?
+  balance       Float    @default(0)
+  rating        Float    @default(5.0)
+  reviewsCount  Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  listings      Listing[]
+  favorites     Favorite[]
+  transactions  Transaction[]
+  reviews       Review[]
+
+  @@index([telegramId])
+  @@index([isActive])
+}
+
+// Оголошення
+model Listing {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  title         String
+  description   String
+  price         String
+  isFree        Boolean  @default(false)
+  category      String
+  subcategory   String?
+  condition     String?  // new, like_new, good, fair
+  location      String
+  views         Int      @default(0)
+  status        String   @default("pending") // pending, approved, rejected, active, sold, expired
+  promotionType String?  // null, highlighted, top_category, vip
+  promotionEnds DateTime?
+  images        String   // JSON array of image URLs
+  tags          String?  // JSON array of tags
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  publishedAt   DateTime?
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favorites     Favorite[]
+  viewsHistory  ViewHistory[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([subcategory])
+  @@index([status])
+  @@index([isFree])
+  @@index([createdAt])
+  @@index([promotionType, promotionEnds])
+  @@index([category, subcategory, status])
+}
+
+// Обране
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  listingId Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+}
+
+// Транзакції
+model Transaction {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  type          String   // payment, refund, withdrawal
+  amount        Float
+  currency      String   @default("EUR")
+  paymentMethod String?  // crypto, stars, stripe, sepa
+  status        String   @default("pending") // pending, completed, failed
+  description   String?
+  metadata      String?  // JSON
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([type, status])
+}
+
+// Відгуки
+model Review {
+  id        Int      @id @default(autoincrement())
+  userId    Int      // хто залишив відгук
+  targetId  Int      // про кого відгук (User.id)
+  listingId Int?
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([targetId])
+  @@index([listingId])
+  @@index([createdAt])
+}
+
+// Історія переглядів
+model ViewHistory {
+  id        Int      @id @default(autoincrement())
+  listingId Int
+  viewedAt  DateTime @default(now())
+  userAgent String?
+  ipAddress String?
+
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([viewedAt])
+}
+
+// Категорії (статичні дані, можна винести в константи)
+// Але якщо потрібна динамічна зміна, можна додати:
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  icon        String
+  parentId    Int?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  parent      Category?  @relation("CategoryParent", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryParent")
+
+  @@index([parentId])
+  @@index([isActive, sortOrder])
+}
+
+// Адміністратори (для бота)
+model Admin {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  username      String?
+  addedBy       Int?
+  addedDate     DateTime @default(now())
+  isSuperadmin  Boolean  @default(false)
+
+  @@index([userId])
+  @@index([isSuperadmin])
+}
+
+// Посилання (реферальні посилання)
+model Link {
+  id        Int      @id @default(autoincrement())
+  linkName  String
+  linkUrl   String?
+  linkCount Int      @default(0)
+
+  @@index([linkName])
+}
+
