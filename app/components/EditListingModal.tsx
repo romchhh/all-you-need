@@ -29,7 +29,7 @@ export const EditListingModal = ({
   const [category, setCategory] = useState(listing.category);
   const [subcategory, setSubcategory] = useState(listing.subcategory || '');
   const [location, setLocation] = useState(listing.location);
-  const [condition, setCondition] = useState(listing.condition || 'new');
+  const [condition, setCondition] = useState<'new' | 'like_new' | 'good' | 'fair'>(listing.condition || 'new');
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>(listing.images || [listing.image]);
   const [loading, setLoading] = useState(false);
@@ -44,7 +44,9 @@ export const EditListingModal = ({
 
   const selectedCategoryData = categories.find(cat => cat.id === category);
 
-  const conditionOptions = [
+  type ConditionType = 'new' | 'like_new' | 'good' | 'fair';
+
+  const conditionOptions: Array<{ value: ConditionType; label: string; emoji: string }> = [
     { value: 'new', label: 'Новий', emoji: '✨' },
     { value: 'like_new', label: 'Як новий', emoji: '🆕' },
     { value: 'good', label: 'Добрий', emoji: '👍' },
@@ -66,7 +68,7 @@ export const EditListingModal = ({
       setCategory(listing.category);
       setSubcategory(listing.subcategory || '');
       setLocation(listing.location);
-      setCondition(listing.condition || 'new');
+      setCondition((listing.condition || 'new') as 'new' | 'like_new' | 'good' | 'fair');
       setImagePreviews(listing.images || [listing.image]);
       setImages([]);
       setStatus(listing.status || 'active');
