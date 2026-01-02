@@ -46,28 +46,30 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
             </div>
           </div>
         ) : (
-          <img 
-            src={(() => {
-              if (listing.image?.startsWith('http')) return listing.image;
-              const cleanPath = listing.image?.split('?')[0] || listing.image;
-              const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-              return `/api/images/${pathWithoutSlash}?t=${Date.now()}`;
-            })()}
-            alt={listing.title}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${
-              imageLoading ? 'opacity-0' : 'opacity-100'
-            } ${isSold ? 'grayscale' : ''}`}
-            loading="lazy"
-            decoding="async"
-            sizes="(max-width: 768px) 50vw, 33vw"
-            key={`${listing.image}-${listing.id}`}
-            onLoad={() => setImageLoading(false)}
-            onError={(e) => {
-              setImageLoading(false);
-              setImageError(true);
-              console.error('Error loading listing image:', listing.image);
-            }}
-          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <img 
+              src={(() => {
+                if (listing.image?.startsWith('http')) return listing.image;
+                const cleanPath = listing.image?.split('?')[0] || listing.image;
+                const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                return `/api/images/${pathWithoutSlash}?t=${Date.now()}`;
+              })()}
+              alt={listing.title}
+              className={`w-full h-full object-contain transition-opacity duration-300 ${
+                imageLoading ? 'opacity-0' : 'opacity-100'
+              } ${isSold ? 'grayscale' : ''}`}
+              loading="lazy"
+              decoding="async"
+              sizes="(max-width: 768px) 50vw, 33vw"
+              key={`${listing.image}-${listing.id}`}
+              onLoad={() => setImageLoading(false)}
+              onError={(e) => {
+                setImageLoading(false);
+                setImageError(true);
+                console.error('Error loading listing image:', listing.image);
+              }}
+            />
+          </div>
         )}
         {/* Бейдж "Продано" */}
         {isSold && (

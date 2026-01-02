@@ -26,29 +26,47 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
     setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
-  // Swipe жести
-  const minSwipeDistance = 50;
+  const goToImage = (index: number) => {
+    setCurrentIndex(index);
+  };
+
+  // Swipe жести з плавністю
+  const minSwipeDistance = 30;
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchEndX.current = null;
     touchStartX.current = e.targetTouches[0].clientX;
+    setIsSwiping(true);
+    setSwipeOffset(0);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
     touchEndX.current = e.targetTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX.current;
+    // Обмежуємо зміщення для плавності
+    setSwipeOffset(Math.max(-100, Math.min(100, diff)));
   };
 
   const onTouchEnd = () => {
-    if (!touchStartX.current || !touchEndX.current) return;
+    if (!touchStartX.current || !touchEndX.current) {
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      return;
+    }
     
     const distance = touchStartX.current - touchEndX.current;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
+    setIsSwiping(false);
+    setSwipeOffset(0);
+
     if (isLeftSwipe) {
       nextImage();
-    }
-    if (isRightSwipe) {
+    } else if (isRightSwipe) {
       prevImage();
     }
   };
@@ -79,10 +97,11 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
 
   return (
     <div 
-      className="relative aspect-square bg-gray-100 overflow-hidden touch-pan-y"
+      className="relative aspect-square bg-gray-100 overflow-hidden"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      style={{ touchAction: 'pan-y pinch-zoom' }}
     >
       {/* Skeleton loader */}
       {imageLoading && !imageError && (
@@ -98,23 +117,30 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
           </div>
         </div>
       ) : (
-        <img 
-          src={getImageUrl(images[currentIndex])}
-          alt={`${title} - фото ${currentIndex + 1}`}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            imageLoading ? 'opacity-0' : 'opacity-100'
-          }`}
-          loading={currentIndex === 0 ? 'eager' : 'lazy'}
-          decoding="async"
-          sizes="100vw"
-          key={`${images[currentIndex]}-${currentIndex}`}
-          onLoad={() => setImageLoading(false)}
-          onError={(e) => {
-            setImageLoading(false);
-            setImageError(true);
-            console.error('Error loading image:', images[currentIndex]);
+        <div 
+          className="absolute inset-0 flex items-center justify-center transition-transform duration-300 ease-out"
+          style={{
+            transform: `translateX(${swipeOffset}px)`,
           }}
-        />
+        >
+          <img 
+            src={getImageUrl(images[currentIndex])}
+            alt={`${title} - фото ${currentIndex + 1}`}
+            className={`w-full h-full object-contain transition-all duration-500 ease-in-out ${
+              imageLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+            }`}
+            loading={currentIndex === 0 ? 'eager' : 'lazy'}
+            decoding="async"
+            sizes="100vw"
+            key={`${images[currentIndex]}-${currentIndex}`}
+            onLoad={() => setImageLoading(false)}
+            onError={(e) => {
+              setImageLoading(false);
+              setImageError(true);
+              console.error('Error loading image:', images[currentIndex]);
+            }}
+          />
+        </div>
       )}
       
       {images.length > 1 && (

@@ -292,7 +292,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
                     }}
                     tg={tg}
                   />
-                  <div className="absolute top-2 left-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <div className="absolute top-2 left-2 flex gap-2 z-10">
                     {!isSold && (
                       <button
                         onClick={async (e) => {
