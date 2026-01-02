@@ -218,7 +218,7 @@ export const EditListingModal = ({
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 pb-8">
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">

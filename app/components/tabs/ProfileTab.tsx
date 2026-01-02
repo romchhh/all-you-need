@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, Edit2, Trash2, Check, Eye, X } from 'lucide-react';
+import { Plus, UserPlus, Package, Edit2, Trash2, Check, X } from 'lucide-react';
 import { ImageViewModal } from '../ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
 import { useUser } from '@/hooks/useUser';
@@ -25,8 +25,6 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
-  const [viewingListingHistory, setViewingListingHistory] = useState<Listing | null>(null);
-  const [viewHistory, setViewHistory] = useState<Array<{ viewedAt: string; userAgent: string | null; ipAddress: string | null }>>([]);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
@@ -340,26 +338,6 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
                       </button>
                     )}
                     <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          const response = await fetch(`/api/listings/${listing.id}/views?userId=${profile.telegramId}`);
-                          if (response.ok) {
-                            const data = await response.json();
-                            setViewHistory(data.views || []);
-                            setViewingListingHistory(listing);
-                          }
-                        } catch (error) {
-                          showToast('Помилка завантаження історії', 'error');
-                        }
-                        tg?.HapticFeedback.impactOccurred('light');
-                      }}
-                      className="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-purple-600 transition-colors"
-                      title="Історія переглядів"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setEditingListing(listing);
@@ -527,39 +505,6 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
         />
       )}
 
-      {/* Модальне вікно історії переглядів */}
-      {viewingListingHistory && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Історія переглядів</h3>
-              <button
-                onClick={() => {
-                  setViewingListingHistory(null);
-                  setViewHistory([]);
-                }}
-                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">{viewingListingHistory.title}</p>
-            {viewHistory.length > 0 ? (
-              <div className="space-y-2">
-                {viewHistory.map((view, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="text-sm font-medium text-gray-900">
-                      Перегляд #{index + 1}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-center py-8">Поки немає переглядів</p>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Модальне вікно для перегляду аватара */}
       {profile.avatar && (
