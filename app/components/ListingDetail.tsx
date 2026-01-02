@@ -222,15 +222,32 @@ export const ListingDetail = ({
         <div className="border border-gray-200 rounded-2xl p-4 mb-6">
           <h2 className="font-semibold text-gray-900 mb-4">Продавець</h2>
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+            <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 relative">
               {listing.seller.avatar && (listing.seller.avatar.startsWith('/') || listing.seller.avatar.startsWith('http')) ? (
-                <img 
-                  src={listing.seller.avatar} 
-                  alt={listing.seller.name}
-                  className="w-full h-full object-cover"
-                  loading="eager"
-                  decoding="async"
-                />
+                <>
+                  <div className="absolute inset-0 animate-pulse bg-gray-200" />
+                  <img 
+                    src={listing.seller.avatar} 
+                    alt={listing.seller.name}
+                    className="w-full h-full object-cover relative z-10"
+                    loading="eager"
+                    decoding="async"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        const placeholder = parent.querySelector('.avatar-placeholder');
+                        if (placeholder) {
+                          placeholder.classList.remove('hidden');
+                        }
+                      }
+                    }}
+                  />
+                  <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(listing.seller.name)} text-white text-xl font-bold relative z-10`}>
+                    {listing.seller.name.charAt(0).toUpperCase()}
+                  </div>
+                </>
               ) : (
                 <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(listing.seller.name)} text-white text-xl font-bold`}>
                   {listing.seller.name.charAt(0).toUpperCase()}

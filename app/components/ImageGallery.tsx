@@ -60,6 +60,7 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
           loading={currentIndex === 0 ? 'eager' : 'lazy'}
           decoding="async"
           sizes="100vw"
+          key={`${images[currentIndex]}-${Date.now()}`}
           onLoad={() => setImageLoading(false)}
           onError={(e) => {
             setImageLoading(false);

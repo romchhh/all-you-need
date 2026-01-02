@@ -68,6 +68,7 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, o
             loading="lazy"
             decoding="async"
             sizes="(max-width: 768px) 50vw, 33vw"
+            key={`${listing.image}-${listing.id}`}
             onLoad={() => setImageLoading(false)}
             onError={(e) => {
               setImageLoading(false);

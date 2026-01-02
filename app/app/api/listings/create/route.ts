@@ -69,11 +69,14 @@ export async function POST(request: NextRequest) {
         .webp({ quality: 85, effort: 4 })
         .toBuffer();
       
-      const filename = `listing_${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(7);
+      const filename = `listing_${timestamp}_${random}.webp`;
       const filepath = join(uploadsDir, filename);
       
       await writeFile(filepath, optimizedBuffer);
-      imageUrls.push(`/listings/${filename}`);
+      // Додаємо timestamp для cache-busting
+      imageUrls.push(`/listings/${filename}?t=${timestamp}`);
     }
 
     // Створюємо оголошення
