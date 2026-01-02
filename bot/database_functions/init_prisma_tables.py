@@ -83,9 +83,9 @@ def init_prisma_tables():
             )
         ''')
         
-        # Transaction таблиця
+        # Transaction таблиця (використовуємо квадратні дужки, оскільки Transaction - зарезервоване слово)
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Transaction (
+            CREATE TABLE IF NOT EXISTS [Transaction] (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 userId INTEGER NOT NULL,
                 type TEXT NOT NULL,
@@ -174,7 +174,7 @@ def init_prisma_tables():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_isFree ON Listing(isFree)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_userId ON Favorite(userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_listingId ON Favorite(listingId)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_userId ON Transaction(userId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_userId ON [Transaction](userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_category_parentId ON Category(parentId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_admin_userId ON Admin(userId)')
         
