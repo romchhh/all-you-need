@@ -83,3 +83,6 @@ coverage/
 *.temp
 .cache/
 
+# Server-specific scripts (може відрізнятися на різних серверах)
+bot/start_bot.sh
+
