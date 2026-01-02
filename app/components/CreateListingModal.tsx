@@ -267,7 +267,7 @@ export const CreateListingModal = ({
                 if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
               }}
               placeholder="Наприклад: iPhone 13 Pro Max"
-              className={`w-full px-4 py-3 bg-gray-50 rounded-xl border ${
+              className={`w-full px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                 errors.title ? 'border-red-300' : 'border-gray-200'
               } focus:outline-none focus:ring-2 focus:ring-blue-500`}
               maxLength={100}
@@ -290,7 +290,7 @@ export const CreateListingModal = ({
               }}
               placeholder="Детальний опис товару..."
               rows={4}
-              className={`w-full px-4 py-3 bg-gray-50 rounded-xl border ${
+              className={`w-full px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                 errors.description ? 'border-red-300' : 'border-gray-200'
               } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
               maxLength={2000}
@@ -321,7 +321,7 @@ export const CreateListingModal = ({
                     if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                   }}
                   placeholder="Ціна (наприклад: 5000 грн)"
-                  className={`w-full px-4 py-3 bg-gray-50 rounded-xl border ${
+                  className={`w-full px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                     errors.price ? 'border-red-300' : 'border-gray-200'
                   } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />

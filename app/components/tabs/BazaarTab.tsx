@@ -18,7 +18,7 @@ interface BazaarTabProps {
   favorites: Set<number>;
   onSelectListing: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
-  onPreviewListing?: (listing: Listing) => void;
+  onCreateListing?: () => void;
   hasMore?: boolean;
   onLoadMore?: () => void;
   tg: TelegramWebApp | null;
@@ -34,7 +34,7 @@ export const BazaarTab = ({
   favorites,
   onSelectListing,
   onToggleFavorite,
-  onPreviewListing,
+  onCreateListing,
   hasMore = false,
   onLoadMore,
   tg
@@ -279,7 +279,11 @@ export const BazaarTab = ({
         <button 
           className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-500/20"
           onClick={() => {
-            tg?.showAlert('Створення оголошення');
+            if (onCreateListing) {
+              onCreateListing();
+            } else {
+              tg?.showAlert('Створення оголошення');
+            }
             tg?.HapticFeedback.impactOccurred('medium');
           }}
         >
@@ -359,7 +363,6 @@ export const BazaarTab = ({
               isFavorite={favorites.has(listing.id)}
               onSelect={onSelectListing}
               onToggleFavorite={onToggleFavorite}
-              onPreview={onPreviewListing}
               tg={tg}
             />
           ))}

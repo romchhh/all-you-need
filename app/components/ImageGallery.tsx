@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface ImageGalleryProps {
   images: string[];
@@ -10,6 +10,8 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
 
   useEffect(() => {
     setImageLoading(true);
@@ -24,6 +26,33 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
     setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
+  // Swipe жести
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchEndX.current = null;
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    
+    const distance = touchStartX.current - touchEndX.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      nextImage();
+    }
+    if (isRightSwipe) {
+      prevImage();
+    }
+  };
+
   if (images.length === 0) {
     return (
       <div className="relative aspect-square bg-gray-100 flex items-center justify-center">
@@ -35,8 +64,26 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
     );
   }
 
+  // Функція для отримання URL зображення через API
+  const getImageUrl = (imagePath: string) => {
+    if (imagePath?.startsWith('http')) {
+      return imagePath;
+    }
+    // Видаляємо query параметри якщо є
+    const cleanPath = imagePath?.split('?')[0] || imagePath;
+    // Видаляємо початковий слеш якщо є
+    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+    // Використовуємо API route для обслуговування зображень
+    return `/api/images/${pathWithoutSlash}?t=${Date.now()}`;
+  };
+
   return (
-    <div className="relative aspect-square bg-gray-100 overflow-hidden">
+    <div 
+      className="relative aspect-square bg-gray-100 overflow-hidden touch-pan-y"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Skeleton loader */}
       {imageLoading && !imageError && (
         <div className="absolute inset-0 animate-pulse bg-gray-200" />
@@ -52,7 +99,7 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
         </div>
       ) : (
         <img 
-          src={images[currentIndex]?.startsWith('http') ? images[currentIndex] : images[currentIndex]?.startsWith('/') ? images[currentIndex] : `/${images[currentIndex]}`} 
+          src={getImageUrl(images[currentIndex])}
           alt={`${title} - фото ${currentIndex + 1}`}
           className={`w-full h-full object-cover transition-opacity duration-300 ${
             imageLoading ? 'opacity-0' : 'opacity-100'
@@ -60,7 +107,7 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
           loading={currentIndex === 0 ? 'eager' : 'lazy'}
           decoding="async"
           sizes="100vw"
-          key={`${images[currentIndex]}-${Date.now()}`}
+          key={`${images[currentIndex]}-${currentIndex}`}
           onLoad={() => setImageLoading(false)}
           onError={(e) => {
             setImageLoading(false);

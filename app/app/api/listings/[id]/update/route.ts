@@ -81,8 +81,8 @@ export async function PUT(
         const filename = `listing_${timestamp}_${random}.webp`;
         const filepath = join(uploadsDir, filename);
         await writeFile(filepath, optimizedBuffer);
-        // Додаємо timestamp для cache-busting
-        imageUrls.push(`/listings/${filename}?t=${timestamp}`);
+        // Зберігаємо шлях без query параметрів, API route сам обробить кешування
+        imageUrls.push(`/listings/${filename}`);
       }
     } else {
       // Використовуємо старі зображення

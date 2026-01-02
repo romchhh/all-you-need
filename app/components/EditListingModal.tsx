@@ -228,7 +228,12 @@ export const EditListingModal = ({
               {imagePreviews.map((preview, index) => (
                 <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
                   <img 
-                    src={typeof preview === 'string' && preview.startsWith('http') ? preview : typeof preview === 'string' && preview.startsWith('/') ? preview : typeof preview === 'string' ? `/${preview}` : preview} 
+                    src={(() => {
+                      if (typeof preview === 'string' && preview.startsWith('http')) return preview;
+                      const cleanPath = (typeof preview === 'string' ? preview : '').split('?')[0];
+                      const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                      return pathWithoutSlash ? `/api/images/${pathWithoutSlash}?t=${Date.now()}` : '';
+                    })()}
                     alt={`Preview ${index + 1}`} 
                     className="w-full h-full object-cover"
                     onError={(e) => {

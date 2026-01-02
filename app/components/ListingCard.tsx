@@ -2,7 +2,6 @@ import { Heart, Image as ImageIcon } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState } from 'react';
-import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
 
 interface ListingCardProps {
@@ -10,39 +9,27 @@ interface ListingCardProps {
   isFavorite: boolean;
   onSelect: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
-  onPreview?: (listing: Listing) => void;
   tg: TelegramWebApp | null;
   isSold?: boolean;
 }
 
-export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, onPreview, tg, isSold = false }: ListingCardProps) => {
+export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false }: ListingCardProps) => {
   const sellerName = listing.seller.name || 'Користувач';
   const sellerAvatar = listing.seller.avatar || '👤';
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
-
-  const longPressHandlers = useLongPress({
-    onLongPress: () => {
-      if (!isSold && onPreview) {
-        onPreview(listing);
-        tg?.HapticFeedback.impactOccurred('medium');
-      }
-    },
-    onClick: () => {
-      if (!isSold) {
-        onSelect(listing);
-        tg?.HapticFeedback.impactOccurred('light');
-      }
-    },
-    delay: 500,
-  });
 
   return (
     <div 
       className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer relative select-none ${
         isSold ? 'opacity-60' : ''
       }`}
-      {...longPressHandlers}
+      onClick={() => {
+        if (!isSold) {
+          onSelect(listing);
+          tg?.HapticFeedback.impactOccurred('light');
+        }
+      }}
     >
       <div className="relative aspect-square bg-gray-100">
         {/* Skeleton loader */}
@@ -60,7 +47,12 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, o
           </div>
         ) : (
           <img 
-            src={listing.image?.startsWith('http') ? listing.image : listing.image?.startsWith('/') ? listing.image : `/${listing.image}`} 
+            src={(() => {
+              if (listing.image?.startsWith('http')) return listing.image;
+              const cleanPath = listing.image?.split('?')[0] || listing.image;
+              const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+              return `/api/images/${pathWithoutSlash}?t=${Date.now()}`;
+            })()}
             alt={listing.title}
             className={`w-full h-full object-cover transition-opacity duration-300 ${
               imageLoading ? 'opacity-0' : 'opacity-100'

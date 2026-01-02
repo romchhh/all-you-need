@@ -16,15 +16,17 @@ import { useToast } from '@/hooks/useToast';
 import { getFavoritesFromStorage, saveFavoritesToStorage } from '@/utils/favorites';
 import { ListingGridSkeleton } from '@/components/SkeletonLoader';
 import { getCachedData, setCachedData } from '@/utils/cache';
-import { ListingPreviewModal } from '@/components/ListingPreviewModal';
+import { CreateListingModal } from '@/components/CreateListingModal';
+import { useUser } from '@/hooks/useUser';
 
 const AYNMarketplace = () => {
   const [activeTab, setActiveTab] = useState('bazaar');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
-  const [previewListing, setPreviewListing] = useState<Listing | null>(null);
   const [selectedSeller, setSelectedSeller] = useState<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
+  const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
+  const { profile } = useUser();
 
   // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {
@@ -89,50 +91,51 @@ const AYNMarketplace = () => {
     }
   }, []);
 
-  // Завантажуємо оголошення з API з кешуванням
-  useEffect(() => {
-    const fetchListings = async () => {
-      try {
-        setLoading(true);
+  // Функція завантаження оголошень
+  const fetchListings = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Перевіряємо кеш
+      const cacheKey = 'listings:0:16';
+      const cached = getCachedData(cacheKey);
+      if (cached) {
+        setListings(cached.listings || []);
+        setTotalListings(cached.total || 0);
+        setHasMore((cached.listings?.length || 0) < (cached.total || 0));
+        setListingsOffset(16);
+        setLoading(false);
+        return;
+      }
+      
+      const response = await fetch('/api/listings?limit=16&offset=0');
+      if (response.ok) {
+        const data = await response.json();
+        setListings(data.listings || []);
+        setTotalListings(data.total || 0);
+        setHasMore((data.listings?.length || 0) < (data.total || 0));
+        setListingsOffset(16);
         
-        // Перевіряємо кеш
-        const cacheKey = 'listings:0:16';
-        const cached = getCachedData(cacheKey);
-        if (cached) {
-          setListings(cached.listings || []);
-          setTotalListings(cached.total || 0);
-          setHasMore((cached.listings?.length || 0) < (cached.total || 0));
-          setListingsOffset(16);
-          setLoading(false);
-          return;
-        }
-        
-        const response = await fetch('/api/listings?limit=16&offset=0');
-        if (response.ok) {
-          const data = await response.json();
-          setListings(data.listings || []);
-          setTotalListings(data.total || 0);
-          setHasMore((data.listings?.length || 0) < (data.total || 0));
-          setListingsOffset(16);
-          
-          // Зберігаємо в кеш
-          setCachedData(cacheKey, data);
-        } else {
-          console.error('Failed to fetch listings:', response.status);
-          setListings([]);
-          showToast('Помилка завантаження товарів', 'error');
-        }
-      } catch (error) {
-        console.error('Error fetching listings:', error);
+        // Зберігаємо в кеш
+        setCachedData(cacheKey, data);
+      } else {
+        console.error('Failed to fetch listings:', response.status);
         setListings([]);
         showToast('Помилка завантаження товарів', 'error');
-      } finally {
-        setLoading(false);
       }
-    };
-
-    fetchListings();
+    } catch (error) {
+      console.error('Error fetching listings:', error);
+      setListings([]);
+      showToast('Помилка завантаження товарів', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, [showToast]);
+
+  // Завантажуємо оголошення з API з кешуванням
+  useEffect(() => {
+    fetchListings();
+  }, [fetchListings]);
 
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -302,7 +305,7 @@ const AYNMarketplace = () => {
             favorites={favorites}
             onSelectListing={setSelectedListing}
             onToggleFavorite={toggleFavorite}
-            onPreviewListing={setPreviewListing}
+            onCreateListing={() => setIsCreateListingModalOpen(true)}
             hasMore={hasMore}
             onLoadMore={loadMoreListings}
             tg={tg}
@@ -317,7 +320,6 @@ const AYNMarketplace = () => {
             favorites={favorites}
             onSelectListing={setSelectedListing}
             onToggleFavorite={toggleFavorite}
-            onPreviewListing={setPreviewListing}
             tg={tg}
           />
         );
@@ -329,7 +331,6 @@ const AYNMarketplace = () => {
             favorites={favorites}
             onSelectListing={setSelectedListing}
             onToggleFavorite={toggleFavorite}
-            onPreviewListing={setPreviewListing}
             onNavigateToCatalog={() => setActiveTab('bazaar')}
             tg={tg}
           />
@@ -359,6 +360,47 @@ const AYNMarketplace = () => {
         }}
         tg={tg}
       />
+
+      {/* Модальне вікно створення оголошення */}
+      {profile && (
+        <CreateListingModal
+          isOpen={isCreateListingModalOpen}
+          onClose={() => setIsCreateListingModalOpen(false)}
+          onSave={async (listingData) => {
+            const formData = new FormData();
+            formData.append('title', listingData.title);
+            formData.append('description', listingData.description);
+            formData.append('price', listingData.price);
+            formData.append('isFree', listingData.isFree.toString());
+            formData.append('category', listingData.category);
+            if (listingData.subcategory) {
+              formData.append('subcategory', listingData.subcategory);
+            }
+            formData.append('location', listingData.location);
+            formData.append('condition', listingData.condition);
+            formData.append('telegramId', profile.telegramId);
+            
+            listingData.images.forEach((image: File) => {
+              formData.append('images', image);
+            });
+
+            const response = await fetch('/api/listings/create', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to create listing');
+            }
+
+            // Оновлюємо список оголошень
+            await fetchListings();
+            setIsCreateListingModalOpen(false);
+            showToast('Оголошення успішно створено!', 'success');
+          }}
+          tg={tg}
+        />
+      )}
 
       {/* Toast сповіщення */}
       <Toast

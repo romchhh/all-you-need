@@ -12,7 +12,6 @@ interface CategoriesTabProps {
   favorites: Set<number>;
   onSelectListing: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
-  onPreviewListing?: (listing: Listing) => void;
   tg: TelegramWebApp | null;
 }
 
@@ -22,7 +21,6 @@ export const CategoriesTab = ({
   favorites,
   onSelectListing,
   onToggleFavorite,
-  onPreviewListing,
   tg
 }: CategoriesTabProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -170,7 +168,6 @@ export const CategoriesTab = ({
                 isFavorite={favorites.has(listing.id)}
                 onSelect={onSelectListing}
                 onToggleFavorite={onToggleFavorite}
-                onPreview={onPreviewListing}
                 tg={tg}
               />
             ))}

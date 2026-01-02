@@ -8,7 +8,6 @@ interface FavoritesTabProps {
   favorites: Set<number>;
   onSelectListing: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
-  onPreviewListing?: (listing: Listing) => void;
   onNavigateToCatalog?: () => void;
   tg: TelegramWebApp | null;
 }
@@ -18,7 +17,6 @@ export const FavoritesTab = ({
   favorites,
   onSelectListing,
   onToggleFavorite,
-  onPreviewListing,
   onNavigateToCatalog,
   tg
 }: FavoritesTabProps) => {
@@ -64,7 +62,6 @@ export const FavoritesTab = ({
               isFavorite={favorites.has(listing.id)}
               onSelect={onSelectListing}
               onToggleFavorite={onToggleFavorite}
-              onPreview={onPreviewListing}
               tg={tg}
             />
           ))}
