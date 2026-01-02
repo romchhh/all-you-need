@@ -3,6 +3,7 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
 import { ListingCard } from './ListingCard';
+import { getAvatarColor } from '@/utils/avatarColors';
 import { useState, useEffect } from 'react';
 
 interface ListingDetailProps {
@@ -231,7 +232,7 @@ export const ListingDetail = ({
                   decoding="async"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-xl font-bold">
+                <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(listing.seller.name)} text-white text-xl font-bold`}>
                   {listing.seller.name.charAt(0).toUpperCase()}
                 </div>
               )}

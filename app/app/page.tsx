@@ -336,7 +336,7 @@ const AYNMarketplace = () => {
         );
 
       case 'profile':
-        return <ProfileTab tg={tg} />;
+        return <ProfileTab tg={tg} onSelectListing={setSelectedListing} />;
 
       default:
         return null;

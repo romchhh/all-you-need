@@ -177,6 +177,7 @@ export const EditListingModal = ({
         subcategory: subcategory || null,
         condition: condition || null,
         location,
+        status: status || 'active',
         images,
         imagePreviews,
       });
@@ -205,28 +206,40 @@ export const EditListingModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative animate-slide-up">
+      <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto relative animate-slide-up">
         {/* Хедер */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-          <h2 className="text-2xl font-bold text-gray-900">Редагувати оголошення</h2>
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10">
+          <h2 className="text-lg font-bold text-gray-900">Редагувати оголошення</h2>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
+            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-4">
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Фото * {imagePreviews.length}/10
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {imagePreviews.map((preview, index) => (
                 <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
-                  <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                  <img 
+                    src={typeof preview === 'string' && preview.startsWith('http') ? preview : typeof preview === 'string' && preview.startsWith('/') ? preview : typeof preview === 'string' ? `/${preview}` : preview} 
+                    alt={`Preview ${index + 1}`} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400 text-xs">Помилка</div>';
+                      }
+                    }}
+                  />
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
@@ -351,12 +364,12 @@ export const EditListingModal = ({
                     if (errors.category) setErrors(prev => ({ ...prev, category: '' }));
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className={`px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                    category === cat.id
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : errors.category
-                      ? 'border-red-300 bg-white text-gray-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                className={`px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
+                  category === cat.id
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : errors.category
+                    ? 'border-red-300 bg-white text-gray-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -384,7 +397,7 @@ export const EditListingModal = ({
                     setSubcategory('');
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                  className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
                     !subcategory
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
@@ -516,41 +529,78 @@ export const EditListingModal = ({
 
           {/* Статус */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               Статус
             </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="active">Активне</option>
-              <option value="sold">Продано</option>
-              <option value="hidden">Приховано</option>
-            </select>
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('active');
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={`px-3 py-2.5 rounded-xl border-2 transition-all text-sm font-medium ${
+                  status === 'active'
+                    ? 'border-green-500 bg-green-50 text-green-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                ✅ Активне
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Ви впевнені, що хочете позначити це оголошення як продане?')) {
+                    setStatus('sold');
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }
+                }}
+                className={`px-3 py-2.5 rounded-xl border-2 transition-all text-sm font-medium ${
+                  status === 'sold'
+                    ? 'border-gray-500 bg-gray-50 text-gray-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                🏷️ Продано
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('hidden');
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={`px-3 py-2.5 rounded-xl border-2 transition-all text-sm font-medium ${
+                  status === 'hidden'
+                    ? 'border-orange-500 bg-orange-50 text-orange-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                👁️ Приховано
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Кнопки */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex gap-3">
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex gap-2">
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={loading}
-            className="px-4 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-3 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <Trash2 size={18} />
+            <Trash2 size={16} />
             Видалити
           </button>
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
           >
             Скасувати
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Збереження...' : 'Зберегти'}
           </button>

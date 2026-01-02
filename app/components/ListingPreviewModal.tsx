@@ -2,6 +2,7 @@ import { X, Heart, MapPin, Eye } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
+import { getAvatarColor } from '@/utils/avatarColors';
 
 interface ListingPreviewModalProps {
   isOpen: boolean;
@@ -103,7 +104,7 @@ export const ListingPreviewModal = ({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-xs font-bold">
+                <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-xs font-bold`}>
                   {sellerName.charAt(0).toUpperCase()}
                 </div>
               )}

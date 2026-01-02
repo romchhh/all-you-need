@@ -3,6 +3,7 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState } from 'react';
 import { useLongPress } from '@/hooks/useLongPress';
+import { getAvatarColor } from '@/utils/avatarColors';
 
 interface ListingCardProps {
   listing: Listing;
@@ -59,7 +60,7 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, o
           </div>
         ) : (
           <img 
-            src={listing.image} 
+            src={listing.image?.startsWith('http') ? listing.image : listing.image?.startsWith('/') ? listing.image : `/${listing.image}`} 
             alt={listing.title}
             className={`w-full h-full object-cover transition-opacity duration-300 ${
               imageLoading ? 'opacity-0' : 'opacity-100'
@@ -67,11 +68,11 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, o
             loading="lazy"
             decoding="async"
             sizes="(max-width: 768px) 50vw, 33vw"
-            srcSet={`${listing.image}?w=400 400w, ${listing.image}?w=800 800w`}
             onLoad={() => setImageLoading(false)}
-            onError={() => {
+            onError={(e) => {
               setImageLoading(false);
               setImageError(true);
+              console.error('Error loading listing image:', listing.image);
             }}
           />
         )}
@@ -132,12 +133,12 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, o
                     }
                   }}
                 />
-                <div className="hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-xs font-bold relative z-10">
+                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-xs font-bold relative z-10`}>
                   {sellerName.charAt(0).toUpperCase()}
                 </div>
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-xs font-bold">
+              <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-xs font-bold`}>
                 {sellerName.charAt(0).toUpperCase()}
               </div>
             )}

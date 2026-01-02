@@ -4,6 +4,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { ListingCard } from './ListingCard';
 import { ImageViewModal } from './ImageViewModal';
 import { useLongPress } from '@/hooks/useLongPress';
+import { getAvatarColor } from '@/utils/avatarColors';
 import { useState, useEffect } from 'react';
 
 interface UserProfilePageProps {
@@ -178,12 +179,12 @@ export const UserProfilePage = ({
                     }
                   }}
                 />
-                <div className="hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-2xl font-bold relative z-10">
+                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-2xl font-bold relative z-10`}>
                   {sellerName.charAt(0).toUpperCase()}
                 </div>
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-2xl font-bold">
+              <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-2xl font-bold`}>
                 {sellerName.charAt(0).toUpperCase()}
               </div>
             )}

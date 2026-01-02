@@ -1,5 +1,6 @@
 import { X, Upload, User } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
+import { getAvatarColor } from '@/utils/avatarColors';
 import { useState } from 'react';
 
 interface EditProfileModalProps {
@@ -82,7 +83,7 @@ export const EditProfileModal = ({
                 decoding="async"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-3xl font-bold">
+              <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(`${firstName || ''} ${lastName || ''}`.trim() || 'User')} text-white text-3xl font-bold`}>
                 {(firstName || lastName) ? (firstName.charAt(0) + (lastName?.charAt(0) || '')).toUpperCase() : 'U'}
               </div>
             )}

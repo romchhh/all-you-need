@@ -52,7 +52,7 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
         </div>
       ) : (
         <img 
-          src={images[currentIndex]} 
+          src={images[currentIndex]?.startsWith('http') ? images[currentIndex] : images[currentIndex]?.startsWith('/') ? images[currentIndex] : `/${images[currentIndex]}`} 
           alt={`${title} - фото ${currentIndex + 1}`}
           className={`w-full h-full object-cover transition-opacity duration-300 ${
             imageLoading ? 'opacity-0' : 'opacity-100'
@@ -60,11 +60,11 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
           loading={currentIndex === 0 ? 'eager' : 'lazy'}
           decoding="async"
           sizes="100vw"
-          srcSet={`${images[currentIndex]}?w=800 800w, ${images[currentIndex]}?w=1200 1200w`}
           onLoad={() => setImageLoading(false)}
-          onError={() => {
+          onError={(e) => {
             setImageLoading(false);
             setImageError(true);
+            console.error('Error loading image:', images[currentIndex]);
           }}
         />
       )}

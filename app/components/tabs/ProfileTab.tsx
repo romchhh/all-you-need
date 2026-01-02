@@ -11,12 +11,14 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from '../Toast';
 import { useLongPress } from '@/hooks/useLongPress';
+import { getAvatarColor } from '@/utils/avatarColors';
 
 interface ProfileTabProps {
   tg: TelegramWebApp | null;
+  onSelectListing?: (listing: Listing) => void;
 }
 
-export const ProfileTab = ({ tg }: ProfileTabProps) => {
+export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
   const { profile, loading, refetch } = useUser();
   const [userListings, setUserListings] = useState<Listing[]>([]);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
@@ -175,12 +177,12 @@ export const ProfileTab = ({ tg }: ProfileTabProps) => {
                     }
                   }}
                 />
-                <div className="hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-2xl font-bold relative z-10">
+                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(displayName)} text-white text-2xl font-bold relative z-10`}>
                   {displayName.charAt(0).toUpperCase()}
                 </div>
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 text-white text-2xl font-bold">
+              <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(displayName)} text-white text-2xl font-bold`}>
                 {displayName.charAt(0).toUpperCase()}
               </div>
             )}
@@ -265,7 +267,18 @@ export const ProfileTab = ({ tg }: ProfileTabProps) => {
                     listing={listing}
                     isFavorite={favorites.has(listing.id)}
                     isSold={isSold}
-                    onSelect={() => {}}
+                    onSelect={(selectedListing) => {
+                      if (onSelectListing) {
+                        // Завантажуємо повну інформацію про товар
+                        fetch(`/api/listings/${selectedListing.id}`)
+                          .then(res => res.json())
+                          .then(data => {
+                            const fullListing = { ...selectedListing, ...data };
+                            onSelectListing(fullListing);
+                          })
+                          .catch(err => console.error('Error loading listing:', err));
+                      }
+                    }}
                     onToggleFavorite={(id) => {
                       setFavorites(prev => {
                         const newFavs = new Set(prev);
@@ -284,6 +297,10 @@ export const ProfileTab = ({ tg }: ProfileTabProps) => {
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
+                          // Підтвердження перед зміною статусу
+                          if (!window.confirm('Ви впевнені, що хочете позначити це оголошення як продане?')) {
+                            return;
+                          }
                           try {
                             const formData = new FormData();
                             formData.append('title', listing.title);
@@ -305,7 +322,7 @@ export const ProfileTab = ({ tg }: ProfileTabProps) => {
                             });
 
                             if (response.ok) {
-                              showToast('Оголошення позначено як продано', 'success');
+                              showToast('Оголошення позначено як продане', 'success');
                               // Оновлюємо список
                               const data = await fetch(`/api/listings?userId=${profile.telegramId}`);
                               const listingsData = await data.json();
@@ -532,19 +549,8 @@ export const ProfileTab = ({ tg }: ProfileTabProps) => {
                 {viewHistory.map((view, index) => (
                   <div key={index} className="p-3 bg-gray-50 rounded-lg">
                     <div className="text-sm font-medium text-gray-900">
-                      {new Date(view.viewedAt).toLocaleString('uk-UA', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      Перегляд #{index + 1}
                     </div>
-                    {view.userAgent && (
-                      <div className="text-xs text-gray-500 mt-1 truncate">
-                        {view.userAgent}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
