@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, Copy } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -34,8 +34,6 @@ export const ListingDetail = ({
   const [categoryListings, setCategoryListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [views, setViews] = useState(listing.views);
-  const [showPhoneModal, setShowPhoneModal] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [sellerHasMore, setSellerHasMore] = useState(false);
   const [categoryHasMore, setCategoryHasMore] = useState(false);
   const [sellerOffset, setSellerOffset] = useState(0);
@@ -348,65 +346,6 @@ export const ListingDetail = ({
         )}
       </div>
 
-      {/* Модальне вікно для номера телефону */}
-      {showPhoneModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowPhoneModal(false)}>
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 animate-slide-up shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Номер телефону</h3>
-              <button
-                onClick={() => {
-                  setShowPhoneModal(false);
-                  setCopied(false);
-                }}
-                className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-              >
-                <X size={20} className="text-gray-900" />
-              </button>
-            </div>
-            <div className="mb-6">
-              <p className="text-2xl font-semibold text-gray-900 text-center mb-6">
-                {sellerPhone || listing.seller.phone}
-              </p>
-              {copied && (
-                <div className="mb-4 text-center">
-                  <p className="text-green-600 font-semibold">Скопійовано!</p>
-                </div>
-              )}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    const phone = sellerPhone || listing.seller.phone;
-                    if (phone) {
-                      window.location.href = `tel:${phone}`;
-                    }
-                    tg?.HapticFeedback.impactOccurred('medium');
-                  }}
-                  className="flex-1 bg-gray-100 text-blue-600 py-4 rounded-2xl font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 cursor-pointer border border-gray-200"
-                >
-                  <Phone size={20} />
-                  Подзвонити
-                </button>
-                <button
-                  onClick={() => {
-                    const phone = sellerPhone || listing.seller.phone;
-                    if (phone && navigator.clipboard) {
-                      navigator.clipboard.writeText(phone);
-                      setCopied(true);
-                      tg?.HapticFeedback.impactOccurred('medium');
-                      setTimeout(() => setCopied(false), 2000);
-                    }
-                  }}
-                  className="flex-1 bg-[#6366F1] text-white py-4 rounded-full font-semibold hover:bg-[#4F46E5] transition-colors flex items-center justify-center gap-2 shadow-md"
-                >
-                  <Copy size={20} />
-                  Скопіювати
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Нижня панель з кнопкою */}
       <div className="fixed bottom-20 left-0 right-0 p-4 z-[60] max-w-2xl mx-auto" style={{ pointerEvents: 'auto' }}>
