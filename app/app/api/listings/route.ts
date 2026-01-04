@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const isFree = searchParams.get('isFree') === 'true';
     const search = searchParams.get('search');
     const userId = searchParams.get('userId');
+    const viewerId = searchParams.get('viewerId'); // ID користувача, який переглядає профіль
     const sortBy = searchParams.get('sortBy') || 'newest';
     const limit = parseInt(searchParams.get('limit') || '16');
     const offset = parseInt(searchParams.get('offset') || '0');
@@ -88,9 +89,17 @@ export async function GET(request: NextRequest) {
     let total = 0;
 
     if (userId) {
+      // Визначаємо, чи це власний профіль (viewerId === userId)
+      const isOwnProfile = viewerId && parseInt(viewerId) === parseInt(userId);
+      
       // Для користувача використовуємо raw query з даними про продавця
-      const userListings = await prisma.$queryRawUnsafe(
-        `SELECT 
+      // Якщо це не власний профіль, виключаємо продані оголошення
+      let whereClause = "WHERE CAST(u.telegramId AS INTEGER) = ?";
+      if (!isOwnProfile) {
+        whereClause += " AND l.status != 'sold'";
+      }
+      
+      const query = `SELECT 
           l.id,
           l.userId,
           l.title,
@@ -114,9 +123,12 @@ export async function GET(request: NextRequest) {
           CAST(u.telegramId AS INTEGER) as sellerTelegramId
         FROM Listing l
         JOIN User u ON l.userId = u.id
-        WHERE CAST(u.telegramId AS INTEGER) = ?
+        ${whereClause}
         ORDER BY l.createdAt DESC
-        LIMIT ? OFFSET ?`,
+        LIMIT ? OFFSET ?`;
+      
+      const userListings = await prisma.$queryRawUnsafe(
+        query,
         parseInt(userId),
         limit,
         offset
@@ -144,11 +156,13 @@ export async function GET(request: NextRequest) {
         sellerTelegramId: number;
       }>;
 
-      const totalCount = await prisma.$queryRawUnsafe(
-        `SELECT COUNT(*) as count
+      const countQuery = `SELECT COUNT(*) as count
         FROM Listing l
         JOIN User u ON l.userId = u.id
-        WHERE CAST(u.telegramId AS INTEGER) = ?`,
+        ${whereClause}`;
+      
+      const totalCount = await prisma.$queryRawUnsafe(
+        countQuery,
         parseInt(userId)
       ) as Array<{ count: bigint }>;
 

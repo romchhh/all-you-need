@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, Edit2, Trash2, Check, X } from 'lucide-react';
+import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2 } from 'lucide-react';
 import { ImageViewModal } from '../ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
 import { useUser } from '@/hooks/useUser';
@@ -6,12 +6,15 @@ import { ListingCard } from '../ListingCard';
 import { EditProfileModal } from '../EditProfileModal';
 import { CreateListingModal } from '../CreateListingModal';
 import { EditListingModal } from '../EditListingModal';
+import { ShareModal } from '../ShareModal';
 import { Listing } from '@/types';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from '../Toast';
 import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
+import { getBotBaseUrl, getBotStartLink } from '@/utils/botLinks';
+import { getProfileShareLink } from '@/utils/botLinks';
 
 interface ProfileTabProps {
   tg: TelegramWebApp | null;
@@ -26,6 +29,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
   const avatarLongPress = useLongPress({
@@ -109,11 +113,10 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
   }
 
   if (!profile) {
-    const botUrl = process.env.NEXT_PUBLIC_BOT_URL || 'https://t.me/your_bot';
     // Якщо є telegramId в URL, використовуємо його для створення профілю
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const telegramId = urlParams?.get('telegramId');
-    const botLink = telegramId ? `${botUrl}?start=${telegramId}` : botUrl;
+    const botLink = telegramId ? getBotStartLink(telegramId) : getBotBaseUrl();
     return (
       <div className="pb-24 flex items-center justify-center min-h-screen bg-white">
         <div className="text-center px-4">
@@ -219,20 +222,12 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
             </button>
             <button
               onClick={() => {
-                if (tg) {
-                  const profileUrl = `${window.location.origin}?profile=${profile.telegramId}`;
-                  const shareText = `👤 Профіль ${displayName}${displayUsername ? ` (@${displayUsername})` : ''} в AYN Marketplace\n\n${profileUrl}`;
-                  tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(profileUrl)}&text=${encodeURIComponent(shareText)}`);
-                  tg.HapticFeedback.impactOccurred('light');
-                }
+                setShowShareModal(true);
+                tg?.HapticFeedback.impactOccurred('light');
               }}
               className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                <polyline points="16 6 12 2 8 6" />
-                <line x1="12" y1="2" x2="12" y2="15" />
-              </svg>
+              <Share2 size={20} />
             </button>
           </div>
         </div>
@@ -523,6 +518,17 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
+
+      {/* Модальне вікно поділу */}
+      {profile && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          shareLink={getProfileShareLink(profile.telegramId)}
+          shareText={`👤 Профіль ${displayName}${displayUsername ? ` (@${displayUsername})` : ''} в AYN Marketplace`}
+          tg={tg}
+        />
+      )}
     </div>
   );
 };

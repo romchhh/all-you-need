@@ -3,7 +3,10 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
 import { ListingCard } from './ListingCard';
+import { ShareModal } from './ShareModal';
 import { getAvatarColor } from '@/utils/avatarColors';
+import { getListingShareLink } from '@/utils/botLinks';
+import { useTelegram } from '@/hooks/useTelegram';
 import { useState, useEffect } from 'react';
 
 interface ListingDetailProps {
@@ -40,6 +43,8 @@ export const ListingDetail = ({
   const [categoryOffset, setCategoryOffset] = useState(0);
   const [sellerTotal, setSellerTotal] = useState(0);
   const [categoryTotal, setCategoryTotal] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const { user: currentUser } = useTelegram();
 
   // Скролимо нагору при відкритті нового оголошення
   useEffect(() => {
@@ -72,9 +77,10 @@ export const ListingDetail = ({
     const fetchRelatedListings = async () => {
       try {
         setLoading(true);
-        // Завантажуємо оголошення продавця
+        // Завантажуємо оголошення продавця (передаємо viewerId, щоб приховати продані для інших користувачів)
         if (listing.seller.telegramId) {
-          const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&limit=16&offset=0`);
+          const viewerId = currentUser?.id?.toString() || '';
+          const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&limit=16&offset=0`);
           if (sellerResponse.ok) {
             const sellerData = await sellerResponse.json();
             const filtered = (sellerData.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -167,12 +173,8 @@ export const ListingDetail = ({
           </button>
           <button 
             onClick={() => {
-              if (tg) {
-                const botUrl = process.env.NEXT_PUBLIC_BOT_URL || 'https://t.me/your_bot';
-                const shareLink = `${botUrl}?start=listing_${listing.id}`;
-                tg.openTelegramLink(shareLink);
-                tg.HapticFeedback.impactOccurred('light');
-              }
+              setShowShareModal(true);
+              tg?.HapticFeedback.impactOccurred('light');
             }}
             className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
           >
@@ -395,6 +397,15 @@ export const ListingDetail = ({
           </button>
         </div>
       </div>
+
+      {/* Модальне вікно поділу */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        shareLink={getListingShareLink(listing.id)}
+        shareText={`📦 ${listing.title} - ${listing.price} в AYN Marketplace`}
+        tg={tg}
+      />
     </div>
   );
 };

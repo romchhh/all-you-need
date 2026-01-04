@@ -1,4 +1,4 @@
-import { Search, X, Gift, Clock, MapPin, Bell } from 'lucide-react';
+import { Search, X, Gift, Clock, MapPin } from 'lucide-react';
 import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '../CategoryChip';
@@ -245,7 +245,7 @@ export const BazaarTab = ({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder={selectedCity ? `Suchen in ${selectedCity}` : "Suchen in Hamburg"}
+              placeholder={selectedCity ? `Пошук в ${selectedCity}...` : "Введіть що вас цікавить..."}
               value={searchQuery}
               onChange={(e) => {
                 onSearchChange(e.target.value);
@@ -307,12 +307,6 @@ export const BazaarTab = ({
             }`}
           >
             <MapPin size={18} className={selectedCity ? 'text-green-500' : 'text-gray-400'} />
-          </button>
-          <button
-            className="px-3 py-3 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors relative"
-          >
-            <Bell size={18} />
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">1</span>
           </button>
         </div>
       </div>

@@ -18,8 +18,28 @@ export const useTelegram = () => {
     if (window.Telegram?.WebApp) {
       const telegram = window.Telegram.WebApp;
       telegram.ready();
+      
+      // Розгортаємо на весь екран
       telegram.expand();
+      
+      // Приховуємо основну кнопку
       telegram.MainButton.hide();
+      
+      // Налаштування для повноекранного режиму
+      if (telegram.enableClosingConfirmation) {
+        telegram.enableClosingConfirmation();
+      }
+      
+      // Встановлюємо колір фону (опціонально)
+      if (telegram.backgroundColor) {
+        telegram.backgroundColor = '#ffffff';
+      }
+      
+      // Встановлюємо колір хедера (опціонально)
+      if (telegram.headerColor) {
+        telegram.headerColor = '#ffffff';
+      }
+      
       setTg(telegram);
 
       // Отримуємо дані користувача з initDataUnsafe

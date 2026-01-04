@@ -66,7 +66,7 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
             tg?.HapticFeedback.impactOccurred('medium');
           }
         }}
-        className="flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all text-orange-500 hover:text-orange-600"
+        className="flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all text-gray-400 hover:text-gray-600"
       >
         <div className="transition-transform">
           <Plus size={24} strokeWidth={2} />

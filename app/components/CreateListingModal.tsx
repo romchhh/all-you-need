@@ -490,7 +490,7 @@ export const CreateListingModal = ({
                   if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
                 }}
                 onFocus={() => setIsLocationOpen(true)}
-                placeholder="Suchen in Hamburg"
+                placeholder="Введіть що вас цікавить..."
                 className={`w-full px-4 py-3 pl-10 pr-10 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                   errors.location ? 'border-red-300' : 'border-gray-200'
                 } focus:outline-none focus:ring-2 focus:ring-blue-500`}
