@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, Phone, User, Eye, MapPin, Clock, X, Copy } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, Copy } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -408,26 +408,9 @@ export const ListingDetail = ({
         </div>
       )}
 
-      {/* Нижня панель з кнопками */}
+      {/* Нижня панель з кнопкою */}
       <div className="fixed bottom-20 left-0 right-0 p-4 z-[60] max-w-2xl mx-auto" style={{ pointerEvents: 'auto' }}>
-        <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-4 flex gap-3">
-          <button 
-            type="button"
-            onClick={() => {
-              const phone = sellerPhone || listing.seller.phone;
-              if (phone) {
-                setShowPhoneModal(true);
-                tg?.HapticFeedback.impactOccurred('medium');
-              } else {
-                tg?.showAlert('Номер телефону не вказано');
-                tg?.HapticFeedback.impactOccurred('medium');
-              }
-            }}
-            className="flex-1 bg-gray-100 text-blue-600 py-4 rounded-2xl font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 cursor-pointer border border-gray-200"
-          >
-            <Phone size={20} />
-            Зателефонувати
-          </button>
+        <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-4">
           <button 
             type="button"
             onClick={(e) => {
@@ -466,7 +449,7 @@ export const ListingDetail = ({
                 window.location.href = link;
               }
             }}
-            className="flex-1 bg-blue-500 text-white py-4 rounded-2xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-blue-500 text-white py-4 rounded-2xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <MessageCircle size={20} />
             Написати

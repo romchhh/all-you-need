@@ -1,14 +1,15 @@
 import { TelegramWebApp } from '@/types/telegram';
-import { Store, Grid3x3, Heart, User } from 'lucide-react';
+import { Store, Grid3x3, Heart, User, Plus } from 'lucide-react';
 
 interface BottomNavigationProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   onCloseDetail?: () => void;
+  onCreateListing?: () => void;
   tg: TelegramWebApp | null;
 }
 
-export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, tg }: BottomNavigationProps) => {
+export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCreateListing, tg }: BottomNavigationProps) => {
   const handleTabChange = (tab: string) => {
     // Закриваємо деталі товару/профілю при зміні вкладки
     if (onCloseDetail) {
@@ -25,8 +26,8 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, tg }: 
       <div className="max-w-2xl mx-auto h-full bg-gradient-to-t from-white via-white/60 to-transparent"></div>
     </div>
     
-    <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-gray-200/50 safe-area-bottom shadow-lg z-50">
-      <div className="max-w-2xl mx-auto flex justify-around items-center px-2 py-1">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-gray-200/50 safe-area-bottom shadow-lg z-50 pb-4">
+      <div className="max-w-2xl mx-auto flex justify-around items-center px-2 py-2">
       {/* Каталог */}
       <button
         onClick={() => handleTabChange('bazaar')}
@@ -55,6 +56,22 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, tg }: 
           <Grid3x3 size={24} strokeWidth={activeTab === 'categories' ? 2.5 : 2} />
         </div>
         <span className="text-xs font-medium">Розділи</span>
+      </button>
+
+      {/* Додати оголошення */}
+      <button
+        onClick={() => {
+          if (onCreateListing) {
+            onCreateListing();
+            tg?.HapticFeedback.impactOccurred('medium');
+          }
+        }}
+        className="flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all text-orange-500 hover:text-orange-600"
+      >
+        <div className="transition-transform">
+          <Plus size={24} strokeWidth={2} />
+        </div>
+        <span className="text-xs font-medium">Додати</span>
       </button>
 
       {/* Обране */}

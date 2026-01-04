@@ -358,6 +358,7 @@ const AYNMarketplace = () => {
           setSelectedListing(null);
           setSelectedSeller(null);
         }}
+        onCreateListing={() => setIsCreateListingModalOpen(true)}
         tg={tg}
       />
 

@@ -1,8 +1,9 @@
 import { X, Upload, Image as ImageIcon, ChevronDown, MapPin } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category } from '@/types';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { categories } from '@/constants/categories';
+import { germanCities } from '@/constants/german-cities';
 import { ukrainianCities } from '@/constants/ukrainian-cities';
 
 interface CreateListingModalProps {
@@ -47,12 +48,19 @@ export const CreateListingModal = ({
 
   const selectedCondition = conditionOptions.find(opt => opt.value === condition);
 
+  // Об'єднуємо німецькі та українські міста
+  const allCities = useMemo(() => {
+    const combined = [...germanCities, ...ukrainianCities];
+    // Видаляємо дублікати та сортуємо
+    return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
+  }, []);
+
   // Фільтруємо міста за запитом
   const filteredCities = locationQuery
-    ? ukrainianCities.filter(city =>
+    ? allCities.filter(city =>
         city.toLowerCase().includes(locationQuery.toLowerCase())
       ).slice(0, 10)
-    : ukrainianCities.slice(0, 10);
+    : allCities.slice(0, 10);
 
   // Закриваємо dropdown при кліку поза ним
   useEffect(() => {
@@ -482,15 +490,29 @@ export const CreateListingModal = ({
                   if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
                 }}
                 onFocus={() => setIsLocationOpen(true)}
-                placeholder="Оберіть або введіть місто"
-                className={`w-full px-4 py-3 pl-10 bg-gray-50 rounded-xl border ${
+                placeholder="Suchen in Hamburg"
+                className={`w-full px-4 py-3 pl-10 pr-10 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                   errors.location ? 'border-red-300' : 'border-gray-200'
                 } focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
               <MapPin 
                 size={18} 
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500"
               />
+              {location && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocation('');
+                    setLocationQuery('');
+                    setIsLocationOpen(false);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors"
+                >
+                  <X size={14} className="text-gray-900" />
+                </button>
+              )}
             </div>
             
             {isLocationOpen && filteredCities.length > 0 && (
@@ -505,9 +527,9 @@ export const CreateListingModal = ({
                       setIsLocationOpen(false);
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 border-b border-gray-100 last:border-b-0"
                   >
-                    <MapPin size={16} className="text-gray-400" />
+                    <MapPin size={16} className="text-green-500" />
                     <span>{city}</span>
                   </button>
                 ))}

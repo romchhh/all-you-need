@@ -1,4 +1,4 @@
-import { ArrowLeft, Package, MessageCircle, Phone, Share2, X, Copy } from 'lucide-react';
+import { ArrowLeft, Package, MessageCircle, Share2, X, Copy } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ListingCard } from './ListingCard';
@@ -35,8 +35,6 @@ export const UserProfilePage = ({
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<{ username: string | null; phone: string | null } | null>(null);
-  const [showPhoneModal, setShowPhoneModal] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [listingsOffset, setListingsOffset] = useState(0);
   const [totalListings, setTotalListings] = useState(0);
@@ -230,25 +228,8 @@ export const UserProfilePage = ({
           )}
         </div>
 
-        {/* Кнопки дій */}
-        <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-4 flex gap-3 mb-6">
-          <button 
-            type="button"
-            onClick={() => {
-              const phone = userData?.phone || sellerPhone;
-              if (phone) {
-                setShowPhoneModal(true);
-                tg?.HapticFeedback.impactOccurred('medium');
-              } else {
-                tg?.showAlert('Номер телефону не вказано');
-                tg?.HapticFeedback.impactOccurred('medium');
-              }
-            }}
-            className="flex-1 bg-gray-100 text-blue-600 py-3 rounded-xl font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 cursor-pointer border border-gray-200"
-          >
-            <Phone size={20} />
-            Зателефонувати
-          </button>
+        {/* Кнопка дії */}
+        <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-4 mb-6">
           <button 
             type="button"
             onClick={(e) => {
@@ -286,7 +267,7 @@ export const UserProfilePage = ({
                 window.location.href = link;
               }
             }}
-            className="flex-1 bg-blue-500 text-white py-3 rounded-xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <MessageCircle size={20} />
             Написати
@@ -332,69 +313,6 @@ export const UserProfilePage = ({
           )}
         </div>
       </div>
-
-      {/* Модальне вікно для номера телефону */}
-      {showPhoneModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => {
-          setShowPhoneModal(false);
-          setCopied(false);
-        }}>
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 animate-slide-up shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Номер телефону</h3>
-              <button
-                onClick={() => {
-                  setShowPhoneModal(false);
-                  setCopied(false);
-                }}
-                className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-              >
-                <X size={20} className="text-gray-900" />
-              </button>
-            </div>
-            <div className="mb-6">
-              <p className="text-2xl font-semibold text-gray-900 text-center mb-6">
-                {userData?.phone || sellerPhone}
-              </p>
-              {copied && (
-                <div className="mb-4 text-center">
-                  <p className="text-green-600 font-semibold">Скопійовано!</p>
-                </div>
-              )}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    const phone = userData?.phone || sellerPhone;
-                    if (phone) {
-                      window.location.href = `tel:${phone}`;
-                    }
-                    tg?.HapticFeedback.impactOccurred('medium');
-                  }}
-                  className="flex-1 bg-gray-100 text-blue-600 py-4 rounded-2xl font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 cursor-pointer border border-gray-200"
-                >
-                  <Phone size={20} />
-                  Подзвонити
-                </button>
-                <button
-                  onClick={() => {
-                    const phone = userData?.phone || sellerPhone;
-                    if (phone && navigator.clipboard) {
-                      navigator.clipboard.writeText(phone);
-                      setCopied(true);
-                      tg?.HapticFeedback.impactOccurred('medium');
-                      setTimeout(() => setCopied(false), 2000);
-                    }
-                  }}
-                  className="flex-1 bg-[#6366F1] text-white py-4 rounded-full font-semibold hover:bg-[#4F46E5] transition-colors flex items-center justify-center gap-2 shadow-md"
-                >
-                  <Copy size={20} />
-                  Скопіювати
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Модальне вікно для перегляду аватара */}
       {sellerAvatar && (sellerAvatar.startsWith('/') || sellerAvatar.startsWith('http')) && (
