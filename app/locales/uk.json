@@ -19,7 +19,8 @@
     "clear": "Очистити",
     "user": "Користувач",
     "currency": "Валюта",
-    "selectCurrency": "Оберіть валюту"
+    "selectCurrency": "Оберіть валюту",
+    "free": "Безкоштовно"
   },
   "navigation": {
     "bazaar": "Головна",

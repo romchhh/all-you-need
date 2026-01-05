@@ -97,11 +97,15 @@ export async function PUT(
     const updateTime = new Date().toISOString();
     const newStatus = status || 'active';
     
-    // Якщо оголошення було expired і стало active, оновлюємо publishedAt
-    const currentListing = await prisma.$queryRawUnsafe(
-      `SELECT status, publishedAt FROM Listing WHERE id = ?`,
-      listingId
-    ) as Array<{ status: string; publishedAt: string | null }>;
+    // Якщо оголошення було expired і стало active, оновлюємо publishedAt (з retry)
+    const { executeWithRetry } = await import('@/lib/prisma');
+    
+    const currentListing = await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(
+        `SELECT status, publishedAt FROM Listing WHERE id = ?`,
+        listingId
+      ) as Promise<Array<{ status: string; publishedAt: string | null }>>
+    );
     
     const wasExpired = currentListing[0]?.status === 'expired';
     const isNowActive = newStatus === 'active';
@@ -109,67 +113,71 @@ export async function PUT(
     
     if (shouldUpdatePublishedAt) {
       // Оновлюємо publishedAt при активації expired оголошення
-      await prisma.$executeRawUnsafe(
-        `UPDATE Listing SET
-          title = ?,
-          description = ?,
-          price = ?,
-          currency = ?,
-          isFree = ?,
-          category = ?,
-          subcategory = ?,
-          condition = ?,
-          location = ?,
-          status = ?,
-          images = ?,
-          updatedAt = ?,
-          publishedAt = ?
-        WHERE id = ?`,
-        title,
-        description,
-        price,
-        currency,
-        isFree ? 1 : 0,
-        category,
-        subcategory || null,
-        condition || null,
-        location,
-        newStatus,
-        JSON.stringify(imageUrls),
-        updateTime,
-        updateTime, // Оновлюємо publishedAt
-        listingId
+      await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `UPDATE Listing SET
+            title = ?,
+            description = ?,
+            price = ?,
+            currency = ?,
+            isFree = ?,
+            category = ?,
+            subcategory = ?,
+            condition = ?,
+            location = ?,
+            status = ?,
+            images = ?,
+            updatedAt = ?,
+            publishedAt = ?
+          WHERE id = ?`,
+          title,
+          description,
+          price,
+          currency,
+          isFree ? 1 : 0,
+          category,
+          subcategory || null,
+          condition || null,
+          location,
+          newStatus,
+          JSON.stringify(imageUrls),
+          updateTime,
+          updateTime, // Оновлюємо publishedAt
+          listingId
+        )
       );
     } else {
       // Звичайне оновлення без зміни publishedAt
-      await prisma.$executeRawUnsafe(
-        `UPDATE Listing SET
-          title = ?,
-          description = ?,
-          price = ?,
-          currency = ?,
-          isFree = ?,
-          category = ?,
-          subcategory = ?,
-          condition = ?,
-          location = ?,
-          status = ?,
-          images = ?,
-          updatedAt = ?
-        WHERE id = ?`,
-        title,
-        description,
-        price,
-        currency,
-        isFree ? 1 : 0,
-        category,
-        subcategory || null,
-        condition || null,
-        location,
-        newStatus,
-        JSON.stringify(imageUrls),
-        updateTime,
-        listingId
+      await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `UPDATE Listing SET
+            title = ?,
+            description = ?,
+            price = ?,
+            currency = ?,
+            isFree = ?,
+            category = ?,
+            subcategory = ?,
+            condition = ?,
+            location = ?,
+            status = ?,
+            images = ?,
+            updatedAt = ?
+          WHERE id = ?`,
+          title,
+          description,
+          price,
+          currency,
+          isFree ? 1 : 0,
+          category,
+          subcategory || null,
+          condition || null,
+          location,
+          newStatus,
+          JSON.stringify(imageUrls),
+          updateTime,
+          listingId
+        )
       );
     }
 

@@ -19,7 +19,8 @@
     "clear": "Очистить",
     "user": "Пользователь",
     "currency": "Валюта",
-    "selectCurrency": "Выберите валюту"
+    "selectCurrency": "Выберите валюту",
+    "free": "Бесплатно"
   },
   "navigation": {
     "bazaar": "Головна",

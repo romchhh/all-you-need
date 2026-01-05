@@ -81,29 +81,32 @@ export async function POST(request: NextRequest) {
       imageUrls.push(`/listings/${filename}`);
     }
 
-    // Створюємо оголошення
+    // Створюємо оголошення (з retry logic)
     const createTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const { executeWithRetry } = await import('@/lib/prisma');
     
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO Listing (
-        userId, title, description, price, currency, isFree, category, subcategory,
-        condition, location, images, status, createdAt, updatedAt, publishedAt
+    await executeWithRetry(() =>
+      prisma.$executeRawUnsafe(
+        `INSERT INTO Listing (
+          userId, title, description, price, currency, isFree, category, subcategory,
+          condition, location, images, status, createdAt, updatedAt, publishedAt
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+        userId,
+        title,
+        description,
+        price,
+        currency,
+        isFree ? 1 : 0,
+        category,
+        subcategory || null,
+        condition || null,
+        location,
+        JSON.stringify(imageUrls),
+        createTime,
+        createTime,
+        createTime
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
-      userId,
-      title,
-      description,
-      price,
-      currency,
-      isFree ? 1 : 0,
-      category,
-      subcategory || null,
-      condition || null,
-      location,
-      JSON.stringify(imageUrls),
-      createTime,
-      createTime,
-      createTime
     );
 
     return NextResponse.json({

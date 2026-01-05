@@ -19,35 +19,9 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const viewerId = searchParams.get('viewerId'); // Telegram ID користувача, який переглядає
 
-    // Перевіряємо, чи існує колонка currency
-    let currencyColumnExists = false;
-    try {
-      const tableInfo = await prisma.$queryRawUnsafe(`
-        PRAGMA table_info(Listing)
-      `) as Array<{ name: string; type: string }>;
-      currencyColumnExists = tableInfo.some(col => col.name === 'currency');
-    } catch (error: any) {
-      console.log('Note: Could not check currency column:', error.message);
-    }
-
-    // Якщо колонки немає, намагаємося її додати
-    if (!currencyColumnExists) {
-      try {
-        await prisma.$executeRawUnsafe(`
-          ALTER TABLE Listing ADD COLUMN currency TEXT
-        `);
-        currencyColumnExists = true;
-      } catch (error: any) {
-        if (!error.message?.includes('duplicate column name') && 
-            !error.message?.includes('duplicate column') &&
-            !error.message?.includes('already exists') &&
-            !error.message?.includes('database is locked')) {
-          console.log('Note: Could not add currency column:', error.message);
-        } else if (!error.message?.includes('database is locked')) {
-          currencyColumnExists = true;
-        }
-      }
-    }
+    // Перевіряємо колонку currency (з кешуванням)
+    const { ensureCurrencyColumn } = await import('@/lib/prisma');
+    const currencyColumnExists = await ensureCurrencyColumn();
 
     // Використовуємо raw SQL для уникнення проблем з форматом дати
     const listings = await prisma.$queryRawUnsafe(
@@ -116,55 +90,40 @@ export async function GET(
     // Рахуємо тільки унікальні перегляди
     if (viewerId) {
       try {
-        // Створюємо таблицю ViewHistory якщо її немає
-        await prisma.$executeRawUnsafe(`
-          CREATE TABLE IF NOT EXISTS ViewHistory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            listingId INTEGER NOT NULL,
-            viewerTelegramId INTEGER,
-            viewedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            userAgent TEXT,
-            ipAddress TEXT,
-            FOREIGN KEY (listingId) REFERENCES Listing(id) ON DELETE CASCADE
-          )
-        `);
+        // Перевіряємо/створюємо таблицю ViewHistory (з кешуванням)
+        const { ensureViewHistoryTable } = await import('@/lib/prisma');
+        await ensureViewHistoryTable();
         
-        // Створюємо індекси якщо їх немає
-        await prisma.$executeRawUnsafe(`
-          CREATE INDEX IF NOT EXISTS idx_viewhistory_listingId ON ViewHistory(listingId)
-        `);
-        await prisma.$executeRawUnsafe(`
-          CREATE INDEX IF NOT EXISTS idx_viewhistory_viewerTelegramId ON ViewHistory(viewerTelegramId)
-        `);
-        await prisma.$executeRawUnsafe(`
-          CREATE INDEX IF NOT EXISTS idx_viewhistory_listing_viewer ON ViewHistory(listingId, viewerTelegramId)
-        `);
-        await prisma.$executeRawUnsafe(`
-          CREATE INDEX IF NOT EXISTS idx_viewhistory_viewedAt ON ViewHistory(viewedAt)
-        `);
-        
-        // Перевіряємо, чи цей користувач вже переглядав це оголошення
+        // Перевіряємо, чи цей користувач вже переглядав це оголошення (з retry)
         const viewerTelegramId = parseInt(viewerId);
-        const existingView = await prisma.$queryRawUnsafe(
-          `SELECT id FROM ViewHistory WHERE listingId = ? AND viewerTelegramId = ? LIMIT 1`,
-          listingId,
-          viewerTelegramId
-        ) as Array<{ id: number }>;
+        const { executeWithRetry } = await import('@/lib/prisma');
         
-        // Якщо користувач ще не переглядав - додаємо перегляд
+        const existingView = await executeWithRetry(() =>
+          prisma.$queryRawUnsafe(
+            `SELECT id FROM ViewHistory WHERE listingId = ? AND viewerTelegramId = ? LIMIT 1`,
+            listingId,
+            viewerTelegramId
+          ) as Promise<Array<{ id: number }>>
+        );
+        
+        // Якщо користувач ще не переглядав - додаємо перегляд (з retry)
         if (!existingView || existingView.length === 0) {
           // Додаємо запис в історію переглядів
-          await prisma.$executeRawUnsafe(
-            `INSERT INTO ViewHistory (listingId, viewerTelegramId, viewedAt) VALUES (?, ?, ?)`,
-            listingId,
-            viewerTelegramId,
-            new Date().toISOString()
+          await executeWithRetry(() =>
+            prisma.$executeRawUnsafe(
+              `INSERT INTO ViewHistory (listingId, viewerTelegramId, viewedAt) VALUES (?, ?, ?)`,
+              listingId,
+              viewerTelegramId,
+              new Date().toISOString()
+            )
           );
           
           // Збільшуємо кількість переглядів
-          await prisma.$executeRawUnsafe(
-            `UPDATE Listing SET views = views + 1 WHERE id = ?`,
-            listingId
+          await executeWithRetry(() =>
+            prisma.$executeRawUnsafe(
+              `UPDATE Listing SET views = views + 1 WHERE id = ?`,
+              listingId
+            )
           );
           
           console.log(`New unique view recorded for listing ${listingId} by user ${viewerTelegramId}`);

@@ -68,8 +68,16 @@ model Listing {
   @@index([status])
   @@index([isFree])
   @@index([createdAt])
+  @@index([publishedAt])
+  @@index([currency])
+  @@index([views])
   @@index([promotionType, promotionEnds])
   @@index([category, subcategory, status])
+  @@index([status, createdAt])
+  @@index([status, views])
+  @@index([userId, status])
+  @@index([userId, category])
+  @@index([status, isFree, createdAt])
 }
 
 // Обране
@@ -130,6 +138,7 @@ model Review {
 model ViewHistory {
   id        Int      @id @default(autoincrement())
   listingId Int
+  viewerTelegramId BigInt?
   viewedAt  DateTime @default(now())
   userAgent String?
   ipAddress String?
@@ -137,7 +146,9 @@ model ViewHistory {
   listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@index([listingId])
+  @@index([viewerTelegramId])
   @@index([viewedAt])
+  @@unique([listingId, viewerTelegramId])
 }
 
 // Категорії (статичні дані, можна винести в константи)
