@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
     const price = formData.get('price') as string;
+    const currency = (formData.get('currency') as 'UAH' | 'EUR' | 'USD') || 'UAH';
     const isFree = formData.get('isFree') === 'true';
     const category = formData.get('category') as string;
     const subcategory = formData.get('subcategory') as string | null;
@@ -60,8 +61,9 @@ export async function POST(request: NextRequest) {
       const bytes = await image.arrayBuffer();
       const buffer = Buffer.from(bytes);
       
-      // Конвертуємо в WebP з оптимізацією
+      // Конвертуємо в WebP з оптимізацією та виправленням орієнтації
       const optimizedBuffer = await sharp(buffer)
+        .rotate() // Автоматично виправляє орієнтацію на основі EXIF даних
         .resize(1200, 1200, {
           fit: 'inside',
           withoutEnlargement: true,
@@ -82,28 +84,27 @@ export async function POST(request: NextRequest) {
     // Створюємо оголошення
     const createTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
     
-    await prisma.$executeRaw`
-      INSERT INTO Listing (
-        userId, title, description, price, isFree, category, subcategory,
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO Listing (
+        userId, title, description, price, currency, isFree, category, subcategory,
         condition, location, images, status, createdAt, updatedAt, publishedAt
       )
-      VALUES (
-        ${userId},
-        ${title},
-        ${description},
-        ${price},
-        ${isFree ? 1 : 0},
-        ${category},
-        ${subcategory || null},
-        ${condition || null},
-        ${location},
-        ${JSON.stringify(imageUrls)},
-        'active',
-        ${createTime},
-        ${createTime},
-        ${createTime}
-      )
-    `;
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+      userId,
+      title,
+      description,
+      price,
+      currency,
+      isFree ? 1 : 0,
+      category,
+      subcategory || null,
+      condition || null,
+      location,
+      JSON.stringify(imageUrls),
+      createTime,
+      createTime,
+      createTime
+    );
 
     return NextResponse.json({
       success: true,

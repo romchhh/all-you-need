@@ -13,6 +13,29 @@ storage = MemoryStorage()
 dp = Dispatcher(bot=bot, storage=storage)
 
 
+async def scheduled_tasks_worker():
+    """
+    Фоновий worker для виконання запланованих задач
+    Запускає перевірку та деактивацію оголошень кожні 6 годин
+    """
+    # Запускаємо одразу при старті
+    try:
+        from utils.cron_functions import run_scheduled_tasks
+        await run_scheduled_tasks()
+    except Exception as e:
+        logging.error(f"Error in initial scheduled tasks: {e}", exc_info=True)
+    
+    # Потім запускаємо періодично
+    while True:
+        try:
+            await asyncio.sleep(6 * 60 * 60)  # 6 годин
+            from utils.cron_functions import run_scheduled_tasks
+            await run_scheduled_tasks()
+        except Exception as e:
+            logging.error(f"Error in scheduled tasks: {e}", exc_info=True)
+            await asyncio.sleep(60)  # Чекаємо 1 хвилину перед повторною спробою
+
+
 async def main():
     from handlers.client_handlers.agreement_handlers import router as agreement_router, on_startup, on_shutdown
     from handlers.admin_handlers.admin_handlers import router as admin_router
@@ -27,6 +50,9 @@ async def main():
     
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
+    
+    # Запускаємо фоновий worker для запланованих задач
+    asyncio.create_task(scheduled_tasks_worker())
 
     while True:
         try:

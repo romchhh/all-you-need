@@ -1,15 +1,18 @@
 import { TelegramWebApp } from '@/types/telegram';
-import { Store, Grid3x3, Heart, User, Plus } from 'lucide-react';
+import { Store, Heart, User, Plus } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface BottomNavigationProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   onCloseDetail?: () => void;
   onCreateListing?: () => void;
+  favoritesCount?: number;
   tg: TelegramWebApp | null;
 }
 
-export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCreateListing, tg }: BottomNavigationProps) => {
+export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCreateListing, favoritesCount = 0, tg }: BottomNavigationProps) => {
+  const { t } = useLanguage();
   const handleTabChange = (tab: string) => {
     // Закриваємо деталі товару/профілю при зміні вкладки
     if (onCloseDetail) {
@@ -40,22 +43,7 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
         <div className={`transition-transform ${activeTab === 'bazaar' ? 'scale-110' : ''}`}>
           <Store size={24} strokeWidth={activeTab === 'bazaar' ? 2.5 : 2} />
         </div>
-        <span className="text-xs font-medium">Каталог</span>
-      </button>
-
-      {/* Категорії */}
-      <button
-        onClick={() => handleTabChange('categories')}
-        className={`flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all ${
-          activeTab === 'categories' 
-            ? 'text-green-500 bg-green-50' 
-            : 'text-gray-400 hover:text-gray-600'
-        }`}
-      >
-        <div className={`transition-transform ${activeTab === 'categories' ? 'scale-110' : ''}`}>
-          <Grid3x3 size={24} strokeWidth={activeTab === 'categories' ? 2.5 : 2} />
-        </div>
-        <span className="text-xs font-medium">Розділи</span>
+        <span className="text-xs font-medium">{t('navigation.bazaar')}</span>
       </button>
 
       {/* Додати оголошення */}
@@ -71,22 +59,27 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
         <div className="transition-transform">
           <Plus size={24} strokeWidth={2} />
         </div>
-        <span className="text-xs font-medium">Додати</span>
+        <span className="text-xs font-medium">{t('common.add')}</span>
       </button>
 
       {/* Обране */}
       <button
         onClick={() => handleTabChange('favorites')}
-        className={`flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all ${
+        className={`flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all relative ${
           activeTab === 'favorites' 
             ? 'text-red-500 bg-red-50' 
             : 'text-gray-400 hover:text-gray-600'
         }`}
       >
-        <div className={`transition-transform ${activeTab === 'favorites' ? 'scale-110' : ''}`}>
+        <div className={`transition-transform relative ${activeTab === 'favorites' ? 'scale-110' : ''}`}>
           <Heart size={24} strokeWidth={activeTab === 'favorites' ? 2.5 : 2} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} />
+          {favoritesCount > 0 && (
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {favoritesCount > 99 ? '99+' : favoritesCount}
+            </span>
+          )}
         </div>
-        <span className="text-xs font-medium">Обране</span>
+        <span className="text-xs font-medium">{t('navigation.favorites')}</span>
       </button>
 
       {/* Профіль */}
@@ -101,7 +94,7 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
         <div className={`transition-transform ${activeTab === 'profile' ? 'scale-110' : ''}`}>
           <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
         </div>
-        <span className="text-xs font-medium">Профіль</span>
+        <span className="text-xs font-medium">{t('navigation.profile')}</span>
       </button>
     </div>
   </div>

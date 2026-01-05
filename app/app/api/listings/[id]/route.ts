@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Функція для конвертації старих значень стану в нові
+function normalizeCondition(condition: string | null): 'new' | 'used' | null {
+  if (!condition) return null;
+  if (condition === 'new') return 'new';
+  // Конвертуємо всі старі значення (like_new, good, fair) в 'used'
+  return 'used';
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -8,6 +16,8 @@ export async function GET(
   try {
     const { id } = await params;
     const listingId = parseInt(id);
+    const searchParams = request.nextUrl.searchParams;
+    const viewerId = searchParams.get('viewerId'); // Telegram ID користувача, який переглядає
 
     // Використовуємо raw SQL для уникнення проблем з форматом дати
     const listings = await prisma.$queryRawUnsafe(
@@ -17,6 +27,7 @@ export async function GET(
         l.title,
         l.description,
         l.price,
+        l.currency,
         l.isFree,
         l.category,
         l.subcategory,
@@ -44,6 +55,7 @@ export async function GET(
       title: string;
       description: string;
       price: string;
+      currency: string | null;
       isFree: number;
       category: string;
       subcategory: string | null;
@@ -71,52 +83,76 @@ export async function GET(
 
     const listing = listings[0];
 
-    // Збільшуємо кількість переглядів використовуючи raw SQL для надійності
-    const updateResult = await prisma.$executeRawUnsafe(
-      `UPDATE Listing SET views = views + 1 WHERE id = ?`,
-      listingId
-    );
-    console.log(`Updated views for listing ${listingId}, affected rows: ${updateResult}`);
-
-    // Записуємо в історію переглядів (якщо таблиця існує)
-    try {
-      // Спочатку перевіряємо чи існує таблиця, якщо ні - створюємо
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS ViewHistory (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          listingId INTEGER NOT NULL,
-          viewedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          userAgent TEXT,
-          ipAddress TEXT,
-          FOREIGN KEY (listingId) REFERENCES Listing(id) ON DELETE CASCADE
-        )
-      `);
-      
-      // Створюємо індекси якщо їх немає
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS idx_viewhistory_listingId ON ViewHistory(listingId)
-      `);
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS idx_viewhistory_viewedAt ON ViewHistory(viewedAt)
-      `);
-      
-      // Тепер вставляємо запис
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO ViewHistory (listingId, viewedAt) VALUES (?, ?)`,
-        listingId,
-        new Date().toISOString()
-      );
-    } catch (error: any) {
-      // Ігноруємо помилки створення історії переглядів
-      console.log('ViewHistory creation skipped:', error?.message || error);
+    // Рахуємо тільки унікальні перегляди
+    if (viewerId) {
+      try {
+        // Створюємо таблицю ViewHistory якщо її немає
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS ViewHistory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            listingId INTEGER NOT NULL,
+            viewerTelegramId INTEGER,
+            viewedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            userAgent TEXT,
+            ipAddress TEXT,
+            FOREIGN KEY (listingId) REFERENCES Listing(id) ON DELETE CASCADE
+          )
+        `);
+        
+        // Створюємо індекси якщо їх немає
+        await prisma.$executeRawUnsafe(`
+          CREATE INDEX IF NOT EXISTS idx_viewhistory_listingId ON ViewHistory(listingId)
+        `);
+        await prisma.$executeRawUnsafe(`
+          CREATE INDEX IF NOT EXISTS idx_viewhistory_viewerTelegramId ON ViewHistory(viewerTelegramId)
+        `);
+        await prisma.$executeRawUnsafe(`
+          CREATE INDEX IF NOT EXISTS idx_viewhistory_listing_viewer ON ViewHistory(listingId, viewerTelegramId)
+        `);
+        await prisma.$executeRawUnsafe(`
+          CREATE INDEX IF NOT EXISTS idx_viewhistory_viewedAt ON ViewHistory(viewedAt)
+        `);
+        
+        // Перевіряємо, чи цей користувач вже переглядав це оголошення
+        const viewerTelegramId = parseInt(viewerId);
+        const existingView = await prisma.$queryRawUnsafe(
+          `SELECT id FROM ViewHistory WHERE listingId = ? AND viewerTelegramId = ? LIMIT 1`,
+          listingId,
+          viewerTelegramId
+        ) as Array<{ id: number }>;
+        
+        // Якщо користувач ще не переглядав - додаємо перегляд
+        if (!existingView || existingView.length === 0) {
+          // Додаємо запис в історію переглядів
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO ViewHistory (listingId, viewerTelegramId, viewedAt) VALUES (?, ?, ?)`,
+            listingId,
+            viewerTelegramId,
+            new Date().toISOString()
+          );
+          
+          // Збільшуємо кількість переглядів
+          await prisma.$executeRawUnsafe(
+            `UPDATE Listing SET views = views + 1 WHERE id = ?`,
+            listingId
+          );
+          
+          console.log(`New unique view recorded for listing ${listingId} by user ${viewerTelegramId}`);
+        } else {
+          console.log(`View already recorded for listing ${listingId} by user ${viewerTelegramId}`);
+        }
+      } catch (error: any) {
+        // Якщо помилка - все одно повертаємо оголошення
+        console.error('Error recording view:', error?.message || error);
+      }
     }
 
-    // Отримуємо оновлене значення views після інкременту
+    // Отримуємо актуальне значення views
     const updatedListing = await prisma.listing.findUnique({
       where: { id: listingId },
       select: { views: true },
     });
-    console.log(`Listing ${listingId} views after update: ${updatedListing?.views}`);
+    const currentViews = updatedListing?.views || listing.views;
 
     // Форматуємо дані
     const createdAt = new Date(listing.createdAt);
@@ -124,6 +160,7 @@ export async function GET(
         id: listing.id,
         title: listing.title,
         price: listing.price,
+        currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
         image: JSON.parse(listing.images)[0] || '',
         images: JSON.parse(listing.images),
         seller: {
@@ -139,9 +176,10 @@ export async function GET(
         subcategory: listing.subcategory,
         description: listing.description,
         location: listing.location,
-        views: updatedListing?.views || listing.views + 1, // Використовуємо оновлене значення
+        views: currentViews, // Використовуємо актуальне значення
         posted: formatPostedTime(createdAt),
-        condition: listing.condition as any,
+        createdAt: listing.createdAt,
+        condition: normalizeCondition(listing.condition),
         tags: listing.tags ? JSON.parse(listing.tags) : [],
         isFree: listing.isFree === 1,
         status: listing.status || 'active',

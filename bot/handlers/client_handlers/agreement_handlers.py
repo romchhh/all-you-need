@@ -4,10 +4,13 @@ from aiogram.filters import CommandStart
 from dotenv import load_dotenv
 
 from main import bot
+from config import bot_username
 from database_functions.client_db import check_user, add_user, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar
 from database_functions.create_dbs import create_dbs
 from database_functions.links_db import increment_link_count
+from database_functions.prisma_db import PrismaDB
 from utils.download_avatar import download_user_avatar
+from utils.translations import t
 from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard
 
 load_dotenv()
@@ -52,19 +55,16 @@ async def start_command(message: types.Message):
     # Якщо користувач не погодився з офертою, показуємо її
     if not has_agreed:
         offer_text = (
-            "📋 **Угода користувача (Оферта)**\n\n"
-            "Ласкаво просимо до AYN Marketplace!\n\n"
-            "Для використання нашого сервісу необхідно ознайомитися з умовами використання та погодитися з ними.\n\n"
-            "Будь ласка:\n"
-            "1️⃣ Натисніть кнопку 'Прочитати оферту' та уважно прочитайте всі умови\n"
-            "2️⃣ Після прочитання натисніть 'Погоджуюсь'\n\n"
-            "Продовжуючи, ви підтверджуєте, що прочитали та згодні з умовами використання."
+            f"{t(user_id, 'agreement.title')}\n\n"
+            f"{t(user_id, 'agreement.welcome')}\n\n"
+            f"{t(user_id, 'agreement.description')}\n\n"
+            f"{t(user_id, 'agreement.instructions')}"
         )
         
         await message.answer(
             offer_text,
             reply_markup=get_agreement_keyboard(user_id),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         return
 
@@ -72,9 +72,8 @@ async def start_command(message: types.Message):
     user_phone = get_user_phone(user_id)
     if not user_phone:
         await message.answer(
-            "📱 Для повноцінного використання сервісу необхідно поділитися номером телефону.\n\n"
-            "Це дозволить іншим користувачам зв'язатися з вами.",
-            reply_markup=get_phone_share_keyboard()
+            t(user_id, 'phone.request'),
+            reply_markup=get_phone_share_keyboard(user_id)
         )
         return
 
@@ -98,57 +97,86 @@ async def start_command(message: types.Message):
 
     # Обробляємо параметри для поділених товарів/профілів
     shared_item = None
+    shared_data = None
+    db = PrismaDB()
+    
     if len(args) > 1:
         param = args[1]
         if param.startswith('listing_'):
             try:
                 listing_id = int(param.split('_')[1])
-                shared_item = {'type': 'listing', 'id': listing_id}
+                listing_data = db.get_listing_by_id(listing_id)
+                if listing_data:
+                    shared_item = {'type': 'listing', 'id': listing_id}
+                    shared_data = listing_data
             except (ValueError, IndexError):
                 pass
         elif param.startswith('user_'):
             try:
-                user_telegram_id = param.split('_')[1]
-                shared_item = {'type': 'user', 'id': user_telegram_id}
-            except IndexError:
+                user_telegram_id = int(param.split('_')[1])
+                user_data = db.get_user_by_telegram_id_with_profile(user_telegram_id)
+                if user_data:
+                    shared_item = {'type': 'user', 'id': str(user_telegram_id)}
+                    shared_data = user_data
+            except (ValueError, IndexError):
                 pass
 
-    welcome_text = (
-        "👋 Вітаємо в AYN Marketplace!\n\n"
-    )
+    welcome_text = "👋 Вітаємо в AYN Marketplace!\n\n"
     
-    # Якщо є поділений товар або профіль, додаємо інформацію
-    if shared_item:
+    # Якщо є поділений товар або профіль, додаємо детальну інформацію
+    if shared_item and shared_data:
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+        webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
+        
         if shared_item['type'] == 'listing':
-            welcome_text += "📦 Товар, яким з вами поділилися, тут:\n\n"
+            listing = shared_data
+            import json
+            is_free = listing.get('isFree') or (isinstance(listing.get('isFree'), int) and listing.get('isFree') == 1)
+            price_text = "Безкоштовно" if is_free else f"{listing.get('price', 'N/A')} €"
+            seller_name = f"{listing.get('firstName', '')} {listing.get('lastName', '')}".strip() or listing.get('username', 'Користувач')
+            
+            welcome_text += (
+                f"📦 <b>{listing.get('title', 'Оголошення')}</b>\n\n"
+                f"💰 Ціна: {price_text}\n"
+                f"📍 Місце: {listing.get('location', 'N/A')}\n"
+                f"👤 Продавець: {seller_name}\n\n"
+                f"Натисніть кнопку нижче, щоб переглянути деталі:"
+            )
+            
+            webapp_url_with_params = f"{webapp_url}?listing={shared_item['id']}&telegramId={user_id}"
+            button_text = "📦 Переглянути оголошення"
+            
         elif shared_item['type'] == 'user':
-            welcome_text += "👤 Профіль користувача, яким з вами поділилися, тут:\n\n"
+            user = shared_data
+            user_name = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip() or user.get('username', 'Користувач')
+            username_text = f"@{user.get('username')}" if user.get('username') else ""
+            total_listings = user.get('totalListings', 0) or 0
+            active_listings = user.get('activeListings', 0) or 0
+            
+            welcome_text += (
+                f"👤 <b>{user_name}</b> {username_text}\n\n"
+                f"📊 Оголошень: {total_listings}\n"
+                f"✅ Активних: {active_listings}\n\n"
+                f"Натисніть кнопку нижче, щоб переглянути профіль:"
+            )
+            
+            webapp_url_with_params = f"{webapp_url}?user={shared_item['id']}&telegramId={user_id}"
+            button_text = "👤 Переглянути профіль"
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text=button_text,
+                web_app=WebAppInfo(url=webapp_url_with_params)
+            )]
+        ])
+        await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
     else:
         welcome_text += (
             "🛍️ Оберіть товари з каталогу\n"
             "📱 Створюйте свої оголошення\n"
             "💬 Спілкуйтесь з продавцями\n\n"
+            "Натисніть кнопку нижче, щоб відкрити каталог:"
         )
-    
-    welcome_text += "Натисніть кнопку нижче, щоб відкрити каталог:"
-    
-    # Створюємо клавіатуру з посиланням на поділений товар/профіль
-    if shared_item:
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-        webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
-        if shared_item['type'] == 'listing':
-            webapp_url_with_params = f"{webapp_url}?listing={shared_item['id']}&telegramId={user_id}"
-        else:
-            webapp_url_with_params = f"{webapp_url}?user={shared_item['id']}&telegramId={user_id}"
-        
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(
-                text="🛍️ Відкрити каталог",
-                web_app=WebAppInfo(url=webapp_url_with_params)
-            )]
-        ])
-        await message.answer(welcome_text, reply_markup=keyboard)
-    else:
         await message.answer(welcome_text, reply_markup=get_catalog_webapp_keyboard(user_id))
 
 
@@ -159,7 +187,7 @@ async def agree_agreement(callback: types.CallbackQuery):
         
         # Перевіряємо чи це той самий користувач
         if callback.from_user.id != user_id:
-            await callback.answer("Помилка доступу", show_alert=True)
+            await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
             return
         
         # Перевіряємо чи користувач існує в БД
@@ -185,10 +213,8 @@ async def agree_agreement(callback: types.CallbackQuery):
         
         # Показуємо запит на номер телефону
         await callback.message.answer(
-            "✅ Дякуємо за згоду з умовами використання!\n\n"
-            "📱 Для повноцінного використання сервісу необхідно поділитися номером телефону.\n\n"
-            "Це дозволить іншим користувачам зв'язатися з вами.",
-            reply_markup=get_phone_share_keyboard()
+            f"{t(user_id, 'agreement.agreed')}\n\n{t(user_id, 'phone.request')}",
+            reply_markup=get_phone_share_keyboard(user_id)
         )
         
         await callback.answer()
@@ -201,12 +227,31 @@ async def agree_agreement(callback: types.CallbackQuery):
 
 @router.callback_query(F.data == "decline_agreement")
 async def decline_agreement(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
     await callback.message.edit_text(
-        "❌ Ви відхилили угоду користувача.\n\n"
-        "Для використання сервісу необхідно погодитися з умовами.\n\n"
-        "Спробуйте ще раз: /start"
+        t(user_id, 'agreement.declined')
     )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("set_lang_"))
+async def handle_language_selection(callback: types.CallbackQuery):
+    """Обробка вибору мови"""
+    user_id = callback.from_user.id
+    lang = callback.data.split("_")[-1]  # 'uk' або 'ru'
+    
+    if lang in ['uk', 'ru']:
+        set_language(user_id, lang)
+        await callback.answer(f"✅ Мова змінена на {'Українську' if lang == 'uk' else 'Русский'}", show_alert=False)
+        
+        # Оновлюємо повідомлення з новою мовою
+        await callback.message.edit_text(
+            f"🌐 {t(user_id, 'language.changed')}\n\n"
+            f"{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
+            reply_markup=get_catalog_webapp_keyboard(user_id, lang)
+        )
+    else:
+        await callback.answer("❌ Помилка вибору мови", show_alert=True)
 
 
 @router.message(F.contact)
@@ -235,27 +280,25 @@ async def handle_contact(message: types.Message):
         
         # Видаляємо клавіатуру
         await message.answer(
-            "✅ Номер телефону збережено!\n\n"
-            "Тепер ви можете повноцінно використовувати сервіс.",
+            t(user_id, 'phone.saved'),
             reply_markup=types.ReplyKeyboardRemove()
         )
         
         # Показуємо кнопку відкриття каталогу
         await message.answer(
-            "👋 Вітаємо в AYN Marketplace!\n\n"
-            "Натисніть кнопку нижче, щоб відкрити каталог:",
+            f"{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
             reply_markup=get_catalog_webapp_keyboard(user_id)
         )
     else:
-        await message.answer("❌ Будь ласка, поділіться своїм номером телефону.")
+        await message.answer(t(user_id, 'phone.invalid'))
 
 
 async def on_startup(router):
-    me = await bot.get_me()
     create_dbs()
-    print(f'Bot: @{me.username} запущений!')
+    username = bot_username or (await bot.get_me()).username
+    print(f'Bot: @{username} запущений!')
 
 async def on_shutdown(router):
-    me = await bot.get_me()
-    print(f'Bot: @{me.username} зупинений!')
+    username = bot_username or (await bot.get_me()).username
+    print(f'Bot: @{username} зупинений!')
 

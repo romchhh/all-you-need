@@ -124,3 +124,12 @@ html {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Safe area для мобільних пристроїв */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 80px);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 80px);
+}

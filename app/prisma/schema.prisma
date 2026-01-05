@@ -42,6 +42,7 @@ model Listing {
   title         String
   description   String
   price         String
+  currency      String?  // UAH, EUR, USD
   isFree        Boolean  @default(false)
   category      String
   subcategory   String?

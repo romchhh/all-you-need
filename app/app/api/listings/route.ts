@@ -1,8 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Функція для конвертації старих значень стану в нові
+function normalizeCondition(condition: string | null): 'new' | 'used' | null {
+  if (!condition) return null;
+  if (condition === 'new') return 'new';
+  // Конвертуємо всі старі значення (like_new, good, fair) в 'used'
+  return 'used';
+}
+
 export async function GET(request: NextRequest) {
   try {
+    // Перевіряємо та додаємо колонку currency, якщо її немає
+    // Використовуємо простий підхід - спробуємо додати колонку, ігноруючи помилку якщо вона вже існує
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE Listing ADD COLUMN currency TEXT
+      `);
+    } catch (error: any) {
+      // Якщо колонка вже існує (SQLite повертає "duplicate column name"), це нормально
+      // Ігноруємо помилку і продовжуємо
+      if (!error.message?.includes('duplicate column name') && 
+          !error.message?.includes('duplicate column') &&
+          !error.message?.includes('already exists')) {
+        // Якщо це інша помилка, логуємо її, але продовжуємо
+        console.log('Note: Could not add currency column:', error.message);
+      }
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const category = searchParams.get('category');
     const subcategory = searchParams.get('subcategory');
@@ -92,11 +117,23 @@ export async function GET(request: NextRequest) {
       // Визначаємо, чи це власний профіль (viewerId === userId)
       const isOwnProfile = viewerId && parseInt(viewerId) === parseInt(userId);
       
+      // Отримуємо параметри фільтрації
+      const status = searchParams.get('status');
+      const categoryFilter = searchParams.get('category');
+      
       // Для користувача використовуємо raw query з даними про продавця
       // Якщо це не власний профіль, виключаємо продані оголошення
       let whereClause = "WHERE CAST(u.telegramId AS INTEGER) = ?";
       if (!isOwnProfile) {
         whereClause += " AND l.status != 'sold'";
+      }
+      // Додаємо фільтр за статусом, якщо він вказаний
+      if (status && status !== 'all') {
+        whereClause += ` AND l.status = '${status}'`;
+      }
+      // Додаємо фільтр за категорією, якщо він вказаний
+      if (categoryFilter && categoryFilter !== 'all') {
+        whereClause += ` AND l.category = '${categoryFilter}'`;
       }
       
       const query = `SELECT 
@@ -105,6 +142,7 @@ export async function GET(request: NextRequest) {
           l.title,
           l.description,
           l.price,
+          l.currency,
           l.isFree,
           l.category,
           l.subcategory,
@@ -138,6 +176,7 @@ export async function GET(request: NextRequest) {
         title: string;
         description: string;
         price: string;
+        currency: string | null;
         isFree: number;
         category: string;
         subcategory: string | null;
@@ -210,34 +249,35 @@ export async function GET(request: NextRequest) {
       }
       
       const listingsQuery = `
-        SELECT 
-          l.id,
-          l.userId,
-          l.title,
-          l.description,
-          l.price,
-          l.isFree,
-          l.category,
-          l.subcategory,
-          l.condition,
-          l.location,
-          l.views,
-          l.status,
-          l.images,
-          l.tags,
-          l.createdAt,
-          u.username as sellerUsername,
-          u.firstName as sellerFirstName,
-          u.lastName as sellerLastName,
-          u.avatar as sellerAvatar,
-          u.phone as sellerPhone,
-          CAST(u.telegramId AS INTEGER) as sellerTelegramId
-        FROM Listing l
-        JOIN User u ON l.userId = u.id
-        ${whereClause}
-        ${orderByClause}
-        LIMIT ? OFFSET ?
-      `;
+             SELECT 
+               l.id,
+               l.userId,
+               l.title,
+               l.description,
+               l.price,
+               l.currency,
+               l.isFree,
+               l.category,
+               l.subcategory,
+               l.condition,
+               l.location,
+               l.views,
+               l.status,
+               l.images,
+               l.tags,
+               l.createdAt,
+               u.username as sellerUsername,
+               u.firstName as sellerFirstName,
+               u.lastName as sellerLastName,
+               u.avatar as sellerAvatar,
+               u.phone as sellerPhone,
+               CAST(u.telegramId AS INTEGER) as sellerTelegramId
+             FROM Listing l
+             JOIN User u ON l.userId = u.id
+             ${whereClause}
+             ${orderByClause}
+             LIMIT ? OFFSET ?
+           `;
       
       const countQuery = `
         SELECT COUNT(*) as count
@@ -257,6 +297,7 @@ export async function GET(request: NextRequest) {
           title: string;
           description: string;
           price: string;
+          currency: string | null;
           isFree: number;
           category: string;
           subcategory: string | null;
@@ -345,30 +386,32 @@ export async function GET(request: NextRequest) {
         sellerPhone = rawListing.sellerPhone || null;
       }
 
-      return {
-        id: listing.id,
-        title: listing.title,
-        price: listing.isFree ? 'Безкоштовно' : listing.price,
-        image: images[0] || '',
-        images: images,
-        seller: {
-          name: sellerName,
-          avatar: sellerAvatar,
-          phone: sellerPhone || '',
-          telegramId: sellerTelegramId,
-          username: sellerUsername,
-        },
-        category: listing.category,
-        subcategory: listing.subcategory,
-        description: listing.description,
-        location: listing.location,
-        views: listing.views || 0,
-        posted: formatPostedTime(createdAt),
-        condition: listing.condition as any,
-        tags: tags,
-        isFree: listing.isFree === 1 || listing.isFree === true,
-        status: listing.status || 'active',
-      };
+             return {
+               id: listing.id,
+               title: listing.title,
+               price: listing.isFree ? 'Безкоштовно' : listing.price,
+               currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
+               image: images[0] || '',
+               images: images,
+               seller: {
+                 name: sellerName,
+                 avatar: sellerAvatar,
+                 phone: sellerPhone || '',
+                 telegramId: sellerTelegramId,
+                 username: sellerUsername,
+               },
+               category: listing.category,
+               subcategory: listing.subcategory,
+               description: listing.description,
+               location: listing.location,
+               views: listing.views || 0,
+               posted: formatPostedTime(createdAt),
+               createdAt: listing.createdAt instanceof Date ? listing.createdAt.toISOString() : listing.createdAt,
+               condition: normalizeCondition(listing.condition),
+               tags: tags,
+               isFree: listing.isFree === 1 || listing.isFree === true,
+               status: listing.status || 'active',
+             };
     });
 
     return NextResponse.json({
@@ -379,8 +422,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching listings:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error('Error details:', { errorMessage, errorStack });
     return NextResponse.json(
-      { error: 'Failed to fetch listings' },
+      { 
+        error: 'Failed to fetch listings',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     );
   }

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import { Listing } from '@/types';
 import { categories } from '@/constants/categories';
 import { useTelegram } from '@/hooks/useTelegram';
@@ -18,15 +19,37 @@ import { ListingGridSkeleton } from '@/components/SkeletonLoader';
 import { getCachedData, setCachedData } from '@/utils/cache';
 import { CreateListingModal } from '@/components/CreateListingModal';
 import { useUser } from '@/hooks/useUser';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const AYNMarketplace = () => {
+  const params = useParams();
+  const lang = (params?.lang as string) || 'uk';
+  const { t, setLanguage } = useLanguage();
+  const { profile } = useUser();
+  
+  // Синхронізуємо мову з URL
+  useEffect(() => {
+    if (lang === 'uk' || lang === 'ru') {
+      setLanguage(lang);
+    }
+  }, [lang, setLanguage]);
+
+  // Передаємо telegramId в LanguageContext для завантаження мови з БД
+  useEffect(() => {
+    if (profile?.telegramId && typeof window !== 'undefined') {
+      // Оновлюємо LanguageContext з telegramId через глобальну змінну або інший механізм
+      // Для простоти, LanguageContext сам завантажить мову при зміні userTelegramId
+      (window as any).__userTelegramId = profile.telegramId;
+    }
+  }, [profile?.telegramId]);
+
   const [activeTab, setActiveTab] = useState('bazaar');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [selectedSeller, setSelectedSeller] = useState<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
-  const { profile } = useUser();
+  const savedScrollPositionRef = useRef<number>(0);
 
   // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {
@@ -54,11 +77,9 @@ const AYNMarketplace = () => {
           .then(res => res.json())
           .then(data => {
             if (data.id) {
+              // Зберігаємо позицію скролу перед відкриттям
+              savedScrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
               setSelectedListing(data);
-              // Скролимо нагору
-              setTimeout(() => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }, 100);
             }
           })
           .catch(err => console.error('Error fetching listing:', err));
@@ -71,6 +92,8 @@ const AYNMarketplace = () => {
           .then(res => res.json())
           .then(data => {
             if (data.telegramId) {
+              // Зберігаємо позицію скролу перед відкриттям
+              savedScrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
               setSelectedSeller({
                 telegramId: data.telegramId.toString(),
                 name: data.firstName && data.lastName 
@@ -80,10 +103,6 @@ const AYNMarketplace = () => {
                 username: data.username || undefined,
                 phone: data.phone || undefined
               });
-              // Скролимо нагору
-              setTimeout(() => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }, 100);
             }
           })
           .catch(err => console.error('Error fetching user profile:', err));
@@ -244,9 +263,25 @@ const AYNMarketplace = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab]);
 
-  // Скролимо нагору при відкритті/закритті товару або профілю
+  // Зберігаємо позицію скролу перед відкриттям деталей товару/профілю
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (selectedListing || selectedSeller) {
+      // Зберігаємо поточну позицію скролу перед відкриттям
+      savedScrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
+      // Скролимо на початок при відкритті
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      // Відновлюємо позицію скролу при закритті
+      if (savedScrollPositionRef.current > 0) {
+        // Використовуємо setTimeout, щоб дати час DOM оновитися
+        const scrollPos = savedScrollPositionRef.current;
+        setTimeout(() => {
+          window.scrollTo({ top: scrollPos, behavior: 'smooth' });
+          // Скидаємо збережену позицію після відновлення
+          savedScrollPositionRef.current = 0;
+        }, 150);
+      }
+    }
   }, [selectedListing, selectedSeller]);
 
   const renderContent = () => {
@@ -308,6 +343,7 @@ const AYNMarketplace = () => {
             onCreateListing={() => setIsCreateListingModalOpen(true)}
             hasMore={hasMore}
             onLoadMore={loadMoreListings}
+            onNavigateToCategories={() => setActiveTab('categories')}
             tg={tg}
           />
         );
@@ -350,17 +386,18 @@ const AYNMarketplace = () => {
         {renderContent()}
       </div>
 
-      {/* Нижнє меню завжди зафіксоване знизу */}
-      <BottomNavigation
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onCloseDetail={() => {
-          setSelectedListing(null);
-          setSelectedSeller(null);
-        }}
-        onCreateListing={() => setIsCreateListingModalOpen(true)}
-        tg={tg}
-      />
+            {/* Нижнє меню завжди зафіксоване знизу */}
+            <BottomNavigation
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onCloseDetail={() => {
+                setSelectedListing(null);
+                setSelectedSeller(null);
+              }}
+              onCreateListing={() => setIsCreateListingModalOpen(true)}
+              favoritesCount={favorites.size}
+              tg={tg}
+            />
 
       {/* Модальне вікно створення оголошення */}
       {profile && (
@@ -372,6 +409,7 @@ const AYNMarketplace = () => {
             formData.append('title', listingData.title);
             formData.append('description', listingData.description);
             formData.append('price', listingData.price);
+            formData.append('currency', listingData.currency || 'UAH');
             formData.append('isFree', listingData.isFree.toString());
             formData.append('category', listingData.category);
             if (listingData.subcategory) {

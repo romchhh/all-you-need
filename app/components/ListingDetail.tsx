@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, TrendingUp } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -7,7 +7,31 @@ import { ShareModal } from './ShareModal';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getListingShareLink } from '@/utils/botLinks';
 import { useTelegram } from '@/hooks/useTelegram';
-import { useState, useEffect } from 'react';
+import { useUser } from '@/hooks/useUser';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useState, useEffect, useMemo } from 'react';
+import { getCurrencySymbol } from '@/utils/currency';
+
+// Функція для форматування дати публікації
+const formatPublicationDate = (dateString: string, lang: 'uk' | 'ru'): string => {
+  const date = new Date(dateString);
+  
+  const monthsUk = [
+    'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
+    'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'
+  ];
+  
+  const monthsRu = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+  ];
+  
+  const months = lang === 'ru' ? monthsRu : monthsUk;
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  
+  return `${day} ${month}`;
+};
 
 interface ListingDetailProps {
   listing: Listing;
@@ -45,6 +69,37 @@ export const ListingDetail = ({
   const [categoryTotal, setCategoryTotal] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
   const { user: currentUser } = useTelegram();
+  const { profile } = useUser();
+  const { t, language } = useLanguage();
+  
+  // Перевіряємо, чи це власне оголошення
+  const isOwnListing = useMemo(() => {
+    // Спробуємо отримати telegramId з різних джерел
+    const currentTelegramId = currentUser?.id || (profile?.telegramId ? parseInt(profile.telegramId) : null);
+    const sellerTelegramId = listing.seller.telegramId;
+    
+    if (!currentTelegramId || !sellerTelegramId) {
+      console.log('Missing IDs for comparison:', { currentTelegramId, sellerTelegramId, currentUser, profile, seller: listing.seller });
+      return false;
+    }
+    
+    const currentIdStr = String(currentTelegramId);
+    const sellerIdStr = String(sellerTelegramId);
+    const isOwn = currentIdStr === sellerIdStr;
+    
+    console.log('Checking if own listing:', {
+      currentTelegramId,
+      sellerTelegramId,
+      currentIdStr,
+      sellerIdStr,
+      isOwn,
+      currentUser,
+      profile,
+      seller: listing.seller
+    });
+    
+    return isOwn;
+  }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
 
   // Скролимо нагору при відкритті нового оголошення
   useEffect(() => {
@@ -58,7 +113,13 @@ export const ListingDetail = ({
   useEffect(() => {
     const recordView = async () => {
       try {
-        const response = await fetch(`/api/listings/${listing.id}`, {
+        // Передаємо viewerId для відстеження унікальних переглядів
+        const viewerId = currentUser?.id;
+        const url = viewerId 
+          ? `/api/listings/${listing.id}?viewerId=${viewerId}`
+          : `/api/listings/${listing.id}`;
+        
+        const response = await fetch(url, {
           method: 'GET',
         });
         if (response.ok) {
@@ -71,7 +132,7 @@ export const ListingDetail = ({
     };
 
     recordView();
-  }, [listing.id]);
+  }, [listing.id, currentUser?.id]);
 
   useEffect(() => {
     const fetchRelatedListings = async () => {
@@ -188,10 +249,17 @@ export const ListingDetail = ({
 
       {/* Контент */}
       <div className="p-4">
-        {/* Ціна */}
-        <div className="mb-4">
-          <div className="text-3xl font-bold text-gray-900 mb-1">{listing.price}</div>
-        </div>
+            {/* Ціна */}
+            <div className="mb-4">
+              <div className="flex items-center gap-2">
+                <div className={`text-3xl font-bold mb-1 ${listing.isFree ? 'text-green-600' : 'text-gray-900'}`}>
+                  {listing.isFree ? t('common.free') : listing.price}
+                </div>
+                {!listing.isFree && listing.currency && (
+                  <span className="text-2xl text-gray-600">{getCurrencySymbol(listing.currency)}</span>
+                )}
+              </div>
+            </div>
 
         {/* Заголовок */}
         <h1 className="text-xl font-semibold text-gray-900 mb-4">{listing.title}</h1>
@@ -199,24 +267,33 @@ export const ListingDetail = ({
         {/* Статистика */}
         <div className="flex gap-4 mb-6 text-sm text-gray-500">
           <div className="flex items-center gap-1">
-            <Eye size={16} className="text-gray-400" />
-            <span>{views} переглядів</span>
-          </div>
-          <div className="flex items-center gap-1">
             <MapPin size={16} className="text-gray-400" />
             <span>{listing.location}</span>
           </div>
           <div className="flex items-center gap-1">
             <Clock size={16} className="text-gray-400" />
-            <span>{listing.posted}</span>
+            <span>{t('listing.created')}: {listing.posted}</span>
           </div>
         </div>
 
         {/* Опис */}
         <div className="mb-6">
-          <h2 className="font-semibold text-gray-900 mb-2">Опис</h2>
+          <h2 className="font-semibold text-gray-900 mb-2">{t('listing.description')}</h2>
           <p className="text-gray-700 whitespace-pre-line leading-relaxed">{listing.description}</p>
         </div>
+
+        {/* Перегляди */}
+        <div className="flex items-center gap-1 mb-3 text-sm text-gray-500">
+          <Eye size={16} className="text-gray-400" />
+          <span>{views} {t('listing.views')}</span>
+        </div>
+
+        {/* Дата публікації */}
+        {listing.createdAt && (
+          <div className="mb-6 text-sm text-gray-500">
+            <span>{t('listing.publishedDate')}: {formatPublicationDate(listing.createdAt, language)}</span>
+          </div>
+        )}
 
         {/* Продавець */}
         <div className="border border-gray-200 rounded-2xl p-4 mb-6">
@@ -261,7 +338,7 @@ export const ListingDetail = ({
               )}
             </div>
           </div>
-          {onViewSellerProfile && listing.seller.telegramId && (
+          {onViewSellerProfile && listing.seller.telegramId && !isOwnListing && (
             <button 
               onClick={() => {
                 onViewSellerProfile(
@@ -357,6 +434,18 @@ export const ListingDetail = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              
+              if (isOwnListing) {
+                // Якщо це власне оголошення - показуємо функцію реклами (поки що просто повідомлення)
+                if (tg) {
+                  tg.showAlert('Функція реклами буде доступна найближчим часом');
+                } else {
+                  alert('Функція реклами буде доступна найближчим часом');
+                }
+                tg?.HapticFeedback.impactOccurred('light');
+                return;
+              }
+              
               const telegramId = listing.seller.telegramId;
               const username = listing.seller.username;
               console.log('Написати clicked, telegramId:', telegramId, 'username:', username, 'listing.seller:', listing.seller);
@@ -372,7 +461,7 @@ export const ListingDetail = ({
               } else {
                 console.log('Telegram ID and username not found');
                 if (tg) {
-                  tg.showAlert('Telegram ID не знайдено');
+                  tg.showAlert(t('listingDetail.telegramIdNotFound'));
                 } else {
                   alert('Telegram ID не знайдено');
                 }
@@ -390,10 +479,19 @@ export const ListingDetail = ({
                 window.location.href = link;
               }
             }}
-            className="w-full bg-blue-500 text-white py-4 rounded-2xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className={`w-full ${isOwnListing ? 'bg-purple-500 hover:bg-purple-600' : 'bg-blue-500 hover:bg-blue-600'} text-white py-4 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer`}
           >
-            <MessageCircle size={20} />
-            Написати
+            {isOwnListing ? (
+              <>
+                <TrendingUp size={20} />
+                {t('sales.promote')}
+              </>
+            ) : (
+              <>
+                <MessageCircle size={20} />
+                {t('common.write')}
+              </>
+            )}
           </button>
         </div>
       </div>

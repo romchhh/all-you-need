@@ -1,15 +1,16 @@
-import { Search, X, Gift, Clock, MapPin } from 'lucide-react';
+import { Search, X, Gift, Clock, MapPin, SlidersHorizontal } from 'lucide-react';
 import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '../CategoryChip';
 import { ListingCard } from '../ListingCard';
-import { FilterBar } from '../FilterBar';
 import { SortModal } from '../SortModal';
 import { SubcategoryList } from '../SubcategoryList';
 import { ListingGridSkeleton } from '../SkeletonLoader';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { germanCities } from '@/constants/german-cities';
 import { ukrainianCities } from '@/constants/ukrainian-cities';
+import { LanguageSwitcher } from '../LanguageSwitcher';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useState, useMemo, useRef, useEffect } from 'react';
 
 interface BazaarTabProps {
@@ -23,6 +24,7 @@ interface BazaarTabProps {
   onCreateListing?: () => void;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  onNavigateToCategories?: () => void;
   tg: TelegramWebApp | null;
 }
 
@@ -39,8 +41,10 @@ export const BazaarTab = ({
   onCreateListing,
   hasMore = false,
   onLoadMore,
+  onNavigateToCategories,
   tg
 }: BazaarTabProps) => {
+  const { t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [showFreeOnly, setShowFreeOnly] = useState(false);
@@ -53,6 +57,8 @@ export const BazaarTab = ({
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
+  const [minPrice, setMinPrice] = useState<number | null>(null);
+  const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -176,6 +182,19 @@ export const BazaarTab = ({
       );
     }
 
+    // Фільтр по діапазону цін
+    if (minPrice !== null || maxPrice !== null) {
+      filtered = filtered.filter(listing => {
+        if (listing.isFree || listing.price.toLowerCase().includes('безкоштовно')) {
+          return minPrice === null || minPrice === 0; // Безкоштовні показуємо тільки якщо мін. ціна = 0
+        }
+        const price = parseInt(listing.price.replace(/\s/g, '').replace('₴', '').replace('€', '')) || 0;
+        if (minPrice !== null && price < minPrice) return false;
+        if (maxPrice !== null && price > maxPrice) return false;
+        return true;
+      });
+    }
+
     // Фільтр по пошуку
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
@@ -211,14 +230,14 @@ export const BazaarTab = ({
     });
 
     return sorted;
-  }, [listings, selectedCategory, selectedSubcategory, showFreeOnly, searchQuery, sortBy, selectedCity]);
+  }, [listings, selectedCategory, selectedSubcategory, showFreeOnly, searchQuery, sortBy, selectedCity, minPrice, maxPrice]);
 
   const getSortLabel = () => {
     switch (sortBy) {
-      case 'newest': return 'Новіші спочатку';
-      case 'price_low': return 'Від дешевих';
-      case 'price_high': return 'Від дорогих';
-      case 'popular': return 'Найпопулярніші';
+      case 'newest': return t('bazaar.sort.newest');
+      case 'price_low': return t('bazaar.sort.priceLow');
+      case 'price_high': return t('bazaar.sort.priceHigh');
+      case 'popular': return t('bazaar.sort.popular');
     }
   };
 
@@ -239,13 +258,13 @@ export const BazaarTab = ({
     <div className="pb-24">
       {/* Пошук */}
       <div className="p-4 bg-white sticky top-0 z-20 border-b border-gray-100">
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2 items-center">
           <div className="relative flex-1" ref={suggestionsRef}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               ref={searchInputRef}
               type="text"
-              placeholder={selectedCity ? `Пошук в ${selectedCity}...` : "Введіть що вас цікавить..."}
+              placeholder={selectedCity ? t('bazaar.searchInCity', { city: selectedCity }) : t('bazaar.whatInterestsYou')}
               value={searchQuery}
               onChange={(e) => {
                 onSearchChange(e.target.value);
@@ -298,33 +317,46 @@ export const BazaarTab = ({
               </div>
             )}
           </div>
+          
+          {/* Перемикач мови (глобус) */}
+          <LanguageSwitcher tg={tg} />
+          
+          {/* Кнопка сортування та фільтрів */}
+          <button
+            onClick={() => {
+              setShowSortModal(true);
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className={`px-3 py-3 rounded-xl flex items-center gap-1 transition-colors ${
+              sortBy !== 'newest' || showFreeOnly || minPrice !== null || maxPrice !== null
+                ? 'bg-blue-50 border-2 border-blue-500'
+                : 'bg-gray-100 hover:bg-gray-200'
+            }`}
+          >
+            <SlidersHorizontal size={18} className="text-gray-900" />
+          </button>
+          
+          {/* Кнопка вибору міста */}
           <button
             onClick={() => setIsCityModalOpen(true)}
             className={`px-3 py-3 rounded-xl flex items-center gap-1 transition-colors ${
               selectedCity
-                ? 'bg-green-50 text-green-600 border-2 border-green-500'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-green-50 border-2 border-green-500'
+                : 'bg-gray-100 hover:bg-gray-200'
             }`}
           >
-            <MapPin size={18} className={selectedCity ? 'text-green-500' : 'text-gray-400'} />
+            <MapPin size={18} className="text-gray-900" />
           </button>
         </div>
       </div>
 
 
 
-      {/* Сортування */}
-      <FilterBar 
-        onSortClick={() => setShowSortModal(true)}
-        sortLabel={getSortLabel()}
-        tg={tg}
-      />
-
       {/* Розділи */}
       {categories.length > 0 && (
         <div className="px-4 pt-4 pb-3">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900">Розділи</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('navigation.categories')}</h2>
             {(selectedCategory || selectedSubcategory) && (
               <button
                 onClick={() => {
@@ -334,12 +366,40 @@ export const BazaarTab = ({
                 }}
                 className="text-sm text-blue-600 font-medium"
               >
-                Очистити
+                {t('common.clear')}
               </button>
             )}
           </div>
           <div className="overflow-x-auto -mx-4 px-4">
             <div className="flex gap-3 pb-2">
+              {/* Кнопка "Всі категорії" */}
+              <div 
+                className="flex flex-col items-center min-w-[100px] max-w-[120px] cursor-pointer"
+                onClick={() => {
+                  if (onNavigateToCategories) {
+                    onNavigateToCategories();
+                    tg?.HapticFeedback.impactOccurred('light');
+                  } else {
+                    setSelectedCategory(null);
+                    setSelectedSubcategory(null);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }
+                }}
+              >
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mb-2 transition-all ${
+                  !selectedCategory && !selectedSubcategory
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}>
+                  📦
+                </div>
+                <span className={`text-xs font-medium text-center whitespace-normal leading-tight ${
+                  !selectedCategory && !selectedSubcategory ? 'text-blue-600' : 'text-gray-700'
+                }`}>
+                  {t('bazaar.allCategories')}
+                </span>
+              </div>
+              
               {categories.map(category => (
                 <CategoryChip 
                   key={category.id} 
@@ -400,18 +460,26 @@ export const BazaarTab = ({
               }}
               className="mt-4 text-blue-600 text-sm font-medium"
             >
-              Очистити фільтри
+              {t('bazaar.clearFilters')}
             </button>
           )}
         </div>
       )}
 
-      {/* Модальне вікно сортування */}
+      {/* Модальне вікно сортування та фільтрів */}
       <SortModal
         isOpen={showSortModal}
         currentSort={sortBy}
+        showFreeOnly={showFreeOnly}
+        minPrice={minPrice}
+        maxPrice={maxPrice}
         onClose={() => setShowSortModal(false)}
         onSelect={(sort) => setSortBy(sort)}
+        onToggleFreeOnly={(value) => setShowFreeOnly(value)}
+        onPriceRangeChange={(min, max) => {
+          setMinPrice(min);
+          setMaxPrice(max);
+        }}
         tg={tg}
       />
 
@@ -420,7 +488,7 @@ export const BazaarTab = ({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Оберіть місто</h2>
+              <h2 className="text-xl font-bold text-gray-900">{t('bazaar.selectCity')}</h2>
               <button
                 onClick={() => {
                   setIsCityModalOpen(false);
@@ -437,7 +505,7 @@ export const BazaarTab = ({
                 type="text"
                 value={cityQuery}
                 onChange={(e) => setCityQuery(e.target.value)}
-                placeholder="Пошук міста..."
+                placeholder={t('bazaar.searchCity')}
                 className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder:text-gray-400"
               />
             </div>
@@ -457,7 +525,7 @@ export const BazaarTab = ({
               >
                 <div className="flex items-center gap-2">
                   <MapPin size={16} className="text-green-500" />
-                  <span className="font-medium">Всі міста</span>
+                  <span className="font-medium">{t('bazaar.allCities')}</span>
                 </div>
               </button>
               {filteredCities.map((city) => (

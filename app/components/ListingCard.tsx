@@ -2,7 +2,8 @@ import { Heart, Image as ImageIcon } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState } from 'react';
-import { getAvatarColor } from '@/utils/avatarColors';
+import { getCurrencySymbol } from '@/utils/currency';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ListingCardProps {
   listing: Listing;
@@ -14,8 +15,7 @@ interface ListingCardProps {
 }
 
 export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false }: ListingCardProps) => {
-  const sellerName = listing.seller.name || 'Користувач';
-  const sellerAvatar = listing.seller.avatar || '👤';
+  const { t } = useLanguage();
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
@@ -55,7 +55,7 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
                 return `/api/images/${pathWithoutSlash}?t=${Date.now()}`;
               })()}
               alt={listing.title}
-              className={`w-full h-full object-contain transition-opacity duration-300 ${
+              className={`w-full h-full object-cover transition-opacity duration-300 ${
                 imageLoading ? 'opacity-0' : 'opacity-100'
               } ${isSold ? 'grayscale' : ''}`}
               loading="lazy"
@@ -96,50 +96,16 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
       </div>
       
       <div className="p-3">
-        <div className="mb-1">
+        <div className="mb-1 flex items-center gap-1">
           <span className={`text-xl font-bold ${listing.isFree ? 'text-green-600' : 'text-gray-900'}`}>
-            {listing.isFree ? 'Безкоштовно' : listing.price}
+            {listing.isFree ? t('common.free') : listing.price}
           </span>
+          {!listing.isFree && listing.currency && (
+            <span className="text-lg text-gray-600">{getCurrencySymbol(listing.currency)}</span>
+          )}
         </div>
         
         <p className="text-sm text-gray-700 line-clamp-2 mb-2">{listing.title}</p>
-        
-        {/* Власник оголошення */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-300 relative">
-            {sellerAvatar && (sellerAvatar.startsWith('/') || sellerAvatar.startsWith('http')) ? (
-              <>
-                <div className="absolute inset-0 animate-pulse bg-gray-200" />
-                <img 
-                  src={sellerAvatar} 
-                  alt={sellerName}
-                  className="w-full h-full object-cover relative z-10"
-                  loading="lazy"
-                  decoding="async"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent) {
-                      const placeholder = parent.querySelector('.avatar-placeholder');
-                      if (placeholder) {
-                        placeholder.classList.remove('hidden');
-                      }
-                    }
-                  }}
-                />
-                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-xs font-bold relative z-10`}>
-                  {sellerName.charAt(0).toUpperCase()}
-                </div>
-              </>
-            ) : (
-              <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-xs font-bold`}>
-                {sellerName.charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
-          <span className="text-xs text-gray-600 truncate flex-1">{sellerName}</span>
-        </div>
         
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span className="truncate">{listing.location.split(',')[0]}</span>

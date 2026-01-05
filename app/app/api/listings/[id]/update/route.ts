@@ -17,6 +17,7 @@ export async function PUT(
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
     const price = formData.get('price') as string;
+    const currency = (formData.get('currency') as 'UAH' | 'EUR' | 'USD') || 'UAH';
     const isFree = formData.get('isFree') === 'true';
     const category = formData.get('category') as string;
     const subcategory = formData.get('subcategory') as string | null;
@@ -72,6 +73,7 @@ export async function PUT(
         const buffer = Buffer.from(bytes);
         
         const optimizedBuffer = await sharp(buffer)
+          .rotate() // Автоматично виправляє орієнтацію на основі EXIF даних
           .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
           .webp({ quality: 85, effort: 4 })
           .toBuffer();
@@ -93,34 +95,83 @@ export async function PUT(
 
     // Оновлюємо оголошення
     const updateTime = new Date().toISOString();
+    const newStatus = status || 'active';
     
-    await prisma.$executeRawUnsafe(
-      `UPDATE Listing SET
-        title = ?,
-        description = ?,
-        price = ?,
-        isFree = ?,
-        category = ?,
-        subcategory = ?,
-        condition = ?,
-        location = ?,
-        status = ?,
-        images = ?,
-        updatedAt = ?
-      WHERE id = ?`,
-      title,
-      description,
-      price,
-      isFree ? 1 : 0,
-      category,
-      subcategory || null,
-      condition || null,
-      location,
-      status || 'active',
-      JSON.stringify(imageUrls),
-      updateTime,
+    // Якщо оголошення було expired і стало active, оновлюємо publishedAt
+    const currentListing = await prisma.$queryRawUnsafe(
+      `SELECT status, publishedAt FROM Listing WHERE id = ?`,
       listingId
-    );
+    ) as Array<{ status: string; publishedAt: string | null }>;
+    
+    const wasExpired = currentListing[0]?.status === 'expired';
+    const isNowActive = newStatus === 'active';
+    const shouldUpdatePublishedAt = wasExpired && isNowActive;
+    
+    if (shouldUpdatePublishedAt) {
+      // Оновлюємо publishedAt при активації expired оголошення
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing SET
+          title = ?,
+          description = ?,
+          price = ?,
+          currency = ?,
+          isFree = ?,
+          category = ?,
+          subcategory = ?,
+          condition = ?,
+          location = ?,
+          status = ?,
+          images = ?,
+          updatedAt = ?,
+          publishedAt = ?
+        WHERE id = ?`,
+        title,
+        description,
+        price,
+        currency,
+        isFree ? 1 : 0,
+        category,
+        subcategory || null,
+        condition || null,
+        location,
+        newStatus,
+        JSON.stringify(imageUrls),
+        updateTime,
+        updateTime, // Оновлюємо publishedAt
+        listingId
+      );
+    } else {
+      // Звичайне оновлення без зміни publishedAt
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing SET
+          title = ?,
+          description = ?,
+          price = ?,
+          currency = ?,
+          isFree = ?,
+          category = ?,
+          subcategory = ?,
+          condition = ?,
+          location = ?,
+          status = ?,
+          images = ?,
+          updatedAt = ?
+        WHERE id = ?`,
+        title,
+        description,
+        price,
+        currency,
+        isFree ? 1 : 0,
+        category,
+        subcategory || null,
+        condition || null,
+        location,
+        newStatus,
+        JSON.stringify(imageUrls),
+        updateTime,
+        listingId
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

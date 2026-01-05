@@ -1,6 +1,7 @@
 import { X, Copy, MessageCircle, Mail, Share2 } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface ShareModalProps {
 }
 
 export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareModalProps) => {
+  const { t } = useLanguage();
   const [showFallback, setShowFallback] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -55,7 +57,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
       }
     } catch (error) {
       console.error('Error copying link:', error);
-      tg?.showAlert('Помилка копіювання посилання');
+      tg?.showAlert(t('share.copyError'));
     }
   };
 
@@ -87,7 +89,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
         <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl">
           {/* Хедер */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Поділитися</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t('share.title')}</h2>
             <button
               onClick={onClose}
               className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
@@ -102,14 +104,14 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
             className="w-full px-6 py-5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mb-4"
           >
             <Share2 size={24} />
-            <span className="text-lg">Поділитися</span>
+            <span className="text-lg">{t('share.title')}</span>
           </button>
 
           {/* Попередній перегляд посилання */}
           <div className="p-3 bg-gray-50 rounded-xl">
             <div className="flex items-center gap-2 mb-2">
               <MessageCircle size={16} className="text-gray-400" />
-              <span className="text-xs text-gray-500 uppercase tracking-wide">Посилання</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wide">{t('share.link')}</span>
             </div>
             <div className="text-sm text-gray-700 break-all font-mono bg-white p-2 rounded-lg border border-gray-200">
               {shareLink}
@@ -125,7 +127,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
             <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
             
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Поділитися через
+              {t('share.shareVia')}
             </h3>
 
             <div className="space-y-2">
@@ -137,7 +139,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
                   <Copy className="w-6 h-6 text-gray-700" />
                 </div>
                 <span className="text-gray-800 font-medium">
-                  {copied ? 'Скопійовано!' : 'Копіювати посилання'}
+                  {copied ? t('share.linkCopied') : t('share.copyLink')}
                 </span>
               </button>
 
@@ -158,7 +160,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
                 <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
                   <Mail className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-gray-800 font-medium">Пошта</span>
+                <span className="text-gray-800 font-medium">{t('share.email')}</span>
               </button>
             </div>
 
@@ -169,7 +171,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
               }}
               className="w-full mt-6 py-3 text-gray-600 font-medium hover:text-gray-800 rounded-xl"
             >
-              Скасувати
+              {t('share.cancel')}
             </button>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { categories } from '@/constants/categories';
 import { germanCities } from '@/constants/german-cities';
 import { ukrainianCities } from '@/constants/ukrainian-cities';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -19,9 +20,11 @@ export const CreateListingModal = ({
   onSave,
   tg
 }: CreateListingModalProps) => {
+  const { t } = useLanguage();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState<'UAH' | 'EUR' | 'USD'>('UAH');
   const [isFree, setIsFree] = useState(false);
   const [category, setCategory] = useState<string>('');
   const [subcategory, setSubcategory] = useState<string>('');
@@ -32,18 +35,18 @@ export const CreateListingModal = ({
   const [loading, setLoading] = useState(false);
   const [isConditionOpen, setIsConditionOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
+  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const conditionRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLDivElement>(null);
 
   const selectedCategoryData = categories.find(cat => cat.id === category);
 
   const conditionOptions = [
-    { value: 'new', label: 'Новий', emoji: '✨' },
-    { value: 'like_new', label: 'Як новий', emoji: '🆕' },
-    { value: 'good', label: 'Добрий', emoji: '👍' },
-    { value: 'fair', label: 'Задовільний', emoji: '✅' },
+    { value: 'new', label: t('listing.new'), emoji: '✨' },
+    { value: 'used', label: t('listing.used'), emoji: '🔧' },
   ];
 
   const selectedCondition = conditionOptions.find(opt => opt.value === condition);
@@ -62,11 +65,26 @@ export const CreateListingModal = ({
       ).slice(0, 10)
     : allCities.slice(0, 10);
 
+  // Блокуємо скрол body при відкритому модальному вікні
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   // Закриваємо dropdown при кліку поза ним
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (conditionRef.current && !conditionRef.current.contains(event.target as Node)) {
         setIsConditionOpen(false);
+      }
+      if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
+        setIsCurrencyOpen(false);
       }
       if (locationRef.current && !locationRef.current.contains(event.target as Node)) {
         setIsLocationOpen(false);
@@ -108,40 +126,40 @@ export const CreateListingModal = ({
     const newErrors: Record<string, string> = {};
 
     if (!title.trim()) {
-      newErrors.title = 'Введіть назву товару';
+      newErrors.title = t('createListing.errors.titleRequired');
     } else if (title.trim().length < 3) {
-      newErrors.title = 'Назва має містити мінімум 3 символи';
+      newErrors.title = t('createListing.errors.titleMinLength');
     }
 
     if (!description.trim()) {
-      newErrors.description = 'Введіть опис товару';
+      newErrors.description = t('createListing.errors.descriptionRequired');
     } else if (description.trim().length < 10) {
-      newErrors.description = 'Опис має містити мінімум 10 символів';
+      newErrors.description = t('createListing.errors.descriptionMinLength');
     }
 
     if (!isFree) {
       if (!price.trim()) {
-        newErrors.price = 'Введіть ціну';
+        newErrors.price = t('createListing.errors.priceRequired');
       } else {
         const priceNum = parseFloat(price.replace(/[^\d.,]/g, '').replace(',', '.'));
         if (isNaN(priceNum) || priceNum <= 0) {
-          newErrors.price = 'Введіть коректну ціну';
+          newErrors.price = t('createListing.errors.priceInvalid');
         }
       }
     }
 
     if (!category) {
-      newErrors.category = 'Оберіть розділ';
+      newErrors.category = t('createListing.errors.categoryRequired');
     }
 
     if (images.length === 0) {
-      newErrors.images = 'Додайте хоча б одне фото';
+      newErrors.images = t('createListing.errors.imagesRequired');
     } else if (images.length > 10) {
-      newErrors.images = 'Максимум 10 фото';
+      newErrors.images = t('createListing.errors.imagesMax');
     }
 
     if (!location.trim()) {
-      newErrors.location = 'Введіть локацію';
+      newErrors.location = t('createListing.errors.locationRequired');
     }
 
     setErrors(newErrors);
@@ -153,22 +171,22 @@ export const CreateListingModal = ({
       return;
     }
     if (!title.trim() || !description.trim() || !location.trim()) {
-      tg?.showAlert('Заповніть всі обов\'язкові поля');
+      tg?.showAlert(t('createListing.fillAllFields'));
       return;
     }
 
     if (!category) {
-      tg?.showAlert('Оберіть розділ');
+      tg?.showAlert(t('createListing.selectCategory'));
       return;
     }
 
     if (!isFree && !price.trim()) {
-      tg?.showAlert('Введіть ціну або позначте як безкоштовне');
+      tg?.showAlert(t('createListing.enterPriceOrFree'));
       return;
     }
 
     if (images.length === 0) {
-      tg?.showAlert('Додайте хоча б одне фото');
+      tg?.showAlert(t('createListing.addPhoto'));
       return;
     }
 
@@ -177,7 +195,8 @@ export const CreateListingModal = ({
       await onSave({
         title,
         description,
-        price: isFree ? 'Безкоштовно' : price,
+        price: isFree ? t('common.free') : price,
+        currency: currency,
         isFree,
         category,
         subcategory: subcategory || null,
@@ -196,13 +215,14 @@ export const CreateListingModal = ({
       setSubcategory('');
       setLocation('');
       setCondition('new');
+      setCurrency('UAH');
       setImages([]);
       setImagePreviews([]);
       
       onClose();
     } catch (error) {
       console.error('Error creating listing:', error);
-      tg?.showAlert('Помилка при створенні оголошення');
+      tg?.showAlert(t('createListing.errorCreating'));
       tg?.HapticFeedback.notificationOccurred('error');
     } finally {
       setLoading(false);
@@ -210,11 +230,11 @@ export const CreateListingModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl my-8">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto pb-24">
+      <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl my-8 max-h-[85vh] flex flex-col">
         {/* Заголовок */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Створити оголошення</h2>
+        <div className="flex items-center justify-between mb-6 flex-shrink-0">
+          <h2 className="text-2xl font-bold text-gray-900">{t('createListing.title')}</h2>
           <button
             onClick={onClose}
             className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
@@ -223,7 +243,7 @@ export const CreateListingModal = ({
           </button>
         </div>
 
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+        <div className="space-y-4 overflow-y-auto pr-2 flex-1 min-h-0">
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -317,22 +337,84 @@ export const CreateListingModal = ({
                 onChange={(e) => setIsFree(e.target.checked)}
                 className="w-4 h-4"
               />
-              <span className="text-sm font-medium text-gray-700">Безкоштовно</span>
+              <span className="text-sm font-medium text-gray-700">{t('common.free')}</span>
             </label>
             {!isFree && (
               <>
-                <input
-                  type="text"
-                  value={price}
-                  onChange={(e) => {
-                    setPrice(e.target.value);
-                    if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
-                  }}
-                  placeholder="Ціна (наприклад: 5000 грн)"
-                  className={`w-full px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
-                    errors.price ? 'border-red-300' : 'border-gray-200'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                />
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={price}
+                    onChange={(e) => {
+                      setPrice(e.target.value);
+                      if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
+                    }}
+                    placeholder="Ціна"
+                    className={`flex-1 px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
+                      errors.price ? 'border-red-300' : 'border-gray-200'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                  <div ref={currencyRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCurrencyOpen(!isCurrencyOpen);
+                        tg?.HapticFeedback.impactOccurred('light');
+                      }}
+                      className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-2 min-w-[80px]"
+                    >
+                      <span className="text-gray-900 font-medium">
+                        {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
+                      </span>
+                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isCurrencyOpen && (
+                      <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-30 min-w-[120px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrency('UAH');
+                            setIsCurrencyOpen(false);
+                            tg?.HapticFeedback.impactOccurred('light');
+                          }}
+                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
+                            currency === 'UAH' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>₴ UAH</span>
+                        </button>
+                        <div className="h-px bg-gray-200"></div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrency('EUR');
+                            setIsCurrencyOpen(false);
+                            tg?.HapticFeedback.impactOccurred('light');
+                          }}
+                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
+                            currency === 'EUR' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>€ EUR</span>
+                        </button>
+                        <div className="h-px bg-gray-200"></div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrency('USD');
+                            setIsCurrencyOpen(false);
+                            tg?.HapticFeedback.impactOccurred('light');
+                          }}
+                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
+                            currency === 'USD' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>$ USD</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 {errors.price && (
                   <p className="mt-1 text-sm text-red-600">{errors.price}</p>
                 )}
@@ -439,7 +521,7 @@ export const CreateListingModal = ({
                   </>
                 )}
                 {!selectedCondition && (
-                  <span className="text-gray-400">Оберіть стан</span>
+                  <span className="text-gray-400">{t('createListing.fields.selectCondition')}</span>
                 )}
               </div>
               <ChevronDown 
@@ -490,7 +572,7 @@ export const CreateListingModal = ({
                   if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
                 }}
                 onFocus={() => setIsLocationOpen(true)}
-                placeholder="Введіть що вас цікавить..."
+                placeholder={t('bazaar.whatInterestsYou')}
                 className={`w-full px-4 py-3 pl-10 pr-10 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                   errors.location ? 'border-red-300' : 'border-gray-200'
                 } focus:outline-none focus:ring-2 focus:ring-blue-500`}
@@ -545,19 +627,19 @@ export const CreateListingModal = ({
         </div>
 
         {/* Кнопки */}
-        <div className="flex gap-3 mt-6">
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex gap-2 flex-shrink-0 pb-4">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
           >
-            Скасувати
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Створення...' : 'Створити'}
+            {loading ? t('createListing.creating') : t('createListing.title')}
           </button>
         </div>
       </div>

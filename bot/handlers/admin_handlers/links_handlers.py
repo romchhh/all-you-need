@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from keyboards.admin_keyboards import get_links_keyboard, cancel_button, admin_keyboard, get_link_stats_keyboard, get_delete_link_confirm_keyboard
 from database_functions.links_db import get_link_by_id, update_link_name, delete_link, add_link, get_link_detailed_stats
 from main import bot
+from config import bot_username
 from states.admin_states import LinkStates
 
 
@@ -21,10 +22,10 @@ async def manage_links(message: types.Message):
 async def show_link_stats(callback: types.CallbackQuery):
     link_id = int(callback.data.split("_")[2])
     link_data = get_link_by_id(link_id)
-    me = await bot.get_me()
     if link_data:
         link_name, link_url = link_data
-        bot_link = f"https://t.me/{me.username}?start=linktowatch_{link_id}"
+        username = bot_username or (await bot.get_me()).username
+        bot_link = f"https://t.me/{username}?start=linktowatch_{link_id}"
 
         detailed_stats = get_link_detailed_stats()
         visits_count = 0
@@ -135,11 +136,10 @@ async def process_link_name(message: types.Message, state: FSMContext):
         return
     
     link_name = message.text
-    me = await bot.get_me()
-
+    username = bot_username or (await bot.get_me()).username
     
     link_id = add_link(link_name)
-    bot_link = f"https://t.me/{me.username}?start=linktowatch_{link_id}"
+    bot_link = f"https://t.me/{username}?start=linktowatch_{link_id}"
 
     await message.answer(
         f"✅ Посилання успішно створено!\n\n",

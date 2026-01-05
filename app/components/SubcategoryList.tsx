@@ -12,51 +12,53 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
   if (!subcategories || subcategories.length === 0) return null;
 
   return (
-    <div className="px-4 mb-4">
-      <div className="flex items-center gap-2 mb-2">
-        <h3 className="text-sm font-medium text-gray-600">Типи</h3>
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-3 px-4">
+        <h3 className="text-sm font-semibold text-gray-700">Підкатегорії</h3>
         {selectedSubcategory && (
           <button
             onClick={() => {
               onSelect(null);
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="text-xs text-blue-600"
+            className="text-xs text-blue-600 font-medium"
           >
             Очистити
           </button>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => {
-            onSelect(null);
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-            selectedSubcategory === null
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          Всі
-        </button>
-        {subcategories.map((subcategory) => (
+      <div className="overflow-x-auto -mx-4 px-4">
+        <div className="flex gap-2 pb-2">
           <button
-            key={subcategory.id}
             onClick={() => {
-              onSelect(subcategory.id);
+              onSelect(null);
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              selectedSubcategory === subcategory.id
+            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+              selectedSubcategory === null
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            {subcategory.name}
+            Всі
           </button>
-        ))}
+          {subcategories.map((subcategory) => (
+            <button
+              key={subcategory.id}
+              onClick={() => {
+                onSelect(subcategory.id);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                selectedSubcategory === subcategory.id
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {subcategory.name}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

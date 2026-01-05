@@ -8,6 +8,7 @@ import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { useTelegram } from '@/hooks/useTelegram';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useState, useEffect } from 'react';
 
 interface UserProfilePageProps {
@@ -35,6 +36,7 @@ export const UserProfilePage = ({
   favorites,
   tg
 }: UserProfilePageProps) => {
+  const { t } = useLanguage();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<{ username: string | null; phone: string | null } | null>(null);
@@ -273,7 +275,7 @@ export const UserProfilePage = ({
             className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <MessageCircle size={20} />
-            Написати
+            {t('common.write')}
           </button>
         </div>
 
@@ -281,7 +283,7 @@ export const UserProfilePage = ({
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Оголошення продавця</h2>
           {loading ? (
-            <div className="text-center py-8 text-gray-500">Завантаження...</div>
+            <div className="text-center py-8 text-gray-500">{t('common.loading')}</div>
           ) : listings.length > 0 ? (
             <>
               <div className="grid grid-cols-2 gap-3">
@@ -312,7 +314,7 @@ export const UserProfilePage = ({
               )}
             </>
           ) : (
-            <div className="text-center py-8 text-gray-500">Немає оголошень</div>
+            <div className="text-center py-8 text-gray-500">{t('userProfile.noListings')}</div>
           )}
         </div>
       </div>

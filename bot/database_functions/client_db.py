@@ -27,7 +27,7 @@ def create_table():
     conn.commit()
     
     
-def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name: str, language: str, ref_link: int = None, avatar_path: str = None):
+def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name: str, language: str = None, ref_link: int = None, avatar_path: str = None):
     # Перевіряємо чи користувач вже є в Prisma User таблиці
     cursor.execute("SELECT id FROM User WHERE telegramId = ?", (int(user_id),))
     existing_user = cursor.fetchone()
@@ -55,11 +55,19 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
         ))
         conn.commit()
         
+        # Визначаємо мову на основі language_code
+        user_language = 'uk'  # За замовчуванням
+        if language:
+            if language.startswith('ru'):
+                user_language = 'ru'
+            elif language.startswith('uk'):
+                user_language = 'uk'
+        
         # Також додаємо в legacy таблицю для сумісності
         cursor.execute('''
             INSERT INTO users_legacy (user_id, user_name, user_first_name, user_last_name, language, join_date, last_activity, ref_link)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (user_id, user_name, user_first_name, user_last_name, language, current_date.strftime('%Y-%m-%d %H:%M:%S'), current_date.strftime('%Y-%m-%d %H:%M:%S'), ref_link))
+        ''', (user_id, user_name, user_first_name, user_last_name, user_language, current_date.strftime('%Y-%m-%d %H:%M:%S'), current_date.strftime('%Y-%m-%d %H:%M:%S'), ref_link))
         conn.commit()
     else:
         # Оновлюємо дані існуючого користувача (якщо вони змінилися)
@@ -194,3 +202,46 @@ def set_user_phone(user_id: str, phone: str):
     )
     conn.commit()
     print(f"Phone {phone} set for user {user_id}")
+
+
+def get_user_language(user_id: int) -> str:
+    """Отримує мову користувача з БД"""
+    # Спочатку перевіряємо в legacy таблиці
+    cursor.execute('SELECT language FROM users_legacy WHERE user_id = ?', (str(user_id),))
+    result = cursor.fetchone()
+    if result and result[0]:
+        lang = result[0]
+        if lang in ['uk', 'ru']:
+            return lang
+    
+    # Якщо мови немає в legacy, перевіряємо language_code з User таблиці
+    # (якщо вона там зберігається)
+    return 'uk'  # За замовчуванням українська
+
+
+def set_user_language(user_id: int, language: str):
+    """Встановлює мову користувача"""
+    if language not in ['uk', 'ru']:
+        print(f"Invalid language: {language}")
+        return
+    
+    # Перевіряємо чи користувач існує в legacy таблиці
+    cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
+    result = cursor.fetchone()
+    
+    if result:
+        # Оновлюємо в legacy таблиці
+        cursor.execute('''
+            UPDATE users_legacy 
+            SET language = ? 
+            WHERE user_id = ?
+        ''', (language, str(user_id)))
+    else:
+        # Створюємо запис в legacy таблиці
+        cursor.execute('''
+            INSERT INTO users_legacy (user_id, language, join_date, last_activity)
+            VALUES (?, ?, ?, ?)
+        ''', (str(user_id), language, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+    
+    conn.commit()
+    print(f"Language {language} set for user {user_id}")

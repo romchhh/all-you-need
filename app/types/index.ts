@@ -10,6 +10,7 @@ export interface Listing {
   id: number;
   title: string;
   price: string;
+  currency?: 'UAH' | 'EUR' | 'USD';
   image: string;
   images?: string[];
   seller: Seller;
@@ -19,7 +20,8 @@ export interface Listing {
   location: string;
   views: number;
   posted: string;
-  condition?: 'new' | 'like_new' | 'good' | 'fair';
+  createdAt?: string;
+  condition?: 'new' | 'used';
   tags?: string[];
   isFree?: boolean;
   status?: 'active' | 'sold' | 'hidden' | 'pending';
