@@ -19,12 +19,122 @@
   }
 }
 
+html {
+  height: 100%;
+  height: 100dvh; /* Dynamic viewport height для мобільних */
+  overflow: hidden; /* Запобігаємо скролу на рівні html */
+  overflow-x: hidden; /* Запобігаємо горизонтальному скролу */
+  max-width: 100vw; /* Обмежуємо ширину */
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  height: 100dvh; /* Dynamic viewport height для мобільних */
+  overflow-y: auto; /* Дозволяємо скрол тільки на body */
+  overflow-x: hidden; /* Запобігаємо горизонтальному скролу */
+  -webkit-overflow-scrolling: touch; /* Плавний скрол на iOS */
+  max-width: 100vw; /* Обмежуємо ширину */
+  width: 100%; /* Фіксуємо ширину */
+  /* Використовуємо viewport height від Telegram, якщо доступно */
+  min-height: var(--tg-viewport-height, 100vh);
+  min-height: var(--tg-viewport-height, 100dvh);
+}
+
+/* Запобігаємо горизонтальному скролу для всіх елементів */
+* {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Додаткові стилі для контейнерів */
+#__next,
+[data-nextjs-scroll-focus-boundary],
+main,
+div[role="main"] {
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+}
+
+/* Обмежуємо ширину для всіх flex контейнерів */
+.flex,
+.flex-col,
+.grid {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Для горизонтальних скролованих елементів (підкатегорії тощо) */
+.overflow-x-auto {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  /* Приховуємо скролбар, але залишаємо функціональність */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
+
+/* Запобігаємо виходу елементів за межі */
+img,
+video,
+iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Додаткові обмеження для модальних вікон */
+[class*="fixed"]:not([class*="gallery"]):not(button):not([class*="ImageGallery"]),
+[class*="absolute"]:not([class*="gallery"]):not(button):not([class*="ImageGallery"]) {
+  max-width: 100vw;
+  left: 0;
+  right: 0;
+}
+
+/* Виключаємо елементи галереї з глобальних обмежень */
+[class*="ImageGallery"] [class*="absolute"],
+[class*="ImageGallery"] button[class*="absolute"] {
+  max-width: none;
+  left: auto;
+  right: auto;
+}
+
+/* Для всіх контейнерів з padding/margin */
+.container,
+.max-w-2xl,
+.max-w-md,
+.max-w-sm {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* Запобігаємо горизонтальному скролу для таблиць */
+table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+}
+
+/* Для текстових елементів */
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+span,
+div {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Анімації */
@@ -116,11 +226,13 @@ html {
 }
 
 /* Hide scrollbar but keep functionality */
-.overflow-x-auto::-webkit-scrollbar {
+.overflow-x-auto::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
 
-.overflow-x-auto {
+.overflow-x-auto,
+.scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }

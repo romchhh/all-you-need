@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 
 interface ImageGalleryProps {
   images: string[];
@@ -45,7 +45,10 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
   const onTouchMove = (e: React.TouchEvent) => {
     if (touchStartX.current === null) return;
     touchEndX.current = e.targetTouches[0].clientX;
-    const diff = touchStartX.current - touchEndX.current;
+    // Інвертуємо diff, щоб фото рухалося в правильному напрямку
+    // Коли свайпаємо вліво (touchEndX < touchStartX), фото має рухатися вліво (негативний offset)
+    // Коли свайпаємо вправо (touchEndX > touchStartX), фото має рухатися вправо (позитивний offset)
+    const diff = touchEndX.current - touchStartX.current;
     // Обмежуємо зміщення для плавності
     setSwipeOffset(Math.max(-100, Math.min(100, diff)));
   };
@@ -57,19 +60,37 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
       return;
     }
     
-    const distance = touchStartX.current - touchEndX.current;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
+    // Інвертуємо distance для правильної логіки
+    // Коли свайпаємо вліво (touchEndX < touchStartX), distance буде негативним, і ми хочемо nextImage
+    // Коли свайпаємо вправо (touchEndX > touchStartX), distance буде позитивним, і ми хочемо prevImage
+    const distance = touchEndX.current - touchStartX.current;
+    const isLeftSwipe = distance < -minSwipeDistance; // Свайп вліво = наступне фото
+    const isRightSwipe = distance > minSwipeDistance; // Свайп вправо = попереднє фото
 
     setIsSwiping(false);
     setSwipeOffset(0);
 
     if (isLeftSwipe) {
-      nextImage();
+      nextImage(); // Свайп вліво = наступне фото
     } else if (isRightSwipe) {
-      prevImage();
+      prevImage(); // Свайп вправо = попереднє фото
     }
   };
+
+  // Мемоізуємо URL зображень, щоб уникнути зайвих запитів
+  const imageUrls = useMemo(() => {
+    return images.map((imagePath) => {
+      if (imagePath?.startsWith('http')) {
+        return imagePath;
+      }
+      // Видаляємо query параметри якщо є
+      const cleanPath = imagePath?.split('?')[0] || imagePath;
+      // Видаляємо початковий слеш якщо є
+      const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+      // Використовуємо API route для обслуговування зображень без timestamp
+      return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+    });
+  }, [images]);
 
   if (images.length === 0) {
     return (
@@ -82,26 +103,18 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
     );
   }
 
-  // Функція для отримання URL зображення через API
-  const getImageUrl = (imagePath: string) => {
-    if (imagePath?.startsWith('http')) {
-      return imagePath;
-    }
-    // Видаляємо query параметри якщо є
-    const cleanPath = imagePath?.split('?')[0] || imagePath;
-    // Видаляємо початковий слеш якщо є
-    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-    // Використовуємо API route для обслуговування зображень
-    return `/api/images/${pathWithoutSlash}?t=${Date.now()}`;
-  };
-
   return (
     <div 
-      className="relative aspect-square bg-gray-100 overflow-hidden"
+      className="relative w-full aspect-square bg-gray-100 overflow-hidden ImageGallery"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      style={{ touchAction: 'pan-y pinch-zoom' }}
+      style={{ 
+        touchAction: 'pan-y pinch-zoom',
+        position: 'relative',
+        width: '100%',
+        maxWidth: '100%'
+      }}
     >
       {/* Skeleton loader */}
       {imageLoading && !imageError && (
@@ -124,7 +137,7 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
           }}
         >
           <img 
-            src={getImageUrl(images[currentIndex])}
+            src={imageUrls[currentIndex]}
             alt={`${title} - фото ${currentIndex + 1}`}
             className={`w-full h-full object-contain transition-all duration-500 ease-in-out ${
               imageLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
@@ -145,27 +158,66 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
       
       {images.length > 1 && (
         <>
-          {/* Індикатор фото */}
-          <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-3 py-1.5 rounded-full">
+          {/* Індикатор фото - зверху справа */}
+          <div 
+            className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-3 py-1.5 rounded-full z-20"
+            style={{ 
+              position: 'absolute',
+              top: '1rem',
+              right: '1rem',
+              left: 'auto',
+              zIndex: 20,
+              pointerEvents: 'none'
+            }}
+          >
             {currentIndex + 1} / {images.length}
           </div>
 
           {/* Кнопки навігації */}
           <button
             onClick={prevImage}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 z-20"
+            aria-label="Попереднє фото"
+            style={{ 
+              position: 'absolute',
+              left: '1rem',
+              right: 'auto',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 20
+            }}
           >
             <ChevronLeft size={20} className="text-gray-700" />
           </button>
           <button
             onClick={nextImage}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 z-20"
+            aria-label="Наступне фото"
+            style={{ 
+              position: 'absolute',
+              right: '1rem',
+              left: 'auto',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 20
+            }}
           >
             <ChevronRight size={20} className="text-gray-700" />
           </button>
 
-          {/* Точки індикації */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+          {/* Точки індикації - знизу по центру */}
+          <div 
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20"
+            style={{ 
+              position: 'absolute',
+              bottom: '1rem',
+              left: '50%',
+              right: 'auto',
+              top: 'auto',
+              transform: 'translateX(-50%)',
+              zIndex: 20
+            }}
+          >
             {images.map((_, index) => (
               <button
                 key={index}
@@ -175,6 +227,7 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
                     ? 'bg-white w-6' 
                     : 'bg-white/50 hover:bg-white/75'
                 }`}
+                aria-label={`Перейти до фото ${index + 1}`}
               />
             ))}
           </div>
@@ -183,4 +236,3 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
     </div>
   );
 };
-

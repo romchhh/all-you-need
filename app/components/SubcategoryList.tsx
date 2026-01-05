@@ -15,20 +15,18 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
     <div className="mb-4">
       <div className="flex items-center justify-between mb-3 px-4">
         <h3 className="text-sm font-semibold text-gray-700">Підкатегорії</h3>
-        {selectedSubcategory && (
-          <button
-            onClick={() => {
-              onSelect(null);
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className="text-xs text-blue-600 font-medium"
-          >
-            Очистити
-          </button>
-        )}
       </div>
-      <div className="overflow-x-auto -mx-4 px-4">
-        <div className="flex gap-2 pb-2">
+      <div 
+        className="overflow-x-auto -mx-4 w-full scrollbar-hide" 
+        style={{ 
+          maxWidth: '100vw',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          paddingLeft: '16px'
+        }}
+      >
+        <div className="flex gap-2 pb-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
           <button
             onClick={() => {
               onSelect(null);

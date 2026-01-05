@@ -8,7 +8,7 @@ import { CreateListingModal } from '../CreateListingModal';
 import { EditListingModal } from '../EditListingModal';
 import { ShareModal } from '../ShareModal';
 import { Listing, Category } from '@/types';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { getCategories } from '@/constants/categories';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from '../Toast';
@@ -18,6 +18,7 @@ import { getBotBaseUrl, getBotStartLink } from '@/utils/botLinks';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
+import { LanguageSwitcher } from '../LanguageSwitcher';
 
 interface ProfileTabProps {
   tg: TelegramWebApp | null;
@@ -206,7 +207,12 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
               <>
                 <div className="absolute inset-0 animate-pulse bg-gray-200" />
                 <img 
-                  src={profile.avatar} 
+                  src={(() => {
+                    if (profile.avatar?.startsWith('http')) return profile.avatar;
+                    const cleanPath = profile.avatar?.split('?')[0] || profile.avatar;
+                    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                    return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+                  })()}
                   alt={displayName}
                   className="w-full h-full object-cover relative z-10"
                   loading="eager"
@@ -569,8 +575,18 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
           )}
         </div>
 
+      {/* Перемикач мови */}
+      <div className="px-4 pb-4 pt-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-900 font-medium">{t('common.language')}</span>
+            <LanguageSwitcher tg={tg} />
+          </div>
+        </div>
+      </div>
+
       {/* Посилання на FAQ та політику конфіденційності */}
-      <div className="px-4 pb-4 pt-6 space-y-2">
+      <div className="px-4 pb-4 pt-2 space-y-2">
         <button
           onClick={() => {
             router.push(`/${language}/faq`);

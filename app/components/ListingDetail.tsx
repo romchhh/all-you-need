@@ -4,11 +4,14 @@ import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
 import { ListingCard } from './ListingCard';
 import { ShareModal } from './ShareModal';
+import { TopBar } from './TopBar';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getListingShareLink } from '@/utils/botLinks';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSwipeBack } from '@/hooks/useSwipeBack';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 
@@ -103,10 +106,27 @@ export const ListingDetail = ({
 
   // Скролимо нагору при відкритті нового оголошення
   useEffect(() => {
-    // Невелика затримка для забезпечення рендерингу
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
+    // Функція для скролу нагору
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    // Миттєво скролимо нагору
+    scrollToTop();
+
+    // Використовуємо requestAnimationFrame для гарантії після рендерингу
+    requestAnimationFrame(() => {
+      scrollToTop();
+      requestAnimationFrame(() => {
+        scrollToTop();
+        // Додаткова перевірка через невелику затримку
+        setTimeout(() => {
+          scrollToTop();
+        }, 100);
+      });
+    });
   }, [listing.id]);
 
   // Фіксуємо перегляд при відкритті оголошення
@@ -205,44 +225,100 @@ export const ListingDetail = ({
     }
   };
 
+  // Додаємо свайп зліва для повернення назад
+  useSwipeBack({
+    onSwipeBack: onClose,
+    enabled: true,
+    tg
+  });
+
+  // Функція для оновлення даних
+  const handleRefresh = async () => {
+    try {
+      // Оновлюємо основні дані оголошення
+      const viewerId = currentUser?.id;
+      const url = viewerId 
+        ? `/api/listings/${listing.id}?viewerId=${viewerId}`
+        : `/api/listings/${listing.id}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+      });
+      if (response.ok) {
+        const updatedListing = await response.json();
+        setViews(updatedListing.views);
+      }
+
+      // Оновлюємо пов'язані оголошення
+      if (listing.seller.telegramId) {
+        const viewerIdStr = currentUser?.id?.toString() || '';
+        const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerIdStr}&limit=16&offset=0`);
+        if (sellerResponse.ok) {
+          const sellerData = await sellerResponse.json();
+          const filtered = (sellerData.listings || []).filter((l: Listing) => l.id !== listing.id);
+          setSellerListings(filtered);
+          setSellerTotal(sellerData.total || 0);
+          setSellerHasMore(filtered.length < ((sellerData.total || 0) - 1));
+        }
+      }
+      
+      const categoryResponse = await fetch(`/api/listings?category=${listing.category}&limit=16&offset=0`);
+      if (categoryResponse.ok) {
+        const categoryData = await categoryResponse.json();
+        const filtered = (categoryData.listings || []).filter((l: Listing) => l.id !== listing.id);
+        setCategoryListings(filtered);
+        setCategoryTotal(categoryData.total || 0);
+        setCategoryHasMore(filtered.length < ((categoryData.total || 0) - 1));
+      }
+    } catch (error) {
+      console.error('Error refreshing listing:', error);
+    }
+  };
+
+  // Додаємо pull-to-refresh
+  const { isPulling, pullDistance, pullProgress } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: true,
+    tg
+  });
+
   return (
     <div className="min-h-screen bg-white pb-20" style={{ position: 'relative' }}>
-      {/* Хедер */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10">
-        <button 
-          onClick={() => {
-            onClose();
-            tg?.HapticFeedback.impactOccurred('light');
+      {/* Індикатор pull-to-refresh */}
+      {isPulling && (
+        <div 
+          className="fixed top-0 left-0 right-0 flex items-center justify-center z-50 bg-white/90 backdrop-blur-sm transition-opacity"
+          style={{
+            height: `${Math.min(pullDistance, 80)}px`,
+            opacity: Math.min(pullProgress * 1.5, 1),
+            transform: `translateY(${Math.min(pullDistance - 80, 0)}px)`
           }}
-          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
         >
-          <ArrowLeft size={20} className="text-gray-900" />
-        </button>
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              onToggleFavorite(listing.id);
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-          >
-            <Heart 
-              size={20} 
-              className={isFavorite ? 'text-red-500' : 'text-gray-600'}
-              fill={isFavorite ? 'currentColor' : 'none'}
-            />
-          </button>
-          <button 
-            onClick={() => {
-              setShowShareModal(true);
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-          >
-            <Share2 size={20} className="text-gray-900" />
-          </button>
+          {pullProgress >= 1 ? (
+            <div className="flex items-center gap-2 text-blue-500">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm font-medium">{t('common.loading')}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-gray-400">
+              <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full" style={{
+                transform: `rotate(${pullProgress * 360}deg)`
+              }}></div>
+              <span className="text-sm">{t('common.pullToRefresh')}</span>
+            </div>
+          )}
         </div>
-      </div>
+      )}
+      {/* Хедер */}
+      <TopBar
+        variant="detail"
+        onBack={onClose}
+        onShareClick={() => setShowShareModal(true)}
+        onFavoriteClick={() => onToggleFavorite(listing.id)}
+        isFavorite={isFavorite}
+        title={listing.title}
+        tg={tg}
+      />
 
       {/* Галерея фото */}
       <ImageGallery images={images} title={listing.title} />
@@ -256,7 +332,7 @@ export const ListingDetail = ({
                   {listing.isFree ? t('common.free') : listing.price}
                 </div>
                 {!listing.isFree && listing.currency && (
-                  <span className="text-2xl text-gray-600">{getCurrencySymbol(listing.currency)}</span>
+                  <span className="text-3xl font-bold text-gray-900">{getCurrencySymbol(listing.currency)}</span>
                 )}
               </div>
             </div>
@@ -297,14 +373,19 @@ export const ListingDetail = ({
 
         {/* Продавець */}
         <div className="border border-gray-200 rounded-2xl p-4 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Продавець</h2>
+          <h2 className="font-semibold text-gray-900 mb-4">{t('listing.seller')}</h2>
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 relative">
               {listing.seller.avatar && (listing.seller.avatar.startsWith('/') || listing.seller.avatar.startsWith('http')) ? (
                 <>
                   <div className="absolute inset-0 animate-pulse bg-gray-200" />
                   <img 
-                    src={listing.seller.avatar} 
+                    src={(() => {
+                      if (listing.seller.avatar?.startsWith('http')) return listing.seller.avatar;
+                      const cleanPath = listing.seller.avatar?.split('?')[0] || listing.seller.avatar;
+                      const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                      return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+                    })()}
                     alt={listing.seller.name}
                     className="w-full h-full object-cover relative z-10"
                     loading="eager"
@@ -353,7 +434,7 @@ export const ListingDetail = ({
               className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-xl font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
             >
               <User size={18} />
-              Переглянути профіль
+              {t('listing.viewSellerProfile')}
             </button>
           )}
         </div>
@@ -361,7 +442,7 @@ export const ListingDetail = ({
         {/* Інші оголошення продавця */}
         {sellerListings.length > 0 && (
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Інші оголошення продавця</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('listing.otherSellerListings')}</h2>
             <div className="grid grid-cols-2 gap-3">
               {sellerListings.map(sellerListing => (
                 <ListingCard 
@@ -384,7 +465,7 @@ export const ListingDetail = ({
                   onClick={loadMoreSellerListings}
                   className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-4 rounded-2xl transition-colors"
                 >
-                  Показати більше
+                  {t('common.showMore')}
                 </button>
               </div>
             )}
@@ -394,7 +475,7 @@ export const ListingDetail = ({
         {/* Оголошення з категорії */}
         {categoryListings.length > 0 && (
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Схожі товари</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('listing.similarListings')}</h2>
             <div className="grid grid-cols-2 gap-3">
               {categoryListings.map(categoryListing => (
                 <ListingCard 
@@ -417,7 +498,7 @@ export const ListingDetail = ({
                   onClick={loadMoreCategoryListings}
                   className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-4 rounded-2xl transition-colors"
                 >
-                  Показати більше
+                  {t('common.showMore')}
                 </button>
               </div>
             )}
@@ -427,7 +508,7 @@ export const ListingDetail = ({
 
 
       {/* Нижня панель з кнопкою */}
-      <div className="fixed bottom-20 left-0 right-0 p-4 z-[60] max-w-2xl mx-auto" style={{ pointerEvents: 'auto' }}>
+      <div className="fixed bottom-20 left-0 right-0 p-4 z-[50] max-w-2xl mx-auto" style={{ pointerEvents: 'auto' }}>
         <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-4">
           <button 
             type="button"

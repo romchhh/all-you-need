@@ -115,8 +115,13 @@ async function optimizeDatabase(): Promise<void> {
     // Створюємо додаткові індекси для оптимізації (якщо їх немає)
     await createAdditionalIndexes();
     
-    // Оптимізувати запити
-    await prisma.$executeRawUnsafe(`PRAGMA optimize;`);
+    // Оптимізувати запити (PRAGMA optimize повертає результати, тому використовуємо queryRaw)
+    try {
+      await prisma.$queryRawUnsafe(`PRAGMA optimize;`);
+    } catch (error: any) {
+      // PRAGMA optimize може не працювати в деяких версіях SQLite, це нормально
+      console.log('Note: PRAGMA optimize not available or returned results');
+    }
     
     dbOptimized = true;
     globalForPrisma.dbOptimized = true;
@@ -129,10 +134,13 @@ async function optimizeDatabase(): Promise<void> {
   }
 }
 
-// Викликаємо оптимізацію при ініціалізації
+// Викликаємо оптимізацію при ініціалізації (асинхронно, не блокуємо)
 if (!dbOptimized) {
-  optimizeDatabase().catch(err => {
-    console.log('Error optimizing database:', err);
+  // Запускаємо оптимізацію в фоні, не блокуємо ініціалізацію
+  setImmediate(() => {
+    optimizeDatabase().catch(err => {
+      console.log('Error optimizing database:', err);
+    });
   });
 }
 

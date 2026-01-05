@@ -20,7 +20,11 @@
     "user": "Пользователь",
     "currency": "Валюта",
     "selectCurrency": "Выберите валюту",
-    "free": "Бесплатно"
+    "free": "Бесплатно",
+    "language": "Язык",
+    "all": "Все",
+    "pullToRefresh": "Потяните для обновления",
+    "showMore": "Показать больше"
   },
   "navigation": {
     "bazaar": "Головна",
@@ -59,7 +63,11 @@
     "removeFromFavorites": "Удалить из избранного",
     "noImages": "Нет фото",
     "addPhoto": "Добавить фото",
-    "removePhoto": "Удалить фото"
+    "removePhoto": "Удалить фото",
+    "viewSellerProfile": "Посмотреть профиль",
+    "otherSellerListings": "Другие товары продавца",
+    "similarListings": "Похожие товары",
+    "sellerProfile": "Профиль продавца"
   },
   "profile": {
     "myProfile": "Мой профиль",
@@ -68,8 +76,31 @@
     "firstName": "Имя",
     "lastName": "Фамилия",
     "phone": "Телефон",
+    "listings": "Объявлений",
+    "sold": "Продано",
+    "onService": "На сервисе",
+    "year": "год",
+    "years": "года",
+    "yearsMany": "лет",
+    "month": "мес",
+    "months": "мес",
+    "monthsMany": "мес",
+    "day": "день",
+    "days": "дня",
+    "daysMany": "дней",
     "username": "Имя пользователя",
-    "listings": "Объявления",
+    "listings": "Объявлений",
+    "sold": "Продано",
+    "onService": "На сервисе",
+    "year": "год",
+    "years": "года",
+    "yearsMany": "лет",
+    "month": "мес",
+    "months": "мес",
+    "monthsMany": "мес",
+    "day": "день",
+    "days": "дня",
+    "daysMany": "дней",
     "activeListings": "активных",
     "soldListings": "продано",
     "totalViews": "всего просмотров",
@@ -105,7 +136,10 @@
         "from": "От",
         "to": "До",
         "freeOnly": "Только бесплатные",
-        "apply": "Применить"
+        "apply": "Применить",
+        "categories": "Категории",
+        "condition": "Состояние",
+        "reset": "Сброс"
   },
   "favorites": {
     "title": "Избранное",
@@ -287,6 +321,8 @@
     }
   },
   "categories": {
+    "title": "Категории",
+    "allCategoriesDescription": "Просмотреть все объявления",
     "fashion": "Мода и стиль",
     "furniture": "Мебель",
     "electronics": "Электроника",
@@ -298,6 +334,19 @@
     "realestate": "Недвижимость",
     "services_work": "Услуги и работа",
     "free": "Бесплатно / Отдам",
+    "description": {
+      "fashion": "Одежда, обувь и аксессуары",
+      "furniture": "Мебель для дома и офиса",
+      "electronics": "Телефоны, компьютеры и техника",
+      "appliances": "Бытовая техника для дома",
+      "kids": "Товары для детей и младенцев",
+      "home": "Товары для дома и декор",
+      "auto": "Автомобили, мотоциклы и запчасти",
+      "hobby_sports": "Спорт, хобби и развлечения",
+      "realestate": "Недвижимость и аренда",
+      "services_work": "Услуги и вакансии",
+      "free": "Бесплатные товары и вещи, которые отдают"
+    },
     "subcategories": {
       "women_clothing": "Женская одежда",
       "women_shoes": "Женская обувь",

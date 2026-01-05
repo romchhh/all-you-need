@@ -1,7 +1,7 @@
 import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2 } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Listing } from '@/types';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { getCategories } from '@/constants/categories';
 import { ukrainianCities, searchCities } from '@/constants/ukrainian-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -83,15 +83,44 @@ export const EditListingModal = ({
     }
   }, [isOpen, listing]);
 
-  // Блокуємо скрол body при відкритому модальному вікні
+  // Блокуємо скрол body та html при відкритому модальному вікні
   useEffect(() => {
     if (isOpen) {
+      // Зберігаємо поточну позицію скролу
+      const scrollY = window.scrollY;
+      
+      // Блокуємо скрол на body та html
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Для мобільних пристроїв
+      document.body.style.touchAction = 'none';
     } else {
+      // Відновлюємо скрол
+      const scrollY = document.body.style.top;
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.touchAction = '';
+      
+      // Відновлюємо позицію скролу
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
     return () => {
+      // Cleanup
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.touchAction = '';
     };
   }, [isOpen]);
 
@@ -228,7 +257,7 @@ export const EditListingModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto pb-24">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
       <div className="bg-white rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col relative animate-slide-up">
         {/* Хедер */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10 flex-shrink-0">
@@ -255,7 +284,7 @@ export const EditListingModal = ({
                       if (typeof preview === 'string' && preview.startsWith('http')) return preview;
                       const cleanPath = (typeof preview === 'string' ? preview : '').split('?')[0];
                       const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-                      return pathWithoutSlash ? `/api/images/${pathWithoutSlash}?t=${Date.now()}` : '';
+                      return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
                     })()}
                     alt={`Preview ${index + 1}`} 
                     className="w-full h-full object-cover"
@@ -698,7 +727,7 @@ export const EditListingModal = ({
 
         {/* Підтвердження видалення */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 overflow-hidden">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
               <h3 className="text-xl font-bold text-gray-900 mb-2">Видалити оголошення?</h3>
               <p className="text-gray-600 mb-6">{t('editListing.confirmDelete')}</p>

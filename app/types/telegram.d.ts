@@ -40,6 +40,8 @@ export interface TelegramWebApp {
   viewportStableHeight?: number;
   headerColor?: string;
   backgroundColor?: string;
+  onEvent?(eventType: string, eventHandler: () => void): void;
+  offEvent?(eventType: string, eventHandler: () => void): void;
   BackButton: {
     isVisible: boolean;
     onClick(callback: () => void): void;

@@ -110,17 +110,23 @@ export async function POST(request: NextRequest) {
     const telegramIdNum = parseInt(telegramId);
     console.log('Looking for user with telegramId:', telegramIdNum);
 
-    // Перевіряємо чи користувач існує через raw query
-    const existingUsers = await prisma.$queryRaw<Array<{ id: number }>>`
-      SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-    `;
+    // Додаємо retry logic для уникнення проблем з блокуванням БД
+    const { executeWithRetry } = await import('@/lib/prisma');
+
+    // Перевіряємо чи користувач існує через raw query (з retry)
+    const existingUsers = await executeWithRetry(() =>
+      prisma.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
+      `
+    );
     
     const existingUser = existingUsers[0];
     let user: any = null;
     
     if (existingUser) {
-      // Отримуємо повні дані користувача
-      const fullUsers = await prisma.$queryRaw<Array<{
+      // Отримуємо повні дані користувача (з retry)
+      const fullUsers = await executeWithRetry(() =>
+        prisma.$queryRaw<Array<{
         id: number;
         telegramId: number;
         username: string | null;
@@ -149,7 +155,8 @@ export async function POST(request: NextRequest) {
           updatedAt
         FROM User
         WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-      `;
+      `
+      );
       user = fullUsers[0];
     }
 
@@ -196,19 +203,22 @@ export async function POST(request: NextRequest) {
       const updateAvatar = avatarPath || user.avatar;
       const updateTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
       
-      await prisma.$executeRaw`
-        UPDATE User 
-        SET 
-          username = ${updateUsername},
-          firstName = ${updateFirstName},
-          lastName = ${updateLastName},
-          avatar = ${updateAvatar},
-          updatedAt = ${updateTime}
-        WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-      `;
+      await executeWithRetry(() =>
+        prisma.$executeRaw`
+          UPDATE User 
+          SET 
+            username = ${updateUsername},
+            firstName = ${updateFirstName},
+            lastName = ${updateLastName},
+            avatar = ${updateAvatar},
+            updatedAt = ${updateTime}
+          WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
+        `
+      );
       
-      // Отримуємо оновлені дані
-      const updatedUsers = await prisma.$queryRaw<Array<{
+      // Отримуємо оновлені дані (з retry)
+      const updatedUsers = await executeWithRetry(() =>
+        prisma.$queryRaw<Array<{
         id: number;
         telegramId: number;
         username: string | null;
@@ -233,37 +243,41 @@ export async function POST(request: NextRequest) {
           createdAt
         FROM User
         WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-      `;
+      `
+      );
       
       user = updatedUsers[0];
       console.log('User updated:', user);
     } else {
-      // Створюємо нового користувача через raw query
+      // Створюємо нового користувача через raw query (з retry)
       console.log('Creating new user');
       const createTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
       
-      await prisma.$executeRaw`
-        INSERT INTO User (
-          telegramId, username, firstName, lastName, avatar, 
-          balance, rating, reviewsCount, isActive, createdAt, updatedAt
-        )
-        VALUES (
-          ${telegramIdNum},
-          ${username || null},
-          ${firstName || null},
-          ${lastName || null},
-          ${avatarPath || null},
-          0.0,
-          5.0,
-          0,
-          1,
-          ${createTime},
-          ${createTime}
-        )
-      `;
+      await executeWithRetry(() =>
+        prisma.$executeRaw`
+          INSERT INTO User (
+            telegramId, username, firstName, lastName, avatar, 
+            balance, rating, reviewsCount, isActive, createdAt, updatedAt
+          )
+          VALUES (
+            ${telegramIdNum},
+            ${username || null},
+            ${firstName || null},
+            ${lastName || null},
+            ${avatarPath || null},
+            0.0,
+            5.0,
+            0,
+            1,
+            ${createTime},
+            ${createTime}
+          )
+        `
+      );
       
-      // Отримуємо створені дані
-      const createdUsers = await prisma.$queryRaw<Array<{
+      // Отримуємо створені дані (з retry)
+      const createdUsers = await executeWithRetry(() =>
+        prisma.$queryRaw<Array<{
         id: number;
         telegramId: number;
         username: string | null;
@@ -288,7 +302,8 @@ export async function POST(request: NextRequest) {
           createdAt
         FROM User
         WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-      `;
+      `
+      );
       
       user = createdUsers[0];
       console.log('User created:', user);
@@ -342,35 +357,40 @@ export async function GET(request: NextRequest) {
 
     // Використовуємо raw query для обходу проблеми з форматом дат в SQLite
     // Використовуємо Prisma.$queryRawUnsafe для правильної роботи з параметрами
-    const users = await prisma.$queryRawUnsafe(
-      `SELECT 
-        id,
-        CAST(telegramId AS INTEGER) as telegramId,
-        username,
-        firstName,
-        lastName,
-        phone,
-        avatar,
-        balance,
-        rating,
-        reviewsCount,
-        createdAt
-      FROM User
-      WHERE CAST(telegramId AS INTEGER) = ?`,
-      telegramIdNum
-    ) as Array<{
-      id: number;
-      telegramId: number;
-      username: string | null;
-      firstName: string | null;
-      lastName: string | null;
-      phone: string | null;
-      avatar: string | null;
-      balance: number;
-      rating: number;
-      reviewsCount: number;
-      createdAt: string;
-    }>;
+    // Додаємо retry logic для уникнення проблем з блокуванням БД
+    const { executeWithRetry } = await import('@/lib/prisma');
+    
+    const users = await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(
+        `SELECT 
+          id,
+          CAST(telegramId AS INTEGER) as telegramId,
+          username,
+          firstName,
+          lastName,
+          phone,
+          avatar,
+          balance,
+          rating,
+          reviewsCount,
+          createdAt
+        FROM User
+        WHERE CAST(telegramId AS INTEGER) = ?`,
+        telegramIdNum
+      ) as Promise<Array<{
+        id: number;
+        telegramId: number;
+        username: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        phone: string | null;
+        avatar: string | null;
+        balance: number;
+        rating: number;
+        reviewsCount: number;
+        createdAt: string;
+      }>>
+    );
     
     console.log('GET /api/user/profile - query returned', users.length, 'users');
     console.log('GET /api/user/profile - first user:', users[0]);

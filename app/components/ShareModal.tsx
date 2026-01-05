@@ -85,7 +85,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl">
           {/* Хедер */}
           <div className="flex items-center justify-between mb-6">
@@ -122,7 +122,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
 
       {/* Fallback меню якщо Web Share API не підтримується */}
       {showFallback && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-end justify-center animate-fadeIn">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-end justify-center animate-fadeIn">
           <div className="bg-white rounded-t-3xl w-full max-w-md p-6 animate-slideUp">
             <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
             

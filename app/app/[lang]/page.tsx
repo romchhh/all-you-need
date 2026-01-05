@@ -18,8 +18,10 @@ import { getFavoritesFromStorage, saveFavoritesToStorage } from '@/utils/favorit
 import { ListingGridSkeleton } from '@/components/SkeletonLoader';
 import { getCachedData, setCachedData } from '@/utils/cache';
 import { CreateListingModal } from '@/components/CreateListingModal';
+import { CategoriesModal } from '@/components/CategoriesModal';
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const AYNMarketplace = () => {
   const params = useParams();
@@ -52,6 +54,8 @@ const AYNMarketplace = () => {
   const [selectedSeller, setSelectedSeller] = useState<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
+  const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
+  const [selectedCategoryFromModal, setSelectedCategoryFromModal] = useState<string | null>(null);
   const savedScrollPositionRef = useRef<number>(0);
 
   // Завантажуємо обране з localStorage при завантаженні
@@ -158,6 +162,23 @@ const AYNMarketplace = () => {
   useEffect(() => {
     fetchListings();
   }, [fetchListings]);
+
+  // Функція для оновлення даних (pull-to-refresh)
+  const handleRefresh = async () => {
+    // Очищаємо кеш для оновлення даних
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cacheKey = 'listings:0:16';
+      localStorage.removeItem(`cache_${cacheKey}`);
+    }
+    await fetchListings();
+  };
+
+  // Додаємо pull-to-refresh тільки на головній вкладці
+  const { isPulling, pullDistance, pullProgress } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: activeTab === 'bazaar' && !selectedListing && !selectedSeller,
+    tg
+  });
 
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -271,8 +292,28 @@ const AYNMarketplace = () => {
     if (selectedListing || selectedSeller) {
       // Зберігаємо поточну позицію скролу перед відкриттям
       savedScrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
-      // Скролимо на початок при відкритті
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Функція для скролу нагору
+      const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      };
+
+      // Миттєво скролимо нагору
+      scrollToTop();
+
+      // Використовуємо requestAnimationFrame для гарантії після рендерингу
+      requestAnimationFrame(() => {
+        scrollToTop();
+        requestAnimationFrame(() => {
+          scrollToTop();
+          // Додаткова перевірка через невелику затримку
+          setTimeout(() => {
+            scrollToTop();
+          }, 100);
+        });
+      });
     } else {
       // Відновлюємо позицію скролу при закритті
       if (savedScrollPositionRef.current > 0) {
@@ -347,6 +388,8 @@ const AYNMarketplace = () => {
             hasMore={hasMore}
             onLoadMore={loadMoreListings}
             onNavigateToCategories={() => setActiveTab('categories')}
+            onOpenCategoriesModal={() => setIsCategoriesModalOpen(true)}
+            initialSelectedCategory={selectedCategoryFromModal}
             tg={tg}
           />
         );
@@ -384,8 +427,33 @@ const AYNMarketplace = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gray-50 pb-20 overflow-x-hidden max-w-full">
+      {/* Індикатор pull-to-refresh */}
+      {isPulling && (
+        <div 
+          className="fixed top-0 left-0 right-0 flex items-center justify-center z-50 bg-white/90 backdrop-blur-sm transition-opacity"
+          style={{
+            height: `${Math.min(pullDistance, 80)}px`,
+            opacity: Math.min(pullProgress * 1.5, 1),
+            transform: `translateY(${Math.min(pullDistance - 80, 0)}px)`
+          }}
+        >
+          {pullProgress >= 1 ? (
+            <div className="flex items-center gap-2 text-blue-500">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm font-medium">{t('common.loading')}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-gray-400">
+              <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full" style={{
+                transform: `rotate(${pullProgress * 360}deg)`
+              }}></div>
+              <span className="text-sm">{t('common.pullToRefresh')}</span>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="max-w-2xl mx-auto w-full overflow-x-hidden">
         {renderContent()}
       </div>
 
@@ -401,6 +469,16 @@ const AYNMarketplace = () => {
               favoritesCount={favorites.size}
               tg={tg}
             />
+
+      {/* Модальне вікно категорій */}
+      <CategoriesModal
+        isOpen={isCategoriesModalOpen}
+        onClose={() => setIsCategoriesModalOpen(false)}
+        onSelectCategory={(categoryId) => {
+          setSelectedCategoryFromModal(categoryId);
+        }}
+        tg={tg}
+      />
 
       {/* Модальне вікно створення оголошення */}
       {profile && (

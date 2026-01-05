@@ -3,6 +3,7 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
 import { getAvatarColor } from '@/utils/avatarColors';
+import { useMemo } from 'react';
 
 interface ListingPreviewModalProps {
   isOpen: boolean;
@@ -99,7 +100,12 @@ export const ListingPreviewModal = ({
             <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
               {listing.seller.avatar && (listing.seller.avatar.startsWith('/') || listing.seller.avatar.startsWith('http')) ? (
                 <img 
-                  src={listing.seller.avatar} 
+                  src={(() => {
+                    if (listing.seller.avatar?.startsWith('http')) return listing.seller.avatar;
+                    const cleanPath = listing.seller.avatar?.split('?')[0] || listing.seller.avatar;
+                    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                    return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+                  })()}
                   alt={sellerName}
                   className="w-full h-full object-cover"
                 />

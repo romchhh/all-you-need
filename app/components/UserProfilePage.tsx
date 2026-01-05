@@ -4,12 +4,14 @@ import { TelegramWebApp } from '@/types/telegram';
 import { ListingCard } from './ListingCard';
 import { ImageViewModal } from './ImageViewModal';
 import { ShareModal } from './ShareModal';
+import { TopBar } from './TopBar';
 import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useState, useEffect } from 'react';
+import { useSwipeBack } from '@/hooks/useSwipeBack';
+import { useState, useEffect, useMemo } from 'react';
 
 interface UserProfilePageProps {
   sellerTelegramId: string;
@@ -129,30 +131,23 @@ export const UserProfilePage = ({
     }, 100);
   }, [sellerTelegramId]);
 
+  // Додаємо свайп зліва для повернення назад
+  useSwipeBack({
+    onSwipeBack: onClose,
+    enabled: true,
+    tg
+  });
+
   return (
     <div className="min-h-screen bg-white pb-20">
       {/* Хедер */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10">
-        <button 
-          onClick={() => {
-            onClose();
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-        >
-          <ArrowLeft size={20} className="text-gray-900" />
-        </button>
-        <h2 className="text-lg font-semibold text-gray-900">Профіль продавця</h2>
-        <button 
-          onClick={() => {
-            setShowShareModal(true);
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-        >
-          <Share2 size={20} className="text-gray-900" />
-        </button>
-      </div>
+      <TopBar
+        variant="profile"
+        onBack={onClose}
+        onShareClick={() => setShowShareModal(true)}
+        title={t('listing.sellerProfile')}
+        tg={tg}
+      />
 
       {/* Профіль */}
       <div className="p-4">
@@ -165,7 +160,12 @@ export const UserProfilePage = ({
               <>
                 <div className="absolute inset-0 animate-pulse bg-gray-200" />
                 <img 
-                  src={sellerAvatar} 
+                  src={(() => {
+                    if (sellerAvatar?.startsWith('http')) return sellerAvatar;
+                    const cleanPath = sellerAvatar?.split('?')[0] || sellerAvatar;
+                    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                    return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+                  })()}
                   alt={sellerName}
                   className="w-full h-full object-cover relative z-10"
                   loading="eager"
@@ -202,11 +202,11 @@ export const UserProfilePage = ({
             <div className="w-full grid grid-cols-3 gap-3 mb-4">
               <div className="bg-gray-50 rounded-xl p-3 text-center">
                 <div className="text-2xl font-bold text-gray-900 mb-1">{stats.totalListings}</div>
-                <div className="text-xs text-gray-500">Оголошень</div>
+                <div className="text-xs text-gray-500">{t('profile.listings')}</div>
               </div>
               <div className="bg-gray-50 rounded-xl p-3 text-center">
                 <div className="text-2xl font-bold text-gray-900 mb-1">{stats.soldListings}</div>
-                <div className="text-xs text-gray-500">Продано</div>
+                <div className="text-xs text-gray-500">{t('profile.sold')}</div>
               </div>
               <div className="bg-gray-50 rounded-xl p-3 text-center">
                 <div className="text-lg font-bold text-gray-900 mb-1">
@@ -219,15 +219,15 @@ export const UserProfilePage = ({
                     const diffYears = Math.floor(diffDays / 365);
                     
                     if (diffYears > 0) {
-                      return `${diffYears} ${diffYears === 1 ? 'рік' : diffYears < 5 ? 'роки' : 'років'}`;
+                      return `${diffYears} ${diffYears === 1 ? t('profile.year') : diffYears < 5 ? t('profile.years') : t('profile.yearsMany')}`;
                     } else if (diffMonths > 0) {
-                      return `${diffMonths} ${diffMonths === 1 ? 'міс' : diffMonths < 5 ? 'міс' : 'міс'}`;
+                      return `${diffMonths} ${diffMonths === 1 ? t('profile.month') : diffMonths < 5 ? t('profile.months') : t('profile.monthsMany')}`;
                     } else {
-                      return `${diffDays} ${diffDays === 1 ? 'день' : diffDays < 5 ? 'дні' : 'днів'}`;
+                      return `${diffDays} ${diffDays === 1 ? t('profile.day') : diffDays < 5 ? t('profile.days') : t('profile.daysMany')}`;
                     }
                   })() : '-'}
                 </div>
-                <div className="text-xs text-gray-500">На сервісі</div>
+                <div className="text-xs text-gray-500">{t('profile.onService')}</div>
               </div>
             </div>
           )}

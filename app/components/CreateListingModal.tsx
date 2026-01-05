@@ -66,15 +66,44 @@ export const CreateListingModal = ({
       ).slice(0, 10)
     : allCities.slice(0, 10);
 
-  // Блокуємо скрол body при відкритому модальному вікні
+  // Блокуємо скрол body та html при відкритому модальному вікні
   useEffect(() => {
     if (isOpen) {
+      // Зберігаємо поточну позицію скролу
+      const scrollY = window.scrollY;
+      
+      // Блокуємо скрол на body та html
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Для мобільних пристроїв
+      document.body.style.touchAction = 'none';
     } else {
+      // Відновлюємо скрол
+      const scrollY = document.body.style.top;
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.touchAction = '';
+      
+      // Відновлюємо позицію скролу
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
     return () => {
+      // Cleanup
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.touchAction = '';
     };
   }, [isOpen]);
 
@@ -231,7 +260,7 @@ export const CreateListingModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto pb-24">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden">
       <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl my-8 max-h-[85vh] flex flex-col">
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-6 flex-shrink-0">

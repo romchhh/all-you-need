@@ -20,7 +20,11 @@
     "user": "Користувач",
     "currency": "Валюта",
     "selectCurrency": "Оберіть валюту",
-    "free": "Безкоштовно"
+    "free": "Безкоштовно",
+    "language": "Мова",
+    "all": "Всі",
+    "pullToRefresh": "Потягніть для оновлення",
+    "showMore": "Показати більше"
   },
   "navigation": {
     "bazaar": "Головна",
@@ -59,7 +63,11 @@
     "removeFromFavorites": "Видалити з обраного",
     "noImages": "Немає фото",
     "addPhoto": "Додати фото",
-    "removePhoto": "Видалити фото"
+    "removePhoto": "Видалити фото",
+    "viewSellerProfile": "Переглянути профіль",
+    "otherSellerListings": "Інші товари продавця",
+    "similarListings": "Схожі товари",
+    "sellerProfile": "Профіль продавця"
   },
   "profile": {
     "myProfile": "Мій профіль",
@@ -68,8 +76,31 @@
     "firstName": "Ім'я",
     "lastName": "Прізвище",
     "phone": "Телефон",
+    "listings": "Оголошень",
+    "sold": "Продано",
+    "onService": "На сервісі",
+    "year": "рік",
+    "years": "роки",
+    "yearsMany": "років",
+    "month": "міс",
+    "months": "міс",
+    "monthsMany": "міс",
+    "day": "день",
+    "days": "дні",
+    "daysMany": "днів",
     "username": "Ім'я користувача",
-    "listings": "Оголошення",
+    "listings": "Оголошень",
+    "sold": "Продано",
+    "onService": "На сервісі",
+    "year": "рік",
+    "years": "роки",
+    "yearsMany": "років",
+    "month": "міс",
+    "months": "міс",
+    "monthsMany": "міс",
+    "day": "день",
+    "days": "дні",
+    "daysMany": "днів",
     "activeListings": "активних",
     "soldListings": "продано",
     "totalViews": "всього переглядів",
@@ -105,7 +136,10 @@
         "from": "Від",
         "to": "До",
         "freeOnly": "Тільки безкоштовні",
-        "apply": "Застосувати"
+        "apply": "Застосувати",
+        "categories": "Категорії",
+        "condition": "Стан",
+        "reset": "Скинути"
   },
   "favorites": {
     "title": "Обране",
@@ -298,6 +332,8 @@
     }
   },
   "categories": {
+    "title": "Категорії",
+    "allCategoriesDescription": "Переглянути всі оголошення",
     "fashion": "Мода та стиль",
     "furniture": "Меблі",
     "electronics": "Електроніка",
@@ -309,6 +345,19 @@
     "realestate": "Нерухомість",
     "services_work": "Послуги та робота",
     "free": "Безкоштовно / Віддам",
+    "description": {
+      "fashion": "Одяг, взуття та аксесуари",
+      "furniture": "Меблі для дому та офісу",
+      "electronics": "Телефони, комп'ютери та техніка",
+      "appliances": "Побутова техніка для дому",
+      "kids": "Товари для дітей та немовлят",
+      "home": "Товари для дому та декор",
+      "auto": "Автомобілі, мотоцикли та запчастини",
+      "hobby_sports": "Спорт, хобі та розваги",
+      "realestate": "Нерухомість та оренда",
+      "services_work": "Послуги та вакансії",
+      "free": "Безкоштовні товари та речі, які віддають"
+    },
     "subcategories": {
       "women_clothing": "Жіночий одяг",
       "women_shoes": "Жіноче взуття",

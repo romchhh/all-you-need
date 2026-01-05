@@ -17,6 +17,8 @@ export const useTelegram = () => {
   useEffect(() => {
     if (window.Telegram?.WebApp) {
       const telegram = window.Telegram.WebApp;
+      
+      // Викликаємо ready() першим
       telegram.ready();
       
       // Розгортаємо на весь екран
@@ -25,19 +27,39 @@ export const useTelegram = () => {
       // Приховуємо основну кнопку
       telegram.MainButton.hide();
       
-      // Налаштування для повноекранного режиму
+      // Налаштування для повноекранного режиму з можливістю згортання
+      // Встановлюємо колір фону
+      telegram.backgroundColor = '#ffffff';
+      
+      // Встановлюємо колір хедера (для можливості згортання)
+      telegram.headerColor = '#ffffff';
+      
+      // Налаштування viewport для правильного відображення та можливості згортання
+      // Telegram автоматично дозволить згортання, якщо контент виходить за межі viewport
+      const updateViewport = () => {
+        if (telegram.viewportStableHeight) {
+          // Встановлюємо CSS змінну для використання в стилях
+          document.documentElement.style.setProperty('--tg-viewport-height', `${telegram.viewportStableHeight}px`);
+          // Встановлюємо мінімальну висоту body для правильного відображення
+          document.body.style.minHeight = `${telegram.viewportStableHeight}px`;
+        }
+      };
+      
+      // Оновлюємо viewport при зміні
+      if (telegram.onEvent) {
+        telegram.onEvent('viewportChanged', updateViewport);
+      }
+      
+      // Викликаємо одразу
+      updateViewport();
+      
+      // Також оновлюємо при зміні розміру вікна
+      const handleResize = () => updateViewport();
+      window.addEventListener('resize', handleResize);
+      
+      // Налаштування для закриття (опціонально)
       if (telegram.enableClosingConfirmation) {
         telegram.enableClosingConfirmation();
-      }
-      
-      // Встановлюємо колір фону (опціонально)
-      if (telegram.backgroundColor) {
-        telegram.backgroundColor = '#ffffff';
-      }
-      
-      // Встановлюємо колір хедера (опціонально)
-      if (telegram.headerColor) {
-        telegram.headerColor = '#ffffff';
       }
       
       setTg(telegram);
@@ -72,6 +94,14 @@ export const useTelegram = () => {
           console.error('No initData string available');
         }
       }
+      
+      // Cleanup function
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        if (telegram.offEvent) {
+          telegram.offEvent('viewportChanged', updateViewport);
+        }
+      };
     } else {
       console.warn('Telegram WebApp not available');
     }
