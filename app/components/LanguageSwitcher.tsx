@@ -95,7 +95,7 @@ export const LanguageSwitcher = ({ tg }: LanguageSwitcherProps) => {
                 : 'text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <span className="text-sm">🇷🇺 RU</span>
+            <span className="text-sm">RU</span>
           </button>
         </div>
       )}

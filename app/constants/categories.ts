@@ -1,148 +1,170 @@
 import { Category } from '@/types';
 
-export const categories: Category[] = [
+// Функція для отримання категорій з перекладами
+export const getCategories = (t: (key: string) => string): Category[] => [
   {
     id: 'fashion',
-    name: 'Мода та стиль',
+    name: t('categories.fashion'),
     icon: '👕',
     subcategories: [
-      { id: 'women_clothing', name: 'Жіночий одяг' },
-      { id: 'women_shoes', name: 'Жіноче взуття' },
-      { id: 'men_clothing', name: 'Чоловічий одяг' },
-      { id: 'men_shoes', name: 'Чоловіче взуття' },
-      { id: 'accessories', name: 'Аксесуари' },
-      { id: 'hats', name: 'Головні убори' },
-      { id: 'beauty_health', name: 'Краса / здоров\'я' },
-      { id: 'other', name: 'Інше' }
+      { id: 'women_clothing', name: t('categories.subcategories.women_clothing') },
+      { id: 'women_shoes', name: t('categories.subcategories.women_shoes') },
+      { id: 'men_clothing', name: t('categories.subcategories.men_clothing') },
+      { id: 'men_shoes', name: t('categories.subcategories.men_shoes') },
+      { id: 'accessories', name: t('categories.subcategories.accessories') },
+      { id: 'hats', name: t('categories.subcategories.hats') },
+      { id: 'beauty_health', name: t('categories.subcategories.beauty_health') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'furniture',
-    name: 'Меблі',
+    name: t('categories.furniture'),
     icon: '🛋️',
     subcategories: [
-      { id: 'sofas_chairs', name: 'Дивани / крісла' },
-      { id: 'wardrobes_chests', name: 'Шафи / комоди' },
-      { id: 'tables_chairs', name: 'Столи / стільці' },
-      { id: 'beds_mattresses', name: 'Ліжка / матраци' },
-      { id: 'other', name: 'Інше' }
+      { id: 'sofas_chairs', name: t('categories.subcategories.sofas_chairs') },
+      { id: 'wardrobes_chests', name: t('categories.subcategories.wardrobes_chests') },
+      { id: 'tables_chairs', name: t('categories.subcategories.tables_chairs') },
+      { id: 'beds_mattresses', name: t('categories.subcategories.beds_mattresses') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'electronics',
-    name: 'Електроніка',
+    name: t('categories.electronics'),
     icon: '📱',
     subcategories: [
-      { id: 'smartphones', name: 'Смартфони' },
-      { id: 'computers_laptops', name: 'Комп\'ютери / ноутбуки' },
-      { id: 'tv_audio', name: 'ТВ / аудіо' },
-      { id: 'games_consoles', name: 'Ігри / приставки' },
-      { id: 'accessories', name: 'Аксесуари' },
-      { id: 'other', name: 'Інше' }
+      { id: 'smartphones', name: t('categories.subcategories.smartphones') },
+      { id: 'computers_laptops', name: t('categories.subcategories.computers_laptops') },
+      { id: 'tv_audio', name: t('categories.subcategories.tv_audio') },
+      { id: 'games_consoles', name: t('categories.subcategories.games_consoles') },
+      { id: 'accessories', name: t('categories.subcategories.accessories') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'appliances',
-    name: 'Побутова техніка',
+    name: t('categories.appliances'),
     icon: '🔌',
     subcategories: [
-      { id: 'large_appliances', name: 'Велика техніка (холодильники, пральні машини)' },
-      { id: 'small_appliances', name: 'Дрібна техніка' },
-      { id: 'kitchen_appliances', name: 'Кухонна техніка' },
-      { id: 'other', name: 'Інше' }
+      { id: 'large_appliances', name: t('categories.subcategories.large_appliances') },
+      { id: 'small_appliances', name: t('categories.subcategories.small_appliances') },
+      { id: 'kitchen_appliances', name: t('categories.subcategories.kitchen_appliances') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'kids',
-    name: 'Дитячі товари',
+    name: t('categories.kids'),
     icon: '🧸',
     subcategories: [
-      { id: 'toys', name: 'Іграшки' },
-      { id: 'strollers_car_seats', name: 'Коляски / автокрісла' },
-      { id: 'clothing', name: 'Одяг' },
-      { id: 'beds_furniture', name: 'Ліжечка / меблі' },
-      { id: 'other', name: 'Інше' }
+      { id: 'toys', name: t('categories.subcategories.toys') },
+      { id: 'strollers_car_seats', name: t('categories.subcategories.strollers_car_seats') },
+      { id: 'clothing', name: t('categories.subcategories.clothing') },
+      { id: 'beds_furniture', name: t('categories.subcategories.beds_furniture') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'home',
-    name: 'Для дому',
+    name: t('categories.home'),
     icon: '🏡',
     subcategories: [
-      { id: 'dishes', name: 'Посуд' },
-      { id: 'textiles', name: 'Текстиль' },
-      { id: 'lighting', name: 'Освітлення' },
-      { id: 'decor', name: 'Декор' },
-      { id: 'tools', name: 'Інструменти' },
-      { id: 'other', name: 'Інше' }
+      { id: 'dishes', name: t('categories.subcategories.dishes') },
+      { id: 'textiles', name: t('categories.subcategories.textiles') },
+      { id: 'lighting', name: t('categories.subcategories.lighting') },
+      { id: 'decor', name: t('categories.subcategories.decor') },
+      { id: 'tools', name: t('categories.subcategories.tools') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'auto',
-    name: 'Авто',
+    name: t('categories.auto'),
     icon: '🚗',
     subcategories: [
-      { id: 'cars', name: 'Автомобілі' },
-      { id: 'tires_wheels', name: 'Шини / диски' },
-      { id: 'parts', name: 'Запчастини' },
-      { id: 'accessories', name: 'Аксесуари' },
-      { id: 'child_seats', name: 'Дитячі крісла' },
-      { id: 'other', name: 'Інше' }
+      { id: 'cars', name: t('categories.subcategories.cars') },
+      { id: 'tires_wheels', name: t('categories.subcategories.tires_wheels') },
+      { id: 'parts', name: t('categories.subcategories.parts') },
+      { id: 'accessories', name: t('categories.subcategories.accessories') },
+      { id: 'child_seats', name: t('categories.subcategories.child_seats') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'hobby_sports',
-    name: 'Хобі / Спорт',
+    name: t('categories.hobby_sports'),
     icon: '⚽',
     subcategories: [
-      { id: 'sports_equipment', name: 'Спортинвентар' },
-      { id: 'bikes_scooters', name: 'Велосипеди / самокати' },
-      { id: 'music_instruments', name: 'Музичні інструменти' },
-      { id: 'tourism', name: 'Туризм' },
-      { id: 'collections_hobby', name: 'Колекції / хобі' },
-      { id: 'other', name: 'Інше' }
+      { id: 'sports_equipment', name: t('categories.subcategories.sports_equipment') },
+      { id: 'bikes_scooters', name: t('categories.subcategories.bikes_scooters') },
+      { id: 'music_instruments', name: t('categories.subcategories.music_instruments') },
+      { id: 'tourism', name: t('categories.subcategories.tourism') },
+      { id: 'collections_hobby', name: t('categories.subcategories.collections_hobby') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'realestate',
-    name: 'Нерухомість',
+    name: t('categories.realestate'),
     icon: '🏠',
     subcategories: [
-      { id: 'rent_apartments', name: 'Оренда квартир' },
-      { id: 'sell_apartments', name: 'Продаж квартир' },
-      { id: 'rooms', name: 'Кімнати' },
-      { id: 'houses', name: 'Будинки' },
-      { id: 'commercial', name: 'Комерційна нерухомість' },
-      { id: 'garages_parking', name: 'Гаражі, парковки' },
-      { id: 'other', name: 'Інше' }
+      { id: 'rent_apartments', name: t('categories.subcategories.rent_apartments') },
+      { id: 'sell_apartments', name: t('categories.subcategories.sell_apartments') },
+      { id: 'rooms', name: t('categories.subcategories.rooms') },
+      { id: 'houses', name: t('categories.subcategories.houses') },
+      { id: 'commercial', name: t('categories.subcategories.commercial') },
+      { id: 'garages_parking', name: t('categories.subcategories.garages_parking') },
+      { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
   {
     id: 'services_work',
-    name: 'Послуги та робота',
+    name: t('categories.services_work'),
     icon: '💼',
     subcategories: [
-      { id: 'services', name: 'Послуги' },
-      { id: 'repair_installation', name: 'Ремонт і монтаж' },
-      { id: 'cleaning', name: 'Прибирання' },
-      { id: 'transportation', name: 'Перевезення' },
-      { id: 'beauty_health', name: 'Краса і здоров\'я' },
-      { id: 'it_design_websites', name: 'IT / дизайн / сайти' },
-      { id: 'photo_video', name: 'Фото / відео' },
-      { id: 'education_tutors', name: 'Навчання / репетитори' },
-      { id: 'translations', name: 'Переклади' },
-      { id: 'auto_services', name: 'Автоуслуги' },
-      { id: 'consultations', name: 'Консультації' },
-      { id: 'other_services', name: 'Інше' },
-      { id: 'vacancies', name: 'Вакансії' },
-      { id: 'part_time', name: 'Підробіток' },
-      { id: 'looking_for_work', name: 'Шукаю роботу' },
-      { id: 'other_work', name: 'Інше' }
+      { id: 'services', name: t('categories.subcategories.services') },
+      { id: 'repair_installation', name: t('categories.subcategories.repair_installation') },
+      { id: 'cleaning', name: t('categories.subcategories.cleaning') },
+      { id: 'transportation', name: t('categories.subcategories.transportation') },
+      { id: 'beauty_health', name: t('categories.subcategories.beauty_health') },
+      { id: 'it_design_websites', name: t('categories.subcategories.it_design_websites') },
+      { id: 'photo_video', name: t('categories.subcategories.photo_video') },
+      { id: 'education_tutors', name: t('categories.subcategories.education_tutors') },
+      { id: 'translations', name: t('categories.subcategories.translations') },
+      { id: 'auto_services', name: t('categories.subcategories.auto_services') },
+      { id: 'consultations', name: t('categories.subcategories.consultations') },
+      { id: 'other_services', name: t('categories.subcategories.other_services') },
+      { id: 'vacancies', name: t('categories.subcategories.vacancies') },
+      { id: 'part_time', name: t('categories.subcategories.part_time') },
+      { id: 'looking_for_work', name: t('categories.subcategories.looking_for_work') },
+      { id: 'other_work', name: t('categories.subcategories.other_work') }
     ]
   },
   {
     id: 'free',
-    name: 'Безкоштовно / Віддам',
+    name: t('categories.free'),
     icon: '🎁'
   }
 ];
+
+// Для зворотної сумісності (якщо десь використовується старий імпорт)
+// Використовується тільки як fallback, краще використовувати getCategories
+export const categories: Category[] = getCategories((key: string) => {
+  // Fallback на українську мову
+  const ukTranslations: Record<string, string> = {
+    'categories.fashion': 'Мода та стиль',
+    'categories.furniture': 'Меблі',
+    'categories.electronics': 'Електроніка',
+    'categories.appliances': 'Побутова техніка',
+    'categories.kids': 'Дитячі товари',
+    'categories.home': 'Для дому',
+    'categories.auto': 'Авто',
+    'categories.hobby_sports': 'Хобі / Спорт',
+    'categories.realestate': 'Нерухомість',
+    'categories.services_work': 'Послуги та робота',
+    'categories.free': 'Безкоштовно / Віддам',
+    // Додати всі підкатегорії...
+  };
+  return ukTranslations[key] || key;
+});

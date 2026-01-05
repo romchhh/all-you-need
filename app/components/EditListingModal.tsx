@@ -2,7 +2,7 @@ import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2 } from 'luci
 import { TelegramWebApp } from '@/types/telegram';
 import { Listing } from '@/types';
 import { useState, useRef, useEffect } from 'react';
-import { categories } from '@/constants/categories';
+import { getCategories } from '@/constants/categories';
 import { ukrainianCities, searchCities } from '@/constants/ukrainian-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -24,6 +24,7 @@ export const EditListingModal = ({
   tg
 }: EditListingModalProps) => {
   const { t } = useLanguage();
+  const categories = getCategories(t);
   const [title, setTitle] = useState(listing.title);
   const [description, setDescription] = useState(listing.description);
   const [price, setPrice] = useState(listing.isFree ? '' : listing.price);

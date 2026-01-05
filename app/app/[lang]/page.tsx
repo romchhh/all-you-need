@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Listing } from '@/types';
-import { categories } from '@/constants/categories';
+import { getCategories } from '@/constants/categories';
 import { useTelegram } from '@/hooks/useTelegram';
 import { ListingDetail } from '@/components/ListingDetail';
 import { UserProfilePage } from '@/components/UserProfilePage';
@@ -26,6 +26,9 @@ const AYNMarketplace = () => {
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
   const { profile } = useUser();
+  
+  // Отримуємо категорії з перекладами
+  const categories = getCategories(t);
   
   // Синхронізуємо мову з URL
   useEffect(() => {

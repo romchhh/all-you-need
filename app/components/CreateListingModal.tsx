@@ -2,7 +2,7 @@ import { X, Upload, Image as ImageIcon, ChevronDown, MapPin } from 'lucide-react
 import { TelegramWebApp } from '@/types/telegram';
 import { Category } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { categories } from '@/constants/categories';
+import { getCategories } from '@/constants/categories';
 import { germanCities } from '@/constants/german-cities';
 import { ukrainianCities } from '@/constants/ukrainian-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -21,6 +21,7 @@ export const CreateListingModal = ({
   tg
 }: CreateListingModalProps) => {
   const { t } = useLanguage();
+  const categories = getCategories(t);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');

@@ -1,8 +1,24 @@
 import sqlite3
 from database_functions.db_config import DATABASE_PATH
 
+# Функція для отримання оптимізованого з'єднання
+def get_optimized_connection():
+    """Створює оптимізоване з'єднання з БД"""
+    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False, timeout=30.0)
+    # Увімкнути WAL mode для одночасних читання та запису
+    conn.execute('PRAGMA journal_mode = WAL;')
+    # Збільшити timeout для запитів (30 секунд)
+    conn.execute('PRAGMA busy_timeout = 30000;')
+    # Увімкнути foreign keys
+    conn.execute('PRAGMA foreign_keys = ON;')
+    # Оптимізувати для швидших запитів
+    conn.execute('PRAGMA synchronous = NORMAL;')
+    # Кешувати сторінки в пам'яті (16MB)
+    conn.execute('PRAGMA cache_size = -16384;')
+    return conn
+
 # Використовуємо спільну БД
-conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+conn = get_optimized_connection()
 cursor = conn.cursor()
 
 

@@ -19,7 +19,19 @@ class PrismaDB:
             os.makedirs(db_dir, exist_ok=True)
     
     def get_connection(self):
-        return sqlite3.connect(self.db_path)
+        """Створює оптимізоване з'єднання з БД"""
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
+        # Увімкнути WAL mode для одночасних читання та запису
+        conn.execute('PRAGMA journal_mode = WAL;')
+        # Збільшити timeout для запитів (30 секунд)
+        conn.execute('PRAGMA busy_timeout = 30000;')
+        # Увімкнути foreign keys
+        conn.execute('PRAGMA foreign_keys = ON;')
+        # Оптимізувати для швидших запитів
+        conn.execute('PRAGMA synchronous = NORMAL;')
+        # Кешувати сторінки в пам'яті (16MB)
+        conn.execute('PRAGMA cache_size = -16384;')
+        return conn
     
     def get_user_by_telegram_id(self, telegram_id: int) -> Optional[Dict[str, Any]]:
         conn = self.get_connection()

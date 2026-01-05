@@ -9,7 +9,7 @@ import { EditListingModal } from '../EditListingModal';
 import { ShareModal } from '../ShareModal';
 import { Listing, Category } from '@/types';
 import { useState, useEffect, useRef } from 'react';
-import { categories } from '@/constants/categories';
+import { getCategories } from '@/constants/categories';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from '../Toast';
 import { useLongPress } from '@/hooks/useLongPress';
@@ -26,6 +26,7 @@ interface ProfileTabProps {
 
 export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
   const { t, language } = useLanguage();
+  const categories = getCategories(t);
   const router = useRouter();
   const { profile, loading, refetch } = useUser();
   const [userListings, setUserListings] = useState<Listing[]>([]);
