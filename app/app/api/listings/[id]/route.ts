@@ -19,6 +19,36 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const viewerId = searchParams.get('viewerId'); // Telegram ID користувача, який переглядає
 
+    // Перевіряємо, чи існує колонка currency
+    let currencyColumnExists = false;
+    try {
+      const tableInfo = await prisma.$queryRawUnsafe(`
+        PRAGMA table_info(Listing)
+      `) as Array<{ name: string; type: string }>;
+      currencyColumnExists = tableInfo.some(col => col.name === 'currency');
+    } catch (error: any) {
+      console.log('Note: Could not check currency column:', error.message);
+    }
+
+    // Якщо колонки немає, намагаємося її додати
+    if (!currencyColumnExists) {
+      try {
+        await prisma.$executeRawUnsafe(`
+          ALTER TABLE Listing ADD COLUMN currency TEXT
+        `);
+        currencyColumnExists = true;
+      } catch (error: any) {
+        if (!error.message?.includes('duplicate column name') && 
+            !error.message?.includes('duplicate column') &&
+            !error.message?.includes('already exists') &&
+            !error.message?.includes('database is locked')) {
+          console.log('Note: Could not add currency column:', error.message);
+        } else if (!error.message?.includes('database is locked')) {
+          currencyColumnExists = true;
+        }
+      }
+    }
+
     // Використовуємо raw SQL для уникнення проблем з форматом дати
     const listings = await prisma.$queryRawUnsafe(
       `SELECT 
@@ -27,7 +57,7 @@ export async function GET(
         l.title,
         l.description,
         l.price,
-        l.currency,
+        ${currencyColumnExists ? 'l.currency,' : 'NULL as currency,'}
         l.isFree,
         l.category,
         l.subcategory,

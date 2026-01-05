@@ -11,20 +11,46 @@ function normalizeCondition(condition: string | null): 'new' | 'used' | null {
 
 export async function GET(request: NextRequest) {
   try {
-    // Перевіряємо та додаємо колонку currency, якщо її немає
-    // Використовуємо простий підхід - спробуємо додати колонку, ігноруючи помилку якщо вона вже існує
+    // Перевіряємо, чи існує колонка currency
+    let currencyColumnExists = false;
     try {
-      await prisma.$executeRawUnsafe(`
-        ALTER TABLE Listing ADD COLUMN currency TEXT
-      `);
+      const tableInfo = await prisma.$queryRawUnsafe(`
+        PRAGMA table_info(Listing)
+      `) as Array<{ name: string; type: string }>;
+      currencyColumnExists = tableInfo.some(col => col.name === 'currency');
     } catch (error: any) {
-      // Якщо колонка вже існує (SQLite повертає "duplicate column name"), це нормально
-      // Ігноруємо помилку і продовжуємо
-      if (!error.message?.includes('duplicate column name') && 
-          !error.message?.includes('duplicate column') &&
-          !error.message?.includes('already exists')) {
-        // Якщо це інша помилка, логуємо її, але продовжуємо
-        console.log('Note: Could not add currency column:', error.message);
+      console.log('Note: Could not check currency column:', error.message);
+    }
+
+    // Якщо колонки немає, намагаємося її додати (з кількома спробами на випадок блокування БД)
+    if (!currencyColumnExists) {
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          await prisma.$executeRawUnsafe(`
+            ALTER TABLE Listing ADD COLUMN currency TEXT
+          `);
+          currencyColumnExists = true;
+          break;
+        } catch (error: any) {
+          attempts++;
+          // Якщо колонка вже існує (SQLite повертає "duplicate column name"), це нормально
+          if (error.message?.includes('duplicate column name') || 
+              error.message?.includes('duplicate column') ||
+              error.message?.includes('already exists')) {
+            currencyColumnExists = true;
+            break;
+          }
+          // Якщо база заблокована, чекаємо і повторюємо
+          if (error.message?.includes('database is locked') && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 100 * attempts)); // Затримка збільшується
+            continue;
+          }
+          // Інші помилки - логуємо і продовжуємо без колонки
+          console.log('Note: Could not add currency column:', error.message);
+          break;
+        }
       }
     }
 
@@ -142,7 +168,7 @@ export async function GET(request: NextRequest) {
           l.title,
           l.description,
           l.price,
-          l.currency,
+          ${currencyColumnExists ? 'l.currency,' : 'NULL as currency,'}
           l.isFree,
           l.category,
           l.subcategory,
@@ -255,7 +281,7 @@ export async function GET(request: NextRequest) {
                l.title,
                l.description,
                l.price,
-               l.currency,
+               ${currencyColumnExists ? 'l.currency,' : 'NULL as currency,'}
                l.isFree,
                l.category,
                l.subcategory,
