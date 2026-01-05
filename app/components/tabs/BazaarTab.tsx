@@ -460,7 +460,7 @@ export const BazaarTab = ({
         </div>
       ) : (
         <div className="px-4 py-16 text-center">
-          <p className="text-gray-500">Нічого не знайдено</p>
+          <p className="text-gray-500">{t('common.nothingFound')}</p>
           {(searchQuery || selectedCategory || selectedSubcategory || showFreeOnly) && (
             <button
               onClick={() => {

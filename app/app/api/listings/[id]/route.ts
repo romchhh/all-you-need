@@ -125,10 +125,6 @@ export async function GET(
               listingId
             )
           );
-          
-          console.log(`New unique view recorded for listing ${listingId} by user ${viewerTelegramId}`);
-        } else {
-          console.log(`View already recorded for listing ${listingId} by user ${viewerTelegramId}`);
         }
       } catch (error: any) {
         // Якщо помилка - все одно повертаємо оголошення

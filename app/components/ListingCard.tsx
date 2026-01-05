@@ -4,6 +4,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatTimeAgo } from '@/utils/formatTime';
 
 interface ListingCardProps {
   listing: Listing;
@@ -16,6 +17,14 @@ interface ListingCardProps {
 
 export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false }: ListingCardProps) => {
   const { t } = useLanguage();
+  
+  // Форматуємо час на клієнті з перекладами
+  const formattedTime = useMemo(() => {
+    if (listing.createdAt) {
+      return formatTimeAgo(listing.createdAt, t);
+    }
+    return listing.posted || '';
+  }, [listing.createdAt, listing.posted, t]);
   const imageLoadedRef = useRef<Set<string>>(new Set());
   
   // Перевіряємо, чи зображення вже завантажене при ініціалізації
@@ -185,7 +194,7 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
         
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span className="truncate">{listing.location.split(',')[0]}</span>
-          <span>{listing.posted}</span>
+          <span>{formattedTime}</span>
         </div>
       </div>
     </div>

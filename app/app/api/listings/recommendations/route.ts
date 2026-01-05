@@ -228,6 +228,7 @@ export async function GET(request: NextRequest) {
         location: listing.location,
         views: listing.views || 0,
         posted: posted,
+        createdAt: listing.createdAt instanceof Date ? listing.createdAt.toISOString() : listing.createdAt,
         condition: listing.condition,
         tags: listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [],
         isFree: listing.isFree === 1 || listing.isFree === true,

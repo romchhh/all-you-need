@@ -127,24 +127,8 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
         });
       }
       
-      // Оновлюємо URL без перезавантаження сторінки
-      const currentPath = window.location.pathname;
-      let newPath = '';
-      
-      if (currentPath.startsWith('/uk') || currentPath.startsWith('/ru')) {
-        // Замінюємо префікс мови
-        newPath = `/${language}${currentPath.slice(3)}`;
-      } else if (currentPath === '/' || currentPath === '') {
-        // Головна сторінка
-        newPath = `/${language}`;
-      } else {
-        // Інші шляхи
-        newPath = `/${language}${currentPath}`;
-      }
-      
-      if (window.location.pathname !== newPath) {
-        window.history.replaceState({}, '', newPath);
-      }
+      // URL оновлюється через router.push в LanguageSwitcher
+      // Тут не оновлюємо URL, щоб уникнути конфліктів
     }
   }, [language, isLoadingLanguage, userTelegramId]);
 

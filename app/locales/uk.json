@@ -22,9 +22,22 @@
     "selectCurrency": "Оберіть валюту",
     "free": "Безкоштовно",
     "language": "Мова",
+    "languageLabel": "Мова",
     "all": "Всі",
     "pullToRefresh": "Потягніть для оновлення",
-    "showMore": "Показати більше"
+    "showMore": "Показати більше",
+    "subcategories": "Підкатегорії",
+    "nothingFound": "Нічого не знайдено",
+    "sections": "Розділи",
+    "timeAgo": {
+      "justNow": "щойно",
+      "minutesAgo": "{count} хв тому",
+      "hoursAgo": "{count} год тому",
+      "dayAgo": "1 день тому",
+      "daysAgo": "{count} днів тому",
+      "weekAgo": "1 тиждень тому",
+      "weeksAgo": "{count} тижнів тому"
+    }
   },
   "navigation": {
     "bazaar": "Головна",
@@ -89,18 +102,6 @@
     "days": "дні",
     "daysMany": "днів",
     "username": "Ім'я користувача",
-    "listings": "Оголошень",
-    "sold": "Продано",
-    "onService": "На сервісі",
-    "year": "рік",
-    "years": "роки",
-    "yearsMany": "років",
-    "month": "міс",
-    "months": "міс",
-    "monthsMany": "міс",
-    "day": "день",
-    "days": "дні",
-    "daysMany": "днів",
     "activeListings": "активних",
     "soldListings": "продано",
     "totalViews": "всього переглядів",
@@ -157,7 +158,15 @@
     "filterByCategory": "Фільтр за категорією",
     "allStatuses": "Всі статуси",
     "allCategories": "Всі категорії",
-    "promote": "Рекламувати"
+    "promote": "Рекламувати",
+    "views": "переглядів",
+    "active": "активних",
+    "sold": "продано",
+    "pending": "Очікує",
+    "showMore": "Показати більше",
+    "trySelling": "Спробуйте продати щось, але поки тільки легальні речі",
+    "topUpBalanceSoon": "Функція поповнення балансу буде доступна найближчим часом",
+    "promoteSoon": "Функція реклами буде доступна найближчим часом"
   },
   "share": {
     "title": "Поділитися",
@@ -196,6 +205,18 @@
     "enterDescription": "Введіть опис",
     "enterPrice": "Введіть ціну",
     "selectCondition": "Оберіть стан",
+    "photosLabel": "Фото (до 10 штук) *",
+    "titleLabel": "Заголовок *",
+    "titlePlaceholder": "Наприклад: iPhone 13 Pro Max",
+    "descriptionLabel": "Опис *",
+    "descriptionPlaceholder": "Детальний опис товару...",
+    "pricePlaceholder": "Ціна",
+    "categoryLabel": "Розділ *",
+    "subcategoryLabel": "Тип (необов'язково)",
+    "allTypes": "Всі типи",
+    "conditionLabel": "Стан",
+    "locationLabel": "Локація *",
+    "locationPlaceholder": "Введіть місто...",
     "errors": {
       "titleRequired": "Введіть назву товару",
       "titleMinLength": "Назва має містити мінімум 3 символи",
@@ -223,7 +244,10 @@
     "listingDeleted": "Оголошення видалено",
     "listingMarkedSold": "Оголошення позначено як продане",
     "updateError": "Помилка оновлення",
-    "confirmDelete": "Цю дію неможливо скасувати."
+    "confirmDelete": "Цю дію неможливо скасувати.",
+    "deleteConfirmTitle": "Видалити оголошення?",
+    "active": "Активне",
+    "openDetails": "Відкрити деталі"
   },
   "userProfile": {
     "noListings": "Немає оголошень"
@@ -334,6 +358,7 @@
   "categories": {
     "title": "Категорії",
     "allCategoriesDescription": "Переглянути всі оголошення",
+    "allSections": "Всі розділи",
     "fashion": "Мода та стиль",
     "furniture": "Меблі",
     "electronics": "Електроніка",

@@ -14,6 +14,7 @@ import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
+import { formatTimeAgo } from '@/utils/formatTime';
 
 // Функція для форматування дати публікації
 const formatPublicationDate = (dateString: string, lang: 'uk' | 'ru'): string => {
@@ -74,6 +75,14 @@ export const ListingDetail = ({
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
   const { t, language } = useLanguage();
+  
+  // Форматуємо час на клієнті з перекладами
+  const formattedTime = useMemo(() => {
+    if (listing.createdAt) {
+      return formatTimeAgo(listing.createdAt, t);
+    }
+    return listing.posted || '';
+  }, [listing.createdAt, listing.posted, t]);
   
   // Перевіряємо, чи це власне оголошення
   const isOwnListing = useMemo(() => {
@@ -348,7 +357,7 @@ export const ListingDetail = ({
           </div>
           <div className="flex items-center gap-1">
             <Clock size={16} className="text-gray-400" />
-            <span>{t('listing.created')}: {listing.posted}</span>
+            <span>{t('listing.created')}: {formattedTime}</span>
           </div>
         </div>
 
@@ -519,9 +528,9 @@ export const ListingDetail = ({
               if (isOwnListing) {
                 // Якщо це власне оголошення - показуємо функцію реклами (поки що просто повідомлення)
                 if (tg) {
-                  tg.showAlert('Функція реклами буде доступна найближчим часом');
+                  tg.showAlert(t('sales.promoteSoon'));
                 } else {
-                  alert('Функція реклами буде доступна найближчим часом');
+                  alert(t('sales.promoteSoon'));
                 }
                 tg?.HapticFeedback.impactOccurred('light');
                 return;
@@ -544,7 +553,7 @@ export const ListingDetail = ({
                 if (tg) {
                   tg.showAlert(t('listingDetail.telegramIdNotFound'));
                 } else {
-                  alert('Telegram ID не знайдено');
+                  alert(t('listingDetail.telegramIdNotFound'));
                 }
                 return;
               }

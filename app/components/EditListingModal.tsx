@@ -222,7 +222,7 @@ export const EditListingModal = ({
       await onSave({
         title,
         description,
-        price: isFree ? 'Безкоштовно' : price,
+        price: isFree ? t('common.free') : price,
         currency: currency,
         isFree,
         category,
@@ -257,20 +257,20 @@ export const EditListingModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
-      <div className="bg-white rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col relative animate-slide-up">
+    <div className="fixed inset-0 bg-white z-[60] flex flex-col overflow-hidden">
+      <div className="bg-white w-full h-full flex flex-col">
         {/* Хедер */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10 flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-900">Редагувати оголошення</h2>
+        <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between flex-shrink-0">
+          <h2 className="text-xl font-bold text-gray-900">{t('listing.editListing')}</h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
+            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
-        <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
+        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -382,7 +382,7 @@ export const EditListingModal = ({
                 onChange={(e) => setIsFree(e.target.checked)}
                 className="w-4 h-4"
               />
-              <span className="text-sm font-medium text-gray-700">Безкоштовно</span>
+              <span className="text-sm font-medium text-gray-700">{t('common.free')}</span>
             </label>
             {!isFree && (
               <>
@@ -664,12 +664,12 @@ export const EditListingModal = ({
                     : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                 }`}
               >
-                ✅ Активне
+                ✅ {t('editListing.active')}
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('Ви впевнені, що хочете позначити це оголошення як продане?')) {
+                  if (window.confirm(t('editListing.confirmMarkSold'))) {
                     setStatus('sold');
                     tg?.HapticFeedback.impactOccurred('light');
                   }
@@ -701,20 +701,20 @@ export const EditListingModal = ({
         </div>
 
         {/* Кнопки */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex gap-2 flex-shrink-0 pb-4">
+        <div className="bg-white border-t border-gray-200 px-4 pt-4 pb-10 flex gap-2 flex-shrink-0 safe-area-bottom">
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={loading}
             className="px-3 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Trash2 size={16} />
-            Видалити
+            {t('common.delete')}
           </button>
           <button
             onClick={onClose}
             className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
           >
-            Скасувати
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
@@ -727,9 +727,9 @@ export const EditListingModal = ({
 
         {/* Підтвердження видалення */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 overflow-hidden">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4 overflow-hidden">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Видалити оголошення?</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">{t('editListing.deleteConfirmTitle')}</h3>
               <p className="text-gray-600 mb-6">{t('editListing.confirmDelete')}</p>
               <div className="flex gap-3">
                 <button

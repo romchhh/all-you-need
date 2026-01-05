@@ -1,24 +1,35 @@
 'use client';
 
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Globe } from 'lucide-react';
+import { Globe, ChevronDown } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useUser } from '@/hooks/useUser';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface LanguageSwitcherProps {
   tg?: TelegramWebApp | null;
+  fullWidth?: boolean;
 }
 
-export const LanguageSwitcher = ({ tg }: LanguageSwitcherProps) => {
+export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProps) => {
   const { language, setLanguage, t } = useLanguage();
   const { profile } = useUser();
+  const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [currentLang, setCurrentLang] = useState(language);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0 });
 
-  const handleLanguageChange = async (newLang: 'uk' | 'ru') => {
-    setLanguage(newLang);
+  // Синхронізуємо локальний стан з контекстом
+  useEffect(() => {
+    setCurrentLang(language);
+  }, [language]);
+
+  const handleLanguageChange = useCallback(async (newLang: 'uk' | 'ru') => {
     setIsOpen(false);
+    setLanguage(newLang);
     tg?.HapticFeedback.impactOccurred('light');
 
     // Зберігаємо мову в БД якщо є профіль
@@ -38,30 +49,169 @@ export const LanguageSwitcher = ({ tg }: LanguageSwitcherProps) => {
         console.error('Failed to save language to database:', error);
       }
     }
-  };
+
+    // Оновлюємо URL з навігацією для перерендеру сторінки
+    if (typeof window !== 'undefined') {
+      const currentPath = pathname || window.location.pathname;
+      let newPath = '';
+      
+      if (currentPath.startsWith('/uk') || currentPath.startsWith('/ru')) {
+        // Замінюємо префікс мови
+        newPath = `/${newLang}${currentPath.slice(3)}`;
+      } else if (currentPath === '/' || currentPath === '') {
+        // Головна сторінка
+        newPath = `/${newLang}`;
+      } else {
+        // Інші шляхи
+        newPath = `/${newLang}${currentPath}`;
+      }
+      
+      // Використовуємо router.push для навігації, що викличе перерендер сторінки
+      router.push(newPath);
+    }
+  }, [setLanguage, profile?.telegramId, tg, pathname, router]);
+
+  // Оновлюємо позицію меню при відкритті
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      if (fullWidth) {
+        setMenuPosition({
+          top: rect.bottom,
+          left: rect.left,
+          width: rect.width
+        });
+      } else {
+        setMenuPosition({
+          top: rect.top,
+          left: rect.right - 140, // 140px - ширина меню
+          width: 140
+        });
+      }
+    }
+  }, [isOpen, fullWidth]);
 
   // Закриваємо меню при кліку поза ним
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (buttonRef.current && !buttonRef.current.contains(target)) {
+        // Перевіряємо, чи клік не був на елементі меню
+        const menuElement = document.getElementById('language-menu');
+        if (menuElement && !menuElement.contains(target)) {
+          setIsOpen(false);
+        }
       }
     };
 
-    if (isOpen) {
+    // Використовуємо затримку, щоб клік на кнопку всередині меню спрацював
+    const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-    }
+      document.addEventListener('touchstart', handleClickOutside as any);
+    }, 100);
 
     return () => {
+      clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as any);
     };
   }, [isOpen]);
 
+  const getLanguageLabel = () => {
+    return currentLang === 'uk' ? 'Українська' : 'Русский';
+  };
+
+  if (fullWidth) {
+    return (
+      <>
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsOpen(prev => !prev);
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          className="w-full bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        >
+          <span className="text-gray-900 font-medium">{t('common.language')}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600">{getLanguageLabel()}</span>
+            <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+
+        {/* Backdrop */}
+        {isOpen && (
+          <div 
+            className="fixed inset-0 z-[9999]"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
+
+        {/* Випадаюче меню */}
+        {isOpen && (
+          <div 
+            id="language-menu"
+            className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] overflow-hidden"
+            style={{
+              top: `${menuPosition.top + 8}px`,
+              left: `${menuPosition.left}px`,
+              width: `${menuPosition.width}px`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleLanguageChange('uk');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
+                currentLang === 'uk'
+                  ? 'bg-blue-50 text-blue-600 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span className="text-sm">Українська</span>
+              {currentLang === 'uk' && <span className="text-blue-500">✓</span>}
+            </button>
+            <div className="h-px bg-gray-200"></div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleLanguageChange('ru');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
+                currentLang === 'ru'
+                  ? 'bg-blue-50 text-blue-600 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span className="text-sm">Русский</span>
+              {currentLang === 'ru' && <span className="text-blue-500">✓</span>}
+            </button>
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
-    <div className="relative" ref={menuRef}>
+    <>
       <button
-        onClick={() => {
-          setIsOpen(!isOpen);
+        ref={buttonRef}
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(prev => !prev);
           tg?.HapticFeedback.impactOccurred('light');
         }}
         className={`p-2.5 rounded-xl transition-all duration-200 ${
@@ -73,33 +223,62 @@ export const LanguageSwitcher = ({ tg }: LanguageSwitcherProps) => {
         <Globe size={20} className="text-gray-900" />
       </button>
 
-      {/* Випадаюче меню */}
+      {/* Backdrop */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg z-50 min-w-[120px] overflow-hidden">
+        <div 
+          className="fixed inset-0 z-[9999]"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Випадаюче меню як portal */}
+      {isOpen && (
+        <div 
+          id="language-menu"
+          className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] overflow-hidden"
+          style={{
+            top: `${menuPosition.top + 50}px`,
+            left: `${menuPosition.left}px`,
+            width: `${menuPosition.width}px`
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
-            onClick={() => handleLanguageChange('uk')}
-            className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-              language === 'uk'
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleLanguageChange('uk');
+            }}
+            className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
+              currentLang === 'uk'
                 ? 'bg-blue-50 text-blue-600 font-semibold'
                 : 'text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <span className="text-sm">🇺🇦 УК</span>
+            <span className="text-sm">Українська</span>
+            {currentLang === 'uk' && <span className="text-blue-500">✓</span>}
           </button>
           <div className="h-px bg-gray-200"></div>
           <button
-            onClick={() => handleLanguageChange('ru')}
-            className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-              language === 'ru'
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleLanguageChange('ru');
+            }}
+            className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
+              currentLang === 'ru'
                 ? 'bg-blue-50 text-blue-600 font-semibold'
                 : 'text-gray-700 hover:bg-gray-50'
             }`}
           >
-            <span className="text-sm">RU</span>
+            <span className="text-sm">Русский</span>
+            {currentLang === 'ru' && <span className="text-blue-500">✓</span>}
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

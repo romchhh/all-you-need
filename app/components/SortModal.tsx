@@ -3,7 +3,7 @@
 import { X } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useState, useEffect, Fragment, useMemo } from 'react';
+import { useState, useEffect, Fragment, useMemo, useCallback, useRef } from 'react';
 import { Category } from '@/types';
 import { getCategories } from '@/constants/categories';
 import { getCurrencySymbol, Currency } from '@/utils/currency';
@@ -81,6 +81,21 @@ export const SortModal = ({
   const [localSelectedCategory, setLocalSelectedCategory] = useState<string | null>(selectedCategory);
   const [localSelectedSubcategory, setLocalSelectedSubcategory] = useState<string | null>(selectedSubcategory);
   const [localCondition, setLocalCondition] = useState<ConditionOption>(selectedCondition);
+  
+  // Зберігаємо функції в ref для гарантії актуальності
+  const onCloseRef = useRef(onClose);
+  const onPriceRangeChangeRef = useRef(onPriceRangeChange);
+  const onCategoryChangeRef = useRef(onCategoryChange);
+  const onConditionChangeRef = useRef(onConditionChange);
+  const onCurrencyChangeRef = useRef(onCurrencyChange);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    onPriceRangeChangeRef.current = onPriceRangeChange;
+    onCategoryChangeRef.current = onCategoryChange;
+    onConditionChangeRef.current = onConditionChange;
+    onCurrencyChangeRef.current = onCurrencyChange;
+  }, [onClose, onPriceRangeChange, onCategoryChange, onConditionChange, onCurrencyChange]);
 
   useEffect(() => {
     if (isOpen) {
@@ -106,65 +121,55 @@ export const SortModal = ({
     return categories.find(cat => cat.id === localSelectedCategory);
   }, [categories, localSelectedCategory]);
 
-  const handleApplyPriceRange = () => {
-    const min = localMinPrice > 0 ? localMinPrice : null;
-    const max = localMaxPrice < 10000 ? localMaxPrice : null;
-    onPriceRangeChange(min, max);
-    tg?.HapticFeedback.impactOccurred('light');
-    onClose();
-  };
-
+  // Обробка скидання всіх фільтрів
   const handleReset = () => {
+    // Скидаємо локальні стани
     setLocalMinPrice(0);
     setLocalMaxPrice(10000);
     setLocalCurrency(null);
     setLocalSelectedCategory(null);
     setLocalSelectedSubcategory(null);
     setLocalCondition(null);
+    
+    // Застосовуємо скидання до батьківського компонента
     onPriceRangeChange(null, null);
     onToggleFreeOnly(false);
     onSelect('newest');
-    if (onCategoryChange) onCategoryChange(null, null);
-    if (onConditionChange) onConditionChange(null);
-    if (onCurrencyChange) onCurrencyChange(null as any);
-    tg?.HapticFeedback.impactOccurred('light');
+    if (onCategoryChange) {
+      onCategoryChange(null, null);
+    }
+    if (onConditionChange) {
+      onConditionChange(null);
+    }
+    if (onCurrencyChange) {
+      onCurrencyChange(null);
+    }
   };
 
+  // Обробка вибору категорії
   const handleCategorySelect = (categoryId: string) => {
     if (localSelectedCategory === categoryId) {
       setLocalSelectedCategory(null);
       setLocalSelectedSubcategory(null);
-      if (onCategoryChange) onCategoryChange(null, null);
     } else {
       setLocalSelectedCategory(categoryId);
       setLocalSelectedSubcategory(null);
-      if (onCategoryChange) onCategoryChange(categoryId, null);
     }
-    tg?.HapticFeedback.impactOccurred('light');
-    onClose();
   };
 
+  // Обробка вибору підкатегорії
   const handleSubcategorySelect = (subcategoryId: string) => {
     setLocalSelectedSubcategory(subcategoryId);
-    if (onCategoryChange && localSelectedCategory) {
-      onCategoryChange(localSelectedCategory, subcategoryId);
-    }
-    tg?.HapticFeedback.impactOccurred('light');
-    onClose();
   };
 
+  // Обробка вибору стану товару
   const handleConditionSelect = (condition: ConditionOption) => {
     setLocalCondition(condition);
-    if (onConditionChange) onConditionChange(condition);
-    tg?.HapticFeedback.impactOccurred('light');
-    onClose();
   };
 
+  // Обробка вибору валюти
   const handleCurrencySelect = (currency: Currency | null) => {
     setLocalCurrency(currency);
-    if (onCurrencyChange) onCurrencyChange(currency);
-    tg?.HapticFeedback.impactOccurred('light');
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -180,25 +185,17 @@ export const SortModal = ({
     selectedCondition !== null || 
     selectedCurrency !== null;
 
-  // Дебаг лог
-  if (isOpen) {
-    console.log('SortModal filters:', {
-      currentSort,
-      showFreeOnly,
-      minPrice,
-      maxPrice,
-      selectedCategory,
-      selectedSubcategory,
-      selectedCondition,
-      selectedCurrency,
-      hasActiveFilters
-    });
-  }
-
   return (
     <Fragment>
       <style>{sliderStyles}</style>
-      <div className="fixed inset-0 bg-black/40 z-50 flex items-end" onClick={onClose}>
+      <div 
+        className="fixed inset-0 bg-black/40 z-50 flex items-end" 
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
         <div 
           className="w-full bg-white rounded-t-3xl flex flex-col max-h-[85vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
@@ -215,8 +212,8 @@ export const SortModal = ({
           </div>
 
           {/* Скролований контент */}
-          <div className="flex-1 overflow-y-auto pb-24" style={{ paddingBottom: '100px' }}>
-            <div className="p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-6 pb-32">
               {/* Сортування - горизонтальний скрол */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('common.sort')}</h4>
@@ -227,7 +224,6 @@ export const SortModal = ({
                         key={option.value}
                         onClick={() => {
                           onSelect(option.value);
-                          tg?.HapticFeedback.impactOccurred('light');
                           onClose();
                         }}
                         className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 ${
@@ -320,16 +316,6 @@ export const SortModal = ({
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('common.currency')}</h4>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleCurrencySelect(null)}
-                    className={`flex-1 px-4 py-3 rounded-xl transition-all ${
-                      localCurrency === null
-                        ? 'bg-blue-500 text-white font-medium'
-                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                    }`}
-                  >
-                    {t('common.all')}
-                  </button>
                   {currencyOptions.map((currency) => (
                     <button
                       key={currency}
@@ -369,7 +355,6 @@ export const SortModal = ({
                         if (value > localMaxPrice) {
                           setLocalMaxPrice(value);
                         }
-                        tg?.HapticFeedback.impactOccurred('light');
                       }}
                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                       style={{
@@ -395,7 +380,6 @@ export const SortModal = ({
                         if (value < localMinPrice) {
                           setLocalMinPrice(value);
                         }
-                        tg?.HapticFeedback.impactOccurred('light');
                       }}
                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                       style={{
@@ -404,13 +388,6 @@ export const SortModal = ({
                     />
                   </div>
                 </div>
-                
-                <button
-                  onClick={handleApplyPriceRange}
-                  className="w-full mt-3 px-4 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors"
-                >
-                  {t('common.apply')}
-                </button>
               </div>
 
               {/* Безкоштовні */}
@@ -421,7 +398,6 @@ export const SortModal = ({
                     checked={showFreeOnly}
                     onChange={(e) => {
                       onToggleFreeOnly(e.target.checked);
-                      tg?.HapticFeedback.impactOccurred('light');
                       onClose();
                     }}
                     className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -429,35 +405,59 @@ export const SortModal = ({
                   <span className="text-gray-900 font-medium">{t('bazaar.freeOnly')}</span>
                 </label>
               </div>
+
+              {/* Кнопка Застосувати */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Обчислюємо мінімальну та максимальну ціну
+                    const min = localMinPrice > 0 ? localMinPrice : null;
+                    const max = localMaxPrice < 10000 ? localMaxPrice : null;
+                    
+                    // Застосовуємо всі фільтри через ref для гарантії
+                    onPriceRangeChangeRef.current(min, max);
+                    
+                    if (onCategoryChangeRef.current) {
+                      onCategoryChangeRef.current(localSelectedCategory, localSelectedSubcategory);
+                    }
+                    
+                    if (onConditionChangeRef.current) {
+                      onConditionChangeRef.current(localCondition);
+                    }
+                    
+                    if (onCurrencyChangeRef.current) {
+                      onCurrencyChangeRef.current(localCurrency);
+                    }
+                    
+                    // Закриваємо модальне вікно через setTimeout для гарантії застосування змін
+                    setTimeout(() => {
+                      onCloseRef.current();
+                    }, 50);
+                  }}
+                  className="w-full px-4 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors active:bg-blue-700 cursor-pointer"
+                >
+                  {t('common.apply')}
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Закріплені кнопки дій */}
-          <div className="flex gap-3 p-6 border-t border-gray-200 flex-shrink-0">
-            {hasActiveFilters ? (
-              <>
-                <button
-                  onClick={handleReset}
-                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
-                >
-                  {t('bazaar.reset')}
-                </button>
-                <button
-                  onClick={onClose}
-                  className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors"
-                >
-                  {t('common.close')}
-                </button>
-              </>
-            ) : (
+          {hasActiveFilters && (
+            <div className="p-6 border-t border-gray-200 flex-shrink-0 bg-white relative z-10">
               <button
-                onClick={onClose}
-                className="w-full px-4 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors"
+                type="button"
+                onClick={() => handleReset()}
+                className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors active:bg-gray-300"
               >
-                {t('common.close')}
+                {t('bazaar.reset')}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </Fragment>

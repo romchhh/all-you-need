@@ -4,6 +4,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { useMemo } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ListingPreviewModalProps {
   isOpen: boolean;
@@ -24,9 +25,10 @@ export const ListingPreviewModal = ({
   onToggleFavorite,
   tg
 }: ListingPreviewModalProps) => {
+  const { t } = useLanguage();
   if (!isOpen || !listing) return null;
 
-  const sellerName = listing.seller.name || 'Користувач';
+  const sellerName = listing.seller.name || t('common.user');
 
   return (
     <div 
@@ -75,7 +77,7 @@ export const ListingPreviewModal = ({
           {/* Ціна */}
           <div className="flex items-center justify-between">
             <span className={`text-2xl font-bold ${listing.isFree ? 'text-green-600' : 'text-gray-900'}`}>
-              {listing.isFree ? 'Безкоштовно' : listing.price}
+              {listing.isFree ? t('common.free') : listing.price}
             </span>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Eye size={16} />
@@ -128,7 +130,7 @@ export const ListingPreviewModal = ({
             }}
             className="flex-1 bg-blue-500 text-white font-semibold py-3 rounded-xl hover:bg-blue-600 transition-colors"
           >
-            Відкрити деталі
+            {t('editListing.openDetails')}
           </button>
         </div>
       </div>

@@ -67,7 +67,6 @@ export async function POST(request: NextRequest) {
       `, language, telegramId.toString());
     } catch (error) {
       // Якщо таблиці немає, це не критично
-      console.log('users_legacy table not found or update failed:', error);
     }
 
     return NextResponse.json({ success: true, language });
@@ -106,7 +105,6 @@ export async function GET(request: NextRequest) {
       }
     } catch (legacyError) {
       // Якщо legacy таблиці немає, це не критично - продовжуємо
-      console.log('users_legacy table not found or query failed:', legacyError);
     }
 
     // Потім перевіряємо таблицю User (якщо колонка language існує)
@@ -121,10 +119,6 @@ export async function GET(request: NextRequest) {
       }
     } catch (error: any) {
       // Якщо поле language не існує в таблиці User, це нормально - просто ігноруємо
-      if (!error.message?.includes('no such column: language')) {
-        // Якщо це інша помилка, логуємо її
-        console.log('Error querying User.language:', error.message);
-      }
     }
 
     // За замовчуванням повертаємо 'uk'

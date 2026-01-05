@@ -88,7 +88,6 @@ async function downloadProfilePhoto(photoUrl: string, userId: number): Promise<s
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('POST /api/user/profile - received data:', body);
     
     const { 
       telegramId, 
@@ -108,7 +107,6 @@ export async function POST(request: NextRequest) {
 
     // Конвертуємо telegramId в число
     const telegramIdNum = parseInt(telegramId);
-    console.log('Looking for user with telegramId:', telegramIdNum);
 
     // Додаємо retry logic для уникнення проблем з блокуванням БД
     const { executeWithRetry } = await import('@/lib/prisma');
@@ -160,22 +158,15 @@ export async function POST(request: NextRequest) {
       user = fullUsers[0];
     }
 
-    console.log('Found user:', user);
-
     let avatarPath: string | null = null;
 
     // Завантажуємо фото профілю якщо є
     if (photoUrl) {
-      console.log('Downloading photo from URL:', photoUrl);
       avatarPath = await downloadProfilePhoto(photoUrl, Number(telegramId));
-      console.log('Photo download result:', avatarPath);
-    } else {
-      console.log('No photoUrl provided');
     }
 
     // Якщо фото немає, створюємо аватар з ініціалами
     if (!avatarPath) {
-      console.log('Generating avatar with initials');
       const initials = generateAvatarInitials(firstName, lastName, username);
       const color = generateColorFromName(firstName || username || 'User');
       const svg = createAvatarSVG(initials, color);
@@ -190,13 +181,10 @@ export async function POST(request: NextRequest) {
       
       await writeFile(filepath, svg);
       avatarPath = `/avatars/${filename}`;
-      console.log('Generated avatar saved to:', avatarPath);
     }
 
     if (user) {
       // Оновлюємо існуючого користувача через raw query
-      console.log('Updating existing user');
-      
       const updateUsername = username !== undefined ? username : user.username;
       const updateFirstName = firstName !== undefined ? firstName : user.firstName;
       const updateLastName = lastName !== undefined ? lastName : user.lastName;
@@ -247,10 +235,8 @@ export async function POST(request: NextRequest) {
       );
       
       user = updatedUsers[0];
-      console.log('User updated:', user);
     } else {
       // Створюємо нового користувача через raw query (з retry)
-      console.log('Creating new user');
       const createTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
       
       await executeWithRetry(() =>
@@ -306,7 +292,6 @@ export async function POST(request: NextRequest) {
       );
       
       user = createdUsers[0];
-      console.log('User created:', user);
     }
 
             const response = {
@@ -322,7 +307,6 @@ export async function POST(request: NextRequest) {
               createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
             };
     
-    console.log('Returning response:', response);
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error creating/updating user profile:', error);
@@ -341,8 +325,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const telegramId = searchParams.get('telegramId');
 
-    console.log('GET /api/user/profile - telegramId:', telegramId);
-
     if (!telegramId) {
       console.error('telegramId is missing in GET request');
       return NextResponse.json(
@@ -353,7 +335,6 @@ export async function GET(request: NextRequest) {
 
     // Конвертуємо telegramId в число (SQLite INTEGER підтримує великі числа)
     const telegramIdNum = parseInt(telegramId);
-    console.log('GET /api/user/profile - searching for telegramId:', telegramId, 'as number:', telegramIdNum);
 
     // Використовуємо raw query для обходу проблеми з форматом дат в SQLite
     // Використовуємо Prisma.$queryRawUnsafe для правильної роботи з параметрами
@@ -392,15 +373,9 @@ export async function GET(request: NextRequest) {
       }>>
     );
     
-    console.log('GET /api/user/profile - query returned', users.length, 'users');
-    console.log('GET /api/user/profile - first user:', users[0]);
     const userData = users[0];
 
-    console.log('GET /api/user/profile - found user:', userData);
-    console.log('GET /api/user/profile - user avatar:', userData?.avatar);
-
     if (!userData) {
-      console.log('User not found for telegramId:', telegramId);
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -421,7 +396,6 @@ export async function GET(request: NextRequest) {
       createdAt: userData.createdAt,
     };
     
-    console.log('GET /api/user/profile - returning:', response);
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error fetching user profile:', error);

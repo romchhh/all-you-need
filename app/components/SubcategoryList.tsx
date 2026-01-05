@@ -1,5 +1,6 @@
 import { Subcategory } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface SubcategoryListProps {
   subcategories: Subcategory[];
@@ -9,12 +10,13 @@ interface SubcategoryListProps {
 }
 
 export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, tg }: SubcategoryListProps) => {
+  const { t } = useLanguage();
   if (!subcategories || subcategories.length === 0) return null;
 
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-3 px-4">
-        <h3 className="text-sm font-semibold text-gray-700">Підкатегорії</h3>
+        <h3 className="text-sm font-semibold text-gray-700">{t('common.subcategories')}</h3>
       </div>
       <div 
         className="overflow-x-auto -mx-4 w-full scrollbar-hide" 
@@ -38,7 +40,7 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Всі
+            {t('common.all')}
           </button>
           {subcategories.map((subcategory) => (
             <button

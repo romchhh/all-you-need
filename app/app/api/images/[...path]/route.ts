@@ -11,24 +11,17 @@ export async function GET(
     const { path } = await params;
     const imagePath = Array.isArray(path) ? path.join('/') : path;
     
-    console.log('GET /api/images - requested path:', imagePath);
-    
     // Безпека: перевіряємо, що шлях не виходить за межі public
     if (!imagePath || imagePath.includes('..') || imagePath.startsWith('/')) {
-      console.log('GET /api/images - invalid path:', imagePath);
       return new NextResponse('Not Found', { status: 404 });
     }
 
     const fullPath = join(process.cwd(), 'public', imagePath);
-    console.log('GET /api/images - full path:', fullPath);
     
     // Перевіряємо, що файл існує
     if (!existsSync(fullPath)) {
-      console.log('GET /api/images - file not found:', fullPath);
       return new NextResponse('Not Found', { status: 404 });
     }
-    
-    console.log('GET /api/images - file found, reading:', fullPath);
 
     // Читаємо файл
     const fileBuffer = await readFile(fullPath);

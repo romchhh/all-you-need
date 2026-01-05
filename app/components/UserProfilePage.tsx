@@ -254,9 +254,9 @@ export const UserProfilePage = ({
               } else {
                 console.log('Telegram ID and username not found');
                 if (tg) {
-                  tg.showAlert('Telegram ID не знайдено');
+                  tg.showAlert(t('listingDetail.telegramIdNotFound'));
                 } else {
-                  alert('Telegram ID не знайдено');
+                  alert(t('listingDetail.telegramIdNotFound'));
                 }
                 return;
               }

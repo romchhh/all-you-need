@@ -130,7 +130,7 @@ export const CreateListingModal = ({
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + images.length > 10) {
-      tg?.showAlert('Максимум 10 фото');
+      tg?.showAlert(t('createListing.maxPhotos'));
       return;
     }
 
@@ -260,11 +260,11 @@ export const CreateListingModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden">
-      <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl my-8 max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 bg-white z-[60] flex flex-col overflow-hidden">
+      <div className="bg-white w-full h-full flex flex-col">
         {/* Заголовок */}
-        <div className="flex items-center justify-between mb-6 flex-shrink-0">
-          <h2 className="text-2xl font-bold text-gray-900">{t('createListing.title')}</h2>
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 flex-shrink-0">
+          <h2 className="text-xl font-bold text-gray-900">{t('createListing.title')}</h2>
           <button
             onClick={onClose}
             className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
@@ -273,11 +273,11 @@ export const CreateListingModal = ({
           </button>
         </div>
 
-        <div className="space-y-4 overflow-y-auto pr-2 flex-1 min-h-0">
+        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Фото (до 10 штук) *
+              {t('createListing.photosLabel')}
             </label>
             <div className="grid grid-cols-3 gap-2 mb-2">
               {imagePreviews.map((preview, index) => (
@@ -315,7 +315,7 @@ export const CreateListingModal = ({
           {/* Заголовок */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Заголовок *
+              {t('createListing.titleLabel')}
             </label>
             <input
               type="text"
@@ -324,7 +324,7 @@ export const CreateListingModal = ({
                 setTitle(e.target.value);
                 if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
               }}
-              placeholder="Наприклад: iPhone 13 Pro Max"
+              placeholder={t('createListing.titlePlaceholder')}
               className={`w-full px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                 errors.title ? 'border-red-300' : 'border-gray-200'
               } focus:outline-none focus:ring-2 focus:ring-blue-500`}
@@ -338,7 +338,7 @@ export const CreateListingModal = ({
           {/* Опис */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Опис *
+              {t('createListing.descriptionLabel')}
             </label>
             <textarea
               value={description}
@@ -346,7 +346,7 @@ export const CreateListingModal = ({
                 setDescription(e.target.value);
                 if (errors.description) setErrors(prev => ({ ...prev, description: '' }));
               }}
-              placeholder="Детальний опис товару..."
+              placeholder={t('createListing.descriptionPlaceholder')}
               rows={4}
               className={`w-full px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                 errors.description ? 'border-red-300' : 'border-gray-200'
@@ -379,7 +379,7 @@ export const CreateListingModal = ({
                       setPrice(e.target.value);
                       if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                     }}
-                    placeholder="Ціна"
+                    placeholder={t('createListing.pricePlaceholder')}
                     className={`flex-1 px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                       errors.price ? 'border-red-300' : 'border-gray-200'
                     } focus:outline-none focus:ring-2 focus:ring-blue-500`}
@@ -455,7 +455,7 @@ export const CreateListingModal = ({
           {/* Розділ */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Розділ *
+              {t('createListing.categoryLabel')}
             </label>
             <div className="grid grid-cols-2 gap-2">
               {categories.map(cat => (
@@ -492,7 +492,7 @@ export const CreateListingModal = ({
           {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                Тип (необов'язково)
+                {t('createListing.subcategoryLabel')}
               </label>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -507,7 +507,7 @@ export const CreateListingModal = ({
                       : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  Всі типи
+                  {t('createListing.allTypes')}
                 </button>
                 {selectedCategoryData.subcategories.map(sub => (
                   <button
@@ -533,7 +533,7 @@ export const CreateListingModal = ({
           {/* Стан */}
           <div ref={conditionRef} className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Стан
+              {t('createListing.conditionLabel')}
             </label>
             <button
               type="button"
@@ -589,7 +589,7 @@ export const CreateListingModal = ({
           {/* Локація */}
           <div ref={locationRef} className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Локація *
+              {t('createListing.locationLabel')}
             </label>
             <div className="relative">
               <input
@@ -602,7 +602,7 @@ export const CreateListingModal = ({
                   if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
                 }}
                 onFocus={() => setIsLocationOpen(true)}
-                placeholder={t('bazaar.whatInterestsYou')}
+                placeholder={t('createListing.locationPlaceholder')}
                 className={`w-full px-4 py-3 pl-10 pr-10 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
                   errors.location ? 'border-red-300' : 'border-gray-200'
                 } focus:outline-none focus:ring-2 focus:ring-blue-500`}
@@ -657,7 +657,7 @@ export const CreateListingModal = ({
         </div>
 
         {/* Кнопки */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex gap-2 flex-shrink-0 pb-4">
+        <div className="bg-white border-t border-gray-200 px-4 pt-4 pb-10 flex gap-2 flex-shrink-0 safe-area-bottom">
           <button
             onClick={onClose}
             className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"

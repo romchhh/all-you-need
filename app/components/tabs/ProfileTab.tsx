@@ -59,25 +59,84 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
   } | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [pendingStatus, setPendingStatus] = useState<string>('all');
+  const [pendingCategory, setPendingCategory] = useState<string>('all');
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
-  const statusFilterRef = useRef<HTMLDivElement>(null);
-  const categoryFilterRef = useRef<HTMLDivElement>(null);
+  
+  // Синхронізуємо pendingStatus та pendingCategory з selectedStatus та selectedCategory
+  useEffect(() => {
+    if (!isStatusFilterOpen) {
+      setPendingStatus(selectedStatus);
+    }
+  }, [selectedStatus, isStatusFilterOpen]);
+  
+  useEffect(() => {
+    if (!isCategoryFilterOpen) {
+      setPendingCategory(selectedCategory);
+    }
+  }, [selectedCategory, isCategoryFilterOpen]);
+  const statusFilterRef = useRef<HTMLButtonElement>(null);
+  const categoryFilterRef = useRef<HTMLButtonElement>(null);
+  const [statusMenuPosition, setStatusMenuPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [categoryMenuPosition, setCategoryMenuPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  // Оновлюємо позиції меню при відкритті
+  useEffect(() => {
+    if (isStatusFilterOpen && statusFilterRef.current) {
+      const rect = statusFilterRef.current.getBoundingClientRect();
+      setStatusMenuPosition({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, [isStatusFilterOpen]);
+
+  useEffect(() => {
+    if (isCategoryFilterOpen && categoryFilterRef.current) {
+      const rect = categoryFilterRef.current.getBoundingClientRect();
+      setCategoryMenuPosition({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, [isCategoryFilterOpen]);
 
   // Закриваємо dropdown при кліку поза ним
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (statusFilterRef.current && !statusFilterRef.current.contains(event.target as Node)) {
-        setIsStatusFilterOpen(false);
+    if (!isStatusFilterOpen && !isCategoryFilterOpen) return;
+
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (statusFilterRef.current && !statusFilterRef.current.contains(target)) {
+        const statusMenu = document.getElementById('status-filter-menu');
+        if (statusMenu && !statusMenu.contains(target)) {
+          setPendingStatus(selectedStatus);
+          setIsStatusFilterOpen(false);
+        }
       }
-      if (categoryFilterRef.current && !categoryFilterRef.current.contains(event.target as Node)) {
-        setIsCategoryFilterOpen(false);
+      if (categoryFilterRef.current && !categoryFilterRef.current.contains(target)) {
+        const categoryMenu = document.getElementById('category-filter-menu');
+        if (categoryMenu && !categoryMenu.contains(target)) {
+          setPendingCategory(selectedCategory);
+          setIsCategoryFilterOpen(false);
+        }
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside as any);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as any);
+    };
+  }, [isStatusFilterOpen, isCategoryFilterOpen]);
 
   // Функція для завантаження оголошень з фільтрами
   const fetchListingsWithFilters = async (offset = 0, reset = false) => {
@@ -248,11 +307,11 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
             )}
             {stats && (
               <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
-                <span>{stats.totalViews} переглядів</span>
+                <span>{stats.totalViews} {t('sales.views')}</span>
                 {stats.soldListings > 0 && (
-                  <span>{stats.soldListings} продано</span>
+                  <span>{stats.soldListings} {t('sales.sold')}</span>
                 )}
-                <span>{stats.activeListings} активних</span>
+                <span>{stats.activeListings} {t('sales.active')}</span>
               </div>
             )}
             {profile.balance !== undefined && (
@@ -312,9 +371,9 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
           className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-green-500/20"
           onClick={() => {
             if (tg) {
-              tg.showAlert('Функція поповнення балансу буде доступна найближчим часом');
+              tg.showAlert(t('sales.topUpBalanceSoon'));
             } else {
-              alert('Функція поповнення балансу буде доступна найближчим часом');
+              alert(t('sales.topUpBalanceSoon'));
             }
             tg?.HapticFeedback.impactOccurred('medium');
           }}
@@ -327,100 +386,172 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
       {/* Оголошення користувача */}
       <div className="px-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-gray-900">Мої оголошення</h3>
+          <h3 className="text-lg font-semibold text-gray-900">{t('sales.title')}</h3>
         </div>
         
         {/* Фільтри */}
         <div className="flex gap-2 mb-4">
             {/* Фільтр за статусом */}
-            <div className="relative flex-1" ref={statusFilterRef}>
+            <button
+              ref={statusFilterRef}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsStatusFilterOpen(!isStatusFilterOpen);
+                setIsCategoryFilterOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className="flex-1 px-3 py-2 bg-gray-100 rounded-xl border border-gray-200 flex items-center justify-between text-sm"
+            >
+              <span className="text-gray-700">
+                {selectedStatus === 'all' ? t('sales.allStatuses') : 
+                 selectedStatus === 'active' ? t('listing.active') :
+                 selectedStatus === 'sold' ? t('listing.sold') : selectedStatus}
+              </span>
+              <ChevronDown size={16} className={`text-gray-400 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Фільтр за категорією */}
+            <button
+              ref={categoryFilterRef}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsCategoryFilterOpen(!isCategoryFilterOpen);
+                setIsStatusFilterOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className="flex-1 px-3 py-2 bg-gray-100 rounded-xl border border-gray-200 flex items-center justify-between text-sm"
+            >
+              <span className="text-gray-700 flex items-center gap-2 truncate">
+                {selectedCategory === 'all' ? (
+                  t('sales.allCategories')
+                ) : (
+                  <>
+                    <span className="flex-shrink-0">{categories.find(c => c.id === selectedCategory)?.icon}</span>
+                    <span className="truncate">{categories.find(c => c.id === selectedCategory)?.name || selectedCategory}</span>
+                  </>
+                )}
+              </span>
+              <ChevronDown size={16} className={`text-gray-400 flex-shrink-0 transition-transform ${isCategoryFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {/* Backdrop для статусу */}
+          {isStatusFilterOpen && (
+            <div 
+              className="fixed inset-0 z-[9999]"
+              onClick={() => {
+                setIsStatusFilterOpen(false);
+              }}
+            />
+          )}
+
+          {/* Меню статусу */}
+          {isStatusFilterOpen && (
+            <div 
+              id="status-filter-menu"
+              className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000]"
+              style={{
+                top: `${statusMenuPosition.top + 8}px`,
+                left: `${statusMenuPosition.left}px`,
+                width: `${statusMenuPosition.width}px`
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {['all', 'active', 'sold', 'pending', 'hidden'].map(status => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedStatus(status);
+                    setIsStatusFilterOpen(false);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className={`w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
+                    selectedStatus === status ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  {status === 'all' ? t('sales.allStatuses') : 
+                   status === 'active' ? t('listing.active') :
+                   status === 'sold' ? t('listing.sold') :
+                   status === 'pending' ? t('sales.pending') :
+                   status === 'hidden' ? t('editListing.hidden') : status}
+                  {selectedStatus === status && <span className="text-blue-500 ml-2">✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Backdrop для категорії */}
+          {isCategoryFilterOpen && (
+            <div 
+              className="fixed inset-0 z-[9999]"
+              onClick={() => {
+                setIsCategoryFilterOpen(false);
+              }}
+            />
+          )}
+
+          {/* Меню категорії */}
+          {isCategoryFilterOpen && (
+            <div 
+              id="category-filter-menu"
+              className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] max-h-[70vh] overflow-y-auto"
+              style={{
+                top: `${categoryMenuPosition.top + 8}px`,
+                left: `${categoryMenuPosition.left}px`,
+                width: `${categoryMenuPosition.width}px`
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
-                onClick={() => {
-                  setIsStatusFilterOpen(!isStatusFilterOpen);
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelectedCategory('all');
                   setIsCategoryFilterOpen(false);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className="w-full px-3 py-2 bg-gray-100 rounded-xl border border-gray-200 flex items-center justify-between text-sm"
+                className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 border-b border-gray-100 ${
+                  selectedCategory === 'all'
+                    ? 'bg-blue-50 text-blue-600 font-semibold'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
               >
-                <span className="text-gray-700">
-                  {selectedStatus === 'all' ? t('sales.allStatuses') : 
-                   selectedStatus === 'active' ? t('listing.active') :
-                   selectedStatus === 'sold' ? t('listing.sold') : selectedStatus}
-                </span>
-                <ChevronDown size={16} className={`text-gray-400 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
+                <span className="text-xl">📦</span>
+                <span className="flex-1">{t('sales.allCategories')}</span>
+                {selectedCategory === 'all' && <span className="text-blue-500">✓</span>}
               </button>
-              {isStatusFilterOpen && (
-                <div className="absolute z-20 w-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg">
-                  {['all', 'active', 'sold', 'pending', 'hidden'].map(status => (
-                    <button
-                      key={status}
-                      onClick={() => {
-                        setSelectedStatus(status);
-                        setIsStatusFilterOpen(false);
-                        tg?.HapticFeedback.impactOccurred('light');
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                    >
-                      {status === 'all' ? t('sales.allStatuses') : 
-                       status === 'active' ? t('listing.active') :
-                       status === 'sold' ? t('listing.sold') :
-                       status === 'pending' ? 'Очікує' :
-                       status === 'hidden' ? t('editListing.hidden') : status}
-                      {selectedStatus === status && <span className="text-blue-500 ml-2">✓</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedCategory(cat.id);
+                    setIsCategoryFilterOpen(false);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 border-b border-gray-100 ${
+                    selectedCategory === cat.id
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-xl flex-shrink-0">{cat.icon}</span>
+                  <span className="flex-1">{cat.name}</span>
+                  {selectedCategory === cat.id && <span className="text-blue-500 flex-shrink-0">✓</span>}
+                </button>
+              ))}
             </div>
-
-            {/* Фільтр за категорією */}
-            <div className="relative flex-1" ref={categoryFilterRef}>
-              <button
-                onClick={() => {
-                  setIsCategoryFilterOpen(!isCategoryFilterOpen);
-                  setIsStatusFilterOpen(false);
-                  tg?.HapticFeedback.impactOccurred('light');
-                }}
-                className="w-full px-3 py-2 bg-gray-100 rounded-xl border border-gray-200 flex items-center justify-between text-sm"
-              >
-                <span className="text-gray-700">
-                  {selectedCategory === 'all' ? t('sales.allCategories') : 
-                   categories.find(c => c.id === selectedCategory)?.name || selectedCategory}
-                </span>
-                <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCategoryFilterOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {isCategoryFilterOpen && (
-                <div className="absolute z-20 w-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
-                  <button
-                    onClick={() => {
-                      setSelectedCategory('all');
-                      setIsCategoryFilterOpen(false);
-                      tg?.HapticFeedback.impactOccurred('light');
-                    }}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors border-b border-gray-100"
-                  >
-                    {t('sales.allCategories')}
-                    {selectedCategory === 'all' && <span className="text-blue-500 ml-2">✓</span>}
-                  </button>
-                  {categories.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        setSelectedCategory(cat.id);
-                        setIsCategoryFilterOpen(false);
-                        tg?.HapticFeedback.impactOccurred('light');
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-center gap-2"
-                    >
-                      <span>{cat.icon}</span>
-                      <span>{cat.name}</span>
-                      {selectedCategory === cat.id && <span className="text-blue-500 ml-auto">✓</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          )}
 
           {userListings.length > 0 ? (
             <>
@@ -464,7 +595,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
                             onClick={async (e) => {
                               e.stopPropagation();
                               // Підтвердження перед зміною статусу
-                              if (!window.confirm('Ви впевнені, що хочете позначити це оголошення як продане?')) {
+                              if (!window.confirm(t('editListing.confirmMarkSold'))) {
                                 return;
                               }
                               try {
@@ -551,7 +682,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
                     onClick={loadMoreListings}
                     className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-4 rounded-2xl transition-colors"
                   >
-                    Показати більше
+                    {t('sales.showMore')}
                   </button>
                 </div>
               )}
@@ -569,7 +700,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
               <p className="text-gray-500 text-sm">
                 {selectedStatus !== 'all' || selectedCategory !== 'all'
                   ? t('bazaar.tryDifferentSearch')
-                  : 'Спробуйте продати щось, але поки тільки легальні речі'}
+                  : t('sales.trySelling')}
               </p>
             </div>
           )}
@@ -577,12 +708,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
 
       {/* Перемикач мови */}
       <div className="px-4 pb-4 pt-6">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-900 font-medium">{t('common.language')}</span>
-            <LanguageSwitcher tg={tg} />
-          </div>
-        </div>
+        <LanguageSwitcher tg={tg} fullWidth />
       </div>
 
       {/* Посилання на FAQ та політику конфіденційності */}

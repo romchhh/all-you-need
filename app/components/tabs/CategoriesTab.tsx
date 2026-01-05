@@ -5,6 +5,7 @@ import { SubcategoryList } from '../SubcategoryList';
 import { ListingCard } from '../ListingCard';
 import { useState, useMemo, useEffect } from 'react';
 import { Gift } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface CategoriesTabProps {
   categories: Category[];
@@ -23,6 +24,7 @@ export const CategoriesTab = ({
   onToggleFavorite,
   tg
 }: CategoriesTabProps) => {
+  const { t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [showFreeOnly, setShowFreeOnly] = useState(false);
@@ -51,7 +53,7 @@ export const CategoriesTab = ({
   const allCategories = [
     {
       id: 'free',
-      name: 'Віддам безкоштовно',
+      name: t('categories.free'),
       icon: '🎁',
       subcategories: []
     },
@@ -83,7 +85,7 @@ export const CategoriesTab = ({
     <div className="pb-24">
       {/* Заголовок */}
       <div className="px-4 pt-4 pb-3 bg-white border-b border-gray-100 sticky top-0 z-10">
-        <h1 className="text-2xl font-bold text-gray-900">Розділи</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('common.sections')}</h1>
       </div>
 
       {/* Кнопка безкоштовних товарів */}
@@ -107,14 +109,14 @@ export const CategoriesTab = ({
         >
           <div className="flex items-center gap-2">
             <Gift size={20} />
-            <span className="font-medium">Безкоштовні товари</span>
+            <span className="font-medium">{t('categories.free')}</span>
           </div>
         </button>
       </div>
 
       {/* Розділи */}
       <div className="px-4 pt-4 pb-3 bg-white">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Всі розділи</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('categories.allSections')}</h2>
         <div className="grid grid-cols-2 gap-3">
           {allCategories.map(category => (
             <button
@@ -177,7 +179,7 @@ export const CategoriesTab = ({
 
       {filteredListings.length === 0 && (selectedCategory || selectedSubcategory || showFreeOnly) && (
         <div className="px-4 py-16 text-center">
-          <p className="text-gray-500">Нічого не знайдено</p>
+          <p className="text-gray-500">{t('common.nothingFound')}</p>
           <button
             onClick={() => {
               setSelectedCategory(null);
