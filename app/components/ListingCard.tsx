@@ -122,10 +122,10 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
         }
       }}
     >
-      <div className="relative aspect-square bg-gray-100 overflow-hidden">
+      <div className="relative aspect-square bg-gray-100 overflow-hidden w-full">
         {/* Placeholder або зображення */}
         {imageError || !listing.image ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 w-full h-full">
             <div className="text-center">
               <ImageIcon size={48} className="text-gray-400 mx-auto mb-2" />
               <p className="text-xs text-gray-500">{t('listing.noImages')}</p>
@@ -135,9 +135,10 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
           <img 
             src={imageUrl}
             alt={listing.title}
-            className={`absolute inset-0 w-full h-full object-cover ${
+            className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
               imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
             } ${isSold ? 'grayscale' : ''}`}
+            style={{ width: '100%', height: '100%' }}
             loading="lazy"
             decoding="async"
             sizes="(max-width: 768px) 50vw, 33vw"

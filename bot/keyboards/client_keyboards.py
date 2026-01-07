@@ -55,6 +55,6 @@ def get_catalog_webapp_keyboard(user_id: int, language: str = None) -> InlineKey
 def get_language_selection_keyboard() -> InlineKeyboardMarkup:
     """Клавіатура для вибору мови"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🇺🇦 Українська", callback_data="set_lang_uk")],
-        [InlineKeyboardButton(text="🇷🇺 Русский", callback_data="set_lang_ru")]
+        [InlineKeyboardButton(text="Українська", callback_data="set_lang_uk")],
+        [InlineKeyboardButton(text="Русский", callback_data="set_lang_ru")]
     ])

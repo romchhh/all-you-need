@@ -222,7 +222,7 @@ def set_user_phone(user_id: str, phone: str):
 
 def get_user_language(user_id: int) -> str:
     """Отримує мову користувача з БД"""
-    # Спочатку перевіряємо в legacy таблиці
+    # Спочатку перевіряємо в legacy таблиці (основне джерело для бота)
     cursor.execute('SELECT language FROM users_legacy WHERE user_id = ?', (str(user_id),))
     result = cursor.fetchone()
     if result and result[0]:
@@ -230,8 +230,23 @@ def get_user_language(user_id: int) -> str:
         if lang in ['uk', 'ru']:
             return lang
     
-    # Якщо мови немає в legacy, перевіряємо language_code з User таблиці
-    # (якщо вона там зберігається)
+    # Якщо мови немає в legacy, перевіряємо таблицю User (синхронізація з веб-додатком)
+    try:
+        cursor.execute('''
+            SELECT language FROM User 
+            WHERE CAST(telegramId AS INTEGER) = ?
+        ''', (user_id,))
+        user_result = cursor.fetchone()
+        if user_result and user_result[0]:
+            lang = user_result[0]
+            if lang in ['uk', 'ru']:
+                # Синхронізуємо з legacy таблицею
+                set_user_language(user_id, lang)
+                return lang
+    except Exception as e:
+        # Якщо поле language не існує в таблиці User, це нормально
+        pass
+    
     return 'uk'  # За замовчуванням українська
 
 
