@@ -346,15 +346,15 @@ export const ListingDetail = ({
           WebkitBackdropFilter: 'blur(8px)'
         }}
       >
-        <TopBar
-          variant="detail"
-          onBack={onClose}
-          onShareClick={() => setShowShareModal(true)}
-          onFavoriteClick={() => onToggleFavorite(listing.id)}
-          isFavorite={isFavorite}
-          title={listing.title}
-          tg={tg}
-        />
+      <TopBar
+        variant="detail"
+        onBack={onClose}
+        onShareClick={() => setShowShareModal(true)}
+        onFavoriteClick={() => onToggleFavorite(listing.id)}
+        isFavorite={isFavorite}
+        title={listing.title}
+        tg={tg}
+      />
       </div>
       
       {/* Spacer для хедера */}
@@ -504,20 +504,20 @@ export const ListingDetail = ({
             <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('listing.otherSellerListings')}</h2>
             <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
-                {sellerListings.map(sellerListing => (
+              {sellerListings.map(sellerListing => (
                   <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[200px]">
-                    <ListingCard 
-                      listing={sellerListing}
-                      isFavorite={favorites.has(sellerListing.id)}
-                      onSelect={(l) => {
-                        if (onSelectListing) {
-                          onSelectListing(l);
-                        }
-                      }}
-                      onToggleFavorite={onToggleFavorite}
-                      tg={tg}
-                    />
-                  </div>
+                <ListingCard 
+                  listing={sellerListing}
+                  isFavorite={favorites.has(sellerListing.id)}
+                  onSelect={(l) => {
+                    if (onSelectListing) {
+                      onSelectListing(l);
+                    }
+                  }}
+                  onToggleFavorite={onToggleFavorite}
+                  tg={tg}
+                />
+            </div>
                 ))}
               </div>
             </div>
@@ -530,20 +530,20 @@ export const ListingDetail = ({
             <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('listing.similarListings')}</h2>
             <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
-                {categoryListings.map(categoryListing => (
+              {categoryListings.map(categoryListing => (
                   <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[200px]">
-                    <ListingCard 
-                      listing={categoryListing}
-                      isFavorite={favorites.has(categoryListing.id)}
-                      onSelect={(l) => {
-                        if (onSelectListing) {
-                          onSelectListing(l);
-                        }
-                      }}
-                      onToggleFavorite={onToggleFavorite}
-                      tg={tg}
-                    />
-                  </div>
+                <ListingCard 
+                  listing={categoryListing}
+                  isFavorite={favorites.has(categoryListing.id)}
+                  onSelect={(l) => {
+                    if (onSelectListing) {
+                      onSelectListing(l);
+                    }
+                  }}
+                  onToggleFavorite={onToggleFavorite}
+                  tg={tg}
+                />
+            </div>
                 ))}
               </div>
             </div>

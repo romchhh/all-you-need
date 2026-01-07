@@ -13,9 +13,10 @@ interface ListingCardProps {
   onToggleFavorite: (id: number) => void;
   tg: TelegramWebApp | null;
   isSold?: boolean;
+  isDeactivated?: boolean;
 }
 
-export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false }: ListingCardProps) => {
+export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false, isDeactivated = false }: ListingCardProps) => {
   const { t } = useLanguage();
   
   // Форматуємо час на клієнті з перекладами
@@ -113,10 +114,10 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
   return (
     <div 
       className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer relative select-none ${
-        isSold ? 'opacity-60' : ''
+        isSold || isDeactivated ? 'opacity-60' : ''
       }`}
       onClick={() => {
-        if (!isSold) {
+        if (!isSold && !isDeactivated) {
           onSelect(listing);
           tg?.HapticFeedback.impactOccurred('light');
         }
@@ -137,7 +138,7 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
             alt={listing.title}
             className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
               imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
-            } ${isSold ? 'grayscale' : ''}`}
+            } ${isSold || isDeactivated ? 'grayscale' : ''}`}
             style={{ width: '100%', height: '100%' }}
             loading="lazy"
             decoding="async"
@@ -155,11 +156,18 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
             }}
           />
         )}
-        {/* Бейдж "Продано" */}
+        {/* Бейдж "Продано" або "Деактивовано" */}
         {isSold && (
-          <div className="absolute top-2 left-2">
+          <div className="absolute bottom-2 left-2">
             <span className="px-2 py-1 bg-gray-800 text-white text-xs font-semibold rounded-full shadow-md">
               {t('listing.sold')}
+            </span>
+          </div>
+        )}
+        {isDeactivated && (
+          <div className="absolute bottom-2 left-2">
+            <span className="px-2 py-1 bg-orange-600 text-white text-xs font-semibold rounded-full shadow-md">
+              {t('sales.deactivated')}
             </span>
           </div>
         )}

@@ -102,7 +102,7 @@ export const useSwipeBack = ({
             onSwipeBack();
           }, 200);
         } else {
-          onSwipeBack();
+        onSwipeBack();
         }
       }
 

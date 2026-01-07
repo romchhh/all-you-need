@@ -649,22 +649,23 @@ export const EditListingModal = ({
           {/* Статус */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Статус
+              {t('editListing.status') || 'Статус'}
             </label>
-            <div className="grid grid-cols-1 gap-2">
+            <div className="space-y-3">
               <button
                 type="button"
                 onClick={() => {
                   setStatus('active');
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className={`px-3 py-2.5 rounded-xl border-2 transition-all text-sm font-medium ${
+                className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'active'
-                    ? 'border-green-500 bg-green-50 text-green-700'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    ? 'border-green-500 bg-green-50 text-green-700 shadow-sm'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                ✅ {t('editListing.active')}
+                <span className="text-lg">✅</span>
+                <span>{t('editListing.active')}</span>
               </button>
               <button
                 type="button"
@@ -674,13 +675,14 @@ export const EditListingModal = ({
                     tg?.HapticFeedback.impactOccurred('light');
                   }
                 }}
-                className={`px-3 py-2.5 rounded-xl border-2 transition-all text-sm font-medium ${
+                className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'sold'
-                    ? 'border-gray-500 bg-gray-50 text-gray-700'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    ? 'border-gray-500 bg-gray-50 text-gray-700 shadow-sm'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                🏷️ {t('editListing.sold')}
+                <span className="text-lg">🏷️</span>
+                <span>{t('editListing.sold')}</span>
               </button>
               <button
                 type="button"
@@ -688,13 +690,14 @@ export const EditListingModal = ({
                   setStatus('hidden');
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className={`px-3 py-2.5 rounded-xl border-2 transition-all text-sm font-medium ${
+                className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'hidden'
-                    ? 'border-orange-500 bg-orange-50 text-orange-700'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
-                👁️ {t('editListing.hidden')}
+                <span className="text-lg">🚫</span>
+                <span>{t('sales.deactivated')}</span>
               </button>
             </div>
           </div>

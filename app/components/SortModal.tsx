@@ -392,57 +392,57 @@ export const SortModal = ({
                 {(() => {
                   const currentMaxPrice = getMaxPrice(localSelectedCategory);
                   return (
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-xs text-gray-500">{t('bazaar.minPrice')}</label>
-                          <span className="text-sm font-semibold text-gray-900">{localMinPrice} {localCurrency ? getCurrencySymbol(localCurrency) : '€'}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max={currentMaxPrice}
-                          step="5"
-                          value={localMinPrice}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value);
-                            setLocalMinPrice(value);
-                            if (value > localMaxPrice) {
-                              setLocalMaxPrice(value);
-                            }
-                          }}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                          style={{
-                            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localMinPrice / currentMaxPrice) * 100}%, #e5e7eb ${(localMinPrice / currentMaxPrice) * 100}%, #e5e7eb 100%)`
-                          }}
-                        />
-                      </div>
-                      
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-xs text-gray-500">{t('bazaar.maxPrice')}</label>
-                          <span className="text-sm font-semibold text-gray-900">{localMaxPrice} {localCurrency ? getCurrencySymbol(localCurrency) : '€'}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max={currentMaxPrice}
-                          step="5"
-                          value={localMaxPrice}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value);
-                            setLocalMaxPrice(value);
-                            if (value < localMinPrice) {
-                              setLocalMinPrice(value);
-                            }
-                          }}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                          style={{
-                            background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${(localMaxPrice / currentMaxPrice) * 100}%, #3b82f6 ${(localMaxPrice / currentMaxPrice) * 100}%, #3b82f6 100%)`
-                          }}
-                        />
-                      </div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-xs text-gray-500">{t('bazaar.minPrice')}</label>
+                      <span className="text-sm font-semibold text-gray-900">{localMinPrice} {localCurrency ? getCurrencySymbol(localCurrency) : '€'}</span>
                     </div>
+                    <input
+                      type="range"
+                      min="0"
+                          max={currentMaxPrice}
+                          step="5"
+                      value={localMinPrice}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setLocalMinPrice(value);
+                        if (value > localMaxPrice) {
+                          setLocalMaxPrice(value);
+                        }
+                      }}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      style={{
+                            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localMinPrice / currentMaxPrice) * 100}%, #e5e7eb ${(localMinPrice / currentMaxPrice) * 100}%, #e5e7eb 100%)`
+                      }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-xs text-gray-500">{t('bazaar.maxPrice')}</label>
+                      <span className="text-sm font-semibold text-gray-900">{localMaxPrice} {localCurrency ? getCurrencySymbol(localCurrency) : '€'}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                          max={currentMaxPrice}
+                          step="5"
+                      value={localMaxPrice}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setLocalMaxPrice(value);
+                        if (value < localMinPrice) {
+                          setLocalMinPrice(value);
+                        }
+                      }}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      style={{
+                            background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${(localMaxPrice / currentMaxPrice) * 100}%, #3b82f6 ${(localMaxPrice / currentMaxPrice) * 100}%, #3b82f6 100%)`
+                      }}
+                    />
+                  </div>
+                </div>
                   );
                 })()}
               </div>
@@ -505,7 +505,7 @@ export const SortModal = ({
           </div>
 
           {/* Закріплені кнопки дій */}
-          {hasActiveFilters && (
+            {hasActiveFilters && (
             <div className="p-6 border-t border-gray-200 flex-shrink-0 bg-white relative z-10">
               <button
                 type="button"

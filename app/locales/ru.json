@@ -17,6 +17,7 @@
     "back": "Назад",
     "add": "Добавить",
     "clear": "Очистить",
+    "reset": "Сбросить",
     "user": "Пользователь",
     "currency": "Валюта",
     "selectCurrency": "Выберите валюту",
@@ -123,6 +124,10 @@
     "searchInCity": "Поиск в {city}...",
     "searchCity": "Поиск города...",
         "allCities": "Все города",
+        "selectedCities": "Выбранные города",
+        "majorCities": "Крупные города",
+        "searchResults": "Результаты поиска",
+        "tryPostalCode": "Попробуйте ввести индекс (5 цифр) или название города",
         "allCategories": "Все категории",
         "clearFilters": "Очистить фильтры",
         "sort": {

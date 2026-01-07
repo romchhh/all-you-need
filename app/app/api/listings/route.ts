@@ -111,16 +111,20 @@ export async function GET(request: NextRequest) {
       // Для користувача використовуємо raw query з даними про продавця
       // Якщо це не власний профіль, виключаємо продані оголошення
       let whereClause = "WHERE CAST(u.telegramId AS INTEGER) = ?";
+      const queryParams: any[] = [parseInt(userId)];
+      
       if (!isOwnProfile) {
-        whereClause += " AND l.status != 'sold'";
+        whereClause += " AND l.status != 'sold' AND l.status != 'hidden'";
       }
       // Додаємо фільтр за статусом, якщо він вказаний
       if (status && status !== 'all') {
-        whereClause += ` AND l.status = '${status}'`;
+        whereClause += " AND l.status = ?";
+        queryParams.push(status);
       }
       // Додаємо фільтр за категорією, якщо він вказаний
       if (categoryFilter && categoryFilter !== 'all') {
-        whereClause += ` AND l.category = '${categoryFilter}'`;
+        whereClause += " AND l.category = ?";
+        queryParams.push(categoryFilter);
       }
       
       const query = `SELECT 
@@ -149,14 +153,20 @@ export async function GET(request: NextRequest) {
         FROM Listing l
         JOIN User u ON l.userId = u.id
         ${whereClause}
-        ORDER BY l.createdAt DESC
+        ORDER BY 
+          CASE 
+            WHEN l.status = 'active' THEN 1
+            WHEN l.status = 'sold' THEN 2
+            WHEN l.status = 'hidden' THEN 3
+            ELSE 4
+          END,
+          l.createdAt DESC
         LIMIT ? OFFSET ?`;
       
+      queryParams.push(limit, offset);
       const userListings = await prisma.$queryRawUnsafe(
         query,
-        parseInt(userId),
-        limit,
-        offset
+        ...queryParams
       ) as Array<{
         id: number;
         userId: number;
@@ -187,9 +197,11 @@ export async function GET(request: NextRequest) {
         JOIN User u ON l.userId = u.id
         ${whereClause}`;
       
+      // Для count query потрібні тільки параметри без limit та offset
+      const countParams = queryParams.slice(0, -2);
       const totalCount = await prisma.$queryRawUnsafe(
         countQuery,
-        parseInt(userId)
+        ...countParams
       ) as Array<{ count: bigint }>;
 
       listings = userListings;

@@ -142,7 +142,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
   const fetchListingsWithFilters = async (offset = 0, reset = false) => {
     if (!profile?.telegramId) return;
     
-    let url = `/api/listings?userId=${profile.telegramId}&limit=16&offset=${offset}`;
+    let url = `/api/listings?userId=${profile.telegramId}&viewerId=${profile.telegramId}&limit=16&offset=${offset}`;
     if (selectedStatus !== 'all') {
       // Конвертуємо 'deactivated' в 'hidden' для API
       const apiStatus = selectedStatus === 'deactivated' ? 'hidden' : selectedStatus;
@@ -564,12 +564,14 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
               <div className="grid grid-cols-2 gap-3">
                 {userListings.map(listing => {
                   const isSold = listing.status === 'sold';
+                  const isDeactivated = listing.status === 'hidden';
                   return (
                     <div key={listing.id} className="relative group">
                       <ListingCard 
                         listing={listing}
                         isFavorite={favorites.has(listing.id)}
                         isSold={isSold}
+                        isDeactivated={isDeactivated}
                         onSelect={(selectedListing) => {
                           if (onSelectListing) {
                             // Завантажуємо повну інформацію про товар
@@ -596,7 +598,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
                         tg={tg}
                       />
                       <div className="absolute top-2 left-2 flex gap-2 z-10">
-                        {!isSold && (
+                        {!isSold && !isDeactivated && (
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();

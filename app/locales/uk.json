@@ -17,6 +17,7 @@
     "back": "Назад",
     "add": "Додати",
     "clear": "Очистити",
+    "reset": "Скинути",
     "user": "Користувач",
     "currency": "Валюта",
     "selectCurrency": "Оберіть валюту",
@@ -123,6 +124,10 @@
     "searchInCity": "Пошук в {city}...",
     "searchCity": "Пошук міста...",
         "allCities": "Всі міста",
+        "selectedCities": "Вибрані міста",
+        "majorCities": "Великі міста",
+        "searchResults": "Результати пошуку",
+        "tryPostalCode": "Спробуйте ввести індекс (5 цифр) або назву міста",
         "allCategories": "Всі категорії",
         "clearFilters": "Очистити фільтри",
         "sort": {

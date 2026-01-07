@@ -296,7 +296,7 @@ export const CityModal = ({
               {localSelectedCities.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                    Вибрані міста ({localSelectedCities.length})
+                    {t('bazaar.selectedCities')} ({localSelectedCities.length})
                   </h4>
                   <div className="flex flex-wrap gap-2 mb-3">
                     {localSelectedCities.map((city) => (
@@ -316,7 +316,7 @@ export const CityModal = ({
               {/* Великі міста */}
               {!searchQuery && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Великі міста</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('bazaar.majorCities')}</h4>
                   <div className="space-y-2">
                     {majorGermanCities.map((city) => {
                       const isSelected = localSelectedCities.includes(city);
@@ -351,7 +351,7 @@ export const CityModal = ({
               {/* Результати пошуку */}
               {searchQuery && searchResults.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Результати пошуку</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('bazaar.searchResults')}</h4>
                   <div className="space-y-2">
                     {searchResults.map((city) => {
                       const isSelected = localSelectedCities.includes(city);
@@ -386,8 +386,8 @@ export const CityModal = ({
               {/* Повідомлення якщо нічого не знайдено */}
               {searchQuery && searchResults.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <p>Нічого не знайдено</p>
-                  <p className="text-sm mt-2">Спробуйте ввести індекс (5 цифр) або назву міста</p>
+                  <p>{t('common.nothingFound')}</p>
+                  <p className="text-sm mt-2">{t('bazaar.tryPostalCode')}</p>
                 </div>
               )}
 
