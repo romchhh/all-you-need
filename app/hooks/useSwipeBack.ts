@@ -3,6 +3,7 @@ import { TelegramWebApp } from '@/types/telegram';
 
 interface UseSwipeBackOptions {
   onSwipeBack: () => void;
+  onSwipeProgress?: (progress: number) => void; // Прогрес свайпу (0-100)
   enabled?: boolean;
   threshold?: number; // Мінімальна відстань свайпу в пікселях
   maxVerticalDistance?: number; // Максимальна вертикальна відстань для горизонтального свайпу
@@ -11,15 +12,17 @@ interface UseSwipeBackOptions {
 
 export const useSwipeBack = ({
   onSwipeBack,
+  onSwipeProgress,
   enabled = true,
-  threshold = 50,
-  maxVerticalDistance = 30,
+  threshold = 100,
+  maxVerticalDistance = 50,
   tg
 }: UseSwipeBackOptions) => {
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
   const touchEndY = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -41,9 +44,33 @@ export const useSwipeBack = ({
       const touch = e.touches[0];
       touchEndX.current = touch.clientX;
       touchEndY.current = touch.clientY;
+      
+      // Обчислюємо прогрес свайпу для візуального ефекту
+      if (onSwipeProgress && touchStartX.current !== null) {
+        const deltaX = touch.clientX - touchStartX.current;
+        const deltaY = Math.abs((touch.clientY || 0) - (touchStartY.current || 0));
+        
+        // Перевіряємо, чи це горизонтальний свайп
+        if (deltaY <= maxVerticalDistance && deltaX > 0) {
+          // Використовуємо easing функцію для плавнішого прогресу
+          const rawProgress = deltaX / threshold;
+          // Застосовуємо cubic-bezier easing для більш природного руху
+          const easedProgress = rawProgress < 1 
+            ? rawProgress * rawProgress * (3 - 2 * rawProgress) // smoothstep
+            : 1;
+          const progress = Math.min(easedProgress * 100, 120); // Дозволяємо трохи перевищити для ефекту
+          onSwipeProgress(progress);
+        } else {
+          onSwipeProgress(0);
+        }
+      }
     };
 
     const handleTouchEnd = () => {
+      if (onSwipeProgress) {
+        onSwipeProgress(0);
+      }
+      
       if (touchStartX.current === null || touchEndX.current === null) {
         touchStartX.current = null;
         touchStartY.current = null;
@@ -68,7 +95,15 @@ export const useSwipeBack = ({
       // Свайп вправо (зліва направо) для повернення назад
       if (deltaX > threshold) {
         tg?.HapticFeedback?.impactOccurred('medium');
-        onSwipeBack();
+        // Плавна анімація перед закриттям
+        if (onSwipeProgress) {
+          onSwipeProgress(120);
+          setTimeout(() => {
+            onSwipeBack();
+          }, 200);
+        } else {
+          onSwipeBack();
+        }
       }
 
       touchStartX.current = null;
@@ -85,7 +120,13 @@ export const useSwipeBack = ({
       document.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (onSwipeProgress) {
+        onSwipeProgress(0);
+      }
     };
-  }, [enabled, threshold, maxVerticalDistance, onSwipeBack, tg]);
+  }, [enabled, threshold, maxVerticalDistance, onSwipeBack, onSwipeProgress, tg]);
 };
 

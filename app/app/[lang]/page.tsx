@@ -58,6 +58,39 @@ const AYNMarketplace = () => {
   const [selectedCategoryFromModal, setSelectedCategoryFromModal] = useState<string | null>(null);
   const savedScrollPositionRef = useRef<number>(0);
 
+  // Зберігаємо стан для кожної вкладки
+  const [bazaarTabState, setBazaarTabState] = useState<{
+    selectedCategory: string | null;
+    selectedSubcategory: string | null;
+    selectedCities: string[];
+    minPrice: number | null;
+    maxPrice: number | null;
+    selectedCondition: 'new' | 'used' | null;
+    selectedCurrency: string | null;
+    sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
+    showFreeOnly: boolean;
+  }>({
+    selectedCategory: null,
+    selectedSubcategory: null,
+    selectedCities: [],
+    minPrice: null,
+    maxPrice: null,
+    selectedCondition: null,
+    selectedCurrency: null,
+    sortBy: 'newest',
+    showFreeOnly: false,
+  });
+
+  const [categoriesTabState, setCategoriesTabState] = useState<{
+    selectedCategory: string | null;
+    selectedSubcategory: string | null;
+    showFreeOnly: boolean;
+  }>({
+    selectedCategory: null,
+    selectedSubcategory: null,
+    showFreeOnly: false,
+  });
+
   // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {
     const savedFavorites = getFavoritesFromStorage();
@@ -173,10 +206,10 @@ const AYNMarketplace = () => {
     await fetchListings();
   };
 
-  // Додаємо pull-to-refresh тільки на головній вкладці
+  // Додаємо pull-to-refresh тільки на головній вкладці (вимкнено)
   const { isPulling, pullDistance, pullProgress } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: activeTab === 'bazaar' && !selectedListing && !selectedSeller,
+    enabled: false, // Вимикаємо pull-to-refresh
     tg
   });
 
@@ -390,6 +423,8 @@ const AYNMarketplace = () => {
             onNavigateToCategories={() => setActiveTab('categories')}
             onOpenCategoriesModal={() => setIsCategoriesModalOpen(true)}
             initialSelectedCategory={selectedCategoryFromModal}
+            savedState={bazaarTabState}
+            onStateChange={setBazaarTabState}
             tg={tg}
           />
         );
@@ -402,6 +437,8 @@ const AYNMarketplace = () => {
             favorites={favorites}
             onSelectListing={setSelectedListing}
             onToggleFavorite={toggleFavorite}
+            savedState={categoriesTabState}
+            onStateChange={setCategoriesTabState}
             tg={tg}
           />
         );

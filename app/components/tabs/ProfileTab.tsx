@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet } from 'lucide-react';
+import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone } from 'lucide-react';
 import { ImageViewModal } from '../ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
 import { useUser } from '@/hooks/useUser';
@@ -144,7 +144,9 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
     
     let url = `/api/listings?userId=${profile.telegramId}&limit=16&offset=${offset}`;
     if (selectedStatus !== 'all') {
-      url += `&status=${selectedStatus}`;
+      // Конвертуємо 'deactivated' в 'hidden' для API
+      const apiStatus = selectedStatus === 'deactivated' ? 'hidden' : selectedStatus;
+      url += `&status=${apiStatus}`;
     }
     if (selectedCategory !== 'all') {
       url += `&category=${selectedCategory}`;
@@ -307,11 +309,13 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
             )}
             {stats && (
               <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
-                <span>{stats.totalViews} {t('sales.views')}</span>
+                <div className="flex items-center gap-1">
+                  <Megaphone size={14} className="text-gray-500" />
+                  <span>{stats.activeListings} {t('sales.active')}</span>
+                </div>
                 {stats.soldListings > 0 && (
                   <span>{stats.soldListings} {t('sales.sold')}</span>
                 )}
-                <span>{stats.activeListings} {t('sales.active')}</span>
               </div>
             )}
             {profile.balance !== undefined && (
@@ -407,7 +411,9 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
               <span className="text-gray-700">
                 {selectedStatus === 'all' ? t('sales.allStatuses') : 
                  selectedStatus === 'active' ? t('listing.active') :
-                 selectedStatus === 'sold' ? t('listing.sold') : selectedStatus}
+                 selectedStatus === 'sold' ? t('listing.sold') :
+                 selectedStatus === 'pending' ? t('sales.pending') :
+                 selectedStatus === 'deactivated' ? t('sales.deactivated') : selectedStatus}
               </span>
               <ChevronDown size={16} className={`text-gray-400 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -461,7 +467,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {['all', 'active', 'sold', 'pending', 'hidden'].map(status => (
+              {['all', 'active', 'sold', 'pending', 'deactivated'].map(status => (
                 <button
                   key={status}
                   type="button"
@@ -480,7 +486,7 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
                    status === 'active' ? t('listing.active') :
                    status === 'sold' ? t('listing.sold') :
                    status === 'pending' ? t('sales.pending') :
-                   status === 'hidden' ? t('editListing.hidden') : status}
+                   status === 'deactivated' ? t('sales.deactivated') : status}
                   {selectedStatus === status && <span className="text-blue-500 ml-2">✓</span>}
                 </button>
               ))}
@@ -643,33 +649,6 @@ export const ProfileTab = ({ tg, onSelectListing }: ProfileTabProps) => {
                           className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 transition-colors"
                         >
                           <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (!window.confirm(t('listing.confirmDelete'))) {
-                              return;
-                            }
-                            try {
-                              const response = await fetch(`/api/listings/${listing.id}/delete?telegramId=${profile.telegramId}`, {
-                                method: 'DELETE',
-                              });
-                              if (response.ok) {
-                                showToast(t('editListing.listingDeleted'), 'success');
-                                // Оновлюємо список
-                                await fetchListingsWithFilters(0, true);
-                              } else {
-                                showToast(t('editListing.updateError'), 'error');
-                              }
-                            } catch (error) {
-                              showToast(t('editListing.updateError'), 'error');
-                            }
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors"
-                          title={t('listing.deleteListing')}
-                        >
-                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>

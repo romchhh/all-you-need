@@ -80,6 +80,7 @@ export const germanCities = [
   'Siegen',
   'Hildesheim',
   'Salzgitter',
+  'Wedel',
   
   // Середні міста (50,000-100,000)
   'Cottbus',

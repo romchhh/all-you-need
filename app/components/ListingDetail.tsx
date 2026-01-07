@@ -4,6 +4,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
 import { ListingCard } from './ListingCard';
 import { ShareModal } from './ShareModal';
+import { ImageViewModal } from './ImageViewModal';
 import { TopBar } from './TopBar';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getListingShareLink } from '@/utils/botLinks';
@@ -72,6 +73,7 @@ export const ListingDetail = ({
   const [sellerTotal, setSellerTotal] = useState(0);
   const [categoryTotal, setCategoryTotal] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
   const { t, language } = useLanguage();
@@ -235,8 +237,11 @@ export const ListingDetail = ({
   };
 
   // Додаємо свайп зліва для повернення назад
+  const [swipeProgress, setSwipeProgress] = useState(0);
+  
   useSwipeBack({
     onSwipeBack: onClose,
+    onSwipeProgress: setSwipeProgress,
     enabled: true,
     tg
   });
@@ -284,15 +289,15 @@ export const ListingDetail = ({
     }
   };
 
-  // Додаємо pull-to-refresh
+  // Додаємо pull-to-refresh (вимкнено)
   const { isPulling, pullDistance, pullProgress } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: true,
+    enabled: false, // Вимикаємо pull-to-refresh
     tg
   });
 
   return (
-    <div className="min-h-screen bg-white pb-20" style={{ position: 'relative' }}>
+    <div className="min-h-screen bg-white pb-20" style={{ position: 'relative', overflowX: 'hidden' }}>
       {/* Індикатор pull-to-refresh */}
       {isPulling && (
         <div 
@@ -318,22 +323,67 @@ export const ListingDetail = ({
           )}
         </div>
       )}
-      {/* Хедер */}
-      <TopBar
-        variant="detail"
-        onBack={onClose}
-        onShareClick={() => setShowShareModal(true)}
-        onFavoriteClick={() => onToggleFavorite(listing.id)}
-        isFavorite={isFavorite}
-        title={listing.title}
-        tg={tg}
-      />
+      
+      {/* Візуальний індикатор свайпу назад */}
+      {swipeProgress > 0 && (
+        <div 
+          className="fixed inset-0 bg-black z-[45] pointer-events-none"
+          style={{ 
+            opacity: Math.min(swipeProgress / 150, 0.35),
+            transition: swipeProgress === 0 ? 'opacity 0.3s ease-out' : 'none'
+          }}
+        />
+      )}
+      
+      {/* Хедер - закріплений */}
+      <div 
+        className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm"
+        style={{
+          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
+          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)'
+        }}
+      >
+        <TopBar
+          variant="detail"
+          onBack={onClose}
+          onShareClick={() => setShowShareModal(true)}
+          onFavoriteClick={() => onToggleFavorite(listing.id)}
+          isFavorite={isFavorite}
+          title={listing.title}
+          tg={tg}
+        />
+      </div>
+      
+      {/* Spacer для хедера */}
+      <div className="h-[64px]"></div>
 
       {/* Галерея фото */}
-      <ImageGallery images={images} title={listing.title} />
+      <div
+        style={{
+          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
+          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
+          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1
+        }}
+      >
+        <ImageGallery 
+          images={images} 
+          title={listing.title}
+          onImageClick={(index) => setSelectedImageIndex(index)}
+        />
+      </div>
 
       {/* Контент */}
-      <div className="p-4">
+      <div 
+        className="p-4"
+        style={{
+          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
+          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
+          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1
+        }}
+      >
             {/* Ціна */}
             <div className="mb-4">
               <div className="flex items-center gap-2">
@@ -452,32 +502,25 @@ export const ListingDetail = ({
         {sellerListings.length > 0 && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('listing.otherSellerListings')}</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {sellerListings.map(sellerListing => (
-                <ListingCard 
-                  key={sellerListing.id} 
-                  listing={sellerListing}
-                  isFavorite={favorites.has(sellerListing.id)}
-                  onSelect={(l) => {
-                    if (onSelectListing) {
-                      onSelectListing(l);
-                    }
-                  }}
-                  onToggleFavorite={onToggleFavorite}
-                  tg={tg}
-                />
-              ))}
-            </div>
-            {sellerHasMore && (
-              <div className="mt-4">
-                <button
-                  onClick={loadMoreSellerListings}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-4 rounded-2xl transition-colors"
-                >
-                  {t('common.showMore')}
-                </button>
+            <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+                {sellerListings.map(sellerListing => (
+                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[200px]">
+                    <ListingCard 
+                      listing={sellerListing}
+                      isFavorite={favorites.has(sellerListing.id)}
+                      onSelect={(l) => {
+                        if (onSelectListing) {
+                          onSelectListing(l);
+                        }
+                      }}
+                      onToggleFavorite={onToggleFavorite}
+                      tg={tg}
+                    />
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -485,32 +528,25 @@ export const ListingDetail = ({
         {categoryListings.length > 0 && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('listing.similarListings')}</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {categoryListings.map(categoryListing => (
-                <ListingCard 
-                  key={categoryListing.id} 
-                  listing={categoryListing}
-                  isFavorite={favorites.has(categoryListing.id)}
-                  onSelect={(l) => {
-                    if (onSelectListing) {
-                      onSelectListing(l);
-                    }
-                  }}
-                  onToggleFavorite={onToggleFavorite}
-                  tg={tg}
-                />
-              ))}
-            </div>
-            {categoryHasMore && (
-              <div className="mt-4">
-                <button
-                  onClick={loadMoreCategoryListings}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-4 rounded-2xl transition-colors"
-                >
-                  {t('common.showMore')}
-                </button>
+            <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+                {categoryListings.map(categoryListing => (
+                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[200px]">
+                    <ListingCard 
+                      listing={categoryListing}
+                      isFavorite={favorites.has(categoryListing.id)}
+                      onSelect={(l) => {
+                        if (onSelectListing) {
+                          onSelectListing(l);
+                        }
+                      }}
+                      onToggleFavorite={onToggleFavorite}
+                      tg={tg}
+                    />
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
@@ -594,6 +630,22 @@ export const ListingDetail = ({
         shareText={`📦 ${listing.title} - ${listing.price} в AYN Marketplace`}
         tg={tg}
       />
+
+      {/* Модальне вікно перегляду фото */}
+      {selectedImageIndex !== null && images[selectedImageIndex] && (
+        <ImageViewModal
+          isOpen={selectedImageIndex !== null}
+          images={images.map(img => {
+            if (img?.startsWith('http')) return img;
+            const cleanPath = img?.split('?')[0] || img;
+            const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+            return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+          })}
+          initialIndex={selectedImageIndex}
+          alt={`${listing.title}`}
+          onClose={() => setSelectedImageIndex(null)}
+        />
+      )}
     </div>
   );
 };

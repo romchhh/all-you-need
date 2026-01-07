@@ -4,12 +4,11 @@ import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '../CategoryChip';
 import { ListingCard } from '../ListingCard';
 import { SortModal } from '../SortModal';
+import { CityModal } from '../CityModal';
 import { SubcategoryList } from '../SubcategoryList';
 import { TopBar } from '../TopBar';
 import { ListingGridSkeleton } from '../SkeletonLoader';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
-import { germanCities } from '@/constants/german-cities';
-import { ukrainianCities } from '@/constants/ukrainian-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Currency } from '@/utils/currency';
@@ -28,6 +27,28 @@ interface BazaarTabProps {
   onNavigateToCategories?: () => void;
   onOpenCategoriesModal?: () => void;
   initialSelectedCategory?: string | null;
+  savedState?: {
+    selectedCategory: string | null;
+    selectedSubcategory: string | null;
+    selectedCities: string[];
+    minPrice: number | null;
+    maxPrice: number | null;
+    selectedCondition: 'new' | 'used' | null;
+    selectedCurrency: string | null;
+    sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
+    showFreeOnly: boolean;
+  };
+  onStateChange?: (state: {
+    selectedCategory: string | null;
+    selectedSubcategory: string | null;
+    selectedCities: string[];
+    minPrice: number | null;
+    maxPrice: number | null;
+    selectedCondition: 'new' | 'used' | null;
+    selectedCurrency: string | null;
+    sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
+    showFreeOnly: boolean;
+  }) => void;
   tg: TelegramWebApp | null;
 }
 
@@ -47,10 +68,12 @@ export const BazaarTab = ({
   onNavigateToCategories,
   onOpenCategoriesModal,
   initialSelectedCategory,
+  savedState,
+  onStateChange,
   tg
 }: BazaarTabProps) => {
   const { t } = useLanguage();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(initialSelectedCategory || null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(savedState?.selectedCategory || initialSelectedCategory || null);
   
   // Синхронізуємо selectedCategory з initialSelectedCategory
   useEffect(() => {
@@ -58,21 +81,38 @@ export const BazaarTab = ({
       setSelectedCategory(initialSelectedCategory);
     }
   }, [initialSelectedCategory]);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [showFreeOnly, setShowFreeOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(savedState?.selectedSubcategory || null);
+  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(savedState?.showFreeOnly || false);
+  const [sortBy, setSortBy] = useState<SortOption>(savedState?.sortBy || 'newest');
   const [showSortModal, setShowSortModal] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<Listing[]>([]);
   const [showRecommendations, setShowRecommendations] = useState(false);
-  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [selectedCities, setSelectedCities] = useState<string[]>(savedState?.selectedCities || []);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
-  const [cityQuery, setCityQuery] = useState('');
-  const [minPrice, setMinPrice] = useState<number | null>(null);
-  const [maxPrice, setMaxPrice] = useState<number | null>(null);
-  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(null);
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+  const [minPrice, setMinPrice] = useState<number | null>(savedState?.minPrice || null);
+  const [maxPrice, setMaxPrice] = useState<number | null>(savedState?.maxPrice || null);
+  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(savedState?.selectedCondition || null);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(savedState?.selectedCurrency as Currency | null || null);
+  
+  // Зберігаємо стан при зміні
+  useEffect(() => {
+    if (onStateChange) {
+      onStateChange({
+        selectedCategory,
+        selectedSubcategory,
+        selectedCities,
+        minPrice,
+        maxPrice,
+        selectedCondition,
+        selectedCurrency,
+        sortBy,
+        showFreeOnly,
+      });
+    }
+  }, [selectedCategory, selectedSubcategory, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency, sortBy, showFreeOnly, onStateChange]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -105,7 +145,7 @@ export const BazaarTab = ({
 
   const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
 
-  // Генеруємо підказки для автодоповнення
+  // Генеруємо підказки для автодоповнення (тільки назви товарів)
   const searchSuggestions = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     
@@ -118,41 +158,16 @@ export const BazaarTab = ({
     
     const suggestionsSet = new Set<string>();
     
-    // Додаємо назви товарів, які містять запит
+    // Додаємо тільки назви товарів, які містять запит
     listings.forEach(listing => {
       const title = listing.title.toLowerCase();
       if (title.includes(query)) {
         suggestionsSet.add(listing.title);
-        title.split(/\s+/).forEach(word => {
-          if (word.length >= 2 && word.startsWith(query)) {
-            suggestionsSet.add(word.charAt(0).toUpperCase() + word.slice(1));
-          }
-        });
       }
-    });
-    
-    // Додаємо локації
-    listings.forEach(listing => {
-      const location = listing.location.toLowerCase();
-      if (location.includes(query)) {
-        suggestionsSet.add(listing.location);
-      }
-    });
-    
-    // Додаємо категорії та підкатегорії
-    categories.forEach(category => {
-      if (category.name.toLowerCase().includes(query)) {
-        suggestionsSet.add(category.name);
-      }
-      category.subcategories?.forEach(sub => {
-        if (sub.name.toLowerCase().includes(query)) {
-          suggestionsSet.add(sub.name);
-        }
-      });
     });
     
     return Array.from(suggestionsSet).slice(0, 5);
-  }, [searchQuery, listings, categories, searchHistory]);
+  }, [searchQuery, listings, searchHistory]);
 
   // Закриваємо підказки при кліку поза ними
   useEffect(() => {
@@ -174,13 +189,13 @@ export const BazaarTab = ({
   const filteredAndSortedListings = useMemo(() => {
     let filtered = listings;
 
-    // Фільтр по категорії
-    if (selectedCategory) {
+    // Фільтр по категорії (не застосовуємо при пошуку)
+    if (selectedCategory && !searchQuery.trim()) {
       filtered = filtered.filter(listing => listing.category === selectedCategory);
     }
 
-    // Фільтр по підкатегорії
-    if (selectedSubcategory) {
+    // Фільтр по підкатегорії (не застосовуємо при пошуку)
+    if (selectedSubcategory && !searchQuery.trim()) {
       filtered = filtered.filter(listing => listing.subcategory === selectedSubcategory);
     }
 
@@ -189,10 +204,12 @@ export const BazaarTab = ({
       filtered = filtered.filter(listing => listing.isFree || listing.price.toLowerCase().includes('безкоштовно'));
     }
 
-    // Фільтр по місту
-    if (selectedCity.trim()) {
+    // Фільтр по містам (множинний вибір)
+    if (selectedCities.length > 0) {
       filtered = filtered.filter(listing => 
-        listing.location.toLowerCase().includes(selectedCity.toLowerCase())
+        selectedCities.some(city => 
+          listing.location.toLowerCase().includes(city.toLowerCase())
+        )
       );
     }
 
@@ -219,7 +236,7 @@ export const BazaarTab = ({
       });
     }
 
-    // Фільтр по пошуку
+    // Фільтр по пошуку (по назві, опису, бренду та ключовим словам)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(listing => 
@@ -254,7 +271,7 @@ export const BazaarTab = ({
     });
 
     return sorted;
-  }, [listings, selectedCategory, selectedSubcategory, showFreeOnly, searchQuery, sortBy, selectedCity, minPrice, maxPrice, selectedCondition, selectedCurrency]);
+  }, [listings, selectedCategory, selectedSubcategory, showFreeOnly, searchQuery, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
 
   const getSortLabel = () => {
     switch (sortBy) {
@@ -265,20 +282,8 @@ export const BazaarTab = ({
     }
   };
 
-  // Об'єднуємо німецькі та українські міста
-  const allCities = useMemo(() => {
-    const combined = [...germanCities, ...ukrainianCities];
-    // Видаляємо дублікати та сортуємо
-    return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
-  }, []);
 
-  const filteredCities = cityQuery
-    ? allCities.filter(city =>
-        city.toLowerCase().includes(cityQuery.toLowerCase())
-      ).slice(0, 10)
-    : allCities.slice(0, 10);
-
-  const hasActiveFilters = !!(sortBy !== 'newest' || showFreeOnly || minPrice !== null || maxPrice !== null || selectedCategory || selectedSubcategory || selectedCity.trim() || selectedCondition !== null || selectedCurrency !== null);
+  const hasActiveFilters = !!(sortBy !== 'newest' || showFreeOnly || minPrice !== null || maxPrice !== null || selectedCategory || selectedSubcategory || selectedCities.length > 0 || selectedCondition !== null || selectedCurrency !== null);
 
   return (
     <div className="pb-24">
@@ -292,6 +297,14 @@ export const BazaarTab = ({
                 onSearchChange(query);
                 setShowSuggestions(true);
               }}
+              onSearchSubmit={(query) => {
+                // Обробка натискання Enter/Search
+                onSearchChange(query);
+                setShowSuggestions(false);
+                addToSearchHistory(query);
+                setSearchHistory(getSearchHistory());
+                searchInputRef.current?.blur();
+              }}
               onFilterClick={() => {
                 setShowSortModal(true);
                 tg?.HapticFeedback.impactOccurred('light');
@@ -301,7 +314,7 @@ export const BazaarTab = ({
                 setShowSuggestions(false);
               }}
               searchQuery={searchQuery}
-              searchPlaceholder={selectedCity ? t('bazaar.searchInCity', { city: selectedCity }) : t('bazaar.whatInterestsYou')}
+              searchPlaceholder={selectedCities.length > 0 ? t('bazaar.searchInCity', { city: selectedCities[0] }) : t('bazaar.whatInterestsYou')}
               searchInputRef={searchInputRef}
               hasActiveFilters={hasActiveFilters}
               tg={tg}
@@ -315,12 +328,14 @@ export const BazaarTab = ({
                     key={index}
                     type="button"
                     onClick={() => {
+                      // При кліку на підказку виконуємо пошук
                       onSearchChange(suggestion);
                       addToSearchHistory(suggestion);
                       setSearchHistory(getSearchHistory());
                       setShowSuggestions(false);
                       searchInputRef.current?.blur();
                       tg?.HapticFeedback.impactOccurred('light');
+                      // Після вибору підказки виконуємо пошук (сторінка оновлюється автоматично через onSearchChange)
                     }}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-900 border-b border-gray-100 last:border-b-0"
                   >
@@ -338,13 +353,18 @@ export const BazaarTab = ({
             {/* Кнопка вибору міста */}
             <button
               onClick={() => setIsCityModalOpen(true)}
-              className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                selectedCity
+              className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors relative ${
+                selectedCities.length > 0
                   ? 'bg-green-50 border-2 border-green-500'
                   : 'bg-gray-100 hover:bg-gray-200'
               }`}
             >
               <MapPin size={18} className="text-gray-900" />
+              {selectedCities.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {selectedCities.length > 9 ? '9+' : selectedCities.length}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -352,8 +372,8 @@ export const BazaarTab = ({
 
 
 
-      {/* Розділи - показуємо тільки якщо не вибрана категорія */}
-      {categories.length > 0 && !selectedCategory && (
+      {/* Розділи - показуємо тільки якщо не вибрана категорія та немає пошуку */}
+      {categories.length > 0 && !selectedCategory && !searchQuery.trim() && (
         <div className="px-4 pt-4 pb-3">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900">{t('navigation.categories')}</h2>
@@ -367,10 +387,10 @@ export const BazaarTab = ({
               msOverflowStyle: 'none'
             }}
           >
-            <div className="flex gap-3 pb-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
+            <div className="flex gap-2 pb-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
               {/* Кнопка "Всі категорії" */}
               <div 
-                className="flex flex-col items-center min-w-[100px] max-w-[120px] cursor-pointer"
+                className="flex flex-col items-center min-w-[80px] max-w-[90px] cursor-pointer flex-shrink-0"
                 onClick={() => {
                   if (onOpenCategoriesModal) {
                     onOpenCategoriesModal();
@@ -385,10 +405,10 @@ export const BazaarTab = ({
                   }
                 }}
               >
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mb-2 transition-all bg-blue-500 text-white">
+                <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl mb-1.5 transition-all bg-blue-500 text-white">
                   📦
                 </div>
-                <span className="text-xs font-medium text-center whitespace-normal leading-tight text-blue-600">
+                <span className="text-xs font-medium text-center whitespace-normal leading-tight px-0.5 text-blue-600">
                   {t('bazaar.allCategories')}
                 </span>
               </div>
@@ -509,74 +529,13 @@ export const BazaarTab = ({
       />
 
       {/* Модальне вікно вибору міста */}
-      {isCityModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">{t('bazaar.selectCity')}</h2>
-              <button
-                onClick={() => {
-                  setIsCityModalOpen(false);
-                  setCityQuery('');
-                }}
-                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-              >
-                <X size={18} className="text-gray-900" />
-              </button>
-            </div>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="text"
-                value={cityQuery}
-                onChange={(e) => setCityQuery(e.target.value)}
-                placeholder={t('bazaar.searchCity')}
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder:text-gray-400"
-              />
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              <button
-                onClick={() => {
-                  setSelectedCity('');
-                  setIsCityModalOpen(false);
-                  setCityQuery('');
-                  tg?.HapticFeedback.impactOccurred('light');
-                }}
-                className={`w-full px-4 py-3 text-left rounded-xl mb-2 transition-colors ${
-                  !selectedCity
-                    ? 'bg-green-50 text-green-700 border-2 border-green-500'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-green-500" />
-                  <span className="font-medium">{t('bazaar.allCities')}</span>
-                </div>
-              </button>
-              {filteredCities.map((city) => (
-                <button
-                  key={city}
-                  type="button"
-                  onClick={() => {
-                    setSelectedCity(city);
-                    setIsCityModalOpen(false);
-                    setCityQuery('');
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className={`w-full px-4 py-3 text-left rounded-xl mb-2 transition-colors flex items-center gap-2 ${
-                    selectedCity === city
-                      ? 'bg-green-50 text-green-700 border-2 border-green-500'
-                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <MapPin size={16} className={selectedCity === city ? 'text-green-500' : 'text-gray-400'} />
-                  <span>{city}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <CityModal
+        isOpen={isCityModalOpen}
+        selectedCities={selectedCities}
+        onClose={() => setIsCityModalOpen(false)}
+        onSelect={(cities) => setSelectedCities(cities)}
+        tg={tg}
+      />
     </div>
   );
 };

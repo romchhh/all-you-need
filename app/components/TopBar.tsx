@@ -7,6 +7,7 @@ interface TopBarProps {
   variant: 'main' | 'detail' | 'profile';
   onBack?: () => void;
   onSearchChange?: (query: string) => void;
+  onSearchSubmit?: (query: string) => void;
   onFilterClick?: () => void;
   onShareClick?: () => void;
   onFavoriteClick?: () => void;
@@ -24,6 +25,7 @@ export const TopBar = ({
   variant,
   onBack,
   onSearchChange,
+  onSearchSubmit,
   onFilterClick,
   onShareClick,
   onFavoriteClick,
@@ -49,6 +51,15 @@ export const TopBar = ({
             placeholder={searchPlaceholder || t('bazaar.whatInterestsYou')}
             value={searchQuery}
             onChange={(e) => onSearchChange?.(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Search') {
+                e.preventDefault();
+                const query = searchQuery.trim();
+                if (query && onSearchSubmit) {
+                  onSearchSubmit(query);
+                }
+              }
+            }}
             onFocus={() => {
               // Можна додати логіку для показу підказок
             }}
@@ -84,7 +95,7 @@ export const TopBar = ({
 
   if (variant === 'detail' || variant === 'profile') {
     return (
-      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200">
+      <div className="w-full">
         <div className="px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => {

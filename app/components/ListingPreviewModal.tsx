@@ -3,7 +3,7 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
 import { getAvatarColor } from '@/utils/avatarColors';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ListingPreviewModalProps {
@@ -26,6 +26,41 @@ export const ListingPreviewModal = ({
   tg
 }: ListingPreviewModalProps) => {
   const { t } = useLanguage();
+
+  // Блокуємо скрол body та html при відкритому модальному вікні
+  useEffect(() => {
+    if (isOpen) {
+      // Зберігаємо поточну позицію скролу
+      const scrollY = window.scrollY;
+      // Блокуємо скрол на body та html
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      // Розблоковуємо скрол
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
+    }
+    
+    // Cleanup при розмонтуванні
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen || !listing) return null;
 
   const sellerName = listing.seller.name || t('common.user');

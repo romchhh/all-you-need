@@ -1,12 +1,13 @@
-import { ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 
 interface ImageGalleryProps {
   images: string[];
   title: string;
+  onImageClick?: (index: number) => void;
 }
 
-export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
+export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
@@ -31,7 +32,7 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
   };
 
   // Swipe жести з плавністю
-  const minSwipeDistance = 30;
+  const minSwipeDistance = 50;
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
 
@@ -45,12 +46,9 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
   const onTouchMove = (e: React.TouchEvent) => {
     if (touchStartX.current === null) return;
     touchEndX.current = e.targetTouches[0].clientX;
-    // Інвертуємо diff, щоб фото рухалося в правильному напрямку
-    // Коли свайпаємо вліво (touchEndX < touchStartX), фото має рухатися вліво (негативний offset)
-    // Коли свайпаємо вправо (touchEndX > touchStartX), фото має рухатися вправо (позитивний offset)
     const diff = touchEndX.current - touchStartX.current;
     // Обмежуємо зміщення для плавності
-    setSwipeOffset(Math.max(-100, Math.min(100, diff)));
+    setSwipeOffset(Math.max(-200, Math.min(200, diff)));
   };
 
   const onTouchEnd = () => {
@@ -60,9 +58,6 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
       return;
     }
     
-    // Інвертуємо distance для правильної логіки
-    // Коли свайпаємо вліво (touchEndX < touchStartX), distance буде негативним, і ми хочемо nextImage
-    // Коли свайпаємо вправо (touchEndX > touchStartX), distance буде позитивним, і ми хочемо prevImage
     const distance = touchEndX.current - touchStartX.current;
     const isLeftSwipe = distance < -minSwipeDistance; // Свайп вліво = наступне фото
     const isRightSwipe = distance > minSwipeDistance; // Свайп вправо = попереднє фото
@@ -109,11 +104,13 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onClick={() => onImageClick?.(currentIndex)}
       style={{ 
         touchAction: 'pan-y pinch-zoom',
         position: 'relative',
         width: '100%',
-        maxWidth: '100%'
+        maxWidth: '100%',
+        cursor: onImageClick ? 'pointer' : 'default'
       }}
     >
       {/* Skeleton loader */}
@@ -131,7 +128,7 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
         </div>
       ) : (
         <div 
-          className="absolute inset-0 flex items-center justify-center transition-transform duration-300 ease-out"
+          className="absolute inset-0 flex items-center justify-center transition-transform duration-200 ease-out"
           style={{
             transform: `translateX(${swipeOffset}px)`,
           }}
@@ -139,8 +136,8 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
           <img 
             src={imageUrls[currentIndex]}
             alt={`${title} - фото ${currentIndex + 1}`}
-            className={`w-full h-full object-contain transition-all duration-500 ease-in-out ${
-              imageLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+            className={`w-full h-full object-cover transition-opacity duration-300 ease-in-out ${
+              imageLoading ? 'opacity-0' : 'opacity-100'
             }`}
             loading={currentIndex === 0 ? 'eager' : 'lazy'}
             decoding="async"
@@ -173,37 +170,6 @@ export const ImageGallery = ({ images, title }: ImageGalleryProps) => {
             {currentIndex + 1} / {images.length}
           </div>
 
-          {/* Кнопки навігації */}
-          <button
-            onClick={prevImage}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 z-20"
-            aria-label="Попереднє фото"
-            style={{ 
-              position: 'absolute',
-              left: '1rem',
-              right: 'auto',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 20
-            }}
-          >
-            <ChevronLeft size={20} className="text-gray-700" />
-          </button>
-          <button
-            onClick={nextImage}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all active:scale-95 z-20"
-            aria-label="Наступне фото"
-            style={{ 
-              position: 'absolute',
-              right: '1rem',
-              left: 'auto',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 20
-            }}
-          >
-            <ChevronRight size={20} className="text-gray-700" />
-          </button>
 
           {/* Точки індикації - знизу по центру */}
           <div 

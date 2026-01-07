@@ -75,8 +75,17 @@ export const SortModal = ({
 }: SortModalProps) => {
   const { t } = useLanguage();
   const categories = getCategories(t);
+  
+  // Функція для визначення максимальної ціни залежно від категорії
+  const getMaxPrice = (categoryId: string | null): number => {
+    if (categoryId === 'auto' || categoryId === 'realestate') {
+      return 100000; // Для авто та нерухомості
+    }
+    return 1000; // Для інших категорій
+  };
+  
   const [localMinPrice, setLocalMinPrice] = useState<number>(minPrice || 0);
-  const [localMaxPrice, setLocalMaxPrice] = useState<number>(maxPrice || 10000);
+  const [localMaxPrice, setLocalMaxPrice] = useState<number>(maxPrice || getMaxPrice(selectedCategory));
   const [localCurrency, setLocalCurrency] = useState<Currency | null>(selectedCurrency || null);
   const [localSelectedCategory, setLocalSelectedCategory] = useState<string | null>(selectedCategory);
   const [localSelectedSubcategory, setLocalSelectedSubcategory] = useState<string | null>(selectedSubcategory);
@@ -99,14 +108,56 @@ export const SortModal = ({
 
   useEffect(() => {
     if (isOpen) {
+      const maxPriceForCategory = getMaxPrice(selectedCategory);
       setLocalMinPrice(minPrice || 0);
-      setLocalMaxPrice(maxPrice || 10000);
+      setLocalMaxPrice(maxPrice || maxPriceForCategory);
       setLocalCurrency(selectedCurrency || null);
       setLocalSelectedCategory(selectedCategory);
       setLocalSelectedSubcategory(selectedSubcategory);
       setLocalCondition(selectedCondition);
+      // Зберігаємо поточну позицію скролу
+      const scrollY = window.scrollY;
+      // Блокуємо скрол на body та html
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      // Розблоковуємо скрол
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
+    
+    // Cleanup при розмонтуванні
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+    };
   }, [isOpen, minPrice, maxPrice, selectedCurrency, selectedCategory, selectedSubcategory, selectedCondition]);
+  
+  // Оновлюємо максимальну ціну при зміні категорії
+  useEffect(() => {
+    if (isOpen) {
+      const maxPriceForCategory = getMaxPrice(localSelectedCategory);
+      if (localMaxPrice > maxPriceForCategory) {
+        setLocalMaxPrice(maxPriceForCategory);
+      }
+      if (localMinPrice > maxPriceForCategory) {
+        setLocalMinPrice(0);
+      }
+    }
+  }, [localSelectedCategory, isOpen]);
 
   const sortOptions: { value: SortOption; labelKey: string }[] = [
     { value: 'newest', labelKey: 'bazaar.sort.newest' },
@@ -125,7 +176,7 @@ export const SortModal = ({
   const handleReset = () => {
     // Скидаємо локальні стани
     setLocalMinPrice(0);
-    setLocalMaxPrice(10000);
+    setLocalMaxPrice(1000); // Стандартний максимум
     setLocalCurrency(null);
     setLocalSelectedCategory(null);
     setLocalSelectedSubcategory(null);
@@ -175,11 +226,12 @@ export const SortModal = ({
   if (!isOpen) return null;
 
   // Перевіряємо реальні застосовані фільтри
+  const maxPriceForCurrentCategory = getMaxPrice(selectedCategory);
   const hasActiveFilters = 
     currentSort !== 'newest' || 
     showFreeOnly || 
     (minPrice !== null && minPrice !== 0) || 
-    (maxPrice !== null && maxPrice !== 10000) || 
+    (maxPrice !== null && maxPrice !== maxPriceForCurrentCategory) || 
     selectedCategory !== null || 
     selectedSubcategory !== null || 
     selectedCondition !== null || 
@@ -337,57 +389,62 @@ export const SortModal = ({
                 <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('bazaar.priceRange')}</h4>
                 
                 {/* Повзунки */}
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs text-gray-500">{t('bazaar.minPrice')}</label>
-                      <span className="text-sm font-semibold text-gray-900">{localMinPrice} {localCurrency ? getCurrencySymbol(localCurrency) : '€'}</span>
+                {(() => {
+                  const currentMaxPrice = getMaxPrice(localSelectedCategory);
+                  return (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="text-xs text-gray-500">{t('bazaar.minPrice')}</label>
+                          <span className="text-sm font-semibold text-gray-900">{localMinPrice} {localCurrency ? getCurrencySymbol(localCurrency) : '€'}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max={currentMaxPrice}
+                          step="5"
+                          value={localMinPrice}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value);
+                            setLocalMinPrice(value);
+                            if (value > localMaxPrice) {
+                              setLocalMaxPrice(value);
+                            }
+                          }}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                          style={{
+                            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localMinPrice / currentMaxPrice) * 100}%, #e5e7eb ${(localMinPrice / currentMaxPrice) * 100}%, #e5e7eb 100%)`
+                          }}
+                        />
+                      </div>
+                      
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="text-xs text-gray-500">{t('bazaar.maxPrice')}</label>
+                          <span className="text-sm font-semibold text-gray-900">{localMaxPrice} {localCurrency ? getCurrencySymbol(localCurrency) : '€'}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max={currentMaxPrice}
+                          step="5"
+                          value={localMaxPrice}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value);
+                            setLocalMaxPrice(value);
+                            if (value < localMinPrice) {
+                              setLocalMinPrice(value);
+                            }
+                          }}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                          style={{
+                            background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${(localMaxPrice / currentMaxPrice) * 100}%, #3b82f6 ${(localMaxPrice / currentMaxPrice) * 100}%, #3b82f6 100%)`
+                          }}
+                        />
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="10000"
-                      step="100"
-                      value={localMinPrice}
-                      onChange={(e) => {
-                        const value = parseInt(e.target.value);
-                        setLocalMinPrice(value);
-                        if (value > localMaxPrice) {
-                          setLocalMaxPrice(value);
-                        }
-                      }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                      style={{
-                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localMinPrice / 10000) * 100}%, #e5e7eb ${(localMinPrice / 10000) * 100}%, #e5e7eb 100%)`
-                      }}
-                    />
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs text-gray-500">{t('bazaar.maxPrice')}</label>
-                      <span className="text-sm font-semibold text-gray-900">{localMaxPrice} {localCurrency ? getCurrencySymbol(localCurrency) : '€'}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="10000"
-                      step="100"
-                      value={localMaxPrice}
-                      onChange={(e) => {
-                        const value = parseInt(e.target.value);
-                        setLocalMaxPrice(value);
-                        if (value < localMinPrice) {
-                          setLocalMinPrice(value);
-                        }
-                      }}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                      style={{
-                        background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${(localMaxPrice / 10000) * 100}%, #3b82f6 ${(localMaxPrice / 10000) * 100}%, #3b82f6 100%)`
-                      }}
-                    />
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Безкоштовні */}
@@ -415,8 +472,9 @@ export const SortModal = ({
                     e.stopPropagation();
                     
                     // Обчислюємо мінімальну та максимальну ціну
+                    const currentMaxPrice = getMaxPrice(localSelectedCategory);
                     const min = localMinPrice > 0 ? localMinPrice : null;
-                    const max = localMaxPrice < 10000 ? localMaxPrice : null;
+                    const max = localMaxPrice < currentMaxPrice ? localMaxPrice : null;
                     
                     // Застосовуємо всі фільтри через ref для гарантії
                     onPriceRangeChangeRef.current(min, max);

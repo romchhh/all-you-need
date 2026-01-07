@@ -1,6 +1,6 @@
 import { X, Copy, MessageCircle, Mail, Share2 } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ShareModalProps {
@@ -15,6 +15,40 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
   const { t } = useLanguage();
   const [showFallback, setShowFallback] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Блокуємо скрол body та html при відкритому модальному вікні
+  useEffect(() => {
+    if (isOpen) {
+      // Зберігаємо поточну позицію скролу
+      const scrollY = window.scrollY;
+      // Блокуємо скрол на body та html
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      // Розблоковуємо скрол
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
+    }
+    
+    // Cleanup при розмонтуванні
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

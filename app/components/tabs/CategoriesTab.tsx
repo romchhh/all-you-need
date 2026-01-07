@@ -13,6 +13,16 @@ interface CategoriesTabProps {
   favorites: Set<number>;
   onSelectListing: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
+  savedState?: {
+    selectedCategory: string | null;
+    selectedSubcategory: string | null;
+    showFreeOnly: boolean;
+  };
+  onStateChange?: (state: {
+    selectedCategory: string | null;
+    selectedSubcategory: string | null;
+    showFreeOnly: boolean;
+  }) => void;
   tg: TelegramWebApp | null;
 }
 
@@ -22,13 +32,26 @@ export const CategoriesTab = ({
   favorites,
   onSelectListing,
   onToggleFavorite,
+  savedState,
+  onStateChange,
   tg
 }: CategoriesTabProps) => {
   const { t } = useLanguage();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [showFreeOnly, setShowFreeOnly] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(savedState?.selectedCategory || null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(savedState?.selectedSubcategory || null);
+  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(savedState?.showFreeOnly || false);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  
+  // Зберігаємо стан при зміні
+  useEffect(() => {
+    if (onStateChange) {
+      onStateChange({
+        selectedCategory,
+        selectedSubcategory,
+        showFreeOnly,
+      });
+    }
+  }, [selectedCategory, selectedSubcategory, showFreeOnly, onStateChange]);
 
   const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
 

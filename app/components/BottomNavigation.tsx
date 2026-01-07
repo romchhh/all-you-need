@@ -71,13 +71,8 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
             : 'text-gray-400 hover:text-gray-600'
         }`}
       >
-        <div className={`transition-transform relative ${activeTab === 'favorites' ? 'scale-110' : ''}`}>
+        <div className={`transition-transform ${activeTab === 'favorites' ? 'scale-110' : ''}`}>
           <Heart size={24} strokeWidth={activeTab === 'favorites' ? 2.5 : 2} fill={activeTab === 'favorites' ? 'currentColor' : 'none'} />
-          {favoritesCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-              {favoritesCount > 99 ? '99+' : favoritesCount}
-            </span>
-          )}
         </div>
         <span className="text-xs font-medium">{t('navigation.favorites')}</span>
       </button>

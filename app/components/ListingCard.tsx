@@ -122,7 +122,7 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
         }
       }}
     >
-      <div className="relative aspect-square bg-gray-100">
+      <div className="relative aspect-square bg-gray-100 overflow-hidden">
         {/* Placeholder або зображення */}
         {imageError || !listing.image ? (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
@@ -132,29 +132,27 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
             </div>
           </div>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <img 
-              src={imageUrl}
-              alt={listing.title}
-              className={`w-full h-full object-cover ${
-                imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
-              } ${isSold ? 'grayscale' : ''}`}
-              loading="lazy"
-              decoding="async"
-              sizes="(max-width: 768px) 50vw, 33vw"
-              key={`${listing.image}-${listing.id}`}
-              onLoad={() => {
-                imageLoadedRef.current.add(imageUrl);
-                setImageLoading(false);
-                setImageError(false);
-              }}
-              onError={(e) => {
-                setImageLoading(false);
-                setImageError(true);
-                console.error('Error loading listing image:', listing.image);
-              }}
-            />
-          </div>
+          <img 
+            src={imageUrl}
+            alt={listing.title}
+            className={`absolute inset-0 w-full h-full object-cover ${
+              imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
+            } ${isSold ? 'grayscale' : ''}`}
+            loading="lazy"
+            decoding="async"
+            sizes="(max-width: 768px) 50vw, 33vw"
+            key={`${listing.image}-${listing.id}`}
+            onLoad={() => {
+              imageLoadedRef.current.add(imageUrl);
+              setImageLoading(false);
+              setImageError(false);
+            }}
+            onError={(e) => {
+              setImageLoading(false);
+              setImageError(true);
+              console.error('Error loading listing image:', listing.image);
+            }}
+          />
         )}
         {/* Бейдж "Продано" */}
         {isSold && (
