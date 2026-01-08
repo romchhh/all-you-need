@@ -71,9 +71,9 @@ export const CategoriesModal = ({
               onClose();
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="text-green-600 font-medium text-sm hover:text-green-700 transition-colors"
+            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
           >
-            {t('common.close') || 'Закрити'}
+            <X size={20} className="text-gray-900" />
           </button>
         </div>
 

@@ -11,7 +11,9 @@ import { getProfileShareLink } from '@/utils/botLinks';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSwipeBack } from '@/hooks/useSwipeBack';
-import { useState, useEffect, useMemo } from 'react';
+import { useToast } from '@/hooks/useToast';
+import { Toast } from './Toast';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 interface UserProfilePageProps {
   sellerTelegramId: string;
@@ -39,6 +41,7 @@ export const UserProfilePage = ({
   tg
 }: UserProfilePageProps) => {
   const { t } = useLanguage();
+  const { toast, showToast, hideToast } = useToast();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<{ username: string | null; phone: string | null } | null>(null);
@@ -66,8 +69,7 @@ export const UserProfilePage = ({
     delay: 500,
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = useCallback(async () => {
       try {
         setLoading(true);
         
@@ -103,10 +105,11 @@ export const UserProfilePage = ({
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchData();
   }, [sellerTelegramId, currentUser?.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const loadMoreListings = async () => {
     try {
@@ -245,18 +248,31 @@ export const UserProfilePage = ({
               
               let link = '';
               
-              if (username) {
+              if (username && username.trim() !== '') {
                 // Якщо є username, використовуємо його
-                link = `https://t.me/${username}`;
-              } else if (sellerTelegramId && String(sellerTelegramId).trim() !== '') {
-                // Використовуємо tg://user?id= для відкриття чату з користувачем за ID
-                link = `tg://user?id=${sellerTelegramId}`;
+                link = `https://t.me/${username.replace('@', '')}`;
+              } else if (sellerTelegramId) {
+                // Перевіряємо, чи telegramId не порожній (може бути числом або рядком)
+                const telegramIdStr = String(sellerTelegramId).trim();
+                if (telegramIdStr !== '' && telegramIdStr !== 'null' && telegramIdStr !== 'undefined') {
+                  // Використовуємо https://t.me/ для відкриття чату з користувачем за ID
+                  // Telegram WebApp автоматично перетворить це на внутрішнє посилання
+                  link = `https://t.me/user${telegramIdStr}`;
+                } else {
+                  console.log('Telegram ID is empty or invalid:', sellerTelegramId);
+                  if (tg) {
+                    tg.showAlert(t('listingDetail.telegramIdNotFound'));
+                  } else {
+                    showToast(t('listingDetail.telegramIdNotFound'), 'error');
+                  }
+                  return;
+                }
               } else {
                 console.log('Telegram ID and username not found');
                 if (tg) {
                   tg.showAlert(t('listingDetail.telegramIdNotFound'));
                 } else {
-                  alert(t('listingDetail.telegramIdNotFound'));
+                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
                 }
                 return;
               }
@@ -293,11 +309,19 @@ export const UserProfilePage = ({
                     listing={listing}
                     isFavorite={favorites.has(listing.id)}
                     onSelect={(selectedListing) => {
+                      // Оновлюємо дані перед закриттям профілю
+                      fetchData();
                       onSelectListing(selectedListing);
                       // Закриваємо профіль продавця при виборі оголошення
                       onClose();
                     }}
-                    onToggleFavorite={onToggleFavorite}
+                    onToggleFavorite={(id) => {
+                      onToggleFavorite(id);
+                      // Оновлюємо сторінку після зміни обраного
+                      setTimeout(() => {
+                        fetchData();
+                      }, 300);
+                    }}
                     tg={tg}
                   />
                 ))}
@@ -325,17 +349,37 @@ export const UserProfilePage = ({
           isOpen={showAvatarModal}
           imageUrl={sellerAvatar}
           alt={sellerName}
-          onClose={() => setShowAvatarModal(false)}
+          onClose={() => {
+            setShowAvatarModal(false);
+            // Оновлюємо дані після закриття модального вікна
+            setTimeout(() => {
+              fetchData();
+            }, 200);
+          }}
         />
       )}
 
       {/* Модальне вікно поділу */}
       <ShareModal
         isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
+        onClose={() => {
+          setShowShareModal(false);
+          // Оновлюємо дані після закриття модального вікна
+          setTimeout(() => {
+            fetchData();
+          }, 200);
+        }}
         shareLink={getProfileShareLink(sellerTelegramId)}
         shareText={`👤 Профіль ${sellerName}${sellerUsername ? ` (@${sellerUsername})` : ''} в AYN Marketplace`}
         tg={tg}
+      />
+
+      {/* Toast сповіщення */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
       />
     </div>
   );

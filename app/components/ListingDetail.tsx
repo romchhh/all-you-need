@@ -13,6 +13,8 @@ import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { useToast } from '@/hooks/useToast';
+import { Toast } from './Toast';
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
@@ -77,6 +79,7 @@ export const ListingDetail = ({
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
   const { t, language } = useLanguage();
+  const { toast, showToast, hideToast } = useToast();
   
   // Форматуємо час на клієнті з перекладами
   const formattedTime = useMemo(() => {
@@ -117,27 +120,72 @@ export const ListingDetail = ({
 
   // Скролимо нагору при відкритті нового оголошення
   useEffect(() => {
-    // Функція для скролу нагору
-    const scrollToTop = () => {
-      window.scrollTo({ top: 0, behavior: 'auto' });
+    // Функція для агресивного скролу нагору
+    const forceScrollToTop = () => {
+      // Використовуємо всі можливі методи
+      window.scrollTo(0, 0);
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+      document.scrollingElement && (document.scrollingElement.scrollTop = 0);
+      
+      // Додатково встановлюємо стилі для запобігання скролу
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Повертаємо скрол через невелику затримку
+      setTimeout(() => {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+      }, 100);
     };
 
     // Миттєво скролимо нагору
-    scrollToTop();
+    forceScrollToTop();
 
     // Використовуємо requestAnimationFrame для гарантії після рендерингу
     requestAnimationFrame(() => {
-      scrollToTop();
+      forceScrollToTop();
       requestAnimationFrame(() => {
-        scrollToTop();
-        // Додаткова перевірка через невелику затримку
-        setTimeout(() => {
-          scrollToTop();
-        }, 100);
+        forceScrollToTop();
+        requestAnimationFrame(() => {
+          forceScrollToTop();
+        });
       });
     });
+    
+    // Кілька додаткових спроб з різними затримками
+    const delays = [0, 10, 20, 50, 100, 150, 200, 300, 500, 800, 1000];
+    const timeouts: NodeJS.Timeout[] = [];
+    
+    delays.forEach(delay => {
+      const timeoutId = setTimeout(() => {
+        forceScrollToTop();
+      }, delay);
+      timeouts.push(timeoutId);
+    });
+    
+    // Агресивний інтервал для гарантії, що скрол залишається зверху
+    const intervalId = setInterval(() => {
+      const currentScroll = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop;
+      if (currentScroll > 0) {
+        forceScrollToTop();
+      }
+    }, 50); // Перевіряємо кожні 50мс
+    
+    // Очищаємо інтервал через 3 секунди
+    const clearIntervalTimeout = setTimeout(() => {
+      clearInterval(intervalId);
+    }, 3000);
+    
+    return () => {
+      timeouts.forEach(clearTimeout);
+      clearInterval(intervalId);
+      clearTimeout(clearIntervalTimeout);
+      // Відновлюємо стилі при розмонтуванні
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
   }, [listing.id]);
 
   // Фіксуємо перегляд при відкритті оголошення
@@ -566,7 +614,7 @@ export const ListingDetail = ({
                 if (tg) {
                   tg.showAlert(t('sales.promoteSoon'));
                 } else {
-                  alert(t('sales.promoteSoon'));
+                  showToast(t('sales.promoteSoon'), 'info');
                 }
                 tg?.HapticFeedback.impactOccurred('light');
                 return;
@@ -578,18 +626,31 @@ export const ListingDetail = ({
               
               let link = '';
               
-              if (username) {
+              if (username && username.trim() !== '') {
                 // Якщо є username, використовуємо його
-                link = `https://t.me/${username}`;
-              } else if (telegramId && String(telegramId).trim() !== '') {
-                // Використовуємо tg://user?id= для відкриття чату з користувачем за ID
-                link = `tg://user?id=${telegramId}`;
+                link = `https://t.me/${username.replace('@', '')}`;
+              } else if (telegramId) {
+                // Перевіряємо, чи telegramId не порожній (може бути числом або рядком)
+                const telegramIdStr = String(telegramId).trim();
+                if (telegramIdStr !== '' && telegramIdStr !== 'null' && telegramIdStr !== 'undefined') {
+                  // Використовуємо https://t.me/ для відкриття чату з користувачем за ID
+                  // Telegram WebApp автоматично перетворить це на внутрішнє посилання
+                  link = `https://t.me/user${telegramIdStr}`;
+                } else {
+                  console.log('Telegram ID is empty or invalid:', telegramId);
+                  if (tg) {
+                    tg.showAlert(t('listingDetail.telegramIdNotFound'));
+                  } else {
+                    showToast(t('listingDetail.telegramIdNotFound'), 'error');
+                  }
+                  return;
+                }
               } else {
                 console.log('Telegram ID and username not found');
                 if (tg) {
                   tg.showAlert(t('listingDetail.telegramIdNotFound'));
                 } else {
-                  alert(t('listingDetail.telegramIdNotFound'));
+                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
                 }
                 return;
               }
@@ -646,6 +707,14 @@ export const ListingDetail = ({
           onClose={() => setSelectedImageIndex(null)}
         />
       )}
+
+      {/* Toast сповіщення */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 };

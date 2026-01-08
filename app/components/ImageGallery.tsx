@@ -36,25 +36,39 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
 
+  const touchStartY = useRef<number | null>(null);
+
   const onTouchStart = (e: React.TouchEvent) => {
     touchEndX.current = null;
     touchStartX.current = e.targetTouches[0].clientX;
+    touchStartY.current = e.targetTouches[0].clientY;
     setIsSwiping(true);
     setSwipeOffset(0);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
-    touchEndX.current = e.targetTouches[0].clientX;
-    const diff = touchEndX.current - touchStartX.current;
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const currentX = e.targetTouches[0].clientX;
+    const currentY = e.targetTouches[0].clientY;
+    touchEndX.current = currentX;
+    const diffX = touchEndX.current - touchStartX.current;
+    const diffY = Math.abs(currentY - touchStartY.current);
+    
+    // Якщо це горизонтальний свайп, запобігаємо свайпу назад
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+      e.preventDefault();
+    }
+    
     // Обмежуємо зміщення для плавності
-    setSwipeOffset(Math.max(-200, Math.min(200, diff)));
+    setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
   };
 
   const onTouchEnd = () => {
     if (!touchStartX.current || !touchEndX.current) {
       setIsSwiping(false);
       setSwipeOffset(0);
+      touchStartX.current = null;
+      touchStartY.current = null;
       return;
     }
     
@@ -64,6 +78,8 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
 
     setIsSwiping(false);
     setSwipeOffset(0);
+    touchStartX.current = null;
+    touchStartY.current = null;
 
     if (isLeftSwipe) {
       nextImage(); // Свайп вліво = наступне фото
@@ -106,7 +122,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
       onTouchEnd={onTouchEnd}
       onClick={() => onImageClick?.(currentIndex)}
       style={{ 
-        touchAction: 'pan-y pinch-zoom',
+        touchAction: 'pan-x',
         position: 'relative',
         width: '100%',
         maxWidth: '100%',

@@ -14,6 +14,7 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
   
   // Оновлюємо індекс при зміні initialIndex
   useEffect(() => {
@@ -39,14 +40,29 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
   const onTouchStart = (e: React.TouchEvent) => {
     touchEndX.current = null;
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    touchEndX.current = currentX;
+    const diffX = currentX - touchStartX.current;
+    const diffY = Math.abs(currentY - touchStartY.current);
+    
+    // Якщо це горизонтальний свайп, запобігаємо свайпу назад
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+      e.preventDefault();
+    }
   };
 
   const onTouchEnd = () => {
-    if (!touchStartX.current || !touchEndX.current) return;
+    if (!touchStartX.current || !touchEndX.current) {
+      touchStartX.current = null;
+      touchStartY.current = null;
+      return;
+    }
     const distance = touchEndX.current - touchStartX.current;
     const minSwipeDistance = 50;
     
@@ -58,6 +74,7 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
     
     touchStartX.current = null;
     touchEndX.current = null;
+    touchStartY.current = null;
   };
   // Блокуємо скрол body та html при відкритому модальному вікні
   useEffect(() => {
@@ -102,6 +119,7 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      style={{ touchAction: 'pan-x' }}
     >
       <button
         onClick={onClose}

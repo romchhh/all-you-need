@@ -2,6 +2,9 @@ import { X, Upload, User } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/useToast';
+import { Toast } from './Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -27,6 +30,8 @@ export const EditProfileModal = ({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(currentAvatar);
   const [loading, setLoading] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
+  const { t } = useLanguage();
 
   // Блокуємо скрол body та html при відкритому модальному вікні
   useEffect(() => {
@@ -84,7 +89,11 @@ export const EditProfileModal = ({
       onClose();
     } catch (error) {
       console.error('Error saving profile:', error);
-      tg?.showAlert('Помилка при збереженні профілю');
+      if (tg) {
+        tg.showAlert(t('profile.saveError'));
+      } else {
+        showToast(t('profile.saveError'), 'error');
+      }
       tg?.HapticFeedback.notificationOccurred('error');
     } finally {
       setLoading(false);
@@ -179,6 +188,14 @@ export const EditProfileModal = ({
           </button>
         </div>
       </div>
+
+      {/* Toast сповіщення */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 };

@@ -6,6 +6,8 @@ import { getCategories } from '@/constants/categories';
 import { germanCities } from '@/constants/german-cities';
 import { ukrainianCities } from '@/constants/ukrainian-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useToast } from '@/hooks/useToast';
+import { Toast } from './Toast';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -21,6 +23,7 @@ export const CreateListingModal = ({
   tg
 }: CreateListingModalProps) => {
   const { t } = useLanguage();
+  const { toast, showToast, hideToast } = useToast();
   const categories = getCategories(t);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -41,7 +44,8 @@ export const CreateListingModal = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const conditionRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLDivElement>(null);
-  const currencyRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLButtonElement>(null);
+  const [currencyMenuPosition, setCurrencyMenuPosition] = useState({ top: 0, left: 0, width: 0 });
 
   const selectedCategoryData = categories.find(cat => cat.id === category);
 
@@ -107,6 +111,18 @@ export const CreateListingModal = ({
     };
   }, [isOpen]);
 
+  // Оновлюємо позицію меню валюти при відкритті
+  useEffect(() => {
+    if (isCurrencyOpen && currencyRef.current) {
+      const rect = currencyRef.current.getBoundingClientRect();
+      setCurrencyMenuPosition({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, [isCurrencyOpen]);
+
   // Закриваємо dropdown при кліку поза ним
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -130,7 +146,11 @@ export const CreateListingModal = ({
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + images.length > 10) {
-      tg?.showAlert(t('createListing.maxPhotos'));
+      if (tg) {
+        tg.showAlert(t('createListing.maxPhotos'));
+      } else {
+        showToast(t('createListing.maxPhotos'), 'error');
+      }
       return;
     }
 
@@ -201,22 +221,38 @@ export const CreateListingModal = ({
       return;
     }
     if (!title.trim() || !description.trim() || !location.trim()) {
-      tg?.showAlert(t('createListing.fillAllFields'));
+      if (tg) {
+        tg.showAlert(t('createListing.fillAllFields'));
+      } else {
+        showToast(t('createListing.fillAllFields'), 'error');
+      }
       return;
     }
 
     if (!category) {
-      tg?.showAlert(t('createListing.selectCategory'));
+      if (tg) {
+        tg.showAlert(t('createListing.selectCategory'));
+      } else {
+        showToast(t('createListing.selectCategory'), 'error');
+      }
       return;
     }
 
     if (!isFree && !price.trim()) {
-      tg?.showAlert(t('createListing.enterPriceOrFree'));
+      if (tg) {
+        tg.showAlert(t('createListing.enterPriceOrFree'));
+      } else {
+        showToast(t('createListing.enterPriceOrFree'), 'error');
+      }
       return;
     }
 
     if (images.length === 0) {
-      tg?.showAlert(t('createListing.addPhoto'));
+      if (tg) {
+        tg.showAlert(t('createListing.addPhoto'));
+      } else {
+        showToast(t('createListing.addPhoto'), 'error');
+      }
       return;
     }
 
@@ -252,7 +288,11 @@ export const CreateListingModal = ({
       onClose();
     } catch (error) {
       console.error('Error creating listing:', error);
-      tg?.showAlert(t('createListing.errorCreating'));
+      if (tg) {
+        tg.showAlert(t('createListing.errorCreating'));
+      } else {
+        showToast(t('createListing.errorCreating'), 'error');
+      }
       tg?.HapticFeedback.notificationOccurred('error');
     } finally {
       setLoading(false);
@@ -260,7 +300,7 @@ export const CreateListingModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-[60] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-white z-[70] flex flex-col overflow-hidden">
       <div className="bg-white w-full h-full flex flex-col">
         {/* Заголовок */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 flex-shrink-0">
@@ -273,43 +313,60 @@ export const CreateListingModal = ({
           </button>
         </div>
 
-        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
+        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32">
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('createListing.photosLabel')}
             </label>
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              {imagePreviews.map((preview, index) => (
-                <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
-                  <img 
-                    src={preview} 
-                    alt={`Preview ${index + 1}`} 
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <button
-                    onClick={() => removeImage(index)}
-                    className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                  >
-                    ×
-                  </button>
+            {imagePreviews.length === 0 ? (
+              <label className="w-full px-4 py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
+                <Upload size={32} className="text-gray-400 mb-2" />
+                <span className="text-sm text-gray-500">{t('createListing.photosLabel')?.replace(' *', '') || 'Додати фото'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </label>
+            ) : (
+              <div className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {imagePreviews.map((preview, index) => (
+                    <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
+                      <img 
+                        src={preview} 
+                        alt={`Preview ${index + 1}`} 
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <button
+                        onClick={() => removeImage(index)}
+                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {images.length < 10 && (
-                <label className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
-                  <Upload size={24} className="text-gray-400" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                </label>
-              )}
-            </div>
+                {images.length < 10 && (
+                  <label className="w-full px-4 py-4 bg-white rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
+                    <Upload size={20} className="text-gray-400 mr-2" />
+                    <span className="text-sm text-gray-600">{t('createListing.addMorePhotos')}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Заголовок */}
@@ -384,66 +441,20 @@ export const CreateListingModal = ({
                       errors.price ? 'border-red-300' : 'border-gray-200'
                     } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
-                  <div ref={currencyRef} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCurrencyOpen(!isCurrencyOpen);
-                        tg?.HapticFeedback.impactOccurred('light');
-                      }}
-                      className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-2 min-w-[80px]"
-                    >
-                      <span className="text-gray-900 font-medium">
-                        {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
-                      </span>
-                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {isCurrencyOpen && (
-                      <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-30 min-w-[120px]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrency('UAH');
-                            setIsCurrencyOpen(false);
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                            currency === 'UAH' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span>₴ UAH</span>
-                        </button>
-                        <div className="h-px bg-gray-200"></div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrency('EUR');
-                            setIsCurrencyOpen(false);
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                            currency === 'EUR' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span>€ EUR</span>
-                        </button>
-                        <div className="h-px bg-gray-200"></div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrency('USD');
-                            setIsCurrencyOpen(false);
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                            currency === 'USD' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span>$ USD</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    ref={currencyRef}
+                    type="button"
+                    onClick={() => {
+                      setIsCurrencyOpen(!isCurrencyOpen);
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-2 min-w-[80px]"
+                  >
+                    <span className="text-gray-900 font-medium">
+                      {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
+                    </span>
+                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''}`} />
+                  </button>
                 </div>
                 {errors.price && (
                   <p className="mt-1 text-sm text-red-600">{errors.price}</p>
@@ -656,23 +667,100 @@ export const CreateListingModal = ({
           )}
         </div>
 
-        {/* Кнопки */}
-        <div className="bg-white border-t border-gray-200 px-4 pt-4 pb-10 flex gap-2 flex-shrink-0 safe-area-bottom">
+        {/* Кнопки - фіксовані знизу поверх головного меню */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 pt-4 pb-4 flex gap-2 z-[80] safe-area-bottom shadow-lg" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
           <button
             onClick={onClose}
-            className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-3 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? t('createListing.creating') : t('createListing.title')}
           </button>
         </div>
+        {/* Backdrop для валюти */}
+        {isCurrencyOpen && (
+          <div 
+            className="fixed inset-0 z-[9999]"
+            onClick={() => setIsCurrencyOpen(false)}
+          />
+        )}
+
+        {/* Меню валюти */}
+        {isCurrencyOpen && (
+          <div 
+            className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000]"
+            style={{
+              top: `${currencyMenuPosition.top + 8}px`,
+              left: `${currencyMenuPosition.left}px`,
+              width: `${currencyMenuPosition.width}px`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrency('UAH');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-gray-100 ${
+                currency === 'UAH' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span>₴ UAH</span>
+              {currency === 'UAH' && <span className="ml-auto text-blue-500">✓</span>}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrency('EUR');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-gray-100 ${
+                currency === 'EUR' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span>€ EUR</span>
+              {currency === 'EUR' && <span className="ml-auto text-blue-500">✓</span>}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrency('USD');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
+                currency === 'USD' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span>$ USD</span>
+              {currency === 'USD' && <span className="ml-auto text-blue-500">✓</span>}
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Toast сповіщення */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </div>
   );
 };

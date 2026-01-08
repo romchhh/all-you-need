@@ -2,6 +2,8 @@ import { X, Copy, MessageCircle, Mail, Share2 } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useToast } from '@/hooks/useToast';
+import { Toast } from './Toast';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -13,6 +15,7 @@ interface ShareModalProps {
 
 export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareModalProps) => {
   const { t } = useLanguage();
+  const { toast, showToast, hideToast } = useToast();
   const [showFallback, setShowFallback] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -91,7 +94,11 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
       }
     } catch (error) {
       console.error('Error copying link:', error);
-      tg?.showAlert(t('share.copyError'));
+      if (tg) {
+        tg.showAlert(t('share.copyError'));
+      } else {
+        showToast(t('share.copyError'), 'error');
+      }
     }
   };
 
@@ -211,6 +218,13 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
         </div>
       )}
 
+      {/* Toast сповіщення */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
     </>
   );
 };

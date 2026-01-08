@@ -20,75 +20,48 @@ let dbOptimized = globalForPrisma.dbOptimized ?? false;
 
 // Створює додаткові індекси для оптимізації запитів
 async function createAdditionalIndexes(): Promise<void> {
-  try {
-    // Listing індекси
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_listing_publishedAt ON Listing(publishedAt)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_listing_currency ON Listing(currency)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_listing_views ON Listing(views)`)
-    );
-    
-    // Composite індекси для Listing
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_listing_status_createdAt ON Listing(status, createdAt)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_listing_status_views ON Listing(status, views)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_listing_userId_status ON Listing(userId, status)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_listing_userId_category ON Listing(userId, category)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_listing_status_isFree_createdAt ON Listing(status, isFree, createdAt)`)
-    );
-    
-    // ViewHistory індекси
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_viewhistory_viewerTelegramId ON ViewHistory(viewerTelegramId)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS idx_viewhistory_listing_viewer ON ViewHistory(listingId, viewerTelegramId)`)
-    );
-    
-    // Transaction індекси
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_transaction_status ON [Transaction](status)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_transaction_createdAt ON [Transaction](createdAt)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_transaction_type_status ON [Transaction](type, status)`)
-    );
-    
-    // Review індекси
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_review_targetId ON Review(targetId)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_review_listingId ON Review(listingId)`)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_review_createdAt ON Review(createdAt)`)
-    );
-    
-    // Link індекси
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_link_linkName ON Link(linkName)`)
-    );
-    
-    console.log('Additional indexes created successfully');
-  } catch (error: any) {
-    // Якщо помилка - просто логуємо, не блокуємо
-    console.log('Note: Could not create some indexes:', error.message);
-  }
+  // Створюємо індекси з обробкою помилок для кожного окремо
+  // Деякі команди CREATE INDEX можуть повертати результати в SQLite, що викликає помилку
+  const createIndexSafely = async (indexName: string, sql: string) => {
+    try {
+      await executeWithRetry(() => prisma.$executeRawUnsafe(sql));
+    } catch (error: any) {
+      // Ігноруємо помилки "Execute returned results" - це нормально для SQLite
+      // Індекси все одно створюються або вже існують
+      if (!error.message?.includes('Execute returned results')) {
+        console.log(`Note: Could not create ${indexName}:`, error.message);
+      }
+    }
+  };
+
+  // Listing індекси
+  await createIndexSafely('idx_listing_publishedAt', `CREATE INDEX IF NOT EXISTS idx_listing_publishedAt ON Listing(publishedAt)`);
+  await createIndexSafely('idx_listing_currency', `CREATE INDEX IF NOT EXISTS idx_listing_currency ON Listing(currency)`);
+  await createIndexSafely('idx_listing_views', `CREATE INDEX IF NOT EXISTS idx_listing_views ON Listing(views)`);
+  
+  // Composite індекси для Listing
+  await createIndexSafely('idx_listing_status_createdAt', `CREATE INDEX IF NOT EXISTS idx_listing_status_createdAt ON Listing(status, createdAt)`);
+  await createIndexSafely('idx_listing_status_views', `CREATE INDEX IF NOT EXISTS idx_listing_status_views ON Listing(status, views)`);
+  await createIndexSafely('idx_listing_userId_status', `CREATE INDEX IF NOT EXISTS idx_listing_userId_status ON Listing(userId, status)`);
+  await createIndexSafely('idx_listing_userId_category', `CREATE INDEX IF NOT EXISTS idx_listing_userId_category ON Listing(userId, category)`);
+  await createIndexSafely('idx_listing_status_isFree_createdAt', `CREATE INDEX IF NOT EXISTS idx_listing_status_isFree_createdAt ON Listing(status, isFree, createdAt)`);
+  
+  // ViewHistory індекси
+  await createIndexSafely('idx_viewhistory_viewerTelegramId', `CREATE INDEX IF NOT EXISTS idx_viewhistory_viewerTelegramId ON ViewHistory(viewerTelegramId)`);
+  await createIndexSafely('idx_viewhistory_listing_viewer', `CREATE UNIQUE INDEX IF NOT EXISTS idx_viewhistory_listing_viewer ON ViewHistory(listingId, viewerTelegramId)`);
+  
+  // Transaction індекси
+  await createIndexSafely('idx_transaction_status', `CREATE INDEX IF NOT EXISTS idx_transaction_status ON [Transaction](status)`);
+  await createIndexSafely('idx_transaction_createdAt', `CREATE INDEX IF NOT EXISTS idx_transaction_createdAt ON [Transaction](createdAt)`);
+  await createIndexSafely('idx_transaction_type_status', `CREATE INDEX IF NOT EXISTS idx_transaction_type_status ON [Transaction](type, status)`);
+  
+  // Review індекси
+  await createIndexSafely('idx_review_targetId', `CREATE INDEX IF NOT EXISTS idx_review_targetId ON Review(targetId)`);
+  await createIndexSafely('idx_review_listingId', `CREATE INDEX IF NOT EXISTS idx_review_listingId ON Review(listingId)`);
+  await createIndexSafely('idx_review_createdAt', `CREATE INDEX IF NOT EXISTS idx_review_createdAt ON Review(createdAt)`);
+  
+  // Link індекси
+  await createIndexSafely('idx_link_linkName', `CREATE INDEX IF NOT EXISTS idx_link_linkName ON Link(linkName)`);
 }
 
 async function optimizeDatabase(): Promise<void> {
@@ -115,19 +88,17 @@ async function optimizeDatabase(): Promise<void> {
     // Створюємо додаткові індекси для оптимізації (якщо їх немає)
     await createAdditionalIndexes();
     
-    // Оптимізувати запити (PRAGMA optimize повертає результати, тому використовуємо queryRaw)
-    try {
-      await prisma.$queryRawUnsafe(`PRAGMA optimize;`);
-    } catch (error: any) {
-      // PRAGMA optimize може не працювати в деяких версіях SQLite, це нормально
-      console.log('Note: PRAGMA optimize not available or returned results');
-    }
+    // PRAGMA optimize повертає результати, тому не використовуємо executeRaw
+    // Це не критично для роботи бази даних - SQLite автоматично оптимізує запити
     
     dbOptimized = true;
     globalForPrisma.dbOptimized = true;
     console.log('Database optimized: WAL mode enabled, timeout set to 30s, indexes created');
   } catch (error: any) {
-    console.log('Note: Could not optimize database:', error.message);
+    // Ігноруємо помилки про "Execute returned results" - це нормально для SQLite
+    if (!error.message?.includes('Execute returned results')) {
+      console.log('Note: Could not optimize database:', error.message);
+    }
     // Відмічаємо як оптимізовану, щоб не повторювати
     dbOptimized = true;
     globalForPrisma.dbOptimized = true;

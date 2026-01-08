@@ -45,12 +45,14 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
 
   // Мемоізуємо URL зображення, щоб уникнути зайвих запитів
   const imageUrl = useMemo(() => {
-    if (!listing.image) return '';
-    if (listing.image?.startsWith('http')) return listing.image;
-    const cleanPath = listing.image?.split('?')[0] || listing.image;
+    // Спочатку перевіряємо listing.image, потім listing.images[0]
+    const image = listing.image || (listing.images && listing.images.length > 0 ? listing.images[0] : '');
+    if (!image) return '';
+    if (image?.startsWith('http')) return image;
+    const cleanPath = image?.split('?')[0] || image;
     const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
     return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
-  }, [listing.image]);
+  }, [listing.image, listing.images]);
 
   // Ініціалізуємо стан завантаження на основі того, чи зображення вже завантажене
   const [imageLoading, setImageLoading] = useState(() => {
@@ -113,6 +115,7 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
 
   return (
     <div 
+      data-listing-id={listing.id}
       className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer relative select-none ${
         isSold || isDeactivated ? 'opacity-60' : ''
       }`}
@@ -125,7 +128,7 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
     >
       <div className="relative aspect-square bg-gray-100 overflow-hidden w-full">
         {/* Placeholder або зображення */}
-        {imageError || !listing.image ? (
+        {imageError || (!listing.image && (!listing.images || listing.images.length === 0)) ? (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 w-full h-full">
             <div className="text-center">
               <ImageIcon size={48} className="text-gray-400 mx-auto mb-2" />
@@ -133,28 +136,28 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
             </div>
           </div>
         ) : (
-          <img 
-            src={imageUrl}
-            alt={listing.title}
+            <img 
+              src={imageUrl}
+              alt={listing.title}
             className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
-              imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
+                imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
             } ${isSold || isDeactivated ? 'grayscale' : ''}`}
             style={{ width: '100%', height: '100%' }}
-            loading="lazy"
-            decoding="async"
-            sizes="(max-width: 768px) 50vw, 33vw"
-            key={`${listing.image}-${listing.id}`}
-            onLoad={() => {
-              imageLoadedRef.current.add(imageUrl);
-              setImageLoading(false);
-              setImageError(false);
-            }}
-            onError={(e) => {
-              setImageLoading(false);
-              setImageError(true);
-              console.error('Error loading listing image:', listing.image);
-            }}
-          />
+              loading="lazy"
+              decoding="async"
+              sizes="(max-width: 768px) 50vw, 33vw"
+              key={`${listing.image}-${listing.id}`}
+              onLoad={() => {
+                imageLoadedRef.current.add(imageUrl);
+                setImageLoading(false);
+                setImageError(false);
+              }}
+              onError={(e) => {
+                setImageLoading(false);
+                setImageError(true);
+                console.error('Error loading listing image:', listing.image);
+              }}
+            />
         )}
         {/* Бейдж "Продано" або "Деактивовано" */}
         {isSold && (

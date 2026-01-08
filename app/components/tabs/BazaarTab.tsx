@@ -10,7 +10,7 @@ import { TopBar } from '../TopBar';
 import { ListingGridSkeleton } from '../SkeletonLoader';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { Currency } from '@/utils/currency';
 
 interface BazaarTabProps {
@@ -54,7 +54,7 @@ interface BazaarTabProps {
 
 type SortOption = 'newest' | 'price_low' | 'price_high' | 'popular';
 
-export const BazaarTab = ({
+const BazaarTabComponent = ({
   categories,
   listings,
   searchQuery,
@@ -73,29 +73,258 @@ export const BazaarTab = ({
   tg
 }: BazaarTabProps) => {
   const { t } = useLanguage();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(savedState?.selectedCategory || initialSelectedCategory || null);
-  
-  // Синхронізуємо selectedCategory з initialSelectedCategory
-  useEffect(() => {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
+    if (savedState?.selectedCategory !== undefined) {
+      return savedState.selectedCategory;
+    }
     if (initialSelectedCategory !== undefined) {
+      return initialSelectedCategory;
+    }
+    // Fallback до localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.selectedCategory || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
+  
+  // Синхронізуємо selectedCategory з initialSelectedCategory (тільки якщо немає збереженого стану)
+  useEffect(() => {
+    if (initialSelectedCategory !== undefined && initialSelectedCategory !== null) {
+      // Перевіряємо, чи є збережений стан в localStorage або savedState
+      const hasSavedCategory = savedState?.selectedCategory || 
+        (typeof window !== 'undefined' && (() => {
+          const saved = localStorage.getItem('bazaarTabState');
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              return parsed.selectedCategory;
+            } catch (e) {
+              // ignore
+            }
+          }
+          return null;
+        })());
+      
+      // Якщо є збережена категорія, не перезаписуємо її initialSelectedCategory
+      if (hasSavedCategory) {
+        return;
+      }
+      
+      // Оновлюємо тільки якщо немає збереженого стану
+      if (initialSelectedCategory !== selectedCategory) {
       setSelectedCategory(initialSelectedCategory);
+      }
     }
   }, [initialSelectedCategory]);
   
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(savedState?.selectedSubcategory || null);
-  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(savedState?.showFreeOnly || false);
-  const [sortBy, setSortBy] = useState<SortOption>(savedState?.sortBy || 'newest');
+  // Синхронізуємо локальний стан з savedState при монтуванні та при зміні
+  useEffect(() => {
+    if (savedState) {
+      // Оновлюємо стан тільки якщо він справді змінився
+      if (savedState.selectedCategory !== selectedCategory && savedState.selectedCategory !== undefined) {
+        setSelectedCategory(savedState.selectedCategory);
+      }
+      if (savedState.selectedSubcategory !== selectedSubcategory && savedState.selectedSubcategory !== undefined) {
+        setSelectedSubcategory(savedState.selectedSubcategory);
+      }
+      if (savedState.showFreeOnly !== showFreeOnly && savedState.showFreeOnly !== undefined) {
+        setShowFreeOnly(savedState.showFreeOnly);
+      }
+      if (savedState.sortBy !== sortBy && savedState.sortBy !== undefined) {
+        setSortBy(savedState.sortBy);
+      }
+      if (savedState.selectedCities && JSON.stringify(savedState.selectedCities) !== JSON.stringify(selectedCities)) {
+        setSelectedCities(savedState.selectedCities);
+      }
+      if (savedState.minPrice !== minPrice && savedState.minPrice !== undefined) {
+        setMinPrice(savedState.minPrice);
+      }
+      if (savedState.maxPrice !== maxPrice && savedState.maxPrice !== undefined) {
+        setMaxPrice(savedState.maxPrice);
+      }
+      if (savedState.selectedCondition !== selectedCondition && savedState.selectedCondition !== undefined) {
+        setSelectedCondition(savedState.selectedCondition);
+      }
+      if (savedState.selectedCurrency !== selectedCurrency && savedState.selectedCurrency !== undefined) {
+        setSelectedCurrency(savedState.selectedCurrency as Currency | null);
+      }
+    }
+  }, [savedState?.selectedCategory, savedState?.selectedSubcategory, savedState?.showFreeOnly, savedState?.sortBy, savedState?.selectedCities, savedState?.minPrice, savedState?.maxPrice, savedState?.selectedCondition, savedState?.selectedCurrency]);
+  
+  // Додаткова синхронізація при монтуванні компонента (якщо savedState є)
+  useEffect(() => {
+    if (savedState && savedState.selectedCategory !== undefined) {
+      // При монтуванні синхронізуємо стан з savedState
+      setSelectedCategory(savedState.selectedCategory);
+      setSelectedSubcategory(savedState.selectedSubcategory);
+      setShowFreeOnly(savedState.showFreeOnly);
+      setSortBy(savedState.sortBy);
+      setSelectedCities(savedState.selectedCities || []);
+      setMinPrice(savedState.minPrice);
+      setMaxPrice(savedState.maxPrice);
+      setSelectedCondition(savedState.selectedCondition);
+      setSelectedCurrency(savedState.selectedCurrency as Currency | null);
+    }
+  }, []); // Виконується тільки при монтуванні
+  
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(() => {
+    if (savedState?.selectedSubcategory !== undefined) {
+      return savedState.selectedSubcategory;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.selectedSubcategory || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
+  
+  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(() => {
+    if (savedState?.showFreeOnly !== undefined) {
+      return savedState.showFreeOnly;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.showFreeOnly || false;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return false;
+  });
+  
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    if (savedState?.sortBy !== undefined) {
+      return savedState.sortBy;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.sortBy || 'newest';
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return 'newest';
+  });
   const [showSortModal, setShowSortModal] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<Listing[]>([]);
   const [showRecommendations, setShowRecommendations] = useState(false);
-  const [selectedCities, setSelectedCities] = useState<string[]>(savedState?.selectedCities || []);
+  const [selectedCities, setSelectedCities] = useState<string[]>(() => {
+    if (savedState?.selectedCities !== undefined) {
+      return savedState.selectedCities;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.selectedCities || [];
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return [];
+  });
+  
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
-  const [minPrice, setMinPrice] = useState<number | null>(savedState?.minPrice || null);
-  const [maxPrice, setMaxPrice] = useState<number | null>(savedState?.maxPrice || null);
-  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(savedState?.selectedCondition || null);
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(savedState?.selectedCurrency as Currency | null || null);
+  
+  const [minPrice, setMinPrice] = useState<number | null>(() => {
+    if (savedState?.minPrice !== undefined) {
+      return savedState.minPrice;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.minPrice || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
+  
+  const [maxPrice, setMaxPrice] = useState<number | null>(() => {
+    if (savedState?.maxPrice !== undefined) {
+      return savedState.maxPrice;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.maxPrice || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
+  
+  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(() => {
+    if (savedState?.selectedCondition !== undefined) {
+      return savedState.selectedCondition;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.selectedCondition || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
+  
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(() => {
+    if (savedState?.selectedCurrency !== undefined) {
+      return savedState.selectedCurrency as Currency | null;
+    }
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.selectedCurrency || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
+  
   
   // Зберігаємо стан при зміні
   useEffect(() => {
@@ -539,4 +768,25 @@ export const BazaarTab = ({
     </div>
   );
 };
+
+// Мемоізуємо компонент для запобігання непотрібних перерендерів
+export const BazaarTab = memo(BazaarTabComponent, (prevProps, nextProps) => {
+  // Перевіряємо, чи змінилися критичні пропси
+  return (
+    prevProps.listings === nextProps.listings &&
+    prevProps.searchQuery === nextProps.searchQuery &&
+    prevProps.favorites === nextProps.favorites &&
+    prevProps.categories === nextProps.categories &&
+    prevProps.savedState?.selectedCategory === nextProps.savedState?.selectedCategory &&
+    prevProps.savedState?.selectedSubcategory === nextProps.savedState?.selectedSubcategory &&
+    prevProps.savedState?.selectedCities === nextProps.savedState?.selectedCities &&
+    prevProps.savedState?.minPrice === nextProps.savedState?.minPrice &&
+    prevProps.savedState?.maxPrice === nextProps.savedState?.maxPrice &&
+    prevProps.savedState?.selectedCondition === nextProps.savedState?.selectedCondition &&
+    prevProps.savedState?.selectedCurrency === nextProps.savedState?.selectedCurrency &&
+    prevProps.savedState?.sortBy === nextProps.savedState?.sortBy &&
+    prevProps.savedState?.showFreeOnly === nextProps.savedState?.showFreeOnly &&
+    prevProps.initialSelectedCategory === nextProps.initialSelectedCategory
+  );
+});
 

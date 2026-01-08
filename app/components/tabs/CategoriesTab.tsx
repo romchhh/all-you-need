@@ -37,9 +37,80 @@ export const CategoriesTab = ({
   tg
 }: CategoriesTabProps) => {
   const { t } = useLanguage();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(savedState?.selectedCategory || null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(savedState?.selectedSubcategory || null);
-  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(savedState?.showFreeOnly || false);
+  // Ініціалізуємо стан з savedState або з localStorage як fallback
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
+    if (savedState?.selectedCategory !== undefined) {
+      return savedState.selectedCategory;
+    }
+    // Fallback до localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('categoriesTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.selectedCategory || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
+  
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(() => {
+    if (savedState?.selectedSubcategory !== undefined) {
+      return savedState.selectedSubcategory;
+    }
+    // Fallback до localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('categoriesTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.selectedSubcategory || null;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  });
+  
+  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(() => {
+    if (savedState?.showFreeOnly !== undefined) {
+      return savedState.showFreeOnly;
+    }
+    // Fallback до localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('categoriesTabState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.showFreeOnly || false;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return false;
+  });
+  
+  // Синхронізуємо локальний стан з savedState при його зміні
+  useEffect(() => {
+    if (savedState) {
+      // Оновлюємо стан тільки якщо він справді змінився, щоб уникнути нескінченних циклів
+      if (savedState.selectedCategory !== selectedCategory) {
+        setSelectedCategory(savedState.selectedCategory);
+      }
+      if (savedState.selectedSubcategory !== selectedSubcategory) {
+        setSelectedSubcategory(savedState.selectedSubcategory);
+      }
+      if (savedState.showFreeOnly !== showFreeOnly) {
+        setShowFreeOnly(savedState.showFreeOnly);
+      }
+    }
+  }, [savedState?.selectedCategory, savedState?.selectedSubcategory, savedState?.showFreeOnly]);
+  
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   
   // Зберігаємо стан при зміні

@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { getCategories } from '@/constants/categories';
 import { ukrainianCities, searchCities } from '@/constants/ukrainian-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { ConfirmModal } from './ConfirmModal';
 
 interface EditListingModalProps {
   isOpen: boolean;
@@ -45,10 +46,12 @@ export const EditListingModal = ({
   const [locationQuery, setLocationQuery] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSoldConfirm, setShowSoldConfirm] = useState(false);
   const [status, setStatus] = useState<string>(listing.status || 'active');
   const conditionRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLDivElement>(null);
-  const currencyRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLButtonElement>(null);
+  const [currencyMenuPosition, setCurrencyMenuPosition] = useState({ top: 0, left: 0, width: 0 });
 
   const selectedCategoryData = categories.find(cat => cat.id === category);
 
@@ -123,6 +126,18 @@ export const EditListingModal = ({
       document.body.style.touchAction = '';
     };
   }, [isOpen]);
+
+  // Оновлюємо позицію меню валюти при відкритті
+  useEffect(() => {
+    if (isCurrencyOpen && currencyRef.current) {
+      const rect = currencyRef.current.getBoundingClientRect();
+      setCurrencyMenuPosition({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, [isCurrencyOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -257,8 +272,8 @@ export const EditListingModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-white z-[60] flex flex-col overflow-hidden">
-      <div className="bg-white w-full h-full flex flex-col">
+    <div className="fixed inset-0 bg-white flex flex-col overflow-hidden" style={{ zIndex: 9999, isolation: 'isolate' }}>
+      <div className="bg-white w-full h-full flex flex-col relative">
         {/* Хедер */}
         <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between flex-shrink-0">
           <h2 className="text-xl font-bold text-gray-900">{t('listing.editListing')}</h2>
@@ -270,7 +285,7 @@ export const EditListingModal = ({
           </button>
         </div>
 
-        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-4">
+        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32">
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -399,66 +414,20 @@ export const EditListingModal = ({
                       errors.price ? 'border-red-300' : 'border-gray-200'
                     } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
-                  <div ref={currencyRef} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCurrencyOpen(!isCurrencyOpen);
-                        tg?.HapticFeedback.impactOccurred('light');
-                      }}
-                      className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-2 min-w-[80px]"
-                    >
-                      <span className="text-gray-900 font-medium">
-                        {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
-                      </span>
-                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {isCurrencyOpen && (
-                      <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-30 min-w-[120px]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrency('UAH');
-                            setIsCurrencyOpen(false);
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                            currency === 'UAH' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span>₴ UAH</span>
-                        </button>
-                        <div className="h-px bg-gray-200"></div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrency('EUR');
-                            setIsCurrencyOpen(false);
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                            currency === 'EUR' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span>€ EUR</span>
-                        </button>
-                        <div className="h-px bg-gray-200"></div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrency('USD');
-                            setIsCurrencyOpen(false);
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                            currency === 'USD' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span>$ USD</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    ref={currencyRef}
+                    type="button"
+                    onClick={() => {
+                      setIsCurrencyOpen(!isCurrencyOpen);
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-2 min-w-[80px]"
+                  >
+                    <span className="text-gray-900 font-medium">
+                      {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
+                    </span>
+                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''}`} />
+                  </button>
                 </div>
                 {errors.price && (
                   <p className="mt-1 text-sm text-red-600">{errors.price}</p>
@@ -670,10 +639,8 @@ export const EditListingModal = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm(t('editListing.confirmMarkSold'))) {
-                    setStatus('sold');
+                  setShowSoldConfirm(true);
                     tg?.HapticFeedback.impactOccurred('light');
-                  }
                 }}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'sold'
@@ -703,55 +670,131 @@ export const EditListingModal = ({
           </div>
         </div>
 
-        {/* Кнопки */}
-        <div className="bg-white border-t border-gray-200 px-4 pt-4 pb-10 flex gap-2 flex-shrink-0 safe-area-bottom">
+        {/* Кнопки - фіксовані знизу поверх головного меню */}
+        <div className="bg-white border-t border-gray-200 px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg" style={{ 
+          paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))', 
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 99999
+        }}>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={loading}
-            className="px-3 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-3 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Trash2 size={16} />
             {t('common.delete')}
           </button>
           <button
             onClick={onClose}
-            className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-3 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? t('editListing.saving') : t('common.save')}
           </button>
         </div>
 
-        {/* Підтвердження видалення */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4 overflow-hidden">
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{t('editListing.deleteConfirmTitle')}</h3>
-              <p className="text-gray-600 mb-6">{t('editListing.confirmDelete')}</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={loading}
-                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
-                >
-                  {t('common.delete')}
-                </button>
-              </div>
-            </div>
+        {/* Backdrop для валюти */}
+        {isCurrencyOpen && (
+          <div 
+            className="fixed inset-0 z-[9999]"
+            onClick={() => setIsCurrencyOpen(false)}
+          />
+        )}
+
+        {/* Меню валюти */}
+        {isCurrencyOpen && (
+          <div 
+            className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000]"
+            style={{
+              top: `${currencyMenuPosition.top + 8}px`,
+              left: `${currencyMenuPosition.left}px`,
+              width: `${currencyMenuPosition.width}px`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setCurrency('UAH');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-gray-100 ${
+                currency === 'UAH' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span>₴ UAH</span>
+              {currency === 'UAH' && <span className="ml-auto text-blue-500">✓</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCurrency('EUR');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-gray-100 ${
+                currency === 'EUR' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span>€ EUR</span>
+              {currency === 'EUR' && <span className="ml-auto text-blue-500">✓</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCurrency('USD');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
+                currency === 'USD' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span>$ USD</span>
+              {currency === 'USD' && <span className="ml-auto text-blue-500">✓</span>}
+            </button>
           </div>
         )}
+
+        {/* Підтвердження видалення */}
+        <ConfirmModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
+          title={t('editListing.deleteConfirmTitle')}
+          message={t('editListing.confirmDelete')}
+          confirmText={t('common.delete')}
+          cancelText={t('common.cancel')}
+          confirmButtonClass="bg-red-500 hover:bg-red-600"
+          tg={tg}
+        />
+
+        {/* Підтвердження продажу */}
+        <ConfirmModal
+          isOpen={showSoldConfirm}
+          onClose={() => setShowSoldConfirm(false)}
+          onConfirm={() => {
+            setStatus('sold');
+            setShowSoldConfirm(false);
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          title={t('editListing.markAsSold')}
+          message={t('editListing.confirmMarkSold')}
+          confirmText={t('editListing.markAsSold')}
+          cancelText={t('common.cancel')}
+          confirmButtonClass="bg-green-500 hover:bg-green-600"
+          tg={tg}
+        />
       </div>
     </div>
   );

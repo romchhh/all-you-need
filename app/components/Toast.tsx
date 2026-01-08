@@ -36,7 +36,7 @@ export const Toast = ({ message, type, isVisible, onClose, duration = 3000 }: To
   };
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-slide-down">
+    <div className="fixed top-4 inset-x-0 z-[100] animate-slide-down flex justify-center">
       <div className={`${bgColors[type]} border rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-[90vw]`}>
         {icons[type]}
         <p className="flex-1 text-sm font-medium text-gray-900">{message}</p>
