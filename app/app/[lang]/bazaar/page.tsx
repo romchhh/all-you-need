@@ -455,6 +455,78 @@ const BazaarPage = () => {
     }
   }, [fetchListings]);
 
+  // Автоматичне оновлення кешу кожні 2 хвилини
+  useEffect(() => {
+    // Оновлюємо тільки якщо сторінка активна (не в фоні)
+    if (typeof window === 'undefined' || selectedListing || selectedSeller) {
+      return;
+    }
+
+    const updateInterval = 2 * 60 * 1000; // 2 хвилини
+
+    const intervalId = setInterval(() => {
+      // Перевіряємо, чи сторінка активна (не в фоні)
+      if (document.hidden) {
+        return;
+      }
+
+      // Тихий фонове оновлення без показу loading стану
+      const cacheKey = 'listings:0:16';
+      
+      // Очищаємо кеш перед оновленням
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem(`cache_${cacheKey}`);
+        invalidateCache('listings');
+      }
+
+      // Оновлюємо дані в фоні
+      fetch('/api/listings?limit=16&offset=0')
+        .then(response => {
+          if (response.ok) {
+            return response.json();
+          }
+          return null;
+        })
+        .then(data => {
+          if (data && data.listings) {
+            // Оновлюємо стан тільки якщо дані змінилися
+            setListings(prevListings => {
+              // Перевіряємо, чи є нові товари або зміни
+              const hasNewListings = data.listings.some((newListing: Listing) => 
+                !prevListings.find(l => l.id === newListing.id)
+              );
+              
+              if (hasNewListings || data.listings.length !== prevListings.length) {
+                return data.listings;
+              }
+              
+              return prevListings;
+            });
+            
+            setTotalListings(data.total || 0);
+            setHasMore((data.listings?.length || 0) < (data.total || 0));
+            
+            // Оновлюємо кеш
+            if (typeof window !== 'undefined') {
+              setCachedData(cacheKey, data);
+              localStorage.setItem('bazaarListings', JSON.stringify({
+                listings: data.listings,
+                total: data.total || 0,
+                timestamp: Date.now()
+              }));
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Background refresh error:', error);
+          // Тихо ігноруємо помилки фонового оновлення
+        });
+    }, updateInterval);
+
+    // Очищаємо інтервал при розмонтуванні або зміні залежностей
+    return () => clearInterval(intervalId);
+  }, [selectedListing, selectedSeller]);
+
   // Функція для оновлення даних (pull-to-refresh)
   const handleRefresh = async () => {
     // Очищаємо весь кеш при оновленні
@@ -903,7 +975,17 @@ const BazaarPage = () => {
               throw new Error('Failed to create listing');
             }
 
-            await fetchListings();
+            // Очищаємо кеш після створення нового товару
+            if (typeof window !== 'undefined' && window.localStorage) {
+              const cacheKey = 'listings:0:16';
+              localStorage.removeItem(`cache_${cacheKey}`);
+              localStorage.removeItem('bazaarListings');
+              localStorage.removeItem('bazaarListingsOffset');
+              invalidateCache('listings');
+            }
+            
+            // Примусово оновлюємо дані
+            await fetchListings(true);
             setIsCreateListingModalOpen(false);
             showToast(t('createListing.listingCreated'), 'success');
           }}

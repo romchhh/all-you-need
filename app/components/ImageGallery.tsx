@@ -37,12 +37,14 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   const [isSwiping, setIsSwiping] = useState(false);
 
   const touchStartY = useRef<number | null>(null);
+  const touchEndY = useRef<number | null>(null);
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchEndX.current = null;
+    touchEndY.current = null;
     touchStartX.current = e.targetTouches[0].clientX;
     touchStartY.current = e.targetTouches[0].clientY;
-    setIsSwiping(true);
+    setIsSwiping(false); // Спочатку вважаємо, що це не свайп
     setSwipeOffset(0);
   };
 
@@ -51,40 +53,63 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
     const currentX = e.targetTouches[0].clientX;
     const currentY = e.targetTouches[0].clientY;
     touchEndX.current = currentX;
+    touchEndY.current = currentY;
     const diffX = touchEndX.current - touchStartX.current;
     const diffY = Math.abs(currentY - touchStartY.current);
     
-    // Якщо це горизонтальний свайп, запобігаємо свайпу назад
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
-      e.preventDefault();
-    }
+    // Перевіряємо, чи це горизонтальний рух (переважно горизонтальний)
+    const isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
     
-    // Обмежуємо зміщення для плавності
-    setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
+    // Запобігаємо дефолтній поведінці ТІЛЬКИ якщо це явно горизонтальний рух
+    // і він достатньо великий, щоб не заважати вертикальному скролу
+    if (isHorizontalSwipe && Math.abs(diffX) > 15 && Math.abs(diffX) > diffY * 2) {
+      e.preventDefault();
+      setIsSwiping(true);
+      // Обмежуємо зміщення для плавності
+      setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
+    } else {
+      // Якщо це вертикальний рух або змішаний, скидаємо offset і не запобігаємо скролу
+      setIsSwiping(false);
+      setSwipeOffset(0);
+    }
   };
 
   const onTouchEnd = () => {
-    if (!touchStartX.current || !touchEndX.current) {
+    if (!touchStartX.current || touchEndX.current === null || touchStartY.current === null || touchEndY.current === null) {
       setIsSwiping(false);
       setSwipeOffset(0);
       touchStartX.current = null;
       touchStartY.current = null;
+      touchEndX.current = null;
+      touchEndY.current = null;
       return;
     }
     
-    const distance = touchEndX.current - touchStartX.current;
-    const isLeftSwipe = distance < -minSwipeDistance; // Свайп вліво = наступне фото
-    const isRightSwipe = distance > minSwipeDistance; // Свайп вправо = попереднє фото
-
+    const distanceX = touchEndX.current - touchStartX.current;
+    const distanceY = touchEndY.current - touchStartY.current;
+    const absX = Math.abs(distanceX);
+    const absY = Math.abs(distanceY);
+    
+    // Перевіряємо, чи це дійсно горизонтальний свайп (більш горизонтальний, ніж вертикальний)
+    const isHorizontalSwipe = absX > absY * 1.5; // Горизонтальний рух має бути в 1.5 рази більшим за вертикальний
+    
     setIsSwiping(false);
     setSwipeOffset(0);
     touchStartX.current = null;
     touchStartY.current = null;
+    touchEndX.current = null;
+    touchEndY.current = null;
 
-    if (isLeftSwipe) {
-      nextImage(); // Свайп вліво = наступне фото
-    } else if (isRightSwipe) {
-      prevImage(); // Свайп вправо = попереднє фото
+    // Обробляємо тільки якщо це явно горизонтальний свайп
+    if (isHorizontalSwipe && absX > minSwipeDistance) {
+      const isLeftSwipe = distanceX < 0; // Свайп вліво = наступне фото
+      const isRightSwipe = distanceX > 0; // Свайп вправо = попереднє фото
+
+      if (isLeftSwipe) {
+        nextImage(); // Свайп вліво = наступне фото
+      } else if (isRightSwipe) {
+        prevImage(); // Свайп вправо = попереднє фото
+      }
     }
   };
 
@@ -122,7 +147,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
       onTouchEnd={onTouchEnd}
       onClick={() => onImageClick?.(currentIndex)}
       style={{ 
-        touchAction: 'pan-x',
+        touchAction: 'pan-y',
         position: 'relative',
         width: '100%',
         maxWidth: '100%',

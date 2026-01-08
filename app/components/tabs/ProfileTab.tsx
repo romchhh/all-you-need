@@ -3,6 +3,7 @@ import { ImageViewModal } from '../ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
 import { useUser } from '@/hooks/useUser';
 import { ListingCard } from '../ListingCard';
+import { ProfileListingCard } from '../ProfileListingCard';
 import { EditProfileModal } from '../EditProfileModal';
 import { EditListingModal } from '../EditListingModal';
 import { ShareModal } from '../ShareModal';
@@ -275,6 +276,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const displayUsername = profile.username ? `@${profile.username}` : '';
 
   return (
+    <>
     <div className="pb-24 bg-white min-h-screen">
       {/* Профіль хедер */}
       <div className="px-4 pt-6 pb-4 border-b border-gray-200">
@@ -583,213 +585,61 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
           {userListings.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 {userListings.map(listing => {
                   const isSold = listing.status === 'sold';
                   const isDeactivated = listing.status === 'hidden';
                   return (
-                    <div key={listing.id} className="relative group">
-                      <ListingCard 
-                        listing={listing}
-                        isFavorite={favorites.has(listing.id)}
-                        isSold={isSold}
-                        isDeactivated={isDeactivated}
-                        onSelect={(selectedListing) => {
-                          if (onSelectListing) {
-                            // Завантажуємо повну інформацію про товар
-                            fetch(`/api/listings/${selectedListing.id}`)
-                              .then(res => res.json())
-                              .then(data => {
-                                const fullListing = { ...selectedListing, ...data };
-                                onSelectListing(fullListing);
-                              })
-                              .catch(err => console.error('Error loading listing:', err));
-                          }
-                        }}
-                        onToggleFavorite={(id) => {
-                          setFavorites(prev => {
-                            const newFavs = new Set(prev);
-                            if (newFavs.has(id)) {
-                              newFavs.delete(id);
-                            } else {
-                              newFavs.add(id);
-                            }
-                            return newFavs;
-                          });
-                        }}
-                        tg={tg}
-                      />
-                      <div className="absolute top-2 left-2 flex gap-2 z-10 flex-wrap max-w-[calc(100%-1rem)]">
-                        {!isSold && !isDeactivated && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmModal({
-                                isOpen: true,
-                                title: t('editListing.markAsSold'),
-                                message: t('editListing.confirmMarkSold'),
-                                onConfirm: async () => {
-                              try {
-                                const formData = new FormData();
-                                formData.append('title', listing.title);
-                                formData.append('description', listing.description);
-                                formData.append('price', listing.isFree ? '0' : listing.price);
-                                formData.append('isFree', listing.isFree ? 'true' : 'false');
-                                formData.append('category', listing.category);
-                                if (listing.subcategory) {
-                                  formData.append('subcategory', listing.subcategory);
-                                }
-                                formData.append('location', listing.location);
-                                formData.append('condition', listing.condition || '');
-                                formData.append('telegramId', profile.telegramId);
-                                formData.append('status', 'sold');
-
-                                const response = await fetch(`/api/listings/${listing.id}/update`, {
-                                  method: 'PUT',
-                                  body: formData,
-                                });
-
-                                if (response.ok) {
-                                  showToast(t('editListing.listingMarkedSold'), 'success');
-                                      // Оновлюємо список з урахуванням поточних фільтрів
-                                  await fetchListingsWithFilters(0, true);
-                                      // Оновлюємо статистику
-                                      fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
-                                        .then(res => {
-                                          if (res.ok) {
-                                            return res.json();
-                                          }
-                                          return null;
-                                        })
-                                        .then(data => {
-                                          if (data) {
-                                            setStats(data);
-                                          }
-                                        })
-                                        .catch(err => console.error('Error fetching stats:', err));
-                                }
-                              } catch (error) {
-                                showToast(t('editListing.updateError'), 'error');
+                    <ProfileListingCard
+                      key={listing.id}
+                      listing={listing}
+                      isFavorite={favorites.has(listing.id)}
+                      isSold={isSold}
+                      isDeactivated={isDeactivated}
+                      onSelect={(selectedListing) => {
+                        if (onSelectListing) {
+                          // Завантажуємо повну інформацію про товар
+                          fetch(`/api/listings/${selectedListing.id}`)
+                            .then(res => res.json())
+                            .then(data => {
+                              const fullListing = { ...selectedListing, ...data };
+                              onSelectListing(fullListing);
+                            })
+                            .catch(err => console.error('Error loading listing:', err));
+                        }
+                      }}
+                      onEdit={() => {
+                        setEditingListing(listing);
+                      }}
+                      onMarkAsSold={() => {
+                        setConfirmModal({
+                          isOpen: true,
+                          title: t('editListing.markAsSold'),
+                          message: t('editListing.confirmMarkSold'),
+                          onConfirm: async () => {
+                            try {
+                              const formData = new FormData();
+                              formData.append('title', listing.title);
+                              formData.append('description', listing.description);
+                              formData.append('price', listing.isFree ? '0' : listing.price);
+                              formData.append('isFree', listing.isFree ? 'true' : 'false');
+                              formData.append('category', listing.category);
+                              if (listing.subcategory) {
+                                formData.append('subcategory', listing.subcategory);
                               }
-                                },
-                                confirmText: t('editListing.markAsSold'),
-                                cancelText: t('common.cancel'),
-                                confirmButtonClass: 'bg-green-500 hover:bg-green-600',
-                              });
-                            }}
-                            className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-green-600 transition-colors"
-                            title={t('editListing.markAsSold')}
-                          >
-                            <Check size={16} />
-                          </button>
-                        )}
-                        {!isSold && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const action = isDeactivated ? 'activate' : 'deactivate';
-                              const confirmMessage = isDeactivated 
-                                ? t('editListing.confirmActivate')
-                                : t('editListing.confirmDeactivate');
-                              const confirmTitle = isDeactivated 
-                                ? t('editListing.activate')
-                                : t('editListing.deactivate');
-                              
-                              setConfirmModal({
-                                isOpen: true,
-                                title: confirmTitle,
-                                message: confirmMessage,
-                                onConfirm: async () => {
-                                  try {
-                                const formData = new FormData();
-                                formData.append('title', listing.title);
-                                formData.append('description', listing.description);
-                                formData.append('price', listing.isFree ? '0' : listing.price);
-                                formData.append('isFree', listing.isFree ? 'true' : 'false');
-                                formData.append('category', listing.category);
-                                if (listing.subcategory) {
-                                  formData.append('subcategory', listing.subcategory);
-                                }
-                                formData.append('location', listing.location);
-                                formData.append('condition', listing.condition || '');
-                                formData.append('telegramId', profile.telegramId);
-                                formData.append('status', isDeactivated ? 'active' : 'hidden');
+                              formData.append('location', listing.location);
+                              formData.append('condition', listing.condition || '');
+                              formData.append('telegramId', profile.telegramId);
+                              formData.append('status', 'sold');
 
-                                const response = await fetch(`/api/listings/${listing.id}/update`, {
-                                  method: 'PUT',
-                                  body: formData,
-                                });
-
-                                if (response.ok) {
-                                  showToast(
-                                    isDeactivated 
-                                      ? t('editListing.listingActivated')
-                                      : t('editListing.listingDeactivated'), 
-                                    'success'
-                                  );
-                                  // Оновлюємо список з урахуванням поточних фільтрів
-                                  await fetchListingsWithFilters(0, true);
-                                  // Оновлюємо статистику
-                                  fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
-                                    .then(res => {
-                                      if (res.ok) {
-                                        return res.json();
-                                      }
-                                      return null;
-                                    })
-                                    .then(data => {
-                                      if (data) {
-                                        setStats(data);
-                                      }
-                                    })
-                                    .catch(err => console.error('Error fetching stats:', err));
-                                } else {
-                                  showToast(t('editListing.updateError'), 'error');
-                                }
-                                } catch (error) {
-                                  showToast(t('editListing.updateError'), 'error');
-                                }
-                              },
-                              confirmText: confirmTitle,
-                              cancelText: t('common.cancel'),
-                              confirmButtonClass: isDeactivated ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600',
-                            });
-                          }}
-                          className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors"
-                            title={isDeactivated ? t('editListing.activate') : t('editListing.deactivate')}
-                          >
-                            {isDeactivated ? <Check size={16} /> : <X size={16} />}
-                          </button>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingListing(listing);
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 transition-colors"
-                          title={t('common.edit')}
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConfirmModal({
-                              isOpen: true,
-                              title: t('editListing.deleteConfirmTitle'),
-                              message: t('editListing.confirmDelete'),
-                              onConfirm: async () => {
-                                try {
-                              const response = await fetch(`/api/listings/${listing.id}/delete?telegramId=${profile.telegramId}`, {
-                                method: 'DELETE',
+                              const response = await fetch(`/api/listings/${listing.id}/update`, {
+                                method: 'PUT',
+                                body: formData,
                               });
 
                               if (response.ok) {
-                                showToast(t('editListing.listingDeleted'), 'success');
-                                // Оновлюємо список з урахуванням поточних фільтрів
+                                showToast(t('editListing.listingMarkedSold'), 'success');
                                 await fetchListingsWithFilters(0, true);
-                                // Оновлюємо статистику
                                 fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
                                   .then(res => {
                                     if (res.ok) {
@@ -803,25 +653,21 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                                     }
                                   })
                                   .catch(err => console.error('Error fetching stats:', err));
-                              } else {
-                                showToast(t('editListing.updateError'), 'error');
                               }
                             } catch (error) {
                               showToast(t('editListing.updateError'), 'error');
                             }
-                              },
-                              confirmText: t('common.delete'),
-                              cancelText: t('common.cancel'),
-                              confirmButtonClass: 'bg-red-500 hover:bg-red-600',
-                            });
-                          }}
-                          className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors"
-                          title={t('common.delete')}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
+                          },
+                          confirmText: t('editListing.markAsSold'),
+                          cancelText: t('common.cancel'),
+                          confirmButtonClass: 'bg-green-500 hover:bg-green-600',
+                        });
+                      }}
+                      onPromote={() => {
+                        showToast(t('sales.promoteSoon'), 'info');
+                      }}
+                      tg={tg}
+                    />
                   );
                 })}
               </div>
@@ -838,55 +684,30 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             </>
           ) : (
             <div className="py-16 text-center">
-              <div className="flex items-center justify-center mb-4">
-                <Package size={64} className="text-gray-400" />
+              <div className="text-gray-400 mb-4">
+                <Package size={64} className="mx-auto" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {selectedStatus !== 'all' || selectedCategory !== 'all' 
-                  ? t('bazaar.noListingsFound') 
-                  : t('sales.createFirst')}
-              </h3>
-              <p className="text-gray-500 text-sm">
-                {selectedStatus !== 'all' || selectedCategory !== 'all'
-                  ? t('bazaar.tryDifferentSearch')
-                  : t('sales.trySelling')}
-              </p>
+              <p className="text-gray-500 mb-2">{t('sales.noListings')}</p>
+              <p className="text-sm text-gray-400">{t('sales.createFirst')}</p>
             </div>
           )}
         </div>
-
-      {/* Перемикач мови */}
-      <div className="px-4 pb-4 pt-6">
-        <LanguageSwitcher tg={tg} fullWidth />
       </div>
+   
 
-      {/* Посилання на FAQ та політику конфіденційності */}
-      <div className="px-4 pb-4 pt-2 space-y-2">
-        <button
-          onClick={() => {
-            router.push(`/${language}/faq`);
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          className="w-full flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-        >
-          <HelpCircle size={20} className="text-gray-600" />
-          <span className="flex-1 text-left text-gray-900 font-medium">{t('faq.title')}</span>
-          <ChevronRight size={20} className="text-gray-400" />
-        </button>
-        <button
-          onClick={() => {
-            router.push(`/${language}/privacy`);
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          className="w-full flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-        >
-          <Shield size={20} className="text-gray-600" />
-          <span className="flex-1 text-left text-gray-900 font-medium">{t('privacy.title')}</span>
-          <ChevronRight size={20} className="text-gray-400" />
-        </button>
-      </div>
+      {/* Модальне вікно перегляду аватара */}
+      {showAvatarModal && profile?.avatar && (
+        <ImageViewModal
+          isOpen={showAvatarModal}
+          images={[profile.avatar]}
+          initialIndex={0}
+          alt={t('profile.avatar')}
+          onClose={() => setShowAvatarModal(false)}
+        />
+      )}
 
-      {/* Модальне вікно редагування */}
+      {/* Модальне вікно редагування профілю */}
+      {profile && (
       <EditProfileModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -903,23 +724,22 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           }
 
           const response = await fetch('/api/user/profile/update', {
-            method: 'POST',
+            method: 'PUT',
             body: formData,
           });
 
-          if (!response.ok) {
-            throw new Error('Failed to update profile');
+          if (response.ok) {
+            refetch();
+            setIsEditModalOpen(false);
           }
-
-          // Оновлюємо профіль відразу
-          await refetch();
         }}
         tg={tg}
       />
+      )}
 
 
       {/* Модальне вікно редагування оголошення */}
-      {editingListing && (
+      {editingListing && profile && (
         <EditListingModal
           isOpen={!!editingListing}
           onClose={() => setEditingListing(null)}
@@ -949,62 +769,85 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               body: formData,
             });
 
-            if (!response.ok) {
-              throw new Error('Failed to update listing');
+            if (response.ok) {
+              showToast(t('editListing.listingUpdated'), 'success');
+              // Оновлюємо список з урахуванням поточних фільтрів
+              await fetchListingsWithFilters(0, true);
+              // Оновлюємо статистику
+              fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
+                .then(res => {
+                  if (res.ok) {
+                    return res.json();
+                  }
+                  return null;
+                })
+                .then(data => {
+                  if (data) {
+                    setStats(data);
+                  }
+                })
+                .catch(err => console.error('Error fetching stats:', err));
+              
+              setEditingListing(null);
             }
-
-            showToast(t('editListing.listingUpdated'), 'success');
-            
-            // Оновлюємо список оголошень з урахуванням поточних фільтрів
-            await fetchListingsWithFilters(0, true);
-            
-            // Оновлюємо статистику
-            fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
-              .then(res => {
-                if (res.ok) {
-                  return res.json();
-                }
-                return null;
-              })
-              .then(data => {
-                if (data) {
-                  setStats(data);
-                }
-              })
-              .catch(err => console.error('Error fetching stats:', err));
-            
-            setEditingListing(null);
           }}
           onDelete={async () => {
             const response = await fetch(`/api/listings/${editingListing.id}/delete?telegramId=${profile.telegramId}`, {
               method: 'DELETE',
             });
 
-            if (!response.ok) {
-              throw new Error('Failed to delete listing');
+            if (response.ok) {
+              showToast(t('editListing.listingDeleted'), 'success');
+              // Оновлюємо список з урахуванням поточних фільтрів
+              await fetchListingsWithFilters(0, true);
+              // Оновлюємо статистику
+              fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
+                .then(res => {
+                  if (res.ok) {
+                    return res.json();
+                  }
+                  return null;
+                })
+                .then(data => {
+                  if (data) {
+                    setStats(data);
+                  }
+                })
+                .catch(err => console.error('Error fetching stats:', err));
+              
+              setEditingListing(null);
             }
-
-            showToast(t('editListing.listingDeleted'), 'success');
-            
-            // Оновлюємо список оголошень
-            const data = await fetch(`/api/listings?userId=${profile.telegramId}`);
-            const listingsData = await data.json();
-            setUserListings(listingsData.listings || []);
           }}
           tg={tg}
         />
       )}
 
-
-      {/* Модальне вікно для перегляду аватара */}
-      {profile.avatar && (
-        <ImageViewModal
-          isOpen={showAvatarModal}
-          imageUrl={profile.avatar}
-          alt={displayName}
-          onClose={() => setShowAvatarModal(false)}
-        />
+      {/* Модальне вікно поділу */}
+      {profile && (
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        shareLink={getProfileShareLink(profile.telegramId)}
+        shareText={`👤 Профіль ${profile.firstName} ${profile.lastName} в AYN Marketplace`}
+        tg={tg}
+      />
       )}
+
+      {/* Модальне вікно підтвердження */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={() => {
+          confirmModal.onConfirm();
+          setConfirmModal({ ...confirmModal, isOpen: false });
+        }}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        confirmButtonClass={confirmModal.confirmButtonClass}
+        tg={tg}
+      />
 
       {/* Toast сповіщення */}
       <Toast
@@ -1013,31 +856,6 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
-
-      {/* Модальне вікно поділу */}
-      {profile && (
-        <ShareModal
-          isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
-          shareLink={getProfileShareLink(profile.telegramId)}
-          shareText={`👤 Профіль ${displayName}${displayUsername ? ` (@${displayUsername})` : ''} в AYN Marketplace`}
-          tg={tg}
-        />
-      )}
-
-      {/* Модальне вікно підтвердження */}
-      <ConfirmModal
-        isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={confirmModal.onConfirm}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        confirmText={confirmModal.confirmText}
-        cancelText={confirmModal.cancelText}
-        confirmButtonClass={confirmModal.confirmButtonClass}
-        tg={tg}
-      />
-    </div>
+    </>
   );
 };
-

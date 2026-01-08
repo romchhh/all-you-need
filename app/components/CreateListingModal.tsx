@@ -126,13 +126,21 @@ export const CreateListingModal = ({
   // Закриваємо dropdown при кліку поза ним
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (conditionRef.current && !conditionRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      
+      // Перевіряємо, чи клік не на меню валюти
+      const currencyMenu = document.getElementById('currency-filter-menu');
+      if (currencyMenu && currencyMenu.contains(target)) {
+        return; // Не закриваємо, якщо клік всередині меню
+      }
+      
+      if (conditionRef.current && !conditionRef.current.contains(target)) {
         setIsConditionOpen(false);
       }
-      if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
+      if (currencyRef.current && !currencyRef.current.contains(target)) {
         setIsCurrencyOpen(false);
       }
-      if (locationRef.current && !locationRef.current.contains(event.target as Node)) {
+      if (locationRef.current && !locationRef.current.contains(target)) {
         setIsLocationOpen(false);
       }
     };
@@ -687,23 +695,42 @@ export const CreateListingModal = ({
         {isCurrencyOpen && (
           <div 
             className="fixed inset-0 z-[9999]"
-            onClick={() => setIsCurrencyOpen(false)}
+            onMouseDown={(e) => {
+              const target = e.target as HTMLElement;
+              if (target.id === 'currency-filter-menu' || target.closest('#currency-filter-menu')) {
+                return;
+              }
+              setIsCurrencyOpen(false);
+            }}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              if (target.id === 'currency-filter-menu' || target.closest('#currency-filter-menu')) {
+                return;
+              }
+              setIsCurrencyOpen(false);
+            }}
           />
         )}
 
         {/* Меню валюти */}
         {isCurrencyOpen && (
           <div 
-            className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000]"
+            id="currency-filter-menu"
+            className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] min-w-[120px]"
             style={{
               top: `${currencyMenuPosition.top + 8}px`,
               left: `${currencyMenuPosition.left}px`,
               width: `${currencyMenuPosition.width}px`
             }}
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -720,6 +747,10 @@ export const CreateListingModal = ({
             </button>
             <button
               type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -736,6 +767,10 @@ export const CreateListingModal = ({
             </button>
             <button
               type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();

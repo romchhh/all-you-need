@@ -120,71 +120,28 @@ export const ListingDetail = ({
 
   // Скролимо нагору при відкритті нового оголошення
   useEffect(() => {
-    // Функція для агресивного скролу нагору
-    const forceScrollToTop = () => {
-      // Використовуємо всі можливі методи
-      window.scrollTo(0, 0);
+    // Простий скрол без блокування
+    const scrollToTop = () => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-      document.scrollingElement && (document.scrollingElement.scrollTop = 0);
-      
-      // Додатково встановлюємо стилі для запобігання скролу
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-      
-      // Повертаємо скрол через невелику затримку
-      setTimeout(() => {
-        document.body.style.overflow = '';
-        document.documentElement.style.overflow = '';
-      }, 100);
     };
 
     // Миттєво скролимо нагору
-    forceScrollToTop();
+    scrollToTop();
 
-    // Використовуємо requestAnimationFrame для гарантії після рендерингу
+    // Ще раз після рендерингу
     requestAnimationFrame(() => {
-      forceScrollToTop();
-      requestAnimationFrame(() => {
-        forceScrollToTop();
-        requestAnimationFrame(() => {
-          forceScrollToTop();
-        });
-      });
+      scrollToTop();
     });
-    
-    // Кілька додаткових спроб з різними затримками
-    const delays = [0, 10, 20, 50, 100, 150, 200, 300, 500, 800, 1000];
-    const timeouts: NodeJS.Timeout[] = [];
-    
-    delays.forEach(delay => {
-      const timeoutId = setTimeout(() => {
-        forceScrollToTop();
-      }, delay);
-      timeouts.push(timeoutId);
-    });
-    
-    // Агресивний інтервал для гарантії, що скрол залишається зверху
-    const intervalId = setInterval(() => {
-      const currentScroll = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop;
-      if (currentScroll > 0) {
-        forceScrollToTop();
-      }
-    }, 50); // Перевіряємо кожні 50мс
-    
-    // Очищаємо інтервал через 3 секунди
-    const clearIntervalTimeout = setTimeout(() => {
-      clearInterval(intervalId);
-    }, 3000);
-    
+
+    // Останній раз через невелику затримку
+    const timeoutId = setTimeout(() => {
+      scrollToTop();
+    }, 100);
+
     return () => {
-      timeouts.forEach(clearTimeout);
-      clearInterval(intervalId);
-      clearTimeout(clearIntervalTimeout);
-      // Відновлюємо стилі при розмонтуванні
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
+      clearTimeout(timeoutId);
     };
   }, [listing.id]);
 
