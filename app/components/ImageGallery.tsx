@@ -65,8 +65,8 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
     if (isHorizontalSwipe && Math.abs(diffX) > 15 && Math.abs(diffX) > diffY * 2) {
       e.preventDefault();
       setIsSwiping(true);
-      // Обмежуємо зміщення для плавності
-      setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
+    // Обмежуємо зміщення для плавності
+    setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
     } else {
       // Якщо це вертикальний рух або змішаний, скидаємо offset і не запобігаємо скролу
       setIsSwiping(false);
@@ -92,7 +92,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
     
     // Перевіряємо, чи це дійсно горизонтальний свайп (більш горизонтальний, ніж вертикальний)
     const isHorizontalSwipe = absX > absY * 1.5; // Горизонтальний рух має бути в 1.5 рази більшим за вертикальний
-    
+
     setIsSwiping(false);
     setSwipeOffset(0);
     touchStartX.current = null;
@@ -105,10 +105,10 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
       const isLeftSwipe = distanceX < 0; // Свайп вліво = наступне фото
       const isRightSwipe = distanceX > 0; // Свайп вправо = попереднє фото
 
-      if (isLeftSwipe) {
-        nextImage(); // Свайп вліво = наступне фото
-      } else if (isRightSwipe) {
-        prevImage(); // Свайп вправо = попереднє фото
+    if (isLeftSwipe) {
+      nextImage(); // Свайп вліво = наступне фото
+    } else if (isRightSwipe) {
+      prevImage(); // Свайп вправо = попереднє фото
       }
     }
   };

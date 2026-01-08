@@ -137,8 +137,8 @@ export const ListingDetail = ({
 
     // Останній раз через невелику затримку
     const timeoutId = setTimeout(() => {
-      scrollToTop();
-    }, 100);
+          scrollToTop();
+        }, 100);
 
     return () => {
       clearTimeout(timeoutId);

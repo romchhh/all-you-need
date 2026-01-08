@@ -367,21 +367,7 @@ const BazaarPage = () => {
     try {
       setLoading(true);
       
-      const cacheKey = 'listings:0:16';
-      
-      // Перевіряємо кеш тільки якщо не примусове оновлення
-      if (!forceRefresh) {
-        const cached = getCachedData(cacheKey);
-        if (cached) {
-          setListings(cached.listings || []);
-          setTotalListings(cached.total || 0);
-          setHasMore((cached.listings?.length || 0) < (cached.total || 0));
-          setListingsOffset(16);
-          setLoading(false);
-          return;
-        }
-      }
-      
+      // Завжди завантажуємо свіжі дані з API без кешування
       const response = await fetch('/api/listings?limit=16&offset=0');
       if (response.ok) {
         const data = await response.json();
@@ -389,19 +375,6 @@ const BazaarPage = () => {
         setTotalListings(data.total || 0);
         setHasMore((data.listings?.length || 0) < (data.total || 0));
         setListingsOffset(16);
-        
-        // Зберігаємо в кеш
-        setCachedData(cacheKey, data);
-        
-        // Також зберігаємо всі listings для швидкого відновлення
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('bazaarListings', JSON.stringify({
-            listings: data.listings || [],
-            total: data.total || 0,
-            timestamp: Date.now()
-          }));
-          localStorage.setItem('bazaarListingsOffset', '16');
-        }
       } else {
         console.error('Failed to fetch listings:', response.status);
         setListings([]);
@@ -414,9 +387,9 @@ const BazaarPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
-  // Завантажуємо оголошення з API з кешуванням (тільки при першому завантаженні)
+  // Завантажуємо оголошення з API (завжди свіжі дані)
   const hasLoadedListings = useRef(false);
   
   useEffect(() => {
@@ -424,120 +397,27 @@ const BazaarPage = () => {
     if (!hasLoadedListings.current) {
       hasLoadedListings.current = true;
       
-      // Спочатку перевіряємо localStorage для швидкого відновлення
+      // Очищаємо старий кеш при завантаженні
       if (typeof window !== 'undefined') {
-        const savedListings = localStorage.getItem('bazaarListings');
-        const savedOffset = localStorage.getItem('bazaarListingsOffset');
-        if (savedListings) {
-          try {
-            const parsed = JSON.parse(savedListings);
-            const now = Date.now();
-            // Якщо дані не старіші за 30 хвилин, використовуємо їх
-            if (now - parsed.timestamp < 30 * 60 * 1000) {
-              setListings(parsed.listings || []);
-              setTotalListings(parsed.total || 0);
-              const offset = savedOffset ? parseInt(savedOffset, 10) : (parsed.listings?.length || 16);
-              setHasMore(offset < (parsed.total || 0));
-              setListingsOffset(offset);
-              setLoading(false);
-              
-              // НЕ завантажуємо оновлені дані в фоні, щоб уникнути скидання стану
-              // Користувач може вручну оновити через pull-to-refresh
-              return;
-            }
-          } catch (e) {
-            // ignore
-          }
-        }
-      }
-      
-      fetchListings(false);
-    }
-  }, [fetchListings]);
-
-  // Автоматичне оновлення кешу кожні 2 хвилини
-  useEffect(() => {
-    // Оновлюємо тільки якщо сторінка активна (не в фоні)
-    if (typeof window === 'undefined' || selectedListing || selectedSeller) {
-      return;
-    }
-
-    const updateInterval = 2 * 60 * 1000; // 2 хвилини
-
-    const intervalId = setInterval(() => {
-      // Перевіряємо, чи сторінка активна (не в фоні)
-      if (document.hidden) {
-        return;
-      }
-
-      // Тихий фонове оновлення без показу loading стану
-      const cacheKey = 'listings:0:16';
-      
-      // Очищаємо кеш перед оновленням
-      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('bazaarListings');
+        localStorage.removeItem('bazaarListingsOffset');
+        const cacheKey = 'listings:0:16';
         localStorage.removeItem(`cache_${cacheKey}`);
         invalidateCache('listings');
       }
+      
+      // Завжди завантажуємо свіжі дані
+      fetchListings(true);
+    }
+  }, [fetchListings]);
 
-      // Оновлюємо дані в фоні
-      fetch('/api/listings?limit=16&offset=0')
-        .then(response => {
-          if (response.ok) {
-            return response.json();
-          }
-          return null;
-        })
-        .then(data => {
-          if (data && data.listings) {
-            // Оновлюємо стан тільки якщо дані змінилися
-            setListings(prevListings => {
-              // Перевіряємо, чи є нові товари або зміни
-              const hasNewListings = data.listings.some((newListing: Listing) => 
-                !prevListings.find(l => l.id === newListing.id)
-              );
-              
-              if (hasNewListings || data.listings.length !== prevListings.length) {
-                return data.listings;
-              }
-              
-              return prevListings;
-            });
-            
-            setTotalListings(data.total || 0);
-            setHasMore((data.listings?.length || 0) < (data.total || 0));
-            
-            // Оновлюємо кеш
-            if (typeof window !== 'undefined') {
-              setCachedData(cacheKey, data);
-              localStorage.setItem('bazaarListings', JSON.stringify({
-                listings: data.listings,
-                total: data.total || 0,
-                timestamp: Date.now()
-              }));
-            }
-          }
-        })
-        .catch(error => {
-          console.error('Background refresh error:', error);
-          // Тихо ігноруємо помилки фонового оновлення
-        });
-    }, updateInterval);
-
-    // Очищаємо інтервал при розмонтуванні або зміні залежностей
-    return () => clearInterval(intervalId);
-  }, [selectedListing, selectedSeller]);
 
   // Функція для оновлення даних (pull-to-refresh)
   const handleRefresh = async () => {
     // Очищаємо весь кеш при оновленні
     if (typeof window !== 'undefined' && window.localStorage) {
-      // Очищаємо кеш listings
-      const cacheKey = 'listings:0:16';
-      localStorage.removeItem(`cache_${cacheKey}`);
       localStorage.removeItem('bazaarListings');
       localStorage.removeItem('bazaarListingsOffset');
-      
-      // Очищаємо всі кеші listings
       invalidateCache('listings');
     }
     
@@ -573,16 +453,6 @@ const BazaarPage = () => {
         setHasMore(newOffset < (data.total || 0));
         setListingsOffset(newOffset);
         tg?.HapticFeedback.impactOccurred('light');
-        
-        // Зберігаємо оновлений список в localStorage
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('bazaarListings', JSON.stringify({
-            listings: newListings,
-            total: data.total || 0,
-            timestamp: Date.now()
-          }));
-          localStorage.setItem('bazaarListingsOffset', newOffset.toString());
-        }
         
         if (nextOffset < (data.total || 0)) {
           fetch(`/api/listings?limit=16&offset=${nextOffset}`).catch(() => {});
@@ -975,16 +845,7 @@ const BazaarPage = () => {
               throw new Error('Failed to create listing');
             }
 
-            // Очищаємо кеш після створення нового товару
-            if (typeof window !== 'undefined' && window.localStorage) {
-              const cacheKey = 'listings:0:16';
-              localStorage.removeItem(`cache_${cacheKey}`);
-              localStorage.removeItem('bazaarListings');
-              localStorage.removeItem('bazaarListingsOffset');
-              invalidateCache('listings');
-            }
-            
-            // Примусово оновлюємо дані
+            // Примусово оновлюємо дані після створення нового товару
             await fetchListings(true);
             setIsCreateListingModalOpen(false);
             showToast(t('createListing.listingCreated'), 'success');

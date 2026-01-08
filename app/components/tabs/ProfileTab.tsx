@@ -592,22 +592,22 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   return (
                     <ProfileListingCard
                       key={listing.id}
-                      listing={listing}
-                      isFavorite={favorites.has(listing.id)}
-                      isSold={isSold}
-                      isDeactivated={isDeactivated}
-                      onSelect={(selectedListing) => {
-                        if (onSelectListing) {
-                          // Завантажуємо повну інформацію про товар
-                          fetch(`/api/listings/${selectedListing.id}`)
-                            .then(res => res.json())
-                            .then(data => {
-                              const fullListing = { ...selectedListing, ...data };
-                              onSelectListing(fullListing);
-                            })
-                            .catch(err => console.error('Error loading listing:', err));
-                        }
-                      }}
+                        listing={listing}
+                        isFavorite={favorites.has(listing.id)}
+                        isSold={isSold}
+                        isDeactivated={isDeactivated}
+                        onSelect={(selectedListing) => {
+                          if (onSelectListing) {
+                            // Завантажуємо повну інформацію про товар
+                            fetch(`/api/listings/${selectedListing.id}`)
+                              .then(res => res.json())
+                              .then(data => {
+                                const fullListing = { ...selectedListing, ...data };
+                                onSelectListing(fullListing);
+                              })
+                              .catch(err => console.error('Error loading listing:', err));
+                          }
+                        }}
                       onEdit={() => {
                         setEditingListing(listing);
                       }}
@@ -617,29 +617,29 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                           title: t('editListing.markAsSold'),
                           message: t('editListing.confirmMarkSold'),
                           onConfirm: async () => {
-                            try {
-                              const formData = new FormData();
-                              formData.append('title', listing.title);
-                              formData.append('description', listing.description);
-                              formData.append('price', listing.isFree ? '0' : listing.price);
-                              formData.append('isFree', listing.isFree ? 'true' : 'false');
-                              formData.append('category', listing.category);
-                              if (listing.subcategory) {
-                                formData.append('subcategory', listing.subcategory);
-                              }
-                              formData.append('location', listing.location);
-                              formData.append('condition', listing.condition || '');
-                              formData.append('telegramId', profile.telegramId);
-                              formData.append('status', 'sold');
+                              try {
+                                const formData = new FormData();
+                                formData.append('title', listing.title);
+                                formData.append('description', listing.description);
+                                formData.append('price', listing.isFree ? '0' : listing.price);
+                                formData.append('isFree', listing.isFree ? 'true' : 'false');
+                                formData.append('category', listing.category);
+                                if (listing.subcategory) {
+                                  formData.append('subcategory', listing.subcategory);
+                                }
+                                formData.append('location', listing.location);
+                                formData.append('condition', listing.condition || '');
+                                formData.append('telegramId', profile.telegramId);
+                                formData.append('status', 'sold');
 
-                              const response = await fetch(`/api/listings/${listing.id}/update`, {
-                                method: 'PUT',
-                                body: formData,
-                              });
+                                const response = await fetch(`/api/listings/${listing.id}/update`, {
+                                  method: 'PUT',
+                                  body: formData,
+                                });
 
-                              if (response.ok) {
-                                showToast(t('editListing.listingMarkedSold'), 'success');
-                                await fetchListingsWithFilters(0, true);
+                                if (response.ok) {
+                                  showToast(t('editListing.listingMarkedSold'), 'success');
+                                  await fetchListingsWithFilters(0, true);
                                 fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
                                   .then(res => {
                                     if (res.ok) {
@@ -653,10 +653,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                                     }
                                   })
                                   .catch(err => console.error('Error fetching stats:', err));
+                                }
+                              } catch (error) {
+                                showToast(t('editListing.updateError'), 'error');
                               }
-                            } catch (error) {
-                              showToast(t('editListing.updateError'), 'error');
-                            }
                           },
                           confirmText: t('editListing.markAsSold'),
                           cancelText: t('common.cancel'),
@@ -693,7 +693,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           )}
         </div>
       </div>
-   
+
 
       {/* Модальне вікно перегляду аватара */}
       {showAvatarModal && profile?.avatar && (
@@ -788,7 +788,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 })
                 .catch(err => console.error('Error fetching stats:', err));
               
-              setEditingListing(null);
+            setEditingListing(null);
             }
           }}
           onDelete={async () => {
@@ -797,7 +797,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             });
 
             if (response.ok) {
-              showToast(t('editListing.listingDeleted'), 'success');
+            showToast(t('editListing.listingDeleted'), 'success');
               // Оновлюємо список з урахуванням поточних фільтрів
               await fetchListingsWithFilters(0, true);
               // Оновлюємо статистику

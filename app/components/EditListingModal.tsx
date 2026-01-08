@@ -414,20 +414,20 @@ export const EditListingModal = ({
                       errors.price ? 'border-red-300' : 'border-gray-200'
                     } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
-                  <button
+                    <button
                     ref={currencyRef}
-                    type="button"
-                    onClick={() => {
-                      setIsCurrencyOpen(!isCurrencyOpen);
-                      tg?.HapticFeedback.impactOccurred('light');
-                    }}
-                    className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-2 min-w-[80px]"
-                  >
-                    <span className="text-gray-900 font-medium">
-                      {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
-                    </span>
-                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''}`} />
-                  </button>
+                      type="button"
+                      onClick={() => {
+                        setIsCurrencyOpen(!isCurrencyOpen);
+                        tg?.HapticFeedback.impactOccurred('light');
+                      }}
+                      className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-2 min-w-[80px]"
+                    >
+                      <span className="text-gray-900 font-medium">
+                        {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
+                      </span>
+                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''}`} />
+                    </button>
                 </div>
                 {errors.price && (
                   <p className="mt-1 text-sm text-red-600">{errors.price}</p>
@@ -735,7 +735,7 @@ export const EditListingModal = ({
               <span>₴ UAH</span>
               {currency === 'UAH' && <span className="ml-auto text-blue-500">✓</span>}
             </button>
-            <button
+                <button
               type="button"
               onClick={() => {
                 setCurrency('EUR');
@@ -748,8 +748,8 @@ export const EditListingModal = ({
             >
               <span>€ EUR</span>
               {currency === 'EUR' && <span className="ml-auto text-blue-500">✓</span>}
-            </button>
-            <button
+                </button>
+                <button
               type="button"
               onClick={() => {
                 setCurrency('USD');
@@ -762,7 +762,7 @@ export const EditListingModal = ({
             >
               <span>$ USD</span>
               {currency === 'USD' && <span className="ml-auto text-blue-500">✓</span>}
-            </button>
+                </button>
           </div>
         )}
 

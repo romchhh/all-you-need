@@ -224,19 +224,19 @@ const ProfilePage = () => {
       </div>
 
       {!isEditModalOpen && (
-        <BottomNavigation
-          activeTab="profile"
-          onTabChange={(tab) => {
-            router.push(`/${lang}/${tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories'}`);
-          }}
-          onCloseDetail={() => {
-            setSelectedListing(null);
-            setSelectedSeller(null);
-          }}
-          onCreateListing={() => setIsCreateListingModalOpen(true)}
-          favoritesCount={favorites.size}
-          tg={tg}
-        />
+      <BottomNavigation
+        activeTab="profile"
+        onTabChange={(tab) => {
+          router.push(`/${lang}/${tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories'}`);
+        }}
+        onCloseDetail={() => {
+          setSelectedListing(null);
+          setSelectedSeller(null);
+        }}
+        onCreateListing={() => setIsCreateListingModalOpen(true)}
+        favoritesCount={favorites.size}
+        tg={tg}
+      />
       )}
 
       {profile && (

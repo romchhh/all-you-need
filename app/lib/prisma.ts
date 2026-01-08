@@ -224,36 +224,50 @@ export async function ensureViewHistoryTable(): Promise<void> {
     );
     
     if (tableInfo.length === 0) {
-      // Створюємо таблицю тільки якщо її немає (з retry)
-      await executeWithRetry(() =>
-        prisma.$executeRawUnsafe(`
-          CREATE TABLE IF NOT EXISTS ViewHistory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            listingId INTEGER NOT NULL,
-            viewerTelegramId INTEGER,
-            viewedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            userAgent TEXT,
-            ipAddress TEXT,
-            FOREIGN KEY (listingId) REFERENCES Listing(id) ON DELETE CASCADE
-          )
-        `)
-      );
+      // Створюємо таблицю тільки якщо її немає (з безпечною обробкою)
+      try {
+        await executeWithRetry(() =>
+          prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS ViewHistory (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              listingId INTEGER NOT NULL,
+              viewerTelegramId INTEGER,
+              viewedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              userAgent TEXT,
+              ipAddress TEXT,
+              FOREIGN KEY (listingId) REFERENCES Listing(id) ON DELETE CASCADE
+            )
+          `)
+        );
+      } catch (error: any) {
+        // Ігноруємо помилки "Execute returned results" - це нормально для SQLite
+        if (!error.message?.includes('Execute returned results')) {
+          console.log('Note: Could not create ViewHistory table:', error.message);
+        }
+      }
     } else {
       // Перевіряємо, чи є колонка viewerTelegramId
       try {
-        const columns = await executeWithRetry(() =>
-          prisma.$queryRawUnsafe(`
-            PRAGMA table_info(ViewHistory)
-          `) as Promise<Array<{ name: string; type: string }>>
-        );
+        const columns = await prisma.$queryRawUnsafe(`
+          PRAGMA table_info(ViewHistory)
+        `) as Array<{ name: string; type: string }>;
         
         const hasViewerTelegramId = columns.some(col => col.name === 'viewerTelegramId');
         if (!hasViewerTelegramId) {
-          await executeWithRetry(() =>
-            prisma.$executeRawUnsafe(`
-              ALTER TABLE ViewHistory ADD COLUMN viewerTelegramId INTEGER
-            `)
-          );
+          try {
+            await executeWithRetry(() =>
+              prisma.$executeRawUnsafe(`
+                ALTER TABLE ViewHistory ADD COLUMN viewerTelegramId INTEGER
+              `)
+            );
+          } catch (error: any) {
+            // Ігноруємо помилки "Execute returned results" та "duplicate column"
+            if (!error.message?.includes('Execute returned results') && 
+                !error.message?.includes('duplicate column') && 
+                !error.message?.includes('already exists')) {
+              console.log('Note: Could not add viewerTelegramId column:', error.message);
+            }
+          }
         }
       } catch (error: any) {
         // Якщо не вдалося додати колонку - це нормально (може вже існувати)
@@ -263,27 +277,30 @@ export async function ensureViewHistoryTable(): Promise<void> {
       }
     }
     
-    // Створюємо індекси (з retry, якщо їх немає)
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS idx_viewhistory_listingId ON ViewHistory(listingId)
-      `)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS idx_viewhistory_viewerTelegramId ON ViewHistory(viewerTelegramId)
-      `)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS idx_viewhistory_viewedAt ON ViewHistory(viewedAt)
-      `)
-    );
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(`
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_viewhistory_listing_viewer ON ViewHistory(listingId, viewerTelegramId)
-      `)
-    );
+    // Створюємо індекси (з безпечною обробкою помилок)
+    const createIndexSafely = async (indexName: string, sql: string) => {
+      try {
+        await executeWithRetry(() => prisma.$executeRawUnsafe(sql));
+      } catch (error: any) {
+        // Ігноруємо помилки "Execute returned results" - це нормально для SQLite
+        if (!error.message?.includes('Execute returned results')) {
+          console.log(`Note: Could not create ${indexName}:`, error.message);
+        }
+      }
+    };
+    
+    await createIndexSafely('idx_viewhistory_listingId', `
+      CREATE INDEX IF NOT EXISTS idx_viewhistory_listingId ON ViewHistory(listingId)
+    `);
+    await createIndexSafely('idx_viewhistory_viewerTelegramId', `
+      CREATE INDEX IF NOT EXISTS idx_viewhistory_viewerTelegramId ON ViewHistory(viewerTelegramId)
+    `);
+    await createIndexSafely('idx_viewhistory_viewedAt', `
+      CREATE INDEX IF NOT EXISTS idx_viewhistory_viewedAt ON ViewHistory(viewedAt)
+    `);
+    await createIndexSafely('idx_viewhistory_listing_viewer', `
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_viewhistory_listing_viewer ON ViewHistory(listingId, viewerTelegramId)
+    `);
     
     viewHistoryTableChecked = true;
   } catch (error: any) {
