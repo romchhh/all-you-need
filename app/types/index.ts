@@ -25,6 +25,7 @@ export interface Listing {
   tags?: string[];
   isFree?: boolean;
   status?: 'active' | 'sold' | 'hidden' | 'pending';
+  favoritesCount?: number;
 }
 
 export interface Subcategory {

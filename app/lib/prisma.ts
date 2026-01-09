@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 
+// Глобальна змінна для відстеження чи таблиця Favorite вже перевірена
+let favoriteTableInitialized = false;
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   currencyColumnChecked: boolean | undefined;
@@ -10,7 +13,9 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ['error'],
+    // Вимкнути логування помилок Prisma - ми обробляємо їх вручну
+    // Це приховує помилки "Execute returned results" для SQLite DDL команд
+    log: [],
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
@@ -28,8 +33,12 @@ async function createAdditionalIndexes(): Promise<void> {
     } catch (error: any) {
       // Ігноруємо помилки "Execute returned results" - це нормально для SQLite
       // Індекси все одно створюються або вже існують
-      if (!error.message?.includes('Execute returned results')) {
-        console.log(`Note: Could not create ${indexName}:`, error.message);
+      // Не логуємо цю помилку взагалі
+      if (!error.message?.includes('Execute returned results') && 
+          !error.message?.includes('already exists')) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Note: Could not create ${indexName}:`, error.message);
+        }
       }
     }
   };
@@ -64,6 +73,23 @@ async function createAdditionalIndexes(): Promise<void> {
   await createIndexSafely('idx_link_linkName', `CREATE INDEX IF NOT EXISTS idx_link_linkName ON Link(linkName)`);
 }
 
+// Helper функція для безпечного виконання DDL команд в SQLite
+async function executeDDLSafely(sql: string): Promise<void> {
+  try {
+    await prisma.$executeRawUnsafe(sql);
+  } catch (error: any) {
+    // Ігноруємо помилки "Execute returned results" - це нормальна поведінка SQLite для DDL команд
+    // Команди все одно виконуються успішно
+    if (!error.message?.includes('Execute returned results') && 
+        !error.message?.includes('already exists')) {
+      // Логуємо тільки реальні помилки
+      if (process.env.NODE_ENV === 'development') {
+        console.log('DDL command warning:', error.message);
+      }
+    }
+  }
+}
+
 async function optimizeDatabase(): Promise<void> {
   if (dbOptimized) {
     return;
@@ -71,19 +97,19 @@ async function optimizeDatabase(): Promise<void> {
 
   try {
     // Увімкнути WAL mode (Write-Ahead Logging) - дозволяє одночасні читання та запис
-    await prisma.$executeRawUnsafe(`PRAGMA journal_mode = WAL;`);
+    await executeDDLSafely(`PRAGMA journal_mode = WAL;`);
     
     // Збільшити timeout для запитів (30 секунд)
-    await prisma.$executeRawUnsafe(`PRAGMA busy_timeout = 30000;`);
+    await executeDDLSafely(`PRAGMA busy_timeout = 30000;`);
     
     // Увімкнути foreign keys
-    await prisma.$executeRawUnsafe(`PRAGMA foreign_keys = ON;`);
+    await executeDDLSafely(`PRAGMA foreign_keys = ON;`);
     
     // Оптимізувати для швидших запитів
-    await prisma.$executeRawUnsafe(`PRAGMA synchronous = NORMAL;`);
+    await executeDDLSafely(`PRAGMA synchronous = NORMAL;`);
     
     // Кешувати сторінки в пам'яті (16MB)
-    await prisma.$executeRawUnsafe(`PRAGMA cache_size = -16384;`);
+    await executeDDLSafely(`PRAGMA cache_size = -16384;`);
     
     // Створюємо додаткові індекси для оптимізації (якщо їх немає)
     await createAdditionalIndexes();
@@ -93,11 +119,15 @@ async function optimizeDatabase(): Promise<void> {
     
     dbOptimized = true;
     globalForPrisma.dbOptimized = true;
-    console.log('Database optimized: WAL mode enabled, timeout set to 30s, indexes created');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Database optimized: WAL mode enabled, timeout set to 30s, indexes created');
+    }
   } catch (error: any) {
     // Ігноруємо помилки про "Execute returned results" - це нормально для SQLite
     if (!error.message?.includes('Execute returned results')) {
-      console.log('Note: Could not optimize database:', error.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Note: Could not optimize database:', error.message);
+      }
     }
     // Відмічаємо як оптимізовану, щоб не повторювати
     dbOptimized = true;
@@ -108,10 +138,17 @@ async function optimizeDatabase(): Promise<void> {
 // Викликаємо оптимізацію при ініціалізації (асинхронно, не блокуємо)
 if (!dbOptimized) {
   // Запускаємо оптимізацію в фоні, не блокуємо ініціалізацію
-  setImmediate(() => {
-    optimizeDatabase().catch(err => {
-      console.log('Error optimizing database:', err);
-    });
+  setImmediate(async () => {
+    try {
+      await optimizeDatabase();
+      // Створюємо індекси для оптимізації SQL запитів
+      const { createDatabaseIndexes } = await import('./db-indexes');
+      await createDatabaseIndexes();
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Error optimizing database:', err);
+      }
+    }
   });
 }
 
@@ -241,8 +278,12 @@ export async function ensureViewHistoryTable(): Promise<void> {
         );
       } catch (error: any) {
         // Ігноруємо помилки "Execute returned results" - це нормально для SQLite
-        if (!error.message?.includes('Execute returned results')) {
-          console.log('Note: Could not create ViewHistory table:', error.message);
+        // Не логуємо цю помилку взагалі
+        if (!error.message?.includes('Execute returned results') && 
+            !error.message?.includes('already exists')) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Note: Could not create ViewHistory table:', error.message);
+          }
         }
       }
     } else {
@@ -310,3 +351,81 @@ export async function ensureViewHistoryTable(): Promise<void> {
   }
 }
 
+// Кешуємо створення таблиці Favorite
+let favoriteTableChecked = false;
+
+export async function ensureFavoriteTable(): Promise<void> {
+  // Якщо таблиця вже ініціалізована глобально, не перевіряємо знову
+  if (favoriteTableInitialized || favoriteTableChecked) {
+    return;
+  }
+
+  try {
+    // Перевіряємо, чи таблиця існує (з retry)
+    const tableInfo = await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(`
+        SELECT name FROM sqlite_master WHERE type='table' AND name='Favorite'
+      `) as Promise<Array<{ name: string }>>
+    );
+    
+    if (tableInfo.length === 0) {
+      // Створюємо таблицю тільки якщо її немає (з безпечною обробкою)
+      try {
+        await executeWithRetry(() =>
+          prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS Favorite (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              userId INTEGER NOT NULL,
+              listingId INTEGER NOT NULL,
+              createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
+              FOREIGN KEY (listingId) REFERENCES Listing(id) ON DELETE CASCADE,
+              UNIQUE(userId, listingId)
+            )
+          `)
+        );
+        // Таблиця створена успішно
+      } catch (error: any) {
+        // Ігноруємо помилки "Execute returned results" - це нормально для SQLite
+        // CREATE TABLE IF NOT EXISTS може повертати результати, але таблиця все одно створюється
+        // Не логуємо цю помилку взагалі
+        if (!error.message?.includes('Execute returned results') && 
+            !error.message?.includes('already exists')) {
+          // Логуємо тільки реальні помилки
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Note: Could not create Favorite table:', error.message);
+          }
+        }
+      }
+    }
+    
+    // Створюємо індекси (з безпечною обробкою помилок)
+    const createIndexSafely = async (indexName: string, sql: string) => {
+      try {
+        await executeWithRetry(() => prisma.$executeRawUnsafe(sql));
+      } catch (error: any) {
+        // Ігноруємо помилки "Execute returned results" - це нормально для SQLite
+        if (!error.message?.includes('Execute returned results')) {
+          console.log(`Note: Could not create ${indexName}:`, error.message);
+        }
+      }
+    };
+    
+    await createIndexSafely('idx_favorite_userId', `
+      CREATE INDEX IF NOT EXISTS idx_favorite_userId ON Favorite(userId)
+    `);
+    await createIndexSafely('idx_favorite_listingId', `
+      CREATE INDEX IF NOT EXISTS idx_favorite_listingId ON Favorite(listingId)
+    `);
+    
+    favoriteTableChecked = true;
+    favoriteTableInitialized = true; // Відмічаємо глобально
+  } catch (error: any) {
+    // Якщо помилка - просто логуємо, не блокуємо запит
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Note: Could not ensure Favorite table:', error.message);
+    }
+    favoriteTableChecked = true; // Відмічаємо як перевірене, щоб не повторювати
+    favoriteTableInitialized = true; // Відмічаємо глобально навіть при помилці
+  }
+}

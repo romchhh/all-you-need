@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useAutoPrefetch } from '@/hooks/usePrefetch';
 import { Listing } from '@/types';
 import { useTelegram } from '@/hooks/useTelegram';
 import { ListingDetail } from '@/components/ListingDetail';
@@ -10,15 +11,23 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { FavoritesTab } from '@/components/tabs/FavoritesTab';
 import { Toast } from '@/components/Toast';
 import { useToast } from '@/hooks/useToast';
-import { getFavoritesFromStorage, saveFavoritesToStorage } from '@/utils/favorites';
+import { getFavoritesFromStorage, getFavoritesFromStorageSync, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
 import { getCachedData, setCachedData } from '@/utils/cache';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { CreateListingModal } from '@/components/CreateListingModal';
+import { useUser } from '@/hooks/useUser';
 
 const FavoritesPage = () => {
   const params = useParams();
+  const pathname = usePathname();
+  
+  // Автоматичний prefetching для покращення UX
+  useAutoPrefetch(pathname);
   const router = useRouter();
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
+  const { profile } = useUser();
   
   useEffect(() => {
     if (lang === 'uk' || lang === 'ru') {
@@ -59,13 +68,60 @@ const FavoritesPage = () => {
     return () => window.removeEventListener('scroll', throttledScroll);
   }, [selectedListing, selectedSeller]);
   
+  // Завантажуємо обране з API при завантаженні
   useEffect(() => {
-    const savedFavorites = getFavoritesFromStorage();
-    setFavorites(savedFavorites);
-  }, []);
+    const loadFavorites = async () => {
+      if (profile?.telegramId) {
+        const favorites = await getFavoritesFromStorage(profile.telegramId);
+        setFavorites(favorites);
+      } else {
+        // Fallback до localStorage, якщо немає profile
+        const savedFavorites = getFavoritesFromStorageSync();
+        setFavorites(savedFavorites);
+      }
+    };
+    loadFavorites();
+  }, [profile?.telegramId]);
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [listingsOffset, setListingsOffset] = useState(16);
+  const [totalListings, setTotalListings] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
+
+  // Функція для завантаження додаткових товарів
+  const loadMoreListings = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    
+    try {
+      setLoadingMore(true);
+      const response = await fetch(`/api/listings?limit=16&offset=${listingsOffset}`);
+      if (response.ok) {
+        const data = await response.json();
+        const newListings = data.listings || [];
+        
+        // Фільтруємо тільки обрані товари
+        const favoriteIds = Array.from(favorites);
+        const favoriteListings = newListings.filter((listing: Listing) => 
+          favoriteIds.includes(listing.id)
+        );
+        
+        // Додаємо нові товари до існуючих
+        setListings(prev => [...prev, ...favoriteListings]);
+        
+        // Оновлюємо offset та hasMore
+        const newOffset = listingsOffset + 16;
+        setListingsOffset(newOffset);
+        setHasMore((newListings.length === 16) && (newOffset < (data.total || 0)));
+      }
+    } catch (error) {
+      console.error('Error loading more listings:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, listingsOffset, favorites]);
   const { tg } = useTelegram();
   const { toast, showToast, hideToast } = useToast();
   
@@ -246,45 +302,43 @@ const FavoritesPage = () => {
         setLoading(true);
         const cacheKey = 'listings:all';
         
-        // Спочатку перевіряємо localStorage для швидкого відновлення
-        if (typeof window !== 'undefined') {
-          const savedListings = localStorage.getItem('favoritesListings');
-          if (savedListings) {
-            try {
-              const parsed = JSON.parse(savedListings);
-              const now = Date.now();
-              if (now - parsed.timestamp < 30 * 60 * 1000) {
-                setListings(parsed.listings || []);
-                setLoading(false);
-                // НЕ завантажуємо оновлені дані в фоні для збереження стану
-                return;
-              }
-            } catch (e) {
-              // ignore
-            }
-          }
-        }
-        
+        // Перевіряємо уніфікований кеш
         const cached = getCachedData(cacheKey);
-        if (cached) {
-          setListings(cached.listings || []);
+        if (cached && cached.listings) {
+          // Фільтруємо тільки обрані товари
+          const favoriteIds = Array.from(favorites);
+          const favoriteListings = (cached.listings || []).filter((listing: Listing) => 
+            favoriteIds.includes(listing.id)
+          );
+          setListings(favoriteListings);
+          setTotalListings(favoriteListings.length);
+          setHasMore(false);
+          setListingsOffset(16);
           setLoading(false);
           return;
         }
         
-        const response = await fetch('/api/listings?limit=1000&offset=0');
+        const response = await fetch('/api/listings?limit=16&offset=0');
         if (response.ok) {
           const data = await response.json();
-          setListings(data.listings || []);
-          setCachedData(cacheKey, data);
+          // Зберігаємо в уніфікований кеш
+          setCachedData(cacheKey, {
+            listings: data.listings || [],
+            total: data.total || 0,
+            offset: 16,
+            hasMore: (data.listings?.length || 0) < (data.total || 0)
+          });
           
-          // Зберігаємо в localStorage
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('favoritesListings', JSON.stringify({
-              listings: data.listings || [],
-              timestamp: Date.now()
-            }));
-          }
+          // Фільтруємо тільки обрані товари
+          const favoriteIds = Array.from(favorites);
+          const favoriteListings = (data.listings || []).filter((listing: Listing) => 
+            favoriteIds.includes(listing.id)
+          );
+          setListings(favoriteListings);
+          setTotalListings(data.total || 0);
+          // Встановлюємо hasMore якщо є ще товари для завантаження
+          setHasMore((data.listings?.length || 0) === 16 && (data.total || 0) > 16);
+          setListingsOffset(16);
         } else {
           setListings([]);
         }
@@ -303,23 +357,110 @@ const FavoritesPage = () => {
     }
   }, []);
 
-  const toggleFavorite = (id: number) => {
+  const toggleFavorite = async (id: number) => {
+    if (!profile?.telegramId) {
+      // Якщо немає profile, використовуємо старий спосіб (localStorage)
+      setFavorites(prev => {
+        const newFavorites = new Set(prev);
+        if (newFavorites.has(id)) {
+          newFavorites.delete(id);
+          tg?.HapticFeedback.notificationOccurred('success');
+          showToast(t('listing.removeFromFavorites'), 'success');
+        } else {
+          newFavorites.add(id);
+          tg?.HapticFeedback.notificationOccurred('success');
+          showToast(t('listing.addToFavorites'), 'success');
+        }
+        return newFavorites;
+      });
+      return;
+    }
+
+    const isFavorite = favorites.has(id);
+    
+    // Оптимістичне оновлення UI
     setFavorites(prev => {
       const newFavorites = new Set(prev);
-      if (newFavorites.has(id)) {
+      if (isFavorite) {
         newFavorites.delete(id);
-        saveFavoritesToStorage(newFavorites);
-        tg?.HapticFeedback.notificationOccurred('success');
-        showToast(t('listing.removeFromFavorites'), 'success');
       } else {
         newFavorites.add(id);
-        saveFavoritesToStorage(newFavorites);
-        tg?.HapticFeedback.notificationOccurred('success');
-        showToast(t('listing.addToFavorites'), 'success');
       }
       return newFavorites;
     });
+
+    tg?.HapticFeedback.notificationOccurred('success');
+    
+    // Виконуємо операцію через API
+    try {
+      if (isFavorite) {
+        await removeFavoriteFromStorage(id, profile.telegramId);
+        showToast(t('listing.removeFromFavorites'), 'success');
+      } else {
+        await addFavoriteToStorage(id, profile.telegramId);
+        showToast(t('listing.addToFavorites'), 'success');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      // Відкатуємо зміни при помилці
+      setFavorites(prev => {
+        const newFavorites = new Set(prev);
+        if (isFavorite) {
+          newFavorites.add(id);
+        } else {
+          newFavorites.delete(id);
+        }
+        return newFavorites;
+      });
+      showToast(t('common.error') || 'Помилка', 'error');
+    }
   };
+
+  // Функція для оновлення даних (pull-to-refresh)
+  const handleRefresh = useCallback(async () => {
+    // Очищаємо кеш при оновленні
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('favoritesListings');
+      const cacheKey = 'listings:all';
+      localStorage.removeItem(`cache_${cacheKey}`);
+    }
+    
+    // Перезавантажуємо дані
+    try {
+      setLoading(true);
+      const response = await fetch('/api/listings?limit=1000&offset=0');
+      if (response.ok) {
+        const data = await response.json();
+        setListings(data.listings || []);
+        
+        // Зберігаємо в localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('favoritesListings', JSON.stringify({
+            listings: data.listings || [],
+            timestamp: Date.now()
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing favorites:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Використовуємо pull-to-refresh для запобігання згортанню додатку
+  const { isPulling, pullDistance, pullProgress } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: !selectedListing && !selectedSeller,
+    tg
+  });
+
+  // Забезпечуємо розгортання вікна при завантаженні
+  useEffect(() => {
+    if (tg && !selectedListing && !selectedSeller) {
+      tg.expand();
+    }
+  }, [tg, selectedListing, selectedSeller]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -515,6 +656,9 @@ const FavoritesPage = () => {
       <FavoritesTab
         listings={listings}
         favorites={favorites}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={loadMoreListings}
         onSelectListing={(listing) => {
           // Зберігаємо ID оголошення перед відкриттям
           if (typeof window !== 'undefined') {
@@ -544,9 +688,24 @@ const FavoritesPage = () => {
           setSelectedListing(null);
           setSelectedSeller(null);
         }}
+        onCreateListing={() => setIsCreateListingModalOpen(true)}
         favoritesCount={favorites.size}
         tg={tg}
       />
+
+      {profile && (
+        <CreateListingModal
+          isOpen={isCreateListingModalOpen}
+          onClose={() => setIsCreateListingModalOpen(false)}
+          onSave={async (listingData) => {
+            // Після створення товару оновлюємо список favorites
+            await handleRefresh();
+            setIsCreateListingModalOpen(false);
+            showToast(t('createListing.listingCreated'), 'success');
+          }}
+          tg={tg}
+        />
+      )}
 
       <Toast
         message={toast.message}

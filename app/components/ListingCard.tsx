@@ -1,7 +1,7 @@
 import { Heart, Image as ImageIcon } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
@@ -16,7 +16,7 @@ interface ListingCardProps {
   isDeactivated?: boolean;
 }
 
-export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false, isDeactivated = false }: ListingCardProps) => {
+const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false, isDeactivated = false }: ListingCardProps) => {
   const { t } = useLanguage();
   
   // Форматуємо час на клієнті з перекладами
@@ -211,3 +211,16 @@ export const ListingCard = ({ listing, isFavorite, onSelect, onToggleFavorite, t
   );
 };
 
+// Мемоізуємо компонент для оптимізації ререндерів
+export const ListingCard = memo(ListingCardComponent, (prevProps, nextProps) => {
+  // Перевіряємо, чи змінилися важливі пропси
+  return (
+    prevProps.listing.id === nextProps.listing.id &&
+    prevProps.listing.image === nextProps.listing.image &&
+    prevProps.listing.price === nextProps.listing.price &&
+    prevProps.listing.title === nextProps.listing.title &&
+    prevProps.isFavorite === nextProps.isFavorite &&
+    prevProps.isSold === nextProps.isSold &&
+    prevProps.isDeactivated === nextProps.isDeactivated
+  );
+});

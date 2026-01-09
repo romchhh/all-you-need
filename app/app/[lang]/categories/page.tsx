@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useAutoPrefetch } from '@/hooks/usePrefetch';
 import { Listing } from '@/types';
 import { getCategories } from '@/constants/categories';
 import { useTelegram } from '@/hooks/useTelegram';
@@ -11,15 +12,21 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { CategoriesTab } from '@/components/tabs/CategoriesTab';
 import { Toast } from '@/components/Toast';
 import { useToast } from '@/hooks/useToast';
-import { getFavoritesFromStorage, saveFavoritesToStorage } from '@/utils/favorites';
+import { getFavoritesFromStorage, getFavoritesFromStorageSync, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
 import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useUser } from '@/hooks/useUser';
 
 const CategoriesPage = () => {
   const params = useParams();
+  const pathname = usePathname();
+  
+  // Автоматичний prefetching для покращення UX
+  useAutoPrefetch(pathname);
   const router = useRouter();
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
+  const { profile } = useUser();
   
   const categories = getCategories(t);
   
@@ -90,13 +97,27 @@ const CategoriesPage = () => {
     }
   }, [categoriesTabState]);
 
+  // Завантажуємо обране з API при завантаженні
   useEffect(() => {
-    const savedFavorites = getFavoritesFromStorage();
-    setFavorites(savedFavorites);
-  }, []);
+    const loadFavorites = async () => {
+      if (profile?.telegramId) {
+        const favorites = await getFavoritesFromStorage(profile.telegramId);
+        setFavorites(favorites);
+      } else {
+        // Fallback до localStorage, якщо немає profile
+        const savedFavorites = getFavoritesFromStorageSync();
+        setFavorites(savedFavorites);
+      }
+    };
+    loadFavorites();
+  }, [profile?.telegramId]);
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [listingsOffset, setListingsOffset] = useState(16);
+  const [totalListings, setTotalListings] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const { tg } = useTelegram();
   const { toast, showToast, hideToast } = useToast();
   
@@ -280,45 +301,30 @@ const CategoriesPage = () => {
         // Перевіряємо кеш тільки якщо не примусове оновлення
         if (!forceRefresh) {
           const cached = getCachedData(cacheKey);
-          if (cached) {
+          if (cached && cached.listings) {
             setListings(cached.listings || []);
+            setTotalListings(cached.total || 0);
+            setHasMore((cached.listings?.length || 0) < (cached.total || 0));
+            setListingsOffset(cached.offset || 16);
             setLoading(false);
             return;
           }
-          
-          // Також перевіряємо localStorage для швидкого відновлення
-          if (typeof window !== 'undefined') {
-            const savedListings = localStorage.getItem('categoriesListings');
-            if (savedListings) {
-              try {
-                const parsed = JSON.parse(savedListings);
-                const now = Date.now();
-                if (now - parsed.timestamp < 30 * 60 * 1000) {
-                  setListings(parsed.listings || []);
-                  setLoading(false);
-                  // НЕ завантажуємо оновлені дані в фоні для збереження стану
-                  return;
-                }
-              } catch (e) {
-                // ignore
-              }
-            }
-          }
         }
         
-        const response = await fetch('/api/listings?limit=1000&offset=0');
+        const response = await fetch('/api/listings?limit=16&offset=0');
         if (response.ok) {
           const data = await response.json();
           setListings(data.listings || []);
-          setCachedData(cacheKey, data);
-          
-          // Зберігаємо в localStorage
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('categoriesListings', JSON.stringify({
-              listings: data.listings || [],
-              timestamp: Date.now()
-            }));
-          }
+          setTotalListings(data.total || 0);
+          setHasMore((data.listings?.length || 0) < (data.total || 0));
+          setListingsOffset(16);
+          // Використовуємо уніфікований кеш
+          setCachedData(cacheKey, {
+            listings: data.listings || [],
+            total: data.total || 0,
+            offset: 16,
+            hasMore: (data.listings?.length || 0) < (data.total || 0)
+          });
         } else {
           setListings([]);
         }
@@ -337,22 +343,104 @@ const CategoriesPage = () => {
     }
   }, []);
 
-  const toggleFavorite = (id: number) => {
+  // Infinite scroll для categories
+  const loadMoreListings = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    try {
+      setLoadingMore(true);
+      
+      const response = await fetch(`/api/listings?limit=16&offset=${listingsOffset}`);
+      if (response.ok) {
+        const data = await response.json();
+        const newListings = [...listings, ...(data.listings || [])];
+        setListings(newListings);
+        const newOffset = listingsOffset + (data.listings?.length || 0);
+        const newHasMore = newOffset < (data.total || 0);
+        setHasMore(newHasMore);
+        setListingsOffset(newOffset);
+        tg?.HapticFeedback.impactOccurred('light');
+      }
+    } catch (error) {
+      console.error('Error loading more listings:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, listingsOffset, listings, tg]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (loadingMore || !hasMore || selectedListing || selectedSeller) return;
+      
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      
+      if (scrollTop + windowHeight >= documentHeight - 300) {
+        loadMoreListings();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loadingMore, hasMore, loadMoreListings, selectedListing, selectedSeller]);
+
+  const toggleFavorite = async (id: number) => {
+    if (!profile?.telegramId) {
+      // Якщо немає profile, використовуємо старий спосіб (localStorage)
+      setFavorites(prev => {
+        const newFavorites = new Set(prev);
+        if (newFavorites.has(id)) {
+          newFavorites.delete(id);
+          tg?.HapticFeedback.notificationOccurred('success');
+          showToast(t('listing.removeFromFavorites'), 'success');
+        } else {
+          newFavorites.add(id);
+          tg?.HapticFeedback.notificationOccurred('success');
+          showToast(t('listing.addToFavorites'), 'success');
+        }
+        return newFavorites;
+      });
+      return;
+    }
+
+    const isFavorite = favorites.has(id);
+    
+    // Оптимістичне оновлення UI
     setFavorites(prev => {
       const newFavorites = new Set(prev);
-      if (newFavorites.has(id)) {
+      if (isFavorite) {
         newFavorites.delete(id);
-        saveFavoritesToStorage(newFavorites);
-        tg?.HapticFeedback.notificationOccurred('success');
-        showToast(t('listing.removeFromFavorites'), 'success');
       } else {
         newFavorites.add(id);
-        saveFavoritesToStorage(newFavorites);
-        tg?.HapticFeedback.notificationOccurred('success');
-        showToast(t('listing.addToFavorites'), 'success');
       }
       return newFavorites;
     });
+
+    tg?.HapticFeedback.notificationOccurred('success');
+    
+    // Виконуємо операцію через API
+    try {
+      if (isFavorite) {
+        await removeFavoriteFromStorage(id, profile.telegramId);
+        showToast(t('listing.removeFromFavorites'), 'success');
+      } else {
+        await addFavoriteToStorage(id, profile.telegramId);
+        showToast(t('listing.addToFavorites'), 'success');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      // Відкатуємо зміни при помилці
+      setFavorites(prev => {
+        const newFavorites = new Set(prev);
+        if (isFavorite) {
+          newFavorites.add(id);
+        } else {
+          newFavorites.delete(id);
+        }
+        return newFavorites;
+      });
+      showToast(t('common.error') || 'Помилка', 'error');
+    }
   };
 
   useEffect(() => {
@@ -575,6 +663,9 @@ const CategoriesPage = () => {
         categories={categories}
         listings={listings}
         favorites={favorites}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={loadMoreListings}
         onSelectListing={(listing) => {
           // Зберігаємо ID оголошення перед відкриттям
           if (typeof window !== 'undefined') {

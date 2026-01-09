@@ -11,6 +11,9 @@ interface CategoriesTabProps {
   categories: Category[];
   listings: Listing[];
   favorites: Set<number>;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
   onSelectListing: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
   savedState?: {
@@ -30,6 +33,9 @@ export const CategoriesTab = ({
   categories,
   listings,
   favorites,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
   onSelectListing,
   onToggleFavorite,
   savedState,
@@ -268,6 +274,25 @@ export const CategoriesTab = ({
               />
             ))}
           </div>
+          {hasMore && (
+            <div className="px-4 py-4 text-center">
+              {loadingMore ? (
+                <div className="text-gray-500 text-sm">{t('common.loading')}</div>
+              ) : (
+                onLoadMore && (
+                  <button
+                    onClick={() => {
+                      onLoadMore();
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className="text-blue-600 text-sm font-medium hover:text-blue-700"
+                  >
+                    {t('common.showMore')}
+                  </button>
+                )
+              )}
+            </div>
+          )}
         </>
       )}
 

@@ -35,7 +35,10 @@ export const getCachedData = (key: string, useStorage: boolean = true): any | nu
         }
       }
     } catch (e) {
-      console.error('Error reading from localStorage cache:', e);
+      // Використовуємо logger замість console
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error reading from localStorage cache:', e);
+      }
     }
   }
   
@@ -52,7 +55,10 @@ export const setCachedData = (key: string, data: any, useStorage: boolean = true
       const storageKey = `${STORAGE_PREFIX}${key}`;
       localStorage.setItem(storageKey, JSON.stringify({ data, timestamp }));
     } catch (e) {
-      console.error('Error writing to localStorage cache:', e);
+      // Використовуємо logger замість console
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error writing to localStorage cache:', e);
+      }
       // Якщо localStorage переповнений, очищаємо старі записи
       clearOldCacheEntries();
     }

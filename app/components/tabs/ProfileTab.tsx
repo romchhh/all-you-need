@@ -592,7 +592,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   return (
                     <ProfileListingCard
                       key={listing.id}
-                        listing={listing}
+                        listing={{ ...listing, favoritesCount: listing.favoritesCount || 0 }}
                         isFavorite={favorites.has(listing.id)}
                         isSold={isSold}
                         isDeactivated={isDeactivated}
@@ -694,6 +694,38 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         </div>
       </div>
 
+      {/* Кнопки налаштувань */}
+      <div className="px-4 py-6 space-y-3">
+        <LanguageSwitcher tg={tg} />
+        
+        <button
+          onClick={() => {
+            router.push(`/${language}/faq`);
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <HelpCircle size={20} className="text-gray-600" />
+            <span className="text-gray-900 font-medium">{t('navigation.faq')}</span>
+          </div>
+          <ChevronRight size={20} className="text-gray-400" />
+        </button>
+
+        <button
+          onClick={() => {
+            router.push(`/${language}/privacy`);
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Shield size={20} className="text-gray-600" />
+            <span className="text-gray-900 font-medium">{t('privacy.title')}</span>
+          </div>
+          <ChevronRight size={20} className="text-gray-400" />
+        </button>
+      </div>
 
       {/* Модальне вікно перегляду аватара */}
       {showAvatarModal && profile?.avatar && (

@@ -82,10 +82,16 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
           width: rect.width
         });
       } else {
+        // Відцентровуємо меню відносно кнопки
+        const menuWidth = 160; // Ширина меню
+        const left = rect.left + (rect.width / 2) - (menuWidth / 2);
+        // Перевіряємо, щоб меню не виходило за межі екрану
+        const adjustedLeft = Math.max(16, Math.min(left, window.innerWidth - menuWidth - 16));
+        
         setMenuPosition({
-          top: rect.top,
-          left: rect.right - 140, // 140px - ширина меню
-          width: 140
+          top: rect.bottom + 8,
+          left: adjustedLeft,
+          width: menuWidth
         });
       }
     }
@@ -137,9 +143,12 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
           }}
           className="w-full bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
         >
-          <span className="text-gray-900 font-medium">{t('common.language')}</span>
           <div className="flex items-center gap-2">
-            <span className="text-gray-600">{getLanguageLabel()}</span>
+            <Globe size={18} className="text-gray-600" />
+            <span className="text-gray-900 font-medium">{t('common.language')}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600 font-medium">{getLanguageLabel()}</span>
             <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </div>
         </button>
@@ -237,7 +246,7 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
           id="language-menu"
           className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] overflow-hidden"
           style={{
-            top: `${menuPosition.top + 50}px`,
+            top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
             width: `${menuPosition.width}px`
           }}

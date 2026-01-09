@@ -133,7 +133,7 @@ export const ProfileListingCard = ({
             </div>
             <div className="flex items-center gap-1">
               <Heart size={14} className={isFavorite ? 'fill-red-500 text-red-500' : ''} />
-              <span>{(listing as any).favoritesCount || 0}</span>
+              <span>{listing.favoritesCount || 0}</span>
             </div>
           </div>
         </div>

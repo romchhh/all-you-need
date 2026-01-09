@@ -11,7 +11,7 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { BazaarTab } from '@/components/tabs/BazaarTab';
 import { Toast } from '@/components/Toast';
 import { useToast } from '@/hooks/useToast';
-import { getFavoritesFromStorage, saveFavoritesToStorage } from '@/utils/favorites';
+import { getFavoritesFromStorage, getFavoritesFromStorageSync, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
 import { ListingGridSkeleton } from '@/components/SkeletonLoader';
 import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
 import { CreateListingModal } from '@/components/CreateListingModal';
@@ -19,11 +19,17 @@ import { CategoriesModal } from '@/components/CategoriesModal';
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useAutoPrefetch } from '@/hooks/usePrefetch';
 
 const BazaarPage = () => {
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Автоматичний prefetching для покращення UX
+  useAutoPrefetch(pathname);
+  
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
   const { profile } = useUser();
@@ -53,6 +59,9 @@ const BazaarPage = () => {
     }
     return '';
   });
+  
+  // Debounce для пошуку - зменшує кількість фільтрацій
+  const debouncedSearchQuery = useDebounce(searchQuery, 400);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [selectedSeller, setSelectedSeller] = useState<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
@@ -140,11 +149,20 @@ const BazaarPage = () => {
     }
   }, [bazaarTabState]);
 
-  // Завантажуємо обране з localStorage при завантаженні
+  // Завантажуємо обране з API при завантаженні
   useEffect(() => {
-    const savedFavorites = getFavoritesFromStorage();
-    setFavorites(savedFavorites);
-  }, []);
+    const loadFavorites = async () => {
+      if (profile?.telegramId) {
+        const favorites = await getFavoritesFromStorage(profile.telegramId);
+        setFavorites(favorites);
+      } else {
+        // Fallback до localStorage, якщо немає profile
+        const savedFavorites = getFavoritesFromStorageSync();
+        setFavorites(savedFavorites);
+      }
+    };
+    loadFavorites();
+  }, [profile?.telegramId]);
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -367,7 +385,29 @@ const BazaarPage = () => {
     try {
       setLoading(true);
       
-      // Завжди завантажуємо свіжі дані з API без кешування
+      // Перевіряємо кеш тільки якщо не примусове оновлення
+      if (!forceRefresh && typeof window !== 'undefined') {
+        const cachedState = sessionStorage.getItem('bazaarListingsState');
+        if (cachedState) {
+          try {
+            const parsed = JSON.parse(cachedState);
+            // Перевіряємо, чи кеш не старіший за 5 хвилин
+            const cacheAge = Date.now() - (parsed.timestamp || 0);
+            if (cacheAge < 5 * 60 * 1000) {
+              setListings(parsed.listings || []);
+              setTotalListings(parsed.total || 0);
+              setHasMore(parsed.hasMore || false);
+              setListingsOffset(parsed.offset || 16);
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            // Якщо помилка парсингу, продовжуємо завантаження
+          }
+        }
+      }
+      
+      // Завантажуємо свіжі дані з API
       const response = await fetch('/api/listings?limit=16&offset=0');
       if (response.ok) {
         const data = await response.json();
@@ -375,6 +415,14 @@ const BazaarPage = () => {
         setTotalListings(data.total || 0);
         setHasMore((data.listings?.length || 0) < (data.total || 0));
         setListingsOffset(16);
+        
+        // Зберігаємо в уніфікований кеш
+        setCachedData('bazaarListingsState', {
+          listings: data.listings || [],
+          total: data.total || 0,
+          hasMore: (data.listings?.length || 0) < (data.total || 0),
+          offset: 16
+        });
       } else {
         console.error('Failed to fetch listings:', response.status);
         setListings([]);
@@ -389,25 +437,33 @@ const BazaarPage = () => {
     }
   }, [showToast, t]);
 
-  // Завантажуємо оголошення з API (завжди свіжі дані)
+  // Завантажуємо оголошення з API (з кешуванням для швидкого відновлення)
   const hasLoadedListings = useRef(false);
   
   useEffect(() => {
-    // Завантажуємо тільки один раз при монтуванні компонента
+    // Пропускаємо, якщо вже є дані в стані (не скидаємо при навігації)
+    if (listings.length > 0 && hasLoadedListings.current) {
+      return;
+    }
+    
+    // Перевіряємо уніфікований кеш
+    const cached = getCachedData('bazaarListingsState');
+    if (cached && cached.listings && cached.listings.length > 0) {
+      setListings(cached.listings || []);
+      setTotalListings(cached.total || 0);
+      setHasMore(cached.hasMore || false);
+      setListingsOffset(cached.offset || 16);
+      setLoading(false);
+      hasLoadedListings.current = true;
+      // Не завантажуємо з API, якщо є свіжий кеш
+      return;
+    }
+    
+    // Завантажуємо тільки один раз при монтуванні компонента, якщо немає кешу
     if (!hasLoadedListings.current) {
       hasLoadedListings.current = true;
-      
-      // Очищаємо старий кеш при завантаженні
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('bazaarListings');
-        localStorage.removeItem('bazaarListingsOffset');
-        const cacheKey = 'listings:0:16';
-        localStorage.removeItem(`cache_${cacheKey}`);
-        invalidateCache('listings');
-      }
-      
-      // Завжди завантажуємо свіжі дані
-      fetchListings(true);
+      // Завантажуємо дані з API
+      fetchListings(false);
     }
   }, [fetchListings]);
 
@@ -415,7 +471,8 @@ const BazaarPage = () => {
   // Функція для оновлення даних (pull-to-refresh)
   const handleRefresh = async () => {
     // Очищаємо весь кеш при оновленні
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('bazaarListingsState');
       localStorage.removeItem('bazaarListings');
       localStorage.removeItem('bazaarListingsOffset');
       invalidateCache('listings');
@@ -450,9 +507,21 @@ const BazaarPage = () => {
         const newListings = [...listings, ...(data.listings || [])];
         setListings(newListings);
         const newOffset = listingsOffset + (data.listings?.length || 0);
-        setHasMore(newOffset < (data.total || 0));
+        const newHasMore = newOffset < (data.total || 0);
+        setHasMore(newHasMore);
         setListingsOffset(newOffset);
         tg?.HapticFeedback.impactOccurred('light');
+        
+        // Оновлюємо кеш з новими даними
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('bazaarListingsState', JSON.stringify({
+            listings: newListings,
+            total: data.total || 0,
+            hasMore: newHasMore,
+            offset: newOffset,
+            timestamp: Date.now()
+          }));
+        }
         
         if (nextOffset < (data.total || 0)) {
           fetch(`/api/listings?limit=16&offset=${nextOffset}`).catch(() => {});
@@ -486,22 +555,63 @@ const BazaarPage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loadingMore, hasMore, loadMoreListings]);
 
-  const toggleFavorite = (id: number) => {
+  const toggleFavorite = async (id: number) => {
+    if (!profile?.telegramId) {
+      // Якщо немає profile, використовуємо старий спосіб (localStorage)
+      setFavorites(prev => {
+        const newFavorites = new Set(prev);
+        if (newFavorites.has(id)) {
+          newFavorites.delete(id);
+          tg?.HapticFeedback.notificationOccurred('success');
+          showToast(t('listing.removeFromFavorites'), 'success');
+        } else {
+          newFavorites.add(id);
+          tg?.HapticFeedback.notificationOccurred('success');
+          showToast(t('listing.addToFavorites'), 'success');
+        }
+        return newFavorites;
+      });
+      return;
+    }
+
+    const isFavorite = favorites.has(id);
+    
+    // Оптимістичне оновлення UI
     setFavorites(prev => {
       const newFavorites = new Set(prev);
-      if (newFavorites.has(id)) {
+      if (isFavorite) {
         newFavorites.delete(id);
-        saveFavoritesToStorage(newFavorites);
-        tg?.HapticFeedback.notificationOccurred('success');
-        showToast(t('listing.removeFromFavorites'), 'success');
       } else {
         newFavorites.add(id);
-        saveFavoritesToStorage(newFavorites);
-        tg?.HapticFeedback.notificationOccurred('success');
-        showToast(t('listing.addToFavorites'), 'success');
       }
       return newFavorites;
     });
+
+    tg?.HapticFeedback.notificationOccurred('success');
+    
+    // Виконуємо операцію через API
+    try {
+      if (isFavorite) {
+        await removeFavoriteFromStorage(id, profile.telegramId);
+        showToast(t('listing.removeFromFavorites'), 'success');
+      } else {
+        await addFavoriteToStorage(id, profile.telegramId);
+        showToast(t('listing.addToFavorites'), 'success');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      // Відкатуємо зміни при помилці
+      setFavorites(prev => {
+        const newFavorites = new Set(prev);
+        if (isFavorite) {
+          newFavorites.add(id);
+        } else {
+          newFavorites.delete(id);
+        }
+        return newFavorites;
+      });
+      showToast(t('common.error') || 'Помилка', 'error');
+    }
   };
 
   // Покращена навігація - оновлюємо URL при зміні вибраного товару/профілю
@@ -535,7 +645,7 @@ const BazaarPage = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [selectedListing, selectedSeller]);
 
-  // Зберігаємо позицію скролу перед відкриттям деталей товару/профілю
+  // Зберігаємо позицію скролу та стан списку перед відкриттям деталей товару/профілю
   useEffect(() => {
     if (selectedListing || selectedSeller) {
       const currentScroll = window.scrollY || document.documentElement.scrollTop;
@@ -544,12 +654,23 @@ const BazaarPage = () => {
       // Зберігаємо в localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem(scrollPositionKey, currentScroll.toString());
+        
+        // Зберігаємо поточний стан списку в localStorage для надійного збереження
+        if (listings.length > 0) {
+          localStorage.setItem('bazaarListingsState', JSON.stringify({
+            listings: listings,
+            total: totalListings,
+            hasMore: hasMore,
+            offset: listingsOffset,
+            timestamp: Date.now()
+          }));
+        }
       }
       
       // НЕ скролимо до верху тут - це робить ListingDetail
       // Просто зберігаємо позицію
     }
-  }, [selectedListing, selectedSeller]);
+  }, [selectedListing, selectedSeller, listings, totalListings, hasMore, listingsOffset]);
   
   // Окремий useEffect для відновлення позиції при закритті
   const shouldRestoreScroll = useRef(false);
@@ -736,7 +857,7 @@ const BazaarPage = () => {
       <BazaarTab
         categories={categories}
         listings={listings}
-        searchQuery={searchQuery}
+        searchQuery={debouncedSearchQuery}
         onSearchChange={handleSearchChange}
         favorites={favorites}
         onSelectListing={(listing) => {
@@ -845,7 +966,10 @@ const BazaarPage = () => {
               throw new Error('Failed to create listing');
             }
 
-            // Примусово оновлюємо дані після створення нового товару
+            // Очищаємо кеш та примусово оновлюємо дані після створення нового товару
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('bazaarListingsState');
+            }
             await fetchListings(true);
             setIsCreateListingModalOpen(false);
             showToast(t('createListing.listingCreated'), 'success');

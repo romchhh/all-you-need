@@ -9,11 +9,19 @@ function normalizeCondition(condition: string | null): 'new' | 'used' | null {
   return 'used';
 }
 
+// Глобальна змінна для відстеження ініціалізації таблиці Favorite
+let favoriteTableInitPromise: Promise<void> | null = null;
+
 export async function GET(request: NextRequest) {
   try {
     // Перевіряємо колонку currency (з кешуванням)
-    const { ensureCurrencyColumn } = await import('@/lib/prisma');
+    const { ensureCurrencyColumn, ensureFavoriteTable } = await import('@/lib/prisma');
     const currencyColumnExists = await ensureCurrencyColumn();
+    // Перевіряємо та створюємо таблицю Favorite тільки один раз
+    if (!favoriteTableInitPromise) {
+      favoriteTableInitPromise = ensureFavoriteTable();
+    }
+    await favoriteTableInitPromise;
 
     const searchParams = request.nextUrl.searchParams;
     const category = searchParams.get('category');
@@ -149,7 +157,8 @@ export async function GET(request: NextRequest) {
           u.lastName as sellerLastName,
           u.avatar as sellerAvatar,
           u.phone as sellerPhone,
-          CAST(u.telegramId AS INTEGER) as sellerTelegramId
+          CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+          COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount
         FROM Listing l
         JOIN User u ON l.userId = u.id
         ${whereClause}
@@ -164,10 +173,14 @@ export async function GET(request: NextRequest) {
         LIMIT ? OFFSET ?`;
       
       queryParams.push(limit, offset);
-      const userListings = await prisma.$queryRawUnsafe(
-        query,
-        ...queryParams
-      ) as Array<{
+      
+      // Безпечно виконуємо запит з обробкою помилок
+      let userListings: any[] = [];
+      try {
+        userListings = await prisma.$queryRawUnsafe(
+          query,
+          ...queryParams
+        ) as Array<{
         id: number;
         userId: number;
         title: string;
@@ -190,7 +203,22 @@ export async function GET(request: NextRequest) {
         sellerAvatar: string | null;
         sellerPhone: string | null;
         sellerTelegramId: number;
+        favoritesCount?: number;
       }>;
+      } catch (error: any) {
+        // Якщо таблиця Favorite не існує, виконуємо запит без favoritesCount
+        if (error.message?.includes('no such table: Favorite') || error.message?.includes('Favorite')) {
+          const queryWithoutFavorites = query.replace(', COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount', '');
+          userListings = await prisma.$queryRawUnsafe(
+            queryWithoutFavorites,
+            ...queryParams
+          ) as any[];
+          // Додаємо favoritesCount = 0 для всіх записів
+          userListings = userListings.map((listing: any) => ({ ...listing, favoritesCount: 0 }));
+        } else {
+          throw error;
+        }
+      }
 
       const countQuery = `SELECT COUNT(*) as count
         FROM Listing l
@@ -204,7 +232,42 @@ export async function GET(request: NextRequest) {
         ...countParams
       ) as Array<{ count: bigint }>;
 
-      listings = userListings;
+      // Форматуємо дані для профілю користувача
+      listings = userListings.map((listing: any) => {
+        const images = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+        const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
+        const createdAt = listing.createdAt instanceof Date ? listing.createdAt : new Date(listing.createdAt);
+        
+        return {
+          id: listing.id,
+          title: listing.title,
+          price: listing.isFree ? 'Безкоштовно' : listing.price,
+          currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
+          image: images[0] || '',
+          images: images,
+          seller: {
+            name: listing.sellerFirstName 
+              ? `${listing.sellerFirstName} ${listing.sellerLastName || ''}`.trim()
+              : listing.sellerUsername || 'Користувач',
+            avatar: listing.sellerAvatar || '👤',
+            phone: listing.sellerPhone || '',
+            telegramId: listing.sellerTelegramId?.toString() || '',
+            username: listing.sellerUsername || null,
+          },
+          category: listing.category,
+          subcategory: listing.subcategory,
+          description: listing.description,
+          location: listing.location,
+          views: listing.views || 0,
+          posted: formatPostedTime(createdAt),
+          createdAt: listing.createdAt instanceof Date ? listing.createdAt.toISOString() : listing.createdAt,
+          condition: normalizeCondition(listing.condition),
+          tags: tags,
+          isFree: listing.isFree === 1 || listing.isFree === true,
+          status: listing.status || 'active',
+          favoritesCount: typeof listing.favoritesCount === 'bigint' ? Number(listing.favoritesCount) : (typeof listing.favoritesCount === 'number' ? listing.favoritesCount : (typeof (listing as any).favoritesCount === 'bigint' ? Number((listing as any).favoritesCount) : (typeof (listing as any).favoritesCount === 'number' ? (listing as any).favoritesCount : 0))),
+        };
+      });
       total = Number(totalCount[0]?.count || 0);
     } else {
       // Для загальних запитів використовуємо raw query для обходу проблем з Prisma та SQLite
@@ -270,7 +333,8 @@ export async function GET(request: NextRequest) {
                u.lastName as sellerLastName,
                u.avatar as sellerAvatar,
                u.phone as sellerPhone,
-               CAST(u.telegramId AS INTEGER) as sellerTelegramId
+               CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+               COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount
              FROM Listing l
              JOIN User u ON l.userId = u.id
              ${whereClause}
@@ -284,40 +348,50 @@ export async function GET(request: NextRequest) {
         ${whereClause}
       `;
       
-      const [listingsData, totalCountData] = await Promise.all([
-        prisma.$queryRawUnsafe(
-          listingsQuery,
-          ...params,
-          limit * 2, // Беремо більше для сортування по ціні
-          offset
-        ) as Promise<Array<{
-          id: number;
-          userId: number;
-          title: string;
-          description: string;
-          price: string;
-          currency: string | null;
-          isFree: number;
-          category: string;
-          subcategory: string | null;
-          condition: string | null;
-          location: string;
-          views: number;
-          status: string;
-          images: string;
-          tags: string | null;
-          createdAt: string;
-          sellerUsername: string | null;
-          sellerFirstName: string | null;
-          sellerLastName: string | null;
-          sellerAvatar: string | null;
-          sellerTelegramId: number;
-        }>>,
-        prisma.$queryRawUnsafe(
-          countQuery,
-          ...params
-        ) as Promise<Array<{ count: bigint }>>
-      ]);
+      // Безпечно виконуємо запит з обробкою помилок
+      let listingsData: any[] = [];
+      let totalCountData: Array<{ count: bigint }> = [];
+      
+      try {
+        const [data, count] = await Promise.all([
+          prisma.$queryRawUnsafe(
+            listingsQuery,
+            ...params,
+            limit * 2, // Беремо більше для сортування по ціні
+            offset
+          ) as any,
+          prisma.$queryRawUnsafe(
+            countQuery,
+            ...params
+          ) as Promise<Array<{ count: bigint }>>
+        ]);
+        
+        listingsData = data;
+        totalCountData = count;
+      } catch (error: any) {
+        // Якщо таблиця Favorite не існує, виконуємо запит без favoritesCount
+        if (error.message?.includes('no such table: Favorite') || error.message?.includes('Favorite')) {
+          const queryWithoutFavorites = listingsQuery.replace(', COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount', '');
+          const [data, count] = await Promise.all([
+            prisma.$queryRawUnsafe(
+              queryWithoutFavorites,
+              ...params,
+              limit * 2,
+              offset
+            ) as any,
+            prisma.$queryRawUnsafe(
+              countQuery,
+              ...params
+            ) as Promise<Array<{ count: bigint }>>
+          ]);
+          
+          // Додаємо favoritesCount = 0 для всіх записів
+          listingsData = data.map((listing: any) => ({ ...listing, favoritesCount: 0 }));
+          totalCountData = count;
+        } else {
+          throw error;
+        }
+      }
 
       listings = listingsData;
       total = Number(totalCountData[0]?.count || 0);
@@ -410,6 +484,7 @@ export async function GET(request: NextRequest) {
                tags: tags,
                isFree: listing.isFree === 1 || listing.isFree === true,
                status: listing.status || 'active',
+               favoritesCount: typeof (listing as any).favoritesCount === 'bigint' ? Number((listing as any).favoritesCount) : ((listing as any).favoritesCount || 0),
              };
     });
 

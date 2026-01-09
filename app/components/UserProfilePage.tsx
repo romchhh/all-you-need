@@ -73,32 +73,59 @@ export const UserProfilePage = ({
       try {
         setLoading(true);
         
-        // Завантажуємо оголошення (передаємо viewerId, щоб приховати продані для інших користувачів)
+        // Використовуємо комплексний endpoint для отримання всіх даних за один запит
         const viewerId = currentUser?.id?.toString() || '';
-        const listingsResponse = await fetch(`/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=0`);
-        if (listingsResponse.ok) {
-          const listingsData = await listingsResponse.json();
-          setListings(listingsData.listings || []);
-          setTotalListings(listingsData.total || 0);
-          setHasMore((listingsData.listings?.length || 0) < (listingsData.total || 0));
-          setListingsOffset(16);
-        }
+        const response = await fetch(`/api/user/profile-full?telegramId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=0`);
         
-        // Завантажуємо дані профілю для отримання username та phone
-        const profileResponse = await fetch(`/api/user/profile?telegramId=${sellerTelegramId}`);
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-          setUserData({
-            username: profileData.username,
-            phone: profileData.phone,
-          });
-        }
-        
-        // Завантажуємо статистику
-        const statsResponse = await fetch(`/api/user/stats?telegramId=${sellerTelegramId}`);
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          setStats(statsData);
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Встановлюємо дані профілю
+          if (data.profile) {
+            setUserData({
+              username: data.profile.username,
+              phone: data.profile.phone,
+            });
+          }
+          
+          // Встановлюємо статистику
+          if (data.stats) {
+            setStats(data.stats);
+          }
+          
+          // Встановлюємо оголошення
+          if (data.listings) {
+            setListings(data.listings.listings || []);
+            setTotalListings(data.listings.total || 0);
+            setHasMore((data.listings.listings?.length || 0) < (data.listings.total || 0));
+            setListingsOffset(16);
+          }
+        } else {
+          // Fallback до окремих запитів, якщо комплексний endpoint не працює
+          const viewerId = currentUser?.id?.toString() || '';
+          const listingsResponse = await fetch(`/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=0`);
+          if (listingsResponse.ok) {
+            const listingsData = await listingsResponse.json();
+            setListings(listingsData.listings || []);
+            setTotalListings(listingsData.total || 0);
+            setHasMore((listingsData.listings?.length || 0) < (listingsData.total || 0));
+            setListingsOffset(16);
+          }
+          
+          const profileResponse = await fetch(`/api/user/profile?telegramId=${sellerTelegramId}`);
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            setUserData({
+              username: profileData.username,
+              phone: profileData.phone,
+            });
+          }
+          
+          const statsResponse = await fetch(`/api/user/stats?telegramId=${sellerTelegramId}`);
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json();
+            setStats(statsData);
+          }
         }
       } catch (error) {
         console.error('Error fetching data:', error);

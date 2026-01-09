@@ -28,7 +28,7 @@ export const CreateListingModal = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState<'UAH' | 'EUR' | 'USD'>('UAH');
+  const [currency, setCurrency] = useState<'UAH' | 'EUR' | 'USD'>('EUR');
   const [isFree, setIsFree] = useState(false);
   const [category, setCategory] = useState<string>('');
   const [subcategory, setSubcategory] = useState<string>('');
@@ -115,10 +115,13 @@ export const CreateListingModal = ({
   useEffect(() => {
     if (isCurrencyOpen && currencyRef.current) {
       const rect = currencyRef.current.getBoundingClientRect();
+      const menuWidth = Math.min(rect.width, window.innerWidth - 32); // Мінімум 16px відступ з обох сторін
+      const left = Math.max(16, Math.min(rect.left, window.innerWidth - menuWidth - 16)); // Не виходити за межі екрану
+      
       setCurrencyMenuPosition({
         top: rect.bottom,
-        left: rect.left,
-        width: rect.width
+        left: left,
+        width: menuWidth
       });
     }
   }, [isCurrencyOpen]);
@@ -289,7 +292,7 @@ export const CreateListingModal = ({
       setSubcategory('');
       setLocation('');
       setCondition('new');
-      setCurrency('UAH');
+      setCurrency('EUR');
       setImages([]);
       setImagePreviews([]);
       

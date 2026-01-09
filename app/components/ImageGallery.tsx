@@ -14,6 +14,13 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
+  // Скидаємо currentIndex до 0 при зміні images (новий товар)
+  useEffect(() => {
+    setCurrentIndex(0);
+    setImageLoading(true);
+    setImageError(false);
+  }, [images]);
+
   useEffect(() => {
     setImageLoading(true);
     setImageError(false);
@@ -183,12 +190,19 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
             loading={currentIndex === 0 ? 'eager' : 'lazy'}
             decoding="async"
             sizes="100vw"
-            key={`${images[currentIndex]}-${currentIndex}`}
-            onLoad={() => setImageLoading(false)}
+            key={`${images[currentIndex]}-${currentIndex}-${images.length}`}
+            onLoad={() => {
+              setImageLoading(false);
+              setImageError(false);
+            }}
             onError={(e) => {
               setImageLoading(false);
               setImageError(true);
               console.error('Error loading image:', images[currentIndex]);
+            }}
+            style={{
+              display: imageError ? 'none' : 'block',
+              visibility: 'visible'
             }}
           />
         </div>

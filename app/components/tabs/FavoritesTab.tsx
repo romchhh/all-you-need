@@ -3,10 +3,14 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ListingCard } from '../ListingCard';
 import { useRef } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface FavoritesTabProps {
   listings: Listing[];
   favorites: Set<number>;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
   onSelectListing: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
   onNavigateToCatalog?: () => void;
@@ -16,11 +20,15 @@ interface FavoritesTabProps {
 export const FavoritesTab = ({
   listings,
   favorites,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
   onSelectListing,
   onToggleFavorite,
   onNavigateToCatalog,
   tg
 }: FavoritesTabProps) => {
+  const { t } = useLanguage();
   const favoritedListings = listings.filter(l => favorites.has(l.id));
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -116,6 +124,26 @@ export const FavoritesTab = ({
             />
           ))}
         </div>
+        
+        {hasMore && (
+          <div className="px-4 py-4 text-center">
+            {loadingMore ? (
+              <div className="text-gray-500 text-sm">{t('common.loading')}</div>
+            ) : (
+              onLoadMore && (
+                <button
+                  onClick={() => {
+                    onLoadMore();
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="text-blue-600 text-sm font-medium hover:text-blue-700"
+                >
+                  {t('common.showMore')}
+                </button>
+              )
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

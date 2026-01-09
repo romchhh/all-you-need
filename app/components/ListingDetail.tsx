@@ -118,30 +118,81 @@ export const ListingDetail = ({
     return isOwn;
   }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
 
-  // Скролимо нагору при відкритті нового оголошення
+  // Додатково скролимо нагору при монтуванні компонента (перший рендер)
   useEffect(() => {
-    // Простий скрол без блокування
-    const scrollToTop = () => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    // Переконаємося, що скрол нагору відбувається при першому рендері
+    const scrollToTopImmediate = () => {
+      if (typeof window === 'undefined') return;
+      window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+    };
+
+    // Миттєвий скрол
+    scrollToTopImmediate();
+
+    // Ще раз через мікро-затримку
+    const timeoutId = setTimeout(scrollToTopImmediate, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, []); // Виконується тільки при монтуванні
+
+  // Скролимо нагору при відкритті нового оголошення - ЗАВЖДИ
+  useEffect(() => {
+    // Функція для скролу нагору - використовуємо кілька методів для надійності
+    const scrollToTop = () => {
+      if (typeof window === 'undefined') return;
+      
+      // Миттєвий скрол без анімації
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      
+      // Також встановлюємо через style для надійності
+      if (document.documentElement) {
+        document.documentElement.style.scrollBehavior = 'auto';
+      }
+      if (document.body) {
+        document.body.style.scrollBehavior = 'auto';
+      }
     };
 
     // Миттєво скролимо нагору
     scrollToTop();
 
-    // Ще раз після рендерингу
-    requestAnimationFrame(() => {
+    // Ще раз через requestAnimationFrame
+    const rafId1 = requestAnimationFrame(() => {
       scrollToTop();
     });
 
-    // Останній раз через невелику затримку
-    const timeoutId = setTimeout(() => {
-          scrollToTop();
-        }, 100);
+    // Ще раз через наступний кадр
+    const rafId2 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToTop();
+      });
+    });
+
+    // Останній раз через невеликі затримки для надійності
+    const timeoutId1 = setTimeout(() => {
+      scrollToTop();
+    }, 10);
+
+    const timeoutId2 = setTimeout(() => {
+      scrollToTop();
+    }, 50);
+
+    const timeoutId3 = setTimeout(() => {
+      scrollToTop();
+    }, 100);
 
     return () => {
-      clearTimeout(timeoutId);
+      cancelAnimationFrame(rafId1);
+      cancelAnimationFrame(rafId2);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
     };
   }, [listing.id]);
 
@@ -302,7 +353,16 @@ export const ListingDetail = ({
   });
 
   return (
-    <div className="min-h-screen bg-white pb-20" style={{ position: 'relative', overflowX: 'hidden' }}>
+    <div 
+      className="min-h-screen bg-white pb-20" 
+      style={{ 
+        position: 'relative', 
+        overflowX: 'hidden',
+        visibility: 'visible',
+        display: 'block',
+        minHeight: '100vh'
+      }}
+    >
       {/* Індикатор pull-to-refresh */}
       {isPulling && (
         <div 

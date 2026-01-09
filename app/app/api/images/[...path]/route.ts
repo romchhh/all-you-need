@@ -35,13 +35,12 @@ export async function GET(
       ext === 'gif' ? 'image/gif' :
       'application/octet-stream';
 
-    // Повертаємо зображення з headers, що забороняють кешування
+    // Повертаємо зображення з headers, що дозволяють кешування
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        'Cache-Control': 'public, max-age=31536000, immutable', // Кешуємо на 1 рік
+        'ETag': `"${imagePath}-${fileBuffer.length}"`, // Додаємо ETag для перевірки змін
       },
     });
   } catch (error) {
