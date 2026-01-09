@@ -695,18 +695,37 @@ const BazaarTabComponent = ({
 
       {/* Сітка оголошень */}
       {filteredAndSortedListings.length > 0 ? (
-        <div className="px-4 grid grid-cols-2 gap-3 pb-4">
-          {filteredAndSortedListings.map(listing => (
-            <ListingCard 
-              key={listing.id} 
-              listing={listing}
-              isFavorite={favorites.has(listing.id)}
-              onSelect={onSelectListing}
-              onToggleFavorite={onToggleFavorite}
-              tg={tg}
-            />
-          ))}
-        </div>
+        <>
+          <div className="px-4 grid grid-cols-2 gap-3 pb-4">
+            {filteredAndSortedListings.map(listing => (
+              <ListingCard 
+                key={listing.id} 
+                listing={listing}
+                isFavorite={favorites.has(listing.id)}
+                onSelect={onSelectListing}
+                onToggleFavorite={onToggleFavorite}
+                tg={tg}
+              />
+            ))}
+          </div>
+          
+          {/* Кнопка "Показати ще" - після списку товарів, перед нижнім меню */}
+          {hasMore && filteredAndSortedListings.length > 0 && (
+            <div className="px-4 py-4 pb-24 text-center">
+              {onLoadMore && (
+                <button
+                  onClick={() => {
+                    onLoadMore();
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="text-blue-600 text-sm font-medium hover:text-blue-700"
+                >
+                  {t('common.showMore')}
+                </button>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="px-4 py-16 text-center">
           <p className="text-gray-500">{t('common.nothingFound')}</p>
