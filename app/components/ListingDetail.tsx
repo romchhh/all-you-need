@@ -118,74 +118,66 @@ export const ListingDetail = ({
     return isOwn;
   }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
 
-  // Додатково скролимо нагору при монтуванні компонента (перший рендер)
-  useEffect(() => {
-    // Переконаємося, що скрол нагору відбувається при першому рендері
-    const scrollToTopImmediate = () => {
-      if (typeof window === 'undefined') return;
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    };
-
-    // Миттєвий скрол
-    scrollToTopImmediate();
-
-    // Ще раз через мікро-затримку
-    const timeoutId = setTimeout(scrollToTopImmediate, 0);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, []); // Виконується тільки при монтуванні
-
   // Скролимо нагору при відкритті нового оголошення - ЗАВЖДИ
   useEffect(() => {
     // Функція для скролу нагору - використовуємо кілька методів для надійності
-    const scrollToTop = () => {
+    const forceScrollToTop = () => {
       if (typeof window === 'undefined') return;
       
-      // Миттєвий скрол без анімації
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-      
-      // Також встановлюємо через style для надійності
-      if (document.documentElement) {
-        document.documentElement.style.scrollBehavior = 'auto';
-      }
-      if (document.body) {
-        document.body.style.scrollBehavior = 'auto';
+      try {
+        // Додаємо клас для вимкнення smooth scroll
+        const html = document.documentElement;
+        const body = document.body;
+        html.classList.add('no-smooth-scroll');
+        html.classList.remove('smooth-scroll');
+        
+        // Миттєвий скрол всіма можливими способами
+        window.scrollTo(0, 0);
+        html.scrollTop = 0;
+        body.scrollTop = 0;
+        
+        // Для Telegram WebApp та інших браузерів
+        if (window.scrollY !== 0) {
+          window.scroll(0, 0);
+        }
+        
+        // Також скролимо всі можливі контейнери
+        const scrollableElements = document.querySelectorAll('[data-scroll-container]');
+        scrollableElements.forEach(el => {
+          if (el instanceof HTMLElement) {
+            el.scrollTop = 0;
+          }
+        });
+        
+        // Відновлюємо smooth scroll через невелику затримку
+        setTimeout(() => {
+          html.classList.remove('no-smooth-scroll');
+          html.classList.add('smooth-scroll');
+        }, 100);
+      } catch (error) {
+        console.error('Error scrolling to top:', error);
       }
     };
 
-    // Миттєво скролимо нагору
-    scrollToTop();
+    // Виконуємо скрол негайно, синхронно
+    forceScrollToTop();
 
-    // Ще раз через requestAnimationFrame
-    const rafId1 = requestAnimationFrame(() => {
-      scrollToTop();
-    });
+    // Через мікротаск (Promise) - виконається після поточного рендеру
+    Promise.resolve().then(forceScrollToTop);
 
-    // Ще раз через наступний кадр
+    // Через requestAnimationFrame - виконається перед наступним рендером
+    const rafId1 = requestAnimationFrame(forceScrollToTop);
+    
+    // Через другий requestAnimationFrame - для подвійної гарантії
     const rafId2 = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        scrollToTop();
-      });
+      requestAnimationFrame(forceScrollToTop);
     });
 
-    // Останній раз через невеликі затримки для надійності
-    const timeoutId1 = setTimeout(() => {
-      scrollToTop();
-    }, 10);
-
-    const timeoutId2 = setTimeout(() => {
-      scrollToTop();
-    }, 50);
-
-    const timeoutId3 = setTimeout(() => {
-      scrollToTop();
-    }, 100);
+    // Через невеликі затримки для надійності на повільних пристроях
+    const timeoutId1 = setTimeout(forceScrollToTop, 0);
+    const timeoutId2 = setTimeout(forceScrollToTop, 50);
+    const timeoutId3 = setTimeout(forceScrollToTop, 100);
+    const timeoutId4 = setTimeout(forceScrollToTop, 200);
 
     return () => {
       cancelAnimationFrame(rafId1);
@@ -193,6 +185,7 @@ export const ListingDetail = ({
       clearTimeout(timeoutId1);
       clearTimeout(timeoutId2);
       clearTimeout(timeoutId3);
+      clearTimeout(timeoutId4);
     };
   }, [listing.id]);
 
@@ -358,9 +351,10 @@ export const ListingDetail = ({
       style={{ 
         position: 'relative', 
         overflowX: 'hidden',
-        visibility: 'visible',
+        minHeight: '100vh',
+        opacity: 1,
         display: 'block',
-        minHeight: '100vh'
+        visibility: 'visible'
       }}
     >
       {/* Індикатор pull-to-refresh */}

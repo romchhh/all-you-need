@@ -22,9 +22,11 @@
 html {
   height: 100%;
   height: 100dvh; /* Dynamic viewport height для мобільних */
-  overflow: hidden; /* Запобігаємо скролу на рівні html */
   overflow-x: hidden; /* Запобігаємо горизонтальному скролу */
   max-width: 100vw; /* Обмежуємо ширину */
+  /* Дозволяємо вертикальний скрол */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -220,8 +222,12 @@ div {
   animation: slideUp 0.3s ease-out;
 }
 
-/* Smooth scrolling */
-html {
+/* Smooth scrolling - але можемо вимкнути програмно для миттєвого скролу */
+html.no-smooth-scroll {
+  scroll-behavior: auto !important;
+}
+
+html.smooth-scroll {
   scroll-behavior: smooth;
 }
 

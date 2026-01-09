@@ -15,11 +15,12 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   const touchEndX = useRef<number | null>(null);
 
   // Скидаємо currentIndex до 0 при зміні images (новий товар)
+  // Використовуємо JSON.stringify для надійного відстеження змін масиву
   useEffect(() => {
     setCurrentIndex(0);
     setImageLoading(true);
     setImageError(false);
-  }, [images]);
+  }, [JSON.stringify(images)]);
 
   useEffect(() => {
     setImageLoading(true);
@@ -190,7 +191,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
             loading={currentIndex === 0 ? 'eager' : 'lazy'}
             decoding="async"
             sizes="100vw"
-            key={`${images[currentIndex]}-${currentIndex}-${images.length}`}
+            key={`img-${currentIndex}-${images.length}-${images[currentIndex]}`}
             onLoad={() => {
               setImageLoading(false);
               setImageError(false);
@@ -201,8 +202,9 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
               console.error('Error loading image:', images[currentIndex]);
             }}
             style={{
-              display: imageError ? 'none' : 'block',
-              visibility: 'visible'
+              display: 'block',
+              visibility: 'visible',
+              opacity: imageError ? 0 : 1
             }}
           />
         </div>
