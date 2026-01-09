@@ -640,19 +640,21 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                                 if (response.ok) {
                                   showToast(t('editListing.listingMarkedSold'), 'success');
                                   await fetchListingsWithFilters(0, true);
-                                fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
-                                  .then(res => {
-                                    if (res.ok) {
-                                      return res.json();
-                                    }
-                                    return null;
-                                  })
-                                  .then(data => {
-                                    if (data) {
-                                      setStats(data);
-                                    }
-                                  })
-                                  .catch(err => console.error('Error fetching stats:', err));
+                                  fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
+                                    .then(res => {
+                                      if (res.ok) {
+                                        return res.json();
+                                      }
+                                      return null;
+                                    })
+                                    .then(data => {
+                                      if (data) {
+                                        setStats(data);
+                                      }
+                                    })
+                                    .catch(err => console.error('Error fetching stats:', err));
+                                  // Оновлюємо сторінку
+                                  router.refresh();
                                 }
                               } catch (error) {
                                 showToast(t('editListing.updateError'), 'error');
@@ -820,7 +822,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 })
                 .catch(err => console.error('Error fetching stats:', err));
               
-            setEditingListing(null);
+              setEditingListing(null);
+              // Оновлюємо сторінку
+              router.refresh();
             }
           }}
           onDelete={async () => {
@@ -829,7 +833,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             });
 
             if (response.ok) {
-            showToast(t('editListing.listingDeleted'), 'success');
+              showToast(t('editListing.listingDeleted'), 'success');
               // Оновлюємо список з урахуванням поточних фільтрів
               await fetchListingsWithFilters(0, true);
               // Оновлюємо статистику
@@ -848,6 +852,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 .catch(err => console.error('Error fetching stats:', err));
               
               setEditingListing(null);
+              // Оновлюємо сторінку
+              router.refresh();
             }
           }}
           tg={tg}

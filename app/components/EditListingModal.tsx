@@ -131,10 +131,15 @@ export const EditListingModal = ({
   useEffect(() => {
     if (isCurrencyOpen && currencyRef.current) {
       const rect = currencyRef.current.getBoundingClientRect();
+      // Зсуваємо вліво на 30% від ширини кнопки
+      const leftOffset = rect.width * 0.3;
+      const menuWidth = Math.min(rect.width, window.innerWidth - 32);
+      const left = Math.max(16, Math.min(rect.left - leftOffset, window.innerWidth - menuWidth - 16));
+      
       setCurrencyMenuPosition({
         top: rect.bottom,
-        left: rect.left,
-        width: rect.width
+        left: left,
+        width: menuWidth
       });
     }
   }, [isCurrencyOpen]);
@@ -421,12 +426,12 @@ export const EditListingModal = ({
                         setIsCurrencyOpen(!isCurrencyOpen);
                         tg?.HapticFeedback.impactOccurred('light');
                       }}
-                      className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-2 min-w-[80px]"
+                      className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-0.5 min-w-[80px]"
                     >
                       <span className="text-gray-900 font-medium">
                         {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
                       </span>
-                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1`} />
                     </button>
                 </div>
                 {errors.price && (
