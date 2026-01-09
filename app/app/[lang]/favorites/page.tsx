@@ -29,6 +29,17 @@ const FavoritesPage = () => {
   const { t, setLanguage } = useLanguage();
   const { profile } = useUser();
   
+  // Зберігаємо telegramId при першому завантаженні
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const telegramId = urlParams.get('telegramId');
+      if (telegramId) {
+        sessionStorage.setItem('telegramId', telegramId);
+      }
+    }
+  }, []);
+  
   useEffect(() => {
     if (lang === 'uk' || lang === 'ru') {
       setLanguage(lang);
@@ -682,7 +693,17 @@ const FavoritesPage = () => {
       <BottomNavigation
         activeTab="favorites"
         onTabChange={(tab) => {
-          router.push(`/${lang}/${tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories'}`);
+          // Зберігаємо telegramId при навігації
+          let telegramId = new URLSearchParams(window.location.search).get('telegramId');
+          
+          // Якщо немає в URL, беремо з sessionStorage
+          if (!telegramId) {
+            telegramId = sessionStorage.getItem('telegramId');
+          }
+          
+          const queryString = telegramId ? `?telegramId=${telegramId}` : '';
+          const targetPath = tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories';
+          router.push(`/${lang}/${targetPath}${queryString}`);
         }}
         onCloseDetail={() => {
           setSelectedListing(null);

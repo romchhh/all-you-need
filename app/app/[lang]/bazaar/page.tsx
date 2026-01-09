@@ -21,6 +21,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAutoPrefetch } from '@/hooks/usePrefetch';
+import { logTelegramEnvironment } from '@/utils/telegramDebug';
 
 const BazaarPage = () => {
   const params = useParams();
@@ -33,6 +34,17 @@ const BazaarPage = () => {
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
   const { profile } = useUser();
+  
+  // Зберігаємо telegramId при першому завантаженні
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const telegramId = urlParams.get('telegramId');
+      if (telegramId) {
+        sessionStorage.setItem('telegramId', telegramId);
+      }
+    }
+  }, []);
   
   // Отримуємо категорії з перекладами
   const categories = getCategories(t);
@@ -50,6 +62,16 @@ const BazaarPage = () => {
       (window as any).__userTelegramId = profile.telegramId;
     }
   }, [profile?.telegramId]);
+
+  // Діагностика Telegram WebApp (тільки в development)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      // Викликаємо через невелику затримку, щоб Telegram WebApp встиг ініціалізуватися
+      setTimeout(() => {
+        logTelegramEnvironment();
+      }, 500);
+    }
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState(() => {
     // Завантажуємо збережений пошуковий запит з localStorage
@@ -914,7 +936,17 @@ const BazaarPage = () => {
       <BottomNavigation
         activeTab="bazaar"
         onTabChange={(tab) => {
-          router.push(`/${lang}/${tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories'}`);
+          // Зберігаємо telegramId при навігації
+          let telegramId = new URLSearchParams(window.location.search).get('telegramId');
+          
+          // Якщо немає в URL, беремо з sessionStorage
+          if (!telegramId) {
+            telegramId = sessionStorage.getItem('telegramId');
+          }
+          
+          const queryString = telegramId ? `?telegramId=${telegramId}` : '';
+          const targetPath = tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories';
+          router.push(`/${lang}/${targetPath}${queryString}`);
         }}
         onCloseDetail={() => {
           setSelectedListing(null);

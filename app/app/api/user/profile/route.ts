@@ -326,19 +326,21 @@ export async function GET(request: NextRequest) {
     const telegramId = searchParams.get('telegramId');
 
     if (!telegramId) {
-      console.error('telegramId is missing in GET request');
       return NextResponse.json(
         { error: 'telegramId is required' },
         { status: 400 }
       );
     }
 
-    // Конвертуємо telegramId в число (SQLite INTEGER підтримує великі числа)
-    const telegramIdNum = parseInt(telegramId);
+    const telegramIdNum = parseInt(telegramId, 10);
 
-    // Використовуємо raw query для обходу проблеми з форматом дат в SQLite
-    // Використовуємо Prisma.$queryRawUnsafe для правильної роботи з параметрами
-    // Додаємо retry logic для уникнення проблем з блокуванням БД
+    if (isNaN(telegramIdNum)) {
+      return NextResponse.json(
+        { error: 'Invalid telegramId format' },
+        { status: 400 }
+      );
+    }
+
     const { executeWithRetry } = await import('@/lib/prisma');
     
     const users = await executeWithRetry(() =>
@@ -360,15 +362,15 @@ export async function GET(request: NextRequest) {
         telegramIdNum
       ) as Promise<Array<{
         id: number;
-        telegramId: number;
+        telegramId: number | bigint;
         username: string | null;
         firstName: string | null;
         lastName: string | null;
         phone: string | null;
         avatar: string | null;
-        balance: number;
-        rating: number;
-        reviewsCount: number;
+        balance: number | bigint;
+        rating: number | bigint;
+        reviewsCount: number | bigint;
         createdAt: string;
       }>>
     );
@@ -382,28 +384,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const telegramIdResponse = typeof userData.telegramId === 'bigint'
+      ? userData.telegramId.toString()
+      : typeof userData.telegramId === 'number' 
+        ? userData.telegramId.toString() 
+        : String(userData.telegramId);
+    
     const response = {
       id: userData.id,
-      telegramId: userData.telegramId.toString(),
+      telegramId: telegramIdResponse,
       username: userData.username,
       firstName: userData.firstName,
       lastName: userData.lastName,
       phone: userData.phone,
       avatar: userData.avatar,
-      balance: userData.balance,
-      rating: userData.rating,
-      reviewsCount: userData.reviewsCount,
+      balance: typeof userData.balance === 'bigint' ? Number(userData.balance) : userData.balance,
+      rating: typeof userData.rating === 'bigint' ? Number(userData.rating) : userData.rating,
+      reviewsCount: typeof userData.reviewsCount === 'bigint' ? Number(userData.reviewsCount) : userData.reviewsCount,
       createdAt: userData.createdAt,
     };
     
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error fetching user profile:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message, error.stack);
-    }
     return NextResponse.json(
-      { error: 'Failed to fetch user profile', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to fetch user profile' },
       { status: 500 }
     );
   }

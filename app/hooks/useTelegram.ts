@@ -15,49 +15,52 @@ export const useTelegram = () => {
   const [user, setUser] = useState<TelegramUser | null>(null);
 
   useEffect(() => {
+    console.log('=== useTelegram: Initializing ===');
+    console.log('window.Telegram:', typeof window !== 'undefined' ? window.Telegram : 'undefined');
+    console.log('window.Telegram.WebApp:', typeof window !== 'undefined' ? window.Telegram?.WebApp : 'undefined');
+    
     if (window.Telegram?.WebApp) {
       const telegram = window.Telegram.WebApp;
       
+      console.log('=== Telegram WebApp found ===');
+      console.log('Platform:', telegram.platform);
+      console.log('Version:', telegram.version);
+      console.log('initData (raw string):', telegram.initData);
+      console.log('initData length:', telegram.initData?.length || 0);
+      console.log('initDataUnsafe:', telegram.initDataUnsafe);
+      
       // Викликаємо ready() першим
       telegram.ready();
+      console.log('✅ telegram.ready() called');
       
       // Розгортаємо на весь екран
       telegram.expand();
+      console.log('✅ telegram.expand() called');
       
       // Приховуємо основну кнопку
       telegram.MainButton.hide();
       
       // Налаштування для повноекранного режиму з можливістю згортання
-      // Встановлюємо колір фону
       telegram.backgroundColor = '#ffffff';
-      
-      // Встановлюємо колір хедера (для можливості згортання)
       telegram.headerColor = '#ffffff';
       
-      // Налаштування viewport для правильного відображення та можливості згортання
-      // Telegram автоматично дозволить згортання, якщо контент виходить за межі viewport
+      // Налаштування viewport
       const updateViewport = () => {
         if (telegram.viewportStableHeight) {
-          // Встановлюємо CSS змінну для використання в стилях
           document.documentElement.style.setProperty('--tg-viewport-height', `${telegram.viewportStableHeight}px`);
-          // Встановлюємо мінімальну висоту body для правильного відображення
           document.body.style.minHeight = `${telegram.viewportStableHeight}px`;
         }
       };
       
-      // Оновлюємо viewport при зміні
       if (telegram.onEvent) {
         telegram.onEvent('viewportChanged', updateViewport);
       }
       
-      // Викликаємо одразу
       updateViewport();
       
-      // Також оновлюємо при зміні розміру вікна
       const handleResize = () => updateViewport();
       window.addEventListener('resize', handleResize);
       
-      // Налаштування для закриття (опціонально)
       if (telegram.enableClosingConfirmation) {
         telegram.enableClosingConfirmation();
       }
@@ -66,32 +69,46 @@ export const useTelegram = () => {
 
       // Отримуємо дані користувача з initDataUnsafe
       const initData = telegram.initDataUnsafe;
-      console.log('Telegram initData:', initData);
+      console.log('=== Processing initDataUnsafe ===');
+      console.log('initDataUnsafe object:', JSON.stringify(initData, null, 2));
       
       if (initData?.user) {
         const telegramUser = initData.user;
-        console.log('Telegram user data:', telegramUser);
+        console.log('✅ User data found in initDataUnsafe:');
+        console.log('  - ID:', telegramUser.id);
+        console.log('  - Username:', telegramUser.username);
+        console.log('  - First name:', telegramUser.first_name);
+        console.log('  - Last name:', telegramUser.last_name);
+        console.log('  - Language:', telegramUser.language_code);
+        
         setUser(telegramUser);
 
-        // Оновлюємо профіль в БД (якщо є нові дані) - але не блокуємо завантаження
+        // Оновлюємо профіль в БД
         updateProfileFromTelegram(telegramUser).catch(err => {
           console.error('Error updating profile from Telegram:', err);
         });
       } else {
-        console.warn('No user data in initDataUnsafe, trying to parse initData string');
+        console.warn('❌ No user data in initDataUnsafe');
+        console.log('Trying to parse initData string...');
+        
         // Спробуємо отримати telegramId з initData рядка
         const initDataString = telegram.initData;
-        if (initDataString) {
+        console.log('initData string:', initDataString);
+        
+        if (initDataString && initDataString.length > 0) {
           const telegramId = parseTelegramIdFromInitData(initDataString);
           if (telegramId) {
-            console.log('Parsed telegramId from initData:', telegramId);
-            // Створюємо мінімальний об'єкт користувача для завантаження профілю
+            console.log('✅ Parsed telegramId from initData string:', telegramId);
             setUser({ id: telegramId, first_name: '' });
           } else {
-            console.error('Could not parse telegramId from initData string');
+            console.error('❌ Could not parse telegramId from initData string');
+            console.log('initData string content:', initDataString.substring(0, 200));
           }
         } else {
-          console.error('No initData string available');
+          // Це нормально, якщо telegramId передається через URL
+          console.warn('⚠️ initData string is empty or not available');
+          console.warn('This is OK if telegramId is passed via URL parameter');
+          console.warn('If opened through bot button, initData should be available');
         }
       }
       
@@ -103,7 +120,9 @@ export const useTelegram = () => {
         }
       };
     } else {
-      console.warn('Telegram WebApp not available');
+      console.error('❌ Telegram WebApp NOT available');
+      console.error('window.Telegram:', typeof window !== 'undefined' ? window.Telegram : 'undefined');
+      console.error('This is normal if opened in regular browser for testing');
     }
   }, []);
 
