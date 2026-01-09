@@ -38,11 +38,13 @@ async def scheduled_tasks_worker():
 
 async def main():
     from handlers.client_handlers.agreement_handlers import router as agreement_router, on_startup, on_shutdown
+    from handlers.client_handlers.menu_handlers import router as menu_router
     from handlers.admin_handlers.admin_handlers import router as admin_router
     from handlers.admin_handlers.mailing_handlers import router as mailing_router
     from handlers.admin_handlers.links_handlers import router as links_router
     from handlers.admin_handlers.admin_management_handlers import router as admin_management_router
     dp.include_router(agreement_router)
+    dp.include_router(menu_router)
     dp.include_router(admin_router)
     dp.include_router(mailing_router)
     dp.include_router(links_router)

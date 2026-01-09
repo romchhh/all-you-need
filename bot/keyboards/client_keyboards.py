@@ -58,3 +58,43 @@ def get_language_selection_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="Українська", callback_data="set_lang_uk")],
         [InlineKeyboardButton(text="Русский", callback_data="set_lang_ru")]
     ])
+
+
+def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
+    """Головне меню з Reply кнопками"""
+    webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
+    lang = get_user_lang(user_id)
+    
+    # Кнопка "Перейти в каталог" з WebApp
+    catalog_button = KeyboardButton(
+        text=t(user_id, 'menu.catalog'),
+        web_app=WebAppInfo(url=f"{webapp_url}/{lang}?telegramId={user_id}")
+    )
+    
+    # Кнопка "Мої оголошення" з WebApp
+    my_listings_button = KeyboardButton(
+        text=t(user_id, 'menu.my_listings'),
+        web_app=WebAppInfo(url=f"{webapp_url}/{lang}/profile?telegramId={user_id}")
+    )
+    
+    # Кнопка "Додати оголошення" з WebApp
+    add_listing_button = KeyboardButton(
+        text=t(user_id, 'menu.add_listing'),
+        web_app=WebAppInfo(url=f"{webapp_url}/{lang}?telegramId={user_id}&action=create")
+    )
+    
+    # Кнопка "Мій профіль" з WebApp
+    my_profile_button = KeyboardButton(
+        text=t(user_id, 'menu.my_profile'),
+        web_app=WebAppInfo(url=f"{webapp_url}/{lang}/profile?telegramId={user_id}")
+    )
+    
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [catalog_button],
+            [my_listings_button, add_listing_button],
+            [my_profile_button]
+        ],
+        resize_keyboard=True,
+        is_persistent=True
+    )

@@ -11,7 +11,7 @@ from database_functions.links_db import increment_link_count
 from database_functions.prisma_db import PrismaDB
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, set_language as set_user_language
-from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard
+from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard
 
 load_dotenv()
 
@@ -170,9 +170,15 @@ async def start_command(message: types.Message):
             )]
         ])
         await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
+        # Показуємо головне меню після поділеного посилання
+        await message.answer(
+            t(user_id, 'menu.main_menu'),
+            reply_markup=get_main_menu_keyboard(user_id)
+        )
     else:
         welcome_text += t(user_id, 'welcome.features')
-        await message.answer(welcome_text, reply_markup=get_catalog_webapp_keyboard(user_id))
+        # Показуємо головне меню
+        await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id))
 
 
 @router.callback_query(F.data.startswith("agree_"))
@@ -254,9 +260,13 @@ async def handle_language_selection(callback: types.CallbackQuery):
         
         # Оновлюємо повідомлення з новою мовою
         await callback.message.edit_text(
-            f"🌐 {t(user_id, 'language.changed')}\n\n"
+            f"🌐 {t(user_id, 'language.changed')}"
+        )
+        
+        # Показуємо головне меню з новою мовою
+        await callback.message.answer(
             f"{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
-            reply_markup=get_catalog_webapp_keyboard(user_id, lang)
+            reply_markup=get_main_menu_keyboard(user_id)
         )
     else:
         await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
@@ -286,16 +296,10 @@ async def handle_contact(message: types.Message):
         set_user_phone(user_id, phone)
         print(f"Phone {phone} saved for user {user_id}")
         
-        # Видаляємо клавіатуру
+        # Показуємо головне меню
         await message.answer(
-            t(user_id, 'phone.saved'),
-            reply_markup=types.ReplyKeyboardRemove()
-        )
-        
-        # Показуємо кнопку відкриття каталогу
-        await message.answer(
-            f"{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
-            reply_markup=get_catalog_webapp_keyboard(user_id)
+            f"{t(user_id, 'phone.saved')}\n\n{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
+            reply_markup=get_main_menu_keyboard(user_id)
         )
     else:
         await message.answer(t(user_id, 'phone.invalid'))
