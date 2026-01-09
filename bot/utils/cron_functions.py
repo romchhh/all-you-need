@@ -1,6 +1,3 @@
-"""
-Функції для автоматичного оновлення статусу оголошень та нагадувань
-"""
 import sqlite3
 import asyncio
 from datetime import datetime, timedelta
@@ -12,9 +9,6 @@ from config import token
 
 
 async def deactivate_old_listings(bot: Bot = None):
-    """
-    Автоматично деактивує оголошення, які старіші за 30 днів
-    """
     conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
     cursor = conn.cursor()
     
@@ -24,7 +18,6 @@ async def deactivate_old_listings(bot: Bot = None):
         thirty_days_ago_str = thirty_days_ago.strftime('%Y-%m-%d %H:%M:%S')
         
         # Знаходимо всі активні оголошення, які старіші за 30 днів
-        # Використовуємо publishedAt якщо є, інакше createdAt
         cursor.execute('''
             SELECT l.id, l.userId, l.title, l.createdAt, l.publishedAt, u.telegramId
             FROM Listing l
@@ -41,8 +34,7 @@ async def deactivate_old_listings(bot: Bot = None):
         if not old_listings:
             print(f"[{datetime.now()}] No listings to deactivate")
             return
-        
-        # Оновлюємо статус на 'expired'
+
         listing_ids = [listing[0] for listing in old_listings]
         placeholders = ','.join(['?'] * len(listing_ids))
         
@@ -66,13 +58,9 @@ async def deactivate_old_listings(bot: Bot = None):
 
 
 async def run_scheduled_tasks():
-    """
-    Запускає всі заплановані задачі
-    """
     bot = Bot(token=token)
     
     try:
-        # Деактивуємо старі оголошення (без нагадувань)
         await deactivate_old_listings(bot)
         
     finally:

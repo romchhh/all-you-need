@@ -39,7 +39,10 @@ def get_phone_share_keyboard(user_id: int) -> ReplyKeyboardMarkup:
 
 
 def get_catalog_webapp_keyboard(user_id: int, language: str = None) -> InlineKeyboardMarkup:
-    """Клавіатура з WebApp кнопкою для відкриття каталогу"""
+    """Клавіатура з WebApp кнопкою для відкриття каталогу
+    
+    Завжди передаємо telegramId в URL для надійності.
+    """
     webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
     lang = language or get_user_lang(user_id)
     webapp_url_with_params = f"{webapp_url}/{lang}?telegramId={user_id}"
@@ -61,14 +64,21 @@ def get_language_selection_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
-    """Головне меню з Reply кнопками"""
+    """Головне меню з Reply кнопками
+    
+    Завжди передаємо telegramId в URL для надійності.
+    Якщо initData не працює, використовується URL параметр.
+    """
     webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
     lang = get_user_lang(user_id)
+    
+    catalog_url = f"{webapp_url}/{lang}/bazaar?telegramId={user_id}"
+    print(f"Creating main menu for user {user_id}, catalog URL: {catalog_url}")
     
     # Кнопка "Перейти в каталог" з WebApp
     catalog_button = KeyboardButton(
         text=t(user_id, 'menu.catalog'),
-        web_app=WebAppInfo(url=f"{webapp_url}/{lang}?telegramId={user_id}")
+        web_app=WebAppInfo(url=catalog_url)
     )
     
     # Кнопка "Мої оголошення" з WebApp

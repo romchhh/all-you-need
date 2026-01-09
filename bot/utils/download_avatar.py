@@ -1,23 +1,10 @@
-"""
-Утиліта для завантаження аватарки користувача через Telegram Bot API
-"""
 from pathlib import Path
 from main import bot
 
 
 async def download_user_avatar(user_id: int, username: str = None) -> str | None:
-    """
-    Завантажує аватарку користувача через Telegram Bot API
-    
-    Args:
-        user_id: Telegram ID користувача
-        username: Username користувача (опціонально)
-    
-    Returns:
-        Шлях до збереженого файлу або None якщо не вдалося завантажити
-    """
     try:
-        # Отримуємо список фото профілю користувача
+        # Отримуємо     список фото профілю користувача
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         
         if not photos.photos:
