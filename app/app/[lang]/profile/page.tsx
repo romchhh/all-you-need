@@ -11,7 +11,7 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { ProfileTab } from '@/components/tabs/ProfileTab';
 import { Toast } from '@/components/Toast';
 import { useToast } from '@/hooks/useToast';
-import { getFavoritesFromStorage, getFavoritesFromStorageSync, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
+import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
 import { CreateListingModal } from '@/components/CreateListingModal';
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -57,20 +57,11 @@ const ProfilePage = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   
-  // Завантажуємо обране з API при завантаженні
+  // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {
-    const loadFavorites = async () => {
-      if (profile?.telegramId) {
-        const favorites = await getFavoritesFromStorage(profile.telegramId);
-        setFavorites(favorites);
-      } else {
-        // Fallback до localStorage, якщо немає profile
-        const savedFavorites = getFavoritesFromStorageSync();
-        setFavorites(savedFavorites);
-      }
-    };
-    loadFavorites();
-  }, [profile?.telegramId]);
+    const favorites = getFavoritesFromStorage();
+    setFavorites(favorites);
+  }, []);
 
   const { tg } = useTelegram();
   const { toast, showToast, hideToast } = useToast();
@@ -118,24 +109,6 @@ const ProfilePage = () => {
   }, []);
 
   const toggleFavorite = async (id: number) => {
-    if (!profile?.telegramId) {
-      // Якщо немає profile, використовуємо старий спосіб (localStorage)
-      setFavorites(prev => {
-        const newFavorites = new Set(prev);
-        if (newFavorites.has(id)) {
-          newFavorites.delete(id);
-          tg?.HapticFeedback.notificationOccurred('success');
-          showToast(t('listing.removeFromFavorites'), 'success');
-        } else {
-          newFavorites.add(id);
-          tg?.HapticFeedback.notificationOccurred('success');
-          showToast(t('listing.addToFavorites'), 'success');
-        }
-        return newFavorites;
-      });
-      return;
-    }
-
     const isFavorite = favorites.has(id);
     
     // Оптимістичне оновлення UI
@@ -151,28 +124,13 @@ const ProfilePage = () => {
 
     tg?.HapticFeedback.notificationOccurred('success');
     
-    // Виконуємо операцію через API
-    try {
-      if (isFavorite) {
-        await removeFavoriteFromStorage(id, profile.telegramId);
-        showToast(t('listing.removeFromFavorites'), 'success');
-      } else {
-        await addFavoriteToStorage(id, profile.telegramId);
-        showToast(t('listing.addToFavorites'), 'success');
-      }
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-      // Відкатуємо зміни при помилці
-      setFavorites(prev => {
-        const newFavorites = new Set(prev);
-        if (isFavorite) {
-          newFavorites.add(id);
-        } else {
-          newFavorites.delete(id);
-        }
-        return newFavorites;
-      });
-      showToast(t('common.error') || 'Помилка', 'error');
+    // Виконуємо операцію (localStorage + БД для статистики)
+    if (isFavorite) {
+      await removeFavoriteFromStorage(id, profile?.telegramId);
+      showToast(t('listing.removeFromFavorites'), 'success');
+    } else {
+      await addFavoriteToStorage(id, profile?.telegramId);
+      showToast(t('listing.addToFavorites'), 'success');
     }
   };
 
