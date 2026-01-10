@@ -2,18 +2,25 @@ const FAVORITES_STORAGE_KEY = 'ayn_marketplace_favorites';
 
 // Отримати favorites з localStorage (швидко)
 export const getFavoritesFromStorage = (): Set<number> => {
-  if (typeof window === 'undefined') return new Set();
+  if (typeof window === 'undefined') {
+    console.log('[getFavoritesFromStorage] window is undefined (SSR)');
+    return new Set();
+  }
   
   try {
     const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    console.log('[getFavoritesFromStorage] Raw data from localStorage:', stored);
+    
     if (stored) {
       const favorites = JSON.parse(stored) as number[];
+      console.log('[getFavoritesFromStorage] Parsed favorites:', favorites);
       return new Set(favorites);
     }
   } catch (error) {
-    console.error('Error reading favorites from localStorage:', error);
+    console.error('[getFavoritesFromStorage] Error reading favorites from localStorage:', error);
   }
   
+  console.log('[getFavoritesFromStorage] Returning empty Set');
   return new Set();
 };
 

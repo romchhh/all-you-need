@@ -84,36 +84,51 @@ const FavoritesPage = () => {
     return () => window.removeEventListener('scroll', throttledScroll);
   }, [selectedListing, selectedSeller]);
   
-  // Завантажуємо обране з localStorage при завантаженні
+  // Завантажуємо обране з localStorage та товари
   useEffect(() => {
-    const favorites = getFavoritesFromStorage();
-    setFavorites(favorites);
-  }, []);
-
-  // Завантажуємо товари з обраного при зміні favorites
-  useEffect(() => {
-    const fetchFavoriteListings = async () => {
-      if (favorites.size === 0) {
+    const loadFavoritesAndListings = async () => {
+      // Діагностика
+      console.log('[Favorites] Starting to load favorites and listings');
+      console.log('[Favorites] window type:', typeof window);
+      
+      // Спочатку завантажуємо favorites з localStorage
+      const loadedFavorites = getFavoritesFromStorage();
+      console.log('[Favorites] Loaded from localStorage:', Array.from(loadedFavorites));
+      setFavorites(loadedFavorites);
+      
+      // Якщо немає обраних - показуємо порожній стан
+      if (loadedFavorites.size === 0) {
+        console.log('[Favorites] No favorites found, showing empty state');
         setListings([]);
         setLoading(false);
         return;
       }
 
+      // Завантажуємо товари для обраних ID
       try {
         setLoading(true);
-        const favoriteIds = Array.from(favorites);
+        const favoriteIds = Array.from(loadedFavorites);
+        console.log('[Favorites] Fetching listings for IDs:', favoriteIds);
         
         // Завантажуємо кожен товар окремо
         const promises = favoriteIds.map(id => 
           fetch(`/api/listings/${id}`)
-            .then(res => res.ok ? res.json() : null)
-            .catch(() => null)
+            .then(res => {
+              console.log(`[Favorites] Response for listing ${id}:`, res.ok, res.status);
+              return res.ok ? res.json() : null;
+            })
+            .catch(error => {
+              console.error(`[Favorites] Error fetching listing ${id}:`, error);
+              return null;
+            })
         );
         
         const results = await Promise.all(promises);
         const validListings = results.filter((listing): listing is Listing => 
           listing !== null && listing.id
         );
+        
+        console.log('[Favorites] Valid listings loaded:', validListings.length);
         
         // Сортуємо по даті створення (новіші спочатку)
         validListings.sort((a, b) => {
@@ -124,15 +139,15 @@ const FavoritesPage = () => {
         
         setListings(validListings);
       } catch (error) {
-        console.error('Error fetching favorite listings:', error);
+        console.error('[Favorites] Error fetching favorite listings:', error);
         setListings([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchFavoriteListings();
-  }, [favorites.size]);
+    loadFavoritesAndListings();
+  }, []);
   
   // Відновлюємо скролл до останнього переглянутого оголошення при завантаженні сторінки
   const hasScrolledToListing = useRef(false);
