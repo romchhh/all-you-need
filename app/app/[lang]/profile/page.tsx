@@ -256,11 +256,11 @@ const ProfilePage = () => {
     }
   }, [refetchProfile]);
 
-  // Використовуємо pull-to-refresh
+  // Використовуємо pull-to-refresh (вимкнено при відкритих модалках)
   const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: !selectedListing && !selectedSeller,
-    threshold: 100,
+    enabled: !selectedListing && !selectedSeller && !isCreateListingModalOpen && !isEditModalOpen,
+    threshold: 120,
     tg
   });
 

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from main import bot
 from config import bot_username
-from database_functions.client_db import check_user, add_user, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar
+from database_functions.client_db import check_user, add_user, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar, update_user_activity
 from database_functions.create_dbs import create_dbs
 from database_functions.links_db import increment_link_count
 from database_functions.prisma_db import PrismaDB
@@ -50,6 +50,9 @@ async def start_command(message: types.Message):
         print(f"User {user_id} created in database")
         user_exists = True
     
+    # Оновлюємо останню активність користувача при команді /start
+    update_user_activity(str(user_id))
+    
     has_agreed = get_user_agreement_status(user_id)
 
     # Якщо користувач не погодився з офертою, показуємо її
@@ -90,6 +93,9 @@ async def start_command(message: types.Message):
     
     # Оновлюємо дані користувача
     add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
+    
+    # Оновлюємо останню активність після оновлення даних
+    update_user_activity(str(user_id))
     
     # Обробляємо реферальні посилання
     if ref_link and not user_exists:

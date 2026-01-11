@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from aiogram import Router, types, F
 from aiogram.filters import CommandStart
 from dotenv import load_dotenv
@@ -37,40 +38,41 @@ async def start_command(message: types.Message):
         except (ValueError, IndexError) as e:
             pass
     
-    # Завантажуємо аватарку тільки якщо користувач новий або аватарки немає в БД
+    # Завантажуємо аватарку ТІЛЬКИ для нових користувачів
     avatar_path = None
+    
     if not user_exists:
         # Новий користувач - завантажуємо аватарку
         try:
-            avatar_path = await download_user_avatar(user_id, username)
+            avatar_path = await download_user_avatar(user_id, username, None)
             if avatar_path:
                 print(f"Avatar downloaded for new user {user_id}: {avatar_path}")
             else:
-                print(f"No avatar found for user {user_id}")
+                print(f"No avatar found for new user {user_id}")
         except Exception as e:
-            print(f"Error downloading avatar for user {user_id}: {e}")
-    else:
-        # Існуючий користувач - перевіряємо чи є аватарка
-        existing_avatar = get_user_avatar(user_id)
-        if not existing_avatar:
-            # Аватарки немає - завантажуємо
-            try:
-                avatar_path = await download_user_avatar(user_id, username)
-                if avatar_path:
-                    print(f"Avatar downloaded for existing user {user_id}: {avatar_path}")
-                else:
-                    print(f"No avatar found for user {user_id}")
-            except Exception as e:
-                print(f"Error downloading avatar for user {user_id}: {e}")
-        else:
-            print(f"User {user_id} already has avatar: {existing_avatar}")
-    
-    # Додаємо або оновлюємо користувача з аватаркою
-    if not user_exists:
+            print(f"Error downloading avatar for new user {user_id}: {e}")
+        
+        # Додаємо нового користувача з аватаркою
         add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
     else:
-        # Оновлюємо користувача (включаючи аватарку якщо вона завантажилася)
-        add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
+        # Існуючий користувач - НЕ завантажуємо аватарку
+        # Просто оновлюємо базову інформацію (ім'я, прізвище) без зміни аватара
+        print(f"User {user_id} already exists, skipping avatar download")
+        
+        # Оновлюємо тільки базову інформацію (БЕЗ аватара)
+        from database_functions.client_db import cursor, conn
+        cursor.execute('''
+            UPDATE User 
+            SET username = ?, firstName = ?, lastName = ?, updatedAt = ?
+            WHERE telegramId = ?
+        ''', (
+            username,
+            user.first_name,
+            user.last_name,
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            int(user_id)
+        ))
+        conn.commit()
 
     # Обробляємо параметри для поділених товарів/профілів
     shared_item = None

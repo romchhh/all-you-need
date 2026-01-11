@@ -122,13 +122,48 @@ def check_user(user_id: str):
 
 
 def update_user_activity(user_id: str):
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-    cursor.execute('''
-        UPDATE users 
-        SET last_activity = ? 
-        WHERE user_id = ?
-    ''', (current_time, user_id))
-    conn.commit()
+    """Оновлює останню активність користувача в UserSession"""
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Спочатку оновлюємо в legacy таблиці
+    try:
+        cursor.execute('''
+            UPDATE users_legacy 
+            SET last_activity = ? 
+            WHERE user_id = ?
+        ''', (current_time, user_id))
+        conn.commit()
+    except Exception as e:
+        print(f"Error updating legacy activity: {e}")
+    
+    # Оновлюємо в UserSession (основна таблиця для відстеження активності)
+    try:
+        # Отримуємо userId з таблиці User
+        cursor.execute("SELECT id FROM User WHERE telegramId = ?", (int(user_id),))
+        user_row = cursor.fetchone()
+        
+        if user_row:
+            user_db_id = user_row[0]
+            # Перевіряємо чи існує запис в UserSession
+            cursor.execute("SELECT id FROM UserSession WHERE userId = ? AND telegramId = ?", (user_db_id, int(user_id)))
+            session_row = cursor.fetchone()
+            
+            if session_row:
+                # Оновлюємо існуючий запис
+                cursor.execute('''
+                    UPDATE UserSession 
+                    SET lastActiveAt = ? 
+                    WHERE userId = ? AND telegramId = ?
+                ''', (current_time, user_db_id, int(user_id)))
+            else:
+                # Створюємо новий запис
+                cursor.execute('''
+                    INSERT INTO UserSession (userId, telegramId, lastActiveAt, createdAt)
+                    VALUES (?, ?, ?, ?)
+                ''', (user_db_id, int(user_id), current_time, current_time))
+            conn.commit()
+    except Exception as e:
+        print(f"Error updating UserSession activity: {e}")
 
 
 def get_user_id_by_username(username: str):

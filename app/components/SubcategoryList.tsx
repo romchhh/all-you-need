@@ -15,9 +15,6 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
 
   return (
     <div className="mb-4">
-      <div className="flex items-center justify-between mb-3 px-4">
-        <h3 className="text-sm font-semibold text-gray-700">{t('common.subcategories')}</h3>
-      </div>
       <div 
         className="overflow-x-auto -mx-4 w-full scrollbar-hide" 
         style={{ 

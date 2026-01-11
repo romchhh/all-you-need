@@ -506,8 +506,8 @@ const BazaarPage = () => {
 
   const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: !selectedListing && !selectedSeller,
-    threshold: 100,
+    enabled: !selectedListing && !selectedSeller && !isCreateListingModalOpen,
+    threshold: 120,
     tg
   });
 

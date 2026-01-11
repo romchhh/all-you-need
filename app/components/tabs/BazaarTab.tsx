@@ -624,6 +624,37 @@ const BazaarTabComponent = ({
         <div className="px-4 pt-4 pb-3">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900">{t('navigation.categories')}</h2>
+            {/* Перемикач виду */}
+            {filteredAndSortedListings.length > 0 && (
+              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+                <button
+                  onClick={() => {
+                    setViewMode('grid');
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className={`p-2 rounded-lg transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Grid3x3 size={18} />
+                </button>
+                <button
+                  onClick={() => {
+                    setViewMode('list');
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className={`p-2 rounded-lg transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <List size={18} />
+                </button>
+              </div>
+            )}
           </div>
           <div 
             className="overflow-x-auto -mx-4 px-4 w-full scrollbar-hide" 
@@ -677,74 +708,78 @@ const BazaarTabComponent = ({
         </div>
       )}
 
-      {/* Кнопка очищення фільтрів, коли вибрана категорія + перемикач виду */}
-      {(selectedCategory || selectedSubcategory || filteredAndSortedListings.length > 0) && (
-        <div className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-between">
-            {(selectedCategory || selectedSubcategory) && (
-              <h2 className="text-lg font-semibold text-gray-900">
-                {selectedCategoryData?.name || t('navigation.categories')}
-              </h2>
-            )}
-            <div className="flex items-center gap-2 ml-auto">
-              {filteredAndSortedListings.length > 0 && (
-                <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-                  <button
-                    onClick={() => {
-                      setViewMode('grid');
-                      tg?.HapticFeedback.impactOccurred('light');
-                    }}
-                    className={`p-2 rounded-lg transition-colors ${
-                      viewMode === 'grid'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Grid3x3 size={18} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setViewMode('list');
-                      tg?.HapticFeedback.impactOccurred('light');
-                    }}
-                    className={`p-2 rounded-lg transition-colors ${
-                      viewMode === 'list'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <List size={18} />
-                  </button>
-                </div>
-              )}
-              {(selectedCategory || selectedSubcategory) && (
+      {/* Заголовок категорії */}
+      {(selectedCategory || selectedSubcategory) && (
+        <div className="px-4 pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {selectedCategoryData?.name || t('navigation.categories')}
+            </h2>
+            {/* Перемикач виду при виборі категорії */}
+            {filteredAndSortedListings.length > 0 && (
+              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
                 <button
                   onClick={() => {
-                    setSelectedCategory(null);
-                    setSelectedSubcategory(null);
+                    setViewMode('grid');
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className="text-sm text-blue-600 font-medium hover:text-blue-700"
+                  className={`p-2 rounded-lg transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
-                  {t('common.clear')}
+                  <Grid3x3 size={18} />
                 </button>
-              )}
-            </div>
+                <button
+                  onClick={() => {
+                    setViewMode('list');
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className={`p-2 rounded-lg transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <List size={18} />
+                </button>
+              </div>
+            )}
           </div>
+          
+          {/* Заголовок підкатегорії та кнопка очищення */}
+          {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
+            <div className="flex items-center justify-between mt-3 mb-3">
+              <h3 className="text-base font-semibold text-gray-900">Підкатегорії</h3>
+              <button
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setSelectedSubcategory(null);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className="text-sm text-blue-600 font-medium hover:text-blue-700"
+              >
+                {t('common.clear')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Типи */}
+      {/* Типи (підкатегорії) */}
       {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
-        <SubcategoryList
-          subcategories={selectedCategoryData.subcategories}
-          selectedSubcategory={selectedSubcategory}
-          onSelect={(subcategoryId) => {
-            setSelectedSubcategory(subcategoryId);
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          tg={tg}
-        />
+        <div className="pl-4">
+          <SubcategoryList
+            subcategories={selectedCategoryData.subcategories}
+            selectedSubcategory={selectedSubcategory}
+            onSelect={(subcategoryId) => {
+              setSelectedSubcategory(subcategoryId);
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            tg={tg}
+          />
+        </div>
       )}
 
       {/* Сітка або список оголошень */}

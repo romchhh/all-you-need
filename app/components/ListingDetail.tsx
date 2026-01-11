@@ -342,7 +342,7 @@ export const ListingDetail = ({
   const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
     enabled: true,
-    threshold: 100,
+    threshold: 120,
     tg
   });
 
