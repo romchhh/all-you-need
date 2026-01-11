@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureFavoriteTable } from '@/lib/prisma';
+import { trackUserActivity } from '@/utils/trackActivity';
 
 // Глобальна змінна для відстеження ініціалізації таблиці Favorite
 let favoriteTableInitPromise: Promise<void> | null = null;
@@ -8,6 +9,9 @@ let favoriteTableInitPromise: Promise<void> | null = null;
 // Отримати всі favorites користувача
 export async function GET(request: NextRequest) {
   try {
+    // Відстежуємо активність користувача
+    await trackUserActivity(request);
+    
     const searchParams = request.nextUrl.searchParams;
     const telegramId = searchParams.get('telegramId');
 
@@ -66,6 +70,8 @@ export async function GET(request: NextRequest) {
 // Додати favorite
 export async function POST(request: NextRequest) {
   try {
+    // Відстежуємо активність користувача
+    await trackUserActivity(request);
     const body = await request.json();
     const { telegramId, listingId } = body;
 
@@ -126,10 +132,11 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error adding favorite:', error);
+  } catch (error) {
+    const err = error as any;
+    console.error('Error adding favorite:', err);
     // Якщо помилка через UNIQUE constraint - це нормально (вже існує)
-    if (error.message?.includes('UNIQUE constraint') || error.message?.includes('unique')) {
+    if (err.message?.includes('UNIQUE constraint') || err.message?.includes('unique')) {
       return NextResponse.json({ success: true, message: 'Already favorited' });
     }
     return NextResponse.json(
@@ -142,6 +149,9 @@ export async function POST(request: NextRequest) {
 // Видалити favorite
 export async function DELETE(request: NextRequest) {
   try {
+    // Відстежуємо активність користувача
+    await trackUserActivity(request);
+    
     const searchParams = request.nextUrl.searchParams;
     const telegramId = searchParams.get('telegramId');
     const listingId = searchParams.get('listingId');

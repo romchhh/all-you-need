@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { trackUserActivity } from '@/utils/trackActivity';
 
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
@@ -14,6 +15,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Відстежуємо активність користувача
+    await trackUserActivity(request);
+    
     const { id } = await params;
     const listingId = parseInt(id);
     const searchParams = request.nextUrl.searchParams;

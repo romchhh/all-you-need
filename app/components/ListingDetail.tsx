@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, TrendingUp, Phone } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -338,10 +338,11 @@ export const ListingDetail = ({
     }
   };
 
-  // Додаємо pull-to-refresh (вимкнено)
-  const { isPulling, pullDistance, pullProgress } = usePullToRefresh({
+  // Додаємо pull-to-refresh
+  const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: false, // Вимикаємо pull-to-refresh
+    enabled: true,
+    threshold: 100,
     tg
   });
 
@@ -357,31 +358,6 @@ export const ListingDetail = ({
         visibility: 'visible'
       }}
     >
-      {/* Індикатор pull-to-refresh */}
-      {isPulling && (
-        <div 
-          className="fixed top-0 left-0 right-0 flex items-center justify-center z-50 bg-white/90 backdrop-blur-sm transition-opacity"
-          style={{
-            height: `${Math.min(pullDistance, 80)}px`,
-            opacity: Math.min(pullProgress * 1.5, 1),
-            transform: `translateY(${Math.min(pullDistance - 80, 0)}px)`
-          }}
-        >
-          {pullProgress >= 1 ? (
-            <div className="flex items-center gap-2 text-blue-500">
-              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-sm font-medium">{t('common.loading')}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-gray-400">
-              <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full" style={{
-                transform: `rotate(${pullProgress * 360}deg)`
-              }}></div>
-              <span className="text-sm">{t('common.pullToRefresh')}</span>
-            </div>
-          )}
-        </div>
-      )}
       
       {/* Візуальний індикатор свайпу назад */}
       {swipeProgress > 0 && (
@@ -418,6 +394,103 @@ export const ListingDetail = ({
       
       {/* Spacer для хедера */}
       <div className="h-[64px]"></div>
+      
+      {/* Покращений pull-to-refresh індикатор */}
+      {isPulling && (
+        <div 
+          className="fixed top-16 left-0 right-0 flex items-center justify-center z-40 pointer-events-none"
+          style={{
+            height: `${Math.min(pullDistance * 0.8, 100)}px`,
+            opacity: Math.min(pullProgress * 1.2, 1),
+            transform: `translateY(${Math.min(pullDistance * 0.4 - 50, 0)}px)`,
+            transition: isRefreshing ? 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none'
+          }}
+        >
+          <div 
+            className="flex flex-col items-center gap-2 px-5 py-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100"
+            style={{
+              transform: `scale(${Math.min(0.85 + pullProgress * 0.15, 1)}) translateY(${isRefreshing ? '0' : `${-pullDistance * 0.1}px`})`,
+              transition: isRefreshing ? 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'transform 0.2s ease-out',
+              boxShadow: `0 ${10 + pullProgress * 10}px ${20 + pullProgress * 10}px rgba(0, 0, 0, ${0.1 + pullProgress * 0.05})`
+            }}
+          >
+            {isRefreshing ? (
+              <>
+                <div className="relative w-8 h-8">
+                  <div className="absolute inset-0 border-3 border-blue-200 rounded-full"></div>
+                  <div className="absolute inset-0 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <span className="text-sm font-semibold text-blue-600">{t('common.loading')}</span>
+              </>
+            ) : pullProgress >= 1 ? (
+              <>
+                <div className="relative w-8 h-8">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <span className="text-sm font-semibold text-blue-600">Відпустіть для оновлення</span>
+              </>
+            ) : (
+              <>
+                <div 
+                  className="relative w-8 h-8"
+                  style={{
+                    transform: `rotate(${pullProgress * 360}deg)`,
+                    transition: 'transform 0.1s ease-out'
+                  }}
+                >
+                  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none">
+                    <circle 
+                      cx="12" 
+                      cy="12" 
+                      r="9" 
+                      stroke="currentColor" 
+                      strokeWidth="2.5"
+                      className="text-gray-200"
+                    />
+                    <circle 
+                      cx="12" 
+                      cy="12" 
+                      r="9" 
+                      stroke="url(#gradient-listing)" 
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeDasharray={`${56.5 * pullProgress} ${56.5 * (1 - pullProgress)}`}
+                      className="transition-all duration-200"
+                      style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
+                    />
+                    <defs>
+                      <linearGradient id="gradient-listing" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#3B82F6" />
+                        <stop offset="100%" stopColor="#60A5FA" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{
+                      transform: `translateY(${-2 + pullProgress * 2}px)`,
+                      opacity: 0.6 + pullProgress * 0.4
+                    }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </div>
+                </div>
+                <span 
+                  className="text-xs font-medium text-gray-500"
+                  style={{
+                    opacity: 0.6 + pullProgress * 0.4
+                  }}
+                >
+                  {pullProgress > 0.7 ? 'Майже...' : t('common.pullToRefresh')}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Галерея фото */}
       <div
@@ -633,22 +706,17 @@ export const ListingDetail = ({
               
               const telegramId = listing.seller.telegramId;
               const username = listing.seller.username;
-              console.log('Написати clicked, telegramId:', telegramId, 'username:', username, 'listing.seller:', listing.seller);
+              const phone = listing.seller.phone;
               
-              let link = '';
-              
-              if (username && username.trim() !== '') {
-                // Якщо є username, використовуємо його
-                link = `https://t.me/${username.replace('@', '')}`;
-              } else if (telegramId) {
-                // Перевіряємо, чи telegramId не порожній (може бути числом або рядком)
-                const telegramIdStr = String(telegramId).trim();
-                if (telegramIdStr !== '' && telegramIdStr !== 'null' && telegramIdStr !== 'undefined') {
-                  // Використовуємо https://t.me/ для відкриття чату з користувачем за ID
-                  // Telegram WebApp автоматично перетворить це на внутрішнє посилання
-                  link = `https://t.me/user${telegramIdStr}`;
+              // Якщо немає username - показуємо телефон
+              if (!username || username.trim() === '') {
+                if (phone && phone.trim() !== '') {
+                  // Відкриваємо телефон
+                  window.location.href = `tel:${phone.trim()}`;
+                  tg?.HapticFeedback?.impactOccurred('medium');
+                  return;
                 } else {
-                  console.log('Telegram ID is empty or invalid:', telegramId);
+                  // Немає ні username, ні телефону
                   if (tg) {
                     tg.showAlert(t('listingDetail.telegramIdNotFound'));
                   } else {
@@ -656,17 +724,10 @@ export const ListingDetail = ({
                   }
                   return;
                 }
-              } else {
-                console.log('Telegram ID and username not found');
-                if (tg) {
-                  tg.showAlert(t('listingDetail.telegramIdNotFound'));
-                } else {
-                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                }
-                return;
               }
               
-              console.log('Opening Telegram link:', link);
+              // Якщо є username - відкриваємо Telegram
+              const link = `https://t.me/${username.replace('@', '')}`;
               
               // Якщо Telegram WebApp доступний, використовуємо його
               if (tg && tg.openTelegramLink) {
@@ -686,8 +747,17 @@ export const ListingDetail = ({
               </>
             ) : (
               <>
-                <MessageCircle size={20} />
-                {t('common.write')}
+                {listing.seller.username && listing.seller.username.trim() !== '' ? (
+                  <>
+                    <MessageCircle size={20} />
+                    {t('common.write')}
+                  </>
+                ) : (
+                  <>
+                    <Phone size={20} />
+                    {t('common.call')}
+                  </>
+                )}
               </>
             )}
           </button>

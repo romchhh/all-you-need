@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { executeWithRetry, ensureUserSessionTable, updateUserActivity } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -294,18 +295,26 @@ export async function POST(request: NextRequest) {
       user = createdUsers[0];
     }
 
-            const response = {
-              id: user.id,
-              telegramId: user.telegramId.toString(),
-              username: user.username,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              avatar: user.avatar,
-              balance: user.balance,
-              rating: user.rating,
-              reviewsCount: user.reviewsCount,
-              createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
-            };
+    // Оновлюємо активність користувача
+    try {
+      await ensureUserSessionTable();
+      await updateUserActivity(telegramIdNum);
+    } catch (err) {
+      // Тиха обробка помилок - не блокуємо відповідь
+    }
+
+    const response = {
+      id: user.id,
+      telegramId: user.telegramId.toString(),
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatar: user.avatar,
+      balance: user.balance,
+      rating: user.rating,
+      reviewsCount: user.reviewsCount,
+      createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
+    };
     
     return NextResponse.json(response);
   } catch (error) {
@@ -341,7 +350,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { executeWithRetry } = await import('@/lib/prisma');
+    const { executeWithRetry, ensureUserSessionTable, updateUserActivity } = await import('@/lib/prisma');
+    
+    // Оновлюємо активність користувача
+    try {
+      await ensureUserSessionTable();
+      await updateUserActivity(telegramIdNum);
+    } catch (err) {
+      // Тиха обробка помилок - не блокуємо відповідь
+    }
     
     const users = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(

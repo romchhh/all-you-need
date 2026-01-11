@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { trackUserActivity } from '@/utils/trackActivity';
 
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
@@ -14,6 +15,9 @@ let favoriteTableInitPromise: Promise<void> | null = null;
 
 export async function GET(request: NextRequest) {
   try {
+    // Відстежуємо активність користувача
+    await trackUserActivity(request);
+    
     // Перевіряємо колонку currency (з кешуванням)
     const { ensureCurrencyColumn, ensureFavoriteTable } = await import('@/lib/prisma');
     const currencyColumnExists = await ensureCurrencyColumn();

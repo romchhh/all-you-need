@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { TelegramWebApp } from '@/types/telegram';
 
 interface UsePullToRefreshOptions {
   onRefresh: () => Promise<void> | void;
   enabled?: boolean;
   threshold?: number; // Мінімальна відстань для активації pull-to-refresh
+  maxDistance?: number; // Максимальна відстань тягнення
+  resistance?: number; // Коефіцієнт опору (0-1, менше = більше опору)
   tg?: TelegramWebApp | null;
 }
 
@@ -12,13 +14,30 @@ export const usePullToRefresh = ({
   onRefresh,
   enabled = true,
   threshold = 80,
+  maxDistance = 150,
+  resistance = 0.5,
   tg
 }: UsePullToRefreshOptions) => {
   const touchStartY = useRef<number | null>(null);
   const touchCurrentY = useRef<number | null>(null);
   const [isPulling, setIsPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
-  const isRefreshing = useRef(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isRefreshingRef = useRef(false);
+  const hasVibratedThreshold = useRef(false);
+  const hasVibratedStart = useRef(false);
+
+  // Функція для розрахунку rubber band ефекту
+  const applyRubberBandEffect = useCallback((distance: number): number => {
+    if (distance <= threshold) {
+      // До порогу - лінійне збільшення
+      return distance;
+    }
+    // Після порогу - rubber band ефект
+    const extraDistance = distance - threshold;
+    const rubberBandDistance = threshold + (extraDistance * resistance);
+    return Math.min(rubberBandDistance, maxDistance);
+  }, [threshold, maxDistance, resistance]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -26,9 +45,13 @@ export const usePullToRefresh = ({
     const handleTouchStart = (e: TouchEvent) => {
       // Перевіряємо, чи користувач на початку сторінки
       const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      if (scrollTop <= 10) {
+      
+      // Дозволяємо pull-to-refresh тільки якщо на самому верху
+      if (scrollTop <= 0) {
         touchStartY.current = e.touches[0].clientY;
         touchCurrentY.current = e.touches[0].clientY;
+        hasVibratedStart.current = false;
+        hasVibratedThreshold.current = false;
       } else {
         touchStartY.current = null;
         touchCurrentY.current = null;
@@ -36,18 +59,21 @@ export const usePullToRefresh = ({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (touchStartY.current === null) return;
+      if (touchStartY.current === null || isRefreshingRef.current) return;
       
-      // Перевіряємо, чи все ще на початку сторінки
       const currentScroll = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      if (currentScroll > 10) {
+      
+      // Якщо скрол не на початку - виходимо
+      if (currentScroll > 0) {
         touchStartY.current = null;
         touchCurrentY.current = null;
         setIsPulling(false);
         setPullDistance(0);
+        hasVibratedStart.current = false;
+        hasVibratedThreshold.current = false;
         return;
       }
-
+      
       touchCurrentY.current = e.touches[0].clientY;
       const deltaY = touchCurrentY.current - touchStartY.current;
 
@@ -57,16 +83,30 @@ export const usePullToRefresh = ({
         if (deltaY > 5) {
           e.preventDefault();
         }
+        
         setIsPulling(true);
-        setPullDistance(Math.min(deltaY, threshold * 1.5));
+        
+        // Застосовуємо rubber band ефект (простий розрахунок)
+        const rubberBandDistance = applyRubberBandEffect(deltaY);
+        setPullDistance(rubberBandDistance);
+        
+        // Легка вібрація на початку тягнення (один раз)
+        if (deltaY > 20 && deltaY < 30 && !hasVibratedStart.current) {
+          hasVibratedStart.current = true;
+          tg?.HapticFeedback?.impactOccurred('soft');
+        }
         
         // Вібрація при досягненні порогу (тільки один раз)
-        if (deltaY >= threshold && !isRefreshing.current && deltaY < threshold + 10) {
-          tg?.HapticFeedback?.impactOccurred('light');
+        if (rubberBandDistance >= threshold && !hasVibratedThreshold.current) {
+          hasVibratedThreshold.current = true;
+          tg?.HapticFeedback?.impactOccurred('medium');
         }
       } else {
+        // Якщо свайп вгору - скидаємо стан
         setIsPulling(false);
         setPullDistance(0);
+        hasVibratedStart.current = false;
+        hasVibratedThreshold.current = false;
       }
     };
 
@@ -76,34 +116,48 @@ export const usePullToRefresh = ({
         touchCurrentY.current = null;
         setIsPulling(false);
         setPullDistance(0);
+        hasVibratedStart.current = false;
+        hasVibratedThreshold.current = false;
         return;
       }
 
+      const currentDistance = pullDistance;
       const deltaY = touchCurrentY.current - touchStartY.current;
+      const finalDistance = deltaY > 0 ? applyRubberBandEffect(deltaY) : 0;
 
-      // Якщо свайп достатньо великий, викликаємо оновлення
-      if (deltaY >= threshold && !isRefreshing.current) {
-        isRefreshing.current = true;
-        setIsPulling(true);
+      // Якщо відстань достатня для оновлення
+      if (finalDistance >= threshold && !isRefreshingRef.current) {
+        isRefreshingRef.current = true;
+        setIsRefreshing(true);
+        
+        // Анімуємо до фіксованої позиції
         setPullDistance(threshold);
-        tg?.HapticFeedback?.impactOccurred('medium');
+        tg?.HapticFeedback?.impactOccurred('heavy');
         
         try {
           await onRefresh();
+          // Успішна вібрація
+          tg?.HapticFeedback?.notificationOccurred('success');
         } catch (error) {
           console.error('Error refreshing:', error);
+          tg?.HapticFeedback?.notificationOccurred('error');
         } finally {
           // Плавно повертаємо до початкового стану
           setTimeout(() => {
+            setIsRefreshing(false);
             setIsPulling(false);
             setPullDistance(0);
-            isRefreshing.current = false;
+            isRefreshingRef.current = false;
+            hasVibratedStart.current = false;
+            hasVibratedThreshold.current = false;
           }, 300);
         }
       } else {
-        // Плавно повертаємо до початкового стану
+        // Швидко повертаємо до початкового стану
         setIsPulling(false);
         setPullDistance(0);
+        hasVibratedStart.current = false;
+        hasVibratedThreshold.current = false;
       }
 
       touchStartY.current = null;
@@ -113,18 +167,21 @@ export const usePullToRefresh = ({
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 
     return () => {
       document.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [enabled, threshold, onRefresh, tg]);
+  }, [enabled, threshold, onRefresh, tg, applyRubberBandEffect]);
 
   return {
     isPulling,
     pullDistance,
-    pullProgress: Math.min(pullDistance / threshold, 1)
+    pullProgress: Math.min(pullDistance / threshold, 1),
+    isRefreshing
   };
 };
 

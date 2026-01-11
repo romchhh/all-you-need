@@ -4,6 +4,11 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
+  // Виключаємо admin роути з мовного редиректу
+  if (pathname.startsWith('/admin')) {
+    return NextResponse.next();
+  }
+  
   // Перевіряємо, чи шлях вже має префікс мови
   const hasLanguagePrefix = pathname.startsWith('/uk/') || pathname.startsWith('/ru/') || pathname === '/uk' || pathname === '/ru';
   

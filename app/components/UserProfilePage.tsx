@@ -1,4 +1,4 @@
-import { ArrowLeft, Package, MessageCircle, Share2, X, Copy } from 'lucide-react';
+import { ArrowLeft, Package, MessageCircle, Share2, X, Copy, Phone } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ListingCard } from './ListingCard';
@@ -271,22 +271,17 @@ export const UserProfilePage = ({
               e.preventDefault();
               e.stopPropagation();
               const username = userData?.username || sellerUsername;
-              console.log('Написати clicked, sellerTelegramId:', sellerTelegramId, 'username:', username);
+              const phone = userData?.phone || sellerPhone;
               
-              let link = '';
-              
-              if (username && username.trim() !== '') {
-                // Якщо є username, використовуємо його
-                link = `https://t.me/${username.replace('@', '')}`;
-              } else if (sellerTelegramId) {
-                // Перевіряємо, чи telegramId не порожній (може бути числом або рядком)
-                const telegramIdStr = String(sellerTelegramId).trim();
-                if (telegramIdStr !== '' && telegramIdStr !== 'null' && telegramIdStr !== 'undefined') {
-                  // Використовуємо https://t.me/ для відкриття чату з користувачем за ID
-                  // Telegram WebApp автоматично перетворить це на внутрішнє посилання
-                  link = `https://t.me/user${telegramIdStr}`;
+              // Якщо немає username - показуємо телефон
+              if (!username || username.trim() === '') {
+                if (phone && phone.trim() !== '') {
+                  // Відкриваємо телефон
+                  window.location.href = `tel:${phone.trim()}`;
+                  tg?.HapticFeedback?.impactOccurred('medium');
+                  return;
                 } else {
-                  console.log('Telegram ID is empty or invalid:', sellerTelegramId);
+                  // Немає ні username, ні телефону
                   if (tg) {
                     tg.showAlert(t('listingDetail.telegramIdNotFound'));
                   } else {
@@ -294,17 +289,10 @@ export const UserProfilePage = ({
                   }
                   return;
                 }
-              } else {
-                console.log('Telegram ID and username not found');
-                if (tg) {
-                  tg.showAlert(t('listingDetail.telegramIdNotFound'));
-                } else {
-                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                }
-                return;
               }
               
-              console.log('Opening Telegram link:', link);
+              // Якщо є username - відкриваємо Telegram
+              const link = `https://t.me/${username.replace('@', '')}`;
               
               // Якщо Telegram WebApp доступний, використовуємо його
               if (tg && tg.openTelegramLink) {
@@ -317,8 +305,17 @@ export const UserProfilePage = ({
             }}
             className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
-            <MessageCircle size={20} />
-            {t('common.write')}
+            {((userData?.username || sellerUsername) ?? '').trim() !== '' ? (
+              <>
+                <MessageCircle size={20} />
+                {t('common.write')}
+              </>
+            ) : (
+              <>
+                <Phone size={20} />
+                {t('common.call')}
+              </>
+            )}
           </button>
         </div>
 
@@ -343,11 +340,19 @@ export const UserProfilePage = ({
                       onClose();
                     }}
                     onToggleFavorite={(id) => {
+                      const isFavorite = favorites.has(id);
+                      
+                      // Оновлюємо лічильник лайків на картці товару
+                      setListings(prev => prev.map(listing => 
+                        listing.id === id 
+                          ? { 
+                              ...listing, 
+                              favoritesCount: Math.max(0, (listing.favoritesCount || 0) + (isFavorite ? -1 : 1))
+                            }
+                          : listing
+                      ));
+                      
                       onToggleFavorite(id);
-                      // Оновлюємо сторінку після зміни обраного
-                      setTimeout(() => {
-                        fetchData();
-                      }, 300);
                     }}
                     tg={tg}
                   />

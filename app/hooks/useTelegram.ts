@@ -27,7 +27,8 @@ export const useTelegram = () => {
       console.log('Version:', telegram.version);
       console.log('initData (raw string):', telegram.initData);
       console.log('initData length:', telegram.initData?.length || 0);
-      console.log('initDataUnsafe:', telegram.initDataUnsafe);
+      console.log('initDataUnsafe (full):', telegram.initDataUnsafe);
+      console.log('initDataUnsafe.user:', telegram.initDataUnsafe?.user);
       
       // Викликаємо ready() першим
       telegram.ready();
@@ -83,6 +84,12 @@ export const useTelegram = () => {
         
         setUser(telegramUser);
 
+        // Зберігаємо telegramId в sessionStorage для використання в інших хуках
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('telegramId', telegramUser.id.toString());
+          console.log('✅ telegramId saved to sessionStorage:', telegramUser.id);
+        }
+
         // Оновлюємо профіль в БД
         updateProfileFromTelegram(telegramUser).catch(err => {
           console.error('Error updating profile from Telegram:', err);
@@ -100,6 +107,12 @@ export const useTelegram = () => {
           if (telegramId) {
             console.log('✅ Parsed telegramId from initData string:', telegramId);
             setUser({ id: telegramId, first_name: '' });
+            
+            // Зберігаємо telegramId в sessionStorage
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('telegramId', telegramId.toString());
+              console.log('✅ telegramId saved to sessionStorage:', telegramId);
+            }
           } else {
             console.error('❌ Could not parse telegramId from initData string');
             console.log('initData string content:', initDataString.substring(0, 200));

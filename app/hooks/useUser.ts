@@ -36,31 +36,41 @@ export const useUser = () => {
 
   useEffect(() => {
     const getTelegramId = (): number | null => {
-      // 1. URL параметр
+      console.log('=== useUser: Getting telegramId ===');
+      
+      // 1. useTelegram hook (пріоритет - дані з Telegram WebApp)
+      if (telegramUser?.id) {
+        console.log('✅ telegramId from useTelegram hook:', telegramUser.id);
+        return telegramUser.id;
+      }
+      
+      // 2. initData (прямий доступ до Telegram WebApp)
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+        const id = window.Telegram.WebApp.initDataUnsafe.user.id;
+        console.log('✅ telegramId from initDataUnsafe:', id);
+        return id;
+      }
+      
+      // 3. sessionStorage (збережений з попереднього відкриття)
+      if (globalTelegramId) {
+        console.log('✅ telegramId from sessionStorage:', globalTelegramId);
+        return globalTelegramId;
+      }
+      
+      // 4. URL параметр (останній варіант, fallback)
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
         const telegramIdFromUrl = urlParams.get('telegramId');
         if (telegramIdFromUrl) {
           const id = parseInt(telegramIdFromUrl, 10);
-          if (!isNaN(id)) return id;
+          if (!isNaN(id)) {
+            console.log('✅ telegramId from URL parameter:', id);
+            return id;
+          }
         }
       }
       
-      // 2. initData
-      if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-        return window.Telegram.WebApp.initDataUnsafe.user.id;
-      }
-      
-      // 3. useTelegram hook
-      if (telegramUser?.id) {
-        return telegramUser.id;
-      }
-      
-      // 4. sessionStorage
-      if (globalTelegramId) {
-        return globalTelegramId;
-      }
-      
+      console.warn('❌ No telegramId found in any source');
       return null;
     };
     
@@ -87,6 +97,17 @@ export const useUser = () => {
 
   const fetchProfile = async (telegramId: number) => {
     try {
+      // Оновлюємо активність користувача
+      try {
+        await fetch('/api/user/activity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId }),
+        });
+      } catch (err) {
+        // Тиха обробка помилок оновлення активності
+      }
+
       const response = await fetch(`/api/user/profile?telegramId=${telegramId}`);
       
       if (response.ok) {

@@ -1,8 +1,9 @@
-import { Search, X, Gift, Clock, MapPin, SlidersHorizontal } from 'lucide-react';
+import { Search, X, Gift, Clock, MapPin, SlidersHorizontal, Grid3x3, List } from 'lucide-react';
 import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '../CategoryChip';
 import { ListingCard } from '../ListingCard';
+import { ListingCardColumn } from '../ListingCardColumn';
 import { SortModal } from '../SortModal';
 import { CityModal } from '../CityModal';
 import { SubcategoryList } from '../SubcategoryList';
@@ -37,6 +38,7 @@ interface BazaarTabProps {
     selectedCurrency: string | null;
     sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
     showFreeOnly: boolean;
+    viewMode?: 'grid' | 'list';
   };
   onStateChange?: (state: {
     selectedCategory: string | null;
@@ -48,6 +50,7 @@ interface BazaarTabProps {
     selectedCurrency: string | null;
     sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
     showFreeOnly: boolean;
+    viewMode?: 'grid' | 'list';
   }) => void;
   tg: TelegramWebApp | null;
 }
@@ -324,6 +327,21 @@ const BazaarTabComponent = ({
     }
     return null;
   });
+  
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bazaarViewMode');
+      return (saved === 'list' || saved === 'grid') ? saved : 'grid';
+    }
+    return 'grid';
+  });
+  
+  // Зберігаємо viewMode при зміні
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bazaarViewMode', viewMode);
+    }
+  }, [viewMode]);
   
   
   // Зберігаємо стан при зміні
@@ -659,23 +677,59 @@ const BazaarTabComponent = ({
         </div>
       )}
 
-      {/* Кнопка очищення фільтрів, коли вибрана категорія */}
-      {(selectedCategory || selectedSubcategory) && (
+      {/* Кнопка очищення фільтрів, коли вибрана категорія + перемикач виду */}
+      {(selectedCategory || selectedSubcategory || filteredAndSortedListings.length > 0) && (
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {selectedCategoryData?.name || t('navigation.categories')}
-            </h2>
-            <button
-              onClick={() => {
-                setSelectedCategory(null);
-                setSelectedSubcategory(null);
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              className="text-sm text-blue-600 font-medium hover:text-blue-700"
-            >
-              {t('common.clear')}
-            </button>
+            {(selectedCategory || selectedSubcategory) && (
+              <h2 className="text-lg font-semibold text-gray-900">
+                {selectedCategoryData?.name || t('navigation.categories')}
+              </h2>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              {filteredAndSortedListings.length > 0 && (
+                <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+                  <button
+                    onClick={() => {
+                      setViewMode('grid');
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className={`p-2 rounded-lg transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Grid3x3 size={18} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode('list');
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className={`p-2 rounded-lg transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <List size={18} />
+                  </button>
+                </div>
+              )}
+              {(selectedCategory || selectedSubcategory) && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setSelectedSubcategory(null);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="text-sm text-blue-600 font-medium hover:text-blue-700"
+                >
+                  {t('common.clear')}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -693,21 +747,36 @@ const BazaarTabComponent = ({
         />
       )}
 
-      {/* Сітка оголошень */}
+      {/* Сітка або список оголошень */}
       {filteredAndSortedListings.length > 0 ? (
         <>
-          <div className="px-4 grid grid-cols-2 gap-3 pb-4">
-            {filteredAndSortedListings.map(listing => (
-              <ListingCard 
-                key={listing.id} 
-                listing={listing}
-                isFavorite={favorites.has(listing.id)}
-                onSelect={onSelectListing}
-                onToggleFavorite={onToggleFavorite}
-                tg={tg}
-              />
-            ))}
-          </div>
+          {viewMode === 'grid' ? (
+            <div className="px-4 grid grid-cols-2 gap-3 pb-4">
+              {filteredAndSortedListings.map(listing => (
+                <ListingCard 
+                  key={listing.id} 
+                  listing={listing}
+                  isFavorite={favorites.has(listing.id)}
+                  onSelect={onSelectListing}
+                  onToggleFavorite={onToggleFavorite}
+                  tg={tg}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="px-4 space-y-3 pb-4">
+              {filteredAndSortedListings.map(listing => (
+                <ListingCardColumn
+                  key={listing.id}
+                  listing={listing}
+                  isFavorite={favorites.has(listing.id)}
+                  onSelect={onSelectListing}
+                  onToggleFavorite={onToggleFavorite}
+                  tg={tg}
+                />
+              ))}
+            </div>
+          )}
           
           {/* Кнопка "Показати ще" - після списку товарів, перед нижнім меню */}
           {hasMore && filteredAndSortedListings.length > 0 && (
