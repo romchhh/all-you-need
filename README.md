@@ -138,7 +138,6 @@ NEXT_PUBLIC_BASE_URL=https://your-domain.com
 # Monobank Payment Integration
 MONOBANK_API_URL=https://api.monobank.ua
 MONOBANK_TOKEN=your_monobank_token
-EUR_TO_UAH_RATE=42.0
 ```
 
 ## 📝 API Endpoints

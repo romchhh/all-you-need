@@ -116,6 +116,31 @@ def init_prisma_tables():
             )
         ''')
         
+        # Payment таблиця для Monobank платежів
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Payment (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userId INTEGER NOT NULL,
+                invoiceId TEXT NOT NULL UNIQUE,
+                amount INTEGER NOT NULL,
+                amountEur REAL NOT NULL,
+                currency TEXT NOT NULL DEFAULT 'EUR',
+                status TEXT NOT NULL DEFAULT 'created',
+                pageUrl TEXT,
+                webhookData TEXT,
+                createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                completedAt DATETIME,
+                FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Створюємо індекси для Payment таблиці
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_Payment_userId ON Payment(userId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_Payment_invoiceId ON Payment(invoiceId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_Payment_status ON Payment(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_Payment_createdAt ON Payment(createdAt)')
+        
         # Review таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Review (
