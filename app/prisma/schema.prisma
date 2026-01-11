@@ -30,6 +30,7 @@ model User {
   favorites     Favorite[]
   transactions  Transaction[]
   reviews       Review[]
+  payments      Payment[]
 
   @@index([telegramId])
   @@index([isActive])
@@ -115,6 +116,29 @@ model Transaction {
   @@index([status])
   @@index([createdAt])
   @@index([type, status])
+}
+
+// Платежі Monobank
+model Payment {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  invoiceId     String   @unique // ID інвойсу від Monobank
+  amount        Int      // Сума в центах EUR (для оплати через Monobank)
+  amountEur     Float    // Оригінальна сума в EUR (для поповнення балансу)
+  currency      String   @default("EUR") // EUR
+  status        String   @default("created") // created, processing, success, failure, expired
+  pageUrl       String?  // URL для оплати
+  webhookData   String?  // JSON дані з вебхука
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  completedAt   DateTime?
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([invoiceId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // Відгуки

@@ -8,6 +8,7 @@ import { EditProfileModal } from '../EditProfileModal';
 import { EditListingModal } from '../EditListingModal';
 import { ShareModal } from '../ShareModal';
 import { ConfirmModal } from '../ConfirmModal';
+import { TopUpBalanceModal } from '../TopUpBalanceModal';
 import { Listing, Category } from '@/types';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getCategories } from '@/constants/categories';
@@ -44,6 +45,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   }, [editingListing, onEditModalChange]);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -344,7 +346,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               <div className="flex items-center gap-2 mt-2">
                 <Wallet size={14} className="text-gray-500" />
                 <span className="text-sm font-semibold text-gray-900">
-                  {t('profile.balance')}: {profile.balance.toFixed(2)} ₴
+                  {t('profile.balance')}: {profile.balance.toFixed(2)} €
                 </span>
               </div>
             )}
@@ -398,11 +400,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         <button 
           className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-green-500/20"
           onClick={() => {
-            if (tg) {
-              tg.showAlert(t('sales.topUpBalanceSoon'));
-            } else {
-              showToast(t('sales.topUpBalanceSoon'), 'info');
-            }
+            setShowTopUpModal(true);
             tg?.HapticFeedback.impactOccurred('medium');
           }}
         >
@@ -737,6 +735,21 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           initialIndex={0}
           alt={t('profile.avatar')}
           onClose={() => setShowAvatarModal(false)}
+        />
+      )}
+
+      {/* Модальне вікно поповнення балансу */}
+      {profile && (
+        <TopUpBalanceModal
+          isOpen={showTopUpModal}
+          onClose={() => setShowTopUpModal(false)}
+          telegramId={profile.telegramId}
+          currentBalance={profile.balance || 0}
+          onSuccess={() => {
+            refetch();
+            setShowTopUpModal(false);
+          }}
+          tg={tg}
         />
       )}
 

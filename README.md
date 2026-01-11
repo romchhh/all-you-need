@@ -133,6 +133,12 @@ ADMINISTRATORS=[123456789,987654321]
 ```env
 DATABASE_URL="file:../database/ayn_marketplace.db"
 NEXT_PUBLIC_BOT_URL=https://t.me/your_bot
+NEXT_PUBLIC_BASE_URL=https://your-domain.com
+
+# Monobank Payment Integration
+MONOBANK_API_URL=https://api.monobank.ua
+MONOBANK_TOKEN=your_monobank_token
+EUR_TO_UAH_RATE=42.0
 ```
 
 ## 📝 API Endpoints
@@ -149,6 +155,12 @@ NEXT_PUBLIC_BOT_URL=https://t.me/your_bot
 - `GET /api/user/profile` - Отримати профіль користувача
 - `POST /api/user/profile/update` - Оновити профіль
 - `GET /api/user/stats` - Статистика користувача
+
+### Payments
+- `POST /api/payments/create-invoice` - Створити інвойс для поповнення балансу
+- `POST /api/payments/webhook` - Webhook для обробки статусів платежів від Monobank
+- `GET /api/payments/success` - Редирект після успішної оплати
+- `GET /api/payments/fail` - Редирект після невдалої оплати
 
 ## 🎨 Основні компоненти
 
