@@ -43,6 +43,8 @@ export async function GET(
           l.createdAt,
           l.updatedAt,
           l.publishedAt,
+          l.promotionType,
+          l.promotionEnds,
           u.username as sellerUsername,
           u.firstName as sellerFirstName,
           u.lastName as sellerLastName,
@@ -87,6 +89,8 @@ export async function GET(
       createdAt: listing.createdAt,
       updatedAt: listing.updatedAt,
       publishedAt: listing.publishedAt,
+      promotionType: listing.promotionType || null,
+      promotionEnds: listing.promotionEnds || null,
       seller: {
         id: listing.userId,
         username: listing.sellerUsername,

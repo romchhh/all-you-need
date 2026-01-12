@@ -4,23 +4,15 @@ from config import administrators
 from database_functions.client_db import get_user_id_by_username, get_username_by_user_id
 from database_functions.db_config import DATABASE_PATH
 
-# Функція для отримання оптимізованого з'єднання
 def get_optimized_connection():
-    """Створює оптимізоване з'єднання з БД"""
     conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False, timeout=30.0)
-    # Увімкнути WAL mode для одночасних читання та запису
     conn.execute('PRAGMA journal_mode = WAL;')
-    # Збільшити timeout для запитів (30 секунд)
     conn.execute('PRAGMA busy_timeout = 30000;')
-    # Увімкнути foreign keys
     conn.execute('PRAGMA foreign_keys = ON;')
-    # Оптимізувати для швидших запитів
     conn.execute('PRAGMA synchronous = NORMAL;')
-    # Кешувати сторінки в пам'яті (16MB)
     conn.execute('PRAGMA cache_size = -16384;')
     return conn
 
-# Використовуємо спільну БД
 conn = get_optimized_connection()
 cursor = conn.cursor()
 
@@ -37,7 +29,6 @@ def get_all_user_ids():
 
 
 def get_all_users_data():
-    # Отримуємо дані з Prisma User таблиці
     cursor.execute('''
         SELECT id, telegramId, username, firstName, lastName, balance, rating, reviewsCount, isActive, createdAt, updatedAt
         FROM User
@@ -48,7 +39,6 @@ def get_all_users_data():
 
 
 def get_all_links_data():
-    # Отримуємо дані без поля link_count (статистика)
     cursor.execute('SELECT id, link_name, link_url FROM links')
     links_data = cursor.fetchall()
     links_columns = [description[0] for description in cursor.description]
@@ -76,8 +66,6 @@ def get_users_with_phone():
 
 
 def get_users_by_language():
-    # Якщо потрібна статистика по мовам, можна додати поле language в User таблицю
-    # Поки що повертаємо порожній список
     return []
 
 
@@ -140,7 +128,6 @@ def get_statistics_summary():
 
 
 def create_admins_table():
-    # Створюємо таблицю Admin в спільній Prisma БД
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS Admin (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,27 +145,24 @@ def add_admin(user_id, username, added_by):
     try:
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Спочатку знаходимо user_id якщо передано username
         if not user_id and username:
             found_user_id = get_user_id_by_username(username)
             if found_user_id:
                 user_id = found_user_id
             else:
-                return "not_found"  # Користувач не знайдений в базі
+                return "not_found"
         
-        # Перевіряємо чи користувач існує в базі даних (в Prisma User таблиці)
         user_internal_id = None
         if user_id:
             cursor.execute("SELECT id FROM User WHERE telegramId = ?", (user_id,))
             user_row = cursor.fetchone()
             if not user_row:
-                return "not_found"  # Користувач не знайдений в базі
+                return "not_found"
             # Отримуємо внутрішній id користувача з User таблиці
             user_internal_id = user_row[0]
         else:
             return "not_found"
         
-        # Перевіряємо чи вже є адміністратором
         existing_admin = None
         if user_id:
             existing_admin = get_admin_by_id(user_id)
@@ -188,7 +172,7 @@ def add_admin(user_id, username, added_by):
                 existing_admin = get_admin_by_id(found_id)
 
         if existing_admin:
-            return "already_admin"  # Вже є адміністратором
+            return "already_admin"
 
         if not username and user_id:
             cursor.execute("SELECT username FROM User WHERE telegramId = ?", (user_id,))
@@ -196,7 +180,6 @@ def add_admin(user_id, username, added_by):
             if result:
                 username = result[0]
         
-        # Отримуємо внутрішній id користувача для addedBy
         added_by_internal_id = None
         if added_by:
             cursor.execute("SELECT id FROM User WHERE telegramId = ?", (added_by,))
@@ -215,9 +198,7 @@ def add_admin(user_id, username, added_by):
 
 
 def remove_admin(telegram_user_id):
-    """Видаляє адміна по Telegram ID"""
     try:
-        # Знаходимо внутрішній id користувача
         cursor.execute("SELECT id FROM User WHERE telegramId = ?", (telegram_user_id,))
         user_row = cursor.fetchone()
         if not user_row:
@@ -240,10 +221,8 @@ def remove_admin(telegram_user_id):
 
 
 def get_admin_by_id(telegram_user_id):
-    """Отримує адміна по Telegram ID (не внутрішньому id)"""
     if not telegram_user_id:
         return None
-    # Спочатку знаходимо внутрішній id користувача
     cursor.execute("SELECT id FROM User WHERE telegramId = ?", (telegram_user_id,))
     user_row = cursor.fetchone()
     if not user_row:
@@ -280,7 +259,6 @@ def get_admin_info_by_id(admin_id):
     return cursor.fetchone()
 
 def is_superadmin(telegram_user_id):
-    """Перевіряє чи користувач суперадмін по Telegram ID"""
     cursor.execute("SELECT id FROM User WHERE telegramId = ?", (telegram_user_id,))
     user_row = cursor.fetchone()
     if not user_row:
@@ -292,13 +270,11 @@ def is_superadmin(telegram_user_id):
 
 
 def init_superadmin(telegram_superadmin_id):
-    """Ініціалізує суперадміна по Telegram ID"""
     try:
         cursor.execute("SELECT userId FROM Admin WHERE isSuperadmin = 1")
         if cursor.fetchone():
             return False
         
-        # Знаходимо внутрішній id користувача
         cursor.execute("SELECT id FROM User WHERE telegramId = ?", (telegram_superadmin_id,))
         user_row = cursor.fetchone()
         if not user_row:

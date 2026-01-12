@@ -12,6 +12,9 @@ from database_functions.prisma_db import PrismaDB
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, set_language as set_user_language
 from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+import aiohttp
+
 
 load_dotenv()
 
@@ -34,9 +37,8 @@ async def start_command(message: types.Message):
 
     user_exists = check_user(user_id)
     
-    # Створюємо користувача якщо його немає (навіть якщо він не погодився з офертою)
+    # Створюємо користува   челя якщо його немає
     if not user_exists:
-        # Завантажуємо аватарку для нового користувача
         avatar_path = None
         try:
             avatar_path = await download_user_avatar(user_id, username)
@@ -47,15 +49,12 @@ async def start_command(message: types.Message):
         
         # Створюємо користувача в БД
         add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
-        print(f"User {user_id} created in database")
         user_exists = True
     
-    # Оновлюємо останню активність користувача при команді /start
     update_user_activity(str(user_id))
     
     has_agreed = get_user_agreement_status(user_id)
 
-    # Якщо користувач не погодився з офертою, показуємо її
     if not has_agreed:
         offer_text = (
             f"{t(user_id, 'agreement.title')}\n\n"
@@ -71,7 +70,6 @@ async def start_command(message: types.Message):
         )
         return
 
-    # Якщо користувач не надав номер телефону
     user_phone = get_user_phone(user_id)
     if not user_phone:
         await message.answer(
@@ -80,7 +78,6 @@ async def start_command(message: types.Message):
         )
         return
 
-    # Оновлюємо дані користувача (ім'я може змінитися)
     existing_avatar = get_user_avatar(user_id)
     avatar_path = None
     if not existing_avatar:
@@ -91,17 +88,13 @@ async def start_command(message: types.Message):
         except Exception as e:
             print(f"Error downloading avatar for user {user_id}: {e}")
     
-    # Оновлюємо дані користувача
     add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
     
-    # Оновлюємо останню активність після оновлення даних
     update_user_activity(str(user_id))
     
-    # Обробляємо реферальні посилання
     if ref_link and not user_exists:
         increment_link_count(ref_link)
 
-    # Обробляємо параметри для поділених товарів/профілів
     shared_item = None
     shared_data = None
     db = PrismaDB()
@@ -129,9 +122,7 @@ async def start_command(message: types.Message):
 
     welcome_text = t(user_id, 'welcome.greeting')
     
-    # Якщо є поділений товар або профіль, додаємо детальну інформацію
     if shared_item and shared_data:
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
         webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
         
         if shared_item['type'] == 'listing':
@@ -176,14 +167,12 @@ async def start_command(message: types.Message):
             )]
         ])
         await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
-        # Показуємо головне меню після поділеного посилання
         await message.answer(
             t(user_id, 'menu.main_menu'),
             reply_markup=get_main_menu_keyboard(user_id)
         )
     else:
         welcome_text += t(user_id, 'welcome.features')
-        # Показуємо головне меню
         await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id))
 
 
@@ -192,15 +181,12 @@ async def agree_agreement(callback: types.CallbackQuery):
     try:
         user_id = int(callback.data.split("_")[1])
         
-        # Перевіряємо чи це той самий користувач
         if callback.from_user.id != user_id:
             await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
             return
-        
-        # Перевіряємо чи користувач існує в БД
+
         user_exists = check_user(user_id)
         if not user_exists:
-            # Створюємо користувача якщо його немає
             user = callback.from_user
             avatar_path = None
             try:
@@ -209,16 +195,11 @@ async def agree_agreement(callback: types.CallbackQuery):
                 print(f"Error downloading avatar: {e}")
             
             add_user(user_id, user.username, user.first_name, user.last_name, user.language_code, None, avatar_path)
-            print(f"User {user_id} created after agreement")
         
-        # Встановлюємо згоду з офертою
         set_user_agreement_status(user_id, True)
-        print(f"User {user_id} agreed to terms")
         
-        # Видаляємо повідомлення з офертою
         await callback.message.delete()
         
-        # Показуємо запит на номер телефону
         await callback.message.answer(
             f"{t(user_id, 'agreement.agreed')}\n\n{t(user_id, 'phone.request')}",
             reply_markup=get_phone_share_keyboard(user_id)
@@ -243,16 +224,13 @@ async def decline_agreement(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("set_lang_"))
 async def handle_language_selection(callback: types.CallbackQuery):
-    """Обробка вибору мови"""
     user_id = callback.from_user.id
-    lang = callback.data.split("_")[-1]  # 'uk' або 'ru'
+    lang = callback.data.split("_")[-1]
     
     if lang in ['uk', 'ru']:
         set_user_language(user_id, lang)
         
-        # Синхронізуємо мову з веб-додатком через API
         try:
-            import aiohttp
             webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
             api_url = f"{webapp_url}/api/user/language"
             async with aiohttp.ClientSession() as session:
@@ -264,12 +242,10 @@ async def handle_language_selection(callback: types.CallbackQuery):
         
         await callback.answer(t(user_id, 'language.changed'), show_alert=False)
         
-        # Оновлюємо повідомлення з новою мовою
         await callback.message.edit_text(
             f"🌐 {t(user_id, 'language.changed')}"
         )
         
-        # Показуємо головне меню з новою мовою
         await callback.message.answer(
             f"{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
             reply_markup=get_main_menu_keyboard(user_id)
@@ -284,10 +260,8 @@ async def handle_contact(message: types.Message):
         phone = message.contact.phone_number
         user_id = message.from_user.id
         
-        # Перевіряємо чи користувач існує
         user_exists = check_user(user_id)
         if not user_exists:
-            # Створюємо користувача якщо його немає
             user = message.from_user
             avatar_path = None
             try:
@@ -298,11 +272,9 @@ async def handle_contact(message: types.Message):
             add_user(user_id, user.username, user.first_name, user.last_name, user.language_code, None, avatar_path)
             print(f"User {user_id} created when sharing phone")
         
-        # Зберігаємо номер телефону
         set_user_phone(user_id, phone)
         print(f"Phone {phone} saved for user {user_id}")
         
-        # Показуємо головне меню
         await message.answer(
             f"{t(user_id, 'phone.saved')}\n\n{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
             reply_markup=get_main_menu_keyboard(user_id)

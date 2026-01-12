@@ -15,7 +15,7 @@ import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorag
 import { getCachedData, setCachedData } from '@/utils/cache';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import { CreateListingModal } from '@/components/CreateListingModal';
+import CreateListingFlow from '@/components/CreateListingFlow';
 import { useUser } from '@/hooks/useUser';
 
 const FavoritesPage = () => {
@@ -801,10 +801,10 @@ const FavoritesPage = () => {
       />
 
       {profile && (
-        <CreateListingModal
+        <CreateListingFlow
           isOpen={isCreateListingModalOpen}
           onClose={() => setIsCreateListingModalOpen(false)}
-          onSave={async (listingData) => {
+          onSuccess={async () => {
             // Після створення товару оновлюємо список favorites
             await handleRefresh();
             setIsCreateListingModalOpen(false);

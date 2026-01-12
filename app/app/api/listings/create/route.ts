@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
-import sharp from 'sharp';
+import {
+  findUserByTelegramIdForListing,
+  deductListingPackage,
+  processAndUploadImages,
+  createDraftListing,
+} from '@/utils/listingHelpers';
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
+    
+    // Отримуємо дані з форми
     const telegramId = formData.get('telegramId') as string;
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
@@ -20,14 +23,33 @@ export async function POST(request: NextRequest) {
     const condition = formData.get('condition') as string;
     const images = formData.getAll('images') as File[];
 
+    console.log('[Create Listing] Request data:', {
+      telegramId,
+      title,
+      description: description?.substring(0, 50),
+      location,
+      category,
+      imagesCount: images.length,
+    });
+
+    // Валідація
     if (!telegramId || !title || !description || !location || !category) {
+      const missingFields = [];
+      if (!telegramId) missingFields.push('telegramId');
+      if (!title) missingFields.push('title');
+      if (!description) missingFields.push('description');
+      if (!location) missingFields.push('location');
+      if (!category) missingFields.push('category');
+      
+      console.error('[Create Listing] Missing required fields:', missingFields);
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields', missingFields },
         { status: 400 }
       );
     }
 
     if (images.length === 0) {
+      console.error('[Create Listing] No images provided');
       return NextResponse.json(
         { error: 'At least one image is required' },
         { status: 400 }
@@ -35,90 +57,53 @@ export async function POST(request: NextRequest) {
     }
 
     // Знаходимо користувача
-    const telegramIdNum = parseInt(telegramId);
-    const users = await prisma.$queryRawUnsafe(
-      `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-      telegramIdNum
-    ) as Array<{ id: number }>;
-
-    if (!users[0]) {
+    const user = await findUserByTelegramIdForListing(telegramId);
+    if (!user) {
+      console.error('[Create Listing] User not found:', telegramId);
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
-    const userId = users[0].id;
+    console.log('[Create Listing] User found:', { userId: user.id, hasUsedFreeAd: user.hasUsedFreeAd, packagesBalance: user.listingPackagesBalance });
 
-    // Завантажуємо зображення
-    const uploadsDir = join(process.cwd(), 'public', 'listings');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
+    // Перевіряємо та списуємо пакет
+    const hasPackage = await deductListingPackage(user);
+    if (!hasPackage) {
+      console.error('[Create Listing] No available packages:', { userId: user.id });
+      return NextResponse.json(
+        { error: 'No available listings. Please purchase a package.' },
+        { status: 400 }
+      );
     }
 
-    const imageUrls: string[] = [];
-    for (const image of images) {
-      const bytes = await image.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      
-      // Конвертуємо в WebP з оптимізацією та виправленням орієнтації
-      const optimizedBuffer = await sharp(buffer)
-        .rotate() // Автоматично виправляє орієнтацію на основі EXIF даних
-        .resize(1200, 1200, {
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .webp({ quality: 85, effort: 4 })
-        .toBuffer();
-      
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(7);
-      const filename = `listing_${timestamp}_${random}.webp`;
-      const filepath = join(uploadsDir, filename);
-      
-      await writeFile(filepath, optimizedBuffer);
-      // Зберігаємо шлях без query параметрів, API route сам обробить кешування
-      imageUrls.push(`/listings/${filename}`);
-    }
+    console.log('[Create Listing] Package deducted successfully');
 
-    // Створюємо оголошення (з retry logic)
-    const createTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const { executeWithRetry } = await import('@/lib/prisma');
-    
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(
-        `INSERT INTO Listing (
-          userId, title, description, price, currency, isFree, category, subcategory,
-          condition, location, images, status, createdAt, updatedAt, publishedAt
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
-        userId,
-        title,
-        description,
-        price,
-        currency,
-        isFree ? 1 : 0,
-        category,
-        subcategory || null,
-        condition || null,
-        location,
-        JSON.stringify(imageUrls),
-        createTime,
-        createTime,
-        createTime
-      )
+    // Обробляємо зображення
+    const imageUrls = await processAndUploadImages(images);
+
+    // Створюємо оголошення зі статусом draft
+    const listingId = await createDraftListing(
+      user.id,
+      { title, description, price, currency, isFree, category, subcategory, condition, location },
+      imageUrls
     );
 
     return NextResponse.json({
       success: true,
-      message: 'Listing created successfully'
+      message: 'Listing created successfully',
+      listingId,
+      needsPromotionSelection: true,
     });
   } catch (error) {
-    console.error('Error creating listing:', error);
+    console.error('[Create Listing] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to create listing', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Failed to create listing', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      },
       { status: 500 }
     );
   }
 }
-

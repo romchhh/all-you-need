@@ -24,7 +24,12 @@ export interface Listing {
   condition?: 'new' | 'used';
   tags?: string[];
   isFree?: boolean;
-  status?: 'active' | 'sold' | 'hidden' | 'pending';
+  status?: 'active' | 'sold' | 'hidden' | 'pending' | 'pending_moderation' | 'rejected' | 'expired';
+  moderationStatus?: 'pending' | 'rejected' | null;
+  rejectionReason?: string;
+  promotionType?: 'highlighted' | 'top_category' | 'vip' | null;
+  promotionEnds?: string | null;
+  expiresAt?: string | null;
   favoritesCount?: number;
 }
 

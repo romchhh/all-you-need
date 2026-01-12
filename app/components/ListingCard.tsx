@@ -19,6 +19,78 @@ interface ListingCardProps {
 const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false, isDeactivated = false }: ListingCardProps) => {
   const { t } = useLanguage();
   
+  // Перевіряємо чи оголошення має активну рекламу
+  const hasPromotion = listing.promotionType && listing.promotionEnds 
+    ? new Date(listing.promotionEnds) > new Date() 
+    : false;
+  
+  const promotionType = hasPromotion ? listing.promotionType : null;
+  
+  // Логування для діагностики
+  useEffect(() => {
+    if (listing.promotionType) {
+      console.log('Listing promotion data:', {
+        id: listing.id,
+        promotionType: listing.promotionType,
+        promotionEnds: listing.promotionEnds,
+        hasPromotion,
+        now: new Date().toISOString(),
+        endsAt: listing.promotionEnds ? new Date(listing.promotionEnds).toISOString() : null,
+        isExpired: listing.promotionEnds ? new Date(listing.promotionEnds) <= new Date() : null
+      });
+    }
+  }, [listing.id, listing.promotionType, listing.promotionEnds]);
+  
+  // Визначаємо стилі в залежності від типу реклами
+  const getPromotionStyles = () => {
+    if (!promotionType) return '';
+    
+    switch (promotionType) {
+      case 'highlighted':
+        return 'ring-1 ring-yellow-400 shadow-lg shadow-yellow-100';
+      case 'top_category':
+        return 'ring-1 ring-orange-400 shadow-lg shadow-orange-100';
+      case 'vip':
+        return 'ring-2 ring-purple-500 shadow-2xl shadow-purple-200';
+      default:
+        return '';
+    }
+  };
+  
+  const getPromotionBadge = () => {
+    if (!promotionType) return null;
+    
+    const badges = {
+      highlighted: { text: '⭐', color: 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md' },
+      top_category: { text: '🔥', color: 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md' },
+      vip: { text: '👑', color: 'bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white shadow-md' },
+    };
+    
+    const badge = badges[promotionType as keyof typeof badges];
+    if (!badge) return null;
+    
+    return (
+      <div className={`absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center text-sm ${badge.color} z-10`}>
+        {badge.text}
+      </div>
+    );
+  };
+  
+  const getCardBackgroundStyles = () => {
+    if (!promotionType) return '';
+    
+    switch (promotionType) {
+      case 'highlighted':
+        return 'bg-gradient-to-br from-yellow-50 via-white to-white';
+      case 'top_category':
+        return 'bg-gradient-to-br from-orange-50 via-white to-white';
+      case 'vip':
+        return 'bg-gradient-to-br from-purple-50 via-pink-50 to-white';
+      default:
+        return 'bg-white';
+    }
+  };
+  
   // Форматуємо час на клієнті з перекладами
   const formattedTime = useMemo(() => {
     if (listing.createdAt) {
@@ -116,9 +188,9 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   return (
     <div 
       data-listing-id={listing.id}
-      className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer relative select-none ${
+      className={`${getCardBackgroundStyles()} rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer relative select-none ${
         isSold || isDeactivated ? 'opacity-60' : ''
-      }`}
+      } ${getPromotionStyles()} ${promotionType ? 'mt-2' : ''}`}
       onClick={() => {
         if (!isSold && !isDeactivated) {
           onSelect(listing);
@@ -127,6 +199,9 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       }}
     >
       <div className="relative aspect-square bg-gray-100 overflow-hidden w-full">
+        {/* Бейдж реклами */}
+        {getPromotionBadge()}
+        
         {/* Placeholder або зображення */}
         {imageError || (!listing.image && (!listing.images || listing.images.length === 0)) ? (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 w-full h-full">
@@ -219,6 +294,8 @@ export const ListingCard = memo(ListingCardComponent, (prevProps, nextProps) => 
     prevProps.listing.image === nextProps.listing.image &&
     prevProps.listing.price === nextProps.listing.price &&
     prevProps.listing.title === nextProps.listing.title &&
+    prevProps.listing.promotionType === nextProps.listing.promotionType &&
+    prevProps.listing.promotionEnds === nextProps.listing.promotionEnds &&
     prevProps.isFavorite === nextProps.isFavorite &&
     prevProps.isSold === nextProps.isSold &&
     prevProps.isDeactivated === nextProps.isDeactivated

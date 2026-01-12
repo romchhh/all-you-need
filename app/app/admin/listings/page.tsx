@@ -22,6 +22,7 @@ interface Listing {
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
+  source?: 'marketplace' | 'telegram';
   seller: {
     id: number;
     username: string | null;
@@ -226,7 +227,6 @@ export default function AdminListingsPage() {
               <option value="all">Всі</option>
               <option value="pending">На модерації</option>
               <option value="approved">Схвалені</option>
-              <option value="rejected">Відхилені</option>
               <option value="active">Активні</option>
               <option value="sold">Продані</option>
               <option value="expired">Прострочені</option>
@@ -322,7 +322,6 @@ export default function AdminListingsPage() {
               <option value="" disabled>Змінити статус...</option>
               <option value="approved">Схвалити</option>
               <option value="active">Активувати</option>
-              <option value="rejected">Відхилити</option>
               <option value="hidden">Приховати</option>
             </select>
             <button
@@ -369,6 +368,9 @@ export default function AdminListingsPage() {
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider whitespace-nowrap min-w-[100px]">
                   Статус
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider whitespace-nowrap min-w-[120px]">
+                  Джерело
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider whitespace-nowrap min-w-[100px]">
                   Перегляди
@@ -419,6 +421,11 @@ export default function AdminListingsPage() {
                       {listing.status}
                     </span>
                   </td>
+                  <td className="px-3 py-4 whitespace-nowrap min-w-[120px]">
+                    <span className="text-sm text-gray-900">
+                      {listing.source === 'telegram' ? '📱 Telegram' : '🌐 Маркетплейс'}
+                    </span>
+                  </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 min-w-[100px]">
                     {listing.views}
                   </td>
@@ -467,7 +474,7 @@ export default function AdminListingsPage() {
                   className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mt-1 flex-shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-xs font-medium text-gray-900">ID: {listing.id}</span>
                     <span
                       className={`
@@ -484,6 +491,9 @@ export default function AdminListingsPage() {
                       `}
                     >
                       {listing.status}
+                    </span>
+                    <span className="text-xs text-gray-900">
+                      {listing.source === 'telegram' ? '📱 Telegram' : '🌐 Маркетплейс'}
                     </span>
                   </div>
                   <h3 className="text-sm font-semibold text-gray-900 truncate mb-1">{listing.title}</h3>

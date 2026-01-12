@@ -6,14 +6,16 @@ from dotenv import load_dotenv
 
 from main import bot
 from config import bot_username
-from database_functions.client_db import check_user, add_user, update_user_activity, get_user_avatar 
+from database_functions.client_db import check_user, add_user, cursor, conn
 from database_functions.create_dbs import create_dbs
 from database_functions.links_db import increment_link_count
 from database_functions.prisma_db import PrismaDB
+from database_functions.telegram_listing_db import get_user_telegram_listings, get_telegram_listing_by_id
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, get_user_lang
 from keyboards.client_keyboards import get_catalog_webapp_keyboard, get_language_selection_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+
 
 load_dotenv()
 
@@ -38,11 +40,9 @@ async def start_command(message: types.Message):
         except (ValueError, IndexError) as e:
             pass
     
-    # Завантажуємо аватарку ТІЛЬКИ для нових користувачів
     avatar_path = None
     
     if not user_exists:
-        # Новий користувач - завантажуємо аватарку
         try:
             avatar_path = await download_user_avatar(user_id, username, None)
             if avatar_path:
@@ -52,15 +52,8 @@ async def start_command(message: types.Message):
         except Exception as e:
             print(f"Error downloading avatar for new user {user_id}: {e}")
         
-        # Додаємо нового користувача з аватаркою
         add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
     else:
-        # Існуючий користувач - НЕ завантажуємо аватарку
-        # Просто оновлюємо базову інформацію (ім'я, прізвище) без зміни аватара
-        print(f"User {user_id} already exists, skipping avatar download")
-        
-        # Оновлюємо тільки базову інформацію (БЕЗ аватара)
-        from database_functions.client_db import cursor, conn
         cursor.execute('''
             UPDATE User 
             SET username = ?, firstName = ?, lastName = ?, updatedAt = ?
@@ -74,7 +67,6 @@ async def start_command(message: types.Message):
         ))
         conn.commit()
 
-    # Обробляємо параметри для поділених товарів/профілів
     shared_item = None
     shared_data = None
     db = PrismaDB()
@@ -102,7 +94,6 @@ async def start_command(message: types.Message):
 
     welcome_text = t(user_id, 'welcome.greeting')
     
-    # Якщо є поділений товар або профіль, додаємо детальну інформацію
     if shared_item and shared_data:
         webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
         
@@ -151,14 +142,12 @@ async def start_command(message: types.Message):
         welcome_text += t(user_id, 'welcome.features')
         await message.answer(welcome_text, reply_markup=get_catalog_webapp_keyboard(user_id))
     
-    # Показуємо кнопку вибору мови після привітання
-    from utils.translations import get_user_lang
-    from keyboards.client_keyboards import get_language_selection_keyboard
     user_lang = get_user_lang(user_id)
     await message.answer(
         t(user_id, 'language.select'),
         reply_markup=get_language_selection_keyboard()
     )
+
 
     
     

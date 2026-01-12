@@ -17,6 +17,8 @@ const menuItems: MenuItem[] = [
   { href: '/admin/listings', label: 'Оголошення', icon: '📋' },
   { href: '/admin/listings/moderation', label: 'На модерації', icon: '⏳', badge: undefined },
   { href: '/admin/users', label: 'Користувачі', icon: '👥' },
+  { href: '/admin/finances', label: 'Фінанси', icon: '💰' },
+  { href: '/admin/settings', label: 'Налаштування', icon: '⚙️' },
 ];
 
 export default function AdminSidebar() {
@@ -110,7 +112,7 @@ export default function AdminSidebar() {
                 Адмін панель
               </h1>
               <p className="text-xs sm:text-sm text-gray-900 mt-1">
-                AYN Marketplace
+                Trade Ground Marketplace
               </p>
             </div>
             {/* Close button - видимий на всіх пристроях */}

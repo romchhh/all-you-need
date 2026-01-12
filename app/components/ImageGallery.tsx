@@ -230,16 +230,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
 
           {/* Точки індикації - знизу по центру */}
           <div 
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20"
-            style={{ 
-              position: 'absolute',
-              bottom: '1rem',
-              left: '50%',
-              right: 'auto',
-              top: 'auto',
-              transform: 'translateX(-50%)',
-              zIndex: 20
-            }}
+            className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-2 z-20"
           >
             {images.map((_, index) => (
               <button

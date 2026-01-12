@@ -8,7 +8,7 @@ export default function OfertaPage() {
         
         <div className="prose prose-lg max-w-none space-y-6 text-gray-700">
           <p className="text-lg">
-            Ласкаво просимо до <strong>AYN Marketplace</strong>!
+            Ласкаво просимо до <strong>Trade Ground Marketplace</strong>!
           </p>
           
           <p>

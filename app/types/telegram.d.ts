@@ -21,6 +21,7 @@ export interface TelegramWebApp {
   disableClosingConfirmation?(): void;
   showAlert(message: string): void;
   openTelegramLink(url: string): void;
+  openLink(url: string): void;
   share?(text: string, url?: string): Promise<void>;
   initData?: string;
   initDataUnsafe?: TelegramInitData;

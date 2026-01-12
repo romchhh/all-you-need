@@ -13,11 +13,9 @@ async def deactivate_old_listings(bot: Bot = None):
     cursor = conn.cursor()
     
     try:
-        # Обчислюємо дату 30 днів тому
         thirty_days_ago = datetime.now() - timedelta(days=30)
         thirty_days_ago_str = thirty_days_ago.strftime('%Y-%m-%d %H:%M:%S')
         
-        # Знаходимо всі активні оголошення, які старіші за 30 днів
         cursor.execute('''
             SELECT l.id, l.userId, l.title, l.createdAt, l.publishedAt, u.telegramId
             FROM Listing l
@@ -32,7 +30,6 @@ async def deactivate_old_listings(bot: Bot = None):
         old_listings = cursor.fetchall()
         
         if not old_listings:
-            print(f"[{datetime.now()}] No listings to deactivate")
             return
 
         listing_ids = [listing[0] for listing in old_listings]
@@ -46,10 +43,7 @@ async def deactivate_old_listings(bot: Bot = None):
         
         conn.commit()
         
-        print(f"[{datetime.now()}] Deactivated {len(old_listings)} listings")
-        
     except Exception as e:
-        print(f"[{datetime.now()}] Error in deactivate_old_listings: {e}")
         conn.rollback()
     finally:
         conn.close()

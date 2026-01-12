@@ -1,7 +1,7 @@
 import { Eye, Heart, Package } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
 
@@ -13,7 +13,7 @@ interface ListingCardColumnProps {
   tg: TelegramWebApp | null;
 }
 
-export const ListingCardColumn = ({
+const ListingCardColumnComponent = ({
   listing,
   isFavorite,
   onSelect,
@@ -21,6 +21,63 @@ export const ListingCardColumn = ({
   tg
 }: ListingCardColumnProps) => {
   const { t } = useLanguage();
+
+  // Перевіряємо чи оголошення має активну рекламу
+  const hasPromotion = listing.promotionType && listing.promotionEnds 
+    ? new Date(listing.promotionEnds) > new Date() 
+    : false;
+  
+  const promotionType = hasPromotion ? listing.promotionType : null;
+  
+  // Визначаємо стилі в залежності від типу реклами
+  const getPromotionStyles = () => {
+    if (!promotionType) return 'border-gray-200 hover:border-blue-300';
+    
+    switch (promotionType) {
+      case 'highlighted':
+        return 'border-yellow-400 ring-1 ring-yellow-300 shadow-md shadow-yellow-100';
+      case 'top_category':
+        return 'border-orange-400 ring-1 ring-orange-300 shadow-md shadow-orange-100';
+      case 'vip':
+        return 'border-purple-500 ring-1 ring-purple-400 shadow-lg shadow-purple-200';
+      default:
+        return 'border-gray-200 hover:border-blue-300';
+    }
+  };
+  
+  const getCardBackgroundStyles = () => {
+    if (!promotionType) return 'bg-white';
+    
+    switch (promotionType) {
+      case 'highlighted':
+        return 'bg-gradient-to-br from-yellow-50 via-white to-white';
+      case 'top_category':
+        return 'bg-gradient-to-br from-orange-50 via-white to-white';
+      case 'vip':
+        return 'bg-gradient-to-br from-purple-50 via-pink-50 to-white';
+      default:
+        return 'bg-white';
+    }
+  };
+  
+  const getPromotionBadge = () => {
+    if (!promotionType) return null;
+    
+    const badges = {
+      highlighted: { text: '⭐', color: 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' },
+      top_category: { text: '🔥', color: 'bg-gradient-to-r from-orange-500 to-red-500 text-white' },
+      vip: { text: '👑', color: 'bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white' },
+    };
+    
+    const badge = badges[promotionType as keyof typeof badges];
+    if (!badge) return null;
+    
+    return (
+      <div className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs ${badge.color} shadow-sm z-10`}>
+        {badge.text}
+      </div>
+    );
+  };
 
   const imageUrl = useMemo(() => {
     if (listing.image) {
@@ -47,7 +104,7 @@ export const ListingCardColumn = ({
   return (
     <div 
       data-listing-id={listing.id}
-      className="bg-white rounded-2xl border-2 border-gray-200 hover:border-blue-300 overflow-hidden transition-all cursor-pointer"
+      className={`${getCardBackgroundStyles()} rounded-2xl border-2 overflow-hidden transition-all cursor-pointer ${getPromotionStyles()} ${promotionType ? 'my-2' : ''}`}
       onClick={() => {
         onSelect(listing);
         tg?.HapticFeedback.impactOccurred('light');
@@ -58,6 +115,9 @@ export const ListingCardColumn = ({
         <div 
           className="relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100"
         >
+          {/* Бейдж реклами */}
+          {getPromotionBadge()}
+          
           {imageUrl ? (
             <img 
               src={imageUrl} 
@@ -137,3 +197,13 @@ export const ListingCardColumn = ({
     </div>
   );
 };
+
+// Мемоізуємо компонент для оптимізації - ререндериться тільки якщо змінилися пропси
+export const ListingCardColumn = memo(ListingCardColumnComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.listing.id === nextProps.listing.id &&
+    prevProps.isFavorite === nextProps.isFavorite &&
+    prevProps.listing.views === nextProps.listing.views &&
+    prevProps.listing.favoritesCount === nextProps.listing.favoritesCount
+  );
+});

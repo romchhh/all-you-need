@@ -2,30 +2,20 @@ import sqlite3
 from datetime import datetime
 from database_functions.db_config import DATABASE_PATH
 
-# Використовуємо спільну БД з оптимізацією
 def get_connection():
-    """Створює оптимізоване з'єднання з БД"""
     conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False, timeout=30.0)
-    # Увімкнути WAL mode для одночасних читання та запису
     conn.execute('PRAGMA journal_mode = WAL;')
-    # Збільшити timeout для запитів (30 секунд)
     conn.execute('PRAGMA busy_timeout = 30000;')
-    # Увімкнути foreign keys
     conn.execute('PRAGMA foreign_keys = ON;')
-    # Оптимізувати для швидших запитів
     conn.execute('PRAGMA synchronous = NORMAL;')
-    # Кешувати сторінки в пам'яті (16MB)
     conn.execute('PRAGMA cache_size = -16384;')
     return conn
 
-# Використовуємо спільну БД
 conn = get_connection()
 cursor = conn.cursor()
 
 
 def create_table():
-    # Таблиця users вже створена через Prisma, але створюємо сумісну таблицю для старої структури
-    # або міграцію даних в Prisma User таблицю
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users_legacy (
             id INTEGER PRIMARY KEY,
@@ -44,7 +34,6 @@ def create_table():
     
     
 def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name: str, language: str = None, ref_link: int = None, avatar_path: str = None):
-    # Перевіряємо чи користувач вже є в Prisma User таблиці
     cursor.execute("SELECT id FROM User WHERE telegramId = ?", (int(user_id),))
     existing_user = cursor.fetchone()
     
@@ -52,7 +41,6 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
     current_date_str = current_date.strftime('%Y-%m-%d %H:%M:%S')
     
     if existing_user is None:
-        # Створюємо нового користувача в Prisma User таблиці
         cursor.execute('''
             INSERT INTO User (telegramId, username, firstName, lastName, avatar, balance, rating, reviewsCount, isActive, createdAt, updatedAt)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -61,7 +49,7 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
             user_name, 
             user_first_name, 
             user_last_name,
-            avatar_path,  # avatar
+            avatar_path,
             0.0,  # balance
             5.0,  # rating
             0,    # reviewsCount
@@ -71,7 +59,6 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
         ))
         conn.commit()
         
-        # Визначаємо мову на основі language_code
         user_language = 'uk'  # За замовчуванням
         if language:
             if language.startswith('ru'):
@@ -79,14 +66,12 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
             elif language.startswith('uk'):
                 user_language = 'uk'
         
-        # Також додаємо в legacy таблицю для сумісності
         cursor.execute('''
             INSERT INTO users_legacy (user_id, user_name, user_first_name, user_last_name, language, join_date, last_activity, ref_link)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (user_id, user_name, user_first_name, user_last_name, user_language, current_date.strftime('%Y-%m-%d %H:%M:%S'), current_date.strftime('%Y-%m-%d %H:%M:%S'), ref_link))
         conn.commit()
     else:
-        # Оновлюємо дані існуючого користувача (якщо вони змінилися)
         update_query = '''
             UPDATE User 
             SET username = ?, firstName = ?, lastName = ?, updatedAt = ?
@@ -98,7 +83,6 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
             current_date_str,
         ]
         
-        # Оновлюємо аватар тільки якщо він переданий
         if avatar_path:
             update_query = '''
                 UPDATE User 
@@ -122,10 +106,8 @@ def check_user(user_id: str):
 
 
 def update_user_activity(user_id: str):
-    """Оновлює останню активність користувача в UserSession"""
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Спочатку оновлюємо в legacy таблиці
     try:
         cursor.execute('''
             UPDATE users_legacy 
@@ -136,27 +118,22 @@ def update_user_activity(user_id: str):
     except Exception as e:
         print(f"Error updating legacy activity: {e}")
     
-    # Оновлюємо в UserSession (основна таблиця для відстеження активності)
     try:
-        # Отримуємо userId з таблиці User
         cursor.execute("SELECT id FROM User WHERE telegramId = ?", (int(user_id),))
         user_row = cursor.fetchone()
         
         if user_row:
             user_db_id = user_row[0]
-            # Перевіряємо чи існує запис в UserSession
             cursor.execute("SELECT id FROM UserSession WHERE userId = ? AND telegramId = ?", (user_db_id, int(user_id)))
             session_row = cursor.fetchone()
             
             if session_row:
-                # Оновлюємо існуючий запис
                 cursor.execute('''
                     UPDATE UserSession 
                     SET lastActiveAt = ? 
                     WHERE userId = ? AND telegramId = ?
                 ''', (current_time, user_db_id, int(user_id)))
             else:
-                # Створюємо новий запис
                 cursor.execute('''
                     INSERT INTO UserSession (userId, telegramId, lastActiveAt, createdAt)
                     VALUES (?, ?, ?, ?)
@@ -179,22 +156,18 @@ def get_username_by_user_id(user_id: str):
 
 
 def get_user_avatar(user_id: str):
-    """Отримує шлях до аватарки користувача"""
     cursor.execute("SELECT avatar FROM User WHERE telegramId = ?", (int(user_id),))
     result = cursor.fetchone()
     return result[0] if result else None
 
 
 def get_user_agreement_status(user_id: str) -> bool:
-    """Перевіряє чи користувач погодився з офертою"""
-    # Додаємо поле agreementAccepted в User таблицю якщо його немає
     try:
         cursor.execute("SELECT agreementAccepted FROM User WHERE telegramId = ?", (int(user_id),))
         result = cursor.fetchone()
         if result is not None:
             return bool(result[0])
     except sqlite3.OperationalError:
-        # Якщо колонки немає, додаємо її
         try:
             cursor.execute("ALTER TABLE User ADD COLUMN agreementAccepted INTEGER DEFAULT 0")
             conn.commit()
@@ -205,16 +178,13 @@ def get_user_agreement_status(user_id: str) -> bool:
 
 
 def set_user_agreement_status(user_id: str, accepted: bool):
-    """Встановлює статус згоди з офертою"""
     try:
-        # Перевіряємо чи колонка існує
         cursor.execute("SELECT agreementAccepted FROM User WHERE telegramId = ?", (int(user_id),))
         result = cursor.fetchone()
         if result is None:
             print(f"User {user_id} not found when setting agreement status")
             return
     except sqlite3.OperationalError:
-        # Додаємо колонку якщо її немає
         try:
             cursor.execute("ALTER TABLE User ADD COLUMN agreementAccepted INTEGER DEFAULT 0")
             conn.commit()
@@ -232,15 +202,12 @@ def set_user_agreement_status(user_id: str, accepted: bool):
 
 
 def get_user_phone(user_id: str) -> str | None:
-    """Отримує номер телефону користувача"""
     cursor.execute("SELECT phone FROM User WHERE telegramId = ?", (int(user_id),))
     result = cursor.fetchone()
     return result[0] if result and result[0] else None
 
 
 def set_user_phone(user_id: str, phone: str):
-    """Встановлює номер телефону користувача"""
-    # Перевіряємо чи користувач існує
     cursor.execute("SELECT id FROM User WHERE telegramId = ?", (int(user_id),))
     result = cursor.fetchone()
     if result is None:
@@ -256,8 +223,6 @@ def set_user_phone(user_id: str, phone: str):
 
 
 def get_user_language(user_id: int) -> str:
-    """Отримує мову користувача з БД"""
-    # Спочатку перевіряємо в legacy таблиці (основне джерело для бота)
     cursor.execute('SELECT language FROM users_legacy WHERE user_id = ?', (str(user_id),))
     result = cursor.fetchone()
     if result and result[0]:
@@ -265,7 +230,6 @@ def get_user_language(user_id: int) -> str:
         if lang in ['uk', 'ru']:
             return lang
     
-    # Якщо мови немає в legacy, перевіряємо таблицю User (синхронізація з веб-додатком)
     try:
         cursor.execute('''
             SELECT language FROM User 
@@ -275,35 +239,29 @@ def get_user_language(user_id: int) -> str:
         if user_result and user_result[0]:
             lang = user_result[0]
             if lang in ['uk', 'ru']:
-                # Синхронізуємо з legacy таблицею
                 set_user_language(user_id, lang)
                 return lang
     except Exception as e:
-        # Якщо поле language не існує в таблиці User, це нормально
         pass
     
-    return 'uk'  # За замовчуванням українська
+    return 'uk'
 
 
 def set_user_language(user_id: int, language: str):
-    """Встановлює мову користувача"""
     if language not in ['uk', 'ru']:
         print(f"Invalid language: {language}")
         return
-    
-    # Перевіряємо чи користувач існує в legacy таблиці
+
     cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
     result = cursor.fetchone()
     
     if result:
-        # Оновлюємо в legacy таблиці
         cursor.execute('''
             UPDATE users_legacy 
             SET language = ? 
             WHERE user_id = ?
         ''', (language, str(user_id)))
     else:
-        # Створюємо запис в legacy таблиці
         cursor.execute('''
             INSERT INTO users_legacy (user_id, language, join_date, last_activity)
             VALUES (?, ?, ?, ?)

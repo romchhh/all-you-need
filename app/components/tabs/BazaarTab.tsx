@@ -18,6 +18,7 @@ interface BazaarTabProps {
   categories: Category[];
   listings: Listing[];
   searchQuery: string;
+  deferredSearchQuery?: string;
   onSearchChange: (query: string) => void;
   favorites: Set<number>;
   onSelectListing: (listing: Listing) => void;
@@ -61,6 +62,7 @@ const BazaarTabComponent = ({
   categories,
   listings,
   searchQuery,
+  deferredSearchQuery,
   onSearchChange,
   favorites,
   onSelectListing,
@@ -434,38 +436,76 @@ const BazaarTabComponent = ({
   }, []);
 
   const filteredAndSortedListings = useMemo(() => {
+    // Early return для порожнього списку
+    if (listings.length === 0) return [];
+    
     let filtered = listings;
+    
+    // Використовуємо deferredSearchQuery для фільтрації (якщо є), інакше searchQuery
+    const queryToUse = deferredSearchQuery !== undefined ? deferredSearchQuery : searchQuery;
+    
+    // Оптимізація: кешуємо запит для пошуку
+    const trimmedQuery = queryToUse.trim();
+    const hasSearch = Boolean(trimmedQuery);
+    const lowerQuery = hasSearch ? trimmedQuery.toLowerCase() : '';
+    
+    // Обмеження: при пошуку показуємо максимум 10 результатів для швидкості
+    const MAX_SEARCH_RESULTS = 20;
 
-    // Фільтр по категорії (не застосовуємо при пошуку)
-    if (selectedCategory && !searchQuery.trim()) {
-      filtered = filtered.filter(listing => listing.category === selectedCategory);
+    // Фільтр по пошуку (найважливіший фільтр - застосовуємо першим для швидшого відсіювання)
+    if (hasSearch) {
+      const searchResults: typeof filtered = [];
+      
+      // Обмежуємо пошук для швидкості - зупиняємось після знаходження MAX_SEARCH_RESULTS
+      for (let i = 0; i < filtered.length && searchResults.length < MAX_SEARCH_RESULTS; i++) {
+        const listing = filtered[i];
+        const titleLower = listing.title.toLowerCase();
+        const descLower = listing.description.toLowerCase();
+        const locationLower = listing.location.toLowerCase();
+        
+        if (titleLower.includes(lowerQuery) || 
+            descLower.includes(lowerQuery) || 
+            locationLower.includes(lowerQuery)) {
+          searchResults.push(listing);
+        }
+      }
+      
+      filtered = searchResults;
+      
+      // Якщо є пошук, не застосовуємо категорії (повертаємо всі результати пошуку)
+      // Застосовуємо тільки інші фільтри
+    } else {
+      // Фільтр по категорії (тільки якщо немає пошуку)
+      if (selectedCategory) {
+        filtered = filtered.filter(listing => listing.category === selectedCategory);
+      }
+
+      // Фільтр по підкатегорії (тільки якщо немає пошуку)
+      if (selectedSubcategory) {
+        filtered = filtered.filter(listing => listing.subcategory === selectedSubcategory);
+      }
     }
 
-    // Фільтр по підкатегорії (не застосовуємо при пошуку)
-    if (selectedSubcategory && !searchQuery.trim()) {
-      filtered = filtered.filter(listing => listing.subcategory === selectedSubcategory);
-    }
-
-    // Фільтр безкоштовних
+    // Фільтр безкоштовних (швидка перевірка)
     if (showFreeOnly) {
-      filtered = filtered.filter(listing => listing.isFree || listing.price.toLowerCase().includes('безкоштовно'));
+      filtered = filtered.filter(listing => listing.isFree);
     }
 
-    // Фільтр по містам (множинний вибір)
+    // Фільтр по містам (оптимізовано)
     if (selectedCities.length > 0) {
-      filtered = filtered.filter(listing => 
-        selectedCities.some(city => 
-          listing.location.toLowerCase().includes(city.toLowerCase())
-        )
-      );
+      const lowerCities = selectedCities.map(c => c.toLowerCase());
+      filtered = filtered.filter(listing => {
+        const lowerLocation = listing.location.toLowerCase();
+        return lowerCities.some(city => lowerLocation.includes(city));
+      });
     }
 
-    // Фільтр по стану товару
+    // Фільтр по стану товару (швидка перевірка)
     if (selectedCondition) {
       filtered = filtered.filter(listing => listing.condition === selectedCondition);
     }
 
-    // Фільтр по валюті (тільки якщо вибрано конкретну валюту)
+    // Фільтр по валюті (швидка перевірка)
     if (selectedCurrency) {
       filtered = filtered.filter(listing => listing.currency === selectedCurrency);
     }
@@ -473,52 +513,47 @@ const BazaarTabComponent = ({
     // Фільтр по діапазону цін
     if (minPrice !== null || maxPrice !== null) {
       filtered = filtered.filter(listing => {
-        if (listing.isFree || listing.price.toLowerCase().includes('безкоштовно')) {
-          return minPrice === null || minPrice === 0; // Безкоштовні показуємо тільки якщо мін. ціна = 0
+        if (listing.isFree) {
+          return minPrice === null || minPrice === 0;
         }
-        const price = parseInt(listing.price.replace(/\s/g, '').replace('₴', '').replace('€', '').replace('$', '')) || 0;
-        if (minPrice !== null && price < minPrice) return false;
-        if (maxPrice !== null && price > maxPrice) return false;
-        return true;
+        const price = parseInt(listing.price.replace(/\s/g, '').replace(/[₴€$]/g, '')) || 0;
+        return (minPrice === null || price >= minPrice) && (maxPrice === null || price <= maxPrice);
       });
     }
 
-    // Фільтр по пошуку (по назві, опису, бренду та ключовим словам)
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(listing => 
-        listing.title.toLowerCase().includes(query) ||
-        listing.description.toLowerCase().includes(query) ||
-        listing.location.toLowerCase().includes(query)
-      );
+    // Сортування (оптимізовано - не сортуємо якщо newest і немає ціни)
+    if (sortBy === 'newest') {
+      return filtered; // Не треба сортувати, оголошення вже відсортовані за датою
+    }
+    
+    // Для сортувань по ціні - кешуємо ціни
+    if (sortBy === 'price_low' || sortBy === 'price_high') {
+      const withPrices = filtered.map(listing => ({
+        listing,
+        price: listing.isFree ? 0 : parseInt(listing.price.replace(/\D/g, '')) || 0,
+        isFree: listing.isFree
+      }));
+      
+      withPrices.sort((a, b) => {
+        if (sortBy === 'price_low') {
+          if (a.isFree !== b.isFree) return a.isFree ? -1 : 1;
+          return a.price - b.price;
+        } else {
+          if (a.isFree !== b.isFree) return a.isFree ? 1 : -1;
+          return b.price - a.price;
+        }
+      });
+      
+      return withPrices.map(item => item.listing);
+    }
+    
+    // Сортування по популярності
+    if (sortBy === 'popular') {
+      return [...filtered].sort((a, b) => b.views - a.views);
     }
 
-    // Сортування
-    const sorted = [...filtered].sort((a, b) => {
-      switch (sortBy) {
-        case 'price_low': {
-          if (a.isFree || a.price.toLowerCase().includes('безкоштовно')) return -1;
-          if (b.isFree || b.price.toLowerCase().includes('безкоштовно')) return 1;
-          const priceA = parseInt(a.price.replace(/\s/g, '').replace('₴', '').replace('€', '')) || 0;
-          const priceB = parseInt(b.price.replace(/\s/g, '').replace('₴', '').replace('€', '')) || 0;
-          return priceA - priceB;
-        }
-        case 'price_high': {
-          if (a.isFree || a.price.toLowerCase().includes('безкоштовно')) return 1;
-          if (b.isFree || b.price.toLowerCase().includes('безкоштовно')) return -1;
-          const priceA = parseInt(a.price.replace(/\s/g, '').replace('₴', '').replace('€', '')) || 0;
-          const priceB = parseInt(b.price.replace(/\s/g, '').replace('₴', '').replace('€', '')) || 0;
-          return priceB - priceA;
-        }
-        case 'popular':
-          return b.views - a.views;
-        default:
-          return 0;
-      }
-    });
-
-    return sorted;
-  }, [listings, selectedCategory, selectedSubcategory, showFreeOnly, searchQuery, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
+    return filtered;
+  }, [listings, selectedCategory, selectedSubcategory, showFreeOnly, deferredSearchQuery, searchQuery, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
 
   const getSortLabel = () => {
     switch (sortBy) {

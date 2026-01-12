@@ -1,32 +1,20 @@
-"""
-Ініціалізація Prisma таблиць в спільній БД
-Створює всі необхідні таблиці якщо їх немає
-"""
 import sqlite3
 from database_functions.db_config import DATABASE_PATH
 
 def get_optimized_connection():
-    """Створює оптимізоване з'єднання з БД"""
     conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False, timeout=30.0)
-    # Увімкнути WAL mode для одночасних читання та запису
     conn.execute('PRAGMA journal_mode = WAL;')
-    # Збільшити timeout для запитів (30 секунд)
     conn.execute('PRAGMA busy_timeout = 30000;')
-    # Увімкнути foreign keys
     conn.execute('PRAGMA foreign_keys = ON;')
-    # Оптимізувати для швидших запитів
     conn.execute('PRAGMA synchronous = NORMAL;')
-    # Кешувати сторінки в пам'яті (16MB)
     conn.execute('PRAGMA cache_size = -16384;')
     return conn
 
 def init_prisma_tables():
-    """Створює всі Prisma таблиці якщо їх немає"""
     conn = get_optimized_connection()
     cursor = conn.cursor()
     
     try:
-        # User таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS User (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,21 +33,15 @@ def init_prisma_tables():
             )
         ''')
         
-        # Перевіряємо та мігруємо telegramId на INTEGER (SQLite INTEGER підтримує до 8 байт)
-        # Але для безпеки перевіряємо чи потрібна міграція
         try:
             cursor.execute("PRAGMA table_info(User)")
             columns = cursor.fetchall()
             telegramId_col = next((col for col in columns if col[1] == 'telegramId'), None)
             if telegramId_col:
-                # Перевіряємо чи колонка має правильний тип
-                # В SQLite INTEGER може зберігати до 8 байт, тому це має працювати
-                # Але якщо є проблеми, можемо спробувати ALTER TABLE
                 pass
         except:
             pass
         
-        # Listing таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Listing (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +67,6 @@ def init_prisma_tables():
             )
         ''')
         
-        # Favorite таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Favorite (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,7 +79,6 @@ def init_prisma_tables():
             )
         ''')
         
-        # Transaction таблиця (використовуємо квадратні дужки, оскільки Transaction - зарезервоване слово)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS [Transaction] (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,7 +96,6 @@ def init_prisma_tables():
             )
         ''')
         
-        # Payment таблиця для Monobank платежів
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Payment (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,13 +114,11 @@ def init_prisma_tables():
             )
         ''')
         
-        # Створюємо індекси для Payment таблиці
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_Payment_userId ON Payment(userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_Payment_invoiceId ON Payment(invoiceId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_Payment_status ON Payment(status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_Payment_createdAt ON Payment(createdAt)')
         
-        # Review таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Review (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -155,7 +132,6 @@ def init_prisma_tables():
             )
         ''')
         
-        # ViewHistory таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS ViewHistory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -169,7 +145,6 @@ def init_prisma_tables():
             )
         ''')
         
-        # Category таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Category (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,7 +158,6 @@ def init_prisma_tables():
             )
         ''')
         
-        # Admin таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Admin (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,7 +170,6 @@ def init_prisma_tables():
             )
         ''')
         
-        # Link таблиця
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Link (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -206,12 +179,35 @@ def init_prisma_tables():
             )
         ''')
         
-        # Створюємо індекси
-        # User індекси
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS TelegramListing (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userId INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                price REAL NOT NULL,
+                currency TEXT DEFAULT 'EUR',
+                category TEXT NOT NULL,
+                subcategory TEXT,
+                condition TEXT NOT NULL,
+                location TEXT,
+                images TEXT NOT NULL,
+                status TEXT DEFAULT 'pending_moderation',
+                moderationStatus TEXT DEFAULT 'pending',
+                rejectionReason TEXT,
+                publishedAt DATETIME,
+                moderatedAt DATETIME,
+                moderatedBy INTEGER,
+                createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
+                FOREIGN KEY (moderatedBy) REFERENCES Admin(userId)
+            )
+        ''')
+        
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_telegramId ON User(telegramId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_isActive ON User(isActive)')
         
-        # Listing індекси
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_userId ON Listing(userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_category ON Listing(category)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_subcategory ON Listing(subcategory)')
@@ -222,7 +218,6 @@ def init_prisma_tables():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_currency ON Listing(currency)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_views ON Listing(views)')
         
-        # Composite індекси для Listing (для швидших запитів)
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_status_createdAt ON Listing(status, createdAt)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_status_views ON Listing(status, views)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_userId_status ON Listing(userId, status)')
@@ -230,22 +225,18 @@ def init_prisma_tables():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_status_isFree_createdAt ON Listing(status, isFree, createdAt)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_category_subcategory_status ON Listing(category, subcategory, status)')
         
-        # Favorite індекси
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_userId ON Favorite(userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_listingId ON Favorite(listingId)')
         
-        # Transaction індекси
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_userId ON [Transaction](userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_status ON [Transaction](status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_createdAt ON [Transaction](createdAt)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_type_status ON [Transaction](type, status)')
         
-        # Review індекси
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_review_targetId ON Review(targetId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_review_listingId ON Review(listingId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_review_createdAt ON Review(createdAt)')
         
-        # ViewHistory індекси
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_viewhistory_listingId ON ViewHistory(listingId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_viewhistory_viewerTelegramId ON ViewHistory(viewerTelegramId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_viewhistory_viewedAt ON ViewHistory(viewedAt)')
@@ -261,6 +252,13 @@ def init_prisma_tables():
         
         # Link індекси
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_link_linkName ON Link(linkName)')
+        
+        # TelegramListing індекси
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_telegram_listing_userId ON TelegramListing(userId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_telegram_listing_status ON TelegramListing(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_telegram_listing_moderationStatus ON TelegramListing(moderationStatus)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_telegram_listing_createdAt ON TelegramListing(createdAt)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_telegram_listing_category ON TelegramListing(category)')
         
         conn.commit()
         print("Prisma таблиці успішно ініціалізовані")

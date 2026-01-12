@@ -1,5 +1,5 @@
 from aiogram.filters import Filter
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.enums.chat_type import ChatType
 from main import bot
 from config import administrators
@@ -24,4 +24,14 @@ class IsSuperAdmin(Filter):
     async def __call__(self, message: Message) -> bool:
         user_id = message.from_user.id
         return user_id == administrators[0]
+
+
+def is_admin(user_id: int) -> bool:
+    """Перевіряє чи користувач є адміністратором"""
+    if not administrators:
+        return False
+    if user_id == administrators[0]:
+        return True
+    admin_ids = get_all_admin_ids()
+    return user_id in admin_ids
 

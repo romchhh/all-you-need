@@ -12,25 +12,29 @@ datasource db {
 
 // Користувачі
 model User {
-  id            Int      @id @default(autoincrement())
-  telegramId    BigInt   @unique
-  username      String?
-  firstName     String?
-  lastName      String?
-  phone         String?
-  avatar        String?
-  balance       Float    @default(0)
-  rating        Float    @default(5.0)
-  reviewsCount  Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                      Int      @id @default(autoincrement())
+  telegramId              BigInt   @unique
+  username                String?
+  firstName               String?
+  lastName                String?
+  phone                   String?
+  avatar                  String?
+  balance                 Float    @default(0)
+  rating                  Float    @default(5.0)
+  reviewsCount            Int      @default(0)
+  isActive                Boolean  @default(true)
+  listingPackagesBalance  Int      @default(1) // Перше оголошення безкоштовне
+  hasUsedFreeAd           Boolean  @default(false) // Чи використав перше безкоштовне оголошення
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-  listings      Listing[]
-  favorites     Favorite[]
-  transactions  Transaction[]
-  reviews       Review[]
-  payments      Payment[]
+  listings                Listing[]
+  favorites               Favorite[]
+  transactions            Transaction[]
+  reviews                 Review[]
+  payments                Payment[]
+  listingPackages         ListingPackagePurchase[]
+  promotionPurchases      PromotionPurchase[]
 
   @@index([telegramId])
   @@index([isActive])
@@ -38,35 +42,41 @@ model User {
 
 // Оголошення
 model Listing {
-  id            Int      @id @default(autoincrement())
-  userId        Int
-  title         String
-  description   String
-  price         String
-  currency      String?  // UAH, EUR, USD
-  isFree        Boolean  @default(false)
-  category      String
-  subcategory   String?
-  condition     String?  // new, like_new, good, fair
-  location      String
-  views         Int      @default(0)
-  status        String   @default("pending") // pending, approved, rejected, active, sold, expired
-  promotionType String?  // null, highlighted, top_category, vip
-  promotionEnds DateTime?
-  images        String   // JSON array of image URLs
-  tags          String?  // JSON array of tags
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  publishedAt   DateTime?
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  title             String
+  description       String
+  price             String
+  currency          String?  // UAH, EUR, USD
+  isFree            Boolean  @default(false)
+  category          String
+  subcategory       String?
+  condition         String?  // new, like_new, good, fair
+  location          String
+  views             Int      @default(0)
+  status            String   @default("pending_moderation") // draft, pending_moderation, approved, active, sold, expired, deactivated, hidden
+  moderationStatus  String   @default("pending") // pending, approved (rejected listings are deleted)
+  rejectionReason   String?  // DEPRECATED: Причина відхилення модератором (rejected listings are now deleted)
+  promotionType     String?  // null, highlighted, top_category, vip
+  promotionEnds     DateTime?
+  expiresAt         DateTime? // Дата закінчення активності оголошення (30 днів)
+  images            String   // JSON array of image URLs
+  tags              String?  // JSON array of tags
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  publishedAt       DateTime?
+  moderatedAt       DateTime? // Дата модерації
+  moderatedBy       Int?     // ID адміна який модерував
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  favorites     Favorite[]
-  viewsHistory  ViewHistory[]
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favorites         Favorite[]
+  viewsHistory      ViewHistory[]
 
   @@index([userId])
   @@index([category])
   @@index([subcategory])
   @@index([status])
+  @@index([moderationStatus])
   @@index([isFree])
   @@index([createdAt])
   @@index([publishedAt])
@@ -79,6 +89,9 @@ model Listing {
   @@index([userId, status])
   @@index([userId, category])
   @@index([status, isFree, createdAt])
+  @@index([moderationStatus, createdAt])
+  @@index([expiresAt])
+  @@index([status, expiresAt])
 }
 
 // Обране
@@ -204,6 +217,65 @@ model Admin {
 
   @@index([userId])
   @@index([isSuperadmin])
+}
+
+// Налаштування системи
+model SystemSettings {
+  id                Int      @id @default(autoincrement())
+  key               String   @unique
+  value             String   // JSON для складних значень
+  description       String?
+  updatedAt         DateTime @updatedAt
+  updatedBy         Int?     // ID адміна
+
+  @@index([key])
+}
+
+// Пакети оголошень (покупки користувачів)
+model ListingPackagePurchase {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  packageType       String   // "single_1", "pack_5", "pack_10"
+  listingsCount     Int      // Кількість оголошень в пакеті
+  price             Float    // Ціна в EUR
+  paymentMethod     String   // "balance", "direct"
+  status            String   @default("pending") // pending, completed, refunded
+  invoiceId         String?  // ID інвойсу від Monobank (для direct payment)
+  paidAt            DateTime? // Дата оплати
+  createdAt         DateTime @default(now())
+  expiresAt         DateTime? // Термін дії (наприклад 1 рік)
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([invoiceId])
+}
+
+// Покупки реклами/просування
+model PromotionPurchase {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  listingId         Int?     // Якщо прив'язано до конкретного оголошення
+  promotionType     String   // "highlighted", "top_category", "vip"
+  price             Float    // Ціна в EUR
+  duration          Int      @default(7) // Тривалість в днях
+  paymentMethod     String   // "balance", "direct"
+  status            String   @default("pending") // pending, paid, active, completed, refunded
+  invoiceId         String?  // ID інвойсу від Monobank (для direct payment)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  createdAt         DateTime @default(now())
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([listingId])
+  @@index([status])
+  @@index([promotionType])
+  @@index([createdAt])
+  @@index([invoiceId])
 }
 
 // Посилання (реферальні посилання)

@@ -11,14 +11,12 @@ from utils.translations import t, get_user_lang
 
 load_dotenv()
 
-# URL оферти на сайті
 def get_offer_url(language: str = 'uk') -> str:
     base_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
     return f"{base_url}/{language}/oferta"
 
 
 def get_agreement_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Клавіатура з офертою для користувача"""
     lang = get_user_lang(user_id)
     offer_url = get_offer_url(lang)
     
@@ -30,7 +28,6 @@ def get_agreement_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_phone_share_keyboard(user_id: int) -> ReplyKeyboardMarkup:
-    """Клавіатура для поділу номером телефону"""
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=t(user_id, 'phone.share_button'), request_contact=True)]],
         resize_keyboard=True,
@@ -39,10 +36,6 @@ def get_phone_share_keyboard(user_id: int) -> ReplyKeyboardMarkup:
 
 
 def get_catalog_webapp_keyboard(user_id: int, language: str = None) -> InlineKeyboardMarkup:
-    """Клавіатура з WebApp кнопкою для відкриття каталогу
-    
-    Завжди передаємо telegramId в URL для надійності.
-    """
     webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
     lang = language or get_user_lang(user_id)
     webapp_url_with_params = f"{webapp_url}/{lang}?telegramId={user_id}"
@@ -56,7 +49,6 @@ def get_catalog_webapp_keyboard(user_id: int, language: str = None) -> InlineKey
 
 
 def get_language_selection_keyboard() -> InlineKeyboardMarkup:
-    """Клавіатура для вибору мови"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Українська", callback_data="set_lang_uk")],
         [InlineKeyboardButton(text="Русский", callback_data="set_lang_ru")]
@@ -64,47 +56,170 @@ def get_language_selection_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
-    """Головне меню з Reply кнопками
-    
-    Завжди передаємо telegramId в URL для надійності.
-    Якщо initData не працює, використовується URL параметр.
-    """
     webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
     lang = get_user_lang(user_id)
     
     catalog_url = f"{webapp_url}/{lang}/bazaar?telegramId={user_id}"
-    print(f"Creating main menu for user {user_id}, catalog URL: {catalog_url}")
     
-    # Кнопка "Перейти в каталог" з WebApp
     catalog_button = KeyboardButton(
         text=t(user_id, 'menu.catalog'),
         web_app=WebAppInfo(url=catalog_url)
     )
     
-    # Кнопка "Мої оголошення" з WebApp
     my_listings_button = KeyboardButton(
-        text=t(user_id, 'menu.my_listings'),
-        web_app=WebAppInfo(url=f"{webapp_url}/{lang}/profile?telegramId={user_id}")
+        text=t(user_id, 'menu.my_listings')
     )
     
-    # Кнопка "Додати оголошення" з WebApp
     add_listing_button = KeyboardButton(
-        text=t(user_id, 'menu.add_listing'),
-        web_app=WebAppInfo(url=f"{webapp_url}/{lang}?telegramId={user_id}&action=create")
+        text=t(user_id, 'menu.add_listing')
     )
     
-    # Кнопка "Мій профіль" з WebApp
     my_profile_button = KeyboardButton(
         text=t(user_id, 'menu.my_profile'),
         web_app=WebAppInfo(url=f"{webapp_url}/{lang}/profile?telegramId={user_id}")
+    )
+    
+    about_us_button = KeyboardButton(
+        text=t(user_id, 'menu.about_us')
     )
     
     return ReplyKeyboardMarkup(
         keyboard=[
             [catalog_button],
             [my_listings_button, add_listing_button],
-            [my_profile_button]
+            [my_profile_button, about_us_button]
         ],
         resize_keyboard=True,
         is_persistent=True
     )
+
+
+def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Створює inline клавіатуру для меню 'Про нас'"""
+    # Отримуємо посилання з змінних оточення (якщо потрібно)
+    telegram_url = os.getenv('TELEGRAM_URL', 'https://t.me/your_channel')
+    instagram_url = os.getenv('INSTAGRAM_URL', 'https://instagram.com/your_account')
+    tiktok_url = os.getenv('TIKTOK_URL', 'https://tiktok.com/@your_account')
+    
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.telegram'),
+                url=telegram_url
+            ),
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.instagram'),
+                url=instagram_url
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.tiktok'),
+                url=tiktok_url
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.tariffs'),
+                callback_data="about_tariffs"
+            ),
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.faq'),
+                callback_data="about_faq"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.instructions'),
+                callback_data="about_instructions"
+            )
+        ]
+    ])
+
+
+def get_about_us_back_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Створює клавіатуру з кнопкою 'Назад' для підрозділів 'Про нас'"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t(user_id, 'about_us.back'),
+            callback_data="about_us_main"
+        )]
+    ])
+
+
+def get_categories_keyboard(user_id: int, categories: list) -> InlineKeyboardMarkup:
+    """Створює клавіатуру з категоріями"""
+    keyboard = []
+    for category in categories:
+        keyboard.append([
+            InlineKeyboardButton(
+                text=f"{category.get('icon', '📂')} {category['name']}",
+                callback_data=f"cat_{category['id']}"
+            )
+        ])
+    keyboard.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'create_listing.cancel'),
+            callback_data="cancel_listing"
+        )
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_subcategories_keyboard(user_id: int, subcategories: list, category_id: int) -> InlineKeyboardMarkup:
+    """Створює клавіатуру з підкатегоріями"""
+    keyboard = []
+    for subcat in subcategories:
+        keyboard.append([
+            InlineKeyboardButton(
+                text=subcat['name'],
+                callback_data=f"subcat_{subcat['id']}_{category_id}"
+            )
+        ])
+    keyboard.append([
+        InlineKeyboardButton(
+            text="⬅️ Назад",
+            callback_data="back_to_categories"
+        )
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_condition_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Створює клавіатуру для вибору стану товару"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.condition_new'),
+                callback_data="condition_new"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.condition_used'),
+                callback_data="condition_used"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.cancel'),
+                callback_data="cancel_listing"
+            )
+        ]
+    ])
+
+
+def get_listing_confirmation_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Створює клавіатуру для підтвердження створення оголошення"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.confirm_button'),
+                callback_data="confirm_listing"
+            ),
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.cancel_button'),
+                callback_data="cancel_listing"
+            )
+        ]
+    ])

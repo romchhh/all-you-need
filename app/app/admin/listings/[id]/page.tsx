@@ -22,6 +22,8 @@ interface Listing {
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
+  promotionType: string | null;
+  promotionEnds: string | null;
   seller: {
     id: number;
     username: string | null;
@@ -96,9 +98,16 @@ export default function AdminListingDetailPage() {
       });
 
       if (response.ok) {
-        fetchListing();
+        const result = await response.json();
+        // Оновлюємо статус локально перед перезавантаженням
+        if (listing) {
+          setListing({ ...listing, status: newStatus });
+        }
+        // Перезавантажуємо дані з сервера
+        await fetchListing();
       } else {
-        alert('Помилка зміни статусу');
+        const error = await response.json();
+        alert(`Помилка зміни статусу: ${error.error || 'Невідома помилка'}`);
       }
     } catch (err) {
       alert('Помилка підключення до сервера');
@@ -146,7 +155,6 @@ export default function AdminListingDetailPage() {
           >
             <option value="pending">На модерації</option>
             <option value="approved">Схвалено</option>
-            <option value="rejected">Відхилено</option>
             <option value="active">Активне</option>
             <option value="sold">Продано</option>
             <option value="expired">Прострочено</option>
@@ -273,6 +281,58 @@ export default function AdminListingDetailPage() {
                   <dd className="text-sm sm:text-base text-gray-900 mt-1">
                     {new Date(listing.publishedAt).toLocaleString('uk-UA')}
                   </dd>
+                </div>
+              )}
+              
+              {/* Інформація про рекламу */}
+              {listing.promotionType && listing.promotionEnds && (
+                <div className="pt-3 border-t border-gray-200">
+                  <dt className="text-xs sm:text-sm font-medium text-gray-900 mb-2">
+                    📢 Реклама
+                  </dt>
+                  <dd className="space-y-2">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r text-white font-semibold text-sm shadow-lg">
+                      {listing.promotionType === 'vip' && (
+                        <span className="from-purple-600 to-pink-600 bg-gradient-to-r px-3 py-1.5 rounded-lg">⭐ VIP розміщення</span>
+                      )}
+                      {listing.promotionType === 'top_category' && (
+                        <span className="from-orange-500 to-red-500 bg-gradient-to-r px-3 py-1.5 rounded-lg">🔝 ТОП категорії</span>
+                      )}
+                      {listing.promotionType === 'highlighted' && (
+                        <span className="from-yellow-500 to-amber-500 bg-gradient-to-r px-3 py-1.5 rounded-lg">✨ Виділення</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-900">
+                      <span className="font-medium">Активна до:</span>{' '}
+                      {new Date(listing.promotionEnds).toLocaleString('uk-UA', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {(() => {
+                        const now = new Date();
+                        const endsAt = new Date(listing.promotionEnds);
+                        const daysLeft = Math.ceil((endsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        if (daysLeft > 0) {
+                          return `Залишилось: ${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft <= 4 ? 'дні' : 'днів'}`;
+                        } else {
+                          return '⚠️ Реклама закінчилась';
+                        }
+                      })()}
+                    </div>
+                  </dd>
+                </div>
+              )}
+              
+              {!listing.promotionType && (
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="text-sm text-gray-500 italic">
+                    Реклама не куплена
+                  </div>
                 </div>
               )}
             </dl>

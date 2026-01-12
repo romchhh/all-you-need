@@ -31,19 +31,19 @@ export async function DELETE(
       );
     }
 
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-      select: { userId: true },
-    });
+    const listing = await prisma.$queryRawUnsafe(
+      `SELECT userId FROM Listing WHERE id = ?`,
+      listingId
+    ) as Array<{ userId: number }>;
 
-    if (!listing) {
+    if (!listing[0]) {
       return NextResponse.json(
         { error: 'Listing not found' },
         { status: 404 }
       );
     }
 
-    if (listing.userId !== user[0].id) {
+    if (listing[0].userId !== user[0].id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -51,9 +51,10 @@ export async function DELETE(
     }
 
     // Видаляємо оголошення
-    await prisma.listing.delete({
-      where: { id: listingId },
-    });
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM Listing WHERE id = ?`,
+      listingId
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

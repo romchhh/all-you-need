@@ -5,6 +5,7 @@ import { ImageGallery } from './ImageGallery';
 import { ListingCard } from './ListingCard';
 import { ShareModal } from './ShareModal';
 import { ImageViewModal } from './ImageViewModal';
+import dynamic from 'next/dynamic';
 import { TopBar } from './TopBar';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getListingShareLink } from '@/utils/botLinks';
@@ -18,6 +19,11 @@ import { Toast } from './Toast';
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
+
+// Динамічний імпорт PromotionUpgradeModal
+const PromotionUpgradeModal = dynamic(() => import('./PromotionUpgradeModal'), {
+  ssr: false,
+});
 
 // Функція для форматування дати публікації
 const formatPublicationDate = (dateString: string, lang: 'uk' | 'ru'): string => {
@@ -76,6 +82,7 @@ export const ListingDetail = ({
   const [categoryTotal, setCategoryTotal] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [showPromotionModal, setShowPromotionModal] = useState(false);
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
   const { t, language } = useLanguage();
@@ -637,7 +644,7 @@ export const ListingDetail = ({
             <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
               {sellerListings.map(sellerListing => (
-                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[200px]">
+                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]">
                 <ListingCard 
                   listing={sellerListing}
                   isFavorite={favorites.has(sellerListing.id)}
@@ -663,7 +670,7 @@ export const ListingDetail = ({
             <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
               {categoryListings.map(categoryListing => (
-                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[200px]">
+                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]">
                 <ListingCard 
                   listing={categoryListing}
                   isFavorite={favorites.has(categoryListing.id)}
@@ -694,12 +701,8 @@ export const ListingDetail = ({
               e.stopPropagation();
               
               if (isOwnListing) {
-                // Якщо це власне оголошення - показуємо функцію реклами (поки що просто повідомлення)
-                if (tg) {
-                  tg.showAlert(t('sales.promoteSoon'));
-                } else {
-                  showToast(t('sales.promoteSoon'), 'info');
-                }
+                // Якщо це власне оголошення - відкриваємо модальне вікно реклами
+                setShowPromotionModal(true);
                 tg?.HapticFeedback.impactOccurred('light');
                 return;
               }
@@ -769,9 +772,62 @@ export const ListingDetail = ({
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         shareLink={getListingShareLink(listing.id)}
-        shareText={`📦 ${listing.title} - ${listing.price} в AYN Marketplace`}
+        shareText={`📦 ${listing.title} - ${listing.price} в Trade Ground Marketplace`}
         tg={tg}
       />
+
+      {/* Модальне вікно реклами/апгрейду */}
+      {showPromotionModal && (
+        <PromotionUpgradeModal
+          isOpen={showPromotionModal}
+          onClose={() => setShowPromotionModal(false)}
+          listingId={listing.id}
+          currentPromotion={listing.promotionType}
+          telegramId={String(currentUser?.id || profile?.telegramId || '')}
+          onSelectPromotion={async (promotionType, paymentMethod) => {
+            try {
+              const userTelegramId = currentUser?.id || profile?.telegramId;
+              console.log('Purchasing promotion:', { userTelegramId, promotionType, paymentMethod });
+              
+              const response = await fetch('/api/listings/promotions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  telegramId: userTelegramId,
+                  listingId: listing.id,
+                  promotionType,
+                  paymentMethod,
+                }),
+              });
+
+              const data = await response.json();
+
+              if (!response.ok) {
+                throw new Error(data.error || 'Failed to purchase promotion');
+              }
+
+              if (data.paymentRequired && data.pageUrl) {
+                // Використовуємо той самий метод, що й TopUpBalanceModal
+                tg?.HapticFeedback.notificationOccurred('success');
+                showToast(t('payments.paymentInfo'), 'info');
+                
+                // Перенаправляємо на сторінку оплати
+                window.location.href = data.pageUrl;
+                return;
+              } else {
+                showToast(t('promotions.promotionSuccess'), 'success');
+                tg?.HapticFeedback.notificationOccurred('success');
+              }
+
+              setShowPromotionModal(false);
+            } catch (error: any) {
+              console.error('Error purchasing promotion:', error);
+              showToast(error.message || t('promotions.promotionError'), 'error');
+              tg?.HapticFeedback.notificationOccurred('error');
+            }
+          }}
+        />
+      )}
 
       {/* Модальне вікно перегляду фото */}
       {selectedImageIndex !== null && images[selectedImageIndex] && (

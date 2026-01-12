@@ -12,7 +12,7 @@ import { ProfileTab } from '@/components/tabs/ProfileTab';
 import { Toast } from '@/components/Toast';
 import { useToast } from '@/hooks/useToast';
 import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
-import { CreateListingModal } from '@/components/CreateListingModal';
+import CreateListingFlow from '@/components/CreateListingFlow';
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -393,38 +393,12 @@ const ProfilePage = () => {
       )}
 
       {profile && (
-        <CreateListingModal
+        <CreateListingFlow
           isOpen={isCreateListingModalOpen}
           onClose={() => setIsCreateListingModalOpen(false)}
-          onSave={async (listingData) => {
-            const formData = new FormData();
-            formData.append('title', listingData.title);
-            formData.append('description', listingData.description);
-            formData.append('price', listingData.price);
-            formData.append('currency', listingData.currency || 'UAH');
-            formData.append('isFree', listingData.isFree.toString());
-            formData.append('category', listingData.category);
-            if (listingData.subcategory) {
-              formData.append('subcategory', listingData.subcategory);
-            }
-            formData.append('location', listingData.location);
-            formData.append('condition', listingData.condition);
-            formData.append('telegramId', profile.telegramId);
-            
-            listingData.images.forEach((image: File) => {
-              formData.append('images', image);
-            });
-
-            const response = await fetch('/api/listings/create', {
-              method: 'POST',
-              body: formData,
-            });
-
-            if (!response.ok) {
-              throw new Error('Failed to create listing');
-            }
-
+          onSuccess={async () => {
             setIsCreateListingModalOpen(false);
+            setRefreshKey(prev => prev + 1); // Оновлюємо ProfileTab
             showToast(t('createListing.listingCreated'), 'success');
           }}
           tg={tg}

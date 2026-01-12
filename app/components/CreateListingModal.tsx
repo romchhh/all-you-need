@@ -2,6 +2,7 @@ import { X, Upload, Image as ImageIcon, ChevronDown, MapPin } from 'lucide-react
 import { TelegramWebApp } from '@/types/telegram';
 import { Category } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { getCategories } from '@/constants/categories';
 import { germanCities } from '@/constants/german-cities';
 import { ukrainianCities } from '@/constants/ukrainian-cities';
@@ -56,58 +57,66 @@ export const CreateListingModal = ({
 
   const selectedCondition = conditionOptions.find(opt => opt.value === condition);
 
-  // Об'єднуємо німецькі та українські міста
+  // Об'єднуємо німецькі та українські міста (німецькі спочатку)
   const allCities = useMemo(() => {
+    // Спочатку німецькі міста, потім українські
     const combined = [...germanCities, ...ukrainianCities];
-    // Видаляємо дублікати та сортуємо
-    return Array.from(new Set(combined)).sort((a, b) => a.localeCompare(b));
+    // Видаляємо дублікати, але зберігаємо порядок (німецькі перші)
+    const uniqueCities: string[] = [];
+    const seen = new Set<string>();
+    for (const city of combined) {
+      if (!seen.has(city)) {
+        seen.add(city);
+        uniqueCities.push(city);
+      }
+    }
+    return uniqueCities;
   }, []);
 
   // Фільтруємо міста за запитом
-  const filteredCities = locationQuery
-    ? allCities.filter(city =>
-        city.toLowerCase().includes(locationQuery.toLowerCase())
-      ).slice(0, 10)
-    : allCities.slice(0, 10);
+  const filteredCities = useMemo(() => {
+    if (locationQuery) {
+      const query = locationQuery.toLowerCase();
+      // Спочатку шукаємо в німецьких містах, потім в українських
+      const germanMatches = germanCities.filter(city =>
+        city.toLowerCase().includes(query)
+      );
+      const ukrainianMatches = ukrainianCities.filter(city =>
+        city.toLowerCase().includes(query)
+      );
+      return [...germanMatches, ...ukrainianMatches].slice(0, 10);
+    }
+    // Без пошуку: спочатку німецькі, потім українські
+    return [...germanCities, ...ukrainianCities].slice(0, 10);
+  }, [locationQuery]);
 
-  // Блокуємо скрол body та html при відкритому модальному вікні
+  // Блокуємо скрол body при відкритому модальному вікні
   useEffect(() => {
     if (isOpen) {
-      // Зберігаємо поточну позицію скролу
       const scrollY = window.scrollY;
-      
-      // Блокуємо скрол на body та html
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.documentElement.style.overflow = 'hidden';
-      
-      // Для мобільних пристроїв
-      document.body.style.touchAction = 'none';
     } else {
-      // Відновлюємо скрол
       const scrollY = document.body.style.top;
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.width = '';
       document.documentElement.style.overflow = '';
-      document.body.style.touchAction = '';
       
-      // Відновлюємо позицію скролу
       if (scrollY) {
         window.scrollTo(0, parseInt(scrollY || '0') * -1);
       }
     }
     return () => {
-      // Cleanup
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.width = '';
       document.documentElement.style.overflow = '';
-      document.body.style.touchAction = '';
     };
   }, [isOpen]);
 
@@ -145,14 +154,14 @@ export const CreateListingModal = ({
       if (currencyRef.current && !currencyRef.current.contains(target)) {
         setIsCurrencyOpen(false);
       }
-      if (locationRef.current && !locationRef.current.contains(target)) {
-        setIsLocationOpen(false);
-      }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    // Не додаємо обробник якщо відкрите модальне вікно міста
+    if (!isLocationOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isLocationOpen]);
 
   if (!isOpen) return null;
 
@@ -233,41 +242,6 @@ export const CreateListingModal = ({
     if (!validate()) {
       return;
     }
-    if (!title.trim() || !description.trim() || !location.trim()) {
-      if (tg) {
-        tg.showAlert(t('createListing.fillAllFields'));
-      } else {
-        showToast(t('createListing.fillAllFields'), 'error');
-      }
-      return;
-    }
-
-    if (!category) {
-      if (tg) {
-        tg.showAlert(t('createListing.selectCategory'));
-      } else {
-        showToast(t('createListing.selectCategory'), 'error');
-      }
-      return;
-    }
-
-    if (!isFree && !price.trim()) {
-      if (tg) {
-        tg.showAlert(t('createListing.enterPriceOrFree'));
-      } else {
-        showToast(t('createListing.enterPriceOrFree'), 'error');
-      }
-      return;
-    }
-
-    if (images.length === 0) {
-      if (tg) {
-        tg.showAlert(t('createListing.addPhoto'));
-      } else {
-        showToast(t('createListing.addPhoto'), 'error');
-      }
-      return;
-    }
 
     setLoading(true);
     try {
@@ -285,20 +259,8 @@ export const CreateListingModal = ({
       });
       tg?.HapticFeedback.notificationOccurred('success');
       
-      // Очищаємо форму
-      setTitle('');
-      setDescription('');
-      setPrice('');
-      setIsFree(false);
-      setCategory('');
-      setSubcategory('');
-      setLocation('');
-      setCondition('new');
-      setCurrency('EUR');
-      setImages([]);
-      setImagePreviews([]);
-      
-      onClose();
+      // НЕ очищаємо форму і НЕ закриваємо модальне вікно
+      // Це буде зроблено в CreateListingFlow після завершення всього потоку
     } catch (error) {
       console.error('Error creating listing:', error);
       if (tg) {
@@ -616,65 +578,46 @@ export const CreateListingModal = ({
               {t('createListing.locationLabel')}
             </label>
             <div className="relative">
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value);
-                  setLocationQuery(e.target.value);
+              <button
+                type="button"
+                onClick={() => {
                   setIsLocationOpen(true);
-                  if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
+                  tg?.HapticFeedback.impactOccurred('light');
                 }}
-                onFocus={() => setIsLocationOpen(true)}
-                placeholder={t('createListing.locationPlaceholder')}
-                className={`w-full px-4 py-3 pl-10 pr-10 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
+                className={`w-full px-4 py-3 pl-10 pr-10 bg-gray-50 rounded-xl border text-left ${
                   errors.location ? 'border-red-300' : 'border-gray-200'
-                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
-              <MapPin 
-                size={18} 
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500"
-              />
+                } focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 transition-colors`}
+              >
+                <MapPin 
+                  size={18} 
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500"
+                />
+                <span className={location ? 'text-gray-900 font-medium' : 'text-gray-400'}>
+                  {location || t('createListing.locationPlaceholder')}
+                </span>
+              </button>
               {location && (
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setLocation('');
                     setLocationQuery('');
-                    setIsLocationOpen(false);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors z-10"
                 >
                   <X size={14} className="text-gray-900" />
                 </button>
               )}
             </div>
             
-            {isLocationOpen && filteredCities.length > 0 && (
-              <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
-                {filteredCities.map((city) => (
-                  <button
-                    key={city}
-                    type="button"
-                    onClick={() => {
-                      setLocation(city);
-                      setLocationQuery('');
-                      setIsLocationOpen(false);
-                      tg?.HapticFeedback.impactOccurred('light');
-                    }}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 border-b border-gray-100 last:border-b-0"
-                  >
-                    <MapPin size={16} className="text-green-500" />
-                    <span>{city}</span>
-                  </button>
-                ))}
-              </div>
-            )}
             {errors.location && (
               <p className="mt-1 text-sm text-red-600">{errors.location}</p>
             )}
           </div>
+
           {errors.images && (
             <p className="mt-1 text-sm text-red-600">{errors.images}</p>
           )}
@@ -801,6 +744,110 @@ export const CreateListingModal = ({
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
+
+      {/* Повноекранне модальне вікно для вибору міста через Portal */}
+      {isLocationOpen && typeof window !== 'undefined' && createPortal(
+        <div 
+          data-city-modal
+          className="fixed inset-0 z-[10000] flex flex-col bg-white"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Хедер */}
+          <div className="flex-shrink-0 flex items-center justify-between px-4 py-4 border-b border-gray-200 bg-white">
+            <h3 className="text-lg font-bold text-gray-900">{t('createListing.selectCity')}</h3>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsLocationOpen(false);
+                setLocationQuery('');
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <X size={20} className="text-gray-900" />
+            </button>
+          </div>
+
+          {/* Поле пошуку */}
+          <div className="flex-shrink-0 px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="relative">
+              <input
+                type="text"
+                value={locationQuery}
+                onChange={(e) => setLocationQuery(e.target.value)}
+                placeholder={t('createListing.searchCity')}
+                autoFocus
+                className="w-full px-4 py-3 pl-10 pr-10 bg-white rounded-xl border border-gray-300 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <MapPin 
+                size={18} 
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
+              {locationQuery && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setLocationQuery('');
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors z-10"
+                >
+                  <X size={14} className="text-gray-900" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Список міст */}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            {filteredCities.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {filteredCities.map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setLocation(city);
+                      setLocationQuery('');
+                      setIsLocationOpen(false);
+                      if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className="w-full px-4 py-4 text-left hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-center gap-3"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <MapPin size={18} className="text-green-600" />
+                    </div>
+                    <span className="text-gray-900 font-medium text-base">{city}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 px-4">
+                <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                  <MapPin size={32} className="text-gray-400" />
+                </div>
+                <p className="text-gray-900 font-semibold text-lg mb-2">{t('createListing.noCitiesFound')}</p>
+                <p className="text-gray-500 text-sm text-center">{t('createListing.tryAnotherSearch')}</p>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

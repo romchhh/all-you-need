@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import json
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DB_PATH = BASE_DIR / "database" / "ayn_marketplace.db"
@@ -18,18 +20,12 @@ class PrismaDB:
         if not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
     
-    def get_connection(self):
-        """Створює оптимізоване з'єднання з БД"""
+    def get_connection(self):               
         conn = sqlite3.connect(self.db_path, timeout=30.0)
-        # Увімкнути WAL mode для одночасних читання та запису
         conn.execute('PRAGMA journal_mode = WAL;')
-        # Збільшити timeout для запитів (30 секунд)
         conn.execute('PRAGMA busy_timeout = 30000;')
-        # Увімкнути foreign keys
         conn.execute('PRAGMA foreign_keys = ON;')
-        # Оптимізувати для швидших запитів
         conn.execute('PRAGMA synchronous = NORMAL;')
-        # Кешувати сторінки в пам'яті (16MB)
         conn.execute('PRAGMA cache_size = -16384;')
         return conn
     
@@ -70,7 +66,6 @@ class PrismaDB:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        import json
         images_json = json.dumps(images)
         tags_json = json.dumps(tags) if tags else None
         

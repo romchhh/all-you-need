@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { trackUserActivity } from '@/utils/trackActivity';
 
+// Відключаємо кешування для API route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
   if (!condition) return null;
@@ -92,20 +96,35 @@ export async function GET(request: NextRequest) {
     let orderBy: any = {};
     switch (sortBy) {
       case 'newest':
-        orderBy = { createdAt: 'desc' };
+        // VIP > TOP > Highlighted > звичайні, всередині кожної групи по даті
+        orderBy = [
+          { promotionType: 'desc' }, // VIP буде першим (за алфавітом)
+          { createdAt: 'desc' }
+        ];
         break;
       case 'price_low':
-        // Сортуємо спочатку по isFree, потім по createdAt (ціну сортуємо вручну)
-        orderBy = { isFree: 'desc' };
+        orderBy = [
+          { promotionType: 'desc' },
+          { isFree: 'desc' }
+        ];
         break;
       case 'price_high':
-        orderBy = { isFree: 'asc' };
+        orderBy = [
+          { promotionType: 'desc' },
+          { isFree: 'asc' }
+        ];
         break;
       case 'popular':
-        orderBy = { views: 'desc' };
+        orderBy = [
+          { promotionType: 'desc' },
+          { views: 'desc' }
+        ];
         break;
       default:
-        orderBy = { createdAt: 'desc' };
+        orderBy = [
+          { promotionType: 'desc' },
+          { createdAt: 'desc' }
+        ];
     }
 
     // Використовуємо raw query для обходу проблеми з форматом дат
@@ -153,6 +172,11 @@ export async function GET(request: NextRequest) {
           l.location,
           l.views,
           l.status,
+          l.moderationStatus,
+          l.rejectionReason,
+          l.promotionType,
+          l.promotionEnds,
+          l.expiresAt,
           l.images,
           l.tags,
           l.createdAt,
@@ -169,9 +193,12 @@ export async function GET(request: NextRequest) {
         ORDER BY 
           CASE 
             WHEN l.status = 'active' THEN 1
-            WHEN l.status = 'sold' THEN 2
-            WHEN l.status = 'hidden' THEN 3
-            ELSE 4
+            WHEN l.status = 'pending_moderation' THEN 2
+            WHEN l.status = 'sold' THEN 3
+            WHEN l.status = 'expired' THEN 4
+            WHEN l.status = 'deactivated' THEN 5
+            WHEN l.status = 'hidden' THEN 6
+            ELSE 7
           END,
           l.createdAt DESC
         LIMIT ? OFFSET ?`;
@@ -269,6 +296,11 @@ export async function GET(request: NextRequest) {
           tags: tags,
           isFree: listing.isFree === 1 || listing.isFree === true,
           status: listing.status || 'active',
+          moderationStatus: listing.moderationStatus || null,
+          rejectionReason: listing.rejectionReason || null,
+          promotionType: listing.promotionType || null,
+          promotionEnds: listing.promotionEnds || null,
+          expiresAt: listing.expiresAt || null,
           favoritesCount: typeof listing.favoritesCount === 'bigint' ? Number(listing.favoritesCount) : (typeof listing.favoritesCount === 'number' ? listing.favoritesCount : (typeof (listing as any).favoritesCount === 'bigint' ? Number((listing as any).favoritesCount) : (typeof (listing as any).favoritesCount === 'number' ? (listing as any).favoritesCount : 0))),
         };
       });
@@ -298,20 +330,44 @@ export async function GET(request: NextRequest) {
         params.push(searchPattern, searchPattern, searchPattern);
       }
       
-      let orderByClause = "ORDER BY l.createdAt DESC";
+      // Додаємо фільтр для активних рекламних оголошень (promotionEnds > NOW)
+      // Якщо реклама закінчилась, оголошення все одно показується (якщо воно активне)
+      // whereClause += " AND (l.promotionEnds IS NULL OR datetime(l.promotionEnds) > datetime('now'))";
+      
+      // Фільтруємо тільки активні оголошення (не закінчені)
+      whereClause += " AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))";
+      
+      // Логування для діагностики (тільки в development)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Listings API] Where clause:', whereClause);
+        console.log('[Listings API] Params:', params);
+      }
+      
+      // Правильне сортування з урахуванням реклами
+      // VIP > TOP > Highlighted > звичайні
+      let orderByClause = `ORDER BY 
+        CASE 
+          WHEN l.promotionType = 'vip' AND datetime(l.promotionEnds) > datetime('now') THEN 1
+          WHEN l.promotionType = 'top_category' AND datetime(l.promotionEnds) > datetime('now') THEN 2
+          WHEN l.promotionType = 'highlighted' AND datetime(l.promotionEnds) > datetime('now') THEN 3
+          ELSE 4
+        END,`;
+      
       switch (sortBy) {
         case 'newest':
-          orderByClause = "ORDER BY l.createdAt DESC";
+          orderByClause += " l.createdAt DESC";
           break;
         case 'price_low':
-          orderByClause = "ORDER BY l.isFree DESC, l.createdAt DESC";
+          orderByClause += " l.isFree DESC, l.createdAt DESC";
           break;
         case 'price_high':
-          orderByClause = "ORDER BY l.isFree ASC, l.createdAt DESC";
+          orderByClause += " l.isFree ASC, l.createdAt DESC";
           break;
         case 'popular':
-          orderByClause = "ORDER BY l.views DESC";
+          orderByClause += " l.views DESC, l.createdAt DESC";
           break;
+        default:
+          orderByClause += " l.createdAt DESC";
       }
       
       const listingsQuery = `
@@ -329,6 +385,11 @@ export async function GET(request: NextRequest) {
                l.location,
                l.views,
                l.status,
+               l.moderationStatus,
+               l.rejectionReason,
+               l.promotionType,
+               l.promotionEnds,
+               l.expiresAt,
                l.images,
                l.tags,
                l.createdAt,
@@ -488,16 +549,30 @@ export async function GET(request: NextRequest) {
                tags: tags,
                isFree: listing.isFree === 1 || listing.isFree === true,
                status: listing.status || 'active',
+               moderationStatus: listing.moderationStatus || null,
+               rejectionReason: listing.rejectionReason || null,
+               promotionType: listing.promotionType || null,
+               promotionEnds: listing.promotionEnds || null,
+               expiresAt: listing.expiresAt || null,
                favoritesCount: typeof (listing as any).favoritesCount === 'bigint' ? Number((listing as any).favoritesCount) : ((listing as any).favoritesCount || 0),
              };
     });
 
-    return NextResponse.json({
+    // Відключаємо кешування для завжди актуальних даних
+    const response = NextResponse.json({
       listings: formattedListings,
       total,
       limit,
       offset,
     });
+    
+    // Додаємо заголовки для відключення кешування
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    response.headers.set('Surrogate-Control', 'no-store');
+    
+    return response;
   } catch (error) {
     console.error('Error fetching listings:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

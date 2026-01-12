@@ -402,7 +402,7 @@ export const UserProfilePage = ({
           }, 200);
         }}
         shareLink={getProfileShareLink(sellerTelegramId)}
-        shareText={`👤 Профіль ${sellerName}${sellerUsername ? ` (@${sellerUsername})` : ''} в AYN Marketplace`}
+        shareText={`👤 Профіль ${sellerName}${sellerUsername ? ` (@${sellerUsername})` : ''} в Trade Ground Marketplace`}
         tg={tg}
       />
 

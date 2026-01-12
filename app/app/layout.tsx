@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AYN Marketplace",
+  title: "Trade Ground Marketplace",
   description: "Marketplace for buying and selling",
 };
 

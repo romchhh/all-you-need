@@ -6,15 +6,12 @@ from config import administrators
 
 
 def create_dbs():
-    # Спочатку ініціалізуємо Prisma таблиці (основні)
     init_prisma_tables()
     
-    # Створюємо legacy таблиці для сумісності
     create_table()
     create_table_links()
     create_admins_table()
     
-    # Ініціалізуємо суперадміна
     if administrators:
         superadmin_id = administrators[0]
         init_superadmin(superadmin_id)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { Listing } from '@/types';
 import { getCategories } from '@/constants/categories';
@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/useToast';
 import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
 import { ListingGridSkeleton } from '@/components/SkeletonLoader';
 import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
-import { CreateListingModal } from '@/components/CreateListingModal';
+import CreateListingFlow from '@/components/CreateListingFlow';
 import { CategoriesModal } from '@/components/CategoriesModal';
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -86,8 +86,13 @@ const BazaarPage = () => {
     return '';
   });
   
-  // Debounce для пошуку - зменшує кількість фільтрацій
-  const debouncedSearchQuery = useDebounce(searchQuery, 400);
+  const [isTyping, setIsTyping] = useState(false);
+  
+  // Debounce для пошуку - збільшено до 800ms для максимальної плавності
+  const debouncedSearchQuery = useDebounce(searchQuery, 800);
+  
+  // useDeferredValue для неблокуючого оновлення UI
+  const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [selectedSeller, setSelectedSeller] = useState<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
@@ -764,6 +769,14 @@ const BazaarPage = () => {
   // Мемоізуємо callbacks для запобігання непотрібних перерендерів (на верхньому рівні!)
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
+    setIsTyping(true);
+    
+    // Скидаємо isTyping через короткий час
+    const timer = setTimeout(() => {
+      setIsTyping(false);
+    }, 300);
+    
+    return () => clearTimeout(timer);
   }, []);
   
   const handleCreateListing = useCallback(() => {
@@ -852,7 +865,8 @@ const BazaarPage = () => {
       <BazaarTab
         categories={categories}
         listings={listings}
-        searchQuery={debouncedSearchQuery}
+        searchQuery={searchQuery}
+        deferredSearchQuery={deferredSearchQuery}
         onSearchChange={handleSearchChange}
         favorites={favorites}
         onSelectListing={(listing) => {
@@ -1012,37 +1026,10 @@ const BazaarPage = () => {
       />
 
       {profile && (
-        <CreateListingModal
+        <CreateListingFlow
           isOpen={isCreateListingModalOpen}
           onClose={() => setIsCreateListingModalOpen(false)}
-          onSave={async (listingData) => {
-            const formData = new FormData();
-            formData.append('title', listingData.title);
-            formData.append('description', listingData.description);
-            formData.append('price', listingData.price);
-            formData.append('currency', listingData.currency || 'UAH');
-            formData.append('isFree', listingData.isFree.toString());
-            formData.append('category', listingData.category);
-            if (listingData.subcategory) {
-              formData.append('subcategory', listingData.subcategory);
-            }
-            formData.append('location', listingData.location);
-            formData.append('condition', listingData.condition);
-            formData.append('telegramId', profile.telegramId);
-            
-            listingData.images.forEach((image: File) => {
-              formData.append('images', image);
-            });
-
-            const response = await fetch('/api/listings/create', {
-              method: 'POST',
-              body: formData,
-            });
-
-            if (!response.ok) {
-              throw new Error('Failed to create listing');
-            }
-
+          onSuccess={async () => {
             // Очищаємо кеш та примусово оновлюємо дані після створення нового товару
             if (typeof window !== 'undefined') {
               localStorage.removeItem('bazaarListingsState');

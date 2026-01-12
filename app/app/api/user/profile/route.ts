@@ -371,6 +371,7 @@ export async function GET(request: NextRequest) {
           phone,
           avatar,
           balance,
+          listingPackagesBalance,
           rating,
           reviewsCount,
           createdAt
@@ -386,6 +387,7 @@ export async function GET(request: NextRequest) {
         phone: string | null;
         avatar: string | null;
         balance: number | bigint;
+        listingPackagesBalance: number | bigint;
         rating: number | bigint;
         reviewsCount: number | bigint;
         createdAt: string;
@@ -416,6 +418,7 @@ export async function GET(request: NextRequest) {
       phone: userData.phone,
       avatar: userData.avatar,
       balance: typeof userData.balance === 'bigint' ? Number(userData.balance) : userData.balance,
+      listingPackagesBalance: typeof userData.listingPackagesBalance === 'bigint' ? Number(userData.listingPackagesBalance) : userData.listingPackagesBalance,
       rating: typeof userData.rating === 'bigint' ? Number(userData.rating) : userData.rating,
       reviewsCount: typeof userData.reviewsCount === 'bigint' ? Number(userData.reviewsCount) : userData.reviewsCount,
       createdAt: userData.createdAt,

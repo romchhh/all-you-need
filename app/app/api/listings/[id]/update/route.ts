@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import sharp from 'sharp';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join } from 'path';
+import {
+  findUserByTelegramIdForListing,
+  deductListingPackage,
+  processAndUploadImages,
+  parseExistingImages,
+  updateListingToDraft,
+  updateListingData,
+  needsReactivation,
+} from '@/utils/listingHelpers';
+
+interface Listing {
+  userId: number;
+  images: string;
+  status: string;
+  moderationStatus: string;
+}
 
 export async function PUT(
   request: NextRequest,
@@ -14,6 +26,8 @@ export async function PUT(
     const listingId = parseInt(id);
     const formData = await request.formData();
 
+    // Отримуємо дані з форми
+    const telegramId = formData.get('telegramId') as string;
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
     const price = formData.get('price') as string;
@@ -23,171 +37,106 @@ export async function PUT(
     const subcategory = formData.get('subcategory') as string | null;
     const condition = formData.get('condition') as string | null;
     const location = formData.get('location') as string;
-    const status = formData.get('status') as string | null;
-    const telegramId = formData.get('telegramId') as string;
+    const requestedStatus = formData.get('status') as string | null;
 
-    // Перевіряємо чи користувач є власником
-    const user = await prisma.$queryRawUnsafe(
-      `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-      parseInt(telegramId)
-    ) as Array<{ id: number }>;
-
-    if (!user[0]) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    // Знаходимо користувача
+    const user = await findUserByTelegramIdForListing(telegramId);
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-      select: { userId: true, images: true },
-    });
+    // Отримуємо оголошення
+    const listings = await prisma.$queryRawUnsafe(
+      `SELECT userId, images, status, moderationStatus FROM Listing WHERE id = ?`,
+      listingId
+    ) as Listing[];
 
-    if (!listing) {
-      return NextResponse.json(
-        { error: 'Listing not found' },
-        { status: 404 }
-      );
+    if (listings.length === 0) {
+      return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
 
-    if (listing.userId !== user[0].id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
+    const listing = listings[0];
+
+    // Перевіряємо власника
+    if (listing.userId !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Обробка зображень
+    // Обробляємо зображення
     const imageFiles = formData.getAll('images') as File[];
-    let imageUrls: string[] = [];
+    const existingImages = parseExistingImages(listing.images);
+    const imageUrls = await processAndUploadImages(imageFiles, existingImages);
 
-    if (imageFiles.length > 0 && imageFiles[0].size > 0) {
-      const uploadsDir = join(process.cwd(), 'public', 'listings');
-      if (!existsSync(uploadsDir)) {
-        await mkdir(uploadsDir, { recursive: true });
+    const listingData = {
+      title,
+      description,
+      price,
+      currency,
+      isFree,
+      category,
+      subcategory,
+      condition,
+      location,
+    };
+
+    // Перевіряємо чи потрібна реактивація (зміна статусу на 'active' з будь-якого іншого статусу)
+    if (needsReactivation(listing.status, requestedStatus || '')) {
+      console.log('[Update Listing] Reactivating listing from status:', listing.status, 'to:', requestedStatus);
+
+      // Списуємо пакет
+      const hasPackage = await deductListingPackage(user);
+      if (!hasPackage) {
+        return NextResponse.json(
+          { error: 'No available listings. Please purchase a package.', needsPackage: true },
+          { status: 400 }
+        );
       }
 
-      for (const file of imageFiles) {
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        
-        const optimizedBuffer = await sharp(buffer)
-          .rotate() // Автоматично виправляє орієнтацію на основі EXIF даних
-          .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-          .webp({ quality: 85, effort: 4 })
-          .toBuffer();
-
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substring(7);
-        const filename = `listing_${timestamp}_${random}.webp`;
-        const filepath = join(uploadsDir, filename);
-        await writeFile(filepath, optimizedBuffer);
-        // Зберігаємо шлях без query параметрів, API route сам обробить кешування
-        imageUrls.push(`/listings/${filename}`);
-      }
-    } else {
-      // Використовуємо старі зображення
-      imageUrls = typeof listing.images === 'string' 
-        ? JSON.parse(listing.images) 
-        : listing.images || [];
-    }
-
-    // Оновлюємо оголошення
-    const updateTime = new Date().toISOString();
-    const newStatus = status || 'active';
-    
-    // Якщо оголошення було expired і стало active, оновлюємо publishedAt (з retry)
-    const { executeWithRetry } = await import('@/lib/prisma');
-    
-    const currentListing = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT status, publishedAt FROM Listing WHERE id = ?`,
+      // Оновлюємо дані оголошення, але НЕ змінюємо статус - залишаємо поточний статус
+      // Статус буде змінено тільки після вибору реклами (або пропуску) на pending_moderation
+      const now = new Date();
+      const nowStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
+      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const expiresAtStr = new Date(expiresAt.getTime() - expiresAt.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
+      
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing SET
+          title = ?, description = ?, price = ?, currency = ?, isFree = ?,
+          category = ?, subcategory = ?, condition = ?, location = ?,
+          images = ?, expiresAt = ?, updatedAt = ?, rejectionReason = NULL
+        WHERE id = ?`,
+        listingData.title,
+        listingData.description,
+        listingData.price,
+        listingData.currency,
+        listingData.isFree ? 1 : 0,
+        listingData.category,
+        listingData.subcategory || null,
+        listingData.condition || null,
+        listingData.location,
+        JSON.stringify(imageUrls),
+        expiresAtStr,
+        nowStr,
         listingId
-      ) as Promise<Array<{ status: string; publishedAt: string | null }>>
-    );
-    
-    const wasExpired = currentListing[0]?.status === 'expired';
-    const isNowActive = newStatus === 'active';
-    const shouldUpdatePublishedAt = wasExpired && isNowActive;
-    
-    if (shouldUpdatePublishedAt) {
-      // Оновлюємо publishedAt при активації expired оголошення
-      await executeWithRetry(() =>
-        prisma.$executeRawUnsafe(
-          `UPDATE Listing SET
-            title = ?,
-            description = ?,
-            price = ?,
-            currency = ?,
-            isFree = ?,
-            category = ?,
-            subcategory = ?,
-            condition = ?,
-            location = ?,
-            status = ?,
-            images = ?,
-            updatedAt = ?,
-            publishedAt = ?
-          WHERE id = ?`,
-          title,
-          description,
-          price,
-          currency,
-          isFree ? 1 : 0,
-          category,
-          subcategory || null,
-          condition || null,
-          location,
-          newStatus,
-          JSON.stringify(imageUrls),
-          updateTime,
-          updateTime, // Оновлюємо publishedAt
-          listingId
-        )
       );
-    } else {
-      // Звичайне оновлення без зміни publishedAt
-      await executeWithRetry(() =>
-        prisma.$executeRawUnsafe(
-          `UPDATE Listing SET
-            title = ?,
-            description = ?,
-            price = ?,
-            currency = ?,
-            isFree = ?,
-            category = ?,
-            subcategory = ?,
-            condition = ?,
-            location = ?,
-            status = ?,
-            images = ?,
-            updatedAt = ?
-          WHERE id = ?`,
-          title,
-          description,
-          price,
-          currency,
-          isFree ? 1 : 0,
-          category,
-          subcategory || null,
-          condition || null,
-          location,
-          newStatus,
-          JSON.stringify(imageUrls),
-          updateTime,
-          listingId
-        )
-      );
+
+      return NextResponse.json({
+        success: true,
+        needsPromotionSelection: true,
+        listingId,
+        message: 'Listing updated, ready for promotion selection',
+      });
     }
+
+    // Звичайне оновлення без реактивації (не змінюємо статус на 'active')
+    await updateListingData(listingId, listingData, imageUrls, requestedStatus || undefined);
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating listing:', error);
+    console.error('[Update Listing] Error:', error);
     return NextResponse.json(
       { error: 'Failed to update listing' },
       { status: 500 }
     );
   }
 }
-

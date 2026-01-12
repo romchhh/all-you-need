@@ -11,6 +11,7 @@ interface UserProfile {
   phone: string | null;
   avatar: string | null;
   balance: number;
+  listingPackagesBalance: number;
   rating: number;
   reviewsCount: number;
   createdAt: string;
