@@ -13,7 +13,7 @@ from database_functions.prisma_db import PrismaDB
 from database_functions.telegram_listing_db import get_user_telegram_listings, get_telegram_listing_by_id
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, get_user_lang
-from keyboards.client_keyboards import get_catalog_webapp_keyboard, get_language_selection_keyboard
+from keyboards.client_keyboards import get_catalog_webapp_keyboard, get_language_selection_keyboard, get_support_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 
@@ -151,6 +151,25 @@ async def start_command(message: types.Message):
 
     
     
+@router.message(F.text.in_([
+    "💬 Підтримка",  # UK
+    "💬 Поддержка"   # RU
+]))
+async def support_handler(message: types.Message):
+    user_id = message.from_user.id
+    
+    support_text = (
+        t(user_id, 'support.title') +
+        t(user_id, 'support.description')
+    )
+    
+    await message.answer(
+        support_text,
+        reply_markup=get_support_keyboard(user_id),
+        parse_mode="HTML"
+    )
+
+
 async def on_startup(router):
     create_dbs()
     username = bot_username or (await bot.get_me()).username

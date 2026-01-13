@@ -1,6 +1,7 @@
+import os
 from aiogram import Router, types, F
 from utils.translations import t
-from keyboards.client_keyboards import get_about_us_keyboard, get_about_us_back_keyboard
+from keyboards.client_keyboards import get_about_us_keyboard, get_about_us_back_keyboard, get_about_us_rules_keyboard
 
 router = Router()
 
@@ -78,6 +79,20 @@ async def about_instructions_callback(callback: types.CallbackQuery):
     await callback.message.edit_text(
         instructions_text,
         reply_markup=get_about_us_back_keyboard(user_id),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "about_rules")
+async def about_rules_callback(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    
+    rules_text = t(user_id, 'about_us.rules_text')
+    
+    await callback.message.edit_text(
+        rules_text,
+        reply_markup=get_about_us_rules_keyboard(user_id),
         parse_mode="HTML"
     )
     await callback.answer()

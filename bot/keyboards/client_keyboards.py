@@ -59,19 +59,16 @@ def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
     lang = get_user_lang(user_id)
     
-    catalog_url = f"{webapp_url}/{lang}/bazaar?telegramId={user_id}"
-    
-    catalog_button = KeyboardButton(
-        text=t(user_id, 'menu.catalog'),
-        web_app=WebAppInfo(url=catalog_url)
+    add_listing_button = KeyboardButton(
+        text=t(user_id, 'menu.add_listing')
     )
     
     my_listings_button = KeyboardButton(
         text=t(user_id, 'menu.my_listings')
     )
     
-    add_listing_button = KeyboardButton(
-        text=t(user_id, 'menu.add_listing')
+    about_us_button = KeyboardButton(
+        text=t(user_id, 'menu.about_us')
     )
     
     my_profile_button = KeyboardButton(
@@ -79,15 +76,17 @@ def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
         web_app=WebAppInfo(url=f"{webapp_url}/{lang}/profile?telegramId={user_id}")
     )
     
-    about_us_button = KeyboardButton(
-        text=t(user_id, 'menu.about_us')
+    support_button = KeyboardButton(
+        text=t(user_id, 'menu.support')
     )
     
     return ReplyKeyboardMarkup(
         keyboard=[
-            [catalog_button],
-            [my_listings_button, add_listing_button],
-            [my_profile_button, about_us_button]
+            [add_listing_button],
+            [my_listings_button],
+            [about_us_button],
+            [my_profile_button],
+            [support_button]
         ],
         resize_keyboard=True,
         is_persistent=True
@@ -100,6 +99,9 @@ def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
     telegram_url = os.getenv('TELEGRAM_URL', 'https://t.me/your_channel')
     instagram_url = os.getenv('INSTAGRAM_URL', 'https://instagram.com/your_account')
     tiktok_url = os.getenv('TIKTOK_URL', 'https://tiktok.com/@your_account')
+    support_url = os.getenv('SUPPORT_URL', telegram_url)  # Якщо немає окремого URL, використовуємо telegram
+    lang = get_user_lang(user_id)
+    offer_url = get_offer_url(lang)
     
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -133,6 +135,12 @@ def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
                 text=t(user_id, 'about_us.instructions'),
                 callback_data="about_instructions"
             )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.rules'),
+                callback_data="about_rules"
+            )
         ]
     ])
 
@@ -144,6 +152,41 @@ def get_about_us_back_keyboard(user_id: int) -> InlineKeyboardMarkup:
             text=t(user_id, 'about_us.back'),
             callback_data="about_us_main"
         )]
+    ])
+
+
+def get_about_us_rules_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Створює клавіатуру для правил з кнопкою 'Назад' та 'Відкрити повну версію'"""
+    lang = get_user_lang(user_id)
+    offer_url = get_offer_url(lang)
+    
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.open_full_version'),
+                url=offer_url
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.back'),
+                callback_data="about_us_main"
+            )
+        ]
+    ])
+
+
+def get_support_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Створює клавіатуру для підтримки з кнопкою посиланням на менеджера"""
+    support_manager = os.getenv('SUPPORT_MANAGER', 'https://t.me/your_support_manager')
+    
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'support.contact_manager'),
+                url=support_manager
+            )
+        ]
     ])
 
 
