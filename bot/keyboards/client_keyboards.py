@@ -82,10 +82,8 @@ def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     
     return ReplyKeyboardMarkup(
         keyboard=[
-            [add_listing_button],
-            [my_listings_button],
-            [about_us_button],
-            [my_profile_button],
+            [add_listing_button, my_listings_button],
+            [about_us_button, my_profile_button],
             [support_button]
         ],
         resize_keyboard=True,
