@@ -7,7 +7,6 @@ from utils.translations import t
 from states.client_states import CreateListing
 from keyboards.client_keyboards import (
     get_categories_keyboard,
-    get_subcategories_keyboard,
     get_condition_keyboard,
     get_listing_confirmation_keyboard,
     get_main_menu_keyboard
@@ -193,68 +192,8 @@ async def process_category(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer("❌ Категорія не знайдена", show_alert=True)
         return
     
-    subcategories = selected_category.get('subcategories', [])
-    
-    await state.update_data(category_id=category_id, category_name=selected_category['name'])
-    
-    if subcategories:
-        await state.set_state(CreateListing.waiting_for_subcategory)
-        await callback.message.edit_text(
-            t(user_id, 'create_listing.subcategory_prompt'),
-            parse_mode="HTML",
-            reply_markup=get_subcategories_keyboard(user_id, subcategories, category_id)
-        )
-    else:
-        await state.update_data(subcategory_id=None, subcategory_name=None)
-        await state.set_state(CreateListing.waiting_for_price)
-        await callback.message.edit_text(
-            t(user_id, 'create_listing.price_prompt'),
-            parse_mode="HTML"
-        )
-    
-    await callback.answer()
-
-
-@router.callback_query(F.data == "back_to_categories", CreateListing.waiting_for_subcategory)
-async def back_to_categories(callback: types.CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    categories = get_categories()
-    
-    await state.set_state(CreateListing.waiting_for_category)
-    await callback.message.edit_text(
-        t(user_id, 'create_listing.category_prompt'),
-        parse_mode="HTML",
-        reply_markup=get_categories_keyboard(user_id, categories)
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("subcat_"), CreateListing.waiting_for_subcategory)
-async def process_subcategory(callback: types.CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    parts = callback.data.split("_")
-    subcategory_id = int(parts[1])
-    category_id = int(parts[2])
-    
-    categories = get_categories()
-    selected_category = next((c for c in categories if c['id'] == category_id), None)
-    
-    if not selected_category:
-        await callback.answer("❌ Категорія не знайдена", show_alert=True)
-        return
-    
-    subcategories = selected_category.get('subcategories', [])
-    selected_subcategory = next((s for s in subcategories if s['id'] == subcategory_id), None)
-    
-    if not selected_subcategory:
-        await callback.answer("❌ Підкатегорія не знайдена", show_alert=True)
-        return
-    
-    await state.update_data(
-        subcategory_id=subcategory_id,
-        subcategory_name=selected_subcategory['name']
-    )
     await state.set_state(CreateListing.waiting_for_price)
+    await state.update_data(category_id=category_id, category_name=selected_category['name'])
     
     await callback.message.edit_text(
         t(user_id, 'create_listing.price_prompt'),
@@ -370,8 +309,6 @@ def build_preview(user_id: int, data: dict) -> str:
     preview += t(user_id, 'create_listing.preview_description').format(description=data.get('description', ''))
     
     category_text = data.get('category_name', '')
-    if data.get('subcategory_name'):
-        category_text += t(user_id, 'create_listing.preview_subcategory').format(subcategory=data.get('subcategory_name', ''))
     preview += t(user_id, 'create_listing.preview_category').format(category=category_text)
     
     preview += t(user_id, 'create_listing.preview_price').format(price=data.get('price', 0))
@@ -409,7 +346,7 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
             price=float(data['price']),
             currency='EUR',
             category=data['category_name'],
-            subcategory=data.get('subcategory_name'),
+            subcategory=None,
             condition=data['condition'],
             location=data.get('location', 'Не вказано'),
             images=photos
