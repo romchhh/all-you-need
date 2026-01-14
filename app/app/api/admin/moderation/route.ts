@@ -3,7 +3,14 @@ import { prisma } from '@/lib/prisma';
 import { isAdminAuthenticated } from '@/utils/adminAuth';
 import { getListingWithUser, approveListing, rejectListing } from '@/utils/moderationHelpers';
 
-// Отримати оголошення на модерації
+/**
+ * @deprecated Використовуйте окремі endpoints:
+ * - GET /api/admin/moderation/marketplace - для маркетплейсу
+ * - GET /api/admin/moderation/telegram - для Telegram бота
+ * 
+ * Цей endpoint залишено для сумісності, але рекомендується використовувати окремі endpoints
+ */
+// Отримати оголошення на модерації (об'єднані з обох джерел)
 export async function GET(request: NextRequest) {
   try {
     const isAdmin = await isAdminAuthenticated();
@@ -13,31 +20,53 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') || 'pending';
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '50', 10) || 50));
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10) || 0);
 
     console.log('[Moderation API] Fetching listings with status:', status);
 
-    // Отримуємо оголошення з маркетплейсу
-    const marketplaceListings = await prisma.$queryRawUnsafe(
-      `SELECT 
-        l.id, l.userId, l.title, l.description, l.price, l.currency,
-        l.category, l.location, l.images, l.createdAt, l.moderationStatus,
-        u.id as user_id, 
-        CAST(u.telegramId AS TEXT) as user_telegramId,
-        u.username as user_username,
-        u.firstName as user_firstName,
-        u.lastName as user_lastName,
-        'marketplace' as source
-      FROM Listing l
-      JOIN User u ON l.userId = u.id
-      WHERE l.moderationStatus = ?
-      ORDER BY l.createdAt DESC`,
-      status
-    ) as any[];
+    // Отримуємо оголошення з маркетплейсу через Prisma
+    const marketplaceDb = await prisma.listing.findMany({
+      where: { moderationStatus: status },
+      include: {
+        user: {
+          select: {
+            id: true,
+            telegramId: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    // Отримуємо оголошення з Telegram бота
-    const telegramListings = await prisma.$queryRawUnsafe(
+    const marketplaceListings = marketplaceDb.map((l: any) => ({
+      id: l.id,
+      userId: l.userId,
+      title: l.title,
+      description: l.description,
+      price: l.price,
+      currency: l.currency,
+      category: l.category,
+      location: l.location,
+      images: l.images,
+      createdAt: l.createdAt,
+      moderationStatus: l.moderationStatus,
+      user_id: l.user.id,
+      user_telegramId: typeof l.user.telegramId === 'bigint' 
+        ? l.user.telegramId.toString() 
+        : (l.user.telegramId?.toString() || null),
+      user_username: l.user.username,
+      user_firstName: l.user.firstName,
+      user_lastName: l.user.lastName,
+      source: 'marketplace' as const,
+    }));
+
+    // Отримуємо оголошення з Telegram бота через сирий SQL
+    // (використовуємо сирий SQL, оскільки цей endpoint deprecated і Prisma Client може не бути згенерований)
+    const telegramRaw = await prisma.$queryRawUnsafe(
       `SELECT 
         tl.id, tl.userId, tl.title, tl.description, tl.price, tl.currency,
         tl.category, tl.location, tl.images, tl.createdAt, tl.moderationStatus,
@@ -45,26 +74,69 @@ export async function GET(request: NextRequest) {
         CAST(u.telegramId AS TEXT) as user_telegramId,
         u.username as user_username,
         u.firstName as user_firstName,
-        u.lastName as user_lastName,
-        'telegram' as source
+        u.lastName as user_lastName
       FROM TelegramListing tl
       JOIN User u ON tl.userId = u.id
       WHERE tl.moderationStatus = ?
       ORDER BY tl.createdAt DESC`,
       status
     ) as any[];
+    
+    // Конвертуємо результат в формат, який очікує код нижче
+    const telegramDb = telegramRaw.map((tl: any) => ({
+      id: tl.id,
+      userId: tl.userId,
+      title: tl.title,
+      description: tl.description,
+      price: tl.price,
+      currency: tl.currency,
+      category: tl.category,
+      location: tl.location,
+      images: tl.images,
+      createdAt: tl.createdAt,
+      moderationStatus: tl.moderationStatus,
+      user: {
+        id: tl.user_id,
+        telegramId: tl.user_telegramId || null,
+        username: tl.user_username || null,
+        firstName: tl.user_firstName || null,
+        lastName: tl.user_lastName || null,
+      },
+    }));
+
+    const telegramListings = telegramDb.map((tl: any) => ({
+      id: tl.id,
+      userId: tl.userId,
+      title: tl.title,
+      description: tl.description,
+      price: tl.price,
+      currency: tl.currency,
+      category: tl.category,
+      location: tl.location,
+      images: tl.images,
+      createdAt: tl.createdAt,
+      moderationStatus: tl.moderationStatus,
+      user_id: tl.user.id,
+      user_telegramId: typeof tl.user.telegramId === 'bigint' 
+        ? tl.user.telegramId.toString() 
+        : (tl.user.telegramId?.toString() || null),
+      user_username: tl.user.username || null,
+      user_firstName: tl.user.firstName || null,
+      user_lastName: tl.user.lastName || null,
+      source: 'telegram' as const,
+    }));
 
     // Об'єднуємо та сортуємо за датою
     const allListings = [...marketplaceListings, ...telegramListings]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(offset, offset + limit);
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    const total = marketplaceListings.length + telegramListings.length;
+    const total = allListings.length;
+    const paginatedListings = allListings.slice(offset, offset + limit);
 
-    console.log('[Moderation API] Found listings:', allListings.length, 'Total:', total);
+    console.log('[Moderation API] Found listings:', paginatedListings.length, 'Total:', total);
 
-    // Форматуємо дані - конвертуємо BigInt в number/string
-    const formattedListings = allListings.map((l: any) => ({
+    // Форматуємо дані - telegramId вже конвертований в string вище
+    const formattedListings = paginatedListings.map((l: any) => ({
       id: l.id,
       userId: l.userId,
       title: l.title,
@@ -78,9 +150,7 @@ export async function GET(request: NextRequest) {
       source: l.source, // 'marketplace' або 'telegram'
       user: {
         id: l.user_id,
-        telegramId: typeof l.user_telegramId === 'bigint' 
-          ? l.user_telegramId.toString() 
-          : l.user_telegramId,
+        telegramId: l.user_telegramId || null,
         username: l.user_username,
         firstName: l.user_firstName,
         lastName: l.user_lastName,
@@ -137,7 +207,7 @@ export async function POST(request: NextRequest) {
     // Отримуємо оголошення (з маркетплейсу або з Telegram)
     let listing;
     if (source === 'telegram') {
-      // Отримуємо TelegramListing
+      // Отримуємо TelegramListing через сирий SQL (оскільки Prisma Client може не бути згенерований)
       const result = await prisma.$queryRawUnsafe(
         `SELECT tl.*, 
                 CAST(u.telegramId AS TEXT) as telegramId, 
@@ -156,7 +226,34 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
-      listing = { ...result[0], source: 'telegram' };
+
+      const rawData = result[0];
+      listing = {
+        id: rawData.id,
+        userId: rawData.userId,
+        title: rawData.title,
+        description: rawData.description,
+        price: rawData.price,
+        currency: rawData.currency,
+        category: rawData.category,
+        subcategory: rawData.subcategory,
+        condition: rawData.condition,
+        location: rawData.location,
+        images: rawData.images,
+        status: rawData.status,
+        moderationStatus: rawData.moderationStatus,
+        rejectionReason: rawData.rejectionReason,
+        publishedAt: rawData.publishedAt,
+        moderatedAt: rawData.moderatedAt,
+        moderatedBy: rawData.moderatedBy,
+        createdAt: rawData.createdAt,
+        updatedAt: rawData.updatedAt,
+        telegramId: rawData.telegramId || null,
+        hasUsedFreeAd: rawData.hasUsedFreeAd || false,
+        listingPackagesBalance: rawData.listingPackagesBalance || 0,
+        balance: rawData.balance || 0,
+        source: 'telegram',
+      };
     } else {
       // Отримуємо звичайне Listing
       listing = await getListingWithUser(listingId);

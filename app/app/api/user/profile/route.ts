@@ -75,7 +75,8 @@ async function downloadProfilePhoto(photoUrl: string, userId: number): Promise<s
       await mkdir(uploadsDir, { recursive: true });
     }
     
-    const filename = `avatar_${userId}_${Date.now()}.webp`;
+    // Використовуємо стабільне ім'я файлу, щоб не створювати дублікати
+    const filename = `avatar_${userId}.webp`;
     const filepath = join(uploadsDir, filename);
     
     await writeFile(filepath, optimizedBuffer);
@@ -177,7 +178,8 @@ export async function POST(request: NextRequest) {
         await mkdir(uploadsDir, { recursive: true });
       }
       
-      const filename = `avatar_${telegramId}_${Date.now()}.svg`;
+      // Стабільне ім'я файлу для SVG-аватара
+      const filename = `avatar_${telegramId}.svg`;
       const filepath = join(uploadsDir, filename);
       
       await writeFile(filepath, svg);

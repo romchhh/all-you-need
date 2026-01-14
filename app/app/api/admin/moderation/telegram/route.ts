@@ -1,0 +1,416 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { isAdminAuthenticated } from '@/utils/adminAuth';
+
+// Отримати оголошення з Telegram бота на модерації
+export async function GET(request: NextRequest) {
+  try {
+    const isAdmin = await isAdminAuthenticated();
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const status = searchParams.get('status') || 'pending';
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '50', 10) || 50));
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10) || 0);
+
+    console.log('[Moderation API - Telegram] Fetching listings with status:', status);
+
+    // Отримуємо оголошення з Telegram бота через Prisma
+    let telegramDb: any[] = [];
+    let total = 0;
+    
+    try {
+      // Спробуємо використати Prisma ORM, якщо модель доступна
+      if ('telegramListing' in prisma && typeof (prisma as any).telegramListing?.findMany === 'function') {
+        telegramDb = await (prisma as any).telegramListing.findMany({
+          where: { moderationStatus: status },
+          include: {
+            user: {
+              select: {
+                id: true,
+                telegramId: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: offset,
+          take: limit,
+        });
+
+        total = await (prisma as any).telegramListing.count({
+          where: { moderationStatus: status },
+        });
+      } else {
+        throw new Error('TelegramListing model not available');
+      }
+    } catch (error: any) {
+      // Якщо модель TelegramListing не знайдена (Prisma Client не згенеровано),
+      // використовуємо сирий SQL як fallback
+      if (error.message?.includes('telegramListing') || error.code === 'P2001') {
+        console.warn('[Moderation API - Telegram] TelegramListing model not found, using raw SQL fallback');
+        
+        const allTelegramListings = await prisma.$queryRawUnsafe(
+          `SELECT 
+            tl.id, tl.userId, tl.title, tl.description, tl.price, tl.currency,
+            tl.category, tl.location, tl.images, tl.createdAt, tl.moderationStatus,
+            u.id as user_id, 
+            CAST(u.telegramId AS TEXT) as user_telegramId,
+            u.username as user_username,
+            u.firstName as user_firstName,
+            u.lastName as user_lastName
+          FROM TelegramListing tl
+          JOIN User u ON tl.userId = u.id
+          WHERE tl.moderationStatus = ?
+          ORDER BY tl.createdAt DESC`,
+          status
+        ) as any[];
+
+        total = allTelegramListings.length;
+        const paginatedListings = allTelegramListings.slice(offset, offset + limit);
+        telegramDb = paginatedListings.map((tl: any) => ({
+          id: tl.id,
+          userId: tl.userId,
+          title: tl.title,
+          description: tl.description,
+          price: tl.price,
+          currency: tl.currency,
+          category: tl.category,
+          location: tl.location,
+          images: tl.images,
+          createdAt: tl.createdAt,
+          moderationStatus: tl.moderationStatus,
+          user: {
+            id: tl.user_id,
+            telegramId: tl.user_telegramId || null,
+            username: tl.user_username || null,
+            firstName: tl.user_firstName || null,
+            lastName: tl.user_lastName || null,
+          },
+        }));
+      } else {
+        throw error;
+      }
+    }
+
+    const telegramListings = telegramDb.map((tl: any) => ({
+      id: tl.id,
+      userId: tl.userId,
+      title: tl.title,
+      description: tl.description,
+      price: tl.price,
+      currency: tl.currency,
+      category: tl.category,
+      location: tl.location,
+      images: tl.images,
+      createdAt: tl.createdAt,
+      moderationStatus: tl.moderationStatus,
+      user: {
+        id: tl.user.id,
+        telegramId: typeof tl.user.telegramId === 'bigint' 
+          ? tl.user.telegramId.toString() 
+          : (tl.user.telegramId?.toString() || null),
+        username: tl.user.username,
+        firstName: tl.user.firstName,
+        lastName: tl.user.lastName,
+      },
+    }));
+
+    console.log('[Moderation API - Telegram] Found listings:', telegramListings.length, 'Total:', total);
+
+    return NextResponse.json({
+      listings: telegramListings,
+      total,
+      hasMore: offset + telegramListings.length < total,
+    });
+  } catch (error) {
+    console.error('Error fetching telegram moderation listings:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch listings' },
+      { status: 500 }
+    );
+  }
+}
+
+// Схвалити/відхилити оголошення з Telegram бота
+export async function POST(request: NextRequest) {
+  try {
+    const isAdmin = await isAdminAuthenticated();
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { listingId, action, reason } = body;
+
+    if (!listingId || !action) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    if (action !== 'approve' && action !== 'reject') {
+      return NextResponse.json(
+        { error: 'Invalid action' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'reject' && !reason) {
+      return NextResponse.json(
+        { error: 'Rejection reason is required' },
+        { status: 400 }
+      );
+    }
+
+    // Отримуємо TelegramListing через Prisma або сирий SQL
+    let tl: any = null;
+    try {
+      // Спробуємо використати Prisma ORM, якщо модель доступна
+      if ('telegramListing' in prisma && typeof (prisma as any).telegramListing?.findUnique === 'function') {
+        tl = await (prisma as any).telegramListing.findUnique({
+          where: { id: listingId },
+          include: {
+            user: {
+              select: {
+                telegramId: true,
+                hasUsedFreeAd: true,
+                listingPackagesBalance: true,
+                balance: true,
+              },
+            },
+          },
+        });
+      } else {
+        throw new Error('TelegramListing model not available');
+      }
+    } catch (error: any) {
+      // Fallback на сирий SQL
+      if (error.message?.includes('telegramListing') || error.code === 'P2001') {
+        const result = await prisma.$queryRawUnsafe(
+          `SELECT tl.*, 
+                  CAST(u.telegramId AS TEXT) as telegramId, 
+                  u.hasUsedFreeAd, 
+                  u.listingPackagesBalance, 
+                  u.balance
+           FROM TelegramListing tl
+           JOIN User u ON tl.userId = u.id
+           WHERE tl.id = ?`,
+          listingId
+        ) as any[];
+
+        if (result.length === 0) {
+          return NextResponse.json(
+            { error: 'Listing not found' },
+            { status: 404 }
+          );
+        }
+        const rawData = result[0];
+        tl = {
+          id: rawData.id,
+          userId: rawData.userId,
+          title: rawData.title,
+          description: rawData.description,
+          price: rawData.price,
+          currency: rawData.currency,
+          category: rawData.category,
+          subcategory: rawData.subcategory,
+          condition: rawData.condition,
+          location: rawData.location,
+          images: rawData.images,
+          status: rawData.status,
+          moderationStatus: rawData.moderationStatus,
+          rejectionReason: rawData.rejectionReason,
+          publishedAt: rawData.publishedAt,
+          moderatedAt: rawData.moderatedAt,
+          moderatedBy: rawData.moderatedBy,
+          createdAt: rawData.createdAt,
+          updatedAt: rawData.updatedAt,
+          user: {
+            telegramId: rawData.telegramId || null,
+            hasUsedFreeAd: rawData.hasUsedFreeAd || false,
+            listingPackagesBalance: rawData.listingPackagesBalance || 0,
+            balance: rawData.balance || 0,
+          },
+        };
+      } else {
+        throw error;
+      }
+    }
+
+    if (!tl) {
+      return NextResponse.json(
+        { error: 'Listing not found' },
+        { status: 404 }
+      );
+    }
+
+    const listing = {
+      ...tl,
+      telegramId: typeof tl.user.telegramId === 'bigint' 
+        ? tl.user.telegramId.toString() 
+        : (tl.user.telegramId?.toString() || null),
+      hasUsedFreeAd: tl.user.hasUsedFreeAd,
+      listingPackagesBalance: tl.user.listingPackagesBalance,
+      balance: tl.user.balance,
+    };
+
+    if (action === 'approve') {
+      // Публікуємо в канал
+      const { publishListingToChannel } = await import('@/utils/publishToChannel');
+      const channelMessageId = await publishListingToChannel(listing.id, {
+        id: listing.id,
+        title: listing.title,
+        description: listing.description,
+        price: listing.price,
+        currency: listing.currency || 'EUR',
+        category: listing.category,
+        subcategory: listing.subcategory,
+        condition: listing.condition,
+        location: listing.location,
+        images: listing.images,
+      });
+
+      // Схвалюємо TelegramListing
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+      const nowStr = new Date().toISOString();
+      
+      // Перевіряємо чи є колонка channelMessageId
+      const tableInfo = await prisma.$queryRawUnsafe(
+        `PRAGMA table_info(TelegramListing)`
+      ) as any[];
+      const hasChannelMessageId = tableInfo.some((col: any) => col.name === 'channelMessageId');
+      
+      if (!hasChannelMessageId) {
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE TelegramListing ADD COLUMN channelMessageId INTEGER`
+        );
+      }
+      
+      if (channelMessageId) {
+        await prisma.$executeRawUnsafe(
+          `UPDATE TelegramListing 
+           SET status = 'approved',
+               moderationStatus = 'approved',
+               publishedAt = ?,
+               moderatedAt = ?,
+               updatedAt = ?,
+               channelMessageId = ?
+           WHERE id = ?`,
+          nowStr,
+          nowStr,
+          nowStr,
+          channelMessageId,
+          listing.id
+        );
+      } else {
+        await prisma.$executeRawUnsafe(
+          `UPDATE TelegramListing 
+           SET status = 'approved',
+               moderationStatus = 'approved',
+               publishedAt = ?,
+               moderatedAt = ?,
+               updatedAt = ?
+           WHERE id = ?`,
+          nowStr,
+          nowStr,
+          nowStr,
+          listing.id
+        );
+      }
+      
+      // Надсилаємо повідомлення користувачу з посиланням на канал
+      if (listing.telegramId) {
+        const { sendTelegramMessage } = await import('@/utils/telegramNotifications');
+        const TRADE_CHANNEL_ID = process.env.TRADE_CHANNEL_ID;
+        const TRADE_CHANNEL_USERNAME = process.env.TRADE_CHANNEL_USERNAME || '';
+        
+        let channelLink = '';
+        if (channelMessageId && TRADE_CHANNEL_ID) {
+          if (TRADE_CHANNEL_USERNAME) {
+            channelLink = `https://t.me/${TRADE_CHANNEL_USERNAME}/${channelMessageId}`;
+          } else {
+            const channelId = TRADE_CHANNEL_ID.replace(/^-100/, '');
+            channelLink = `https://t.me/c/${channelId}/${channelMessageId}`;
+          }
+        }
+        
+        const message = `✅ <b>Оголошення схвалено!</b>
+
+Ваше оголошення "<b>${listing.title}</b>" пройшло модерацію та опубліковане в каналі.
+
+Дякуємо за використання нашого сервісу!`;
+        
+        const replyMarkup = channelLink ? {
+          inline_keyboard: [[
+            {
+              text: '🔗 Переглянути оголошення',
+              url: channelLink,
+            }
+          ]]
+        } : undefined;
+        
+        await sendTelegramMessage(listing.telegramId, message, {
+          reply_markup: replyMarkup,
+        }).catch(err => {
+          console.error('Failed to send approval notification:', err);
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Telegram listing approved',
+      });
+    } else {
+      // Відхиляємо TelegramListing
+      const nowStr = new Date().toISOString();
+      await prisma.$executeRawUnsafe(
+        `UPDATE TelegramListing 
+         SET status = 'rejected',
+             moderationStatus = 'rejected',
+             rejectionReason = ?,
+             moderatedAt = ?,
+             updatedAt = ?
+         WHERE id = ?`,
+        reason,
+        nowStr,
+        nowStr,
+        listing.id
+      );
+      
+      // Надсилаємо повідомлення користувачу
+      if (listing.telegramId) {
+        const { sendTelegramMessage } = await import('@/utils/telegramNotifications');
+        const message = `❌ <b>Оголошення відхилено</b>
+
+Ваше оголошення "<b>${listing.title}</b>" не пройшло модерацію.
+
+📝 <b>Причина відхилення:</b>
+${reason}
+
+Ви можете створити нове оголошення з урахуванням зауважень модератора.`;
+        
+        await sendTelegramMessage(listing.telegramId, message).catch(err => {
+          console.error('Failed to send rejection notification:', err);
+        });
+      }
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Telegram listing rejected',
+      });
+    }
+  } catch (error) {
+    console.error('Error moderating telegram listing:', error);
+    return NextResponse.json(
+      { error: 'Failed to moderate listing' },
+      { status: 500 }
+    );
+  }
+}

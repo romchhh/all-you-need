@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
         .webp({ quality: 85, effort: 4 })
         .toBuffer();
       
-      const filename = `avatar_${telegramId}_${Date.now()}.webp`;
+      // Стабільне ім'я файлу, щоб не створювати новий аватар при кожному оновленні
+      const filename = `avatar_${telegramId}.webp`;
       const filepath = join(uploadsDir, filename);
       
       await writeFile(filepath, optimizedBuffer);

@@ -29,6 +29,7 @@ model User {
   updatedAt               DateTime @updatedAt
 
   listings                Listing[]
+  telegramListings        TelegramListing[]
   favorites               Favorite[]
   transactions            Transaction[]
   reviews                 Review[]
@@ -92,6 +93,38 @@ model Listing {
   @@index([moderationStatus, createdAt])
   @@index([expiresAt])
   @@index([status, expiresAt])
+}
+
+// Оголошення з Telegram-бота (TelegramListing таблиця, яку створює бот)
+model TelegramListing {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  title            String
+  description      String
+  price            Float
+  currency         String?  @default("EUR")
+  category         String
+  subcategory      String?
+  condition        String   // NOT NULL в БД
+  location         String?
+  images           String   // JSON array of Telegram file_ids
+  status           String   @default("pending_moderation")
+  moderationStatus String   @default("pending")
+  rejectionReason  String?
+  publishedAt      DateTime?
+  moderatedAt      DateTime?
+  moderatedBy      Int?
+  channelMessageId Int?     // ID повідомлення в Telegram каналі (додається динамічно)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now())
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([moderationStatus])
+  @@index([createdAt])
+  @@index([category])
 }
 
 // Обране
