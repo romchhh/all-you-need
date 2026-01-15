@@ -92,8 +92,6 @@ def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
 
 
 def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Створює inline клавіатуру для меню 'Про нас'"""
-    # Отримуємо посилання з змінних оточення (якщо потрібно)
     telegram_url = os.getenv('TELEGRAM_URL', 'https://t.me/your_channel')
     instagram_url = os.getenv('INSTAGRAM_URL', 'https://instagram.com/your_account')
     tiktok_url = os.getenv('TIKTOK_URL', 'https://tiktok.com/@your_account')
@@ -144,7 +142,6 @@ def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_about_us_back_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Створює клавіатуру з кнопкою 'Назад' для підрозділів 'Про нас'"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text=t(user_id, 'about_us.back'),
@@ -154,7 +151,6 @@ def get_about_us_back_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_about_us_rules_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Створює клавіатуру для правил з кнопкою 'Назад' та 'Відкрити повну версію'"""
     lang = get_user_lang(user_id)
     offer_url = get_offer_url(lang)
     
@@ -175,7 +171,6 @@ def get_about_us_rules_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_support_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Створює клавіатуру для підтримки з кнопкою посиланням на менеджера"""
     support_manager = os.getenv('SUPPORT_MANAGER', 'https://t.me/your_support_manager')
     
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -189,7 +184,6 @@ def get_support_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_categories_keyboard(user_id: int, categories: list) -> InlineKeyboardMarkup:
-    """Створює клавіатуру з категоріями"""
     keyboard = []
     for category in categories:
         keyboard.append([
@@ -208,7 +202,6 @@ def get_categories_keyboard(user_id: int, categories: list) -> InlineKeyboardMar
 
 
 def get_subcategories_keyboard(user_id: int, subcategories: list, category_id: int) -> InlineKeyboardMarkup:
-    """Створює клавіатуру з підкатегоріями"""
     keyboard = []
     for subcat in subcategories:
         keyboard.append([
@@ -227,7 +220,6 @@ def get_subcategories_keyboard(user_id: int, subcategories: list, category_id: i
 
 
 def get_condition_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Створює клавіатуру для вибору стану товару"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
@@ -251,7 +243,6 @@ def get_condition_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_listing_confirmation_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Створює клавіатуру для підтвердження створення оголошення"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
@@ -263,4 +254,86 @@ def get_listing_confirmation_keyboard(user_id: int) -> InlineKeyboardMarkup:
                 callback_data="cancel_listing"
             )
         ]
+    ])
+
+
+def get_publication_tariff_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="📌 Звичайна публікація — 3€",
+                callback_data="tariff_standard"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="⭐ Виділене оголошення — 4,5€",
+                callback_data="tariff_highlighted"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="📌 Закріп у каналі — 5,5€ / 12 годин",
+                callback_data="tariff_pinned"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="📸 Сторіс у каналі — 5€ / 24 години",
+                callback_data="tariff_story"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="❌ Скасувати",
+                callback_data="cancel_listing"
+            )
+        ]
+    ])
+
+
+def get_german_cities_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    cities = [
+        "Berlin", "Hamburg",
+        "München", "Köln",
+        "Frankfurt am Main", "Stuttgart",
+        "Düsseldorf", "Dortmund",
+        "Essen", "Leipzig",
+        "Bremen", "Dresden",
+        "Hannover", "Nürnberg",
+        "Duisburg", "Bochum"
+    ]
+    
+    keyboard = []
+    for i in range(0, len(cities), 2):
+        row = []
+        row.append(InlineKeyboardButton(
+            text=cities[i],
+            callback_data=f"city_{cities[i]}"
+        ))
+        if i + 1 < len(cities):
+            row.append(InlineKeyboardButton(
+                text=cities[i + 1],
+                callback_data=f"city_{cities[i + 1]}"
+            ))
+        keyboard.append(row)
+    
+    # Додаємо кнопку "Скасувати"
+    keyboard.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'create_listing.cancel'),
+            callback_data="cancel_listing"
+        )
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_continue_photos_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Клавіатура для продовження після додавання фото"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t(user_id, 'create_listing.continue_button'),
+            callback_data="continue_after_photos"
+        )]
     ])

@@ -10,8 +10,8 @@ from database_functions.create_dbs import create_dbs
 from database_functions.links_db import increment_link_count
 from database_functions.prisma_db import PrismaDB
 from utils.download_avatar import download_user_avatar
-from utils.translations import t, set_language as set_user_language
-from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard
+from utils.translations import t, set_language as set_user_language, get_user_lang, get_welcome_message
+from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard, get_language_selection_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 import aiohttp
 
@@ -53,7 +53,31 @@ async def start_command(message: types.Message):
     
     update_user_activity(str(user_id))
     
+    # Перевіряємо чи користувач вже погодився з офертою
     has_agreed = get_user_agreement_status(user_id)
+    
+    # Крок 1: Привітання з коротким описом апки (тільки для нових користувачів)
+    # Визначаємо мову з інтерфейсу Telegram (за замовчуванням українська)
+    telegram_lang = user.language_code or 'uk'
+    
+    # Крок 2: Вибір мови (якщо оферта не погоджена - значить користувач новий)
+    if not has_agreed:
+        # Для нових користувачів показуємо привітання з HTML форматуванням
+        welcome_text = get_welcome_message(telegram_lang)
+        await message.answer(welcome_text, parse_mode="HTML")
+        
+        # Показуємо вибір мови
+        await message.answer(
+            "🌐 <b>Оберіть мову інтерфейсу / Выберите язык интерфейса:</b>",
+            reply_markup=get_language_selection_keyboard(),
+            parse_mode="HTML"
+        )
+        return
+    
+    # Якщо оферта вже погоджена, використовуємо мову користувача
+    user_lang = get_user_lang(user_id)
+    
+    # Крок 3: Оферта (якщо не погоджено)
 
     if not has_agreed:
         offer_text = (
@@ -120,6 +144,14 @@ async def start_command(message: types.Message):
             except (ValueError, IndexError):
                 pass
 
+    # Для існуючих користувачів показуємо привітання тільки якщо немає shared_item
+    if not (shared_item and shared_data):
+        # greeting вже містить весь текст з HTML тегами
+        welcome_text = t(user_id, 'welcome.greeting')
+        await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+        return
+    
+    # Якщо є shared_item, показуємо інформацію про нього
     welcome_text = t(user_id, 'welcome.greeting')
     
     if shared_item and shared_data:
@@ -171,9 +203,6 @@ async def start_command(message: types.Message):
             t(user_id, 'menu.main_menu'),
             reply_markup=get_main_menu_keyboard(user_id)
         )
-    else:
-        welcome_text += t(user_id, 'welcome.features')
-        await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id))
 
 
 @router.callback_query(F.data.startswith("agree_"))
@@ -246,10 +275,28 @@ async def handle_language_selection(callback: types.CallbackQuery):
             f"🌐 {t(user_id, 'language.changed')}"
         )
         
-        await callback.message.answer(
-            f"{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
-            reply_markup=get_main_menu_keyboard(user_id)
-        )
+        # Після вибору мови показуємо оферту (якщо не погоджено)
+        has_agreed = get_user_agreement_status(user_id)
+        if not has_agreed:
+            offer_text = (
+                f"{t(user_id, 'agreement.title')}\n\n"
+                f"{t(user_id, 'agreement.welcome')}\n\n"
+                f"{t(user_id, 'agreement.description')}\n\n"
+                f"{t(user_id, 'agreement.instructions')}"
+            )
+            
+            await callback.message.answer(
+                offer_text,
+                reply_markup=get_agreement_keyboard(user_id),
+                parse_mode="HTML"
+            )
+        else:
+            # Якщо оферта вже погоджена, показуємо головне меню
+            await callback.message.answer(
+                t(user_id, 'welcome.greeting'),
+                reply_markup=get_main_menu_keyboard(user_id),
+                parse_mode="HTML"
+            )
     else:
         await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
 
@@ -276,19 +323,13 @@ async def handle_contact(message: types.Message):
         print(f"Phone {phone} saved for user {user_id}")
         
         await message.answer(
-            f"{t(user_id, 'phone.saved')}\n\n{t(user_id, 'welcome.greeting')}{t(user_id, 'welcome.features')}",
-            reply_markup=get_main_menu_keyboard(user_id)
+            f"{t(user_id, 'phone.saved')}\n\n{t(user_id, 'welcome.greeting')}",
+            reply_markup=get_main_menu_keyboard(user_id),
+            parse_mode="HTML"
         )
     else:
         await message.answer(t(user_id, 'phone.invalid'))
 
 
-async def on_startup(router):
-    create_dbs()
-    username = bot_username or (await bot.get_me()).username
-    print(f'Bot: @{username} запущений!')
-
-async def on_shutdown(router):
-    username = bot_username or (await bot.get_me()).username
-    print(f'Bot: @{username} зупинений!')
+# on_startup та on_shutdown тепер в client_handlers.py
 

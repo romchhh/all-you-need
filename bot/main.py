@@ -3,7 +3,8 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import token
-
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.executors.asyncio import AsyncIOExecutor
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,9 +14,27 @@ storage = MemoryStorage()
 dp = Dispatcher(bot=bot, storage=storage)
 
 
+executors = {
+    'default': AsyncIOExecutor(),
+}
+
+job_defaults = {
+    'coalesce': False,
+    'max_instances': 3,
+    'misfire_grace_time': 30
+}
+
+scheduler = AsyncIOScheduler(
+    executors=executors,
+    job_defaults=job_defaults,
+    timezone='Europe/Kiev'
+)
+
+scheduler.start()
+
 async def main():
-    from handlers.client_handlers.agreement_handlers import router as agreement_router, on_startup, on_shutdown
-    from handlers.client_handlers.client_handlers import router as client_router
+    from handlers.client_handlers.agreement_handlers import router as agreement_router
+    from handlers.client_handlers.client_handlers import router as client_router, on_startup, on_shutdown
     from handlers.client_handlers.about_us_handlers import router as about_us_router
     from handlers.client_handlers.create_listing_handlers import router as create_listing_router
     from handlers.admin_handlers.admin_handlers import router as admin_router

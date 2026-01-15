@@ -8,3 +8,4 @@ bot_username = getenv('BOT_USERNAME', '')
 
 administrators = [int(id) for id in getenv('ADMINISTRATORS')[1:-1].split(',')]
 
+MONOBANK_TOKEN = getenv('MONOBANK_TOKEN')

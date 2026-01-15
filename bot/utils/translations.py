@@ -40,6 +40,19 @@ def t(user_id: int, key: str, **kwargs) -> str:
     return str(value) if value else key
 
 
+def get_welcome_message(telegram_lang: str = None) -> str:
+    if telegram_lang and telegram_lang.startswith('ru'):
+        lang = 'ru'
+    else:
+        lang = 'uk'  # За замовчуванням українська
+    
+    # Отримуємо greeting з локалізації (там вже є HTML теги)
+    translations = TRANSLATIONS.get(lang, TRANSLATIONS[DEFAULT_LANGUAGE])
+    greeting = translations.get('welcome', {}).get('greeting', '')
+    
+    return greeting
+
+
 def set_language(user_id: int, language: str):
     if language in TRANSLATIONS:
         set_user_language(user_id, language)

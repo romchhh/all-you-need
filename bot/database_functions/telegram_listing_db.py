@@ -49,37 +49,32 @@ def create_telegram_listing(
     
     images_json = json.dumps(images)
     
-    # Перевіряємо чи є колонка location в таблиці
+    # Перевіряємо чи є колонки в таблиці
     cursor.execute("PRAGMA table_info(TelegramListing)")
     columns = [row[1] for row in cursor.fetchall()]
     has_location = 'location' in columns
+    has_publication_tariff = 'publicationTariff' in columns
+    has_payment_status = 'paymentStatus' in columns
     
-    if has_location:
-        cursor.execute("""
-            INSERT INTO TelegramListing (
-                userId, title, description, price, currency, category, subcategory,
-                condition, location, images, status, moderationStatus, createdAt, updatedAt
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id, title, description, price, currency, category, subcategory,
-            condition, location, images_json, 'pending_moderation', 'pending',
-            datetime.now(), datetime.now()
-        ))
-    else:
-        # Якщо колонки немає, додаємо її
+    # Додаємо колонки якщо їх немає
+    if not has_location:
         cursor.execute("ALTER TABLE TelegramListing ADD COLUMN location TEXT")
-        cursor.execute("""
-            INSERT INTO TelegramListing (
-                userId, title, description, price, currency, category, subcategory,
-                condition, location, images, status, moderationStatus, createdAt, updatedAt
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id, title, description, price, currency, category, subcategory,
-            condition, location, images_json, 'pending_moderation', 'pending',
-            datetime.now(), datetime.now()
-        ))
+    if not has_publication_tariff:
+        cursor.execute("ALTER TABLE TelegramListing ADD COLUMN publicationTariff TEXT")
+    if not has_payment_status:
+        cursor.execute("ALTER TABLE TelegramListing ADD COLUMN paymentStatus TEXT DEFAULT 'pending'")
+    
+    cursor.execute("""
+        INSERT INTO TelegramListing (
+            userId, title, description, price, currency, category, subcategory,
+            condition, location, images, status, moderationStatus, createdAt, updatedAt
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        user_id, title, description, price, currency, category, subcategory,
+        condition, location, images_json, 'pending_moderation', 'pending',
+        datetime.now(), datetime.now()
+    ))
     
     listing_id = cursor.lastrowid
     conn.commit()
@@ -117,6 +112,12 @@ def get_telegram_listing_by_id(listing_id: int) -> Optional[Dict[str, Any]]:
     else:
         result['images'] = []
     
+    # Перевіряємо чи є колонки publicationTariff та paymentStatus
+    if 'publicationTariff' not in result:
+        result['publicationTariff'] = None
+    if 'paymentStatus' not in result:
+        result['paymentStatus'] = 'pending'
+    
     return result
 
 
@@ -153,6 +154,13 @@ def get_telegram_listings_for_moderation(
                 item['images'] = []
         else:
             item['images'] = []
+        
+        # Перевіряємо чи є колонки publicationTariff та paymentStatus
+        if 'publicationTariff' not in item:
+            item['publicationTariff'] = None
+        if 'paymentStatus' not in item:
+            item['paymentStatus'] = 'pending'
+        
         result.append(item)
     
     return result
@@ -174,11 +182,12 @@ def get_user_telegram_listings(telegram_id: int) -> List[Dict[str, Any]]:
     
     user_id = user_row['id']
     
-    # Отримуємо всі оголошення користувача
+    # Отримуємо всі оголошення користувача (виключаємо видалені)
     cursor.execute("""
         SELECT tl.*
         FROM TelegramListing tl
         WHERE tl.userId = ?
+        AND (tl.status IS NULL OR tl.status != 'deleted')
         ORDER BY tl.createdAt DESC
     """, (user_id,))
     
@@ -196,6 +205,13 @@ def get_user_telegram_listings(telegram_id: int) -> List[Dict[str, Any]]:
                 item['images'] = []
         else:
             item['images'] = []
+        
+        # Перевіряємо чи є колонки publicationTariff та paymentStatus
+        if 'publicationTariff' not in item:
+            item['publicationTariff'] = None
+        if 'paymentStatus' not in item:
+            item['paymentStatus'] = 'pending'
+        
         result.append(item)
     
     return result
@@ -226,6 +242,56 @@ def update_telegram_listing_moderation_status(
     conn.close()
     
     return success
+
+
+def update_telegram_listing_publication_tariff(
+    listing_id: int,
+    tariff_type: str,
+    payment_status: str = 'pending'
+) -> bool:
+    """Оновлює тариф публікації та статус оплати для оголошення"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Перевіряємо чи є колонки
+    cursor.execute("PRAGMA table_info(TelegramListing)")
+    columns = [row[1] for row in cursor.fetchall()]
+    has_publication_tariff = 'publicationTariff' in columns
+    has_payment_status = 'paymentStatus' in columns
+    
+    if not has_publication_tariff:
+        cursor.execute("ALTER TABLE TelegramListing ADD COLUMN publicationTariff TEXT")
+    if not has_payment_status:
+        cursor.execute("ALTER TABLE TelegramListing ADD COLUMN paymentStatus TEXT DEFAULT 'pending'")
+    
+    cursor.execute("""
+        UPDATE TelegramListing
+        SET publicationTariff = ?,
+            paymentStatus = ?,
+            updatedAt = ?
+        WHERE id = ?
+    """, (tariff_type, payment_status, datetime.now(), listing_id))
+    
+    success = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    
+    return success
+
+
+def get_telegram_listing_payment_status(listing_id: int) -> Optional[str]:
+    """Отримує статус оплати для оголошення"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT paymentStatus FROM TelegramListing WHERE id = ?
+    """, (listing_id,))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    return result[0] if result else None
 
 
 def init_categories_if_empty():

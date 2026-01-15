@@ -199,14 +199,30 @@ async def send_approval_notification(
         channel_id = os.getenv('TRADE_CHANNEL_ID')
         
         if source == 'telegram':
-            # Отримуємо channel_message_id з БД
+            # Отримуємо channel_message_id та дату публікації з БД
             from database_functions.telegram_listing_db import get_telegram_listing_by_id
+            from datetime import datetime, timedelta
             listing = get_telegram_listing_by_id(listing_id)
             channel_message_id = listing.get('channelMessageId') if listing else None
+            published_at = listing.get('publishedAt') if listing else None
+            
+            # Форматуємо дату закінчення (опубліковано до)
+            expires_date_text = ""
+            if published_at:
+                try:
+                    if isinstance(published_at, str):
+                        published_date = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
+                    else:
+                        published_date = published_at
+                    # Оголошення активне 30 днів
+                    expires_date = published_date + timedelta(days=30)
+                    expires_date_text = f"\n📅 Опубліковано до: {expires_date.strftime('%d.%m.%Y')}"
+                except:
+                    pass
             
             message_text = f"""✅ <b>Оголошення схвалено!</b>
 
-Ваше оголошення "<b>{title}</b>" пройшло модерацію та опубліковане в каналі.
+Ваше оголошення "<b>{title}</b>" пройшло модерацію та опубліковане в каналі.{expires_date_text}
 
 Дякуємо за використання нашого сервісу!"""
             

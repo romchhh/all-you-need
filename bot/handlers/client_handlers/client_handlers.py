@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from aiogram import Router, types, F
-from aiogram.filters import CommandStart
+from aiogram.fsm.context import FSMContext
 from dotenv import load_dotenv
 
 from main import bot
@@ -13,143 +13,74 @@ from database_functions.prisma_db import PrismaDB
 from database_functions.telegram_listing_db import get_user_telegram_listings, get_telegram_listing_by_id
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, get_user_lang
-from keyboards.client_keyboards import get_catalog_webapp_keyboard, get_language_selection_keyboard, get_support_keyboard
+from keyboards.client_keyboards import get_catalog_webapp_keyboard, get_language_selection_keyboard, get_support_keyboard, get_main_menu_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-
+from utils.monopay_functions import check_pending_payments
+from utils.cron_functions import deactivate_old_telegram_listings
+from main import scheduler
 
 load_dotenv()
 
+
+async def scheduler_jobs():
+    # Перевіряємо чи job вже існує
+    job_id = 'check_pending_payments'
+    existing_job = scheduler.get_job(job_id)
+    
+    if existing_job:
+        # Якщо job вже існує, видаляємо його
+        scheduler.remove_job(job_id)
+        print(f"🔄 Видалено існуючий job '{job_id}'")
+    
+    # Додаємо новий job з унікальним ID
+    try:
+        scheduler.add_job(
+            check_pending_payments,
+            'interval',
+            seconds=10,
+            id=job_id,
+            replace_existing=True,
+            max_instances=1
+        )
+        print(f"✅ Scheduler job '{job_id}' додано (перевірка кожні 10 секунд)")
+        
+        # Перевіряємо чи job дійсно додано
+        added_job = scheduler.get_job(job_id)
+        if added_job:
+            print(f"✅ Job '{job_id}' успішно зареєстровано в scheduler")
+            print(f"   Наступний запуск: {added_job.next_run_time}")
+        else:
+            print(f"❌ Помилка: Job '{job_id}' не знайдено після додавання!")
+    except Exception as e:
+        print(f"❌ Помилка додавання job '{job_id}': {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # Додаємо job для деактивації старих оголошень (щодня о 00:00)
+    try:
+        deactivate_job_id = 'deactivate_old_telegram_listings'
+        existing_deactivate_job = scheduler.get_job(deactivate_job_id)
+        
+        if existing_deactivate_job:
+            scheduler.remove_job(deactivate_job_id)
+        
+        scheduler.add_job(
+            deactivate_old_telegram_listings,
+            'cron',
+            hour=0,
+            minute=0,
+            id=deactivate_job_id,
+            replace_existing=True
+        )
+        print(f"✅ Scheduler job '{deactivate_job_id}' додано (щодня о 00:00)")
+    except Exception as e:
+        print(f"❌ Помилка додавання job '{deactivate_job_id}': {e}")
+        import traceback
+        traceback.print_exc()
+
 router = Router()
 
-
-@router.message(CommandStart())
-async def start_command(message: types.Message):
-    user = message.from_user
-    user_id = user.id
-    username = user.username
-    args = message.text.split()
-
-    user_exists = check_user(user_id)
-
-    ref_link = None
-    if len(args) > 1 and args[1].startswith('linktowatch_'):
-        try:
-            ref_link = int(args[1].split('_')[1])
-            if not user_exists:
-                increment_link_count(ref_link)
-        except (ValueError, IndexError) as e:
-            pass
-    
-    avatar_path = None
-    
-    if not user_exists:
-        try:
-            avatar_path = await download_user_avatar(user_id, username, None)
-            if avatar_path:
-                print(f"Avatar downloaded for new user {user_id}: {avatar_path}")
-            else:
-                print(f"No avatar found for new user {user_id}")
-        except Exception as e:
-            print(f"Error downloading avatar for new user {user_id}: {e}")
-        
-        add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
-    else:
-        cursor.execute('''
-            UPDATE User 
-            SET username = ?, firstName = ?, lastName = ?, updatedAt = ?
-            WHERE telegramId = ?
-        ''', (
-            username,
-            user.first_name,
-            user.last_name,
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            int(user_id)
-        ))
-        conn.commit()
-
-    shared_item = None
-    shared_data = None
-    db = PrismaDB()
-    
-    if len(args) > 1:
-        param = args[1]
-        if param.startswith('listing_'):
-            try:
-                listing_id = int(param.split('_')[1])
-                listing_data = db.get_listing_by_id(listing_id)
-                if listing_data:
-                    shared_item = {'type': 'listing', 'id': listing_id}
-                    shared_data = listing_data
-            except (ValueError, IndexError):
-                pass
-        elif param.startswith('user_'):
-            try:
-                user_telegram_id = int(param.split('_')[1])
-                user_data = db.get_user_by_telegram_id_with_profile(user_telegram_id)
-                if user_data:
-                    shared_item = {'type': 'user', 'id': str(user_telegram_id)}
-                    shared_data = user_data
-            except (ValueError, IndexError):
-                pass
-
-    welcome_text = t(user_id, 'welcome.greeting')
-    
-    if shared_item and shared_data:
-        webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
-        
-        if shared_item['type'] == 'listing':
-            listing = shared_data
-            is_free = listing.get('isFree') or (isinstance(listing.get('isFree'), int) and listing.get('isFree') == 1)
-            price_text = t(user_id, 'common.free') if is_free else f"{listing.get('price', 'N/A')} €"
-            seller_name = f"{listing.get('firstName', '')} {listing.get('lastName', '')}".strip() or listing.get('username', t(user_id, 'common.user'))
-            
-            welcome_text += (
-                f"{t(user_id, 'shared.listing.title', title=listing.get('title', 'Оголошення'))}\n\n"
-                f"{t(user_id, 'shared.listing.price', price=price_text)}\n"
-                f"{t(user_id, 'shared.listing.location', location=listing.get('location', 'N/A'))}\n"
-                f"{t(user_id, 'shared.listing.seller', seller=seller_name)}\n\n"
-                f"{t(user_id, 'shared.listing.instruction')}"
-            )
-            
-            webapp_url_with_params = f"{webapp_url}?listing={shared_item['id']}&telegramId={user_id}"
-            button_text = t(user_id, 'shared.listing.button')
-            
-        elif shared_item['type'] == 'user':
-            user = shared_data
-            user_name = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip() or user.get('username', t(user_id, 'common.user'))
-            username_text = f"@{user.get('username')}" if user.get('username') else ""
-            total_listings = user.get('totalListings', 0) or 0
-            active_listings = user.get('activeListings', 0) or 0
-            
-            welcome_text += (
-                f"{t(user_id, 'shared.user.title', name=user_name, username=username_text)}\n\n"
-                f"{t(user_id, 'shared.user.listings', total=total_listings)}\n"
-                f"{t(user_id, 'shared.user.active', active=active_listings)}\n\n"
-                f"{t(user_id, 'shared.user.instruction')}"
-            )
-            
-            webapp_url_with_params = f"{webapp_url}?user={shared_item['id']}&telegramId={user_id}"
-            button_text = t(user_id, 'shared.user.button')
-        
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(
-                text=button_text,
-                web_app=WebAppInfo(url=webapp_url_with_params)
-            )]
-        ])
-        await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
-    else:
-        welcome_text += t(user_id, 'welcome.features')
-        await message.answer(welcome_text, reply_markup=get_catalog_webapp_keyboard(user_id))
-    
-    user_lang = get_user_lang(user_id)
-    await message.answer(
-        t(user_id, 'language.select'),
-        reply_markup=get_language_selection_keyboard()
-    )
-
-
-    
+  
     
 @router.message(F.text.in_([
     "💬 Підтримка",  # UK
@@ -170,8 +101,28 @@ async def support_handler(message: types.Message):
     )
 
 
+@router.message(F.text.in_([
+    "Скасувати",      # UK
+    "Отменить",       # RU
+    "❌ Скасувати",   # UK з емодзі
+    "❌ Отменить"     # RU з емодзі
+]))
+async def cancel_handler(message: types.Message, state: FSMContext):
+    """Обробник для кнопки 'Скасувати' - очищає стан та повертає в головне меню"""
+    user_id = message.from_user.id
+    
+    # Очищаємо стан FSM
+    await state.clear()
+    
+    await message.answer(
+        t(user_id, 'menu.main_menu'),
+        reply_markup=get_main_menu_keyboard(user_id)
+    )
+
+
 async def on_startup(router):
     create_dbs()
+    await scheduler_jobs()
     username = bot_username or (await bot.get_me()).username
     print(f'Bot: @{username} запущений!')
 
