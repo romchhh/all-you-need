@@ -180,15 +180,19 @@ export default function AdminListingDetailPage() {
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 {listing.images.map((image, index) => {
-                  const imageUrl = image.startsWith('http') 
-                    ? image 
-                    : image.startsWith('/') 
-                    ? image 
-                    : `/api/images/${image}`;
+                  // Використовуємо таку саму логіку як в маркетплейсі
+                  let imageUrl = '';
+                  if (image?.startsWith('http')) {
+                    imageUrl = image;
+                  } else {
+                    const cleanPath = image?.split('?')[0] || image;
+                    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                    imageUrl = pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+                  }
                   return (
                     <img
                       key={index}
-                      src={imageUrl}
+                      src={imageUrl || '/placeholder.png'}
                       alt={`${listing.title} ${index + 1}`}
                       className="w-full h-32 sm:h-48 object-cover rounded-lg"
                       onError={(e) => {

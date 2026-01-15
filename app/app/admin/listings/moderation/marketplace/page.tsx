@@ -135,7 +135,16 @@ export default function MarketplaceModerationPage() {
   const getImageUrl = (images: string) => {
     try {
       const parsed = JSON.parse(images);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : '/placeholder.png';
+      const image = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : null;
+      if (!image) return '/placeholder.png';
+      
+      // Використовуємо таку саму логіку як в маркетплейсі
+      if (image?.startsWith('http')) {
+        return image;
+      }
+      const cleanPath = image?.split('?')[0] || image;
+      const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+      return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '/placeholder.png';
     } catch {
       return '/placeholder.png';
     }
