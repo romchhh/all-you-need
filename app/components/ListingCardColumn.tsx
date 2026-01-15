@@ -1,9 +1,10 @@
-import { Eye, Heart, Package } from 'lucide-react';
+import { Eye, Heart, Package, MapPin } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
+import { getCurrencySymbol } from '@/utils/currency';
 
 interface ListingCardColumnProps {
   listing: Listing;
@@ -31,52 +32,33 @@ const ListingCardColumnComponent = ({
   
   // Визначаємо стилі в залежності від типу реклами
   const getPromotionStyles = () => {
-    if (!promotionType) return 'border-gray-200 hover:border-blue-300';
+    if (!promotionType) return 'ring-1 ring-white/30 shadow-lg shadow-white/10';
     
     switch (promotionType) {
       case 'highlighted':
-        return 'border-yellow-400 ring-1 ring-yellow-300 shadow-md shadow-yellow-100';
+        return 'ring-1 ring-yellow-400 shadow-lg shadow-yellow-100';
       case 'top_category':
-        return 'border-orange-400 ring-1 ring-orange-300 shadow-md shadow-orange-100';
+        return 'ring-1 ring-orange-400 shadow-lg shadow-orange-100';
       case 'vip':
-        return 'border-purple-500 ring-1 ring-purple-400 shadow-lg shadow-purple-200';
+        return 'ring-2 ring-[#D3F1A7] shadow-2xl shadow-[#D3F1A7]/50';
       default:
-        return 'border-gray-200 hover:border-blue-300';
+        return 'ring-1 ring-white/30 shadow-lg shadow-white/10';
     }
   };
   
   const getCardBackgroundStyles = () => {
-    if (!promotionType) return 'bg-white';
-    
-    switch (promotionType) {
-      case 'highlighted':
-        return 'bg-gradient-to-br from-yellow-50 via-white to-white';
-      case 'top_category':
-        return 'bg-gradient-to-br from-orange-50 via-white to-white';
-      case 'vip':
-        return 'bg-gradient-to-br from-purple-50 via-pink-50 to-white';
-      default:
-        return 'bg-white';
-    }
+    return 'bg-gray-800/50';
   };
   
   const getPromotionBadge = () => {
-    if (!promotionType) return null;
-    
-    const badges = {
-      highlighted: { text: '⭐', color: 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' },
-      top_category: { text: '🔥', color: 'bg-gradient-to-r from-orange-500 to-red-500 text-white' },
-      vip: { text: '👑', color: 'bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white' },
-    };
-    
-    const badge = badges[promotionType as keyof typeof badges];
-    if (!badge) return null;
-    
-    return (
-      <div className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs ${badge.color} shadow-sm z-10`}>
-        {badge.text}
-      </div>
-    );
+    if (promotionType === 'vip') {
+      return (
+        <div className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-gray-800/80 rounded-full z-10">
+          <span className="text-xs font-semibold text-[#D3F1A7]">VIP</span>
+        </div>
+      );
+    }
+    return null;
   };
 
   const imageUrl = useMemo(() => {
@@ -104,7 +86,7 @@ const ListingCardColumnComponent = ({
   return (
     <div 
       data-listing-id={listing.id}
-      className={`${getCardBackgroundStyles()} rounded-2xl border-2 overflow-hidden transition-all cursor-pointer ${getPromotionStyles()} ${promotionType ? 'my-2' : ''}`}
+      className={`${getCardBackgroundStyles()} rounded-2xl overflow-hidden transition-all cursor-pointer relative ${getPromotionStyles()}`}
       onClick={() => {
         onSelect(listing);
         tg?.HapticFeedback.impactOccurred('light');
@@ -113,7 +95,7 @@ const ListingCardColumnComponent = ({
       <div className="flex gap-3 p-3.5">
         {/* Фото */}
         <div 
-          className="relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100"
+          className="relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden bg-gray-700"
         >
           {/* Бейдж реклами */}
           {getPromotionBadge()}
@@ -127,7 +109,7 @@ const ListingCardColumnComponent = ({
               loading="lazy"
             />
           ) : (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-400 bg-gray-100">
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-400 bg-gray-700">
               <Package size={32} />
             </div>
           )}
@@ -142,55 +124,44 @@ const ListingCardColumnComponent = ({
               onToggleFavorite(listing.id);
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="absolute top-0 right-0 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform active:scale-95 z-10"
+            className="absolute top-0 right-0 w-8 h-8 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 z-10"
           >
             <Heart 
               size={18} 
-              className={isFavorite ? 'text-red-500' : 'text-gray-600'}
+              className={isFavorite ? 'text-black fill-black' : 'text-white'}
               fill={isFavorite ? 'currentColor' : 'none'}
+              strokeWidth={isFavorite ? 0 : 2}
             />
           </button>
 
           {/* Верхня частина: назва + ціна */}
           <div className="flex-1 pr-10">
-            <div className="font-semibold text-base text-gray-900 line-clamp-2 leading-snug mb-1.5">
+            <div className="font-semibold text-base text-white line-clamp-2 leading-snug mb-2">
               {listing.title}
             </div>
-            <div className="text-blue-600 font-bold text-lg mb-2">
-              {listing.isFree ? t('common.free') : `${listing.price} ${listing.currency || '₴'}`}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[#D3F1A7] font-bold text-lg">
+                {listing.isFree ? t('common.free') : `${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}
+              </span>
+              {listing.condition && (
+                <span className="px-2 py-0.5 bg-gray-700/50 text-white text-xs font-medium rounded-full">
+                  {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Нижня частина: розташування, час, статистика */}
-          <div className="flex flex-col gap-1.5">
-            {/* Розташування та час */}
-            <div className="text-xs text-gray-500 space-y-0.5">
-              {listing.location && (
-                <div className="line-clamp-1 font-medium">{listing.location}</div>
-              )}
-              {formattedTime && (
-                <div>{formattedTime}</div>
-              )}
-            </div>
-
-            {/* Статистика */}
-            <div className="flex items-center gap-4 text-xs text-gray-600 pt-1">
-              <div className="flex items-center gap-1.5">
-                <Eye size={15} className="text-gray-500" />
-                <span className="font-medium">{listing.views || 0}</span>
+          {/* Нижня частина: розташування та час */}
+          <div className="flex items-center justify-between text-xs text-white/80">
+            {listing.location && (
+              <div className="flex items-center gap-1">
+                <MapPin size={12} className="text-white/80" />
+                <span className="line-clamp-1">{listing.location.split(',')[0]}</span>
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(listing.id);
-                  tg?.HapticFeedback.impactOccurred('light');
-                }}
-                className="flex items-center gap-1.5 hover:opacity-70 transition-opacity"
-              >
-                <Heart size={15} className={isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-500'} />
-                <span className="font-medium">{listing.favoritesCount || 0}</span>
-              </button>
-            </div>
+            )}
+            {formattedTime && (
+              <span className="text-white/60">{formattedTime}</span>
+            )}
           </div>
         </div>
       </div>

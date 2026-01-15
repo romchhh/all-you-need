@@ -43,7 +43,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   
   // Визначаємо стилі в залежності від типу реклами
   const getPromotionStyles = () => {
-    if (!promotionType) return '';
+    if (!promotionType) return 'ring-1 ring-white/30 shadow-lg shadow-white/10';
     
     switch (promotionType) {
       case 'highlighted':
@@ -51,44 +51,25 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       case 'top_category':
         return 'ring-1 ring-orange-400 shadow-lg shadow-orange-100';
       case 'vip':
-        return 'ring-2 ring-purple-500 shadow-2xl shadow-purple-200';
+        return 'ring-2 ring-[#D3F1A7] shadow-2xl shadow-[#D3F1A7]/50';
       default:
-        return '';
+        return 'ring-1 ring-white/30 shadow-lg shadow-white/10';
     }
   };
   
   const getPromotionBadge = () => {
-    if (!promotionType) return null;
-    
-    const badges = {
-      highlighted: { text: '⭐', color: 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-md' },
-      top_category: { text: '🔥', color: 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md' },
-      vip: { text: '👑', color: 'bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white shadow-md' },
-    };
-    
-    const badge = badges[promotionType as keyof typeof badges];
-    if (!badge) return null;
-    
-    return (
-      <div className={`absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center text-sm ${badge.color} z-10`}>
-        {badge.text}
-      </div>
-    );
+    if (promotionType === 'vip') {
+      return (
+        <div className="absolute top-2 left-2 px-2 py-0.5 bg-gray-800/80 rounded-full z-10">
+          <span className="text-xs font-semibold text-[#D3F1A7]">VIP</span>
+        </div>
+      );
+    }
+    return null;
   };
   
   const getCardBackgroundStyles = () => {
-    if (!promotionType) return '';
-    
-    switch (promotionType) {
-      case 'highlighted':
-        return 'bg-gradient-to-br from-yellow-50 via-white to-white';
-      case 'top_category':
-        return 'bg-gradient-to-br from-orange-50 via-white to-white';
-      case 'vip':
-        return 'bg-gradient-to-br from-purple-50 via-pink-50 to-white';
-      default:
-        return 'bg-white';
-    }
+    return 'bg-gray-800/50';
   };
   
   // Форматуємо час на клієнті з перекладами
@@ -188,9 +169,9 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   return (
     <div 
       data-listing-id={listing.id}
-      className={`${getCardBackgroundStyles()} rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer relative select-none ${
+      className={`${getCardBackgroundStyles()} rounded-2xl overflow-hidden transition-all cursor-pointer relative select-none ${
         isSold || isDeactivated ? 'opacity-60' : ''
-      } ${getPromotionStyles()} ${promotionType ? 'mt-2' : ''}`}
+      } ${getPromotionStyles()}`}
       onClick={() => {
         if (!isSold && !isDeactivated) {
           onSelect(listing);
@@ -255,30 +236,42 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
             onToggleFavorite(listing.id);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="absolute top-2 right-2 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
+          className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 z-10"
         >
           <Heart 
             size={20} 
-            className={isFavorite ? 'text-red-500' : 'text-gray-600'}
+            className={isFavorite ? 'text-black fill-black' : 'text-white'}
             fill={isFavorite ? 'currentColor' : 'none'}
+            strokeWidth={isFavorite ? 0 : 2}
           />
         </button>
       </div>
       
-      <div className="p-3">
-        <div className="mb-1 flex items-center gap-1">
-          <span className={`text-xl font-bold ${listing.isFree ? 'text-green-600' : 'text-gray-900'}`}>
+      <div className="p-3 bg-gray-800/50">
+        <div className="mb-2 flex items-center gap-2">
+          <span className={`text-2xl font-bold ${listing.isFree ? 'text-[#D3F1A7]' : 'text-[#D3F1A7]'}`}>
             {listing.isFree ? t('common.free') : listing.price}
           </span>
           {!listing.isFree && listing.currency && (
-            <span className="text-xl font-bold text-gray-900">{getCurrencySymbol(listing.currency)}</span>
+            <span className="text-2xl font-bold text-[#D3F1A7]">{getCurrencySymbol(listing.currency)}</span>
+          )}
+          {listing.condition && (
+            <span className="px-2 py-0.5 bg-gray-700/50 text-white text-xs font-medium rounded-full">
+              {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
+            </span>
           )}
         </div>
         
-        <p className="text-sm text-gray-700 line-clamp-2 mb-2">{listing.title}</p>
+        <p className="text-sm text-white line-clamp-2 mb-2">{listing.title}</p>
         
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span className="truncate">{listing.location.split(',')[0]}</span>
+        <div className="flex items-center gap-2 text-xs text-white/80">
+          <span className="flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+              <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+            <span className="truncate">{listing.location.split(',')[0]}</span>
+          </span>
           <span>{formattedTime}</span>
         </div>
       </div>

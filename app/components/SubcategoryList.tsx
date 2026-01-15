@@ -31,10 +31,10 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
               onSelect(null);
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all border ${
               selectedSubcategory === null
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                : 'border-white text-white bg-transparent hover:bg-white/10'
             }`}
           >
             {t('common.all')}
@@ -46,10 +46,10 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
                 onSelect(subcategory.id);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all border ${
                 selectedSubcategory === subcategory.id
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                  : 'border-white text-white bg-transparent hover:bg-white/10'
               }`}
             >
               {subcategory.name}

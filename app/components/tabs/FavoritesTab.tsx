@@ -71,30 +71,25 @@ export const FavoritesTab = ({
   if (favoritedListings.length === 0) {
     return (
       <div 
-        className="pb-24 flex items-center justify-center min-h-screen bg-white"
+        className="pb-24 flex flex-col h-screen overflow-hidden px-4"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ touchAction: 'pan-y' }}
+        style={{ touchAction: 'none' }}
       >
-        <div className="text-center px-4">
-          <div className="flex items-center justify-center mx-auto mb-4">
-            <Heart size={48} className="text-gray-400" fill="none" strokeWidth={1.5} />
+        <h2 className="text-2xl font-bold text-white mb-2 pt-2">Обране</h2>
+        <p className="text-sm text-gray-400 mb-8">Тут товари, які вам сподобалися</p>
+        
+        <div className="flex-1 flex items-start justify-center pt-8 pb-20">
+          <div className="max-w-sm mx-auto px-4">
+            <div className="border-2 border-gray-600 rounded-3xl p-8 text-center">
+              <div className="flex items-center justify-center mx-auto mb-6">
+                <Heart size={64} className="text-white" fill="none" strokeWidth={2} />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">У вас ще немає обраних</h3>
+              <p className="text-sm text-gray-400">Додайте товари до списку обраного, щоб швидко знаходити улюблене</p>
+            </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Ви ще нічого не додали в обране</h2>
-          <p className="text-gray-500 mb-6">Натисніть ❤️ на товарах, які сподобались, щоб зберегти їх тут</p>
-          {onNavigateToCatalog && (
-            <button
-              onClick={() => {
-                onNavigateToCatalog();
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors"
-            >
-              До каталогу
-              <ArrowRight size={20} />
-            </button>
-          )}
         </div>
       </div>
     );
@@ -108,9 +103,9 @@ export const FavoritesTab = ({
       onTouchEnd={handleTouchEnd}
       style={{ touchAction: 'pan-y' }}
     >
-      <div className="p-4">
-        <h2 className="text-xl font-semibold text-gray-900 mb-1">Обране</h2>
-        <p className="text-sm text-gray-500 mb-4">Тут товари, які вам сподобалися</p>
+      <div className="p-4 pt-2">
+        <h2 className="text-2xl font-bold text-white mb-2">Обране</h2>
+        <p className="text-sm text-gray-400 mb-4">Тут товари, які вам сподобалися</p>
         
         <div className="grid grid-cols-2 gap-4">
           {favoritedListings.map(listing => (
@@ -128,7 +123,7 @@ export const FavoritesTab = ({
         {hasMore && (
           <div className="px-4 py-4 text-center">
             {loadingMore ? (
-              <div className="text-gray-500 text-sm">{t('common.loading')}</div>
+              <div className="text-gray-400 text-sm">{t('common.loading')}</div>
             ) : (
               onLoadMore && (
                 <button
@@ -136,7 +131,7 @@ export const FavoritesTab = ({
                     onLoadMore();
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className="text-blue-600 text-sm font-medium hover:text-blue-700"
+                  className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
                 >
                   {t('common.showMore')}
                 </button>

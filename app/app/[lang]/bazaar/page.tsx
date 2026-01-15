@@ -23,6 +23,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAutoPrefetch } from '@/hooks/usePrefetch';
 import { logTelegramEnvironment } from '@/utils/telegramDebug';
+import { AppHeader } from '@/components/AppHeader';
 
 const BazaarPage = () => {
   const params = useParams();
@@ -891,7 +892,8 @@ const BazaarPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 overflow-x-hidden max-w-full">
+    <div className="min-h-screen pb-20 overflow-x-hidden max-w-full">
+      <AppHeader />
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 

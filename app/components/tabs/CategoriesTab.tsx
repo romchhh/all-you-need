@@ -3,6 +3,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '../CategoryChip';
 import { SubcategoryList } from '../SubcategoryList';
 import { ListingCard } from '../ListingCard';
+import { CategoryIcon } from '../CategoryIcon';
 import { useState, useMemo, useEffect } from 'react';
 import { Gift } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -184,12 +185,12 @@ export const CategoriesTab = ({
   return (
     <div className="pb-24">
       {/* Заголовок */}
-      <div className="px-4 pt-4 pb-3 bg-white border-b border-gray-100 sticky top-0 z-10">
-        <h1 className="text-2xl font-bold text-gray-900">{t('common.sections')}</h1>
+      <div className="px-4 pt-2 pb-3 border-b border-gray-800/50 sticky top-0 z-10">
+        <h1 className="text-2xl font-bold text-white">{t('common.sections')}</h1>
       </div>
 
       {/* Кнопка безкоштовних товарів */}
-      <div className="px-4 py-3 bg-white border-b border-gray-100">
+      <div className="px-4 py-3 border-b border-gray-800/50">
         <button
           onClick={() => {
             if (selectedCategory === 'free') {
@@ -203,8 +204,8 @@ export const CategoriesTab = ({
           }}
           className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl transition-colors ${
             selectedCategory === 'free'
-              ? 'bg-green-100 text-green-700'
-              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              ? 'bg-green-500/20 text-[#D3F1A7] border border-[#D3F1A7]'
+              : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
           }`}
         >
           <div className="flex items-center gap-2">
@@ -215,8 +216,8 @@ export const CategoriesTab = ({
       </div>
 
       {/* Розділи */}
-      <div className="px-4 pt-4 pb-3 bg-white">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('categories.allSections')}</h2>
+      <div className="px-4 pt-2 pb-3">
+        <h2 className="text-lg font-semibold text-white mb-3">{t('categories.allSections')}</h2>
         <div className="grid grid-cols-2 gap-3">
           {allCategories.map(category => (
             <button
@@ -231,14 +232,21 @@ export const CategoriesTab = ({
                 }
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`p-4 rounded-2xl border-2 transition-all text-left ${
+              className={`p-4 rounded-2xl border transition-all text-left relative overflow-hidden ${
                 selectedCategory === category.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
+                  ? 'border-[#D3F1A7]'
+                  : 'border-white hover:border-white/80'
               }`}
+              style={{
+                background: selectedCategory === category.id
+                  ? 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+                  : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+              }}
             >
-              <div className="text-3xl mb-2">{category.icon}</div>
-              <div className="font-semibold text-gray-900 text-sm">{category.name}</div>
+              <div className="mb-2">
+                <CategoryIcon categoryId={category.id} isActive={selectedCategory === category.id} size={32} />
+              </div>
+              <div className={`font-semibold text-sm ${selectedCategory === category.id ? 'text-[#D3F1A7]' : 'text-white'}`}>{category.name}</div>
             </button>
           ))}
         </div>
@@ -246,7 +254,7 @@ export const CategoriesTab = ({
 
       {/* Типи */}
       {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
-        <div className="px-4 pt-4 pb-3 bg-white border-t border-gray-100">
+        <div className="px-4 pt-2 pb-3 border-t border-gray-800/50">
           <SubcategoryList
             subcategories={selectedCategoryData.subcategories}
             selectedSubcategory={selectedSubcategory}
@@ -277,7 +285,7 @@ export const CategoriesTab = ({
           {hasMore && (
             <div className="px-4 py-4 text-center">
               {loadingMore ? (
-                <div className="text-gray-500 text-sm">{t('common.loading')}</div>
+                <div className="text-gray-400 text-sm">{t('common.loading')}</div>
               ) : (
                 onLoadMore && (
                   <button
@@ -285,7 +293,7 @@ export const CategoriesTab = ({
                       onLoadMore();
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
-                    className="text-blue-600 text-sm font-medium hover:text-blue-700"
+                    className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
                   >
                     {t('common.showMore')}
                   </button>
@@ -298,14 +306,14 @@ export const CategoriesTab = ({
 
       {filteredListings.length === 0 && (selectedCategory || selectedSubcategory || showFreeOnly) && (
         <div className="px-4 py-16 text-center">
-          <p className="text-gray-500">{t('common.nothingFound')}</p>
+          <p className="text-gray-400">{t('common.nothingFound')}</p>
           <button
             onClick={() => {
               setSelectedCategory(null);
               setSelectedSubcategory(null);
               setShowFreeOnly(false);
             }}
-            className="mt-4 text-blue-600 text-sm font-medium"
+            className="mt-4 px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
           >
             Очистити фільтри
           </button>

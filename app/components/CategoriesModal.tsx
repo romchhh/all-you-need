@@ -5,6 +5,7 @@ import { Category } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getCategories } from '@/constants/categories';
+import { CategoryIcon } from './CategoryIcon';
 import { useEffect } from 'react';
 
 interface CategoriesModalProps {
@@ -62,18 +63,24 @@ export const CategoriesModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end overflow-hidden" onClick={onClose}>
-      <div className="w-full bg-white rounded-t-3xl max-h-[90vh] flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
+      <div 
+        className="w-full rounded-t-3xl border-t-2 border-white max-h-[90vh] flex flex-col animate-slide-up" 
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+        }}
+      >
         {/* Хедер */}
-        <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-xl font-bold text-gray-900">{t('categories.title') || 'Категорії'}</h2>
+        <div className="border-b border-gray-700/50 px-4 py-4 flex items-center justify-between flex-shrink-0">
+          <h2 className="text-xl font-bold text-white">{t('categories.title') || 'Категорії'}</h2>
           <button
             onClick={() => {
               onClose();
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            className="w-10 h-10 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
           >
-            <X size={20} className="text-gray-900" />
+            <X size={20} className="text-white" />
           </button>
         </div>
 
@@ -95,14 +102,19 @@ export const CategoriesModal = ({
               onClose();
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-full flex items-center gap-4 px-4 py-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center gap-4 px-4 py-4 border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors"
           >
-            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-              <span className="text-2xl">📦</span>
+            <div 
+              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border border-white relative overflow-hidden"
+              style={{
+                background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+              }}
+            >
+              <CategoryIcon categoryId="all_categories" size={24} />
             </div>
             <div className="flex-1 text-left min-w-0">
-              <div className="font-semibold text-gray-900 text-base">{t('bazaar.allCategories')}</div>
-              <div className="text-sm text-gray-500 mt-0.5">{t('categories.allCategoriesDescription') || 'Переглянути всі оголошення'}</div>
+              <div className="font-semibold text-white text-base">{t('bazaar.allCategories')}</div>
+              <div className="text-sm text-gray-400 mt-0.5">{t('categories.allCategoriesDescription') || 'Переглянути всі оголошення'}</div>
             </div>
             <ChevronRight size={20} className="text-gray-400 flex-shrink-0" />
           </button>
@@ -112,14 +124,19 @@ export const CategoriesModal = ({
             <button
               key={category.id}
               onClick={() => handleCategoryClick(category.id)}
-              className="w-full flex items-center gap-4 px-4 py-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center gap-4 px-4 py-4 border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors"
             >
-              <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-                <span className="text-2xl">{category.icon}</span>
+              <div 
+                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border border-white relative overflow-hidden"
+                style={{
+                  background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+                }}
+              >
+                <CategoryIcon categoryId={category.id} size={24} />
               </div>
               <div className="flex-1 text-left min-w-0">
-                <div className="font-semibold text-gray-900 text-base">{category.name}</div>
-                <div className="text-sm text-gray-500 mt-0.5">
+                <div className="font-semibold text-white text-base">{category.name}</div>
+                <div className="text-sm text-gray-400 mt-0.5">
                   {t(`categories.description.${category.id}`) || ''}
                 </div>
               </div>

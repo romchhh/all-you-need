@@ -219,17 +219,20 @@ export const CityModal = ({
         }}
       >
         <div 
-          className="w-full bg-white rounded-t-3xl flex flex-col max-h-[85vh] overflow-hidden"
+          className="w-full rounded-t-3xl border-t-2 border-white flex flex-col max-h-[85vh] overflow-hidden"
           onClick={(e) => e.stopPropagation()}
+          style={{
+            background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+          }}
         >
           {/* Закріплена шапка */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-            <h3 className="text-xl font-bold text-gray-900">{t('bazaar.selectCity')}</h3>
+          <div className="flex items-center justify-between p-6 border-b border-gray-700/50 flex-shrink-0">
+            <h3 className="text-xl font-bold text-white">{t('bazaar.selectCity')}</h3>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              className="w-8 h-8 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
             >
-              <X size={18} className="text-gray-900" />
+              <X size={18} className="text-white" />
             </button>
           </div>
 
@@ -267,13 +270,13 @@ export const CityModal = ({
             <div className="p-6 space-y-4">
               {/* Пошук */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80" size={18} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('bazaar.searchCity') || 'Пошук по назві або індексу (наприклад: 22880 або Wedel)'}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder:text-gray-400"
+                  className="w-full pl-11 pr-4 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder:text-white/60"
                 />
               </div>
 
@@ -281,13 +284,13 @@ export const CityModal = ({
               <div>
                 <button
                   onClick={() => toggleCity('')}
-                  className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 ${
+                  className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
                     localSelectedCities.length === 0
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                      ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                      : 'border-white text-white bg-transparent hover:bg-white/10'
                   }`}
                 >
-                  <MapPin size={16} className={localSelectedCities.length === 0 ? 'text-white' : 'text-gray-400'} />
+                  <MapPin size={16} className={localSelectedCities.length === 0 ? 'text-[#D3F1A7]' : 'text-white'} />
                   <span className="font-medium">{t('bazaar.allCities') || 'Всі міста'}</span>
                 </button>
               </div>
@@ -295,7 +298,7 @@ export const CityModal = ({
               {/* Показуємо вибрані міста */}
               {localSelectedCities.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                  <h4 className="text-sm font-semibold text-white mb-3">
                     {t('bazaar.selectedCities')} ({localSelectedCities.length})
                   </h4>
                   <div className="flex flex-wrap gap-2 mb-3">
@@ -303,7 +306,7 @@ export const CityModal = ({
                       <button
                         key={city}
                         onClick={() => toggleCity(city)}
-                        className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-1"
+                        className="px-3 py-1.5 bg-[#D3F1A7] text-black rounded-lg text-sm font-medium hover:bg-[#D3F1A7]/80 transition-colors flex items-center gap-1"
                       >
                         <span>{city}</span>
                         <X size={14} />
@@ -316,7 +319,7 @@ export const CityModal = ({
               {/* Великі міста */}
               {!searchQuery && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('bazaar.majorCities')}</h4>
+                  <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.majorCities')}</h4>
                   <div className="space-y-2">
                     {majorGermanCities.map((city) => {
                       const isSelected = localSelectedCities.includes(city);
@@ -324,22 +327,22 @@ export const CityModal = ({
                         <button
                           key={city}
                           onClick={() => toggleCity(city)}
-                          className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 ${
+                          className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
                             isSelected
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                              ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                              : 'border-white text-white bg-transparent hover:bg-white/10'
                           }`}
                         >
                           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                             isSelected 
-                              ? 'border-white bg-white' 
-                              : 'border-gray-400'
+                              ? 'border-[#D3F1A7] bg-[#D3F1A7]' 
+                              : 'border-white'
                           }`}>
                             {isSelected && (
-                              <Check size={12} className="text-blue-500" strokeWidth={3} />
+                              <Check size={12} className="text-black" strokeWidth={3} />
                             )}
                           </div>
-                          <MapPin size={16} className={isSelected ? 'text-white' : 'text-gray-400'} />
+                          <MapPin size={16} className={isSelected ? 'text-[#D3F1A7]' : 'text-white'} />
                           <span>{city}</span>
                         </button>
                       );
@@ -351,7 +354,7 @@ export const CityModal = ({
               {/* Результати пошуку */}
               {searchQuery && searchResults.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('bazaar.searchResults')}</h4>
+                  <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.searchResults')}</h4>
                   <div className="space-y-2">
                     {searchResults.map((city) => {
                       const isSelected = localSelectedCities.includes(city);
@@ -359,22 +362,22 @@ export const CityModal = ({
                         <button
                           key={city}
                           onClick={() => toggleCity(city)}
-                          className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 ${
+                          className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
                             isSelected
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                              ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                              : 'border-white text-white bg-transparent hover:bg-white/10'
                           }`}
                         >
                           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                             isSelected 
-                              ? 'border-white bg-white' 
-                              : 'border-gray-400'
+                              ? 'border-[#D3F1A7] bg-[#D3F1A7]' 
+                              : 'border-white'
                           }`}>
                             {isSelected && (
-                              <Check size={12} className="text-blue-500" strokeWidth={3} />
+                              <Check size={12} className="text-black" strokeWidth={3} />
                             )}
                           </div>
-                          <MapPin size={16} className={isSelected ? 'text-white' : 'text-gray-400'} />
+                          <MapPin size={16} className={isSelected ? 'text-[#D3F1A7]' : 'text-white'} />
                           <span>{city}</span>
                         </button>
                       );
@@ -385,7 +388,7 @@ export const CityModal = ({
 
               {/* Повідомлення якщо нічого не знайдено */}
               {searchQuery && searchResults.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-white/60">
                   <p>{t('common.nothingFound')}</p>
                   <p className="text-sm mt-2">{t('bazaar.tryPostalCode')}</p>
                 </div>
@@ -396,14 +399,14 @@ export const CityModal = ({
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-900 rounded-xl font-semibold hover:bg-gray-200 transition-colors active:bg-gray-300"
+                  className="flex-1 px-4 py-3 bg-transparent border border-white text-white rounded-xl font-semibold hover:bg-white/10 transition-colors active:bg-white/20"
                 >
                   {t('common.reset')}
                 </button>
                 <button
                   type="button"
                   onClick={handleApply}
-                  className="flex-1 px-4 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors active:bg-green-700"
+                  className="flex-1 px-4 py-3 bg-[#D3F1A7] text-black rounded-xl font-semibold hover:bg-[#D3F1A7]/80 transition-colors active:bg-[#D3F1A7]/70"
                 >
                   {t('common.apply') || 'Застосувати'}
                 </button>

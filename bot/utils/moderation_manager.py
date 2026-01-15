@@ -130,9 +130,20 @@ class ModerationManager:
         else:
             seller_info = seller_name
         
+        # Перевіряємо чи є priceDisplay (для "Договірна" або діапазону)
+        price_display = listing.get('priceDisplay')
         price = listing.get('price', '0')
         currency = listing.get('currency', 'EUR')
-        price_text = f"{price} {currency}"
+        
+        if price_display:
+            # Використовуємо оригінальне значення (діапазон або "Договірна")
+            price_text = price_display if price_display == "Договірна" else f"{price_display} {currency}"
+        else:
+            # Якщо price == 0 і немає priceDisplay, можливо це "Договірна"
+            if float(price) == 0:
+                price_text = "Договірна"
+            else:
+                price_text = f"{price} {currency}"
         
         category = listing.get('category', 'Не вказано')
         subcategory = listing.get('subcategory')
@@ -441,8 +452,21 @@ class ModerationManager:
             
             title = listing.get('title', '')
             description = listing.get('description', '')
+            # Перевіряємо чи є priceDisplay (для "Договірна" або діапазону)
+            price_display = listing.get('priceDisplay')
             price = listing.get('price', 0)
             currency = listing.get('currency', 'EUR')
+            
+            # Формуємо текст ціни
+            if price_display:
+                if price_display == "Договірна":
+                    price_text = "Договірна"
+                else:
+                    price_text = f"{price_display} {currency}"
+            elif float(price) == 0:
+                price_text = "Договірна"
+            else:
+                price_text = f"{price} {currency}"
             category = listing.get('category', '')
             subcategory = listing.get('subcategory')
             condition = listing.get('condition', '')
@@ -503,7 +527,7 @@ class ModerationManager:
 
 📄 {description}
 
-💰 <b>Ціна:</b> {price} {currency}
+💰 <b>Ціна:</b> {price_text}
 📂 <b>Категорія:</b> {category_text}
 🔄 <b>Стан:</b> {condition_text}
 📍 <b>Місто:</b> {location}
@@ -527,6 +551,24 @@ class ModerationManager:
                         parse_mode="HTML"
                     )
                     message_id = message.message_id
+                    
+                    # Зберігаємо message_id як JSON масив (для уніфікації з медіа-групою)
+                    import json
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("PRAGMA table_info(TelegramListing)")
+                    columns = [row[1] for row in cursor.fetchall()]
+                    has_channel_message_id = 'channelMessageId' in columns
+                    
+                    if has_channel_message_id:
+                        # Зберігаємо як JSON масив навіть для одного фото
+                        cursor.execute("""
+                            UPDATE TelegramListing
+                            SET channelMessageId = ?
+                            WHERE id = ?
+                        """, (json.dumps([message_id]), listing_id))
+                        conn.commit()
+                    conn.close()
                     
                     if tariff == 'pinned' and message_id:
                         try:
@@ -556,8 +598,8 @@ class ModerationManager:
                     )
                     message_id = messages[0].message_id if messages else None
                     
-                    # Зберігаємо всі message_id з медіа-групи як JSON
-                    if messages and len(messages) > 1:
+                    # Зберігаємо всі message_id з медіа-групи як JSON (завжди, навіть якщо одне повідомлення)
+                    if messages:
                         all_message_ids = [msg.message_id for msg in messages]
                         # Зберігаємо JSON з усіма message_id в channelMessageId (як рядок)
                         import json
@@ -633,33 +675,104 @@ class ModerationManager:
             message_ids = []
             try:
                 # Спробуємо розпарсити як JSON
-                if isinstance(channel_message_id, str) and channel_message_id.startswith('['):
-                    message_ids = json.loads(channel_message_id)
+                if isinstance(channel_message_id, str) and (channel_message_id.startswith('[') or channel_message_id.startswith('"')):
+                    # Може бути JSON масив або JSON рядок з масивом
+                    parsed = json.loads(channel_message_id)
+                    if isinstance(parsed, list):
+                        message_ids = parsed
+                    else:
+                        # Якщо це не масив, спробуємо як число
+                        message_ids = [int(parsed)]
+                elif isinstance(channel_message_id, (int, str)):
+                    # Старий формат - один message_id
+                    # Спробуємо видалити це повідомлення, а також спробуємо видалити сусідні (якщо це медіа-група)
+                    single_msg_id = int(channel_message_id)
+                    message_ids = [single_msg_id]
+                    
+                    # Для старих записів: спробуємо також видалити повідомлення +1 та -1
+                    # (медіа-групи зазвичай мають послідовні message_id)
+                    # Але це не надійно, тому просто видалимо одне повідомлення
+                    # Telegram автоматично видалить всю медіа-групу, якщо видалити одне повідомлення з неї
+                    print(f"Використовується старий формат channelMessageId для оголошення {listing_id}, спробуємо видалити повідомлення {single_msg_id}")
                 else:
-                    # Якщо це не JSON, то це один message_id
                     message_ids = [int(channel_message_id)]
-            except:
+            except Exception as e:
                 # Якщо не вдалося розпарсити, спробуємо як число
                 try:
                     message_ids = [int(channel_message_id)]
+                    print(f"Використовується fallback для channelMessageId для оголошення {listing_id}")
                 except:
-                    print(f"Не вдалося розпарсити channelMessageId для оголошення {listing_id}")
+                    print(f"Не вдалося розпарсити channelMessageId для оголошення {listing_id}: {e}")
                     return False
             
             # Видаляємо всі повідомлення з медіа-групи
             deleted_count = 0
-            for msg_id in message_ids:
+            
+            # Якщо це старий формат (один message_id), спробуємо знайти всі повідомлення з медіа-групи
+            if len(message_ids) == 1 and isinstance(channel_message_id, (int, str)) and not (isinstance(channel_message_id, str) and channel_message_id.startswith('[')):
+                first_msg_id = message_ids[0]
+                
+                # Для старих записів: спробуємо знайти всі повідомлення з медіа-групи поступово
+                # Перевіряємо сусідні повідомлення, починаючи з найближчих
+                # Медіа-групи зазвичай мають послідовні message_id, максимум 10 повідомлень
+                found_message_ids = [first_msg_id]
+                
+                # Спочатку видаляємо центральне повідомлення
                 try:
-                    await self.bot.delete_message(chat_id=channel_id, message_id=int(msg_id))
+                    await self.bot.delete_message(chat_id=channel_id, message_id=first_msg_id)
                     deleted_count += 1
-                    print(f"Повідомлення {msg_id} видалено з каналу для оголошення {listing_id}")
                 except Exception as e:
-                    # Якщо повідомлення вже видалено або не існує, ігноруємо помилку
                     error_msg = str(e).lower()
-                    if "message to delete not found" in error_msg or "message not found" in error_msg or "message can't be deleted" in error_msg:
-                        print(f"Повідомлення {msg_id} вже видалено або не існує")
-                    else:
-                        print(f"Помилка при видаленні повідомлення {msg_id} з каналу: {e}")
+                    if "message to delete not found" not in error_msg and "message not found" not in error_msg:
+                        pass  # Ігноруємо помилки
+                
+                # Тепер спробуємо знайти інші повідомлення з медіа-групи
+                # Перевіряємо сусідні повідомлення поступово в обох напрямках
+                # Зупиняємося тільки коли не знайдено кілька повідомлень підряд
+                max_range = 10  # Максимум 10 повідомлень в медіа-групі
+                consecutive_not_found = {}  # Лічильник послідовних не знайдених в кожному напрямку
+                
+                for direction in [-1, 1]:
+                    consecutive_not_found[direction] = 0
+                    for offset in range(1, max_range + 1):
+                        check_msg_id = first_msg_id + (offset * direction)
+                        
+                        # Спробуємо видалити повідомлення
+                        try:
+                            await self.bot.delete_message(chat_id=channel_id, message_id=check_msg_id)
+                            deleted_count += 1
+                            found_message_ids.append(check_msg_id)
+                            consecutive_not_found[direction] = 0  # Скидаємо лічильник
+                        except Exception as e:
+                            error_msg = str(e).lower()
+                            if "message to delete not found" in error_msg or "message not found" in error_msg:
+                                # Повідомлення не існує
+                                consecutive_not_found[direction] += 1
+                                # Якщо не знайдено 2 повідомлення підряд, зупиняємося в цьому напрямку
+                                if consecutive_not_found[direction] >= 2:
+                                    break
+                            else:
+                                # Інша помилка - можливо повідомлення не належить до медіа-групи
+                                # Зупиняємося в цьому напрямку
+                                break
+            else:
+                # Новий формат - маємо всі message_id, просто видаляємо їх
+                for msg_id in message_ids:
+                    try:
+                        await self.bot.delete_message(chat_id=channel_id, message_id=int(msg_id))
+                        deleted_count += 1
+                    except Exception as e:
+                        # Якщо повідомлення вже видалено або не існує, ігноруємо помилку
+                        error_msg = str(e).lower()
+                        if not any(phrase in error_msg for phrase in [
+                            "message to delete not found",
+                            "message not found", 
+                            "message can't be deleted",
+                            "bad request: message to delete not found",
+                            "bad request: message not found"
+                        ]):
+                            # Ігноруємо помилки видалення
+                            pass
             
             # Оновлюємо БД - очищаємо channelMessageId
             conn = get_db_connection()

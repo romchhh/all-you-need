@@ -233,7 +233,7 @@ async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext
 @router.message(CreateListing.waiting_for_photos, F.text == "/skip")
 async def skip_photos_handler(message: types.Message, state: FSMContext):   
     user_id = message.from_user.id
-    await message.answer("❌ <b>Не можна пропустити додавання фото!</b>\n\nБудь ласка, надішліть хоча б одне фото вашого товару. Після додавання фото надішліть /next для продовження.", parse_mode="HTML")
+    await message.answer("❌ <b>Не можна пропустити додавання фото!</b>\n\nБудь ласка, надішліть хоча б одне фото вашого товару. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
 
 
 @router.message(CreateListing.waiting_for_photos, F.text)
@@ -249,7 +249,7 @@ async def handle_text_in_photos_state(message: types.Message, state: FSMContext)
         )
         return
     
-    await message.answer("📸 <b>Будь ласка, надішліть фото товару!</b>\n\nВи можете надіслати до 10 фото. Після додавання фото надішліть /next для продовження.", parse_mode="HTML")
+    await message.answer("📸 <b>Будь ласка, надішліть фото товару!</b>\n\nВи можете надіслати до 10 фото. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
 
 
 async def process_category_selection(message: types.Message, state: FSMContext):
@@ -284,11 +284,37 @@ async def process_category(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(CreateListing.waiting_for_price)
     await state.update_data(category_id=category_id, category_name=selected_category['name'])
     
+    # Створюємо клавіатуру з кнопкою "Договірна"
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="🤝 Договірна",
+            callback_data="price_negotiable"
+        )]
+    ])
+    
     await callback.message.edit_text(
         t(user_id, 'create_listing.price_prompt'),
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=keyboard
     )
     await callback.answer()
+
+
+@router.callback_query(F.data == "price_negotiable", CreateListing.waiting_for_price)
+async def process_price_negotiable(callback: types.CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    
+    # Зберігаємо "Договірна" як ціну
+    await state.update_data(price="Договірна", isNegotiable=True)
+    await state.set_state(CreateListing.waiting_for_condition)
+    
+    await callback.message.edit_text(
+        t(user_id, 'create_listing.condition_prompt'),
+        parse_mode="HTML",
+        reply_markup=get_condition_keyboard(user_id)
+    )
+    await callback.answer("✅ Ціна встановлена як договірна")
 
 
 @router.message(CreateListing.waiting_for_price)
@@ -299,8 +325,37 @@ async def process_price(message: types.Message, state: FSMContext):
         await cancel_listing(message, state)
         return
     
+    text = message.text.replace(',', '.').strip()
+    
+    # Перевіряємо чи це діапазон ціни (наприклад "50-100" або "50 - 100")
+    if '-' in text:
+        try:
+            parts = [p.strip() for p in text.split('-')]
+            if len(parts) == 2:
+                price_min = float(parts[0])
+                price_max = float(parts[1])
+                if price_min < 0 or price_max < 0:
+                    raise ValueError("Ціна не може бути від'ємною")
+                if price_min > price_max:
+                    raise ValueError("Мінімальна ціна не може бути більшою за максимальну")
+                # Зберігаємо як рядок діапазону
+                price = f"{price_min}-{price_max}"
+                await state.update_data(price=price, priceMin=price_min, priceMax=price_max)
+                await state.set_state(CreateListing.waiting_for_condition)
+                
+                await message.answer(
+                    t(user_id, 'create_listing.condition_prompt'),
+                    parse_mode="HTML",
+                    reply_markup=get_condition_keyboard(user_id)
+                )
+                return
+        except ValueError as e:
+            await message.answer(t(user_id, 'create_listing.price_invalid'))
+            return
+    
+    # Якщо не діапазон, обробляємо як звичайну ціну
     try:
-        price = float(message.text.replace(',', '.').strip())
+        price = float(text)
         if price < 0:
             raise ValueError("Ціна не може бути від'ємною")
     except ValueError:
@@ -522,7 +577,26 @@ def build_preview(user_id: int, data: dict) -> str:
     category_text = data.get('category_name', '')
     preview += t(user_id, 'create_listing.preview_category').format(category=category_text)
     
-    preview += t(user_id, 'create_listing.preview_price').format(price=data.get('price', 0))
+    # Форматуємо ціну для відображення
+    price_display = data.get('price', 0)
+    if isinstance(price_display, str):
+        if price_display == "Договірна":
+            price_display = "Договірна"
+        elif '-' in price_display:
+            # Діапазон ціни - вже містить формат "50-100"
+            price_display = f"{price_display} EUR"
+        else:
+            # Звичайна ціна як рядок
+            price_display = f"{price_display} EUR"
+    else:
+        # Числова ціна
+        price_display = f"{price_display} EUR"
+    
+    # Використовуємо спеціальний формат для "Договірна"
+    if price_display == "Договірна":
+        preview += f"💰 <b>Ціна:</b> Договірна\n"
+    else:
+        preview += t(user_id, 'create_listing.preview_price').format(price=price_display.replace(' EUR', ''))
     preview += t(user_id, 'create_listing.preview_condition').format(condition=data.get('condition_text', ''))
     preview += t(user_id, 'create_listing.preview_location').format(location=data.get('location', ''))
     
@@ -552,17 +626,41 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         title = capitalize_first_letter(data['title'])
         description = capitalize_first_letter(data['description'])
         
+        # Обробляємо ціну: може бути число, діапазон або "Договірна"
+        price_value = data.get('price', 0)
+        is_negotiable = data.get('isNegotiable', False)
+        price_display = None  # Оригінальне значення для відображення
+        
+        if isinstance(price_value, str):
+            if price_value == "Договірна" or is_negotiable:
+                # Для "Договірна" зберігаємо як 0, але зберігаємо оригінальне значення
+                price_display = "Договірна"
+                price_value = 0
+            elif '-' in price_value:
+                # Для діапазону беремо мінімальне значення для сортування, але зберігаємо діапазон
+                try:
+                    parts = price_value.split('-')
+                    price_min = float(parts[0].strip())
+                    price_max = float(parts[1].strip())
+                    price_display = f"{price_min}-{price_max}"  # Зберігаємо діапазон для відображення
+                    price_value = price_min  # Зберігаємо мінімальну ціну для сортування
+                except:
+                    price_value = 0
+        else:
+            price_value = float(price_value) if price_value else 0
+        
         listing_id = create_telegram_listing(
             user_id=db_user_id,
             title=title,
             description=description,
-            price=float(data['price']),
+            price=price_value,
             currency='EUR',
             category=data['category_name'],
             subcategory=None,
             condition=data['condition'],
             location=data.get('location', 'Не вказано'),
-            images=photos
+            images=photos,
+            price_display=price_display  # Передаємо оригінальне значення
         )
         
         # Зберігаємо listing_id в стані для подальшого використання

@@ -16,6 +16,7 @@ import CreateListingFlow from '@/components/CreateListingFlow';
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { AppHeader } from '@/components/AppHeader';
 
 const ProfilePage = () => {
   const params = useParams();
@@ -265,7 +266,8 @@ const ProfilePage = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 overflow-x-hidden max-w-full">
+    <div className="min-h-screen pb-20 overflow-x-hidden max-w-full">
+      <AppHeader />
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 

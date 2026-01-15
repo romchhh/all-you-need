@@ -41,7 +41,8 @@ def create_telegram_listing(
     subcategory: Optional[str],
     condition: str,
     location: str,
-    images: List[str]
+    images: List[str],
+    price_display: Optional[str] = None
 ) -> int:
     """Створює нове оголошення для Telegram каналу"""
     conn = get_connection()
@@ -55,6 +56,7 @@ def create_telegram_listing(
     has_location = 'location' in columns
     has_publication_tariff = 'publicationTariff' in columns
     has_payment_status = 'paymentStatus' in columns
+    has_price_display = 'priceDisplay' in columns
     
     # Додаємо колонки якщо їх немає
     if not has_location:
@@ -63,17 +65,23 @@ def create_telegram_listing(
         cursor.execute("ALTER TABLE TelegramListing ADD COLUMN publicationTariff TEXT")
     if not has_payment_status:
         cursor.execute("ALTER TABLE TelegramListing ADD COLUMN paymentStatus TEXT DEFAULT 'pending'")
+    if not has_price_display:
+        cursor.execute("ALTER TABLE TelegramListing ADD COLUMN priceDisplay TEXT")
+    
+    # Якщо price_display не передано, використовуємо звичайну ціну
+    if price_display is None:
+        price_display = str(price) if price > 0 else None
     
     cursor.execute("""
         INSERT INTO TelegramListing (
             userId, title, description, price, currency, category, subcategory,
-            condition, location, images, status, moderationStatus, createdAt, updatedAt
+            condition, location, images, status, moderationStatus, createdAt, updatedAt, priceDisplay
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         user_id, title, description, price, currency, category, subcategory,
         condition, location, images_json, 'pending_moderation', 'pending',
-        datetime.now(), datetime.now()
+        datetime.now(), datetime.now(), price_display
     ))
     
     listing_id = cursor.lastrowid

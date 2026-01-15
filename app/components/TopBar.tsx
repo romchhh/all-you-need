@@ -44,7 +44,11 @@ export const TopBar = ({
     return (
       <div className="flex gap-1 items-center flex-1">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Search 
+            className="absolute top-1/2 -translate-y-1/2 text-white/80" 
+            size={18} 
+            style={{ left: '28px' }}
+          />
           <input
             ref={searchInputRef}
             type="text"
@@ -63,7 +67,8 @@ export const TopBar = ({
             onFocus={() => {
               // Можна додати логіку для показу підказок
             }}
-            className="w-full pl-10 pr-10 py-3 bg-gray-100 rounded-xl border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-900 placeholder:text-gray-400"
+            className="w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 transition-all text-white placeholder:text-white/60"
+            style={{ paddingLeft: '52px' }}
           />
           {searchQuery && onSearchClear && (
             <button
@@ -71,9 +76,9 @@ export const TopBar = ({
                 onSearchClear();
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
             >
-              <X size={14} className="text-gray-900" />
+              <X size={14} className="text-white" />
             </button>
           )}
         </div>
@@ -82,11 +87,11 @@ export const TopBar = ({
             onFilterClick?.();
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="relative w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+          className="relative w-12 h-12 rounded-xl bg-transparent border border-white flex items-center justify-center hover:bg-white/10 transition-colors"
         >
-          <SlidersHorizontal size={18} className="text-gray-900" />
+          <SlidersHorizontal size={18} className="text-white" />
           {hasActiveFilters && (
-            <span className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+            <span className="absolute top-1 right-1 w-2 h-2 bg-[#D3F1A7] rounded-full"></span>
           )}
         </button>
       </div>

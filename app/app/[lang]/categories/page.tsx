@@ -17,6 +17,7 @@ import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useUser } from '@/hooks/useUser';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { AppHeader } from '@/components/AppHeader';
 
 const CategoriesPage = () => {
   const params = useParams();
@@ -702,7 +703,8 @@ const CategoriesPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 overflow-x-hidden max-w-full">
+    <div className="min-h-screen pb-20 overflow-x-hidden max-w-full">
+      <AppHeader />
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 

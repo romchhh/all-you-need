@@ -1,4 +1,5 @@
 import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone } from 'lucide-react';
+import { NavIcon } from '../NavIcon';
 import { ImageViewModal } from '../ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
 import { useUser } from '@/hooks/useUser';
@@ -250,7 +251,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   if (loading) {
     return (
       <div className="pb-24 flex items-center justify-center min-h-screen">
-        <div className="text-gray-500">{t('common.loading')}</div>
+        <div className="text-gray-400">{t('common.loading')}</div>
       </div>
     );
   }
@@ -261,27 +262,25 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     const telegramId = urlParams?.get('telegramId');
     const botLink = telegramId ? getBotStartLink(telegramId) : getBotBaseUrl();
     return (
-      <div className="pb-24 flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center px-4">
-          <div className="flex items-center justify-center mx-auto mb-4">
-            <UserPlus size={48} className="text-gray-400" />
+      <div className="pb-24 flex flex-col h-screen overflow-hidden px-4">
+        <h2 className="text-2xl font-bold text-white mb-2 pt-2">Профіль</h2>
+        <p className="text-sm text-gray-400 mb-8">Ваш особистий профіль</p>
+        
+        <div className="flex-1 flex items-start justify-center pt-8 pb-20">
+          <div className="max-w-sm mx-auto px-4">
+            <div className="border-2 border-gray-600 rounded-3xl p-8 text-center">
+              <div className="flex items-center justify-center mx-auto mb-6">
+                <div className="text-white" style={{ width: '64px', height: '64px' }}>
+                  <svg width="64" height="64" viewBox="0 0 39 39" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M37 19.4959C37.0055 22.9702 35.9722 26.3667 34.0328 29.2493C32.4333 31.6351 30.2705 33.5901 27.7358 34.9412C25.201 36.2924 22.3724 36.9981 19.5 36.9959C16.6276 36.9981 13.7989 36.2924 11.2642 34.9412C8.72943 33.5901 6.56668 31.6351 4.96722 29.2493C3.4442 26.979 2.47425 24.3834 2.13515 21.6707C1.79605 18.958 2.09721 16.2035 3.01451 13.6282C3.9318 11.0528 5.43971 8.72817 7.41735 6.84063C9.39499 4.95309 11.7873 3.55513 14.4026 2.75882C17.0179 1.96252 19.7834 1.79002 22.4774 2.25515C25.1714 2.72028 27.7189 3.8101 29.9158 5.43725C32.1127 7.06441 33.8978 9.18363 35.128 11.625C36.3582 14.0664 36.9993 16.7621 37 19.4959Z" stroke="currentColor" strokeWidth="4"/>
+                    <path d="M21.4445 13.6626C21.4445 14.1783 21.2397 14.6729 20.875 15.0375C20.5104 15.4022 20.0158 15.6071 19.5001 15.6071V19.4959C21.0472 19.4959 22.5309 18.8814 23.6249 17.7874C24.7188 16.6934 25.3334 15.2097 25.3334 13.6626H21.4445ZM19.5001 15.6071C18.9844 15.6071 18.4898 15.4022 18.1252 15.0375C17.7605 14.6729 17.5556 14.1783 17.5556 13.6626H13.6668C13.6668 15.2097 14.2813 16.6934 15.3753 17.7874C16.4693 18.8814 17.953 19.4959 19.5001 19.4959V15.6071ZM17.5556 13.6626C17.5556 13.1469 17.7605 12.6523 18.1252 12.2877C18.4898 11.923 18.9844 11.7182 19.5001 11.7182V7.82928C17.953 7.82928 16.4693 8.44387 15.3753 9.53783C14.2813 10.6318 13.6668 12.1155 13.6668 13.6626H17.5556ZM19.5001 11.7182C20.0158 11.7182 20.5104 11.923 20.875 12.2877C21.2397 12.6523 21.4445 13.1469 21.4445 13.6626H25.3334C25.3334 12.1155 24.7188 10.6318 23.6249 9.53783C22.5309 8.44387 21.0472 7.82928 19.5001 7.82928V11.7182ZM6.21176 30.8826L4.34704 30.3284L4.04565 31.3454L4.73593 32.1484L6.21176 30.8826ZM32.7884 30.8826L34.2662 32.1484L34.9545 31.3454L34.6531 30.3284L32.7884 30.8826ZM13.6668 27.2737H25.3334V23.3848H13.6668V27.2737ZM13.6668 23.3848C11.5727 23.3842 9.5344 24.0597 7.85516 25.3108C6.17593 26.5619 4.94552 28.3217 4.34704 30.3284L8.07454 31.4368C8.43421 30.2333 9.17274 29.178 10.1803 28.4279C11.1879 27.6778 12.4107 27.273 13.6668 27.2737V23.3848ZM19.5001 35.0515C17.2552 35.054 15.0365 34.5694 12.9971 33.6311C10.9577 32.6928 9.14621 31.3232 7.6876 29.6168L4.73593 32.1484C6.5596 34.2805 8.8239 35.9918 11.3728 37.1644C13.9216 38.3369 16.6944 38.9429 19.5001 38.9404V35.0515ZM25.3334 27.2737C27.972 27.2737 30.2062 29.0276 30.9256 31.4387L34.6531 30.3284C34.0547 28.322 32.8227 26.5624 31.1438 25.3113C29.465 24.0603 27.4271 23.3846 25.3334 23.3848V27.2737ZM31.3126 29.6168C29.854 31.3232 28.0425 32.6928 26.0031 33.6311C23.9637 34.5694 21.745 35.054 19.5001 35.0515V38.9404C22.3057 38.9429 25.0785 38.3369 27.6274 37.1644C30.1763 35.9918 32.4425 34.2805 34.2662 32.1484L31.3126 29.6168Z" fill="currentColor"/>
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">{t('profileNotFound.title')}</h3>
+              <p className="text-sm text-gray-400">{t('profileNotFound.description')}</p>
+            </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('profileNotFound.title')}</h2>
-          <p className="text-gray-500 mb-6">{t('profileNotFound.description')}</p>
-          <a
-            href={botLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors"
-            onClick={() => {
-              if (tg) {
-                tg.openTelegramLink(botLink);
-              }
-            }}
-          >
-            <Plus size={20} />
-            {t('profileNotFound.createButton')}
-          </a>
         </div>
       </div>
     );
@@ -292,9 +291,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   return (
     <>
-    <div className="pb-24 bg-white min-h-screen">
+    <div className="pb-24 min-h-screen">
       {/* Профіль хедер */}
-      <div className="px-4 pt-6 pb-4 border-b border-gray-200">
+      <div className="px-4 pt-2 pb-4 border-b border-gray-200">
         <div className="flex items-center gap-4">
           {/* Фото профілю */}
           <div 
@@ -340,14 +339,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           
           {/* Інформація */}
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-gray-900 mb-1 truncate">{displayName}</h2>
+            <h2 className="text-xl font-bold text-white mb-1 truncate">{displayName}</h2>
             {displayUsername && (
-              <p className="text-sm text-gray-600 mb-2 truncate">{displayUsername}</p>
+              <p className="text-sm text-gray-400 mb-2 truncate">{displayUsername}</p>
             )}
             {stats && (
-              <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
+              <div className="flex items-center gap-4 text-xs text-gray-400 mt-2">
                 <div className="flex items-center gap-1">
-                  <Megaphone size={14} className="text-gray-500" />
+                  <Megaphone size={14} className="text-gray-400" />
                   <span>{stats.activeListings} {t('sales.active')}</span>
                 </div>
                 {stats.soldListings > 0 && (
@@ -358,8 +357,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             {profile.balance !== undefined && (
               <div className="flex items-center flex-wrap gap-2 mt-2">
                 <div className="flex items-center gap-2">
-                  <Wallet size={14} className="text-gray-500 flex-shrink-0" />
-                  <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                  <Wallet size={14} className="text-gray-400 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-white whitespace-nowrap">
                     {t('profile.balance')}: {profile.balance.toFixed(2)} €
                   </span>
                 </div>
@@ -385,7 +384,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 setIsEditModalOpen(true);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
+              className="w-10 h-10 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors text-white"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -397,7 +396,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 setShowShareModal(true);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
+              className="w-10 h-10 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors text-white"
             >
               <Share2 size={20} />
             </button>
@@ -406,7 +405,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       </div>
 
       {/* Кнопка створення оголошення */}
-      <div className="px-4 pt-6 pb-3">
+      <div className="px-4 pt-3 pb-3">
         <button 
           className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-500/20"
           onClick={() => {
@@ -438,7 +437,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       {/* Оголошення користувача */}
       <div className="px-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-gray-900">{t('sales.title')}</h3>
+          <h3 className="text-lg font-semibold text-white">{t('sales.title')}</h3>
         </div>
         
         {/* Фільтри */}
@@ -454,9 +453,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 setIsCategoryFilterOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="flex-1 px-3 py-2 bg-gray-100 rounded-xl border border-gray-200 flex items-center justify-between text-sm"
+              className="flex-1 px-3 py-2 bg-gray-800/50 rounded-xl border border-gray-700 flex items-center justify-between text-sm"
             >
-              <span className="text-gray-700">
+              <span className="text-gray-300">
                 {selectedStatus === 'all' ? t('sales.allStatuses') : 
                  selectedStatus === 'active' ? t('listing.active') :
                  selectedStatus === 'sold' ? t('listing.sold') :
@@ -509,7 +508,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           {isStatusFilterOpen && (
             <div 
               id="status-filter-menu"
-              className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000]"
+              className="fixed bg-gray-900 rounded-xl border border-gray-700 shadow-2xl z-[10000]"
               style={{
                 top: `${statusMenuPosition.top + 8}px`,
                 left: `${statusMenuPosition.left}px`,
@@ -528,8 +527,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setIsStatusFilterOpen(false);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className={`w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
-                    selectedStatus === status ? 'bg-blue-50' : ''
+                  className={`w-full px-3 py-2.5 text-left text-sm hover:bg-gray-800 transition-colors border-b border-gray-700 last:border-b-0 ${
+                    selectedStatus === status ? 'bg-blue-500/20 text-[#D3F1A7]' : 'text-white'
                   }`}
                 >
                   {status === 'all' ? t('sales.allStatuses') : 
@@ -576,10 +575,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   setIsCategoryFilterOpen(false);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 border-b border-gray-100 ${
+                className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 border-b border-gray-700 ${
                   selectedCategory === 'all'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'bg-blue-500/20 text-[#D3F1A7] font-semibold'
+                    : 'text-white hover:bg-gray-800'
                 }`}
               >
                 <span className="text-xl">📦</span>
@@ -597,10 +596,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setIsCategoryFilterOpen(false);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 border-b border-gray-100 ${
+                  className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 border-b border-gray-700 ${
                     selectedCategory === cat.id
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      ? 'bg-blue-500/20 text-[#D3F1A7] font-semibold'
+                      : 'text-white hover:bg-gray-800'
                   }`}
                 >
                   <span className="text-xl flex-shrink-0">{cat.icon}</span>
@@ -715,7 +714,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 <div className="py-6">
                   <button
                     onClick={loadMoreListings}
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-4 rounded-2xl transition-colors"
+                    className="w-full bg-gray-800/50 hover:bg-gray-700/50 text-white font-semibold py-4 rounded-2xl transition-colors"
                   >
                     {t('sales.showMore')}
                   </button>
@@ -727,7 +726,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               <div className="text-gray-400 mb-4">
                 <Package size={64} className="mx-auto" />
               </div>
-              <p className="text-gray-500 mb-2">{t('sales.noListings')}</p>
+              <p className="text-gray-400 mb-2">{t('sales.noListings')}</p>
               <p className="text-sm text-gray-400">{t('sales.createFirst')}</p>
             </div>
           )}
@@ -743,11 +742,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             router.push(`/${language}/faq`);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-800/30 rounded-xl border border-gray-700 hover:bg-gray-700/50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <HelpCircle size={20} className="text-gray-600" />
-            <span className="text-gray-900 font-medium">{t('navigation.faq')}</span>
+            <HelpCircle size={20} className="text-gray-400" />
+            <span className="text-white font-medium">{t('navigation.faq')}</span>
           </div>
           <ChevronRight size={20} className="text-gray-400" />
         </button>
@@ -757,11 +756,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             router.push(`/${language}/privacy`);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-800/30 rounded-xl border border-gray-700 hover:bg-gray-700/50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <Shield size={20} className="text-gray-600" />
-            <span className="text-gray-900 font-medium">{t('privacy.title')}</span>
+            <Shield size={20} className="text-gray-400" />
+            <span className="text-white font-medium">{t('privacy.title')}</span>
           </div>
           <ChevronRight size={20} className="text-gray-400" />
         </button>
