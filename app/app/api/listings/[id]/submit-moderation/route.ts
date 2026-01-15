@@ -11,10 +11,10 @@ export async function POST(
     const listingId = parseInt(id);
     const { telegramId } = await request.json();
 
-    // Знаходимо користувача
+    // Знаходимо користувача (telegramId - це BIGINT, тому використовуємо TEXT для порівняння)
     const users = await prisma.$queryRawUnsafe(
-      `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-      parseInt(telegramId)
+      `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
+      String(telegramId)
     ) as Array<{ id: number }>;
 
     if (!users[0]) {
@@ -38,15 +38,26 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Перевіряємо статус - не дозволяємо відправляти на модерацію вже активні або вже на модерації оголошення
-    if (listing.status === 'active' || listing.status === 'pending_moderation') {
+    // Перевіряємо статус
+    if (listing.status === 'active') {
       return NextResponse.json(
-        { error: 'Listing is already active or pending moderation' },
+        { error: 'Listing is already active' },
         { status: 400 }
       );
     }
 
-    // Відправляємо на модерацію
+    // Якщо статус вже pending_moderation, просто відправляємо в ТГ групу
+    // (це може статися після оплати реклами з балансу)
+    if (listing.status === 'pending_moderation') {
+      console.log('[Submit Moderation] Listing already pending_moderation, sending to TG group');
+      await submitListingToModeration(listingId);
+      return NextResponse.json({
+        success: true,
+        message: 'Listing sent to moderation group',
+      });
+    }
+
+    // Відправляємо на модерацію (змінює статус на pending_moderation)
     await submitListingToModeration(listingId);
 
     return NextResponse.json({

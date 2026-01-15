@@ -20,6 +20,7 @@ interface ListingData {
   condition?: string;
   location: string;
   images: string | string[];
+  publicationTariff?: string; // 'standard', 'highlighted', 'pinned', 'story'
 }
 
 /**
@@ -53,7 +54,26 @@ export async function publishListingToChannel(
     };
     const conditionText = conditionMap[condition] || condition;
 
-    const text = `📌 <b>${title}</b>
+    // Застосовуємо тариф публікації
+    const tariff = listingData.publicationTariff || 'standard';
+    let titlePrefix = '';
+    let titleStyle = title;
+    
+    if (tariff === 'highlighted') {
+      titlePrefix = '⭐ ';
+      titleStyle = `<b>${title}</b>`;
+    } else if (tariff === 'pinned') {
+      titlePrefix = '📌 ';
+      titleStyle = `<b>${title}</b>`;
+    } else if (tariff === 'story') {
+      titlePrefix = '📸 ';
+      titleStyle = `<b>${title}</b>`;
+    } else {
+      titlePrefix = '📌 ';
+      titleStyle = title;
+    }
+
+    const text = `${titlePrefix}${titleStyle}
 
 📄 ${description}
 
@@ -175,7 +195,28 @@ export async function publishListingToChannel(
 
             if (response.ok) {
               const result = await response.json();
-              return result.result?.message_id || null;
+              const messageId = result.result?.message_id || null;
+              
+              // Закріплюємо повідомлення якщо тариф 'pinned'
+              if (messageId && tariff === 'pinned') {
+                try {
+                  await fetch(
+                    `https://api.telegram.org/bot${BOT_TOKEN}/pinChatMessage`,
+                    {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        chat_id: TRADE_CHANNEL_ID,
+                        message_id: messageId,
+                      }),
+                    }
+                  );
+                } catch (error) {
+                  console.error('[publishToChannel] Error pinning message:', error);
+                }
+              }
+              
+              return messageId;
             }
           }
         }
@@ -290,7 +331,28 @@ export async function publishListingToChannel(
 
       if (response.ok) {
         const result = await response.json();
-        return result.result?.message_id || null;
+        const messageId = result.result?.message_id || null;
+        
+        // Закріплюємо повідомлення якщо тариф 'pinned'
+        if (messageId && tariff === 'pinned') {
+          try {
+            await fetch(
+              `https://api.telegram.org/bot${BOT_TOKEN}/pinChatMessage`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: TRADE_CHANNEL_ID,
+                  message_id: messageId,
+                }),
+              }
+            );
+          } catch (error) {
+            console.error('[publishToChannel] Error pinning message:', error);
+          }
+        }
+        
+        return messageId;
       }
     }
 

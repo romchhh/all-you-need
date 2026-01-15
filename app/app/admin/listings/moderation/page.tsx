@@ -5,12 +5,11 @@ import Link from 'next/link';
 
 interface Stats {
   marketplace: number;
-  telegram: number;
   total: number;
 }
 
 export default function ModerationPage() {
-  const [stats, setStats] = useState<Stats>({ marketplace: 0, telegram: 0, total: 0 });
+  const [stats, setStats] = useState<Stats>({ marketplace: 0, total: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,49 +18,30 @@ export default function ModerationPage() {
 
   const fetchStats = async () => {
     try {
-      const [marketplaceRes, telegramRes] = await Promise.allSettled([
-        fetch('/api/admin/moderation/marketplace?status=pending'),
-        fetch('/api/admin/moderation/telegram?status=pending'),
-      ]);
-
+      const marketplaceRes = await fetch('/api/admin/moderation/marketplace?status=pending');
       let marketplaceCount = 0;
-      let telegramCount = 0;
 
       // Обробка результату маркетплейсу
-      if (marketplaceRes.status === 'fulfilled' && marketplaceRes.value.ok) {
+      if (marketplaceRes.ok) {
         try {
-          const marketplaceData = await marketplaceRes.value.json();
-          marketplaceCount = marketplaceData.listings?.length || 0;
+          const marketplaceData = await marketplaceRes.json();
+          marketplaceCount = marketplaceData.total || 0;
         } catch (error) {
           console.error('Error parsing marketplace data:', error);
         }
       } else {
-        console.error('Marketplace API error:', marketplaceRes.status === 'rejected' ? marketplaceRes.reason : 'Request failed');
-      }
-
-      // Обробка результату Telegram
-      if (telegramRes.status === 'fulfilled' && telegramRes.value.ok) {
-        try {
-          const telegramData = await telegramRes.value.json();
-          telegramCount = telegramData.listings?.length || 0;
-        } catch (error) {
-          console.error('Error parsing telegram data:', error);
-        }
-      } else {
-        console.error('Telegram API error:', telegramRes.status === 'rejected' ? telegramRes.reason : 'Request failed');
+        console.error('Marketplace API error: Request failed');
       }
 
       setStats({
         marketplace: marketplaceCount,
-        telegram: telegramCount,
-        total: marketplaceCount + telegramCount,
+        total: marketplaceCount,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
       // Встановлюємо нульові значення при помилці
       setStats({
         marketplace: 0,
-        telegram: 0,
         total: 0,
       });
     } finally {
@@ -93,7 +73,7 @@ export default function ModerationPage() {
           <p className="text-gray-600">Всі оголошення перевірено</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Маркетплейс */}
           <Link
             href="/admin/listings/moderation/marketplace"
@@ -114,34 +94,13 @@ export default function ModerationPage() {
               Перейти до модерації →
             </div>
           </Link>
-
-          {/* Telegram бот */}
-          <Link
-            href="/admin/listings/moderation/telegram"
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-5xl">📱</div>
-              <div className="text-right">
-                <div className="text-4xl font-bold text-green-600">{stats.telegram}</div>
-                <div className="text-sm text-gray-500">оголошень</div>
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Telegram бот</h2>
-            <p className="text-gray-600 mb-4">
-              Оголошення, створені через Telegram бота
-            </p>
-            <div className="text-green-600 font-medium">
-              Перейти до модерації →
-            </div>
-          </Link>
         </div>
       )}
 
       {/* Статистика */}
       <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Статистика</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
             <div className="text-sm text-gray-500">Всього</div>
@@ -149,10 +108,6 @@ export default function ModerationPage() {
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{stats.marketplace}</div>
             <div className="text-sm text-gray-500">Маркетплейс</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.telegram}</div>
-            <div className="text-sm text-gray-500">Telegram</div>
           </div>
         </div>
       </div>

@@ -18,28 +18,70 @@ export async function GET(request: NextRequest) {
 
     console.log('[Moderation API - Marketplace] Fetching listings with status:', status);
 
-    // Отримуємо оголошення з маркетплейсу через Prisma
-    const marketplaceDb = await prisma.listing.findMany({
-      where: { moderationStatus: status },
-      include: {
-        user: {
-          select: {
-            id: true,
-            telegramId: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
+    // Отримуємо оголошення з маркетплейсу через SQL запит (обхід проблеми з форматом дати expiresAt)
+    const marketplaceQuery = `
+      SELECT 
+        l.id,
+        l.userId,
+        l.title,
+        l.description,
+        l.price,
+        COALESCE(l.currency, 'EUR') as currency,
+        l.category,
+        l.location,
+        l.images,
+        l.createdAt,
+        l.moderationStatus,
+        u.id as userId,
+        CAST(u.telegramId AS TEXT) as telegramId,
+        u.username,
+        u.firstName,
+        u.lastName
+      FROM Listing l
+      JOIN User u ON l.userId = u.id
+      WHERE l.moderationStatus = ?
+      ORDER BY l.createdAt DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    const marketplaceDbRaw = await prisma.$queryRawUnsafe(
+      marketplaceQuery,
+      status,
+      limit,
+      offset
+    ) as any[];
+    
+    const marketplaceDb = marketplaceDbRaw.map((row: any) => ({
+      id: row.id,
+      userId: row.userId,
+      title: row.title,
+      description: row.description,
+      price: row.price,
+      currency: row.currency,
+      category: row.category,
+      location: row.location,
+      images: row.images,
+      createdAt: row.createdAt,
+      moderationStatus: row.moderationStatus,
+      user: {
+        id: row.userId,
+        telegramId: row.telegramId,
+        username: row.username,
+        firstName: row.firstName,
+        lastName: row.lastName,
       },
-      orderBy: { createdAt: 'desc' },
-      skip: offset,
-      take: limit,
-    });
+    }));
 
-    const total = await prisma.listing.count({
-      where: { moderationStatus: status },
-    });
+    const totalQuery = `
+      SELECT COUNT(*) as count
+      FROM Listing
+      WHERE moderationStatus = ?
+    `;
+    const totalResult = await prisma.$queryRawUnsafe(
+      totalQuery,
+      status
+    ) as Array<{ count: bigint }>;
+    const total = Number(totalResult[0]?.count || 0);
 
     const marketplaceListings = marketplaceDb.map((l: any) => ({
       id: l.id,

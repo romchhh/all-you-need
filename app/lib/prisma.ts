@@ -111,6 +111,10 @@ async function optimizeDatabase(): Promise<void> {
     // Кешувати сторінки в пам'яті (16MB)
     await executeDDLSafely(`PRAGMA cache_size = -16384;`);
     
+    // Налаштування для правильної обробки UTF-8 (кирилиця та інші спеціальні символи)
+    // SQLite за замовчуванням використовує UTF-8, але явно вказуємо для надійності
+    await executeDDLSafely(`PRAGMA encoding = 'UTF-8';`);
+    
     // Створюємо додаткові індекси для оптимізації (якщо їх немає)
     await createAdditionalIndexes();
     

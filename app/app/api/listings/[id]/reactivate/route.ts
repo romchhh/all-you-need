@@ -83,15 +83,15 @@ export async function POST(
 
     console.log('[Reactivate Listing] Package deducted successfully');
 
-    // Реактивуємо оголошення зі статусом draft для проходження модерації
+    // Реактивуємо оголошення зі статусом pending_moderation для проходження модерації
     const expiresAt = addDays(new Date(), 30); // 30 днів від реактивації
     const expiresAtStr = toSQLiteDate(expiresAt);
     const nowStr = nowSQLite();
 
-    // Оновлюємо статус на draft, щоб оголошення пройшло через модерацію
+    // Оновлюємо статус на pending_moderation, щоб оголошення пройшло через модерацію
     await prisma.$executeRawUnsafe(
       `UPDATE Listing 
-       SET status = 'draft',
+       SET status = 'pending_moderation',
            moderationStatus = 'pending',
            expiresAt = ?,
            updatedAt = ?,
@@ -102,7 +102,7 @@ export async function POST(
       listingId
     );
 
-    console.log('[Reactivate Listing] Listing reactivated to draft status for moderation');
+    console.log('[Reactivate Listing] Listing reactivated to pending_moderation status for moderation');
 
     return NextResponse.json({
       success: true,

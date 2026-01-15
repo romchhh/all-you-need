@@ -24,6 +24,7 @@ interface Listing {
   publishedAt: string | null;
   promotionType: string | null;
   promotionEnds: string | null;
+  source?: 'marketplace' | 'telegram';
   seller: {
     id: number;
     username: string | null;
@@ -178,18 +179,37 @@ export default function AdminListingDetailPage() {
                 Зображення
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                {listing.images.map((image, index) => (
-                  <img
-                    key={index}
-                    src={image.startsWith('http') ? image : image}
-                    alt={`${listing.title} ${index + 1}`}
-                    className="w-full h-32 sm:h-48 object-cover rounded-lg"
-                    onError={(e) => {
-                      e.currentTarget.src = '/placeholder.png';
-                      e.currentTarget.alt = 'Зображення недоступне';
-                    }}
-                  />
-                ))}
+                {listing.images.map((image, index) => {
+                  const imageUrl = image.startsWith('http') 
+                    ? image 
+                    : image.startsWith('/') 
+                    ? image 
+                    : `/api/images/${image}`;
+                  return (
+                    <img
+                      key={index}
+                      src={imageUrl}
+                      alt={`${listing.title} ${index + 1}`}
+                      className="w-full h-32 sm:h-48 object-cover rounded-lg"
+                      onError={(e) => {
+                        e.currentTarget.src = '/placeholder.png';
+                        e.currentTarget.alt = 'Зображення недоступне';
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Показуємо повідомлення для Telegram оголошень, якщо немає фото */}
+          {listing.source === 'telegram' && (!listing.images || listing.images.length === 0) && (
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
+                Зображення
+              </h2>
+              <div className="w-full h-48 bg-gray-100 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-gray-300">
+                <span className="text-4xl mb-2">📷</span>
+                <span className="text-gray-400 text-sm text-center px-2">Telegram фото<br/>(file_id не відображається)</span>
               </div>
             </div>
           )}

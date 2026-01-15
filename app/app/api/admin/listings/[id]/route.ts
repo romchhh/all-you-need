@@ -22,7 +22,8 @@ export async function GET(
 
     const currencyColumnExists = await ensureCurrencyColumn();
 
-    const listings = await executeWithRetry(() =>
+    // Спочатку шукаємо в таблиці Listing
+    let listings = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
         `SELECT 
           l.id,
@@ -51,7 +52,8 @@ export async function GET(
           u.avatar as sellerAvatar,
           u.phone as sellerPhone,
           CAST(u.telegramId AS INTEGER) as sellerTelegramId,
-          COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount
+          COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount,
+          'marketplace' as source
         FROM Listing l
         JOIN User u ON l.userId = u.id
         WHERE l.id = ?`,
@@ -59,7 +61,57 @@ export async function GET(
       ) as Promise<Array<any>>
     );
 
-    const listing = listings[0];
+    let listing = listings[0];
+    let source = 'marketplace';
+
+    // Якщо не знайдено в Listing, шукаємо в TelegramListing
+    if (!listing) {
+      try {
+        const telegramListings = await executeWithRetry(() =>
+          prisma.$queryRawUnsafe(
+            `SELECT 
+              tl.id,
+              tl.userId,
+              tl.title,
+              tl.description,
+              tl.price,
+              COALESCE(tl.currency, 'EUR') as currency,
+              0 as isFree,
+              tl.category,
+              tl.subcategory,
+              tl.condition,
+              tl.location,
+              0 as views,
+              tl.status,
+              tl.images,
+              NULL as tags,
+              tl.createdAt,
+              COALESCE(tl.updatedAt, tl.createdAt) as updatedAt,
+              tl.publishedAt,
+              NULL as promotionType,
+              NULL as promotionEnds,
+              u.username as sellerUsername,
+              u.firstName as sellerFirstName,
+              u.lastName as sellerLastName,
+              u.avatar as sellerAvatar,
+              u.phone as sellerPhone,
+              CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+              0 as favoritesCount,
+              'telegram' as source
+            FROM TelegramListing tl
+            JOIN User u ON tl.userId = u.id
+            WHERE tl.id = ?`,
+            listingId
+          ) as Promise<Array<any>>
+        );
+        listing = telegramListings[0];
+        source = 'telegram';
+      } catch (telegramError: any) {
+        // Якщо таблиця TelegramListing не існує, ігноруємо помилку
+        console.warn('[Admin Listings Detail] TelegramListing table not available:', telegramError.message);
+      }
+    }
+
     if (!listing) {
       return NextResponse.json(
         { error: 'Listing not found' },
@@ -67,7 +119,27 @@ export async function GET(
       );
     }
 
-    const images = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+    // Парсимо images
+    let images: string[] = [];
+    try {
+      if (typeof listing.images === 'string') {
+        if (listing.images.trim()) {
+          images = JSON.parse(listing.images);
+        }
+      } else if (Array.isArray(listing.images)) {
+        images = listing.images;
+      }
+    } catch (e) {
+      console.warn(`[Admin Listings Detail] Failed to parse images for listing ${listing.id}:`, e);
+      images = [];
+    }
+
+    // Для Telegram оголошень images містить file_id, які не можна використовувати як URL
+    // Очищаємо images для Telegram оголошень, щоб не виникали помилки при відображенні
+    if (source === 'telegram') {
+      images = [];
+    }
+
     const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
 
     const formattedListing = {
@@ -75,9 +147,9 @@ export async function GET(
       userId: listing.userId,
       title: listing.title,
       description: listing.description,
-      price: listing.price,
+      price: String(listing.price || '0'),
       currency: listing.currency || null,
-      isFree: listing.isFree === 1 || listing.isFree === true,
+      isFree: listing.isFree === 1 || listing.isFree === true || listing.isFree === '1',
       category: listing.category,
       subcategory: listing.subcategory,
       condition: listing.condition,
@@ -91,6 +163,7 @@ export async function GET(
       publishedAt: listing.publishedAt,
       promotionType: listing.promotionType || null,
       promotionEnds: listing.promotionEnds || null,
+      source: source, // 'marketplace' або 'telegram'
       seller: {
         id: listing.userId,
         username: listing.sellerUsername,

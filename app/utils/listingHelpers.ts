@@ -150,7 +150,7 @@ export function parseExistingImages(images: string | string[]): string[] {
 }
 
 /**
- * Створює нове оголошення зі статусом draft
+ * Створює нове оголошення зі статусом pending_moderation
  */
 export async function createDraftListing(
   userId: number,
@@ -167,7 +167,7 @@ export async function createDraftListing(
         userId, title, description, price, currency, isFree, category, subcategory,
         condition, location, images, status, moderationStatus, expiresAt, createdAt, updatedAt, publishedAt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'pending', ?, ?, ?, NULL)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, NULL)`,
       userId,
       data.title,
       data.description,
@@ -195,7 +195,7 @@ export async function createDraftListing(
 }
 
 /**
- * Оновлює оголошення до статусу draft (для реактивації)
+ * Оновлює оголошення до статусу pending_moderation (для реактивації)
  */
 export async function updateListingToDraft(
   listingId: number,
@@ -211,7 +211,7 @@ export async function updateListingToDraft(
       `UPDATE Listing SET
         title = ?, description = ?, price = ?, currency = ?, isFree = ?,
         category = ?, subcategory = ?, condition = ?, location = ?,
-        status = 'draft', moderationStatus = 'pending',
+        status = 'pending_moderation', moderationStatus = 'pending',
         images = ?, expiresAt = ?, updatedAt = ?, rejectionReason = NULL
       WHERE id = ?`,
       data.title,

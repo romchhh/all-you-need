@@ -216,18 +216,24 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         console.log('[CreateListingFlow] Applying promotion:', promotionType, 'with method:', paymentMethod);
         const needsPayment = await applyPromotion(listingId, promotionType, telegramId, paymentMethod);
         
-        // Якщо потрібна оплата, зупиняємо флоу і чекаємо на оплату
+        // Якщо потрібна оплата через Monobank, зупиняємо флоу і чекаємо на оплату
         if (needsPayment) {
           console.log('[CreateListingFlow] Waiting for payment, stopping flow');
           showToast('Оголошення створено. Завершіть оплату реклами в боті.', 'info');
           onClose();
           return;
         }
+        
+        // Після успішної оплати реклами з балансу, статус вже змінився на pending_moderation
+        // Відправляємо на модерацію через API
+        console.log('[CreateListingFlow] Promotion paid from balance, submitting to moderation');
+        await submitToModeration(listingId, telegramId);
+      } else {
+        // Якщо реклама не обрана, оголошення вже створене зі статусом pending_moderation
+        // Відправляємо на модерацію через API
+        console.log('[CreateListingFlow] No promotion selected, submitting to moderation');
+        await submitToModeration(listingId, telegramId);
       }
-
-      // Відправляємо на модерацію
-      console.log('[CreateListingFlow] Submitting to moderation');
-      await submitToModeration(listingId, telegramId);
 
       // Успіх!
       showToast(t('createListing.listingCreated'), 'success');

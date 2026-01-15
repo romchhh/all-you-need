@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface Listing {
   id: number;
@@ -36,6 +36,7 @@ interface Listing {
 
 export default function AdminListingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -43,6 +44,12 @@ export default function AdminListingsPage() {
   const [page, setPage] = useState(1);
   const limit = 50;
 
+  // Tabs - читаємо з query параметрів або використовуємо marketplace за замовчуванням
+  const [activeTab, setActiveTab] = useState<'marketplace' | 'telegram'>(() => {
+    const source = searchParams?.get('source');
+    return (source === 'telegram' ? 'telegram' : 'marketplace');
+  });
+  
   // Filters
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFromFilter, setDateFromFilter] = useState('');
@@ -56,6 +63,7 @@ export default function AdminListingsPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      params.set('source', activeTab);
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (dateFromFilter) params.set('dateFrom', dateFromFilter);
       if (dateToFilter) params.set('dateTo', dateToFilter);
@@ -81,7 +89,7 @@ export default function AdminListingsPage() {
 
   useEffect(() => {
     fetchListings();
-  }, [page, statusFilter, dateFromFilter, dateToFilter, categoryFilter, searchFilter]);
+  }, [page, statusFilter, dateFromFilter, dateToFilter, categoryFilter, searchFilter, activeTab]);
 
   const handleDelete = async (id: number) => {
     if (!confirm('Ви впевнені, що хочете видалити це оголошення?')) {
@@ -122,6 +130,23 @@ export default function AdminListingsPage() {
     setSelectedIds(new Set());
     setShowBulkActions(false);
   };
+
+  const handleTabChange = (tab: 'marketplace' | 'telegram') => {
+    setActiveTab(tab);
+    setPage(1);
+    setSelectedIds(new Set());
+    setShowBulkActions(false);
+    // Оновлюємо URL з query параметром
+    router.push(`/admin/listings?source=${tab}`);
+  };
+
+  // Синхронізуємо activeTab з query параметрами при зміні URL
+  useEffect(() => {
+    const source = searchParams?.get('source');
+    if (source === 'telegram' || source === 'marketplace') {
+      setActiveTab(source);
+    }
+  }, [searchParams]);
 
   const handleSelectAll = () => {
     if (selectedIds.size === listings.length) {
@@ -207,6 +232,40 @@ export default function AdminListingsPage() {
         <p className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-2">
           Управління всіма оголошеннями
         </p>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white rounded-lg shadow-md">
+        <div className="border-b border-gray-200">
+          <nav className="flex -mb-px" aria-label="Tabs">
+            <button
+              onClick={() => handleTabChange('marketplace')}
+              className={`
+                flex-1 px-4 py-3 text-center text-sm font-medium border-b-2 transition-colors
+                ${
+                  activeTab === 'marketplace'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }
+              `}
+            >
+              Оголошення маркетплейсу
+            </button>
+            <button
+              onClick={() => handleTabChange('telegram')}
+              className={`
+                flex-1 px-4 py-3 text-center text-sm font-medium border-b-2 transition-colors
+                ${
+                  activeTab === 'telegram'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }
+              `}
+            >
+              Оголошення тг бот
+            </button>
+          </nav>
+        </div>
       </div>
 
       {/* Filters */}

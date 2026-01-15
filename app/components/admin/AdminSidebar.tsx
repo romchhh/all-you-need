@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -14,7 +14,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { href: '/admin', label: 'Статистика', icon: '📊' },
-  { href: '/admin/listings', label: 'Оголошення', icon: '📋' },
+  { href: '/admin/listings?source=marketplace', label: 'Оголошення маркетплейсу', icon: '🌐' },
   { href: '/admin/listings/moderation', label: 'На модерації', icon: '⏳', badge: undefined },
   { href: '/admin/users', label: 'Користувачі', icon: '👥' },
   { href: '/admin/finances', label: 'Фінанси', icon: '💰' },
@@ -23,6 +23,7 @@ const menuItems: MenuItem[] = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
@@ -140,7 +141,16 @@ export default function AdminSidebar() {
           {/* Menu */}
           <nav className="flex-1 p-3 sm:p-4 space-y-1 sm:space-y-2 overflow-y-auto">
             {menuItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href));
+              // Перевіряємо активний пункт меню з урахуванням query параметрів
+              let isActive = false;
+              if (item.href.includes('?')) {
+                const [path, query] = item.href.split('?');
+                const params = new URLSearchParams(query);
+                const sourceParam = params.get('source');
+                isActive = pathname === path && searchParams?.get('source') === sourceParam;
+              } else {
+                isActive = pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href));
+              }
               const badgeCount = item.href === '/admin/listings/moderation' ? pendingCount : item.badge;
               return (
                 <Link

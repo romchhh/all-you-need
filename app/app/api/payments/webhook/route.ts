@@ -110,14 +110,38 @@ export async function POST(request: NextRequest) {
         console.log(`Processing promotion payment for invoiceId: ${invoiceId}`);
         const promotion = promotions[0];
         
-        // Оновлюємо статус промо на 'paid' (не 'completed' бо оголошення ще на модерації)
-        // Модератор потім активує промо коли схвалить оголошення
+        // Оновлюємо статус промо на 'paid'
         await prisma.$executeRawUnsafe(
           `UPDATE PromotionPurchase SET status = 'paid' WHERE id = ?`,
           promotion.id
         );
 
-        console.log(`Promotion payment confirmed for listing ${promotion.listingId}: ${promotion.promotionType}`);
+        // Оновлюємо оголошення: встановлюємо рекламу та статус pending_moderation
+        const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const endsAt = new Date();
+        endsAt.setDate(endsAt.getDate() + (promotion.promotionType === 'vip' ? 7 : promotion.promotionType === 'top_category' ? 3 : 1));
+        
+        await prisma.$executeRawUnsafe(
+          `UPDATE Listing SET 
+            promotionType = ?, 
+            promotionEnds = ?, 
+            status = 'pending_moderation',
+            moderationStatus = 'pending',
+            updatedAt = ? 
+          WHERE id = ?`,
+          promotion.promotionType,
+          endsAt.toISOString(),
+          nowStr,
+          promotion.listingId
+        );
+
+        // Відправляємо на модерацію в ТГ групу
+        const { submitListingToModeration } = await import('@/utils/listingHelpers');
+        await submitListingToModeration(promotion.listingId).catch(err => {
+          console.error('[Webhook] Failed to send listing to moderation group:', err);
+        });
+
+        console.log(`Promotion payment confirmed for listing ${promotion.listingId}: ${promotion.promotionType}, status set to pending_moderation`);
       }
 
       // Перевіряємо ListingPackagePurchase
