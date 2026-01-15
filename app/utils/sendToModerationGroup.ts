@@ -131,36 +131,77 @@ export async function sendListingToModerationGroup(
         if (isUrl && source === 'marketplace') {
           // Завантажуємо зображення та надсилаємо через multipart/form-data
           try {
-            const webappUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-            const fullUrl = imageUrl.startsWith('http') 
-              ? imageUrl 
-              : `${webappUrl}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+            let buffer: Buffer | null = null;
             
-            // Спробуємо спочатку прочитати з диска, якщо це локальний файл
-            let buffer: Buffer;
+            // Спочатку спробуємо прочитати з диска
+            // Витягуємо шлях з URL (наприклад, https://tradegrnd.com/listings/file.webp -> /listings/file.webp)
+            let localPath: string | null = null;
             
-            // Перевіряємо чи це локальний файл
-            if (imageUrl.startsWith('/') && !imageUrl.startsWith('http')) {
-              const localPath = join(process.cwd(), 'public', imageUrl);
-              if (existsSync(localPath)) {
-                buffer = await readFile(localPath);
-              } else {
-                // Завантажуємо через HTTP
-                const imageResponse = await fetch(fullUrl);
-                if (!imageResponse.ok) {
+            if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+              // Витягуємо шлях з URL
+              try {
+                const urlObj = new URL(imageUrl);
+                const pathFromUrl = urlObj.pathname; // /listings/file.webp
+                localPath = join(process.cwd(), 'public', pathFromUrl);
+              } catch (e) {
+                // Якщо не вдалося розпарсити URL, спробуємо витягти шлях вручну
+                const pathMatch = imageUrl.match(/\/listings\/[^\/]+$/);
+                if (pathMatch) {
+                  localPath = join(process.cwd(), 'public', pathMatch[0]);
+                }
+              }
+            } else if (imageUrl.startsWith('/')) {
+              // Вже відносний шлях
+              localPath = join(process.cwd(), 'public', imageUrl);
+            }
+            
+            // Спробуємо прочитати з диска
+            if (localPath && existsSync(localPath)) {
+              console.log('[sendToModerationGroup] Reading image from disk:', localPath);
+              buffer = await readFile(localPath);
+            } else {
+              // Якщо не знайдено на диску, спробуємо завантажити через HTTP
+              // Спочатку спробуємо через API route, якщо це listings
+              let fetchUrl = imageUrl;
+              if (imageUrl.includes('/listings/')) {
+                // Конвертуємо URL в API route формат
+                // https://tradegrnd.com/listings/file.webp -> https://tradegrnd.com/api/images/listings/file.webp
+                try {
+                  const urlObj = new URL(imageUrl);
+                  const pathFromUrl = urlObj.pathname; // /listings/file.webp
+                  const apiRouteUrl = `${urlObj.origin}/api/images${pathFromUrl}`;
+                  console.log('[sendToModerationGroup] Trying API route:', apiRouteUrl);
+                  fetchUrl = apiRouteUrl;
+                } catch (e) {
+                  // Якщо не вдалося розпарсити, використовуємо оригінальний URL
+                  console.log('[sendToModerationGroup] Failed to parse URL, using original:', imageUrl);
+                }
+              }
+              
+              console.log('[sendToModerationGroup] Fetching image via HTTP:', fetchUrl);
+              const imageResponse = await fetch(fetchUrl);
+              if (!imageResponse.ok) {
+                // Якщо API route не спрацював, спробуємо прямий шлях
+                if (fetchUrl.includes('/api/images/') && imageUrl !== fetchUrl) {
+                  console.log('[sendToModerationGroup] API route failed, trying direct path:', imageUrl);
+                  const directResponse = await fetch(imageUrl);
+                  if (directResponse.ok) {
+                    const imageBuffer = await directResponse.arrayBuffer();
+                    buffer = Buffer.from(imageBuffer);
+                  } else {
+                    throw new Error(`Failed to fetch image: ${directResponse.status} ${directResponse.statusText}`);
+                  }
+                } else {
                   throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
                 }
+              } else {
                 const imageBuffer = await imageResponse.arrayBuffer();
                 buffer = Buffer.from(imageBuffer);
               }
-            } else {
-              // Завантажуємо через HTTP
-              const imageResponse = await fetch(fullUrl);
-              if (!imageResponse.ok) {
-                throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
-              }
-              const imageBuffer = await imageResponse.arrayBuffer();
-              buffer = Buffer.from(imageBuffer);
+            }
+            
+            if (!buffer) {
+              throw new Error('Failed to load image buffer');
             }
             
             // Створюємо multipart/form-data вручну для Node.js
@@ -273,41 +314,77 @@ export async function sendListingToModerationGroup(
             const imageBuffers: Array<{ buffer: Buffer; fullUrl: string } | null> = [];
             for (let i = 0; i < images.length; i++) {
               const img = images[i];
-              const fullUrl = img.startsWith('http') 
-                ? img 
-                : `${webappUrl}${img.startsWith('/') ? img : '/' + img}`;
               
               try {
-                let buffer: Buffer;
+                let buffer: Buffer | null = null;
+                let localPath: string | null = null;
                 
-                // Спробуємо спочатку прочитати з диска, якщо це локальний файл
-                if (img.startsWith('/') && !img.startsWith('http')) {
-                  const localPath = join(process.cwd(), 'public', img);
-                  if (existsSync(localPath)) {
-                    buffer = await readFile(localPath);
-                    imageBuffers.push({ buffer, fullUrl });
+                // Спочатку спробуємо прочитати з диска
+                if (img.startsWith('http://') || img.startsWith('https://')) {
+                  // Витягуємо шлях з URL
+                  try {
+                    const urlObj = new URL(img);
+                    const pathFromUrl = urlObj.pathname; // /listings/file.webp
+                    localPath = join(process.cwd(), 'public', pathFromUrl);
+                  } catch (e) {
+                    // Якщо не вдалося розпарсити URL, спробуємо витягти шлях вручну
+                    const pathMatch = img.match(/\/listings\/[^\/]+$/);
+                    if (pathMatch) {
+                      localPath = join(process.cwd(), 'public', pathMatch[0]);
+                    }
+                  }
+                } else if (img.startsWith('/')) {
+                  // Вже відносний шлях
+                  localPath = join(process.cwd(), 'public', img);
+                }
+                
+                // Спробуємо прочитати з диска
+                if (localPath && existsSync(localPath)) {
+                  console.log(`[sendToModerationGroup] Reading image ${i} from disk:`, localPath);
+                  buffer = await readFile(localPath);
+                  imageBuffers.push({ buffer, fullUrl: img });
+                } else {
+                  // Якщо не знайдено на диску, спробуємо завантажити через HTTP
+                  let fetchUrl = img.startsWith('http') 
+                    ? img 
+                    : `${webappUrl}${img.startsWith('/') ? img : '/' + img}`;
+                  
+                  // Якщо це listings, спробуємо через API route
+                  if (fetchUrl.includes('/listings/')) {
+                    try {
+                      const urlObj = new URL(fetchUrl);
+                      const pathFromUrl = urlObj.pathname; // /listings/file.webp
+                      const apiRouteUrl = `${urlObj.origin}/api/images${pathFromUrl}`;
+                      console.log(`[sendToModerationGroup] Image ${i} trying API route:`, apiRouteUrl);
+                      fetchUrl = apiRouteUrl;
+                    } catch (e) {
+                      // Якщо не вдалося розпарсити, використовуємо оригінальний URL
+                    }
+                  }
+                  
+                  console.log(`[sendToModerationGroup] Image ${i} not found on disk, trying HTTP:`, fetchUrl);
+                  const imageResponse = await fetch(fetchUrl);
+                  if (imageResponse.ok) {
+                    const imageBuffer = await imageResponse.arrayBuffer();
+                    buffer = Buffer.from(imageBuffer);
+                    imageBuffers.push({ buffer, fullUrl: img });
                   } else {
-                    // Завантажуємо через HTTP
-                    const imageResponse = await fetch(fullUrl);
-                    if (imageResponse.ok) {
-                      const imageBuffer = await imageResponse.arrayBuffer();
-                      buffer = Buffer.from(imageBuffer);
-                      imageBuffers.push({ buffer, fullUrl });
+                    // Якщо API route не спрацював, спробуємо прямий шлях
+                    if (fetchUrl.includes('/api/images/') && img !== fetchUrl && img.startsWith('http')) {
+                      console.log(`[sendToModerationGroup] Image ${i} API route failed, trying direct:`, img);
+                      const directResponse = await fetch(img);
+                      if (directResponse.ok) {
+                        const imageBuffer = await directResponse.arrayBuffer();
+                        buffer = Buffer.from(imageBuffer);
+                        imageBuffers.push({ buffer, fullUrl: img });
+                      } else {
+                        console.warn(`[sendToModerationGroup] Failed to load image ${i}: ${directResponse.status}`);
+                        imageBuffers.push(null);
+                      }
                     } else {
                       console.warn(`[sendToModerationGroup] Failed to load image ${i}: ${imageResponse.status}`);
                       imageBuffers.push(null);
                     }
-                  }
-                } else {
-                  // Завантажуємо через HTTP
-                  const imageResponse = await fetch(fullUrl);
-                  if (imageResponse.ok) {
-                    const imageBuffer = await imageResponse.arrayBuffer();
-                    buffer = Buffer.from(imageBuffer);
-                    imageBuffers.push({ buffer, fullUrl });
-                  } else {
-                    console.warn(`[sendToModerationGroup] Failed to load image ${i}: ${imageResponse.status}`);
-                    imageBuffers.push(null);
                   }
                 }
               } catch (error) {
@@ -708,7 +785,7 @@ function getImages(images: string | string[]): string[] {
   imageArray = imageArray.map(img => {
     const trimmedImg = img.trim();
     
-    // Якщо це вже повний HTTP/HTTPS URL або file_id (починається з цифр/букв без http), повертаємо як є
+    // Якщо це вже повний HTTP/HTTPS URL, повертаємо як є
     if (trimmedImg.startsWith('http://') || trimmedImg.startsWith('https://')) {
       return trimmedImg;
     }
@@ -720,13 +797,16 @@ function getImages(images: string | string[]): string[] {
       return trimmedImg;
     }
     
-    // Відносний шлях - додаємо базовий URL
+    // Відносний шлях - конвертуємо в повний URL через API route
+    // Наприклад: /listings/file.webp -> https://tradegrnd.com/api/images/listings/file.webp
     if (trimmedImg.startsWith('/')) {
-      return `${webappUrl}${trimmedImg}`;
+      // Видаляємо початковий слеш і додаємо через API route
+      const pathWithoutSlash = trimmedImg.slice(1);
+      return `${webappUrl}/api/images/${pathWithoutSlash}`;
     }
     
-    // Якщо немає слешу, додаємо його
-    return `${webappUrl}/${trimmedImg}`;
+    // Якщо немає слешу, додаємо через API route
+    return `${webappUrl}/api/images/${trimmedImg}`;
   });
 
   // Фільтруємо дублікати та обмежуємо до 10 фото
