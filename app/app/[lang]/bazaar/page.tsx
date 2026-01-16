@@ -512,7 +512,7 @@ const BazaarPage = () => {
 
   const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: !selectedListing && !selectedSeller && !isCreateListingModalOpen,
+    enabled: false, // Вимкнено
     threshold: 120,
     tg
   });
@@ -840,6 +840,21 @@ const BazaarPage = () => {
             }
             setSelectedListing(null);
           }}
+          onBack={() => {
+            // Встановлюємо прапорець, що користувач повертається з товару
+            isReturningFromListing.current = true;
+            hasScrolledOnThisMount.current = false;
+            
+            // Зберігаємо позицію перед закриттям (на випадок, якщо вона змінилася)
+            const currentScroll = window.scrollY || document.documentElement.scrollTop;
+            if (currentScroll > 0) {
+              savedScrollPositionRef.current = currentScroll;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(scrollPositionKey, currentScroll.toString());
+              }
+            }
+            setSelectedListing(null);
+          }}
           onToggleFavorite={toggleFavorite}
           onSelectListing={setSelectedListing}
           onViewSellerProfile={(telegramId, name, avatar, username, phone) => {
@@ -893,7 +908,7 @@ const BazaarPage = () => {
 
   return (
     <div className="min-h-screen pb-20 overflow-x-hidden max-w-full">
-      <AppHeader />
+      {!selectedListing && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 

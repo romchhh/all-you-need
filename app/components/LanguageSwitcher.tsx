@@ -141,15 +141,15 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
             setIsOpen(prev => !prev);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+          className="w-full bg-transparent border border-white/20 rounded-xl px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors"
         >
-          <div className="flex items-center gap-2">
-            <Globe size={18} className="text-gray-600" />
-            <span className="text-gray-900 font-medium">{t('common.language')}</span>
+          <div className="flex items-center gap-3">
+            <Globe size={20} className="text-white/70" />
+            <span className="text-white font-medium">{t('common.language')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-gray-600 font-medium">{getLanguageLabel()}</span>
-            <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            <span className="text-white/70 font-medium text-sm">{getLanguageLabel()}</span>
+            <ChevronDown size={16} className={`text-white/70 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </div>
         </button>
 
@@ -165,7 +165,7 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
         {isOpen && (
           <div 
             id="language-menu"
-            className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] overflow-hidden"
+            className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] overflow-hidden"
             style={{
               top: `${menuPosition.top + 8}px`,
               left: `${menuPosition.left}px`,
@@ -182,14 +182,14 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
                 currentLang === 'uk'
-                  ? 'bg-blue-50 text-blue-600 font-semibold'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
+                  : 'text-white hover:bg-white/10'
               }`}
             >
               <span className="text-sm">Українська</span>
-              {currentLang === 'uk' && <span className="text-blue-500">✓</span>}
+              {currentLang === 'uk' && <span className="text-[#D3F1A7]">✓</span>}
             </button>
-            <div className="h-px bg-gray-200"></div>
+            <div className="h-px bg-white/10"></div>
             <button
               type="button"
               onClick={(e) => {
@@ -199,12 +199,12 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
                 currentLang === 'ru'
-                  ? 'bg-blue-50 text-blue-600 font-semibold'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
+                  : 'text-white hover:bg-white/10'
               }`}
             >
               <span className="text-sm">Русский</span>
-              {currentLang === 'ru' && <span className="text-blue-500">✓</span>}
+              {currentLang === 'ru' && <span className="text-[#D3F1A7]">✓</span>}
             </button>
           </div>
         )}

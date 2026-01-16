@@ -260,14 +260,14 @@ const ProfilePage = () => {
   // Використовуємо pull-to-refresh (вимкнено при відкритих модалках)
   const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: !selectedListing && !selectedSeller && !isCreateListingModalOpen && !isEditModalOpen,
+    enabled: false, // Вимкнено
     threshold: 120,
     tg
   });
 
   return (
     <div className="min-h-screen pb-20 overflow-x-hidden max-w-full">
-      <AppHeader />
+      {!selectedListing && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 

@@ -12,7 +12,7 @@ interface UsePullToRefreshOptions {
 
 export const usePullToRefresh = ({
   onRefresh,
-  enabled = true,
+  enabled = false, // Вимкнено за замовчуванням
   threshold = 80,
   maxDistance = 150,
   resistance = 0.5,

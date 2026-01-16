@@ -455,7 +455,7 @@ const FavoritesPage = () => {
   // Використовуємо pull-to-refresh для запобігання згортанню додатку
   const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: !selectedListing && !selectedSeller,
+    enabled: false, // Вимкнено
     threshold: 120,
     tg
   });
@@ -677,7 +677,7 @@ const FavoritesPage = () => {
 
   return (
     <div className="min-h-screen pb-20 overflow-x-hidden max-w-full">
-      <AppHeader />
+      {!selectedListing && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 

@@ -127,34 +127,34 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
   return (
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl">
+        <div className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl">
           {/* Хедер */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">{t('share.title')}</h2>
+            <h2 className="text-xl font-bold text-white">{t('share.title')}</h2>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors"
             >
-              <X size={20} className="text-gray-900" />
+              <X size={20} className="text-white" />
             </button>
           </div>
 
           {/* Основна кнопка поділу */}
           <button
             onClick={handleShare}
-            className="w-full px-6 py-5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mb-4"
+            className="w-full px-6 py-5 bg-[#D3F1A7] text-black rounded-2xl font-semibold hover:bg-[#D3F1A7]/90 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mb-4"
           >
             <Share2 size={24} />
             <span className="text-lg">{t('share.title')}</span>
           </button>
 
           {/* Попередній перегляд посилання */}
-          <div className="p-3 bg-gray-50 rounded-xl">
+          <div className="p-3 bg-[#1C1C1C] rounded-xl border border-white/20">
             <div className="flex items-center gap-2 mb-2">
-              <MessageCircle size={16} className="text-gray-400" />
-              <span className="text-xs text-gray-500 uppercase tracking-wide">{t('share.link')}</span>
+              <MessageCircle size={16} className="text-white/70" />
+              <span className="text-xs text-white/70 uppercase tracking-wide">{t('share.link')}</span>
             </div>
-            <div className="text-sm text-gray-700 break-all font-mono bg-white p-2 rounded-lg border border-gray-200">
+            <div className="text-sm text-white/90 break-all font-mono bg-[#000000] p-2 rounded-lg border border-white/20">
               {shareLink}
             </div>
           </div>
@@ -164,44 +164,44 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
       {/* Fallback меню якщо Web Share API не підтримується */}
       {showFallback && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-end justify-center animate-fadeIn">
-          <div className="bg-white rounded-t-3xl w-full max-w-md p-6 animate-slideUp">
-            <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
+          <div className="bg-[#000000] rounded-t-3xl border-t-2 border-white w-full max-w-md p-6 animate-slideUp">
+            <div className="w-12 h-1 bg-white/30 rounded-full mx-auto mb-6"></div>
             
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            <h3 className="text-lg font-semibold text-white mb-4">
               {t('share.shareVia')}
             </h3>
 
             <div className="space-y-2">
               <button
                 onClick={handleCopyLink}
-                className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors"
+                className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
               >
-                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                  <Copy className="w-6 h-6 text-gray-700" />
+                <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
+                  <Copy className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-gray-800 font-medium">
+                <span className="text-white font-medium">
                   {copied ? t('share.linkCopied') : t('share.copyLink')}
                 </span>
               </button>
 
               <button
                 onClick={shareViaTelegram}
-                className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors"
+                className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
               >
-                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
                   <MessageCircle className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-gray-800 font-medium">Telegram</span>
+                <span className="text-white font-medium">Telegram</span>
               </button>
 
               <button
                 onClick={shareViaEmail}
-                className="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors"
+                className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
               >
-                <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
                   <Mail className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-gray-800 font-medium">{t('share.email')}</span>
+                <span className="text-white font-medium">{t('share.email')}</span>
               </button>
             </div>
 
@@ -210,7 +210,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
                 setShowFallback(false);
                 onClose();
               }}
-              className="w-full mt-6 py-3 text-gray-600 font-medium hover:text-gray-800 rounded-xl"
+              className="w-full mt-6 py-3 text-white/70 font-medium hover:text-white rounded-xl"
             >
               {t('share.cancel')}
             </button>

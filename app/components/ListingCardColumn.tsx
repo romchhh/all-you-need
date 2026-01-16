@@ -32,29 +32,34 @@ const ListingCardColumnComponent = ({
   
   // Визначаємо стилі в залежності від типу реклами
   const getPromotionStyles = () => {
-    if (!promotionType) return 'ring-1 ring-white/30 shadow-lg shadow-white/10';
+    if (!promotionType) return 'border border-white/20';
     
     switch (promotionType) {
-      case 'highlighted':
-        return 'ring-1 ring-yellow-400 shadow-lg shadow-yellow-100';
-      case 'top_category':
-        return 'ring-1 ring-orange-400 shadow-lg shadow-orange-100';
       case 'vip':
-        return 'ring-2 ring-[#D3F1A7] shadow-2xl shadow-[#D3F1A7]/50';
+        return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+      case 'top_category':
+        return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
       default:
-        return 'ring-1 ring-white/30 shadow-lg shadow-white/10';
+        return 'border border-white/20';
     }
   };
   
   const getCardBackgroundStyles = () => {
-    return 'bg-gray-800/50';
+    return 'bg-[#000000]';
   };
   
   const getPromotionBadge = () => {
     if (promotionType === 'vip') {
       return (
-        <div className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-gray-800/80 rounded-full z-10">
-          <span className="text-xs font-semibold text-[#D3F1A7]">VIP</span>
+        <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+          VIP
+        </div>
+      );
+    }
+    if (promotionType === 'top_category') {
+      return (
+        <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+          TOP
         </div>
       );
     }
@@ -95,10 +100,12 @@ const ListingCardColumnComponent = ({
       <div className="flex gap-3 p-3.5">
         {/* Фото */}
         <div 
-          className="relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden bg-gray-700"
+          className="relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden bg-[#1A1A1A]"
         >
           {/* Бейдж реклами */}
-          {getPromotionBadge()}
+          <div className="absolute top-2 left-2 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+            {getPromotionBadge()}
+          </div>
           
           {imageUrl ? (
             <img 
@@ -109,7 +116,7 @@ const ListingCardColumnComponent = ({
               loading="lazy"
             />
           ) : (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-400 bg-gray-700">
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-white/10 bg-[#1A1A1A]">
               <Package size={32} />
             </div>
           )}
@@ -140,11 +147,11 @@ const ListingCardColumnComponent = ({
               {listing.title}
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[#D3F1A7] font-bold text-lg">
+              <span className="text-white font-bold text-lg">
                 {listing.isFree ? t('common.free') : `${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}
               </span>
               {listing.condition && (
-                <span className="px-2 py-0.5 bg-gray-700/50 text-white text-xs font-medium rounded-full">
+                <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-[11px] font-semibold rounded">
                   {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
                 </span>
               )}

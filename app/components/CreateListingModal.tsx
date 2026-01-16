@@ -1,4 +1,4 @@
-import { X, Upload, Image as ImageIcon, ChevronDown, MapPin } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Sparkles, Wrench } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -9,6 +9,8 @@ import { ukrainianCities } from '@/constants/ukrainian-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
+import { CategoryIcon } from './CategoryIcon';
+import Image from 'next/image';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -51,8 +53,8 @@ export const CreateListingModal = ({
   const selectedCategoryData = categories.find(cat => cat.id === category);
 
   const conditionOptions = [
-    { value: 'new', label: t('listing.new'), emoji: '✨' },
-    { value: 'used', label: t('listing.used'), emoji: '🔧' },
+    { value: 'new', label: t('listing.new'), icon: Sparkles },
+    { value: 'used', label: t('listing.used'), icon: Wrench },
   ];
 
   const selectedCondition = conditionOptions.find(opt => opt.value === condition);
@@ -275,29 +277,40 @@ export const CreateListingModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-[70] flex flex-col overflow-hidden">
-      <div className="bg-white w-full h-full flex flex-col">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-xl font-bold text-gray-900">{t('createListing.title')}</h2>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-          >
-            <X size={20} className="text-gray-900" />
-          </button>
-        </div>
-
+    <div 
+      className="fixed inset-0 z-[70] flex flex-col overflow-hidden font-montserrat"
+      style={{
+        background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+      }}
+    >
+      <div className="w-full h-full flex flex-col">
         <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32">
+          {/* Лого Trade Ground */}
+          <div className="w-full pt-4 pb-3 flex items-center justify-center">
+            <Image 
+              src="/images/Group 1000007086.svg" 
+              alt="Trade Ground" 
+              width={204} 
+              height={64.5}
+              className="w-auto object-contain"
+              style={{ height: '52.5px', width: 'auto' }}
+              priority
+            />
+          </div>
+          
+          {/* Заголовок */}
+          <div className="flex items-center justify-center px-4 pb-4">
+            <h2 className="text-xl font-bold text-white">{t('createListing.title')}</h2>
+          </div>
           {/* Фото */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               {t('createListing.photosLabel')}
             </label>
             {imagePreviews.length === 0 ? (
-              <label className="w-full px-4 py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
-                <Upload size={32} className="text-gray-400 mb-2" />
-                <span className="text-sm text-gray-500">{t('createListing.photosLabel')?.replace(' *', '') || 'Додати фото'}</span>
+              <label className="w-full px-4 py-8 bg-transparent rounded-xl border-2 border-dashed border-white flex flex-col items-center justify-center cursor-pointer hover:border-white/70 transition-colors">
+                <Upload size={32} className="text-white mb-2" />
+                <span className="text-sm text-white">{t('createListing.photosLabel')?.replace(' *', '') || 'Додати фото'}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -307,10 +320,10 @@ export const CreateListingModal = ({
                 />
               </label>
             ) : (
-              <div className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="w-full px-4 py-3 bg-transparent rounded-xl">
                 <div className="grid grid-cols-3 gap-2 mb-2">
                   {imagePreviews.map((preview, index) => (
-                    <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
+                    <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C]">
                       <img 
                         src={preview} 
                         alt={`Preview ${index + 1}`} 
@@ -328,9 +341,9 @@ export const CreateListingModal = ({
                   ))}
                 </div>
                 {images.length < 10 && (
-                  <label className="w-full px-4 py-4 bg-white rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
-                    <Upload size={20} className="text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-600">{t('createListing.addMorePhotos')}</span>
+                  <label className="w-full px-4 py-4 bg-transparent rounded-xl border-2 border-dashed border-white flex items-center justify-center cursor-pointer hover:border-white/70 transition-colors">
+                    <Upload size={20} className="text-white mr-2" />
+                    <span className="text-sm text-white">{t('createListing.addMorePhotos')}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -346,7 +359,7 @@ export const CreateListingModal = ({
 
           {/* Заголовок */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               {t('createListing.titleLabel')}
             </label>
             <input
@@ -357,19 +370,19 @@ export const CreateListingModal = ({
                 if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
               }}
               placeholder={t('createListing.titlePlaceholder')}
-              className={`w-full px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
-                errors.title ? 'border-red-300' : 'border-gray-200'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
+                errors.title ? 'border-red-500' : 'border-white/20'
+              } focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50`}
               maxLength={100}
             />
             {errors.title && (
-              <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.title}</p>
             )}
           </div>
 
           {/* Опис */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               {t('createListing.descriptionLabel')}
             </label>
             <textarea
@@ -380,13 +393,13 @@ export const CreateListingModal = ({
               }}
               placeholder={t('createListing.descriptionPlaceholder')}
               rows={4}
-              className={`w-full px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
-                errors.description ? 'border-red-300' : 'border-gray-200'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+              className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
+                errors.description ? 'border-red-500' : 'border-white/20'
+              } focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 resize-none`}
               maxLength={2000}
             />
             {errors.description && (
-              <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.description}</p>
             )}
           </div>
 
@@ -399,7 +412,7 @@ export const CreateListingModal = ({
                 onChange={(e) => setIsFree(e.target.checked)}
                 className="w-4 h-4"
               />
-              <span className="text-sm font-medium text-gray-700">{t('common.free')}</span>
+              <span className="text-sm font-medium text-white">{t('common.free')}</span>
             </label>
             {!isFree && (
               <>
@@ -412,9 +425,9 @@ export const CreateListingModal = ({
                       if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                     }}
                     placeholder={t('createListing.pricePlaceholder')}
-                    className={`flex-1 px-4 py-3 bg-gray-50 rounded-xl border text-gray-900 placeholder:text-gray-400 ${
-                      errors.price ? 'border-red-300' : 'border-gray-200'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`flex-1 px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
+                      errors.price ? 'border-red-500' : 'border-white/20'
+                    } focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50`}
                   />
                     <button
                     ref={currencyRef}
@@ -423,16 +436,16 @@ export const CreateListingModal = ({
                         setIsCurrencyOpen(!isCurrencyOpen);
                         tg?.HapticFeedback.impactOccurred('light');
                       }}
-                      className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-0.5 min-w-[80px]"
+                      className="px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 hover:border-white/50 transition-colors flex items-center gap-0.5 min-w-[80px]"
                     >
-                      <span className="text-gray-900 font-medium">
+                      <span className="text-white font-medium">
                         {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
                       </span>
-                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1`} />
+                      <ChevronDown size={16} className={`text-white/70 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1`} />
                     </button>
                 </div>
                 {errors.price && (
-                  <p className="mt-1 text-sm text-red-600">{errors.price}</p>
+                  <p className="mt-1 text-sm text-red-400">{errors.price}</p>
                 )}
               </>
             )}
@@ -440,7 +453,7 @@ export const CreateListingModal = ({
 
           {/* Розділ */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-white mb-3">
               {t('createListing.categoryLabel')}
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -456,28 +469,31 @@ export const CreateListingModal = ({
                   }}
                   className={`px-4 py-3 rounded-xl border-2 transition-all text-left ${
                     category === cat.id
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
                       : errors.category
-                      ? 'border-red-300 bg-white text-gray-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                      ? 'border-red-500 bg-[#1C1C1C] text-white'
+                      : 'border-white/20 text-white hover:border-white/40'
                   }`}
+                  style={category !== cat.id && !errors.category ? {
+                    background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+                  } : {}}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">{cat.icon}</span>
+                    <CategoryIcon categoryId={cat.id} isActive={category === cat.id} size={24} />
                     <span className="font-medium text-sm">{cat.name}</span>
                   </div>
                 </button>
               ))}
             </div>
             {errors.category && (
-              <p className="mt-1 text-sm text-red-600">{errors.category}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.category}</p>
             )}
           </div>
 
           {/* Тип */}
           {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-white mb-3">
                 {t('createListing.subcategoryLabel')}
               </label>
               <div className="flex flex-wrap gap-2">
@@ -489,8 +505,8 @@ export const CreateListingModal = ({
                   }}
                   className={`px-4 py-2 rounded-xl border-2 transition-all ${
                     subcategory === ''
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                      ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                      : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                   }`}
                 >
                   {t('createListing.allTypes')}
@@ -505,8 +521,8 @@ export const CreateListingModal = ({
                     }}
                     className={`px-4 py-2 rounded-xl border-2 transition-all ${
                       subcategory === sub.id
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                        ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                        : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                     }`}
                   >
                     {sub.name}
@@ -518,7 +534,7 @@ export const CreateListingModal = ({
 
           {/* Стан */}
           <div ref={conditionRef} className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               {t('createListing.conditionLabel')}
             </label>
             <button
@@ -527,27 +543,29 @@ export const CreateListingModal = ({
                 setIsConditionOpen(!isConditionOpen);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between hover:bg-gray-100 transition-colors"
+              className="w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 flex items-center justify-between hover:bg-[#1C1C1C]/80 transition-colors"
             >
               <div className="flex items-center gap-2">
                 {selectedCondition && (
                   <>
-                    <span className="text-lg">{selectedCondition.emoji}</span>
-                    <span className="text-gray-700 font-medium">{selectedCondition.label}</span>
+                    {selectedCondition.icon && (
+                      <selectedCondition.icon size={20} className="text-white" />
+                    )}
+                    <span className="text-white font-medium">{selectedCondition.label}</span>
                   </>
                 )}
                 {!selectedCondition && (
-                  <span className="text-gray-400">{t('createListing.fields.selectCondition')}</span>
+                  <span className="text-white/50">{t('createListing.fields.selectCondition')}</span>
                 )}
               </div>
               <ChevronDown 
                 size={20} 
-                className={`text-gray-400 transition-transform ${isConditionOpen ? 'rotate-180' : ''}`}
+                className={`text-white/70 transition-transform ${isConditionOpen ? 'rotate-180' : ''}`}
               />
             </button>
             
             {isConditionOpen && (
-              <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
+              <div className="absolute z-50 w-full mt-2 bg-[#1C1C1C] rounded-xl border border-white/20 shadow-lg overflow-hidden">
                 {conditionOptions.map((option) => (
                   <button
                     key={option.value}
@@ -557,14 +575,19 @@ export const CreateListingModal = ({
                       setIsConditionOpen(false);
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
-                    className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-                      condition === option.value ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors ${
+                      condition === option.value ? 'bg-[#D3F1A7]/20 text-[#D3F1A7]' : 'text-white'
                     }`}
                   >
-                    <span className="text-xl">{option.emoji}</span>
+                    {option.icon && (
+                      <option.icon 
+                        size={20} 
+                        className={condition === option.value ? 'text-[#D3F1A7]' : 'text-white'} 
+                      />
+                    )}
                     <span className="font-medium">{option.label}</span>
                     {condition === option.value && (
-                      <span className="ml-auto text-blue-500">✓</span>
+                      <span className="ml-auto text-[#D3F1A7]">✓</span>
                     )}
                   </button>
                 ))}
@@ -574,7 +597,7 @@ export const CreateListingModal = ({
 
           {/* Локація */}
           <div ref={locationRef} className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               {t('createListing.locationLabel')}
             </label>
             <div className="relative">
@@ -584,15 +607,15 @@ export const CreateListingModal = ({
                   setIsLocationOpen(true);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className={`w-full px-4 py-3 pl-10 pr-10 bg-gray-50 rounded-xl border text-left ${
-                  errors.location ? 'border-red-300' : 'border-gray-200'
-                } focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-100 transition-colors`}
+                className={`w-full px-4 py-3 pl-10 pr-10 bg-[#1C1C1C] rounded-xl border text-left ${
+                  errors.location ? 'border-red-500' : 'border-white/20'
+                } focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 hover:bg-[#1C1C1C]/80 transition-colors`}
               >
                 <MapPin 
                   size={18} 
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#D3F1A7]"
                 />
-                <span className={location ? 'text-gray-900 font-medium' : 'text-gray-400'}>
+                <span className={location ? 'text-white font-medium' : 'text-white/50'}>
                   {location || t('createListing.locationPlaceholder')}
                 </span>
               </button>
@@ -606,35 +629,35 @@ export const CreateListingModal = ({
                     setLocationQuery('');
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors z-10"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors z-10"
                 >
-                  <X size={14} className="text-gray-900" />
+                  <X size={14} className="text-white" />
                 </button>
               )}
             </div>
             
             {errors.location && (
-              <p className="mt-1 text-sm text-red-600">{errors.location}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.location}</p>
             )}
           </div>
 
           {errors.images && (
-            <p className="mt-1 text-sm text-red-600">{errors.images}</p>
+            <p className="mt-1 text-sm text-red-400">{errors.images}</p>
           )}
         </div>
 
         {/* Кнопки - фіксовані знизу поверх головного меню */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 pt-4 pb-4 flex gap-2 z-[80] safe-area-bottom shadow-lg" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-white/20 px-4 pt-2 pb-2 flex gap-2 z-[80] safe-area-bottom" style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}>
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 px-4 py-1.5 bg-transparent text-white rounded-xl text-base font-semibold border border-white hover:bg-white/10 transition-colors font-montserrat"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-1.5 bg-[#D3F1A7] text-black rounded-xl text-base font-semibold hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-montserrat"
           >
             {loading ? t('createListing.creating') : t('createListing.title')}
           </button>
@@ -664,7 +687,7 @@ export const CreateListingModal = ({
         {isCurrencyOpen && (
           <div 
             id="currency-filter-menu"
-            className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] min-w-[120px]"
+            className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] min-w-[120px]"
             style={{
               top: `${currencyMenuPosition.top + 8}px`,
               left: `${currencyMenuPosition.left}px`,
@@ -686,12 +709,12 @@ export const CreateListingModal = ({
                 setIsCurrencyOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-gray-100 ${
-                currency === 'UAH' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-white/10 ${
+                currency === 'UAH' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'text-white hover:bg-white/10'
               }`}
             >
               <span>₴ UAH</span>
-              {currency === 'UAH' && <span className="ml-auto text-blue-500">✓</span>}
+              {currency === 'UAH' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
             </button>
             <button
               type="button"
@@ -706,12 +729,12 @@ export const CreateListingModal = ({
                 setIsCurrencyOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-gray-100 ${
-                currency === 'EUR' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-white/10 ${
+                currency === 'EUR' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'text-white hover:bg-white/10'
               }`}
             >
               <span>€ EUR</span>
-              {currency === 'EUR' && <span className="ml-auto text-blue-500">✓</span>}
+              {currency === 'EUR' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
             </button>
             <button
               type="button"
@@ -727,11 +750,11 @@ export const CreateListingModal = ({
                 tg?.HapticFeedback.impactOccurred('light');
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                currency === 'USD' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                currency === 'USD' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'text-white hover:bg-white/10'
               }`}
             >
               <span>$ USD</span>
-              {currency === 'USD' && <span className="ml-auto text-blue-500">✓</span>}
+              {currency === 'USD' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
             </button>
           </div>
         )}
@@ -749,13 +772,13 @@ export const CreateListingModal = ({
       {isLocationOpen && typeof window !== 'undefined' && createPortal(
         <div 
           data-city-modal
-          className="fixed inset-0 z-[10000] flex flex-col bg-white"
+          className="fixed inset-0 z-[10000] flex flex-col bg-black font-montserrat"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Хедер */}
-          <div className="flex-shrink-0 flex items-center justify-between px-4 py-4 border-b border-gray-200 bg-white">
-            <h3 className="text-lg font-bold text-gray-900">{t('createListing.selectCity')}</h3>
+          <div className="flex-shrink-0 flex items-center justify-between px-4 py-4 border-b border-white/20 bg-black">
+            <h3 className="text-lg font-bold text-white">{t('createListing.selectCity')}</h3>
             <button
               type="button"
               onClick={(e) => {
@@ -765,14 +788,14 @@ export const CreateListingModal = ({
                 setLocationQuery('');
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
             >
-              <X size={20} className="text-gray-900" />
+              <X size={20} className="text-white" />
             </button>
           </div>
 
           {/* Поле пошуку */}
-          <div className="flex-shrink-0 px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <div className="flex-shrink-0 px-4 py-3 bg-black border-b border-white/20">
             <div className="relative">
               <input
                 type="text"
@@ -780,13 +803,13 @@ export const CreateListingModal = ({
                 onChange={(e) => setLocationQuery(e.target.value)}
                 placeholder={t('createListing.searchCity')}
                 autoFocus
-                className="w-full px-4 py-3 pl-10 pr-10 bg-white rounded-xl border border-gray-300 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 pl-10 pr-10 bg-[#1C1C1C] rounded-xl border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50"
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
               />
               <MapPin 
                 size={18} 
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#D3F1A7] pointer-events-none"
               />
               {locationQuery && (
                 <button
@@ -797,9 +820,9 @@ export const CreateListingModal = ({
                     setLocationQuery('');
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors z-10"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors z-10"
                 >
-                  <X size={14} className="text-gray-900" />
+                  <X size={14} className="text-white" />
                 </button>
               )}
             </div>
@@ -808,7 +831,7 @@ export const CreateListingModal = ({
           {/* Список міст */}
           <div className="flex-1 overflow-y-auto overscroll-contain">
             {filteredCities.length > 0 ? (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-white/10">
                 {filteredCities.map((city) => (
                   <button
                     key={city}
@@ -826,22 +849,22 @@ export const CreateListingModal = ({
                       if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
-                    className="w-full px-4 py-4 text-left hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-4 text-left hover:bg-[#D3F1A7]/10 active:bg-[#D3F1A7]/20 transition-colors flex items-center gap-3"
                   >
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                      <MapPin size={18} className="text-green-600" />
+                    <div className="w-10 h-10 rounded-full bg-[#D3F1A7]/20 flex items-center justify-center flex-shrink-0">
+                      <MapPin size={18} className="text-[#D3F1A7]" />
                     </div>
-                    <span className="text-gray-900 font-medium text-base">{city}</span>
+                    <span className="text-white font-medium text-base">{city}</span>
                   </button>
                 ))}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                  <MapPin size={32} className="text-gray-400" />
+                <div className="w-20 h-20 rounded-full bg-[#1C1C1C] flex items-center justify-center mb-4">
+                  <MapPin size={32} className="text-white/50" />
                 </div>
-                <p className="text-gray-900 font-semibold text-lg mb-2">{t('createListing.noCitiesFound')}</p>
-                <p className="text-gray-500 text-sm text-center">{t('createListing.tryAnotherSearch')}</p>
+                <p className="text-white font-semibold text-lg mb-2">{t('createListing.noCitiesFound')}</p>
+                <p className="text-white/50 text-sm text-center">{t('createListing.tryAnotherSearch')}</p>
               </div>
             )}
           </div>

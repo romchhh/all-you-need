@@ -43,25 +43,30 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   
   // Визначаємо стилі в залежності від типу реклами
   const getPromotionStyles = () => {
-    if (!promotionType) return 'ring-1 ring-white/30 shadow-lg shadow-white/10';
+    if (!promotionType) return 'border border-white/20';
     
     switch (promotionType) {
-      case 'highlighted':
-        return 'ring-1 ring-yellow-400 shadow-lg shadow-yellow-100';
-      case 'top_category':
-        return 'ring-1 ring-orange-400 shadow-lg shadow-orange-100';
       case 'vip':
-        return 'ring-2 ring-[#D3F1A7] shadow-2xl shadow-[#D3F1A7]/50';
+        return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+      case 'top_category':
+        return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
       default:
-        return 'ring-1 ring-white/30 shadow-lg shadow-white/10';
+        return 'border border-white/20';
     }
   };
   
   const getPromotionBadge = () => {
     if (promotionType === 'vip') {
       return (
-        <div className="absolute top-2 left-2 px-2 py-0.5 bg-gray-800/80 rounded-full z-10">
-          <span className="text-xs font-semibold text-[#D3F1A7]">VIP</span>
+        <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+          VIP
+        </div>
+      );
+    }
+    if (promotionType === 'top_category') {
+      return (
+        <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+          TOP
         </div>
       );
     }
@@ -69,7 +74,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   };
   
   const getCardBackgroundStyles = () => {
-    return 'bg-gray-800/50';
+    return 'bg-[#000000]';
   };
   
   // Форматуємо час на клієнті з перекладами
@@ -179,98 +184,106 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
         }
       }}
     >
-      <div className="relative aspect-square bg-gray-100 overflow-hidden w-full">
-        {/* Бейдж реклами */}
-        {getPromotionBadge()}
+      {/* Зображення товару - займає більшу частину картки */}
+      <div className="relative w-full" style={{ height: '65%', minHeight: '200px' }}>
+        {/* Бейдж реклами (VIP/TOP) - лівий верхній кут */}
+        <div className="absolute top-2 left-2 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+          {getPromotionBadge()}
+        </div>
         
         {/* Placeholder або зображення */}
         {imageError || (!listing.image && (!listing.images || listing.images.length === 0)) ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 w-full h-full">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1A1A1A] w-full h-full">
             <div className="text-center">
-              <ImageIcon size={48} className="text-gray-400 mx-auto mb-2" />
-              <p className="text-xs text-gray-500">{t('listing.noImages')}</p>
+              <ImageIcon size={48} className="text-white/10 mx-auto" />
             </div>
           </div>
         ) : (
-            <img 
-              src={imageUrl}
-              alt={listing.title}
+          <img 
+            src={imageUrl}
+            alt={listing.title}
             className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
-                imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
+              imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
             } ${isSold || isDeactivated ? 'grayscale' : ''}`}
             style={{ width: '100%', height: '100%' }}
-              loading="lazy"
-              decoding="async"
-              sizes="(max-width: 768px) 50vw, 33vw"
-              key={`${listing.image}-${listing.id}`}
-              onLoad={() => {
-                imageLoadedRef.current.add(imageUrl);
-                setImageLoading(false);
-                setImageError(false);
-              }}
-              onError={(e) => {
-                setImageLoading(false);
-                setImageError(true);
-                console.error('Error loading listing image:', listing.image);
-              }}
-            />
+            loading="lazy"
+            decoding="async"
+            sizes="(max-width: 768px) 50vw, 33vw"
+            key={`${listing.image}-${listing.id}`}
+            onLoad={() => {
+              imageLoadedRef.current.add(imageUrl);
+              setImageLoading(false);
+              setImageError(false);
+            }}
+            onError={(e) => {
+              setImageLoading(false);
+              setImageError(true);
+              console.error('Error loading listing image:', listing.image);
+            }}
+          />
         )}
+        
         {/* Бейдж "Продано" або "Деактивовано" */}
         {isSold && (
-          <div className="absolute bottom-2 left-2">
-            <span className="px-2 py-1 bg-gray-800 text-white text-xs font-semibold rounded-full shadow-md">
+          <div className="absolute bottom-2 left-2 z-10">
+            <span className="px-2 py-1 bg-gray-800/90 text-white text-xs font-semibold rounded-full shadow-md">
               {t('listing.sold')}
             </span>
           </div>
         )}
         {isDeactivated && (
-          <div className="absolute bottom-2 left-2">
-            <span className="px-2 py-1 bg-orange-600 text-white text-xs font-semibold rounded-full shadow-md">
+          <div className="absolute bottom-2 left-2 z-10">
+            <span className="px-2 py-1 bg-orange-600/90 text-white text-xs font-semibold rounded-full shadow-md">
               {t('sales.deactivated')}
             </span>
           </div>
         )}
+        
+        {/* Кнопка лайку - правий верхній кут */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggleFavorite(listing.id);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 z-10"
+          className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-full border border-white/30 hover:bg-black/60 transition-all z-10"
         >
           <Heart 
-            size={20} 
-            className={isFavorite ? 'text-black fill-black' : 'text-white'}
+            size={16} 
+            className={isFavorite ? 'text-white fill-white' : 'text-white'}
             fill={isFavorite ? 'currentColor' : 'none'}
             strokeWidth={isFavorite ? 0 : 2}
           />
         </button>
       </div>
       
-      <div className="p-3 bg-gray-800/50">
-        <div className="mb-2 flex items-center gap-2">
-          <span className={`text-2xl font-bold ${listing.isFree ? 'text-[#D3F1A7]' : 'text-[#D3F1A7]'}`}>
-            {listing.isFree ? t('common.free') : listing.price}
+      {/* Темний overlay з інформацією - нижня частина з заокругленими верхніми кутами */}
+      <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl -mt-6 pt-6 px-4 pb-4">
+        {/* Ціна та тег стану */}
+        <div className="flex items-start justify-between mb-2">
+          <span className="text-2xl font-bold text-white">
+            {listing.isFree ? t('common.free') : `${listing.price}${getCurrencySymbol(listing.currency)}`}
           </span>
-          {!listing.isFree && listing.currency && (
-            <span className="text-2xl font-bold text-[#D3F1A7]">{getCurrencySymbol(listing.currency)}</span>
-          )}
           {listing.condition && (
-            <span className="px-2 py-0.5 bg-gray-700/50 text-white text-xs font-medium rounded-full">
+            <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-[11px] font-semibold rounded">
               {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
             </span>
           )}
         </div>
         
-        <p className="text-sm text-white line-clamp-2 mb-2">{listing.title}</p>
+        {/* Назва товару */}
+        <p className="text-sm text-white line-clamp-2 mb-3 font-medium leading-snug">
+          {listing.title}
+        </p>
         
-        <div className="flex items-center gap-2 text-xs text-white/80">
-          <span className="flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        {/* Локація та час */}
+        <div className="flex items-center justify-between text-xs text-white/60">
+          <span className="flex items-center gap-1.5">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
             </svg>
-            <span className="truncate">{listing.location.split(',')[0]}</span>
+            <span className="truncate">{listing.location?.split(',')[0] || ''}</span>
           </span>
           <span>{formattedTime}</span>
         </div>

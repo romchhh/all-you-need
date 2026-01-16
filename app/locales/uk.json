@@ -51,13 +51,20 @@
     "profile": "Профіль",
     "faq": "FAQ"
   },
+  "menu": {
+    "support": "Підтримка"
+  },
   "listing": {
     "title": "Назва",
     "description": "Опис",
     "price": "Ціна",
     "free": "Безкоштовно",
     "location": "Місце",
-    "condition": "Стан",
+    "condition": {
+      "label": "Стан",
+      "new": "Нове",
+      "used": "Б/У"
+    },
     "new": "Новий",
     "used": "Б/у",
     "likeNew": "Як новий",
@@ -93,6 +100,10 @@
     "editProfile": "Редагувати профіль",
     "firstName": "Ім'я",
     "lastName": "Прізвище",
+    "firstNamePlaceholder": "Введіть ім'я",
+    "lastNamePlaceholder": "Введіть прізвище",
+    "avatar": "Аватар",
+    "changePhoto": "Змінити фото",
     "phone": "Телефон",
     "listings": "Оголошень",
     "sold": "Продано",
@@ -188,6 +199,7 @@
     "created": "Створено",
     "expires": "Закінчується",
     "reactivate": "Активувати знову",
+    "activate": "Активувати",
     "reactivateDescription": "Термін дії оголошення закінчився. Щоб активувати знову, потрібно оплатити оголошення."
   },
   "share": {

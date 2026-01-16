@@ -138,10 +138,10 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
 
   if (images.length === 0) {
     return (
-      <div className="relative aspect-square bg-gray-100 flex items-center justify-center">
+      <div className="relative aspect-square flex items-center justify-center rounded-2xl overflow-hidden" style={{ background: 'rgba(0, 0, 0, 0.5)' }}>
         <div className="text-center">
-          <ImageIcon size={64} className="text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Немає фото</p>
+          <ImageIcon size={64} className="mx-auto mb-2" style={{ color: 'rgba(211, 241, 167, 0.5)' }} />
+          <p className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Немає фото</p>
         </div>
       </div>
     );
@@ -149,7 +149,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
 
   return (
     <div 
-      className="relative w-full aspect-square bg-gray-100 overflow-hidden ImageGallery"
+      className="relative w-full aspect-square overflow-hidden ImageGallery rounded-2xl"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
@@ -159,20 +159,21 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
         position: 'relative',
         width: '100%',
         maxWidth: '100%',
-        cursor: onImageClick ? 'pointer' : 'default'
+        cursor: onImageClick ? 'pointer' : 'default',
+        background: 'rgba(0, 0, 0, 0.5)'
       }}
     >
       {/* Skeleton loader */}
       {imageLoading && !imageError && (
-        <div className="absolute inset-0 animate-pulse bg-gray-200" />
+        <div className="absolute inset-0 animate-pulse" style={{ background: 'rgba(63, 83, 49, 0.5)' }} />
       )}
       
       {/* Placeholder або зображення */}
       {imageError ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0, 0, 0, 0.5)' }}>
           <div className="text-center">
-            <ImageIcon size={64} className="text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">Помилка завантаження</p>
+            <ImageIcon size={64} className="mx-auto mb-2" style={{ color: 'rgba(211, 241, 167, 0.5)' }} />
+            <p className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Помилка завантаження</p>
           </div>
         </div>
       ) : (
@@ -214,14 +215,16 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
         <>
           {/* Індикатор фото - зверху справа */}
           <div 
-            className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-3 py-1.5 rounded-full z-20"
+            className="absolute top-4 right-4 backdrop-blur-sm text-xs font-medium px-3 py-1.5 rounded-full z-20"
             style={{ 
               position: 'absolute',
               top: '1rem',
               right: '1rem',
               left: 'auto',
               zIndex: 20,
-              pointerEvents: 'none'
+              pointerEvents: 'none',
+              background: 'rgba(211, 241, 167, 0.9)',
+              color: '#000000'
             }}
           >
             {currentIndex + 1} / {images.length}
@@ -236,11 +239,11 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`w-2 h-2 rounded-full transition-all ${
-                  index === currentIndex 
-                    ? 'bg-white w-6' 
-                    : 'bg-white/50 hover:bg-white/75'
-                }`}
+                className={`w-2 h-2 rounded-full transition-all`}
+                style={{
+                  background: index === currentIndex ? '#D3F1A7' : 'rgba(211, 241, 167, 0.5)',
+                  width: index === currentIndex ? '24px' : '8px'
+                }}
                 aria-label={`Перейти до фото ${index + 1}`}
               />
             ))}

@@ -86,23 +86,23 @@ export default function ListingPackageModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto relative z-[10000]">
+      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[90vh] overflow-y-auto relative z-[10000]">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
+        <div className="sticky top-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-white">
               {t('listingPackages.title')}
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-white/70 hover:text-white transition-colors"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
-          <p className="text-sm text-gray-600 mt-2">
+          <p className="text-sm text-white/70 mt-2">
             {t('listingPackages.description')}
           </p>
         </div>
@@ -110,31 +110,31 @@ export default function ListingPackageModal({
         {/* Content */}
         <div className="p-6 space-y-4">
           {/* Показуємо баланс */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+          <div className="bg-[#1C1C1C] rounded-xl p-4 border border-white/20">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-sm text-gray-600">{t('payments.currentBalance')}</p>
-                <p className="text-2xl font-bold text-gray-900">{balance.toFixed(2)}€</p>
+                <p className="text-sm text-white/70">{t('payments.currentBalance')}</p>
+                <p className="text-2xl font-bold text-[#D3F1A7]">{balance.toFixed(2)}€</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">{t('listingPackages.availableListings')}</p>
-                <p className="text-2xl font-bold text-blue-600">{packagesBalance}</p>
+                <p className="text-sm text-white/70">{t('listingPackages.availableListings')}</p>
+                <p className="text-2xl font-bold text-[#D3F1A7]">{packagesBalance}</p>
               </div>
             </div>
           </div>
 
           {/* Безкоштовне оголошення */}
           {!hasUsedFreeAd && (
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-200">
+            <div className="bg-[#1C1C1C] rounded-xl p-4 border-2 border-[#D3F1A7]/30">
               <div className="flex items-start gap-3">
-                <div className="bg-green-500 rounded-full p-2 flex-shrink-0">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="bg-[#D3F1A7] rounded-full p-2 flex-shrink-0">
+                  <svg className="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900">{t('listingPackages.free')}</h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <h3 className="font-bold text-white">{t('listingPackages.free')}</h3>
+                  <p className="text-sm text-white/70 mt-1">
                     {t('listingPackages.validFor')}
                   </p>
                 </div>
@@ -149,14 +149,14 @@ export default function ListingPackageModal({
               onClick={() => setSelectedPackage(pkg.type)}
               className={`w-full text-left rounded-xl p-4 border-2 transition-all ${
                 selectedPackage === pkg.type
-                  ? 'border-blue-500 bg-blue-50 shadow-md scale-[1.02]'
-                  : 'border-gray-200 hover:border-blue-300 hover:shadow-sm'
+                  ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 shadow-md scale-[1.02]'
+                  : 'border-white/20 bg-[#1C1C1C] hover:border-white/40 hover:bg-white/5'
               }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-lg text-gray-900">
+                    <h3 className="font-bold text-lg text-white">
                       {pkg.count === 1 
                         ? t('listingPackages.single') 
                         : pkg.count === 5 
@@ -166,32 +166,32 @@ export default function ListingPackageModal({
                     {pkg.badge && (
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                         pkg.badge === 'mostPopular' 
-                          ? 'bg-orange-100 text-orange-700' 
-                          : 'bg-green-100 text-green-700'
+                          ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] border border-[#D3F1A7]/30' 
+                          : 'bg-[#D3F1A7]/20 text-[#D3F1A7] border border-[#D3F1A7]/30'
                       }`}>
                         {t(`listingPackages.${pkg.badge}`)}
                       </span>
                     )}
                   </div>
-                  <p className="text-2xl font-bold text-blue-600 mt-2">
+                  <p className="text-2xl font-bold text-[#D3F1A7] mt-2">
                     {pkg.price.toFixed(1)}€
                   </p>
                   {pkg.save && (
-                    <p className="text-sm text-green-600 font-medium mt-1">
+                    <p className="text-sm text-[#D3F1A7] font-medium mt-1">
                       {t('listingPackages.save')}: {pkg.save}
                     </p>
                   )}
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-white/70 mt-2">
                     {t('listingPackages.validFor')}
                   </p>
                 </div>
                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                   selectedPackage === pkg.type
-                    ? 'border-blue-500 bg-blue-500'
-                    : 'border-gray-300'
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    : 'border-white/30'
                 }`}>
                   {selectedPackage === pkg.type && (
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -202,14 +202,14 @@ export default function ListingPackageModal({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-2xl">
+        <div className="sticky bottom-0 bg-[#000000] border-t border-white/20 px-6 py-4 rounded-b-2xl">
           <button
             onClick={handleSelectPackage}
             disabled={!selectedPackage || loading}
-            className={`w-full py-4 rounded-xl font-semibold text-white transition-all ${
+            className={`w-full py-4 rounded-xl font-semibold text-black transition-all ${
               !selectedPackage || loading
-                ? 'bg-gray-300 cursor-not-allowed'
-                : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl'
+                ? 'bg-white/20 cursor-not-allowed text-white/50'
+                : 'bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 shadow-lg hover:shadow-xl'
             }`}
           >
             {loading ? t('common.loading') : t('common.continue')}

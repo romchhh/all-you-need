@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone } from 'lucide-react';
+import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle } from 'lucide-react';
 import { NavIcon } from '../NavIcon';
 import { ImageViewModal } from '../ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
@@ -23,6 +23,7 @@ import { getProfileShareLink } from '@/utils/botLinks';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { CategoryIcon } from '../CategoryIcon';
 
 // Динамічний імпорт PromotionUpgradeModal та ReactivateListingFlow
 const PromotionUpgradeModal = dynamic(() => import('../PromotionUpgradeModal'), {
@@ -293,11 +294,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     <>
     <div className="pb-24 min-h-screen">
       {/* Профіль хедер */}
-      <div className="px-4 pt-2 pb-4 border-b border-gray-200">
-        <div className="flex items-center gap-4">
+      <div className="px-4 pt-4 pb-4">
+        <div className="flex items-start gap-4">
           {/* Фото профілю */}
           <div 
-            className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 relative cursor-pointer select-none"
+            className="w-16 h-16 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 border-white"
             {...avatarLongPress}
           >
             {profile.avatar ? (
@@ -326,12 +327,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     }
                   }}
                 />
-                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(displayName)} text-white text-2xl font-bold relative z-10`}>
+                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gray-800 text-white text-xl font-bold relative z-10`}>
                   {displayName.charAt(0).toUpperCase()}
                 </div>
               </>
             ) : (
-              <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(displayName)} text-white text-2xl font-bold`}>
+              <div className={`w-full h-full flex items-center justify-center bg-gray-800 text-white text-xl font-bold`}>
                 {displayName.charAt(0).toUpperCase()}
               </div>
             )}
@@ -339,75 +340,79 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           
           {/* Інформація */}
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-white mb-1 truncate">{displayName}</h2>
-            {displayUsername && (
-              <p className="text-sm text-gray-400 mb-2 truncate">{displayUsername}</p>
-            )}
-            {stats && (
-              <div className="flex items-center gap-4 text-xs text-gray-400 mt-2">
-                <div className="flex items-center gap-1">
-                  <Megaphone size={14} className="text-gray-400" />
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-white mb-1 truncate">{displayName}</h2>
+                {displayUsername && (
+                  <p className="text-sm text-white/70 truncate">{displayUsername}</p>
+                )}
+              </div>
+              
+              {/* Кнопки дій */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => {
+                    setShowShareModal(true);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+                >
+                  <Share2 size={18} />
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditModalOpen(true);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+                >
+                  <Edit2 size={18} />
+                </button>
+              </div>
+            </div>
+            
+            {/* Статистика */}
+            <div className="space-y-1.5 mt-3">
+              {stats && (
+                <div className="flex items-center gap-2 text-sm text-white/70">
+                  <Megaphone size={16} className="text-white/70 flex-shrink-0" />
                   <span>{stats.activeListings} {t('sales.active')}</span>
                 </div>
-                {stats.soldListings > 0 && (
-                  <span>{stats.soldListings} {t('sales.sold')}</span>
-                )}
-              </div>
-            )}
-            {profile.balance !== undefined && (
-              <div className="flex items-center flex-wrap gap-2 mt-2">
-                <div className="flex items-center gap-2">
-                  <Wallet size={14} className="text-gray-400 flex-shrink-0" />
-                  <span className="text-sm font-semibold text-white whitespace-nowrap">
-                    {t('profile.balance')}: {profile.balance.toFixed(2)} €
-                  </span>
+              )}
+              {profile.balance !== undefined && (
+                <div className="flex items-center gap-2 text-sm text-white/70">
+                  <Wallet size={16} className="text-white/70 flex-shrink-0" />
+                  <span>{t('profile.balance')}: {profile.balance.toFixed(2)}$</span>
                 </div>
-                {profile.listingPackagesBalance !== undefined && profile.listingPackagesBalance > 0 && (
-                  <>
-                    <span className="text-gray-400">•</span>
-                    <div className="flex items-center gap-2">
-                      <Package size={14} className="text-blue-500 flex-shrink-0" />
-                      <span className="text-sm font-semibold text-blue-600 whitespace-nowrap">
-                        {profile.listingPackagesBalance} {t('profile.availableListings')}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Кнопки дій */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setIsEditModalOpen(true);
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              className="w-10 h-10 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors text-white"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-            </button>
-            <button
-              onClick={() => {
-                setShowShareModal(true);
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              className="w-10 h-10 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors text-white"
-            >
-              <Share2 size={20} />
-            </button>
+              )}
+              {profile.listingPackagesBalance !== undefined && profile.listingPackagesBalance > 0 && (
+                <div className="flex items-center gap-2 text-sm text-white/70">
+                  <Package size={16} className="text-white/70 flex-shrink-0" />
+                  <span>{profile.listingPackagesBalance} {t('profile.availableListings')}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Кнопка створення оголошення */}
-      <div className="px-4 pt-3 pb-3">
+      {/* Кнопки дій */}
+      <div className="px-4 space-y-3 pb-4">
+        {/* Кнопка поповнення балансу */}
         <button 
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-500/20"
+          className="w-full bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 text-black font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+          onClick={() => {
+            setShowTopUpModal(true);
+            tg?.HapticFeedback.impactOccurred('medium');
+          }}
+        >
+          <Wallet size={20} />
+          {t('profile.topUpBalance')}
+        </button>
+
+        {/* Кнопка створення оголошення */}
+        <button 
+          className="w-full bg-transparent hover:bg-white/10 border-2 border-white text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
           onClick={() => {
             if (onCreateListing) {
               onCreateListing();
@@ -420,25 +425,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         </button>
       </div>
 
-      {/* Кнопка поповнення балансу */}
+      {/* Розділювач */}
       <div className="px-4 pb-4">
-        <button 
-          className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-green-500/20"
-          onClick={() => {
-            setShowTopUpModal(true);
-            tg?.HapticFeedback.impactOccurred('medium');
-          }}
-        >
-          <Wallet size={20} />
-          {t('profile.topUpBalance')}
-        </button>
+        <div className="border-t border-white/20"></div>
       </div>
 
       {/* Оголошення користувача */}
       <div className="px-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-white">{t('sales.title')}</h3>
-        </div>
+        <h3 className="text-lg font-semibold text-white mb-3">{t('sales.title')}</h3>
         
         {/* Фільтри */}
         <div className="flex gap-2 mb-4">
@@ -453,9 +447,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 setIsCategoryFilterOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="flex-1 px-3 py-2 bg-gray-800/50 rounded-xl border border-gray-700 flex items-center justify-between text-sm"
+              className="flex-1 px-3 py-2.5 bg-[#000000] rounded-xl border border-white/20 flex items-center justify-between text-sm hover:border-white/40 transition-colors"
             >
-              <span className="text-gray-300">
+              <span className="text-white">
                 {selectedStatus === 'all' ? t('sales.allStatuses') : 
                  selectedStatus === 'active' ? t('listing.active') :
                  selectedStatus === 'sold' ? t('listing.sold') :
@@ -464,7 +458,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                  selectedStatus === 'pending' ? t('sales.pending') :
                  selectedStatus === 'deactivated' ? t('sales.deactivated') : selectedStatus}
               </span>
-              <ChevronDown size={16} className={`text-gray-400 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={16} className={`text-white/70 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Фільтр за категорією */}
@@ -478,19 +472,16 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 setIsStatusFilterOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="flex-1 px-3 py-2 bg-gray-100 rounded-xl border border-gray-200 flex items-center justify-between text-sm"
+              className="flex-1 px-3 py-2.5 bg-[#000000] rounded-xl border border-white/20 flex items-center justify-between text-sm hover:border-white/40 transition-colors"
             >
-              <span className="text-gray-700 flex items-center gap-2 truncate">
+              <span className="text-white truncate">
                 {selectedCategory === 'all' ? (
                   t('sales.allCategories')
                 ) : (
-                  <>
-                    <span className="flex-shrink-0">{categories.find(c => c.id === selectedCategory)?.icon}</span>
-                    <span className="truncate">{categories.find(c => c.id === selectedCategory)?.name || selectedCategory}</span>
-                  </>
+                  categories.find(c => c.id === selectedCategory)?.name || selectedCategory
                 )}
               </span>
-              <ChevronDown size={16} className={`text-gray-400 flex-shrink-0 transition-transform ${isCategoryFilterOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={16} className={`text-white/70 flex-shrink-0 transition-transform ${isCategoryFilterOpen ? 'rotate-180' : ''}`} />
             </button>
           </div>
 
@@ -508,7 +499,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           {isStatusFilterOpen && (
             <div 
               id="status-filter-menu"
-              className="fixed bg-gray-900 rounded-xl border border-gray-700 shadow-2xl z-[10000]"
+              className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000]"
               style={{
                 top: `${statusMenuPosition.top + 8}px`,
                 left: `${statusMenuPosition.left}px`,
@@ -527,8 +518,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setIsStatusFilterOpen(false);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className={`w-full px-3 py-2.5 text-left text-sm hover:bg-gray-800 transition-colors border-b border-gray-700 last:border-b-0 ${
-                    selectedStatus === status ? 'bg-blue-500/20 text-[#D3F1A7]' : 'text-white'
+                  className={`w-full px-3 py-2.5 text-left text-sm hover:bg-white/10 transition-colors border-b border-white/10 last:border-b-0 ${
+                    selectedStatus === status ? 'bg-[#D3F1A7]/20 text-[#D3F1A7]' : 'text-white'
                   }`}
                 >
                   {status === 'all' ? t('sales.allStatuses') : 
@@ -538,7 +529,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                    status === 'pending_moderation' ? t('profile.onModeration') :
                    status === 'pending' ? t('sales.pending') :
                    status === 'deactivated' ? t('sales.deactivated') : status}
-                  {selectedStatus === status && <span className="text-blue-500 ml-2">✓</span>}
+                  {selectedStatus === status && <span className="text-[#D3F1A7] ml-2">✓</span>}
                 </button>
               ))}
             </div>
@@ -558,7 +549,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           {isCategoryFilterOpen && (
             <div 
               id="category-filter-menu"
-              className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] max-h-[70vh] overflow-y-auto"
+              className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] max-h-[70vh] overflow-y-auto"
               style={{
                 top: `${categoryMenuPosition.top + 8}px`,
                 left: `${categoryMenuPosition.left}px`,
@@ -575,15 +566,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   setIsCategoryFilterOpen(false);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 border-b border-gray-700 ${
+                className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b border-white/10 ${
                   selectedCategory === 'all'
-                    ? 'bg-blue-500/20 text-[#D3F1A7] font-semibold'
-                    : 'text-white hover:bg-gray-800'
+                    ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
+                    : 'text-white hover:bg-white/10'
                 }`}
               >
-                <span className="text-xl">📦</span>
                 <span className="flex-1">{t('sales.allCategories')}</span>
-                {selectedCategory === 'all' && <span className="text-blue-500">✓</span>}
+                {selectedCategory === 'all' && <span className="text-[#D3F1A7]">✓</span>}
               </button>
               {categories.map(cat => (
                 <button
@@ -596,15 +586,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setIsCategoryFilterOpen(false);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 border-b border-gray-700 ${
+                  className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b border-white/10 ${
                     selectedCategory === cat.id
-                      ? 'bg-blue-500/20 text-[#D3F1A7] font-semibold'
-                      : 'text-white hover:bg-gray-800'
+                      ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
+                      : 'text-white hover:bg-white/10'
                   }`}
                 >
-                  <span className="text-xl flex-shrink-0">{cat.icon}</span>
                   <span className="flex-1">{cat.name}</span>
-                  {selectedCategory === cat.id && <span className="text-blue-500 flex-shrink-0">✓</span>}
+                  {selectedCategory === cat.id && <span className="text-[#D3F1A7] flex-shrink-0">✓</span>}
                 </button>
               ))}
             </div>
@@ -723,11 +712,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             </>
           ) : (
             <div className="py-16 text-center">
-              <div className="text-gray-400 mb-4">
-                <Package size={64} className="mx-auto" />
-              </div>
-              <p className="text-gray-400 mb-2">{t('sales.noListings')}</p>
-              <p className="text-sm text-gray-400">{t('sales.createFirst')}</p>
+              <p className="text-white mb-2 font-medium">{t('sales.noListings')}</p>
+              <p className="text-sm text-white/70">{t('sales.createFirst')}</p>
             </div>
           )}
         </div>
@@ -735,20 +721,34 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
       {/* Кнопки налаштувань */}
       <div className="px-4 py-6 space-y-3">
-        <LanguageSwitcher tg={tg} />
+        <LanguageSwitcher tg={tg} fullWidth />
+        
+        <button
+          onClick={() => {
+            const supportManager = process.env.NEXT_PUBLIC_SUPPORT_MANAGER || 'https://t.me/tradeground_support';
+            if (tg && tg.openTelegramLink) {
+              tg.openTelegramLink(supportManager);
+              tg.HapticFeedback?.impactOccurred('medium');
+            } else {
+              window.location.href = supportManager;
+            }
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          className="w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border border-white/20 hover:bg-white/10 transition-colors"
+        >
+          <span className="text-white font-medium">{t('menu.support') || 'Підтримка'}</span>
+          <ChevronRight size={20} className="text-white/70" />
+        </button>
         
         <button
           onClick={() => {
             router.push(`/${language}/faq`);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full flex items-center justify-between px-4 py-3 bg-gray-800/30 rounded-xl border border-gray-700 hover:bg-gray-700/50 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border border-white/20 hover:bg-white/10 transition-colors"
         >
-          <div className="flex items-center gap-3">
-            <HelpCircle size={20} className="text-gray-400" />
-            <span className="text-white font-medium">{t('navigation.faq')}</span>
-          </div>
-          <ChevronRight size={20} className="text-gray-400" />
+          <span className="text-white font-medium">{t('navigation.faq')}</span>
+          <ChevronRight size={20} className="text-white/70" />
         </button>
 
         <button
@@ -756,13 +756,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             router.push(`/${language}/privacy`);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full flex items-center justify-between px-4 py-3 bg-gray-800/30 rounded-xl border border-gray-700 hover:bg-gray-700/50 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border border-white/20 hover:bg-white/10 transition-colors"
         >
-          <div className="flex items-center gap-3">
-            <Shield size={20} className="text-gray-400" />
-            <span className="text-white font-medium">{t('privacy.title')}</span>
-          </div>
-          <ChevronRight size={20} className="text-gray-400" />
+          <span className="text-white font-medium">{t('privacy.title')}</span>
+          <ChevronRight size={20} className="text-white/70" />
         </button>
       </div>
 

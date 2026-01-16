@@ -1,4 +1,4 @@
-import { Eye, Heart, Edit2, Check, Megaphone, Package } from 'lucide-react';
+import { Eye, Heart, Edit2, Check, Megaphone, Package, DollarSign, Loader2 } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useMemo } from 'react';
@@ -74,69 +74,51 @@ export const ProfileListingCard = ({
     return date.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
+  // Визначаємо стилі залежно від статусу
+  const getCardStyles = () => {
+    if (hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated) {
+      return 'bg-[#000000] border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.3)]';
+    }
+    return 'bg-[#000000] border-2 border-white/20';
+  };
+
   return (
     <div 
-      className={`bg-white rounded-2xl border-2 overflow-hidden transition-all ${
-        isSold ? 'border-gray-300 opacity-60' : 
-        isDeactivated ? 'border-orange-300' : 
-        isPendingModeration ? 'border-blue-300 bg-blue-50/30' :
-        'border-gray-200 hover:border-blue-300'
-      }`}
+      className={`${getCardStyles()} rounded-2xl overflow-hidden transition-all`}
     >
-      <div className="flex gap-3 p-3">
+      <div className="flex gap-3 p-3 relative">
+        {/* Значок "На модерації" - у верхньому правому куті картки */}
+        {isPendingModeration && (
+          <div className="absolute top-3 right-3 z-10">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#FFFFFFA6] text-black text-[9px] font-bold">
+              <Loader2 size={10} className="animate-spin" />
+            </div>
+          </div>
+        )}
+
         {/* Фото */}
         <div 
-          className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100 cursor-pointer"
+          className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden bg-[#2A2A2A] cursor-pointer"
           onClick={() => {
-            onSelect(listing);
-            tg?.HapticFeedback.impactOccurred('light');
+            if (!isPendingModeration && !isDeactivated) {
+              onSelect(listing);
+              tg?.HapticFeedback.impactOccurred('light');
+            }
           }}
         >
           {imageUrl ? (
             <img 
               src={imageUrl} 
               alt={listing.title}
-              className="absolute inset-0 w-full h-full min-w-full min-h-full object-cover"
+              className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
+                isPendingModeration ? 'opacity-50' : isDeactivated ? 'opacity-65' : ''
+              }`}
               style={{ width: '100%', height: '100%' }}
               loading="lazy"
             />
           ) : (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-400">
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-white/20">
               <Package size={32} />
-            </div>
-          )}
-          
-          {/* Бейдж реклами */}
-          {hasPromotion && isPromotionActive && (
-            <div className="absolute top-1 left-1 z-10">
-              <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white shadow-lg ${
-                listing.promotionType === 'vip' 
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600' 
-                  : listing.promotionType === 'top_category'
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500'
-                  : 'bg-gradient-to-r from-yellow-500 to-amber-500'
-              }`}>
-                {listing.promotionType === 'vip' && '⭐ VIP'}
-                {listing.promotionType === 'top_category' && '🔝 TOP'}
-                {listing.promotionType === 'highlighted' && '✨ '}
-              </div>
-            </div>
-          )}
-          
-          {/* Статус */}
-          {isPendingModeration && (
-            <div className="absolute inset-0 bg-blue-500/70 flex items-center justify-center">
-              <span className="text-white text-xs font-bold text-center px-1">⏳ {t('profile.onModeration')}</span>
-            </div>
-          )}
-          {isSold && !isPendingModeration && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">{t('listing.sold')}</span>
-            </div>
-          )}
-          {isDeactivated && !isPendingModeration && (
-            <div className="absolute inset-0 bg-orange-500/50 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">{t('sales.deactivated')}</span>
             </div>
           )}
         </div>
@@ -146,87 +128,118 @@ export const ProfileListingCard = ({
           {/* Верхня частина: назва + ціна */}
           <div>
             <div 
-              className="font-semibold text-sm text-gray-900 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
+              className={`font-semibold text-sm line-clamp-2 cursor-pointer transition-colors ${
+                isPendingModeration 
+                  ? 'text-[#FFFFFFA6]' 
+                  : isDeactivated
+                  ? 'text-[#FFFFFFA6]'
+                  : 'text-white hover:text-[#D3F1A7]'
+              }`}
               onClick={() => {
-                onSelect(listing);
-                tg?.HapticFeedback.impactOccurred('light');
+                if (!isPendingModeration && !isDeactivated) {
+                  onSelect(listing);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }
               }}
             >
               {listing.title}
             </div>
-            <div className="text-blue-600 font-bold text-base mt-1">
-              {listing.isFree ? t('common.free') : `${listing.price} ${listing.currency || '₴'}`}
+            <div className={`font-bold text-base mt-1 ${
+              isPendingModeration 
+                ? 'text-[#FFFFFFA6]' 
+                : isDeactivated
+                ? 'text-[#FFFFFFA6]'
+                : 'text-white'
+            }`}>
+              {listing.isFree ? t('common.free') : `${listing.price} ${listing.currency || '$'}`}
             </div>
+
+            {/* Статус модерації або деактивації */}
+            {isPendingModeration && (
+              <div className="mt-2 text-[#FFFFFFA6] font-bold text-base flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin text-[#FFFFFFA6]" />
+                <span>{t('profile.onModeration')}</span>
+              </div>
+            )}
+            {isDeactivated && !isPendingModeration && (
+              <div className="mt-2 text-[#FFFFFFA6] font-bold text-base">
+                {t('sales.deactivated')}
+              </div>
+            )}
           </div>
 
           {/* Дати */}
-          <div className="text-[10px] text-gray-500 space-y-0.5">
+          <div className={`text-[10px] space-y-0.5 mt-2 ${
+            isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/70'
+          }`}>
             {createdDate && (
-              <div>{t('sales.created')}: {formatDate(createdDate)}</div>
+              <div className="flex items-center gap-1">
+                <span>{t('sales.created')}: {formatDate(createdDate)}</span>
+              </div>
             )}
             {expiresAt && !isExpired && (
-              <div className={isExpiringSoon ? 'text-orange-600 font-semibold' : ''}>
-                {t('sales.expires')}: {formatDate(expiresAt)}
-                {isExpiringSoon && ` (${daysUntilExpiry} ${daysUntilExpiry === 1 ? t('profile.day') : t('profile.days')})`}
+              <div className={`flex items-center gap-1 ${
+                isPendingModeration 
+                  ? 'text-[#FFFFFFA6]' 
+                  : isExpiringSoon 
+                  ? 'text-orange-400 font-semibold' 
+                  : ''
+              }`}>
+                {isPendingModeration && <Loader2 size={10} className="animate-spin text-[#FFFFFFA6]" />}
+                <span>{t('sales.expires')}: {formatDate(expiresAt)}</span>
+                {isExpiringSoon && !isPendingModeration && ` (${daysUntilExpiry} ${daysUntilExpiry === 1 ? t('profile.day') : t('profile.days')})`}
               </div>
             )}
             {isExpired && expiresAt && (
-              <div className="text-red-600 font-semibold">
+              <div className="text-red-400 font-semibold">
                 Закінчилось: {formatDate(expiresAt)}
               </div>
             )}
             {/* Інформація про рекламу */}
             {hasPromotion && isPromotionActive && promotionDaysLeft !== null && (
-              <div className={`font-semibold ${
-                listing.promotionType === 'vip' 
-                  ? 'text-purple-600' 
-                  : listing.promotionType === 'top_category'
-                  ? 'text-orange-600'
-                  : 'text-yellow-600'
-              }`}>
-                📢 Реклама: {promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}
+              <div className={isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6] font-semibold' : 'text-[#D3F1A7] font-semibold'}>
+                Реклама: {promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}
               </div>
             )}
             {hasPromotion && !isPromotionActive && (
-              <div className="text-gray-400">
-                📢 Реклама закінчилась
+              <div className={isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/50'}>
+                Реклама закінчилась
               </div>
             )}
           </div>
 
           {/* Статистика */}
-          <div className="flex items-center gap-3 text-xs text-gray-600">
+          <div className={`flex items-center gap-3 text-xs mt-2 ${
+            isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/70'
+          }`}>
             <div className="flex items-center gap-1">
-              <Eye size={14} />
+              <Eye size={14} className={isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : ''} />
               <span>{listing.views || 0}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Heart size={14} className={isFavorite ? 'fill-red-500 text-red-500' : ''} />
+              <Heart size={14} className={
+                isPendingModeration || isDeactivated
+                  ? 'text-[#FFFFFFA6]' 
+                  : isFavorite 
+                  ? 'fill-[#D3F1A7] text-[#D3F1A7]' 
+                  : ''
+              } />
               <span>{listing.favoritesCount || 0}</span>
             </div>
           </div>
-          
-          {/* Статус закінчення */}
-          {isExpired && (
-            <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
-              <p className="text-xs text-orange-700 font-semibold">
-                ⏰ Термін дії оголошення закінчився. Натисніть "Активувати" щоб поновити (потрібна оплата).
-              </p>
-            </div>
-          )}
-          
-          {/* Попередження про закінчення */}
-          {isExpiringSoon && !isExpired && (
-            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-xs text-yellow-700 font-semibold">
-                ⚠️ Оголошення закінчується через {daysUntilExpiry} {daysUntilExpiry === 1 ? t('profile.day') : t('profile.days')}
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Кнопки дій */}
-        <div className="flex flex-col gap-2 justify-center">
+        <div className="flex flex-col gap-2 justify-center relative">
+          {/* Тег реклами - над іконками */}
+          {hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && (
+            <div className="absolute -top-12 right-0 z-10">
+              <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded inline-block max-w-fit w-auto">
+                VIP
+              </div>
+            </div>
+          )}
+
           {/* Кнопка редагувати */}
           <button
             onClick={(e) => {
@@ -234,59 +247,70 @@ export const ProfileListingCard = ({
               onEdit();
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 transition-colors"
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+              isPendingModeration
+                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                : isDeactivated
+                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
+            }`}
             title={t('common.edit')}
           >
-            <Edit2 size={14} />
+            <Edit2 size={12} />
           </button>
 
-          {/* Кнопка продано */}
-          {!isSold && !isExpired && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onMarkAsSold();
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-green-600 transition-colors"
-              title={t('editListing.markAsSold')}
-            >
-              <Check size={14} />
-            </button>
-          )}
-          
-          {/* Кнопка реактивувати для закінчених, проданих і деактивованих */}
-          {(isExpired || isSold || isDeactivated) && onReactivate && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onReactivate();
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors"
-              title="Активувати знову"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          )}
+          {/* Кнопка реклами */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPromote();
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+              isPendingModeration
+                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                : isDeactivated
+                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
+            }`}
+            title={t('sales.promote')}
+          >
+            <DollarSign size={12} />
+          </button>
         </div>
       </div>
       
-      {/* Кнопка рекламувати - знизу */}
+      {/* Кнопка рекламувати/активувати - знизу */}
       <div className="px-3 pb-3">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onPromote();
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          className="w-full bg-purple-500 text-white rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 shadow-lg hover:bg-purple-600 transition-colors font-semibold text-sm"
-        >
-          <Megaphone size={16} />
-          {t('sales.promote')}
-        </button>
+        {isDeactivated && onReactivate ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onReactivate();
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className="w-full bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-[#FFFFFFA6]/10 transition-colors font-semibold text-sm"
+          >
+            {t('sales.activate') || 'Активувати'}
+          </button>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPromote();
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            disabled={isPendingModeration}
+            className={`w-full rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors font-semibold text-sm ${
+              isPendingModeration
+                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed'
+                : 'bg-[#D3F1A7] text-black hover:bg-[#D3F1A7]/90'
+            }`}
+          >
+            <Megaphone size={16} />
+            {t('sales.promote')}
+          </button>
+        )}
       </div>
     </div>
   );

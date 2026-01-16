@@ -123,7 +123,7 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
     >
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-colors text-white z-20"
+        className="absolute top-4 right-4 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-20"
       >
         <X size={24} />
       </button>
@@ -135,7 +135,7 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
               e.stopPropagation();
               prevImage();
             }}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-colors text-white z-20"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-20"
           >
             <ChevronLeft size={24} />
           </button>
@@ -144,11 +144,11 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
               e.stopPropagation();
               nextImage();
             }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-colors text-white z-20"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-20"
           >
             <ChevronRight size={24} />
           </button>
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-sm text-white text-sm font-medium px-3 py-1.5 rounded-full z-20">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm text-white text-sm font-medium px-3 py-1.5 rounded-full z-20">
             {currentIndex + 1} / {imageList.length}
           </div>
         </>

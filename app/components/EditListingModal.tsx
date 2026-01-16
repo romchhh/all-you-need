@@ -1,4 +1,4 @@
-import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2 } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2, Sparkles, Wrench, CheckCircle, Tag, EyeOff } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Listing } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -6,6 +6,7 @@ import { getCategories } from '@/constants/categories';
 import { ukrainianCities, searchCities } from '@/constants/ukrainian-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ConfirmModal } from './ConfirmModal';
+import { CategoryIcon } from './CategoryIcon';
 
 interface EditListingModalProps {
   isOpen: boolean;
@@ -57,9 +58,9 @@ export const EditListingModal = ({
 
   type ConditionType = 'new' | 'used';
 
-  const conditionOptions: Array<{ value: ConditionType; label: string; emoji: string }> = [
-    { value: 'new', label: t('listing.new'), emoji: '✨' },
-    { value: 'used', label: t('listing.used'), emoji: '🔧' },
+  const conditionOptions: Array<{ value: ConditionType; label: string; icon: typeof Sparkles | typeof Wrench }> = [
+    { value: 'new', label: t('listing.new'), icon: Sparkles },
+    { value: 'used', label: t('listing.used'), icon: Wrench },
   ];
 
   const selectedCondition = conditionOptions.find(opt => opt.value === condition);
@@ -277,28 +278,30 @@ export const EditListingModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-white flex flex-col overflow-hidden" style={{ zIndex: 9999, isolation: 'isolate' }}>
-      <div className="bg-white w-full h-full flex flex-col relative">
+    <div className="fixed inset-0 bg-[#000000] flex flex-col overflow-hidden" style={{ zIndex: 9999, isolation: 'isolate' }}>
+      <div className="bg-[#000000] w-full h-full flex flex-col relative">
         {/* Хедер */}
-        <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-xl font-bold text-gray-900">{t('listing.editListing')}</h2>
+        <div className="bg-[#000000] border-b border-white/20 px-4 py-4 flex items-center justify-between flex-shrink-0">
+          <h2 className="text-xl font-bold text-white">{t('listing.editListing')}</h2>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-900"
+            className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors text-white"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32">
+        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32" style={{
+          background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000'
+        }}>
           {/* Фото */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-white mb-3">
               Фото * {imagePreviews.length}/10
             </label>
             <div className="grid grid-cols-3 gap-2">
               {imagePreviews.map((preview, index) => (
-                <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
+                <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] border border-white/20">
                   <img 
                     src={(() => {
                       if (typeof preview === 'string' && preview.startsWith('http')) return preview;
@@ -313,7 +316,7 @@ export const EditListingModal = ({
                       target.style.display = 'none';
                       const parent = target.parentElement;
                       if (parent) {
-                        parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400 text-xs">Помилка</div>';
+                        parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-white/40 text-xs">Помилка</div>';
                       }
                     }}
                   />
@@ -327,10 +330,10 @@ export const EditListingModal = ({
                 </div>
               ))}
               {imagePreviews.length < 10 && (
-                <label className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-500 transition-colors">
+                <label className="aspect-square rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-[#D3F1A7] transition-colors">
                   <div className="text-center">
-                    <Upload size={24} className="text-gray-400 mx-auto mb-1" />
-                    <span className="text-xs text-gray-500">Додати</span>
+                    <Upload size={24} className="text-white/70 mx-auto mb-1" />
+                    <span className="text-xs text-white/70">Додати</span>
                   </div>
                   <input
                     type="file"
@@ -343,13 +346,13 @@ export const EditListingModal = ({
               )}
             </div>
             {errors.images && (
-              <p className="mt-1 text-sm text-red-600">{errors.images}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.images}</p>
             )}
           </div>
 
           {/* Заголовок */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               Заголовок *
             </label>
             <input
@@ -360,19 +363,19 @@ export const EditListingModal = ({
                 if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
               }}
               placeholder="Наприклад: iPhone 13 Pro Max"
-              className={`w-full px-4 py-3 bg-gray-50 rounded-xl border ${
-                errors.title ? 'border-red-300' : 'border-gray-200'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
+                errors.title ? 'border-red-500' : 'border-white/20'
+              } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
               maxLength={100}
             />
             {errors.title && (
-              <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.title}</p>
             )}
           </div>
 
           {/* Опис */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               Опис *
             </label>
             <textarea
@@ -383,13 +386,13 @@ export const EditListingModal = ({
               }}
               placeholder="Детальний опис товару..."
               rows={4}
-              className={`w-full px-4 py-3 bg-gray-50 rounded-xl border ${
-                errors.description ? 'border-red-300' : 'border-gray-200'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+              className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
+                errors.description ? 'border-red-500' : 'border-white/20'
+              } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7] resize-none`}
               maxLength={2000}
             />
             {errors.description && (
-              <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.description}</p>
             )}
           </div>
 
@@ -400,9 +403,10 @@ export const EditListingModal = ({
                 type="checkbox"
                 checked={isFree}
                 onChange={(e) => setIsFree(e.target.checked)}
-                className="w-4 h-4"
+                className="w-4 h-4 rounded border-white/20 text-[#D3F1A7] focus:ring-[#D3F1A7] bg-transparent"
+                style={{ accentColor: '#D3F1A7' }}
               />
-              <span className="text-sm font-medium text-gray-700">{t('common.free')}</span>
+              <span className="text-sm font-medium text-white">{t('common.free')}</span>
             </label>
             {!isFree && (
               <>
@@ -415,9 +419,9 @@ export const EditListingModal = ({
                       if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                     }}
                     placeholder="Ціна"
-                    className={`flex-1 px-4 py-3 bg-gray-50 rounded-xl border ${
-                      errors.price ? 'border-red-300' : 'border-gray-200'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className={`flex-1 px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
+                      errors.price ? 'border-red-500' : 'border-white/20'
+                    } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
                   />
                     <button
                     ref={currencyRef}
@@ -426,16 +430,16 @@ export const EditListingModal = ({
                         setIsCurrencyOpen(!isCurrencyOpen);
                         tg?.HapticFeedback.impactOccurred('light');
                       }}
-                      className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-0.5 min-w-[80px]"
+                      className="px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 hover:border-white/40 transition-colors flex items-center gap-0.5 min-w-[80px] text-white"
                     >
-                      <span className="text-gray-900 font-medium">
+                      <span className="font-medium">
                         {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
                       </span>
-                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1`} />
+                      <ChevronDown size={16} className={`text-white/70 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1`} />
                     </button>
                 </div>
                 {errors.price && (
-                  <p className="mt-1 text-sm text-red-600">{errors.price}</p>
+                  <p className="mt-1 text-sm text-red-400">{errors.price}</p>
                 )}
               </>
             )}
@@ -443,7 +447,7 @@ export const EditListingModal = ({
 
           {/* Розділ */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-white mb-3">
               Розділ *
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -459,28 +463,28 @@ export const EditListingModal = ({
                   }}
                 className={`px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
                   category === cat.id
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
                     : errors.category
-                    ? 'border-red-300 bg-white text-gray-700'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    ? 'border-red-500 bg-[#1C1C1C] text-white'
+                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">{cat.icon}</span>
+                    <CategoryIcon categoryId={cat.id} isActive={category === cat.id} size={20} />
                     <span className="font-medium text-sm">{cat.name}</span>
                   </div>
                 </button>
               ))}
             </div>
             {errors.category && (
-              <p className="mt-1 text-sm text-red-600">{errors.category}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.category}</p>
             )}
           </div>
 
           {/* Тип */}
           {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-white mb-3">
                 Тип (необов'язково)
               </label>
               <div className="flex flex-wrap gap-2">
@@ -492,8 +496,8 @@ export const EditListingModal = ({
                   }}
                   className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
                     !subcategory
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                      ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                      : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                   }`}
                 >
                   Всі типи
@@ -508,8 +512,8 @@ export const EditListingModal = ({
                     }}
                     className={`px-4 py-2 rounded-xl border-2 transition-all ${
                       subcategory === sub.id
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                        ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                        : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                     }`}
                   >
                     {sub.name}
@@ -521,56 +525,59 @@ export const EditListingModal = ({
 
           {/* Стан */}
           <div className="relative" ref={conditionRef}>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               Стан (необов'язково)
             </label>
             <button
               type="button"
               onClick={() => setIsConditionOpen(!isConditionOpen)}
-              className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between hover:border-gray-300 transition-colors"
+              className="w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 flex items-center justify-between hover:border-white/40 transition-colors text-white"
             >
               <div className="flex items-center gap-2">
                 {selectedCondition && (
                   <>
-                    <span className="text-lg">{selectedCondition.emoji}</span>
-                    <span className="text-gray-700 font-medium">{selectedCondition.label}</span>
+                    {selectedCondition.icon && <selectedCondition.icon size={20} className="text-[#D3F1A7]" />}
+                    <span className="font-medium">{selectedCondition.label}</span>
                   </>
                 )}
                 {!selectedCondition && (
-                  <span className="text-gray-400">Оберіть стан</span>
+                  <span className="text-white/50">Оберіть стан</span>
                 )}
               </div>
-              <ChevronDown size={20} className={`text-gray-400 transition-transform ${isConditionOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={20} className={`text-white/70 transition-transform ${isConditionOpen ? 'rotate-180' : ''}`} />
             </button>
             {isConditionOpen && (
-              <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-20">
-                {conditionOptions.map(option => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      setCondition(option.value);
-                      setIsConditionOpen(false);
-                      tg?.HapticFeedback.impactOccurred('light');
-                    }}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{option.emoji}</span>
-                      <span>{option.label}</span>
-                    </div>
-                    {selectedCondition?.value === option.value && (
-                      <span className="text-blue-500">✓</span>
-                    )}
-                  </button>
-                ))}
+              <div className="absolute left-0 right-0 mt-2 bg-[#1C1C1C] border border-white/20 rounded-xl shadow-lg z-20">
+                {conditionOptions.map(option => {
+                  const IconComponent = option.icon;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setCondition(option.value);
+                        setIsConditionOpen(false);
+                        tg?.HapticFeedback.impactOccurred('light');
+                      }}
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors border-b border-white/10 last:border-b-0 text-white"
+                    >
+                      <div className="flex items-center gap-3">
+                        <IconComponent size={20} className="text-[#D3F1A7]" />
+                        <span>{option.label}</span>
+                      </div>
+                      {selectedCondition?.value === option.value && (
+                        <span className="text-[#D3F1A7]">✓</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
 
           {/* Локація */}
           <div className="relative" ref={locationRef}>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white mb-2">
               Локація *
             </label>
             <div className="relative">
@@ -585,18 +592,18 @@ export const EditListingModal = ({
                 }}
                 onFocus={() => setIsLocationOpen(true)}
                 placeholder="Оберіть або введіть місто"
-                className={`w-full px-4 py-3 pl-10 bg-gray-50 rounded-xl border ${
-                  errors.location ? 'border-red-300' : 'border-gray-200'
-                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-4 py-3 pl-12 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
+                  errors.location ? 'border-red-500' : 'border-white/20'
+                } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
               />
               <MapPin 
                 size={18} 
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70"
               />
             </div>
             
             {isLocationOpen && filteredCities.length > 0 && (
-              <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-2 bg-[#1C1C1C] rounded-xl border border-white/20 shadow-lg max-h-60 overflow-y-auto">
                 {filteredCities.map((city) => (
                   <button
                     key={city}
@@ -607,22 +614,22 @@ export const EditListingModal = ({
                       setIsLocationOpen(false);
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700"
+                    className="w-full px-4 py-3 text-left hover:bg-white/10 transition-colors flex items-center gap-2 text-white"
                   >
-                    <MapPin size={16} className="text-gray-400" />
+                    <MapPin size={16} className="text-white/70" />
                     <span>{city}</span>
                   </button>
                 ))}
               </div>
             )}
             {errors.location && (
-              <p className="mt-1 text-sm text-red-600">{errors.location}</p>
+              <p className="mt-1 text-sm text-red-400">{errors.location}</p>
             )}
           </div>
 
           {/* Статус */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-white mb-3">
               {t('editListing.status') || 'Статус'}
             </label>
             <div className="space-y-3">
@@ -634,11 +641,11 @@ export const EditListingModal = ({
                 }}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'active'
-                    ? 'border-green-500 bg-green-50 text-green-700 shadow-sm'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
-                <span className="text-lg">✅</span>
+                <CheckCircle size={20} />
                 <span>{t('editListing.active')}</span>
               </button>
               <button
@@ -649,11 +656,11 @@ export const EditListingModal = ({
                 }}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'sold'
-                    ? 'border-gray-500 bg-gray-50 text-gray-700 shadow-sm'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    ? 'border-white/40 bg-white/10 text-white shadow-sm'
+                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
-                <span className="text-lg">🏷️</span>
+                <Tag size={20} />
                 <span>{t('editListing.sold')}</span>
               </button>
               <button
@@ -664,11 +671,11 @@ export const EditListingModal = ({
                 }}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'hidden'
-                    ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    ? 'border-orange-500/70 bg-orange-500/20 text-orange-400 shadow-sm'
+                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
-                <span className="text-lg">🚫</span>
+                <EyeOff size={20} />
                 <span>{t('sales.deactivated')}</span>
               </button>
             </div>
@@ -676,7 +683,7 @@ export const EditListingModal = ({
         </div>
 
         {/* Кнопки - фіксовані знизу поверх головного меню */}
-        <div className="bg-white border-t border-gray-200 px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg" style={{ 
+        <div className="bg-[#000000] border-t border-white/20 px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg" style={{ 
           paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))', 
           position: 'fixed',
           bottom: 0,
@@ -694,14 +701,14 @@ export const EditListingModal = ({
           </button>
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 px-4 py-3 bg-transparent border border-white/20 text-white rounded-xl text-sm font-medium hover:bg-white/10 transition-colors"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-[#D3F1A7] text-black rounded-xl text-sm font-medium hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? t('editListing.saving') : t('common.save')}
           </button>
@@ -718,7 +725,7 @@ export const EditListingModal = ({
         {/* Меню валюти */}
         {isCurrencyOpen && (
           <div 
-            className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000]"
+            className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000]"
             style={{
               top: `${currencyMenuPosition.top + 8}px`,
               left: `${currencyMenuPosition.left}px`,
@@ -733,12 +740,12 @@ export const EditListingModal = ({
                 setIsCurrencyOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-gray-100 ${
-                currency === 'UAH' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-white/10 text-white ${
+                currency === 'UAH' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'hover:bg-white/10'
               }`}
             >
               <span>₴ UAH</span>
-              {currency === 'UAH' && <span className="ml-auto text-blue-500">✓</span>}
+              {currency === 'UAH' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
             </button>
                 <button
               type="button"
@@ -747,12 +754,12 @@ export const EditListingModal = ({
                 setIsCurrencyOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-gray-100 ${
-                currency === 'EUR' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-white/10 text-white ${
+                currency === 'EUR' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'hover:bg-white/10'
               }`}
             >
               <span>€ EUR</span>
-              {currency === 'EUR' && <span className="ml-auto text-blue-500">✓</span>}
+              {currency === 'EUR' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
                 </button>
                 <button
               type="button"
@@ -761,12 +768,12 @@ export const EditListingModal = ({
                 setIsCurrencyOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                currency === 'USD' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 text-white ${
+                currency === 'USD' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'hover:bg-white/10'
               }`}
             >
               <span>$ USD</span>
-              {currency === 'USD' && <span className="ml-auto text-blue-500">✓</span>}
+              {currency === 'USD' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
                 </button>
           </div>
         )}

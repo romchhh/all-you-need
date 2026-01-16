@@ -121,22 +121,22 @@ export const TopUpBalanceModal = ({
       <div className="fixed inset-0 bg-black/50 z-[9998] backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
         <div 
-          className="bg-white rounded-3xl shadow-2xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto"
+          className="bg-[#000000] rounded-3xl border-2 border-white shadow-2xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Заголовок */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between p-6 border-b border-white/20">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                <Wallet size={20} className="text-green-600" />
+              <div className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center">
+                <Wallet size={20} className="text-[#D3F1A7]" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-white">
                 {t('profile.topUpBalance') || 'Поповнити баланс'}
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-600"
+              className="w-8 h-8 rounded-full bg-transparent border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors text-white"
               disabled={loading}
             >
               <X size={18} />
@@ -146,18 +146,18 @@ export const TopUpBalanceModal = ({
           {/* Контент */}
           <div className="p-6 space-y-6">
             {/* Поточний баланс */}
-            <div className="bg-gray-50 rounded-2xl p-4">
-              <p className="text-sm text-gray-600 mb-1">
+            <div className="bg-[#1C1C1C] rounded-2xl p-4 border border-white/20">
+              <p className="text-sm text-white/70 mb-1">
                 {t('profile.balance') || 'Баланс'}
               </p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-[#D3F1A7]">
                 {currentBalance.toFixed(2)} €
               </p>
             </div>
 
             {/* Вибір суми */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
+              <label className="block text-sm font-semibold text-white mb-3">
                 {t('payments.amount') || 'Сума поповнення (EUR)'}
               </label>
               
@@ -173,8 +173,8 @@ export const TopUpBalanceModal = ({
                     }}
                     className={`px-4 py-2.5 rounded-xl border-2 font-bold text-base transition-all ${
                       amount === quickAmount.toString()
-                        ? 'border-green-500 bg-green-500 text-white shadow-lg'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-green-300 hover:bg-green-50'
+                        ? 'border-[#D3F1A7] bg-[#D3F1A7] text-black shadow-lg'
+                        : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/10'
                     }`}
                     disabled={loading}
                   >
@@ -187,10 +187,10 @@ export const TopUpBalanceModal = ({
           </div>
 
           {/* Кнопки */}
-          <div className="p-6 border-t border-gray-200 flex gap-3">
+          <div className="p-6 border-t border-white/20 flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-xl transition-colors"
+              className="flex-1 px-4 py-3 bg-transparent border border-white/20 hover:bg-white/10 text-white font-semibold rounded-xl transition-colors"
               disabled={loading}
             >
               {t('common.cancel') || 'Скасувати'}
@@ -198,7 +198,7 @@ export const TopUpBalanceModal = ({
             <button
               onClick={handleSubmit}
               disabled={loading || !amount || parseFloat(amount) <= 0}
-              className="flex-1 px-4 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 disabled:bg-white/20 disabled:cursor-not-allowed text-black font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

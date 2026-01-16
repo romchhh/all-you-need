@@ -101,39 +101,50 @@ export const EditProfileModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl">
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Редагувати профіль</h2>
+          <h2 className="text-2xl font-bold text-white">{t('profile.editProfile')}</h2>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors"
           >
-            <X size={20} className="text-gray-900" />
+            <X size={20} className="text-white" />
           </button>
         </div>
 
         {/* Аватар */}
         <div className="flex flex-col items-center mb-6">
-          <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 mb-4 relative">
+          <label className="block text-sm font-medium text-white mb-2">{t('profile.avatar')}</label>
+          <div className="w-24 h-24 rounded-full overflow-hidden bg-white border-2 border-white mb-4 relative">
             {avatarPreview ? (
               <img 
                 src={avatarPreview} 
-                alt="Avatar"
+                alt={t('profile.avatar')}
                 className="w-full h-full object-cover"
                 loading="eager"
                 decoding="async"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    const placeholder = parent.querySelector('.avatar-placeholder');
+                    if (placeholder) {
+                      placeholder.classList.remove('hidden');
+                    }
+                  }
+                }}
               />
-            ) : (
-              <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(`${firstName || ''} ${lastName || ''}`.trim() || 'User')} text-white text-3xl font-bold`}>
-                {(firstName || lastName) ? (firstName.charAt(0) + (lastName?.charAt(0) || '')).toUpperCase() : 'U'}
-              </div>
-            )}
+            ) : null}
+            <div className={`${avatarPreview ? 'hidden' : ''} avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(`${firstName || ''} ${lastName || ''}`.trim() || 'User')} text-white text-3xl font-bold`}>
+              {(firstName || lastName) ? (firstName.charAt(0) + (lastName?.charAt(0) || '')).toUpperCase() : 'U'}
+            </div>
           </div>
-          <label className="px-4 py-2 bg-blue-500 text-white rounded-xl cursor-pointer hover:bg-blue-600 transition-colors flex items-center gap-2">
+          <label className="px-4 py-2 bg-transparent border-2 border-white text-white rounded-xl cursor-pointer hover:bg-white/10 transition-colors flex items-center gap-2">
             <Upload size={18} />
-            <span>Змінити фото</span>
+            <span>{t('profile.changePhoto')}</span>
             <input
               type="file"
               accept="image/*"
@@ -145,29 +156,29 @@ export const EditProfileModal = ({
 
         {/* Ім'я */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Ім'я
+          <label className="block text-sm font-medium text-white mb-2">
+            {t('profile.firstName')}
           </label>
           <input
             type="text"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
-            placeholder="Введіть ім'я"
-            className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder={t('profile.firstNamePlaceholder')}
+            className="w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]"
           />
         </div>
 
         {/* Прізвище */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Прізвище
+          <label className="block text-sm font-medium text-white mb-2">
+            {t('profile.lastName')}
           </label>
           <input
             type="text"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
-            placeholder="Введіть прізвище"
-            className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder={t('profile.lastNamePlaceholder')}
+            className="w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]"
           />
         </div>
 
@@ -175,16 +186,16 @@ export const EditProfileModal = ({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 px-4 py-3 bg-transparent border border-white/20 text-white rounded-xl font-medium hover:bg-white/10 transition-colors"
           >
-            Скасувати
+            {t('common.cancel') || 'Скасувати'}
           </button>
           <button
             onClick={handleSave}
             disabled={loading || !firstName.trim()}
-            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-[#D3F1A7] text-black rounded-xl font-medium hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Збереження...' : 'Зберегти'}
+            {loading ? (t('common.saving') || 'Збереження...') : (t('common.save') || 'Зберегти')}
           </button>
         </div>
       </div>

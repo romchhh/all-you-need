@@ -19,6 +19,8 @@ import { Toast } from './Toast';
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
+import Image from 'next/image';
+import { useRouter, useParams } from 'next/navigation';
 
 // Динамічний імпорт PromotionUpgradeModal
 const PromotionUpgradeModal = dynamic(() => import('./PromotionUpgradeModal'), {
@@ -55,6 +57,7 @@ interface ListingDetailProps {
   onViewSellerProfile?: (telegramId: string, name: string, avatar: string, username?: string, phone?: string) => void;
   favorites: Set<number>;
   tg: TelegramWebApp | null;
+  onBack?: () => void;
 }
 
 export const ListingDetail = ({ 
@@ -62,10 +65,11 @@ export const ListingDetail = ({
   isFavorite, 
   onClose, 
   onToggleFavorite,
-          onSelectListing,
-          onViewSellerProfile,
-          favorites,
-          tg 
+  onSelectListing,
+  onViewSellerProfile,
+  favorites,
+  tg,
+  onBack
 }: ListingDetailProps) => {
   const sellerUsername = listing.seller.username;
   const sellerPhone = listing.seller.phone;
@@ -87,6 +91,9 @@ export const ListingDetail = ({
   const { profile } = useUser();
   const { t, language } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
+  const router = useRouter();
+  const params = useParams();
+  const lang = (params?.lang as string) || 'uk';
   
   // Форматуємо час на клієнті з перекладами
   const formattedTime = useMemo(() => {
@@ -348,21 +355,23 @@ export const ListingDetail = ({
   // Додаємо pull-to-refresh
   const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: true,
+    enabled: false, // Вимкнено
     threshold: 120,
     tg
   });
 
   return (
     <div 
-      className="min-h-screen bg-white pb-20" 
+      className="min-h-screen pb-20 font-montserrat" 
       style={{ 
         position: 'relative', 
         overflowX: 'hidden',
         minHeight: '100vh',
         opacity: 1,
         display: 'block',
-        visibility: 'visible'
+        visibility: 'visible',
+        background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000',
+        zIndex: 1
       }}
     >
       
@@ -377,36 +386,72 @@ export const ListingDetail = ({
         />
       )}
       
-      {/* Хедер - закріплений */}
+      {/* Кнопки управління - фіксовані */}
       <div 
-        className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm"
+        className="fixed top-4 left-0 right-0 px-4 flex items-center justify-between pointer-events-none"
         style={{
           transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
           transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
           opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)'
+          zIndex: 100
         }}
       >
-      <TopBar
-        variant="detail"
-        onBack={onClose}
-        onShareClick={() => setShowShareModal(true)}
-        onFavoriteClick={() => onToggleFavorite(listing.id)}
-        isFavorite={isFavorite}
-        title={listing.title}
-        tg={tg}
-      />
+        <button
+          onClick={() => {
+            onBack?.();
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
+        >
+          <ArrowLeft size={20} className="text-gray-900" />
+        </button>
+        
+        <button
+          onClick={() => {
+            onToggleFavorite(listing.id);
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
+        >
+          <Heart 
+            size={20} 
+            className={isFavorite ? 'text-red-500' : 'text-gray-900'}
+            fill={isFavorite ? 'currentColor' : 'none'}
+          />
+        </button>
       </div>
-      
-      {/* Spacer для хедера */}
-      <div className="h-[64px]"></div>
+
+      {/* Лого Trade Ground - частина сторінки */}
+      <div 
+        className="w-full px-4 pt-4 pb-3 flex items-center justify-center cursor-pointer"
+        style={{
+          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
+          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
+          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1
+        }}
+        onClick={() => {
+          if (typeof window !== 'undefined') {
+            window.location.href = `/${lang}/bazaar`;
+          }
+        }}
+      >
+        <Image 
+          src="/images/Group 1000007086.svg" 
+          alt="Trade Ground" 
+          width={204} 
+          height={64.5}
+          className="w-auto object-contain"
+          style={{ height: '52.5px', width: 'auto' }}
+          priority
+        />
+      </div>
       
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 
-          className="fixed top-16 left-0 right-0 flex items-center justify-center z-40 pointer-events-none"
+          className="fixed left-0 right-0 flex items-center justify-center z-40 pointer-events-none"
           style={{
+            top: '70px',
             height: `${Math.min(pullDistance * 0.8, 100)}px`,
             opacity: Math.min(pullProgress * 1.2, 1),
             transform: `translateY(${Math.min(pullDistance * 0.4 - 50, 0)}px)`,
@@ -414,31 +459,33 @@ export const ListingDetail = ({
           }}
         >
           <div 
-            className="flex flex-col items-center gap-2 px-5 py-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100"
+            className="flex flex-col items-center gap-2 px-5 py-3 backdrop-blur-xl rounded-2xl shadow-2xl"
             style={{
+              background: 'rgba(211, 241, 167, 0.95)',
               transform: `scale(${Math.min(0.85 + pullProgress * 0.15, 1)}) translateY(${isRefreshing ? '0' : `${-pullDistance * 0.1}px`})`,
               transition: isRefreshing ? 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'transform 0.2s ease-out',
-              boxShadow: `0 ${10 + pullProgress * 10}px ${20 + pullProgress * 10}px rgba(0, 0, 0, ${0.1 + pullProgress * 0.05})`
+              boxShadow: `0 ${10 + pullProgress * 10}px ${20 + pullProgress * 10}px rgba(0, 0, 0, ${0.1 + pullProgress * 0.05})`,
+              border: '1px solid rgba(63, 83, 49, 0.1)'
             }}
           >
             {isRefreshing ? (
               <>
                 <div className="relative w-8 h-8">
-                  <div className="absolute inset-0 border-3 border-blue-200 rounded-full"></div>
-                  <div className="absolute inset-0 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 border-3 rounded-full" style={{ borderColor: 'rgba(63, 83, 49, 0.2)' }}></div>
+                  <div className="absolute inset-0 border-3 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#3F5331' }}></div>
                 </div>
-                <span className="text-sm font-semibold text-blue-600">{t('common.loading')}</span>
+                <span className="text-sm font-semibold" style={{ color: '#3F5331' }}>{t('common.loading')}</span>
               </>
             ) : pullProgress >= 1 ? (
               <>
                 <div className="relative w-8 h-8">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{ background: '#3F5331' }}>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#D3F1A7">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                 </div>
-                <span className="text-sm font-semibold text-blue-600">Відпустіть для оновлення</span>
+                <span className="text-sm font-semibold" style={{ color: '#3F5331' }}>Відпустіть для оновлення</span>
               </>
             ) : (
               <>
@@ -454,30 +501,23 @@ export const ListingDetail = ({
                       cx="12" 
                       cy="12" 
                       r="9" 
-                      stroke="currentColor" 
+                      stroke="rgba(63, 83, 49, 0.2)" 
                       strokeWidth="2.5"
-                      className="text-gray-200"
                     />
                     <circle 
                       cx="12" 
                       cy="12" 
                       r="9" 
-                      stroke="url(#gradient-listing)" 
+                      stroke="#3F5331" 
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeDasharray={`${56.5 * pullProgress} ${56.5 * (1 - pullProgress)}`}
                       className="transition-all duration-200"
                       style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
                     />
-                    <defs>
-                      <linearGradient id="gradient-listing" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#3B82F6" />
-                        <stop offset="100%" stopColor="#60A5FA" />
-                      </linearGradient>
-                    </defs>
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#3F5331" style={{
                       transform: `translateY(${-2 + pullProgress * 2}px)`,
                       opacity: 0.6 + pullProgress * 0.4
                     }}>
@@ -486,8 +526,9 @@ export const ListingDetail = ({
                   </div>
                 </div>
                 <span 
-                  className="text-xs font-medium text-gray-500"
+                  className="text-xs font-medium"
                   style={{
+                    color: '#3F5331',
                     opacity: 0.6 + pullProgress * 0.4
                   }}
                 >
@@ -499,81 +540,89 @@ export const ListingDetail = ({
         </div>
       )}
 
-      {/* Галерея фото */}
-      <div
-        style={{
-          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
-          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
-          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1
-        }}
-      >
-        <ImageGallery 
-          images={images} 
-          title={listing.title}
-          onImageClick={(index) => setSelectedImageIndex(index)}
-        />
-      </div>
-
-      {/* Контент */}
+      {/* Блок з рамкою зверху - містить фото та контент */}
       <div 
-        className="p-4"
+        className="mx-4 mt-4 rounded-t-3xl border-t-2 border-white bg-[#000000]"
         style={{
           transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
           transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
           opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1
         }}
       >
+        {/* Галерея фото */}
+        <div className="px-4 pt-4">
+          <ImageGallery 
+            images={images} 
+            title={listing.title}
+            onImageClick={(index) => setSelectedImageIndex(index)}
+          />
+        </div>
+
+        {/* Контент */}
+        <div className="p-4">
             {/* Ціна */}
             <div className="mb-4">
               <div className="flex items-center gap-2">
-                <div className={`text-3xl font-bold mb-1 ${listing.isFree ? 'text-green-600' : 'text-gray-900'}`}>
+                <div className={`text-3xl font-bold mb-1`} style={{ color: listing.isFree ? '#D3F1A7' : '#D3F1A7' }}>
                   {listing.isFree ? t('common.free') : listing.price}
                 </div>
                 {!listing.isFree && listing.currency && (
-                  <span className="text-3xl font-bold text-gray-900">{getCurrencySymbol(listing.currency)}</span>
+                  <span className="text-3xl font-bold" style={{ color: '#D3F1A7' }}>{getCurrencySymbol(listing.currency)}</span>
                 )}
               </div>
             </div>
 
         {/* Заголовок */}
-        <h1 className="text-xl font-semibold text-gray-900 mb-4">{listing.title}</h1>
+        <h1 className="text-xl font-semibold mb-4" style={{ color: '#FFFFFF' }}>{listing.title}</h1>
 
         {/* Статистика */}
-        <div className="flex gap-4 mb-6 text-sm text-gray-500">
+        <div className="flex gap-4 mb-6 text-sm text-white/70">
           <div className="flex items-center gap-1">
-            <MapPin size={16} className="text-gray-400" />
+            <MapPin size={16} className="text-white/70" />
             <span>{listing.location}</span>
           </div>
           <div className="flex items-center gap-1">
-            <Clock size={16} className="text-gray-400" />
+            <Clock size={16} className="text-white/70" />
             <span>{t('listing.created')}: {formattedTime}</span>
           </div>
         </div>
 
+        {/* Стан товару */}
+        {listing.condition && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-white/70">{t('listing.condition.label')}:</span>
+              <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-xs font-semibold rounded">
+                {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Опис */}
-        <div className="mb-6">
-          <h2 className="font-semibold text-gray-900 mb-2">{t('listing.description')}</h2>
-          <p className="text-gray-700 whitespace-pre-line leading-relaxed">{listing.description}</p>
+        <div className="mb-6 rounded-2xl p-4" style={{ background: '#1C1C1C' }}>
+          <h2 className="font-semibold mb-2 text-white">{t('listing.description')}</h2>
+          <p className="whitespace-pre-line leading-relaxed text-white">{listing.description}</p>
         </div>
 
         {/* Перегляди */}
-        <div className="flex items-center gap-1 mb-3 text-sm text-gray-500">
-          <Eye size={16} className="text-gray-400" />
+        <div className="flex items-center gap-1 mb-3 text-sm text-white/70">
+          <Eye size={16} className="text-white/70" />
           <span>{views} {t('listing.views')}</span>
         </div>
 
         {/* Дата публікації */}
         {listing.createdAt && (
-          <div className="mb-6 text-sm text-gray-500">
+          <div className="mb-6 text-sm text-white/70">
             <span>{t('listing.publishedDate')}: {formatPublicationDate(listing.createdAt, language)}</span>
           </div>
         )}
 
         {/* Продавець */}
-        <div className="border border-gray-200 rounded-2xl p-4 mb-6">
-          <h2 className="font-semibold text-gray-900 mb-4">{t('listing.seller')}</h2>
+        <div className="rounded-2xl p-4 mb-6 border border-white">
+          <h2 className="font-semibold mb-4 text-white">{t('listing.seller')}</h2>
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 relative">
+            <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 relative bg-white">
               {listing.seller.avatar && (listing.seller.avatar.startsWith('/') || listing.seller.avatar.startsWith('http')) ? (
                 <>
                   <div className="absolute inset-0 animate-pulse bg-gray-200" />
@@ -600,20 +649,20 @@ export const ListingDetail = ({
                       }
                     }}
                   />
-                  <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(listing.seller.name)} text-white text-xl font-bold relative z-10`}>
+                  <div className="hidden avatar-placeholder w-full h-full flex items-center justify-center bg-white text-xl font-bold relative z-10 text-gray-700">
                     {listing.seller.name.charAt(0).toUpperCase()}
                   </div>
                 </>
               ) : (
-                <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(listing.seller.name)} text-white text-xl font-bold`}>
+                <div className="w-full h-full flex items-center justify-center bg-white text-xl font-bold text-gray-700">
                   {listing.seller.name.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-gray-900 text-lg mb-1">{listing.seller.name}</p>
+              <p className="font-semibold text-lg mb-1 text-white">{listing.seller.name}</p>
               {listing.seller.username && (
-                <p className="text-sm text-gray-500 mb-1">@{listing.seller.username}</p>
+                <p className="text-sm mb-1 text-white/70">@{listing.seller.username}</p>
               )}
             </div>
           </div>
@@ -629,7 +678,7 @@ export const ListingDetail = ({
                 );
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="w-full px-4 py-3 bg-gray-100 text-gray-900 rounded-xl font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 border border-white text-white bg-transparent hover:bg-white/10"
             >
               <User size={18} />
               {t('listing.viewSellerProfile')}
@@ -637,14 +686,16 @@ export const ListingDetail = ({
           )}
         </div>
 
+        </div>
+
         {/* Інші оголошення продавця */}
         {sellerListings.length > 0 && (
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('listing.otherSellerListings')}</h2>
-            <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+          <div className="mb-6" style={{ position: 'relative', zIndex: 10 }}>
+            <h2 className="text-lg font-semibold mb-3 px-4" style={{ color: '#FFFFFF' }}>{t('listing.otherSellerListings')}</h2>
+            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', position: 'relative', zIndex: 10, width: '100vw' }}>
+              <div className="flex gap-3 pl-4" style={{ minWidth: 'max-content' }}>
               {sellerListings.map(sellerListing => (
-                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]">
+                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px] h-full" style={{ position: 'relative', zIndex: 10 }}>
                 <ListingCard 
                   listing={sellerListing}
                   isFavorite={favorites.has(sellerListing.id)}
@@ -658,6 +709,8 @@ export const ListingDetail = ({
                 />
             </div>
                 ))}
+                {/* Невеликий відступ справа для останнього елемента */}
+                <div className="flex-shrink-0 w-2" style={{ minWidth: '0.5rem' }}></div>
               </div>
             </div>
           </div>
@@ -665,12 +718,12 @@ export const ListingDetail = ({
 
         {/* Оголошення з категорії */}
         {categoryListings.length > 0 && (
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('listing.similarListings')}</h2>
-            <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+          <div className="mb-6" style={{ position: 'relative', zIndex: 10 }}>
+            <h2 className="text-lg font-semibold mb-3 px-4" style={{ color: '#FFFFFF' }}>{t('listing.similarListings')}</h2>
+            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', position: 'relative', zIndex: 10, width: '100vw' }}>
+              <div className="flex gap-3 pl-4" style={{ minWidth: 'max-content' }}>
               {categoryListings.map(categoryListing => (
-                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]">
+                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px] h-full" style={{ position: 'relative', zIndex: 10 }}>
                 <ListingCard 
                   listing={categoryListing}
                   isFavorite={favorites.has(categoryListing.id)}
@@ -684,6 +737,8 @@ export const ListingDetail = ({
                 />
             </div>
                 ))}
+                {/* Невеликий відступ справа для останнього елемента */}
+                <div className="flex-shrink-0 w-2" style={{ minWidth: '0.5rem' }}></div>
               </div>
             </div>
           </div>
@@ -692,79 +747,82 @@ export const ListingDetail = ({
 
 
       {/* Нижня панель з кнопкою */}
-      <div className="fixed bottom-20 left-0 right-0 p-4 z-[50] max-w-2xl mx-auto" style={{ pointerEvents: 'auto' }}>
-        <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-4">
-          <button 
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              
-              if (isOwnListing) {
-                // Якщо це власне оголошення - відкриваємо модальне вікно реклами
-                setShowPromotionModal(true);
-                tg?.HapticFeedback.impactOccurred('light');
+      <div className="fixed bottom-28 left-0 right-0 p-4 z-[50] max-w-2xl mx-auto" style={{ pointerEvents: 'auto' }}>
+        <button 
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (isOwnListing) {
+              // Якщо це власне оголошення - відкриваємо модальне вікно реклами
+              setShowPromotionModal(true);
+              tg?.HapticFeedback.impactOccurred('light');
+              return;
+            }
+            
+            const telegramId = listing.seller.telegramId;
+            const username = listing.seller.username;
+            const phone = listing.seller.phone;
+            
+            // Якщо немає username - показуємо телефон
+            if (!username || username.trim() === '') {
+              if (phone && phone.trim() !== '') {
+                // Відкриваємо телефон
+                window.location.href = `tel:${phone.trim()}`;
+                tg?.HapticFeedback?.impactOccurred('medium');
+                return;
+              } else {
+                // Немає ні username, ні телефону
+                if (tg) {
+                  tg.showAlert(t('listingDetail.telegramIdNotFound'));
+                } else {
+                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
+                }
                 return;
               }
-              
-              const telegramId = listing.seller.telegramId;
-              const username = listing.seller.username;
-              const phone = listing.seller.phone;
-              
-              // Якщо немає username - показуємо телефон
-              if (!username || username.trim() === '') {
-                if (phone && phone.trim() !== '') {
-                  // Відкриваємо телефон
-                  window.location.href = `tel:${phone.trim()}`;
-                  tg?.HapticFeedback?.impactOccurred('medium');
-                  return;
-                } else {
-                  // Немає ні username, ні телефону
-                  if (tg) {
-                    tg.showAlert(t('listingDetail.telegramIdNotFound'));
-                  } else {
-                    showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                  }
-                  return;
-                }
-              }
-              
-              // Якщо є username - відкриваємо Telegram
-              const link = `https://t.me/${username.replace('@', '')}`;
-              
-              // Якщо Telegram WebApp доступний, використовуємо його
-              if (tg && tg.openTelegramLink) {
-                tg.openTelegramLink(link);
-                tg.HapticFeedback?.impactOccurred('medium');
-              } else {
-                // Якщо ні, відкриваємо посилання через звичайний браузер
-                window.location.href = link;
-              }
-            }}
-            className={`w-full ${isOwnListing ? 'bg-purple-500 hover:bg-purple-600' : 'bg-blue-500 hover:bg-blue-600'} text-white py-4 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer`}
-          >
-            {isOwnListing ? (
-              <>
-                <TrendingUp size={20} />
-                {t('sales.promote')}
-              </>
-            ) : (
-              <>
-                {listing.seller.username && listing.seller.username.trim() !== '' ? (
-                  <>
-                    <MessageCircle size={20} />
-                    {t('common.write')}
-                  </>
-                ) : (
-                  <>
-                    <Phone size={20} />
-                    {t('common.call')}
-                  </>
-                )}
-              </>
-            )}
-          </button>
-        </div>
+            }
+            
+            // Якщо є username - відкриваємо Telegram
+            const link = `https://t.me/${username.replace('@', '')}`;
+            
+            // Якщо Telegram WebApp доступний, використовуємо його
+            if (tg && tg.openTelegramLink) {
+              tg.openTelegramLink(link);
+              tg.HapticFeedback?.impactOccurred('medium');
+            } else {
+              // Якщо ні, відкриваємо посилання через звичайний браузер
+              window.location.href = link;
+            }
+          }}
+          className="w-full py-4 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl"
+          style={{
+            background: '#D3F1A7',
+            color: '#000000',
+            border: 'none'
+          }}
+        >
+          {isOwnListing ? (
+            <>
+              <TrendingUp size={24} />
+              {t('sales.promote')}
+            </>
+          ) : (
+            <>
+              {listing.seller.username && listing.seller.username.trim() !== '' ? (
+                <>
+                  <MessageCircle size={24} />
+                  {t('common.write')}
+                </>
+              ) : (
+                <>
+                  <Phone size={24} />
+                  {t('common.call')}
+                </>
+              )}
+            </>
+          )}
+        </button>
       </div>
 
       {/* Модальне вікно поділу */}

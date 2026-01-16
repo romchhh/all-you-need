@@ -657,8 +657,8 @@ const BazaarTabComponent = ({
 
       {/* Розділи - показуємо тільки якщо не вибрана категорія та немає пошуку */}
       {categories.length > 0 && !selectedCategory && !searchQuery.trim() && (
-        <div className="px-4 pt-2 pb-3">
-          <div className="flex items-center justify-between mb-3">
+        <div className="pt-2 pb-3">
+          <div className="flex items-center justify-between mb-3 px-4">
             <h2 className="text-lg font-semibold text-white">{t('navigation.categories')}</h2>
             {/* Перемикач виду */}
             {filteredAndSortedListings.length > 0 && (
@@ -693,9 +693,9 @@ const BazaarTabComponent = ({
             )}
           </div>
           <div 
-            className="overflow-x-auto -mx-4 px-4 w-full scrollbar-hide" 
+            className="overflow-x-auto scrollbar-hide" 
             style={{ 
-              maxWidth: '100vw',
+              width: '100vw',
               WebkitOverflowScrolling: 'touch',
               scrollbarWidth: 'none',
               msOverflowStyle: 'none'
@@ -744,6 +744,8 @@ const BazaarTabComponent = ({
                   }}
                 />
               ))}
+              {/* Невеликий відступ справа для останнього елемента */}
+              <div className="flex-shrink-0 w-2" style={{ minWidth: '0.5rem' }}></div>
             </div>
           </div>
         </div>

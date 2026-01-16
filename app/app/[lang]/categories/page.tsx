@@ -459,7 +459,7 @@ const CategoriesPage = () => {
   // Використовуємо pull-to-refresh
   const { isPulling, pullDistance, pullProgress, isRefreshing } = usePullToRefresh({
     onRefresh: handleRefresh,
-    enabled: !selectedListing && !selectedSeller,
+    enabled: false, // Вимкнено
     threshold: 120,
     tg
   });
