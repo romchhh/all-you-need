@@ -92,7 +92,8 @@
     "viewSellerProfile": "Посмотреть профиль",
     "otherSellerListings": "Другие товары продавца",
     "similarListings": "Похожие товары",
-    "sellerProfile": "Профиль продавца"
+    "sellerProfile": "Профиль продавца",
+    "sellerListings": "Объявления продавца"
   },
   "profile": {
     "myProfile": "Мой профиль",

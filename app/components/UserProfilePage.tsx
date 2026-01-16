@@ -1,10 +1,9 @@
-import { ArrowLeft, Package, MessageCircle, Share2, X, Copy, Phone } from 'lucide-react';
+import { ArrowLeft, Package, MessageCircle, Share2, X, Copy, Phone, Megaphone } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ListingCard } from './ListingCard';
 import { ImageViewModal } from './ImageViewModal';
 import { ShareModal } from './ShareModal';
-import { TopBar } from './TopBar';
 import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getProfileShareLink } from '@/utils/botLinks';
@@ -168,22 +167,29 @@ export const UserProfilePage = ({
     tg
   });
 
-  return (
-    <div className="min-h-screen bg-white pb-20">
-      {/* Хедер */}
-      <TopBar
-        variant="profile"
-        onBack={onClose}
-        onShareClick={() => setShowShareModal(true)}
-        title={t('listing.sellerProfile')}
-        tg={tg}
-      />
+  const displayUsername = (userData?.username || sellerUsername) ? `@${userData?.username || sellerUsername}` : '';
 
-      {/* Профіль */}
-      <div className="p-4">
-        <div className="flex flex-col items-center mb-6">
+  return (
+    <div className="pb-24 min-h-screen">
+      {/* Профіль хедер */}
+      <div className="px-4 pt-4 pb-4">
+        {/* Кнопка назад */}
+        <div className="mb-4">
+          <button
+            onClick={() => {
+              onClose();
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+          >
+            <ArrowLeft size={20} />
+          </button>
+        </div>
+
+        <div className="flex items-start gap-4">
+          {/* Фото профілю */}
           <div 
-            className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 mb-4 relative cursor-pointer select-none"
+            className="w-20 h-20 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 border-white"
             {...avatarLongPress}
           >
             {sellerAvatar && (sellerAvatar.startsWith('/') || sellerAvatar.startsWith('http')) ? (
@@ -212,167 +218,204 @@ export const UserProfilePage = ({
                     }
                   }}
                 />
-                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-2xl font-bold relative z-10`}>
+                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gray-800 text-white text-2xl font-bold relative z-10`}>
                   {sellerName.charAt(0).toUpperCase()}
                 </div>
               </>
             ) : (
-              <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${getAvatarColor(sellerName)} text-white text-2xl font-bold`}>
+              <div className={`w-full h-full flex items-center justify-center bg-gray-800 text-white text-2xl font-bold`}>
                 {sellerName.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">{sellerName}</h1>
-          {(userData?.username || sellerUsername) && (
-            <p className="text-gray-500 text-sm mb-4">@{userData?.username || sellerUsername}</p>
-          )}
           
-          {/* Статистика */}
-          {stats && (
-            <div className="w-full grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <div className="text-2xl font-bold text-gray-900 mb-1">{stats.totalListings}</div>
-                <div className="text-xs text-gray-500">{t('profile.listings')}</div>
+          {/* Інформація */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-2xl font-bold text-white mb-1 truncate">{sellerName}</h2>
+                {displayUsername && (
+                  <p className="text-lg text-white/70 truncate">{displayUsername}</p>
+                )}
               </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <div className="text-2xl font-bold text-gray-900 mb-1">{stats.soldListings}</div>
-                <div className="text-xs text-gray-500">{t('profile.sold')}</div>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <div className="text-lg font-bold text-gray-900 mb-1">
-                  {stats.createdAt ? (() => {
-                    const createdDate = new Date(stats.createdAt);
-                    const now = new Date();
-                    const diffTime = Math.abs(now.getTime() - createdDate.getTime());
-                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                    const diffMonths = Math.floor(diffDays / 30);
-                    const diffYears = Math.floor(diffDays / 365);
-                    
-                    if (diffYears > 0) {
-                      return `${diffYears} ${diffYears === 1 ? t('profile.year') : diffYears < 5 ? t('profile.years') : t('profile.yearsMany')}`;
-                    } else if (diffMonths > 0) {
-                      return `${diffMonths} ${diffMonths === 1 ? t('profile.month') : diffMonths < 5 ? t('profile.months') : t('profile.monthsMany')}`;
-                    } else {
-                      return `${diffDays} ${diffDays === 1 ? t('profile.day') : diffDays < 5 ? t('profile.days') : t('profile.daysMany')}`;
-                    }
-                  })() : '-'}
-                </div>
-                <div className="text-xs text-gray-500">{t('profile.onService')}</div>
+              
+              {/* Кнопка поділу */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => {
+                    setShowShareModal(true);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+                >
+                  <Share2 size={18} />
+                </button>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Кнопка дії */}
-        <div className="bg-white rounded-3xl shadow-lg border border-gray-200 p-4 mb-6">
-          <button 
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const username = userData?.username || sellerUsername;
-              const phone = userData?.phone || sellerPhone;
-              
-              // Якщо немає username - показуємо телефон
-              if (!username || username.trim() === '') {
-                if (phone && phone.trim() !== '') {
-                  // Відкриваємо телефон
-                  window.location.href = `tel:${phone.trim()}`;
-                  tg?.HapticFeedback?.impactOccurred('medium');
-                  return;
-                } else {
-                  // Немає ні username, ні телефону
-                  if (tg) {
-                    tg.showAlert(t('listingDetail.telegramIdNotFound'));
-                  } else {
-                    showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                  }
-                  return;
-                }
-              }
-              
-              // Якщо є username - відкриваємо Telegram
-              const link = `https://t.me/${username.replace('@', '')}`;
-              
-              // Якщо Telegram WebApp доступний, використовуємо його
-              if (tg && tg.openTelegramLink) {
-                tg.openTelegramLink(link);
-                tg.HapticFeedback?.impactOccurred('medium');
-              } else {
-                // Якщо ні, відкриваємо посилання через звичайний браузер
-                window.location.href = link;
-              }
-            }}
-            className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {((userData?.username || sellerUsername) ?? '').trim() !== '' ? (
-              <>
-                <MessageCircle size={20} />
-                {t('common.write')}
-              </>
-            ) : (
-              <>
-                <Phone size={20} />
-                {t('common.call')}
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Оголошення */}
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Оголошення продавця</h2>
-          {loading ? (
-            <div className="text-center py-8 text-gray-500">{t('common.loading')}</div>
-          ) : listings.length > 0 ? (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                {listings.map(listing => (
-                  <ListingCard 
-                    key={listing.id} 
-                    listing={listing}
-                    isFavorite={favorites.has(listing.id)}
-                    onSelect={(selectedListing) => {
-                      // Оновлюємо дані перед закриттям профілю
-                      fetchData();
-                      onSelectListing(selectedListing);
-                      // Закриваємо профіль продавця при виборі оголошення
-                      onClose();
-                    }}
-                    onToggleFavorite={(id) => {
-                      const isFavorite = favorites.has(id);
-                      
-                      // Оновлюємо лічильник лайків на картці товару
-                      setListings(prev => prev.map(listing => 
-                        listing.id === id 
-                          ? { 
-                              ...listing, 
-                              favoritesCount: Math.max(0, (listing.favoritesCount || 0) + (isFavorite ? -1 : 1))
-                            }
-                          : listing
-                      ));
-                      
-                      onToggleFavorite(id);
-                    }}
-                    tg={tg}
-                  />
-                ))}
-              </div>
-              {hasMore && (
-                <div className="py-6">
-                  <button
-                    onClick={loadMoreListings}
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-4 rounded-2xl transition-colors"
-                  >
-                    Показати більше
-                  </button>
-                </div>
+            
+            {/* Статистика */}
+            <div className="space-y-1.5 mt-3">
+              {stats && (
+                <>
+                  <div className="flex items-center gap-2 text-base text-white/70">
+                    <Package size={18} className="text-white/70 flex-shrink-0" />
+                    <span>{stats.totalListings} {t('profile.listings')}</span>
+                  </div>
+                  {stats.soldListings > 0 && (
+                    <div className="flex items-center gap-2 text-base text-white/70">
+                      <Megaphone size={18} className="text-white/70 flex-shrink-0" />
+                      <span>{stats.soldListings} {t('profile.sold')}</span>
+                    </div>
+                  )}
+                  {stats.activeListings > 0 && (
+                    <div className="flex items-center gap-2 text-base text-white/70">
+                      <Megaphone size={18} className="text-white/70 flex-shrink-0" />
+                      <span>{stats.activeListings} {t('sales.active')}</span>
+                    </div>
+                  )}
+                  {stats.createdAt && (
+                    <div className="flex items-center gap-2 text-base text-white/70">
+                      <span>
+                        {(() => {
+                          const createdDate = new Date(stats.createdAt);
+                          const now = new Date();
+                          const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+                          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                          const diffMonths = Math.floor(diffDays / 30);
+                          const diffYears = Math.floor(diffDays / 365);
+                          
+                          if (diffYears > 0) {
+                            return `${diffYears} ${diffYears === 1 ? t('profile.year') : diffYears < 5 ? t('profile.years') : t('profile.yearsMany')} ${t('profile.onService')}`;
+                          } else if (diffMonths > 0) {
+                            return `${diffMonths} ${diffMonths === 1 ? t('profile.month') : diffMonths < 5 ? t('profile.months') : t('profile.monthsMany')} ${t('profile.onService')}`;
+                          } else {
+                            return `${diffDays} ${diffDays === 1 ? t('profile.day') : diffDays < 5 ? t('profile.days') : t('profile.daysMany')} ${t('profile.onService')}`;
+                          }
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Кнопка дії */}
+      <div className="px-4 space-y-3 pb-4">
+        <button 
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const username = userData?.username || sellerUsername;
+            const phone = userData?.phone || sellerPhone;
+            
+            // Якщо немає username - показуємо телефон
+            if (!username || username.trim() === '') {
+              if (phone && phone.trim() !== '') {
+                // Відкриваємо телефон
+                window.location.href = `tel:${phone.trim()}`;
+                tg?.HapticFeedback?.impactOccurred('medium');
+                return;
+              } else {
+                // Немає ні username, ні телефону
+                if (tg) {
+                  tg.showAlert(t('listingDetail.telegramIdNotFound'));
+                } else {
+                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
+                }
+                return;
+              }
+            }
+            
+            // Якщо є username - відкриваємо Telegram
+            const link = `https://t.me/${username.replace('@', '')}`;
+            
+            // Якщо Telegram WebApp доступний, використовуємо його
+            if (tg && tg.openTelegramLink) {
+              tg.openTelegramLink(link);
+              tg.HapticFeedback?.impactOccurred('medium');
+            } else {
+              // Якщо ні, відкриваємо посилання через звичайний браузер
+              window.location.href = link;
+            }
+          }}
+          className="w-full bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 text-black font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+        >
+          {((userData?.username || sellerUsername) ?? '').trim() !== '' ? (
+            <>
+              <MessageCircle size={20} />
+              {t('common.write')}
             </>
           ) : (
-            <div className="text-center py-8 text-gray-500">{t('userProfile.noListings')}</div>
+            <>
+              <Phone size={20} />
+              {t('common.call')}
+            </>
           )}
-        </div>
+        </button>
+      </div>
+
+      {/* Розділювач */}
+      <div className="px-4 pb-4">
+        <div className="border-t border-white/20"></div>
+      </div>
+
+      {/* Оголошення */}
+      <div className="px-4">
+        <h3 className="text-lg font-semibold text-white mb-3">{t('listing.sellerListings')}</h3>
+        {loading ? (
+          <div className="text-center py-8 text-white/70">{t('common.loading')}</div>
+        ) : listings.length > 0 ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {listings.map(listing => (
+                <ListingCard 
+                  key={listing.id} 
+                  listing={listing}
+                  isFavorite={favorites.has(listing.id)}
+                  onSelect={(selectedListing) => {
+                    // Оновлюємо дані перед закриттям профілю
+                    fetchData();
+                    onSelectListing(selectedListing);
+                    // Закриваємо профіль продавця при виборі оголошення
+                    onClose();
+                  }}
+                  onToggleFavorite={(id) => {
+                    const isFavorite = favorites.has(id);
+                    
+                    // Оновлюємо лічильник лайків на картці товару
+                    setListings(prev => prev.map(listing => 
+                      listing.id === id 
+                        ? { 
+                            ...listing, 
+                            favoritesCount: Math.max(0, (listing.favoritesCount || 0) + (isFavorite ? -1 : 1))
+                          }
+                        : listing
+                    ));
+                    
+                    onToggleFavorite(id);
+                  }}
+                  tg={tg}
+                />
+              ))}
+            </div>
+            {hasMore && listings.length < totalListings && (
+              <div className="py-6">
+                <button
+                  onClick={loadMoreListings}
+                  className="w-full bg-transparent hover:bg-white/10 border-2 border-white text-white font-semibold py-4 rounded-2xl transition-colors"
+                >
+                  {t('common.showMore')}
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-8 text-white/70">{t('userProfile.noListings')}</div>
+        )}
       </div>
 
       {/* Модальне вікно для перегляду аватара */}
