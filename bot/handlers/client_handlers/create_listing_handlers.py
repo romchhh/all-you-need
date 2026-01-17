@@ -33,6 +33,8 @@ from datetime import datetime, timedelta
 router = Router()
 
 MAX_PHOTOS = 10
+MAX_TITLE_LENGTH = 100
+MAX_DESCRIPTION_LENGTH = 600
 
 
 @router.message(F.text.in_([
@@ -82,6 +84,17 @@ async def process_title(message: types.Message, state: FSMContext):
         await message.answer("❌ Назва повинна містити мінімум 3 символи. Спробуйте ще раз:")
         return
     
+    if len(title) > MAX_TITLE_LENGTH:
+        excess = len(title) - MAX_TITLE_LENGTH
+        await message.answer(
+            t(user_id, 'create_listing.title_max_length', 
+              max_length=MAX_TITLE_LENGTH, 
+              current_length=len(title), 
+              excess=excess),
+            parse_mode="HTML"
+        )
+        return
+    
     await state.update_data(title=title)
     await state.set_state(CreateListing.waiting_for_description)
     
@@ -118,6 +131,17 @@ async def process_description(message: types.Message, state: FSMContext):
     
     if not description or len(description) < 10:
         await message.answer("❌ Опис повинен містити мінімум 10 символів. Спробуйте ще раз:")
+        return
+    
+    if len(description) > MAX_DESCRIPTION_LENGTH:
+        excess = len(description) - MAX_DESCRIPTION_LENGTH
+        await message.answer(
+            t(user_id, 'create_listing.description_max_length',
+              max_length=MAX_DESCRIPTION_LENGTH,
+              current_length=len(description),
+              excess=excess),
+            parse_mode="HTML"
+        )
         return
     
     await state.update_data(description=description)

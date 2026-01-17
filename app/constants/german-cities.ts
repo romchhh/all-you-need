@@ -81,6 +81,12 @@ export const germanCities = [
   'Hildesheim',
   'Salzgitter',
   'Wedel',
+  'Pinneberg',
+  'Ahrensburg',
+  'Reinbek',
+  'Barsbüttel',
+  'Elmshorn',
+  'Buxtehude',
   
   // Середні міста (50,000-100,000)
   'Cottbus',

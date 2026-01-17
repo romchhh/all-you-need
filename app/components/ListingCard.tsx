@@ -42,6 +42,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   }, [listing.id, listing.promotionType, listing.promotionEnds]);
   
   // Визначаємо стилі в залежності від типу реклами
+  // Лаймова рамка тільки для VIP, не для TOP
   const getPromotionStyles = () => {
     if (!promotionType) return 'border border-white/20';
     
@@ -49,7 +50,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       case 'vip':
         return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
       case 'top_category':
-        return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+        return 'border border-white/20';
       default:
         return 'border border-white/20';
     }
@@ -187,7 +188,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       {/* Зображення товару - займає більшу частину картки */}
       <div className="relative w-full" style={{ height: '65%', minHeight: '200px' }}>
         {/* Бейдж реклами (VIP/TOP) - лівий верхній кут */}
-        <div className="absolute top-2 left-2 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div className="absolute top-3 left-3 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           {getPromotionBadge()}
         </div>
         
@@ -258,10 +259,10 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       </div>
       
       {/* Темний overlay з інформацією - нижня частина з заокругленими верхніми кутами */}
-      <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl -mt-6 pt-6 px-4 pb-4">
+      <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl -mt-6 pt-6 px-4 pb-4 flex flex-col min-h-0">
         {/* Ціна та тег стану */}
         <div className="flex items-start justify-between mb-2">
-          <span className="text-2xl font-bold text-white">
+          <span className={`font-bold text-white ${listing.isFree ? 'text-2xl' : 'text-2xl'}`}>
             {listing.isFree ? t('common.free') : `${listing.price}${getCurrencySymbol(listing.currency)}`}
           </span>
           {listing.condition && (
@@ -272,20 +273,22 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
         </div>
         
         {/* Назва товару */}
-        <p className="text-sm text-white line-clamp-2 mb-3 font-medium leading-snug">
+        <p className="text-sm text-white line-clamp-2 mb-2 font-medium leading-snug">
           {listing.title}
         </p>
         
         {/* Локація та час */}
-        <div className="flex items-center justify-between text-xs text-white/60">
-          <span className="flex items-center gap-1.5">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60">
+        <div className="flex flex-col gap-1 text-[10px] text-white/60 mt-auto">
+          <div className="flex items-center gap-1">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60 flex-shrink-0">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
             </svg>
             <span className="truncate">{listing.location?.split(',')[0] || ''}</span>
-          </span>
-          <span>{formattedTime}</span>
+          </div>
+          <div className="text-white/60 truncate">
+            {formattedTime}
+          </div>
         </div>
       </div>
     </div>

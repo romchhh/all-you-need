@@ -791,6 +791,23 @@ const BazaarTabComponent = ({
             )}
           </div>
           
+          {/* Кнопка очищення для категорії "Безкоштовно" */}
+          {(showFreeOnly || selectedCategory === 'free') && !selectedCategoryData?.subcategories?.length && (
+            <div className="flex items-center justify-end mt-3 mb-3">
+              <button
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setSelectedSubcategory(null);
+                  setShowFreeOnly(false);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+              >
+                {t('common.clear')}
+              </button>
+            </div>
+          )}
+
           {/* Заголовок підкатегорії та кнопка очищення */}
           {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
             <div className="flex items-center justify-between mt-3 mb-3">
@@ -799,6 +816,7 @@ const BazaarTabComponent = ({
                 onClick={() => {
                   setSelectedCategory(null);
                   setSelectedSubcategory(null);
+                  setShowFreeOnly(false);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
                 className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"

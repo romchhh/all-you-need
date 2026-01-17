@@ -52,9 +52,10 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
     const diffY = Math.abs(currentY - touchStartY.current);
     const absX = Math.abs(diffX);
     
+    // Запобігаємо pull-to-close та згортанню додатку для будь-якого руху на фото
     // Якщо це горизонтальний свайп (горизонтальний рух значно більший за вертикальний)
-    // запобігаємо свайпу назад та згортанню додатка
-    if (absX > diffY * 2 && absX > 10) {
+    // або вертикальний рух - запобігаємо дефолтній поведінці
+    if ((absX > diffY * 2 && absX > 10) || diffY > 5) {
       e.preventDefault();
       e.stopPropagation();
     }
@@ -117,12 +118,12 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
 
   return (
     <div 
-      className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4"
+      className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100]"
       onClick={onClose}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      style={{ touchAction: 'pan-x' }}
+      style={{ touchAction: 'none', padding: '0', width: '100vw', maxWidth: '100vw' }}
     >
       <button
         onClick={onClose}
@@ -157,12 +158,26 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
         </>
       )}
       
-      <img 
-        src={imageList[currentIndex]} 
-        alt={`${alt} - фото ${currentIndex + 1}`}
-        className="max-w-full max-h-[90vh] object-contain transition-opacity duration-300"
+      <div 
+        className="w-full flex items-center justify-center"
+        style={{ width: '100vw', maxWidth: '100vw' }}
         onClick={(e) => e.stopPropagation()}
-      />
+      >
+        <img 
+          src={imageList[currentIndex]} 
+          alt={`${alt} - фото ${currentIndex + 1}`}
+          className="transition-opacity duration-300"
+          style={{ 
+            width: '100%', 
+            maxWidth: '100%', 
+            height: 'auto',
+            maxHeight: '90vh',
+            objectFit: 'contain',
+            display: 'block'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
     </div>
   );
 };

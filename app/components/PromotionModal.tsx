@@ -65,9 +65,9 @@ export default function PromotionModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[90vh] overflow-y-auto relative z-[10000]">
+      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col relative z-[10000]">
         {/* Header */}
-        <div className="sticky top-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
+        <div className="flex-shrink-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">
               {t('promotions.title')}
@@ -87,7 +87,7 @@ export default function PromotionModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-4">
           {/* Типи реклами */}
           {PROMOTIONS.map((promo) => (
             <button
@@ -176,7 +176,7 @@ export default function PromotionModal({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-[#000000] border-t border-white/20 px-6 py-4 rounded-b-2xl space-y-2">
+        <div className="flex-shrink-0 bg-[#000000] border-t border-white/20 px-6 py-4 rounded-b-2xl space-y-2">
           <button
             onClick={handleSelectPromotion}
             disabled={!selectedPromotion || loading}

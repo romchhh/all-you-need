@@ -125,9 +125,9 @@ export default function PromotionUpgradeModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[90vh] overflow-y-auto relative z-[10000]">
+      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col relative z-[10000]">
         {/* Header */}
-        <div className="sticky top-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
+        <div className="flex-shrink-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">
               {currentPromotion ? t('promotions.upgradeTitle') : t('promotions.title')}
@@ -155,7 +155,7 @@ export default function PromotionUpgradeModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-4">
           {/* Показуємо баланс */}
           <div className="bg-[#1C1C1C] rounded-xl p-4 border border-white/20">
             <div className="flex justify-between items-center">
@@ -329,7 +329,7 @@ export default function PromotionUpgradeModal({
 
         {/* Footer */}
         {availableUpgrades.length > 0 && (
-          <div className="sticky bottom-0 bg-[#000000] border-t border-white/20 px-6 py-4 rounded-b-2xl space-y-2">
+          <div className="flex-shrink-0 bg-[#000000] border-t border-white/20 px-6 py-4 rounded-b-2xl space-y-2">
             <button
               onClick={handleSelectPromotion}
               disabled={!selectedPromotion || loading}
@@ -341,16 +341,6 @@ export default function PromotionUpgradeModal({
             >
               {loading ? t('common.loading') : currentPromotion ? t('promotions.upgradeNow') : t('promotions.addPromotion')}
             </button>
-            
-            {!currentPromotion && (
-              <button
-                onClick={handleSkip}
-                disabled={loading}
-                className="w-full py-3 rounded-xl font-semibold text-white bg-transparent border border-white/20 hover:bg-white/10 transition-all"
-              >
-                {t('promotions.noPromotion')}
-              </button>
-            )}
           </div>
         )}
       </div>

@@ -78,8 +78,14 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
       setIsSwiping(true);
       // Обмежуємо зміщення для плавності
       setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
+    } else if (diffY > 5) {
+      // Якщо це вертикальний рух - запобігаємо pull-to-close та згортанню додатку
+      e.preventDefault();
+      e.stopPropagation();
+      setIsSwiping(false);
+      setSwipeOffset(0);
     } else {
-      // Якщо це вертикальний рух або змішаний, скидаємо offset і не запобігаємо скролу
+      // Якщо це змішаний рух, скидаємо offset і не запобігаємо скролу
       setIsSwiping(false);
       setSwipeOffset(0);
     }
@@ -158,7 +164,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
       onTouchEnd={onTouchEnd}
       onClick={() => onImageClick?.(currentIndex)}
       style={{ 
-        touchAction: 'pan-y',
+        touchAction: 'none',
         position: 'relative',
         width: '100%',
         maxWidth: '100%',

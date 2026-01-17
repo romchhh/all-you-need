@@ -31,6 +31,7 @@ const ListingCardColumnComponent = ({
   const promotionType = hasPromotion ? listing.promotionType : null;
   
   // Визначаємо стилі в залежності від типу реклами
+  // Лаймова рамка тільки для VIP, не для TOP
   const getPromotionStyles = () => {
     if (!promotionType) return 'border border-white/20';
     
@@ -38,7 +39,7 @@ const ListingCardColumnComponent = ({
       case 'vip':
         return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
       case 'top_category':
-        return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+        return 'border border-white/20';
       default:
         return 'border border-white/20';
     }
@@ -103,7 +104,7 @@ const ListingCardColumnComponent = ({
           className="relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden bg-[#1A1A1A]"
         >
           {/* Бейдж реклами */}
-          <div className="absolute top-2 left-2 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+          <div className="absolute top-3 left-3 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
             {getPromotionBadge()}
           </div>
           
@@ -142,12 +143,12 @@ const ListingCardColumnComponent = ({
           </button>
 
           {/* Верхня частина: назва + ціна */}
-          <div className="flex-1 pr-10">
-            <div className="font-semibold text-base text-white line-clamp-2 leading-snug mb-2">
+          <div className="flex-1 pr-10 min-w-0">
+            <div className="font-semibold text-base text-white line-clamp-2 leading-snug mb-1.5">
               {listing.title}
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-white font-bold text-lg">
+              <span className={`text-white font-bold ${listing.isFree ? 'text-lg' : 'text-lg'}`}>
                 {listing.isFree ? t('common.free') : `${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}
               </span>
               {listing.condition && (
@@ -159,15 +160,15 @@ const ListingCardColumnComponent = ({
           </div>
 
           {/* Нижня частина: розташування та час */}
-          <div className="flex items-center justify-between text-xs text-white/80">
+          <div className="flex flex-col gap-1 text-[10px] min-w-0">
             {listing.location && (
-              <div className="flex items-center gap-1">
-                <MapPin size={12} className="text-white/80" />
-                <span className="line-clamp-1">{listing.location.split(',')[0]}</span>
+              <div className="flex items-center gap-1 text-white/80">
+                <MapPin size={10} className="text-white/80 flex-shrink-0" />
+                <span className="line-clamp-1 truncate">{listing.location.split(',')[0]}</span>
               </div>
             )}
             {formattedTime && (
-              <span className="text-white/60">{formattedTime}</span>
+              <span className="text-white/60 truncate">{formattedTime}</span>
             )}
           </div>
         </div>

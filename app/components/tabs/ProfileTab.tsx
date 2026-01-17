@@ -663,7 +663,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
                                 if (response.ok) {
                                   showToast(t('editListing.listingMarkedSold'), 'success');
+                                  tg?.HapticFeedback.notificationOccurred('success');
+                                  // Закриваємо модальне вікно після успішного оновлення
+                                  setConfirmModal({ ...confirmModal, isOpen: false });
+                                  // Оновлюємо список оголошень
                                   await fetchListingsWithFilters(0, true);
+                                  // Оновлюємо статистику
                                   fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
                                     .then(res => {
                                       if (res.ok) {
@@ -679,8 +684,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                                     .catch(err => console.error('Error fetching stats:', err));
                                   // Оновлюємо сторінку
                                   router.refresh();
+                                } else {
+                                  const errorData = await response.json().catch(() => ({}));
+                                  console.error('Error updating listing:', errorData);
+                                  showToast(t('editListing.updateError'), 'error');
                                 }
                               } catch (error) {
+                                console.error('Error marking listing as sold:', error);
                                 showToast(t('editListing.updateError'), 'error');
                               }
                           },
@@ -812,8 +822,20 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           });
 
           if (response.ok) {
-            refetch();
+            const updatedProfile = await response.json();
+            // Очікуємо завершення refetch перед закриттям модального вікна
+            await refetch();
             setIsEditModalOpen(false);
+            // Показуємо повідомлення про успішне збереження
+            if (tg) {
+              tg.showAlert(t('profile.profileUpdated') || 'Профіль оновлено');
+            }
+          } else {
+            const errorData = await response.json();
+            console.error('Error updating profile:', errorData);
+            if (tg) {
+              tg.showAlert(t('profile.saveError') || 'Помилка збереження профілю');
+            }
           }
         }}
         tg={tg}
@@ -983,9 +1005,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={() => {
-          confirmModal.onConfirm();
-          setConfirmModal({ ...confirmModal, isOpen: false });
+        onConfirm={async () => {
+          await confirmModal.onConfirm();
         }}
         title={confirmModal.title}
         message={confirmModal.message}

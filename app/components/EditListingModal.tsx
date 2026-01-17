@@ -3,7 +3,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { Listing } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { getCategories } from '@/constants/categories';
-import { ukrainianCities, searchCities } from '@/constants/ukrainian-cities';
+import { germanCities } from '@/constants/german-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ConfirmModal } from './ConfirmModal';
 import { CategoryIcon } from './CategoryIcon';
@@ -65,9 +65,17 @@ export const EditListingModal = ({
 
   const selectedCondition = conditionOptions.find(opt => opt.value === condition);
 
-  const filteredCities = locationQuery
-    ? searchCities(locationQuery, 10)
-    : (isLocationOpen ? ukrainianCities.slice(0, 10) : []);
+  // Фільтруємо міста за запитом (по ключових літерах, як на головній сторінці)
+  const filteredCities = useMemo(() => {
+    if (!locationQuery.trim()) {
+      return isLocationOpen ? germanCities.slice(0, 10) : [];
+    }
+    const query = locationQuery.toLowerCase().trim();
+    // Пошук по ключових літерах (починається з або містить)
+    return germanCities.filter(city =>
+      city.toLowerCase().startsWith(query) || city.toLowerCase().includes(query)
+    ).slice(0, 10);
+  }, [locationQuery, isLocationOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -311,10 +319,17 @@ export const EditListingModal = ({
                 <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] border border-white/20">
                   <img 
                     src={(() => {
-                      if (typeof preview === 'string' && preview.startsWith('http')) return preview;
-                      const cleanPath = (typeof preview === 'string' ? preview : '').split('?')[0];
-                      const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-                      return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+                      if (typeof preview === 'string') {
+                        // Повні URL (http/https)
+                        if (preview.startsWith('http')) return preview;
+                        // Data URLs (base64 для нових фото)
+                        if (preview.startsWith('data:')) return preview;
+                        // Шляхи до файлів
+                        const cleanPath = preview.split('?')[0];
+                        const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                        return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+                      }
+                      return '';
                     })()}
                     alt={`Preview ${index + 1}`} 
                     className="w-full h-full object-cover"
@@ -597,6 +612,14 @@ export const EditListingModal = ({
                   setIsLocationOpen(true);
                   if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === 'Search') {
+                    e.preventDefault();
+                    const input = e.target as HTMLInputElement;
+                    input.blur();
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }
+                }}
                 onFocus={() => setIsLocationOpen(true)}
                 placeholder="Оберіть або введіть місто"
                 className={`w-full px-4 py-3 pl-12 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
@@ -605,7 +628,7 @@ export const EditListingModal = ({
               />
               <MapPin 
                 size={18} 
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70"
+                className="absolute left-5 top-1/2 -translate-y-1/2 text-white/70"
               />
             </div>
             

@@ -5,7 +5,7 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import sharp from 'sharp';
 
-export async function POST(request: NextRequest) {
+async function handleRequest(request: NextRequest) {
   try {
     const formData = await request.formData();
     const telegramId = formData.get('telegramId') as string;
@@ -135,3 +135,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  return handleRequest(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handleRequest(request);
+}

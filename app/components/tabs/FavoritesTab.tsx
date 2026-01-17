@@ -50,6 +50,16 @@ export const FavoritesTab = ({
     const currentScrollY = window.scrollY || document.documentElement.scrollTop;
     const scrollDelta = Math.abs(currentScrollY - touchStartScrollY.current);
     
+    // Запобігаємо свайпу вниз для закриття додатку (pull-to-close)
+    // Якщо користувач свайпає вниз і ми на початку скролу
+    if (deltaY > 0 && deltaY > 5) {
+      if (touchStartScrollY.current <= 10 && currentScrollY === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+    
     // Якщо це вертикальний скрол або свайп не з лівого краю, запобігаємо свайпу назад
     if (Math.abs(deltaY) > Math.abs(deltaX) || scrollDelta > 5 || touchStartX.current > 20) {
       // Це вертикальний скрол, дозволяємо його
@@ -75,7 +85,7 @@ export const FavoritesTab = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: 'pan-y' }}
       >
         <h2 className="text-2xl font-bold text-white mb-2 pt-2">Обране</h2>
         <p className="text-sm text-gray-400 mb-8">Тут товари, які вам сподобалися</p>

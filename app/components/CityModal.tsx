@@ -151,12 +151,43 @@ export const CityModal = ({
     };
   }, [isOpen, selectedCities]);
 
-  // Фільтруємо результати пошуку
+  // Фільтруємо результати пошуку (по ключових літерах, як на головній сторінці)
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) {
       return [];
     }
-    return searchCityByIndexOrName(searchQuery);
+    const query = searchQuery.toLowerCase().trim();
+    // Спочатку перевіряємо чи це індекс (5 цифр)
+    const isPostalCode = /^\d{5}$/.test(query);
+    
+    if (isPostalCode) {
+      // Пошук по індексу
+      const mappedCity = postalCodeToCity[query];
+      if (mappedCity) {
+        const cityExists = germanCities.some(c => 
+          c.toLowerCase() === mappedCity.toLowerCase()
+        );
+        if (cityExists) {
+          return [mappedCity];
+        }
+        return [mappedCity];
+      }
+      // Якщо немає в маппінгу, шукаємо в назвах
+      return germanCities.filter(city => 
+        city.toLowerCase().includes(query)
+      ).slice(0, 10);
+    }
+    
+    // Пошук по назві (по ключових літерах - починається з або містить)
+    const lowerQuery = query;
+    const startsWith = germanCities.filter(city => 
+      city.toLowerCase().startsWith(lowerQuery)
+    );
+    const includes = germanCities.filter(city => 
+      city.toLowerCase().includes(lowerQuery) && !city.toLowerCase().startsWith(lowerQuery)
+    );
+    // Спочатку ті, що починаються з запиту, потім ті, що містять
+    return [...startsWith, ...includes].slice(0, 10);
   }, [searchQuery]);
 
   // Обробка вибору/зняття вибору міста
@@ -202,7 +233,14 @@ export const CityModal = ({
         className="fixed inset-0 bg-black/40 z-50 flex items-end" 
         onClick={(e) => {
           if (e.target === e.currentTarget) {
-            onClose();
+            // При закритті через клік на фон - застосовуємо вибір міста (якщо є зміни)
+            if (localSelectedCities.length !== selectedCities.length || 
+                localSelectedCities.some((city, idx) => city !== selectedCities[idx])) {
+              handleApply();
+            } else {
+              onClose();
+            }
+            tg?.HapticFeedback.impactOccurred('light');
           }
         }}
         onTouchStart={(e) => {
@@ -229,7 +267,16 @@ export const CityModal = ({
           <div className="flex items-center justify-between p-6 border-b border-gray-700/50 flex-shrink-0">
             <h3 className="text-xl font-bold text-white">{t('bazaar.selectCity')}</h3>
             <button
-              onClick={onClose}
+              onClick={() => {
+                // При закритті через X - застосовуємо вибір міста (якщо є зміни)
+                if (localSelectedCities.length !== selectedCities.length || 
+                    localSelectedCities.some((city, idx) => city !== selectedCities[idx])) {
+                  handleApply();
+                } else {
+                  onClose();
+                }
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
               className="w-8 h-8 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
             >
               <X size={18} className="text-white" />
@@ -270,13 +317,27 @@ export const CityModal = ({
             <div className="p-6 space-y-4">
               {/* Пошук */}
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80" size={18} />
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-white/80" size={18} />
                 <input
+                  ref={(el) => {
+                    if (el && isOpen) {
+                      setTimeout(() => el.focus(), 100);
+                    }
+                  }}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Search') {
+                      e.preventDefault();
+                      const input = e.target as HTMLInputElement;
+                      input.blur();
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }
+                  }}
                   placeholder={t('bazaar.searchCity') || 'Пошук по назві або індексу (наприклад: 22880 або Wedel)'}
-                  className="w-full pl-11 pr-4 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder:text-white/60"
+                  className="w-full pr-4 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder:text-white/60"
+                  style={{ paddingLeft: '52px' }}
                 />
               </div>
 

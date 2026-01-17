@@ -33,7 +33,17 @@ export const EditProfileModal = ({
   const { toast, showToast, hideToast } = useToast();
   const { t } = useLanguage();
 
-  // Блокуємо скрол body та html при відкритому модальному вікні
+  // Оновлюємо локальний стан при зміні props
+  useEffect(() => {
+    if (isOpen) {
+      setFirstName(currentFirstName || '');
+      setLastName(currentLastName || '');
+      setAvatarPreview(currentAvatar);
+      setAvatarFile(null);
+    }
+  }, [isOpen, currentFirstName, currentLastName, currentAvatar]);
+
+  // Блокуємо скрол body та html при відкритому модальному вікні та запобігаємо свайпу вниз
   useEffect(() => {
     if (isOpen) {
       // Зберігаємо поточну позицію скролу
@@ -44,6 +54,65 @@ export const EditProfileModal = ({
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.documentElement.style.overflow = 'hidden';
+      
+      // Запобігаємо pull-to-close (свайп вниз для закриття)
+      let touchStartY: number | null = null;
+      let touchStartScrollY: number | null = null;
+      
+      const handleTouchStart = (e: TouchEvent) => {
+        const touch = e.touches[0];
+        if (touch) {
+          touchStartY = touch.clientY;
+          touchStartScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        }
+      };
+      
+      const preventPullToClose = (e: TouchEvent) => {
+        if (touchStartY === null || touchStartScrollY === null) {
+          return;
+        }
+        
+        const touch = e.touches[0];
+        if (!touch) return;
+        
+        const deltaY = touch.clientY - touchStartY;
+        const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        
+        // Запобігаємо свайпу вниз на будь-якій позиції сторінки
+        // Якщо користувач свайпає вниз і це не стандартний скрол
+        if (deltaY > 0 && deltaY > 5) {
+          // Якщо ми на початку скролу або свайп більший за скрол
+          if (touchStartScrollY <= 10 || (currentScrollY === 0 && deltaY > 10)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
+      };
+      
+      const handleTouchEnd = () => {
+        touchStartY = null;
+        touchStartScrollY = null;
+      };
+      
+      // Додаємо обробники для запобігання свайпу вниз
+      document.addEventListener('touchstart', handleTouchStart, { passive: true });
+      document.addEventListener('touchmove', preventPullToClose, { passive: false });
+      document.addEventListener('touchend', handleTouchEnd, { passive: true });
+      document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+      
+      // Cleanup для видалення обробників
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.documentElement.style.overflow = '';
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchmove', preventPullToClose);
+        document.removeEventListener('touchend', handleTouchEnd);
+        document.removeEventListener('touchcancel', handleTouchEnd);
+      };
     } else {
       // Розблоковуємо скрол
       const scrollY = document.body.style.top;
@@ -56,15 +125,6 @@ export const EditProfileModal = ({
         window.scrollTo(0, parseInt(scrollY || '0') * -1);
       }
     }
-    
-    // Cleanup при розмонтуванні
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -101,7 +161,16 @@ export const EditProfileModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => {
+        // Запобігаємо свайпу вниз для закриття додатку
+        e.stopPropagation();
+      }}
+      onTouchEnd={(e) => e.stopPropagation()}
+      style={{ touchAction: 'none' }}
+    >
       <div className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl">
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-6">

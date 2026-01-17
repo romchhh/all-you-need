@@ -92,12 +92,18 @@ export const SortModal = ({
   const [localSelectedSubcategory, setLocalSelectedSubcategory] = useState<string | null>(selectedSubcategory);
   const [localCondition, setLocalCondition] = useState<ConditionOption>(selectedCondition);
   
+  // Refs для прокрутки до вибраної категорії
+  const categoriesContainerRef = useRef<HTMLDivElement>(null);
+  const selectedCategoryButtonRef = useRef<HTMLButtonElement>(null);
+  
   // Зберігаємо функції в ref для гарантії актуальності
   const onCloseRef = useRef(onClose);
   const onPriceRangeChangeRef = useRef(onPriceRangeChange);
   const onCategoryChangeRef = useRef(onCategoryChange);
   const onConditionChangeRef = useRef(onConditionChange);
   const onCurrencyChangeRef = useRef(onCurrencyChange);
+  const onToggleFreeOnlyRef = useRef(onToggleFreeOnly);
+  const onSelectRef = useRef(onSelect);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -105,7 +111,9 @@ export const SortModal = ({
     onCategoryChangeRef.current = onCategoryChange;
     onConditionChangeRef.current = onConditionChange;
     onCurrencyChangeRef.current = onCurrencyChange;
-  }, [onClose, onPriceRangeChange, onCategoryChange, onConditionChange, onCurrencyChange]);
+    onToggleFreeOnlyRef.current = onToggleFreeOnly;
+    onSelectRef.current = onSelect;
+  }, [onClose, onPriceRangeChange, onCategoryChange, onConditionChange, onCurrencyChange, onToggleFreeOnly, onSelect]);
 
   useEffect(() => {
     if (isOpen) {
@@ -160,6 +168,31 @@ export const SortModal = ({
     }
   }, [localSelectedCategory, isOpen]);
 
+  // Автоматична прокрутка до вибраної категорії при відкритті модального вікна
+  useEffect(() => {
+    if (isOpen && localSelectedCategory && categories.find(cat => cat.id === localSelectedCategory) && categoriesContainerRef.current && selectedCategoryButtonRef.current) {
+      // Затримка для того, щоб модальне вікно встигло відрендеритися
+      const scrollTimeout = setTimeout(() => {
+        const container = categoriesContainerRef.current;
+        const button = selectedCategoryButtonRef.current;
+        if (container && button) {
+          const containerRect = container.getBoundingClientRect();
+          const buttonRect = button.getBoundingClientRect();
+          
+          // Обчислюємо позицію для прокрутки (центруємо кнопку)
+          const scrollLeft = container.scrollLeft + (buttonRect.left - containerRect.left) - (containerRect.width / 2) + (buttonRect.width / 2);
+          
+          container.scrollTo({
+            left: Math.max(0, scrollLeft),
+            behavior: 'smooth'
+          });
+        }
+      }, 150);
+      
+      return () => clearTimeout(scrollTimeout);
+    }
+  }, [isOpen, localSelectedCategory, categories]);
+
   const sortOptions: { value: SortOption; labelKey: string }[] = [
     { value: 'newest', labelKey: 'bazaar.sort.newest' },
     { value: 'price_low', labelKey: 'bazaar.sort.priceLow' },
@@ -176,26 +209,29 @@ export const SortModal = ({
   // Обробка скидання всіх фільтрів
   const handleReset = () => {
     // Скидаємо локальні стани
+    const defaultMaxPrice = 1000;
     setLocalMinPrice(0);
-    setLocalMaxPrice(1000); // Стандартний максимум
+    setLocalMaxPrice(defaultMaxPrice);
     setLocalCurrency(null);
     setLocalSelectedCategory(null);
     setLocalSelectedSubcategory(null);
     setLocalCondition(null);
     
-    // Застосовуємо скидання до батьківського компонента
-    onPriceRangeChange(null, null);
-    onToggleFreeOnly(false);
-    onSelect('newest');
-    if (onCategoryChange) {
-      onCategoryChange(null, null);
+    // Застосовуємо скидання до батьківського компонента через ref
+    onPriceRangeChangeRef.current(null, null);
+    onToggleFreeOnlyRef.current(false);
+    onSelectRef.current('newest');
+    if (onCategoryChangeRef.current) {
+      onCategoryChangeRef.current(null, null);
     }
-    if (onConditionChange) {
-      onConditionChange(null);
+    if (onConditionChangeRef.current) {
+      onConditionChangeRef.current(null);
     }
-    if (onCurrencyChange) {
-      onCurrencyChange(null);
+    if (onCurrencyChangeRef.current) {
+      onCurrencyChangeRef.current(null);
     }
+    
+    tg?.HapticFeedback.impactOccurred('light');
   };
 
   // Обробка вибору категорії
@@ -259,12 +295,24 @@ export const SortModal = ({
           {/* Закріплена шапка */}
           <div className="flex items-center justify-between p-6 border-b border-gray-700/50 flex-shrink-0">
             <h3 className="text-xl font-bold text-white">{t('common.filter')}</h3>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
-            >
-              <X size={18} className="text-white" />
-            </button>
+            <div className="flex items-center gap-2">
+              {hasActiveFilters && (
+                <button
+                  onClick={() => {
+                    handleReset();
+                  }}
+                  className="px-3 py-1.5 text-sm font-medium text-white border border-white rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  {t('common.clear')}
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
+              >
+                <X size={18} className="text-white" />
+              </button>
+            </div>
           </div>
 
           {/* Скролований контент */}
@@ -298,11 +346,16 @@ export const SortModal = ({
               {/* Категорії */}
               <div>
                 <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.categories')}</h4>
-                <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div 
+                  ref={categoriesContainerRef}
+                  className="overflow-x-auto scrollbar-hide" 
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
                   <div className="flex gap-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
                     {categories.map((category) => (
                       <button
                         key={category.id}
+                        ref={selectedCategory === category.id ? selectedCategoryButtonRef : null}
                         onClick={() => handleCategorySelect(category.id)}
                         className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 flex items-center gap-2 border ${
                           localSelectedCategory === category.id
@@ -540,17 +593,23 @@ export const SortModal = ({
           </div>
 
           {/* Закріплені кнопки дій */}
-            {hasActiveFilters && (
-            <div className="p-6 border-t border-gray-700/50 flex-shrink-0 relative z-10">
-              <button
-                type="button"
-                onClick={() => handleReset()}
-                className="w-full px-4 py-3 bg-transparent border border-white text-white rounded-xl font-semibold hover:bg-white/10 transition-colors active:bg-white/20"
-              >
-                {t('bazaar.reset')}
-              </button>
-            </div>
-          )}
+          <div className="p-6 border-t border-gray-700/50 flex-shrink-0 relative z-10">
+            <button
+              type="button"
+              onClick={() => {
+                handleReset();
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 rounded-xl font-semibold transition-colors ${
+                hasActiveFilters
+                  ? 'bg-transparent border border-white text-white hover:bg-white/10 active:bg-white/20'
+                  : 'bg-gray-800/50 border border-gray-700 text-gray-500 cursor-not-allowed'
+              }`}
+              disabled={!hasActiveFilters}
+            >
+              {t('bazaar.reset') || 'Скинути'}
+            </button>
+          </div>
         </div>
       </div>
     </Fragment>

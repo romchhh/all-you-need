@@ -23,7 +23,7 @@
     "user": "Пользователь",
     "currency": "Валюта",
     "selectCurrency": "Выберите валюту",
-    "free": "Бесплатно",
+    "free": "FREE",
     "language": "Язык",
     "languageLabel": "Язык",
     "all": "Все",
@@ -133,7 +133,8 @@
     "availableListings": "Доступно объявлений",
     "onModeration": "На модерации",
     "moderationPending": "Ожидает модерации",
-    "moderationRejected": "Отклонено модератором"
+    "moderationRejected": "Отклонено модератором",
+    "profileUpdated": "Профиль обновлен"
   },
   "bazaar": {
     "allListings": "Все объявления",

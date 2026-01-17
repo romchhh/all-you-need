@@ -23,7 +23,7 @@
     "user": "Користувач",
     "currency": "Валюта",
     "selectCurrency": "Оберіть валюту",
-    "free": "Безкоштовно",
+    "free": "FREE",
     "language": "Мова",
     "languageLabel": "Мова",
     "all": "Всі",
@@ -134,7 +134,8 @@
     "availableListings": "Доступно оголошень",
     "onModeration": "На модерації",
     "moderationPending": "Очікує модерації",
-    "moderationRejected": "Відхилено модератором"
+    "moderationRejected": "Відхилено модератором",
+    "profileUpdated": "Профіль оновлено"
   },
   "bazaar": {
     "allListings": "Всі оголошення",

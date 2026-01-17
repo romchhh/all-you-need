@@ -5,7 +5,7 @@ import { SubcategoryList } from '../SubcategoryList';
 import { ListingCard } from '../ListingCard';
 import { CategoryIcon } from '../CategoryIcon';
 import { useState, useMemo, useEffect } from 'react';
-import { Gift } from 'lucide-react';
+import { Gift, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface CategoriesTabProps {
@@ -213,6 +213,22 @@ export const CategoriesTab = ({
             <span className="font-medium">{t('categories.free')}</span>
           </div>
         </button>
+        
+        {/* Кнопка очищення для категорії "Безкоштовно" */}
+        {(selectedCategory === 'free' || showFreeOnly) && (
+          <div className="mt-3">
+            <button
+              onClick={() => {
+                setSelectedCategory(null);
+                setShowFreeOnly(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className="w-full px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+            >
+              {t('common.clear')}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Розділи */}
@@ -252,9 +268,23 @@ export const CategoriesTab = ({
         </div>
       </div>
 
+
       {/* Типи */}
       {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
         <div className="px-4 pt-2 pb-3 border-t border-gray-800/50">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-base font-semibold text-white">{t('categories.subcategories') || 'Підкатегорії'}</h3>
+            <button
+              onClick={() => {
+                setSelectedCategory(null);
+                setSelectedSubcategory(null);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+            >
+              {t('common.clear')}
+            </button>
+          </div>
           <SubcategoryList
             subcategories={selectedCategoryData.subcategories}
             selectedSubcategory={selectedSubcategory}
