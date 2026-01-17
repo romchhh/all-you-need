@@ -224,6 +224,15 @@ const ProfilePage = () => {
             savedScrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
             setSelectedListing(null);
           }}
+          onBack={() => {
+            // Якщо є selectedSeller, повертаємося до профілю, інакше закриваємо товар
+            if (selectedSeller) {
+              setSelectedListing(null);
+            } else {
+              savedScrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
+              setSelectedListing(null);
+            }
+          }}
           onToggleFavorite={toggleFavorite}
           onSelectListing={setSelectedListing}
           onViewSellerProfile={(telegramId, name, avatar, username, phone) => {

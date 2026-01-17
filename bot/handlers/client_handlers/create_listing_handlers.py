@@ -7,7 +7,6 @@ from utils.translations import t
 from states.client_states import CreateListing
 from keyboards.client_keyboards import (
     get_categories_keyboard,
-    get_condition_keyboard,
     get_listing_confirmation_keyboard,
     get_main_menu_keyboard,
     get_publication_tariff_keyboard,
@@ -48,13 +47,25 @@ async def start_create_listing(message: types.Message, state: FSMContext):
         return
     
     await state.set_state(CreateListing.waiting_for_title)
-    await message.answer(
-        t(user_id, 'create_listing.title_prompt'),
+    
+    # Відправляємо початкове повідомлення з кнопкою "Скасувати" (не видаляється)
+    initial_message = await message.answer(
+        t(user_id, 'create_listing.start'),
         parse_mode="HTML",
         reply_markup=types.ReplyKeyboardMarkup(
             keyboard=[[types.KeyboardButton(text=t(user_id, 'create_listing.cancel'))]],
             resize_keyboard=True
         )
+    )
+    
+    # Зберігаємо ID повідомлення для можливого видалення
+    sent_message = await message.answer(
+        t(user_id, 'create_listing.title_prompt'),
+        parse_mode="HTML"
+        )
+    await state.update_data(
+        last_message_id=sent_message.message_id,
+        initial_message_id=initial_message.message_id  # Зберігаємо ID початкового повідомлення (не видаляємо)
     )
 
 
@@ -73,10 +84,27 @@ async def process_title(message: types.Message, state: FSMContext):
     
     await state.update_data(title=title)
     await state.set_state(CreateListing.waiting_for_description)
-    await message.answer(
+    
+    # Видаляємо попереднє повідомлення про назву (промпт) та повідомлення користувача
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    # Видаляємо повідомлення користувача з назвою
+    try:
+        await message.delete()
+    except:
+        pass
+    
+    sent_message = await message.answer(
         t(user_id, 'create_listing.description_prompt'),
         parse_mode="HTML"
     )
+    await state.update_data(last_message_id=sent_message.message_id)
 
 
 @router.message(CreateListing.waiting_for_description)
@@ -96,10 +124,26 @@ async def process_description(message: types.Message, state: FSMContext):
     await state.set_state(CreateListing.waiting_for_photos)
     await state.update_data(photos=[])
     
-    await message.answer(
+    # Видаляємо попереднє повідомлення про опис (промпт) та повідомлення користувача
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    # Видаляємо повідомлення користувача з описом
+    try:
+        await message.delete()
+    except:
+        pass
+    
+    sent_message = await message.answer(
         t(user_id, 'create_listing.photos_prompt'),
         parse_mode="HTML"
     )
+    await state.update_data(last_message_id=sent_message.message_id)
 
 
 @router.message(CreateListing.waiting_for_photos, F.photo, F.media_group_id)
@@ -112,6 +156,11 @@ async def process_media_group_photo(message: types.Message, state: FSMContext):
     media_group_responses = data.get('media_group_responses', {})
     
     if len(photos) >= MAX_PHOTOS:
+        # Видаляємо фото від користувача
+        try:
+            await message.delete()
+        except:
+            pass
         return
     
     file_id = message.photo[-1].file_id
@@ -122,10 +171,25 @@ async def process_media_group_photo(message: types.Message, state: FSMContext):
         # Перше фото з групи - зберігаємо інформацію та запускаємо таймер
         media_group_responses[media_group_id] = True
         
+        # Видаляємо промпт про фото при першому додаванні
+        last_message_id = data.get('last_message_id')
+        if last_message_id and len(photos) == 1:
+            try:
+                await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+                await state.update_data(last_message_id=None)  # Очищаємо ID промпта
+            except:
+                pass
+        
         await state.update_data(
             photos=photos,
             media_group_responses=media_group_responses
         )
+        
+        # Видаляємо фото від користувача
+        try:
+            await message.delete()
+        except:
+            pass
         
         # Запускаємо відкладений відповідь
         import asyncio
@@ -133,6 +197,11 @@ async def process_media_group_photo(message: types.Message, state: FSMContext):
     else:
         # Наступні фото з тієї ж групи - просто додаємо без відповіді
         await state.update_data(photos=photos)
+        # Видаляємо фото від користувача
+        try:
+            await message.delete()
+        except:
+            pass
 
 
 async def delayed_media_group_response(user_id: int, media_group_id: str, state: FSMContext):
@@ -150,7 +219,7 @@ async def delayed_media_group_response(user_id: int, media_group_id: str, state:
         del media_group_responses[media_group_id]
         await state.update_data(media_group_responses=media_group_responses)
         
-        # Відправляємо одне повідомлення
+        # Видаляємо попереднє повідомлення "Фото додано!" якщо є
         last_photo_message_id = data.get('last_photo_message_id')
         if last_photo_message_id:
             try:
@@ -180,8 +249,14 @@ async def process_photo(message: types.Message, state: FSMContext):
     data = await state.get_data()
     photos = data.get('photos', [])
     last_photo_message_id = data.get('last_photo_message_id')
+    last_message_id = data.get('last_message_id')  # Промпт про фото
     
     if len(photos) >= MAX_PHOTOS:
+        # Видаляємо фото від користувача
+        try:
+            await message.delete()
+        except:
+            pass
         await message.answer(
             t(user_id, 'create_listing.photo_limit_reached'),
             reply_markup=get_continue_photos_keyboard(user_id)
@@ -191,7 +266,21 @@ async def process_photo(message: types.Message, state: FSMContext):
     file_id = message.photo[-1].file_id
     photos.append(file_id)
     
-    # Видаляємо старе повідомлення якщо є
+    # Видаляємо фото від користувача
+    try:
+        await message.delete()
+    except:
+        pass
+    
+    # Видаляємо промпт про фото при першому додаванні
+    if last_message_id and len(photos) == 1:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+            await state.update_data(last_message_id=None)  # Очищаємо ID промпта
+        except:
+            pass
+    
+    # Видаляємо старе повідомлення "Фото додано!" якщо є
     if last_photo_message_id:
         try:
             await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
@@ -226,6 +315,15 @@ async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext
     # Очищаємо оброблені медіа групи при переході до наступного кроку
     await state.update_data(processed_media_groups={}, media_group_responses={})
     
+    # Видаляємо останнє повідомлення "Фото додано!" при переході до наступного кроку
+    data = await state.get_data()
+    last_photo_message_id = data.get('last_photo_message_id')
+    if last_photo_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
+        except:
+            pass
+    
     await callback.answer()
     await process_category_selection(callback.message, state)
 
@@ -233,7 +331,7 @@ async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext
 @router.message(CreateListing.waiting_for_photos, F.text == "/skip")
 async def skip_photos_handler(message: types.Message, state: FSMContext):   
     user_id = message.from_user.id
-    await message.answer("❌ <b>Не можна пропустити додавання фото!</b>\n\nБудь ласка, надішліть хоча б одне фото вашого товару. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
+    await message.answer("❌ <b>Не можна пропустити додавання фото!</b>\n\nБудь ласка, надішліть хоча б одне фото. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
 
 
 @router.message(CreateListing.waiting_for_photos, F.text)
@@ -249,7 +347,7 @@ async def handle_text_in_photos_state(message: types.Message, state: FSMContext)
         )
         return
     
-    await message.answer("📸 <b>Будь ласка, надішліть фото товару!</b>\n\nВи можете надіслати до 10 фото. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
+    await message.answer("📸 <b>Будь ласка, надішліть фото!</b>\n\nВи можете надіслати до 10 фото. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
 
 
 async def process_category_selection(message: types.Message, state: FSMContext):
@@ -262,11 +360,22 @@ async def process_category_selection(message: types.Message, state: FSMContext):
         return
     
     await state.set_state(CreateListing.waiting_for_category)
-    await message.answer(
+    
+    # Видаляємо попереднє повідомлення якщо є
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    sent_message = await message.answer(
         t(user_id, 'create_listing.category_prompt'),
         parse_mode="HTML",
         reply_markup=get_categories_keyboard(user_id, categories)
     )
+    await state.update_data(last_message_id=sent_message.message_id)
 
 
 @router.callback_query(F.data.startswith("cat_"), CreateListing.waiting_for_category)
@@ -293,11 +402,30 @@ async def process_category(callback: types.CallbackQuery, state: FSMContext):
         )]
     ])
     
-    await callback.message.edit_text(
-        t(user_id, 'create_listing.price_prompt'),
-        parse_mode="HTML",
-        reply_markup=keyboard
-    )
+    # Видаляємо попереднє повідомлення якщо є
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.price_prompt'),
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.update_data(last_message_id=callback.message.message_id)
+    except:
+        sent_message = await callback.message.answer(
+            t(user_id, 'create_listing.price_prompt'),
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.update_data(last_message_id=sent_message.message_id)
+    
     await callback.answer()
 
 
@@ -307,14 +435,16 @@ async def process_price_negotiable(callback: types.CallbackQuery, state: FSMCont
     
     # Зберігаємо "Договірна" як ціну
     await state.update_data(price="Договірна", isNegotiable=True)
-    await state.set_state(CreateListing.waiting_for_condition)
+    await state.set_state(CreateListing.waiting_for_location)
+    
+    location_text = t(user_id, 'create_listing.location_prompt') + "\n\n<i>Або оберіть місто зі списку:</i>"
     
     await callback.message.edit_text(
-        t(user_id, 'create_listing.condition_prompt'),
+        location_text,
         parse_mode="HTML",
-        reply_markup=get_condition_keyboard(user_id)
+        reply_markup=get_german_cities_keyboard(user_id)
     )
-    await callback.answer("✅ Ціна встановлена як договірна")
+    await callback.answer(t(user_id, 'create_listing.price_negotiable_set'))
 
 
 @router.message(CreateListing.waiting_for_price)
@@ -341,13 +471,25 @@ async def process_price(message: types.Message, state: FSMContext):
                 # Зберігаємо як рядок діапазону
                 price = f"{price_min}-{price_max}"
                 await state.update_data(price=price, priceMin=price_min, priceMax=price_max)
-                await state.set_state(CreateListing.waiting_for_condition)
+                await state.set_state(CreateListing.waiting_for_location)
                 
-                await message.answer(
-                    t(user_id, 'create_listing.condition_prompt'),
+                location_text = t(user_id, 'create_listing.location_prompt') + "\n\n<i>Або оберіть місто зі списку:</i>"
+                
+                # Видаляємо попереднє повідомлення якщо є
+                data = await state.get_data()
+                last_message_id = data.get('last_message_id')
+                if last_message_id:
+                    try:
+                        await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+                    except:
+                        pass
+                
+                sent_message = await message.answer(
+                    location_text,
                     parse_mode="HTML",
-                    reply_markup=get_condition_keyboard(user_id)
+                    reply_markup=get_german_cities_keyboard(user_id)
                 )
+                await state.update_data(last_message_id=sent_message.message_id)
                 return
         except ValueError as e:
             await message.answer(t(user_id, 'create_listing.price_invalid'))
@@ -363,33 +505,27 @@ async def process_price(message: types.Message, state: FSMContext):
         return
     
     await state.update_data(price=price)
-    await state.set_state(CreateListing.waiting_for_condition)
-    
-    await message.answer(
-        t(user_id, 'create_listing.condition_prompt'),
-        parse_mode="HTML",
-        reply_markup=get_condition_keyboard(user_id)
-    )
-
-
-@router.callback_query(F.data.startswith("condition_"), CreateListing.waiting_for_condition)
-async def process_condition(callback: types.CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    condition = callback.data.split("_")[1]  # "new" або "used"
-    
-    condition_text = t(user_id, 'create_listing.condition_new') if condition == 'new' else t(user_id, 'create_listing.condition_used')
-    
-    await state.update_data(condition=condition, condition_text=condition_text)
     await state.set_state(CreateListing.waiting_for_location)
     
     location_text = t(user_id, 'create_listing.location_prompt') + "\n\n<i>Або оберіть місто зі списку:</i>"
     
-    await callback.message.edit_text(
+    # Видаляємо попереднє повідомлення якщо є
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    sent_message = await message.answer(
         location_text,
         parse_mode="HTML",
         reply_markup=get_german_cities_keyboard(user_id)
     )
-    await callback.answer()
+    await state.update_data(last_message_id=sent_message.message_id)
+
+
 
 
 @router.callback_query(F.data == "cancel_listing", CreateListing.waiting_for_location)
@@ -472,11 +608,10 @@ async def process_city_selection(callback: types.CallbackQuery, state: FSMContex
 
 
 @router.message(CreateListing.waiting_for_location)
-async def cancel_listing_from_location_text(message: types.Message, state: FSMContext):
-    """Окремий обробник для текстової кнопки 'Скасувати' під час вибору міста"""
+async def process_location(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     
-    # Перевіряємо чи це текст "Скасувати"
+    # Перевіряємо чи це кнопка "Скасувати"
     cancel_text = t(user_id, 'create_listing.cancel')
     if message.text and message.text == cancel_text:
         await state.clear()
@@ -486,16 +621,6 @@ async def cancel_listing_from_location_text(message: types.Message, state: FSMCo
             reply_markup=get_main_menu_keyboard(user_id)
         )
         return
-
-
-@router.message(CreateListing.waiting_for_location)
-async def process_location(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    
-    # Перевіряємо чи це не кнопка "Скасувати" (якщо не обробив попередній обробник)
-    cancel_text = t(user_id, 'create_listing.cancel')
-    if message.text and message.text == cancel_text:
-        return  # Обробляється окремим обробником вище
     
     if not message.text:
         return
@@ -506,9 +631,23 @@ async def process_location(message: types.Message, state: FSMContext):
         await message.answer("❌ Місто повинно містити мінімум 2 символи. Спробуйте ще раз:", reply_markup=get_german_cities_keyboard(user_id))
         return
     
+    # Видаляємо повідомлення користувача з локацією
+    try:
+        await message.delete()
+    except:
+        pass
+    
     await state.update_data(location=location)
     
+    # Видаляємо попереднє повідомлення про локацію (промпт) якщо є
     data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
     preview_text = build_preview(user_id, data)
     photos = data.get('photos', [])
     
@@ -597,7 +736,7 @@ def build_preview(user_id: int, data: dict) -> str:
         preview += f"💰 <b>Ціна:</b> Договірна\n"
     else:
         preview += t(user_id, 'create_listing.preview_price').format(price=price_display.replace(' EUR', ''))
-    preview += t(user_id, 'create_listing.preview_condition').format(condition=data.get('condition_text', ''))
+    # Убрано preview_condition - не показуємо стан для послуг
     preview += t(user_id, 'create_listing.preview_location').format(location=data.get('location', ''))
     
     # Видалено preview_photos - не показуємо кількість фото
@@ -657,7 +796,7 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
             currency='EUR',
             category=data['category_name'],
             subcategory=None,
-            condition=data['condition'],
+            condition='service',  # Для послуг завжди 'service'
             location=data.get('location', 'Не вказано'),
             images=photos,
             price_display=price_display  # Передаємо оригінальне значення
@@ -839,8 +978,7 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         if subcategory:
             message_text += f" / {subcategory}"
         message_text += f"\n"
-        message_text += f"🔧 <b>Стан:</b> {condition}\n"
-        message_text += f"📍 <b>Локація:</b> {location}\n"
+        message_text += f"📍 <b>Розташування:</b> {location}\n"
         message_text += f"📊 <b>Статус:</b> {status_text}\n"
         if created_at:
             # Форматуємо дату в нормальний формат

@@ -722,16 +722,6 @@ function formatListingText(
   const subcategory = listing.subcategory;
   const categoryText = subcategory ? `${category} / ${subcategory}` : category;
 
-  const condition = listing.condition;
-  let conditionText = '';
-  if (condition) {
-    const conditionMap: Record<string, string> = {
-      new: '🆕 Новий',
-      used: '🔧 Б/У',
-    };
-    conditionText = `\n🔄 <b>Стан:</b> ${conditionMap[condition] || condition}`;
-  }
-
   const location = listing.location || 'Не вказано';
   const createdAt = formatDate(listing.createdAt);
 
@@ -750,7 +740,7 @@ ${listing.description || 'Без опису'}
 
 💰 <b>Ціна:</b> ${priceText}
 📂 <b>Категорія:</b> ${categoryText}
-📍 <b>Місто:</b> ${location}${conditionText}
+📍 <b>Розташування:</b> ${location}
 
 👤 <b>Продавець:</b> ${sellerInfo}
 📅 <b>Створено:</b> ${createdAt}

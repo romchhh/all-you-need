@@ -293,15 +293,13 @@ def get_publication_tariff_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_german_cities_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    # Гамбург та найближчі великі міста
     cities = [
-        "Berlin", "Hamburg",
-        "München", "Köln",
-        "Frankfurt am Main", "Stuttgart",
-        "Düsseldorf", "Dortmund",
-        "Essen", "Leipzig",
-        "Bremen", "Dresden",
-        "Hannover", "Nürnberg",
-        "Duisburg", "Bochum"
+        "Hamburg", "Lüneburg",
+        "Norderstedt", "Wedel",
+        "Pinneberg", "Elmshorn",
+        "Stade", "Lübeck",
+        "Kiel", "Schwerin"
     ]
     
     keyboard = []

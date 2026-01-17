@@ -62,6 +62,58 @@ export const useTelegram = () => {
       const handleResize = () => updateViewport();
       window.addEventListener('resize', handleResize);
       
+      // Запобігаємо свайпу зверху вниз для закриття додатка
+      // Захоплюємо події touchmove на верхній частині екрану
+      let touchStartY: number | null = null;
+      let touchStartScrollY: number | null = null;
+      
+      const handleTouchStart = (e: TouchEvent) => {
+        touchStartY = e.touches[0]?.clientY || null;
+        touchStartScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      };
+      
+      const preventPullToClose = (e: TouchEvent) => {
+        // Якщо ми на самому верху сторінки (scrollY === 0 або дуже близько до 0)
+        const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        
+        if (touchStartY === null || touchStartScrollY === null) {
+          return;
+        }
+        
+        // Якщо починали на верхній частині екрану (верхні 150px) і на початку скролу
+        if (touchStartScrollY <= 10 && touchStartY < 150) {
+          const touch = e.touches[0];
+          if (touch) {
+            const deltaY = touch.clientY - touchStartY;
+            
+            // Якщо рух вниз (позитивний deltaY) і рух досить значний
+            if (deltaY > 0 && deltaY > 5) {
+              // Запобігаємо свайпу зверху вниз
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }
+        }
+      };
+      
+      const handleTouchEnd = () => {
+        touchStartY = null;
+        touchStartScrollY = null;
+      };
+      
+      // Додаємо обробники для запобігання свайпу зверху вниз
+      document.addEventListener('touchstart', handleTouchStart, { passive: true });
+      document.addEventListener('touchmove', preventPullToClose, { passive: false });
+      document.addEventListener('touchend', handleTouchEnd, { passive: true });
+      document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+      
+      // Cleanup для видалення обробників
+      const removePreventPullToClose = () => {
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchmove', preventPullToClose);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+      
       if (telegram.enableClosingConfirmation) {
         telegram.enableClosingConfirmation();
       }
@@ -127,6 +179,7 @@ export const useTelegram = () => {
       
       // Cleanup function
       return () => {
+        removePreventPullToClose();
         window.removeEventListener('resize', handleResize);
         if (telegram.offEvent) {
           telegram.offEvent('viewportChanged', updateViewport);

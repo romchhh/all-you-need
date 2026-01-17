@@ -64,8 +64,23 @@ export async function PUT(
 
     // Обробляємо зображення
     const imageFiles = formData.getAll('images') as File[];
-    const existingImages = parseExistingImages(listing.images);
-    const imageUrls = await processAndUploadImages(imageFiles, existingImages);
+    const existingImageUrls = formData.getAll('existingImages') as string[];
+    
+    // Отримуємо старі зображення або з параметра existingImages, або з БД
+    let existingImages: string[] = [];
+    if (existingImageUrls.length > 0) {
+      // Якщо передано existingImages, використовуємо їх
+      existingImages = existingImageUrls;
+    } else {
+      // Інакше використовуємо зображення з БД
+      existingImages = parseExistingImages(listing.images);
+    }
+    
+    // Обробляємо нові файли
+    const newImageUrls = await processAndUploadImages(imageFiles);
+    
+    // Об'єднуємо старі та нові зображення
+    const imageUrls = [...existingImages, ...newImageUrls];
 
     const listingData = {
       title,

@@ -50,10 +50,13 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
     touchEndX.current = currentX;
     const diffX = currentX - touchStartX.current;
     const diffY = Math.abs(currentY - touchStartY.current);
+    const absX = Math.abs(diffX);
     
-    // Якщо це горизонтальний свайп, запобігаємо свайпу назад
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+    // Якщо це горизонтальний свайп (горизонтальний рух значно більший за вертикальний)
+    // запобігаємо свайпу назад та згортанню додатка
+    if (absX > diffY * 2 && absX > 10) {
       e.preventDefault();
+      e.stopPropagation();
     }
   };
 

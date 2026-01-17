@@ -70,8 +70,8 @@ export const TopUpBalanceModal = ({
       return;
     }
 
-    if (amountNum < 1) {
-      showToast(t('payments.minAmount') || 'Мінімальна сума поповнення: 1 EUR', 'error');
+    if (amountNum < 5) {
+      showToast(t('payments.minAmount') || 'Мінімальна сума поповнення: 5 EUR', 'error');
       tg?.HapticFeedback.impactOccurred('heavy');
       return;
     }
@@ -114,7 +114,7 @@ export const TopUpBalanceModal = ({
   };
 
   // Попередньо визначені суми
-  const quickAmounts = [10, 20, 30, 50, 100, 200];
+  const quickAmounts = [5, 10, 20, 30, 50, 100, 200];
 
   return (
     <>

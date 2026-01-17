@@ -843,9 +843,28 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             formData.append('telegramId', profile.telegramId);
             formData.append('status', listingData.status || 'active');
             
-            listingData.images.forEach((image: File) => {
-              formData.append('images', image);
-            });
+            // Додаємо нові фото (File об'єкти)
+            if (listingData.images && Array.isArray(listingData.images)) {
+              listingData.images.forEach((image: File) => {
+                if (image instanceof File) {
+                  formData.append('images', image);
+                }
+              });
+            }
+            
+            // Передаємо інформацію про старі зображення, які залишаються
+            // imagePreviews містить шляхи до існуючих зображень
+            if (listingData.imagePreviews && Array.isArray(listingData.imagePreviews)) {
+              // Фільтруємо тільки URL (старі зображення), а не data URLs (нові)
+              const existingImageUrls = listingData.imagePreviews.filter(
+                (preview: string) => !preview.startsWith('data:')
+              );
+              
+              // Передаємо старі зображення як окреме поле для обробки на бекенді
+              existingImageUrls.forEach((url: string) => {
+                formData.append('existingImages', url);
+              });
+            }
 
             console.log('[ProfileTab] Updating listing with status:', listingData.status);
 

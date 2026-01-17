@@ -151,15 +151,6 @@ class ModerationManager:
         if subcategory:
             category_text += f" / {subcategory}"
         
-        condition = listing.get('condition')
-        condition_text = ""
-        if condition:
-            condition_map = {
-                'new': '🆕 Новий',
-                'used': '🔧 Б/У'
-            }
-            condition_text = f"\n🔄 <b>Стан:</b> {condition_map.get(condition, condition)}"
-        
         location = listing.get('location', 'Не вказано')
         
         tariff_info = ""
@@ -191,7 +182,7 @@ class ModerationManager:
 
 💰 <b>Ціна:</b> {price_text}
 📂 <b>Категорія:</b> {category_text}
-📍 <b>Місто:</b> {location}{condition_text}{tariff_info}
+📍 <b>Розташування:</b> {location}{tariff_info}
 
 👤 <b>Продавець:</b> {seller_info}
 📅 <b>Створено:</b> {self._format_date(listing.get('createdAt'))}
@@ -529,8 +520,7 @@ class ModerationManager:
 
 💰 <b>Ціна:</b> {price_text}
 📂 <b>Категорія:</b> {category_text}
-🔄 <b>Стан:</b> {condition_text}
-📍 <b>Місто:</b> {location}
+📍 <b>Розташування:</b> {location}
 {seller_text}
 
 #Оголошення #{category.replace(' ', '')}"""

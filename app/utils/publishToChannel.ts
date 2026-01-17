@@ -79,8 +79,7 @@ export async function publishListingToChannel(
 
 💰 <b>Ціна:</b> ${price} ${currency}
 📂 <b>Категорія:</b> ${categoryText}
-🔄 <b>Стан:</b> ${conditionText}
-📍 <b>Місто:</b> ${location}
+📍 <b>Розташування:</b> ${location}
 
 #Оголошення #${category.replace(/\s+/g, '')}`;
 

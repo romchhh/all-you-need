@@ -76,6 +76,9 @@ export const ProfileListingCard = ({
 
   // Визначаємо стилі залежно від статусу
   const getCardStyles = () => {
+    if (isSold) {
+      return 'bg-[#000000] border-2 border-gray-600 opacity-75';
+    }
     if (hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated) {
       return 'bg-[#000000] border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.3)]';
     }
@@ -95,12 +98,21 @@ export const ProfileListingCard = ({
             </div>
           </div>
         )}
+        
+        {/* Бейдж "Продано" - у верхньому лівому куті картки */}
+        {isSold && (
+          <div className="absolute top-3 left-3 z-10">
+            <div className="px-3 py-1.5 bg-green-600/90 text-white text-xs font-bold rounded-full shadow-lg border border-green-400">
+              {t('listing.sold')}
+            </div>
+          </div>
+        )}
 
         {/* Фото */}
         <div 
           className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden bg-[#2A2A2A] cursor-pointer"
           onClick={() => {
-            if (!isPendingModeration && !isDeactivated) {
+            if (!isPendingModeration && !isDeactivated && !isSold) {
               onSelect(listing);
               tg?.HapticFeedback.impactOccurred('light');
             }
@@ -111,7 +123,7 @@ export const ProfileListingCard = ({
               src={imageUrl} 
               alt={listing.title}
               className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
-                isPendingModeration ? 'opacity-50' : isDeactivated ? 'opacity-65' : ''
+                isSold ? 'grayscale opacity-50' : isPendingModeration ? 'opacity-50' : isDeactivated ? 'opacity-65' : ''
               }`}
               style={{ width: '100%', height: '100%' }}
               loading="lazy"
@@ -129,14 +141,16 @@ export const ProfileListingCard = ({
           <div>
             <div 
               className={`font-semibold text-sm line-clamp-2 cursor-pointer transition-colors ${
-                isPendingModeration 
+                isSold
+                  ? 'text-gray-500 line-through'
+                  : isPendingModeration 
                   ? 'text-[#FFFFFFA6]' 
                   : isDeactivated
                   ? 'text-[#FFFFFFA6]'
                   : 'text-white hover:text-[#D3F1A7]'
               }`}
               onClick={() => {
-                if (!isPendingModeration && !isDeactivated) {
+                if (!isPendingModeration && !isDeactivated && !isSold) {
                   onSelect(listing);
                   tg?.HapticFeedback.impactOccurred('light');
                 }
@@ -145,7 +159,9 @@ export const ProfileListingCard = ({
               {listing.title}
             </div>
             <div className={`font-bold text-base mt-1 ${
-              isPendingModeration 
+              isSold
+                ? 'text-gray-500 line-through'
+                : isPendingModeration 
                 ? 'text-[#FFFFFFA6]' 
                 : isDeactivated
                 ? 'text-[#FFFFFFA6]'
@@ -154,14 +170,19 @@ export const ProfileListingCard = ({
               {listing.isFree ? t('common.free') : `${listing.price} ${listing.currency || '$'}`}
             </div>
 
-            {/* Статус модерації або деактивації */}
-            {isPendingModeration && (
+            {/* Статус модерації, деактивації або продажу */}
+            {isSold && (
+              <div className="mt-2 text-green-400 font-bold text-base flex items-center gap-2">
+                <span>✓ {t('listing.sold')}</span>
+              </div>
+            )}
+            {isPendingModeration && !isSold && (
               <div className="mt-2 text-[#FFFFFFA6] font-bold text-base flex items-center gap-2">
                 <Loader2 size={16} className="animate-spin text-[#FFFFFFA6]" />
                 <span>{t('profile.onModeration')}</span>
               </div>
             )}
-            {isDeactivated && !isPendingModeration && (
+            {isDeactivated && !isPendingModeration && !isSold && (
               <div className="mt-2 text-[#FFFFFFA6] font-bold text-base">
                 {t('sales.deactivated')}
               </div>
@@ -170,7 +191,7 @@ export const ProfileListingCard = ({
 
           {/* Дати */}
           <div className={`text-[10px] space-y-0.5 mt-2 ${
-            isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/70'
+            isSold ? 'text-gray-500' : isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/70'
           }`}>
             {createdDate && (
               <div className="flex items-center gap-1">
@@ -210,7 +231,7 @@ export const ProfileListingCard = ({
 
           {/* Статистика */}
           <div className={`flex items-center gap-3 text-xs mt-2 ${
-            isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/70'
+            isSold ? 'text-gray-500' : isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/70'
           }`}>
             <div className="flex items-center gap-1">
               <Eye size={14} className={isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : ''} />
@@ -259,24 +280,26 @@ export const ProfileListingCard = ({
             <Edit2 size={12} />
           </button>
 
-          {/* Кнопка реклами */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPromote();
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              isPendingModeration
-                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
-                : isDeactivated
-                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
-                : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
-            }`}
-            title={t('sales.promote')}
-          >
-            <DollarSign size={12} />
-          </button>
+          {/* Кнопка відмітити як продане */}
+          {!isSold && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMarkAsSold();
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                isPendingModeration
+                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  : isDeactivated
+                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
+              }`}
+              title={t('editListing.markAsSold')}
+            >
+              <DollarSign size={12} />
+            </button>
+          )}
         </div>
       </div>
       

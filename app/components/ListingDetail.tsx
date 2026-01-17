@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, TrendingUp, Phone } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, TrendingUp, Phone, DollarSign } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -16,6 +16,7 @@ import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
+import { ConfirmModal } from './ConfirmModal';
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
@@ -87,6 +88,7 @@ export const ListingDetail = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [showMarkSoldConfirm, setShowMarkSoldConfirm] = useState(false);
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
   const { t, language } = useLanguage();
@@ -406,6 +408,18 @@ export const ListingDetail = ({
           <ArrowLeft size={20} className="text-gray-900" />
         </button>
         
+        {isOwnListing && listing.status !== 'sold' && (
+          <button
+            onClick={() => {
+              setShowMarkSoldConfirm(true);
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white mr-2"
+            title={t('editListing.markAsSold')}
+          >
+            <DollarSign size={20} className="text-gray-900" />
+          </button>
+        )}
         <button
           onClick={() => {
             onToggleFavorite(listing.id);
@@ -902,6 +916,61 @@ export const ListingDetail = ({
           onClose={() => setSelectedImageIndex(null)}
         />
       )}
+
+      {/* Підтвердження відмітки як продане */}
+      <ConfirmModal
+        isOpen={showMarkSoldConfirm}
+        onClose={() => setShowMarkSoldConfirm(false)}
+        onConfirm={async () => {
+          try {
+            const userTelegramId = currentUser?.id || profile?.telegramId;
+            if (!userTelegramId) {
+              showToast(t('editListing.updateError'), 'error');
+              return;
+            }
+
+            const formData = new FormData();
+            formData.append('title', listing.title);
+            formData.append('description', listing.description);
+            formData.append('price', listing.isFree ? '0' : listing.price);
+            formData.append('isFree', listing.isFree ? 'true' : 'false');
+            formData.append('category', listing.category);
+            if (listing.subcategory) {
+              formData.append('subcategory', listing.subcategory);
+            }
+            formData.append('location', listing.location);
+            formData.append('condition', listing.condition || '');
+            formData.append('telegramId', userTelegramId.toString());
+            formData.append('status', 'sold');
+
+            const response = await fetch(`/api/listings/${listing.id}/update`, {
+              method: 'PUT',
+              body: formData,
+            });
+
+            if (response.ok) {
+              showToast(t('editListing.listingMarkedSold'), 'success');
+              tg?.HapticFeedback.notificationOccurred('success');
+              setShowMarkSoldConfirm(false);
+              // Оновлюємо сторінку
+              router.refresh();
+              // Закриваємо детальний перегляд
+              onClose();
+            } else {
+              showToast(t('editListing.updateError'), 'error');
+            }
+          } catch (error) {
+            console.error('Error marking listing as sold:', error);
+            showToast(t('editListing.updateError'), 'error');
+          }
+        }}
+        title={t('editListing.markAsSold')}
+        message={t('editListing.confirmMarkSold')}
+        confirmText={t('editListing.markAsSold')}
+        cancelText={t('common.cancel')}
+        confirmButtonClass="bg-green-500 hover:bg-green-600"
+        tg={tg}
+      />
 
       {/* Toast сповіщення */}
       <Toast

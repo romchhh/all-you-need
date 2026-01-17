@@ -64,17 +64,20 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
     touchEndY.current = currentY;
     const diffX = touchEndX.current - touchStartX.current;
     const diffY = Math.abs(currentY - touchStartY.current);
+    const absX = Math.abs(diffX);
     
     // Перевіряємо, чи це горизонтальний рух (переважно горизонтальний)
-    const isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
+    // Горизонтальний рух має бути значно більшим за вертикальний (в 2 рази)
+    const isHorizontalSwipe = absX > diffY * 2;
     
     // Запобігаємо дефолтній поведінці ТІЛЬКИ якщо це явно горизонтальний рух
     // і він достатньо великий, щоб не заважати вертикальному скролу
-    if (isHorizontalSwipe && Math.abs(diffX) > 15 && Math.abs(diffX) > diffY * 2) {
+    if (isHorizontalSwipe && absX > 15) {
       e.preventDefault();
+      e.stopPropagation();
       setIsSwiping(true);
-    // Обмежуємо зміщення для плавності
-    setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
+      // Обмежуємо зміщення для плавності
+      setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
     } else {
       // Якщо це вертикальний рух або змішаний, скидаємо offset і не запобігаємо скролу
       setIsSwiping(false);

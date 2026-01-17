@@ -67,7 +67,7 @@ export const EditListingModal = ({
 
   const filteredCities = locationQuery
     ? searchCities(locationQuery, 10)
-    : [];
+    : (isLocationOpen ? ukrainianCities.slice(0, 10) : []);
 
   useEffect(() => {
     if (isOpen) {
@@ -80,7 +80,9 @@ export const EditListingModal = ({
       setLocation(listing.location);
       setCondition(listing.condition === 'new' ? 'new' : (listing.condition ? 'used' : 'new'));
       setCurrency(listing.currency || 'UAH');
-      setImagePreviews(listing.images || [listing.image]);
+      // Оновлюємо imagePreviews - фільтруємо null/undefined значення
+      const existingImages = (listing.images || (listing.image ? [listing.image] : [])).filter(Boolean);
+      setImagePreviews(existingImages);
       setImages([]);
       setStatus(listing.status || 'active');
       setErrors({});
@@ -150,8 +152,13 @@ export const EditListingModal = ({
       if (conditionRef.current && !conditionRef.current.contains(event.target as Node)) {
         setIsConditionOpen(false);
       }
+      // Перевіряємо клік поза меню валюти
       if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
-        setIsCurrencyOpen(false);
+        // Перевіряємо чи клік не на самому меню валюти
+        const currencyMenu = document.querySelector('[data-currency-menu]');
+        if (!currencyMenu || !currencyMenu.contains(event.target as Node)) {
+          setIsCurrencyOpen(false);
+        }
       }
       if (locationRef.current && !locationRef.current.contains(event.target as Node)) {
         setIsLocationOpen(false);
@@ -725,11 +732,12 @@ export const EditListingModal = ({
         {/* Меню валюти */}
         {isCurrencyOpen && (
           <div 
-            className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000]"
+            data-currency-menu
+            className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] min-w-[120px]"
             style={{
               top: `${currencyMenuPosition.top + 8}px`,
               left: `${currencyMenuPosition.left}px`,
-              width: `${currencyMenuPosition.width}px`
+              width: `${currencyMenuPosition.width || 120}px`
             }}
             onClick={(e) => e.stopPropagation()}
           >
