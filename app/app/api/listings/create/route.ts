@@ -56,6 +56,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Валідація розміру файлів (5 МБ на файл)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
+    const oversizedFiles = images.filter(file => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(f => f.name).join(', ');
+      console.error('[Create Listing] Files exceed 5MB limit:', fileNames);
+      return NextResponse.json(
+        { 
+          error: 'File size exceeds limit', 
+          details: `The following files exceed 5MB limit: ${fileNames}. Please compress or resize them.` 
+        },
+        { status: 400 }
+      );
+    }
+
     // Знаходимо користувача
     const user = await findUserByTelegramIdForListing(telegramId);
     if (!user) {
@@ -97,6 +112,22 @@ export async function POST(request: NextRequest) {
       needsPromotionSelection: true,
     });
   } catch (error) {
+    // М'яка обробка ECONNRESET - якщо з'єднання розірвалось, але оголошення могло створитися
+    const isConnectionReset = (error as any)?.code === 'ECONNRESET' || 
+                              (error as any)?.message?.includes('aborted') ||
+                              (error as any)?.message?.includes('ECONNRESET');
+    
+    if (isConnectionReset) {
+      console.warn('[Create Listing] Connection reset (ECONNRESET) - listing may have been created despite connection error');
+      // Повертаємо успішну відповідь, оскільки оголошення могло створитися
+      // Користувач може перевірити свої оголошення в профілі
+      return NextResponse.json({
+        success: true,
+        message: 'Listing may have been created. Please check your listings.',
+        warning: 'Connection was interrupted, but listing creation may have completed.',
+      }, { status: 200 });
+    }
+    
     console.error('[Create Listing] Error:', error);
     return NextResponse.json(
       { 

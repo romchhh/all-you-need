@@ -856,6 +856,8 @@ export const ListingDetail = ({
           listingId={listing.id}
           currentPromotion={listing.promotionType}
           telegramId={String(currentUser?.id || profile?.telegramId || '')}
+          // Тут користувач явно натискає «Рекламувати» — кнопка «Опублікувати без реклами» не потрібна
+          showSkipButton={false}
           onSelectPromotion={async (promotionType, paymentMethod) => {
             try {
               const userTelegramId = currentUser?.id || profile?.telegramId;

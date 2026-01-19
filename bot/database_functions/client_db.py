@@ -269,3 +269,36 @@ def set_user_language(user_id: int, language: str):
     
     conn.commit()
     print(f"Language {language} set for user {user_id}")
+
+
+def get_user_balance(telegram_id: int) -> float:
+    """Отримує баланс користувача за telegram_id"""
+    cursor.execute("SELECT balance FROM User WHERE telegramId = ?", (telegram_id,))
+    result = cursor.fetchone()
+    if result:
+        return float(result[0]) if result[0] is not None else 0.0
+    return 0.0
+
+
+def deduct_user_balance(telegram_id: int, amount: float) -> bool:
+    """Списує кошти з балансу користувача. Повертає True якщо успішно, False якщо недостатньо коштів"""
+    cursor.execute("SELECT balance FROM User WHERE telegramId = ?", (telegram_id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        return False
+    
+    current_balance = float(result[0]) if result[0] is not None else 0.0
+    
+    if current_balance < amount:
+        return False
+    
+    new_balance = current_balance - amount
+    cursor.execute("""
+        UPDATE User 
+        SET balance = ?, updatedAt = ?
+        WHERE telegramId = ?
+    """, (new_balance, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), telegram_id))
+    conn.commit()
+    
+    return True

@@ -403,10 +403,37 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
   if (loading) {
     console.log('[CreateListingFlow] Showing loading screen');
     return (
-      <div className="fixed inset-0 bg-white z-[70] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('common.loading')}</p>
+      <div 
+        className="fixed inset-0 z-[70] flex items-center justify-center"
+        style={{
+          background: 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.15) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.15) 0%, transparent 40%), #000000'
+        }}
+      >
+        <div className="text-center px-6">
+          {/* Елегантний спіннер */}
+          <div className="relative w-14 h-14 mx-auto mb-6">
+            {/* Фон кільце */}
+            <div className="absolute inset-0 rounded-full" style={{ border: '2px solid rgba(63, 83, 49, 0.1)' }}></div>
+            {/* Анімоване кільце з градієнтом */}
+            <div 
+              className="absolute inset-0 rounded-full animate-spin"
+              style={{ 
+                border: '2px solid transparent',
+                borderTop: '2px solid #D3F1A7',
+                borderRight: '2px solid rgba(211, 241, 167, 0.3)',
+                animationDuration: '1s',
+                animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+            ></div>
+          </div>
+          
+          {/* Текст завантаження */}
+          <p className="text-base font-medium text-white/95 mb-0.5">
+            {t('createListing.creating') || 'Створення...'}
+          </p>
+          <p className="text-xs text-white/40 font-light">
+            {t('common.loading')}
+          </p>
         </div>
       </div>
     );

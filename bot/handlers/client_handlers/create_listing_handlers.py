@@ -10,6 +10,7 @@ from keyboards.client_keyboards import (
     get_listing_confirmation_keyboard,
     get_main_menu_keyboard,
     get_publication_tariff_keyboard,
+    get_payment_method_keyboard,
     get_german_cities_keyboard,
     get_continue_photos_keyboard
 )
@@ -21,7 +22,7 @@ from database_functions.telegram_listing_db import (
     get_telegram_listing_by_id,
     update_telegram_listing_publication_tariff
 )
-from database_functions.client_db import check_user
+from database_functions.client_db import check_user, get_user_balance, deduct_user_balance
 from utils.moderation_manager import ModerationManager
 from utils.monopay_functions import create_publication_payment_link
 from main import bot
@@ -837,7 +838,12 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         except:
             pass
         
-        tariff_text = """💰 <b>Оберіть тариф для публікації оголошення:</b>
+        # Отримуємо баланс користувача
+        user_balance = get_user_balance(user_id)
+        
+        tariff_text = f"""💰 <b>Оберіть тариф для публікації оголошення:</b>
+
+💵 <b>Ваш баланс:</b> {user_balance:.2f}€
 
 📌 <b>Звичайна публікація</b> — 3€
 • Стандартний пост
@@ -1291,6 +1297,7 @@ async def refresh_listing(callback: types.CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("tariff_"), CreateListing.waiting_for_publication_tariff)
 async def process_publication_tariff(callback: types.CallbackQuery, state: FSMContext):
+    """Обробляє вибір тарифу та переходить до вибору способу оплати"""
     user_id = callback.from_user.id
     data = await state.get_data()
     listing_id = data.get('listing_id')
@@ -1315,7 +1322,166 @@ async def process_publication_tariff(callback: types.CallbackQuery, state: FSMCo
         return
     
     amount = tariff_prices[tariff_type]
+    tariff_names = {
+        'standard': 'Звичайна публікація',
+        'highlighted': 'Виділене оголошення',
+        'pinned': 'Закріп у каналі',
+        'story': 'Сторіс у каналі'
+    }
     
+    # Оновлюємо тариф в БД
+    update_telegram_listing_publication_tariff(listing_id, tariff_type, 'pending')
+    
+    # Створюємо платіжне посилання для картки заздалегідь
+    payment_result = create_publication_payment_link(
+        user_id=user_id,
+        listing_id=listing_id,
+        tariff_type=tariff_type,
+        amount=amount
+    )
+    
+    payment_url = None
+    if payment_result.get('success'):
+        payment_url = payment_result['payment_url']
+        # Зберігаємо дані про платіж
+        await state.update_data(
+            tariff_type=tariff_type,
+            tariff_amount=amount,
+            payment_invoice_id=payment_result['invoice_id'],
+            payment_local_id=payment_result['local_payment_id']
+        )
+    else:
+        # Якщо не вдалося створити платіж, все одно показуємо вибір способу оплати
+        await state.update_data(tariff_type=tariff_type, tariff_amount=amount)
+    
+    await state.set_state(CreateListing.waiting_for_payment_method)
+    
+    # Отримуємо баланс користувача
+    user_balance = get_user_balance(user_id)
+    
+    payment_method_text = f"""💳 <b>Оберіть спосіб оплати:</b>
+
+📋 <b>Тариф:</b> {tariff_names.get(tariff_type, tariff_type)}
+💰 <b>Сума:</b> {amount}€
+💵 <b>Ваш баланс:</b> {user_balance:.2f}€
+
+Яким чином бажаєте оплатити?"""
+    
+    try:
+        await callback.message.edit_text(
+            payment_method_text,
+            parse_mode="HTML",
+            reply_markup=get_payment_method_keyboard(user_id, user_balance, amount, payment_url)
+        )
+    except:
+        await callback.message.answer(
+            payment_method_text,
+            parse_mode="HTML",
+            reply_markup=get_payment_method_keyboard(user_id, user_balance, amount, payment_url)
+        )
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "payment_balance", CreateListing.waiting_for_payment_method)
+async def process_payment_balance(callback: types.CallbackQuery, state: FSMContext):
+    """Обробляє оплату з балансу"""
+    user_id = callback.from_user.id
+    data = await state.get_data()
+    listing_id = data.get('listing_id')
+    tariff_type = data.get('tariff_type')
+    amount = data.get('tariff_amount')
+    
+    if not listing_id or not tariff_type or not amount:
+        await callback.answer("❌ Помилка: дані не знайдено", show_alert=True)
+        await state.clear()
+        return
+    
+    # Перевіряємо баланс
+    current_balance = get_user_balance(user_id)
+    if current_balance < amount:
+        await callback.answer(f"❌ Недостатньо коштів на балансі. Потрібно: {amount}€, на балансі: {current_balance:.2f}€", show_alert=True)
+        return
+    
+    # Списуємо з балансу
+    success = deduct_user_balance(user_id, amount)
+    if not success:
+        await callback.answer("❌ Помилка списання з балансу", show_alert=True)
+        return
+    
+    # Оновлюємо тариф в БД як оплачений
+    update_telegram_listing_publication_tariff(listing_id, tariff_type, 'paid')
+    
+    # Очищаємо стан
+    await state.clear()
+    
+    tariff_names = {
+        'standard': 'Звичайна публікація',
+        'highlighted': 'Виділене оголошення',
+        'pinned': 'Закріп у каналі',
+        'story': 'Сторіс у каналі'
+    }
+    
+    # Відправляємо на модерацію
+    try:
+        moderation_manager = ModerationManager(bot)
+        await moderation_manager.send_listing_to_moderation(
+            listing_id=listing_id,
+            source='telegram'
+        )
+        
+        new_balance = get_user_balance(user_id)
+        success_text = f"""✅ <b>Оплата з балансу успішна!</b>
+
+📋 <b>Тариф:</b> {tariff_names.get(tariff_type, tariff_type)}
+💰 <b>Списано:</b> {amount}€
+💵 <b>Залишок на балансі:</b> {new_balance:.2f}€
+
+Ваше оголошення відправлено на модерацію. Після схвалення воно буде опубліковане в каналі."""
+        
+        try:
+            await callback.message.edit_text(
+                success_text,
+                parse_mode="HTML",
+                reply_markup=get_main_menu_keyboard(user_id)
+            )
+        except:
+            await callback.message.answer(
+                success_text,
+                parse_mode="HTML",
+                reply_markup=get_main_menu_keyboard(user_id)
+            )
+        
+        await callback.answer("✅ Оплата успішна! Оголошення відправлено на модерацію")
+        
+    except Exception as e:
+        print(f"Error processing balance payment: {e}")
+        import traceback
+        traceback.print_exc()
+        await callback.answer("❌ Помилка при обробці оплати", show_alert=True)
+
+
+@router.callback_query(F.data == "payment_card", CreateListing.waiting_for_payment_method)
+async def process_payment_card(callback: types.CallbackQuery, state: FSMContext):
+    """Обробляє оплату картою (fallback якщо URL не було створено)"""
+    user_id = callback.from_user.id
+    data = await state.get_data()
+    listing_id = data.get('listing_id')
+    tariff_type = data.get('tariff_type')
+    amount = data.get('tariff_amount')
+    payment_url = data.get('payment_url')
+    
+    if not listing_id or not tariff_type or not amount:
+        await callback.answer("❌ Помилка: дані не знайдено", show_alert=True)
+        await state.clear()
+        return
+    
+    # Якщо посилання вже є, просто показуємо його
+    if payment_url:
+        await callback.answer("Натисніть кнопку 'Оплатити картою' для переходу до оплати", show_alert=True)
+        return
+    
+    # Якщо посилання немає, створюємо його
     # Оновлюємо тариф в БД
     update_telegram_listing_publication_tariff(listing_id, tariff_type, 'pending')
     
@@ -1335,9 +1501,9 @@ async def process_publication_tariff(callback: types.CallbackQuery, state: FSMCo
     
     # Зберігаємо дані про платіж
     await state.update_data(
-        tariff_type=tariff_type,
         payment_invoice_id=payment_result['invoice_id'],
-        payment_local_id=payment_result['local_payment_id']
+        payment_local_id=payment_result['local_payment_id'],
+        payment_url=payment_url
     )
     await state.set_state(CreateListing.waiting_for_payment)
     

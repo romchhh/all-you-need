@@ -179,8 +179,19 @@ export const EditListingModal = ({
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
+    
     if (files.length + imagePreviews.length > 10) {
-      setErrors(prev => ({ ...prev, images: 'Максимум 10 фото' }));
+      setErrors(prev => ({ ...prev, images: t('createListing.errors.imagesMax') }));
+      return;
+    }
+
+    // Перевірка розміру файлів
+    const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      setErrors(prev => ({ ...prev, images: t('createListing.errors.fileSizeExceeded') }));
+      // Скидаємо input, щоб користувач міг вибрати інші файли
+      e.target.value = '';
       return;
     }
     
@@ -509,39 +520,115 @@ export const EditListingModal = ({
               <label className="block text-sm font-medium text-white mb-3">
                 Тип (необов'язково)
               </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSubcategory('');
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
-                    !subcategory
-                      ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
-                      : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
-                  }`}
-                >
-                  Всі типи
-                </button>
-                {selectedCategoryData.subcategories.map(sub => (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => {
-                      setSubcategory(sub.id);
-                      tg?.HapticFeedback.impactOccurred('light');
-                    }}
-                    className={`px-4 py-2 rounded-xl border-2 transition-all ${
-                      subcategory === sub.id
-                        ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
-                        : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
-                    }`}
-                  >
-                    {sub.name}
-                  </button>
-                ))}
-              </div>
+              {(() => {
+                // Для категорії "Послуги та робота" розділяємо підкатегорії на дві групи
+                const isServicesWork = category === 'services_work';
+                const workSubcategories = ['vacancies', 'part_time', 'looking_for_work', 'other_work'];
+                
+                const servicesSubcategories = isServicesWork 
+                  ? selectedCategoryData.subcategories.filter(sub => !workSubcategories.includes(sub.id))
+                  : selectedCategoryData.subcategories;
+                const workSubcategoriesList = isServicesWork
+                  ? selectedCategoryData.subcategories.filter(sub => workSubcategories.includes(sub.id))
+                  : [];
+
+                if (isServicesWork && workSubcategoriesList.length > 0) {
+                  // Відображаємо в 2 ряди
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubcategory('');
+                            tg?.HapticFeedback.impactOccurred('light');
+                          }}
+                          className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
+                            !subcategory
+                              ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                              : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                          }`}
+                        >
+                          Всі типи
+                        </button>
+                        {servicesSubcategories.map(sub => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => {
+                              setSubcategory(sub.id);
+                              tg?.HapticFeedback.impactOccurred('light');
+                            }}
+                            className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                              subcategory === sub.id
+                                ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                                : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                            }`}
+                          >
+                            {sub.name}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {workSubcategoriesList.map(sub => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => {
+                              setSubcategory(sub.id);
+                              tg?.HapticFeedback.impactOccurred('light');
+                            }}
+                            className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                              subcategory === sub.id
+                                ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                                : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                            }`}
+                          >
+                            {sub.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Звичайне відображення в один ряд
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubcategory('');
+                        tg?.HapticFeedback.impactOccurred('light');
+                      }}
+                      className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
+                        !subcategory
+                          ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                          : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                      }`}
+                    >
+                      Всі типи
+                    </button>
+                    {selectedCategoryData.subcategories.map(sub => (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => {
+                          setSubcategory(sub.id);
+                          tg?.HapticFeedback.impactOccurred('light');
+                        }}
+                        className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                          subcategory === sub.id
+                            ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                            : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                        }`}
+                      >
+                        {sub.name}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

@@ -373,23 +373,81 @@ export const SortModal = ({
                 {/* Підкатегорії */}
                 {selectedCategoryData && selectedCategoryData.subcategories && selectedCategoryData.subcategories.length > 0 && (
                   <div className="mt-3">
-                    <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', paddingLeft: '16px' }}>
-                      <div className="flex gap-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
-                        {selectedCategoryData.subcategories.map((subcategory) => (
-                          <button
-                            key={subcategory.id}
-                            onClick={() => handleSubcategorySelect(subcategory.id)}
-                            className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 border ${
-                              localSelectedSubcategory === subcategory.id
-                                ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                                : 'border-white text-white bg-transparent hover:bg-white/10'
-                            }`}
-                          >
-                            {subcategory.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    {(() => {
+                      // Для категорії "Послуги та робота" розділяємо підкатегорії на дві групи
+                      const isServicesWork = localSelectedCategory === 'services_work';
+                      const workSubcategories = ['vacancies', 'part_time', 'looking_for_work', 'other_work'];
+                      
+                      const servicesSubcategories = isServicesWork 
+                        ? selectedCategoryData.subcategories.filter(sub => !workSubcategories.includes(sub.id))
+                        : selectedCategoryData.subcategories;
+                      const workSubcategoriesList = isServicesWork
+                        ? selectedCategoryData.subcategories.filter(sub => workSubcategories.includes(sub.id))
+                        : [];
+
+                      if (isServicesWork && workSubcategoriesList.length > 0) {
+                        // Відображаємо в 2 ряди
+                        return (
+                          <div className="space-y-2">
+                            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', paddingLeft: '16px' }}>
+                              <div className="flex gap-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
+                                {servicesSubcategories.map((subcategory) => (
+                                  <button
+                                    key={subcategory.id}
+                                    onClick={() => handleSubcategorySelect(subcategory.id)}
+                                    className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 border ${
+                                      localSelectedSubcategory === subcategory.id
+                                        ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
+                                        : 'border-white text-white bg-transparent hover:bg-white/10'
+                                    }`}
+                                  >
+                                    {subcategory.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', paddingLeft: '16px' }}>
+                              <div className="flex gap-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
+                                {workSubcategoriesList.map((subcategory) => (
+                                  <button
+                                    key={subcategory.id}
+                                    onClick={() => handleSubcategorySelect(subcategory.id)}
+                                    className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 border ${
+                                      localSelectedSubcategory === subcategory.id
+                                        ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
+                                        : 'border-white text-white bg-transparent hover:bg-white/10'
+                                    }`}
+                                  >
+                                    {subcategory.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      
+                      // Звичайне відображення в один ряд
+                      return (
+                        <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', paddingLeft: '16px' }}>
+                          <div className="flex gap-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
+                            {selectedCategoryData.subcategories.map((subcategory) => (
+                              <button
+                                key={subcategory.id}
+                                onClick={() => handleSubcategorySelect(subcategory.id)}
+                                className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 border ${
+                                  localSelectedSubcategory === subcategory.id
+                                    ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
+                                    : 'border-white text-white bg-transparent hover:bg-white/10'
+                                }`}
+                              >
+                                {subcategory.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

@@ -11,4 +11,5 @@ class CreateListing(StatesGroup):
     waiting_for_location = State()
     waiting_for_confirmation = State()
     waiting_for_publication_tariff = State()
+    waiting_for_payment_method = State()
     waiting_for_payment = State()

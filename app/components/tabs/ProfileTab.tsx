@@ -59,6 +59,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [selectedListingForPromotion, setSelectedListingForPromotion] = useState<Listing | null>(null);
+  // Звідки відкрито модалку реклами: 'auto' (система запропонувала) або 'manual' (користувач натиснув «Рекламувати»)
+  const [promotionOpenSource, setPromotionOpenSource] = useState<'auto' | 'manual' | null>(null);
   const [showReactivateFlow, setShowReactivateFlow] = useState(false);
   const [selectedListingForReactivation, setSelectedListingForReactivation] = useState<number | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
@@ -382,7 +384,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               {profile.balance !== undefined && (
                 <div className="flex items-center gap-2 text-sm text-white/70">
                   <Wallet size={16} className="text-white/70 flex-shrink-0" />
-                  <span>{t('profile.balance')}: {profile.balance.toFixed(2)}$</span>
+                  <span>{t('profile.balance')}: {profile.balance.toFixed(2)}€</span>
                 </div>
               )}
               {profile.listingPackagesBalance !== undefined && profile.listingPackagesBalance > 0 && (
@@ -702,6 +704,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                       onPromote={() => {
                         setSelectedListingForPromotion(listing);
                         setShowPromotionModal(true);
+                        setPromotionOpenSource('manual');
                         tg?.HapticFeedback.impactOccurred('light');
                       }}
                       tg={tg}
@@ -923,6 +926,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               if (listingResponse.ok) {
                 const updatedListing = await listingResponse.json();
                 setSelectedListingForPromotion(updatedListing);
+                // Система сама пропонує рекламу після активації — дозволяємо «Опублікувати без реклами»
+                setPromotionOpenSource('auto');
                 setShowPromotionModal(true);
               }
             } else {
@@ -1025,10 +1030,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             // Оголошення залишається в статусі draft до явного вибору користувача
             setShowPromotionModal(false);
             setSelectedListingForPromotion(null);
+            setPromotionOpenSource(null);
           }}
           listingId={selectedListingForPromotion.id}
           currentPromotion={selectedListingForPromotion.promotionType}
           telegramId={profile?.telegramId}
+          // Кнопка «Опублікувати без реклами» повинна бути скрізь,
+          // ОКРІМ випадку, коли користувач сам натиснув «Рекламувати»
+          showSkipButton={promotionOpenSource !== 'manual'}
           onSelectPromotion={async (promotionType, paymentMethod) => {
             try {
               const listingId = selectedListingForPromotion.id;

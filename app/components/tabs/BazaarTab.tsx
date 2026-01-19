@@ -839,6 +839,7 @@ const BazaarTabComponent = ({
               tg?.HapticFeedback.impactOccurred('light');
             }}
             tg={tg}
+            categoryId={selectedCategory}
           />
         </div>
       )}

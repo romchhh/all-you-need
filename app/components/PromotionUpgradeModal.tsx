@@ -12,6 +12,8 @@ interface PromotionUpgradeModalProps {
   listingId: number;
   currentPromotion?: string | null;
   telegramId?: string;
+  // Чи показувати кнопку «Опублікувати без реклами»
+  showSkipButton?: boolean;
 }
 
 export default function PromotionUpgradeModal({
@@ -21,6 +23,7 @@ export default function PromotionUpgradeModal({
   listingId,
   currentPromotion,
   telegramId,
+  showSkipButton = true,
 }: PromotionUpgradeModalProps) {
   const { t } = useLanguage();
   const { user } = useTelegram();
@@ -341,6 +344,16 @@ export default function PromotionUpgradeModal({
             >
               {loading ? t('common.loading') : currentPromotion ? t('promotions.upgradeNow') : t('promotions.addPromotion')}
             </button>
+
+            {showSkipButton && (
+              <button
+                onClick={handleSkip}
+                disabled={loading}
+                className="w-full py-3 rounded-xl font-semibold text-white bg-transparent border border-white/20 hover:bg-white/10 transition-all"
+              >
+                {t('promotions.noPromotion')}
+              </button>
+            )}
           </div>
         )}
       </div>

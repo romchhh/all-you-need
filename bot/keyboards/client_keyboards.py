@@ -258,6 +258,7 @@ def get_listing_confirmation_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_publication_tariff_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Створює клавіатуру для вибору тарифу публікації"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
@@ -290,6 +291,47 @@ def get_publication_tariff_keyboard(user_id: int) -> InlineKeyboardMarkup:
             )
         ]
     ])
+
+
+def get_payment_method_keyboard(user_id: int, balance: float, amount: float, payment_url: str = None) -> InlineKeyboardMarkup:
+    """Створює клавіатуру для вибору способу оплати"""
+    keyboard = []
+    
+    # Кнопка оплати з балансу (тільки якщо достатньо коштів)
+    if balance >= amount:
+        keyboard.append([
+            InlineKeyboardButton(
+                text=f"💰 Оплатити з балансу ({balance:.2f}€)",
+                callback_data="payment_balance"
+            )
+        ])
+    
+    # Кнопка оплати картою (URL-кнопка якщо є посилання)
+    if payment_url:
+        keyboard.append([
+            InlineKeyboardButton(
+                text="💳 Оплатити картою",
+                url=payment_url
+            )
+        ])
+    else:
+        # Fallback на callback якщо посилання ще не готове
+        keyboard.append([
+            InlineKeyboardButton(
+                text="💳 Оплатити картою",
+                callback_data="payment_card"
+            )
+        ])
+    
+    # Кнопка скасувати
+    keyboard.append([
+        InlineKeyboardButton(
+            text="❌ Скасувати",
+            callback_data="cancel_listing"
+        )
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def get_german_cities_keyboard(user_id: int) -> InlineKeyboardMarkup:

@@ -50,7 +50,7 @@ export async function publishListingToChannel(
     
     const conditionMap: Record<string, string> = {
       new: '🆕 Новий',
-      used: '🔧 Б/У',
+      used: '🔧 Б/у',
     };
     const conditionText = conditionMap[condition] || condition;
 

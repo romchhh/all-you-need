@@ -79,6 +79,12 @@ export const ProfileListingCard = ({
     if (isSold) {
       return 'bg-[#000000] border-2 border-gray-600 opacity-75';
     }
+    if (isPendingModeration) {
+      return 'bg-[#000000] border-2 border-yellow-600 opacity-75';
+    }
+    if (isDeactivated) {
+      return 'bg-[#000000] border-2 border-orange-600 opacity-75';
+    }
     if (hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated) {
       return 'bg-[#000000] border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.3)]';
     }
@@ -89,12 +95,30 @@ export const ProfileListingCard = ({
     <div 
       className={`${getCardStyles()} rounded-2xl overflow-hidden transition-all`}
     >
+      {/* Напівпрозора смуга зверху для статусів */}
+      {(isSold || isPendingModeration || isDeactivated) && (
+        <div className={`absolute top-0 left-0 right-0 h-1 z-20 ${
+          isSold ? 'bg-green-600/80' : 
+          isPendingModeration ? 'bg-yellow-600/80' : 
+          'bg-orange-600/80'
+        }`} />
+      )}
+      
       <div className="flex gap-3 p-3 relative">
-        {/* Значок "На модерації" - у верхньому правому куті картки */}
+        {/* Бейдж "На модерації" - у верхньому лівому куті картки */}
         {isPendingModeration && (
-          <div className="absolute top-3 right-3 z-10">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#FFFFFFA6] text-black text-[9px] font-bold">
-              <Loader2 size={10} className="animate-spin" />
+          <div className="absolute top-3 left-3 z-10">
+            <div className="px-3 py-1.5 bg-yellow-600/90 text-white text-xs font-bold rounded-full shadow-lg border border-yellow-400">
+              {t('profile.onModeration')}
+            </div>
+          </div>
+        )}
+        
+        {/* Бейдж "Деактивовано" - у верхньому лівому куті картки */}
+        {isDeactivated && !isPendingModeration && (
+          <div className="absolute top-3 left-3 z-10">
+            <div className="px-3 py-1.5 bg-orange-600/90 text-white text-xs font-bold rounded-full shadow-lg border border-orange-400">
+              {t('sales.deactivated')}
             </div>
           </div>
         )}
@@ -123,7 +147,7 @@ export const ProfileListingCard = ({
               src={imageUrl} 
               alt={listing.title}
               className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
-                isSold ? 'grayscale opacity-50' : isPendingModeration ? 'opacity-50' : isDeactivated ? 'opacity-65' : ''
+                isSold || isPendingModeration || isDeactivated ? 'grayscale opacity-50' : ''
               }`}
               style={{ width: '100%', height: '100%' }}
               loading="lazy"
@@ -144,9 +168,9 @@ export const ProfileListingCard = ({
                 isSold
                   ? 'text-gray-500 line-through'
                   : isPendingModeration 
-                  ? 'text-[#FFFFFFA6]' 
+                  ? 'text-gray-500 line-through' 
                   : isDeactivated
-                  ? 'text-[#FFFFFFA6]'
+                  ? 'text-gray-500 line-through'
                   : 'text-white hover:text-[#D3F1A7]'
               }`}
               onClick={() => {
@@ -162,9 +186,9 @@ export const ProfileListingCard = ({
               isSold
                 ? 'text-gray-500 line-through'
                 : isPendingModeration 
-                ? 'text-[#FFFFFFA6]' 
+                ? 'text-gray-500 line-through' 
                 : isDeactivated
-                ? 'text-[#FFFFFFA6]'
+                ? 'text-gray-500 line-through'
                 : 'text-white'
             }`}>
               {listing.isFree ? t('common.free') : `${listing.price} ${listing.currency || '$'}`}
@@ -177,21 +201,21 @@ export const ProfileListingCard = ({
               </div>
             )}
             {isPendingModeration && !isSold && (
-              <div className="mt-2 text-[#FFFFFFA6] font-bold text-base flex items-center gap-2">
-                <Loader2 size={16} className="animate-spin text-[#FFFFFFA6]" />
+              <div className="mt-2 text-yellow-400 font-bold text-base flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin text-yellow-400" />
                 <span>{t('profile.onModeration')}</span>
               </div>
             )}
             {isDeactivated && !isPendingModeration && !isSold && (
-              <div className="mt-2 text-[#FFFFFFA6] font-bold text-base">
-                {t('sales.deactivated')}
+              <div className="mt-2 text-orange-400 font-bold text-base flex items-center gap-2">
+                <span>✓ {t('sales.deactivated')}</span>
               </div>
             )}
           </div>
 
           {/* Дати */}
           <div className={`text-[10px] space-y-0.5 mt-2 ${
-            isSold ? 'text-gray-500' : isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/70'
+            isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : 'text-white/70'
           }`}>
             {createdDate && (
               <div className="flex items-center gap-1">
@@ -200,15 +224,15 @@ export const ProfileListingCard = ({
             )}
             {expiresAt && !isExpired && (
               <div className={`flex items-center gap-1 ${
-                isPendingModeration 
-                  ? 'text-[#FFFFFFA6]' 
+                isSold || isPendingModeration || isDeactivated
+                  ? 'text-gray-500' 
                   : isExpiringSoon 
                   ? 'text-orange-400 font-semibold' 
                   : ''
               }`}>
-                {isPendingModeration && <Loader2 size={10} className="animate-spin text-[#FFFFFFA6]" />}
+                {isPendingModeration && <Loader2 size={10} className="animate-spin text-gray-500" />}
                 <span>{t('sales.expires')}: {formatDate(expiresAt)}</span>
-                {isExpiringSoon && !isPendingModeration && ` (${daysUntilExpiry} ${daysUntilExpiry === 1 ? t('profile.day') : t('profile.days')})`}
+                {isExpiringSoon && !isPendingModeration && !isSold && !isDeactivated && ` (${daysUntilExpiry} ${daysUntilExpiry === 1 ? t('profile.day') : t('profile.days')})`}
               </div>
             )}
             {isExpired && expiresAt && (
@@ -218,12 +242,12 @@ export const ProfileListingCard = ({
             )}
             {/* Інформація про рекламу */}
             {hasPromotion && isPromotionActive && promotionDaysLeft !== null && (
-              <div className={isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6] font-semibold' : 'text-[#D3F1A7] font-semibold'}>
+              <div className={isSold || isPendingModeration || isDeactivated ? 'text-gray-500 font-semibold' : 'text-[#D3F1A7] font-semibold'}>
                 Реклама: {promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}
               </div>
             )}
             {hasPromotion && !isPromotionActive && (
-              <div className={isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/50'}>
+              <div className={isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : 'text-white/50'}>
                 Реклама закінчилась
               </div>
             )}
@@ -231,16 +255,16 @@ export const ProfileListingCard = ({
 
           {/* Статистика */}
           <div className={`flex items-center gap-3 text-xs mt-2 ${
-            isSold ? 'text-gray-500' : isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : 'text-white/70'
+            isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : 'text-white/70'
           }`}>
             <div className="flex items-center gap-1">
-              <Eye size={14} className={isPendingModeration || isDeactivated ? 'text-[#FFFFFFA6]' : ''} />
+              <Eye size={14} className={isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : ''} />
               <span>{listing.views || 0}</span>
             </div>
             <div className="flex items-center gap-1">
               <Heart size={14} className={
-                isPendingModeration || isDeactivated
-                  ? 'text-[#FFFFFFA6]' 
+                isSold || isPendingModeration || isDeactivated
+                  ? 'text-gray-500' 
                   : isFavorite 
                   ? 'fill-[#D3F1A7] text-[#D3F1A7]' 
                   : ''
@@ -261,24 +285,26 @@ export const ProfileListingCard = ({
             </div>
           )}
 
-          {/* Кнопка редагувати */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              isPendingModeration
-                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
-                : isDeactivated
-                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
-                : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
-            }`}
-            title={t('common.edit')}
-          >
-            <Edit2 size={12} />
-          </button>
+          {/* Кнопка редагувати - прихована для проданих */}
+          {!isSold && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                isPendingModeration
+                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  : isDeactivated
+                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
+              }`}
+              title={t('common.edit')}
+            >
+              <Edit2 size={12} />
+            </button>
+          )}
 
           {/* Кнопка відмітити як продане */}
           {!isSold && (
@@ -303,38 +329,40 @@ export const ProfileListingCard = ({
         </div>
       </div>
       
-      {/* Кнопка рекламувати/активувати - знизу */}
-      <div className="px-3 pb-3">
-        {isDeactivated && onReactivate ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onReactivate();
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className="w-full bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-[#FFFFFFA6]/10 transition-colors font-semibold text-sm"
-          >
-            {t('sales.activate') || 'Активувати'}
-          </button>
-        ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPromote();
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            disabled={isPendingModeration}
-            className={`w-full rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors font-semibold text-sm ${
-              isPendingModeration
-                ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed'
-                : 'bg-[#D3F1A7] text-black hover:bg-[#D3F1A7]/90'
-            }`}
-          >
-            <Megaphone size={16} />
-            {t('sales.promote')}
-          </button>
-        )}
-      </div>
+      {/* Кнопка рекламувати/активувати - знизу (прихована для проданих) */}
+      {!isSold && (
+        <div className="px-3 pb-3">
+          {isDeactivated && onReactivate ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onReactivate();
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className="w-full bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-[#FFFFFFA6]/10 transition-colors font-semibold text-sm"
+            >
+              {t('sales.activate') || 'Активувати'}
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPromote();
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              disabled={isPendingModeration}
+              className={`w-full rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors font-semibold text-sm ${
+                isPendingModeration
+                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed'
+                  : 'bg-[#D3F1A7] text-black hover:bg-[#D3F1A7]/90'
+              }`}
+            >
+              <Megaphone size={16} />
+              {t('sales.promote')}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

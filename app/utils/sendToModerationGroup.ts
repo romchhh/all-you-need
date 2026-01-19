@@ -163,7 +163,8 @@ export async function sendListingToModerationGroup(
               // Якщо не знайдено на диску, спробуємо завантажити через HTTP
               // Спочатку спробуємо через API route, якщо це listings
               let fetchUrl = imageUrl;
-              if (imageUrl.includes('/listings/')) {
+              // Перевіряємо, чи URL вже містить /api/images/ - якщо так, не додаємо його знову
+              if (imageUrl.includes('/listings/') && !imageUrl.includes('/api/images/')) {
                 // Конвертуємо URL в API route формат
                 // https://tradegrnd.com/listings/file.webp -> https://tradegrnd.com/api/images/listings/file.webp
                 try {
@@ -350,7 +351,8 @@ export async function sendListingToModerationGroup(
                     : `${webappUrl}${img.startsWith('/') ? img : '/' + img}`;
                   
                   // Якщо це listings, спробуємо через API route
-                  if (fetchUrl.includes('/listings/')) {
+                  // Але не додаємо /api/images, якщо URL вже містить його
+                  if (fetchUrl.includes('/listings/') && !fetchUrl.includes('/api/images/')) {
                     try {
                       const urlObj = new URL(fetchUrl);
                       const pathFromUrl = urlObj.pathname; // /listings/file.webp
@@ -412,99 +414,111 @@ export async function sendListingToModerationGroup(
             };
             
             // Створюємо media array з attach:// для завантажених файлів
+            // Пропускаємо зображення, які не завантажилися
             const mediaArray: any[] = [];
+            const loadedBuffers: Array<{ buffer: Buffer; index: number }> = [];
             for (let i = 0; i < images.length; i++) {
               if (imageBuffers[i]) {
                 const attachName = `photo_${i}`;
                 appendFile(attachName, imageBuffers[i]!.buffer, `image_${i}.webp`, 'image/webp');
+                loadedBuffers.push({ buffer: imageBuffers[i]!.buffer, index: i });
                 mediaArray.push({
                   type: 'photo',
                   media: `attach://${attachName}`,
-                  caption: i === 0 ? truncatedText : undefined,
-                  parse_mode: i === 0 ? 'HTML' : undefined,
-                });
-              } else {
-                // Fallback: використовуємо URL
-                const fullUrl = images[i].startsWith('http') 
-                  ? images[i] 
-                  : `${webappUrl}${images[i].startsWith('/') ? images[i] : '/' + images[i]}`;
-                mediaArray.push({
-                  type: 'photo',
-                  media: fullUrl,
-                  caption: i === 0 ? truncatedText : undefined,
-                  parse_mode: i === 0 ? 'HTML' : undefined,
+                  caption: loadedBuffers.length === 1 ? truncatedText : undefined,
+                  parse_mode: loadedBuffers.length === 1 ? 'HTML' : undefined,
                 });
               }
+              // Пропускаємо зображення, які не завантажилися (502 або інші помилки)
             }
             
-            appendField('chat_id', MODERATION_GROUP_ID!);
-            appendField('media', JSON.stringify(mediaArray));
-            formDataParts.push(Buffer.from(`--${boundary}--\r\n`));
-            
-            const formDataBuffer = Buffer.concat(formDataParts);
-            
-            const mediaResponse = await fetch(
-              `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': `multipart/form-data; boundary=${boundary}`,
-                  'Content-Length': formDataBuffer.length.toString(),
-                },
-                body: formDataBuffer,
-              }
-            );
-            
-            if (!mediaResponse.ok) {
-              const errorText = await mediaResponse.text();
-              let error;
-              try {
-                error = JSON.parse(errorText);
-              } catch {
-                error = { description: errorText };
-              }
-              console.error('Telegram API error (media group with files):', {
-                error,
-                listingId,
-                source,
-                mediaCount: mediaArray.length,
-              });
+            // Якщо є хоча б одне завантажене зображення, надсилаємо медіа-групу
+            let mediaSent = false;
+            if (mediaArray.length > 0) {
+              appendField('chat_id', MODERATION_GROUP_ID!);
+              appendField('media', JSON.stringify(mediaArray));
+              formDataParts.push(Buffer.from(`--${boundary}--\r\n`));
               
-              // Fallback: надсилаємо як URL (може не спрацювати)
-              const fallbackMedia = images.map((img, i) => {
-                const fallbackUrl = img.startsWith('http') 
-                  ? img 
-                  : `${webappUrl}${img.startsWith('/') ? img : '/' + img}`;
-                return {
-                  type: 'photo',
-                  media: fallbackUrl,
-                  caption: i === 0 ? truncatedText : undefined,
-                  parse_mode: i === 0 ? 'HTML' : undefined,
-                };
-              });
+              const formDataBuffer = Buffer.concat(formDataParts);
               
-              const fallbackResponse = await fetch(
+              const mediaResponse = await fetch(
                 `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
                 {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    chat_id: MODERATION_GROUP_ID,
-                    media: fallbackMedia,
-                  }),
+                  headers: {
+                    'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                    'Content-Length': formDataBuffer.length.toString(),
+                  },
+                  body: formDataBuffer,
                 }
               );
               
-              if (!fallbackResponse.ok) {
-                throw new Error('Both file upload and URL methods failed');
+              if (mediaResponse.ok) {
+                mediaSent = true;
+              } else {
+                const errorText = await mediaResponse.text();
+                let error;
+                try {
+                  error = JSON.parse(errorText);
+                } catch {
+                  error = { description: errorText };
+                }
+                console.error('Telegram API error (media group with files):', {
+                  error,
+                  listingId,
+                  source,
+                  mediaCount: mediaArray.length,
+                });
+                
+                // Fallback: надсилаємо як URL (може не спрацювати)
+                const fallbackMedia = mediaArray.map((item, i) => {
+                  const img = images[loadedBuffers[i]?.index || i];
+                  const fallbackUrl = img.startsWith('http') 
+                    ? img 
+                    : `${webappUrl}${img.startsWith('/') ? img : '/' + img}`;
+                  return {
+                    type: 'photo',
+                    media: fallbackUrl,
+                    caption: i === 0 ? truncatedText : undefined,
+                    parse_mode: i === 0 ? 'HTML' : undefined,
+                  };
+                });
+                
+                const fallbackResponse = await fetch(
+                  `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      chat_id: MODERATION_GROUP_ID,
+                      media: fallbackMedia,
+                    }),
+                  }
+                );
+                
+                if (fallbackResponse.ok) {
+                  mediaSent = true;
+                } else {
+                  // Якщо і fallback не спрацював, надсилаємо тільки текст
+                  console.warn('[sendToModerationGroup] All media methods failed, sending text only');
+                }
               }
+            } else {
+              // Якщо всі зображення не завантажилися, надсилаємо тільки текст
+              console.warn('[sendToModerationGroup] No images loaded, sending text only');
             }
             
             // Надсилаємо кнопки окремим повідомленням після успішного надсилання медіа-групи
+            // Або якщо медіа не вдалося відправити, надсилаємо текст з кнопками
             const webappUrlForButtons = process.env.WEBAPP_URL || 'http://localhost:3000';
             const adminLink = source === 'marketplace' 
               ? `\n\n🔗 <a href="${webappUrlForButtons}/admin/listings/${listingId}">Переглянути в адмінці</a>`
               : '';
+            
+            // Якщо медіа не вдалося відправити, надсилаємо текст з описом
+            const messageText = !mediaSent
+              ? `${truncatedText}\n\n🔔 <b>Оголошення #${listingId}</b>\n\nОберіть дію:${adminLink}`
+              : `🔔 <b>Оголошення #${listingId}</b>\n\nОберіть дію:${adminLink}`;
             
             const buttonsResponse = await fetch(
               `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
@@ -513,7 +527,7 @@ export async function sendListingToModerationGroup(
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   chat_id: MODERATION_GROUP_ID,
-                  text: `🔔 <b>Оголошення #${listingId}</b>\n\nОберіть дію:${adminLink}`,
+                  text: messageText,
                   parse_mode: 'HTML',
                   reply_markup: keyboard,
                 }),
@@ -533,52 +547,46 @@ export async function sendListingToModerationGroup(
                 listingId,
                 source,
               });
-              // Не повертаємо false, бо медіа-група вже надіслана
+              // Не повертаємо false, щоб не блокувати процес
             }
+            
+            // Повертаємо true, навіть якщо медіа не вдалося відправити - текст надіслано
+            return true;
           } catch (error) {
             console.error('[sendToModerationGroup] Error with media group:', error);
-            // Fallback: надсилаємо як URL
-            const media = images.map((img, i) => {
-              const webappUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-              const fullUrl = img.startsWith('http') 
-                ? img 
-                : `${webappUrl}${img.startsWith('/') ? img : '/' + img}`;
-              return {
-                type: 'photo',
-                media: fullUrl,
-                caption: i === 0 ? truncatedText : undefined,
-                parse_mode: i === 0 ? 'HTML' : undefined,
-              };
-            });
+            // Якщо виникла помилка, надсилаємо тільки текст, щоб не блокувати користувача
+            console.warn('[sendToModerationGroup] Sending text only due to media errors');
             
-            const mediaResponse = await fetch(
-              `https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`,
+            const webappUrlForButtons = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+            const adminLink = source === 'marketplace' 
+              ? `\n\n🔗 <a href="${webappUrlForButtons}/admin/listings/${listingId}">Переглянути в адмінці</a>`
+              : '';
+            
+            const textResponse = await fetch(
+              `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   chat_id: MODERATION_GROUP_ID,
-                  media: media,
+                  text: `${truncatedText}\n\n🔔 <b>Оголошення #${listingId}</b>\n\nОберіть дію:${adminLink}`,
+                  parse_mode: 'HTML',
+                  reply_markup: keyboard,
                 }),
               }
             );
             
-            if (!mediaResponse.ok) {
-              const errorText = await mediaResponse.text();
-              let error;
-              try {
-                error = JSON.parse(errorText);
-              } catch {
-                error = { description: errorText };
-              }
-              console.error('Telegram API error (media group fallback):', {
-                error,
+            if (!textResponse.ok) {
+              const errorText = await textResponse.text();
+              console.error('Telegram API error (text only fallback):', {
+                error: errorText,
                 listingId,
                 source,
-                mediaCount: media.length,
               });
-              return false;
+              // Все одно повертаємо true, щоб не блокувати процес активації
             }
+            
+            return true;
           }
         } else {
           // Для Telegram file_id - надсилаємо напряму

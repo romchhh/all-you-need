@@ -469,7 +469,7 @@ class ModerationManager:
             
             condition_map = {
                 'new': '🆕 Новий',
-                'used': '🔧 Б/У'
+                'used': '🔧 Б/у'
             }
             condition_text = condition_map.get(condition, condition)
             
@@ -569,6 +569,16 @@ class ModerationManager:
                         except Exception as e:
                             print(f"Error pinning message: {e}")
                     
+                    # Для виділеного оголошення відправляємо додаткове повідомлення
+                    if tariff == 'highlighted' and message_id:
+                        try:
+                            await self.bot.send_message(
+                                chat_id=channel_id,
+                                text="🔝🔝🔝"
+                            )
+                        except Exception as e:
+                            print(f"Error sending highlighted message: {e}")
+                    
                     return message_id
                 else:
                     media = []
@@ -617,6 +627,16 @@ class ModerationManager:
                         except Exception as e:
                             print(f"Error pinning message: {e}")
                     
+                    # Для виділеного оголошення відправляємо додаткове повідомлення
+                    if tariff == 'highlighted' and message_id:
+                        try:
+                            await self.bot.send_message(
+                                chat_id=channel_id,
+                                text="🔝🔝🔝"
+                            )
+                        except Exception as e:
+                            print(f"Error sending highlighted message: {e}")
+                    
                     return message_id
             else:
                 message = await self.bot.send_message(
@@ -634,6 +654,16 @@ class ModerationManager:
                         )
                     except Exception as e:
                         print(f"Error pinning message: {e}")
+                
+                # Для виділеного оголошення відправляємо додаткове повідомлення
+                if tariff == 'highlighted' and message_id:
+                    try:
+                        await self.bot.send_message(
+                            chat_id=channel_id,
+                            text="🔝🔝🔝"
+                        )
+                    except Exception as e:
+                        print(f"Error sending highlighted message: {e}")
                 
                 return message_id
                 

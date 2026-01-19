@@ -293,6 +293,7 @@ export const CategoriesTab = ({
               tg?.HapticFeedback.impactOccurred('light');
             }}
             tg={tg}
+            categoryId={selectedCategory}
           />
         </div>
       )}

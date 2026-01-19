@@ -104,15 +104,23 @@ export async function processAndUploadImages(
   }
 
   const imageUrls: string[] = [];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
   
   for (const file of imageFiles) {
+    // Перевірка розміру файлу перед обробкою
+    if (file.size > MAX_FILE_SIZE) {
+      console.warn(`[processAndUploadImages] File ${file.name} exceeds 5MB limit (${(file.size / 1024 / 1024).toFixed(2)}MB), skipping`);
+      continue; // Пропускаємо файл, який перевищує ліміт
+    }
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     
+    // Оптимізована обробка: менший розмір, нижча якість, менший effort для швидшої обробки
     const optimizedBuffer = await sharp(buffer)
       .rotate() // Автоматично виправляє орієнтацію
-      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 85, effort: 4 })
+      .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 75, effort: 3 })
       .toBuffer();
 
     const filename = generateImageFilename();
@@ -120,6 +128,12 @@ export async function processAndUploadImages(
     
     await writeFile(filepath, optimizedBuffer);
     imageUrls.push(`/listings/${filename}`);
+  }
+  
+  // Якщо всі файли були занадто великі, повертаємо існуючі зображення
+  if (imageUrls.length === 0 && existingImages) {
+    console.warn('[processAndUploadImages] No valid images processed, returning existing images');
+    return existingImages;
   }
 
   return imageUrls;

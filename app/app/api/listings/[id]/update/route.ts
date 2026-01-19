@@ -66,6 +66,21 @@ export async function PUT(
     const imageFiles = formData.getAll('images') as File[];
     const existingImageUrls = formData.getAll('existingImages') as string[];
     
+    // Валідація розміру файлів (5 МБ на файл)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
+    const oversizedFiles = imageFiles.filter(file => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(f => f.name).join(', ');
+      console.error('[Update Listing] Files exceed 5MB limit:', fileNames);
+      return NextResponse.json(
+        { 
+          error: 'File size exceeds limit', 
+          details: `The following files exceed 5MB limit: ${fileNames}. Please compress or resize them.` 
+        },
+        { status: 400 }
+      );
+    }
+    
     // Отримуємо старі зображення або з параметра existingImages, або з БД
     let existingImages: string[] = [];
     if (existingImageUrls.length > 0) {
@@ -148,9 +163,27 @@ export async function PUT(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    // М'яка обробка ECONNRESET - якщо з'єднання розірвалось, але оголошення могло оновитися
+    const isConnectionReset = (error as any)?.code === 'ECONNRESET' || 
+                              (error as any)?.message?.includes('aborted') ||
+                              (error as any)?.message?.includes('ECONNRESET');
+    
+    if (isConnectionReset) {
+      console.warn('[Update Listing] Connection reset (ECONNRESET) - listing may have been updated despite connection error');
+      // Повертаємо успішну відповідь, оскільки оголошення могло оновитися
+      return NextResponse.json({
+        success: true,
+        message: 'Listing may have been updated. Please check your listings.',
+        warning: 'Connection was interrupted, but listing update may have completed.',
+      }, { status: 200 });
+    }
+    
     console.error('[Update Listing] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to update listing' },
+      { 
+        error: 'Failed to update listing',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
