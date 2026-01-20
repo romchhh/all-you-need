@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, TrendingUp, Phone, DollarSign } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, TrendingUp, Phone } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -407,19 +407,6 @@ export const ListingDetail = ({
         >
           <ArrowLeft size={20} className="text-gray-900" />
         </button>
-        
-        {isOwnListing && listing.status !== 'sold' && (
-          <button
-            onClick={() => {
-              setShowMarkSoldConfirm(true);
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white mr-2"
-            title={t('editListing.markAsSold')}
-          >
-            <DollarSign size={20} className="text-gray-900" />
-          </button>
-        )}
         <button
           onClick={() => {
             onToggleFavorite(listing.id);

@@ -326,8 +326,12 @@ export async function sendListingToModerationGroup(
                   // Витягуємо шлях з URL
                   try {
                     const urlObj = new URL(img);
-                    const pathFromUrl = urlObj.pathname; // /listings/file.webp
-                    localPath = join(process.cwd(), 'public', pathFromUrl);
+                    const pathFromUrl = urlObj.pathname; // /listings/file.webp або /api/images/listings/file.webp
+                    // Якщо це API route, витягаємо оригінальний шлях
+                    const actualPath = pathFromUrl.startsWith('/api/images/') 
+                      ? pathFromUrl.replace('/api/images/', '/') 
+                      : pathFromUrl;
+                    localPath = join(process.cwd(), 'public', actualPath);
                   } catch (e) {
                     // Якщо не вдалося розпарсити URL, спробуємо витягти шлях вручну
                     const pathMatch = img.match(/\/listings\/[^\/]+$/);
@@ -336,8 +340,11 @@ export async function sendListingToModerationGroup(
                     }
                   }
                 } else if (img.startsWith('/')) {
-                  // Вже відносний шлях
+                  // Вже відносний шлях з початковим слешем
                   localPath = join(process.cwd(), 'public', img);
+                } else if (img.includes('listings/')) {
+                  // Шлях без початкового слеша (наприклад: listings/file.webp)
+                  localPath = join(process.cwd(), 'public', '/' + img);
                 }
                 
                 // Спробуємо прочитати з диска
@@ -347,21 +354,32 @@ export async function sendListingToModerationGroup(
                   imageBuffers.push({ buffer, fullUrl: img });
                 } else {
                   // Якщо не знайдено на диску, спробуємо завантажити через HTTP
-                  let fetchUrl = img.startsWith('http') 
-                    ? img 
-                    : `${webappUrl}${img.startsWith('/') ? img : '/' + img}`;
+                  let fetchUrl: string;
                   
-                  // Якщо це listings, спробуємо через API route
-                  // Але не додаємо /api/images, якщо URL вже містить його
-                  if (fetchUrl.includes('/listings/') && !fetchUrl.includes('/api/images/')) {
-                    try {
-                      const urlObj = new URL(fetchUrl);
-                      const pathFromUrl = urlObj.pathname; // /listings/file.webp
-                      const apiRouteUrl = `${urlObj.origin}/api/images${pathFromUrl}`;
-                      console.log(`[sendToModerationGroup] Image ${i} trying API route:`, apiRouteUrl);
-                      fetchUrl = apiRouteUrl;
-                    } catch (e) {
-                      // Якщо не вдалося розпарсити, використовуємо оригінальний URL
+                  if (img.startsWith('http')) {
+                    // Вже повний URL
+                    fetchUrl = img;
+                    // Якщо це API route URL, спробуємо його напряму
+                    if (fetchUrl.includes('/api/images/')) {
+                      // Залишаємо як є
+                    } else if (fetchUrl.includes('/listings/')) {
+                      // Конвертуємо в API route
+                      try {
+                        const urlObj = new URL(fetchUrl);
+                        const pathFromUrl = urlObj.pathname; // /listings/file.webp
+                        fetchUrl = `${urlObj.origin}/api/images${pathFromUrl}`;
+                      } catch (e) {
+                        // Якщо не вдалося розпарсити, використовуємо оригінальний
+                      }
+                    }
+                  } else {
+                    // Відносний шлях - формуємо правильний URL
+                    const pathWithSlash = img.startsWith('/') ? img : '/' + img;
+                    // Завжди використовуємо API route для зображень з listings
+                    if (pathWithSlash.includes('/listings/')) {
+                      fetchUrl = `${webappUrl}/api/images${pathWithSlash}`;
+                    } else {
+                      fetchUrl = `${webappUrl}${pathWithSlash}`;
                     }
                   }
                   
@@ -795,21 +813,18 @@ function getImages(images: string | string[]): string[] {
     
     // Якщо це file_id (Telegram file_id зазвичай не містить слешів на початку)
     // Але для безпеки перевіряємо чи це не відносний шлях
-    if (!trimmedImg.startsWith('/') && !trimmedImg.includes('..')) {
+    if (!trimmedImg.startsWith('/') && !trimmedImg.includes('/') && !trimmedImg.includes('..')) {
       // Може бути file_id, повертаємо як є
       return trimmedImg;
     }
     
     // Відносний шлях - конвертуємо в повний URL через API route
     // Наприклад: /listings/file.webp -> https://tradegrnd.com/api/images/listings/file.webp
-    if (trimmedImg.startsWith('/')) {
-      // Видаляємо початковий слеш і додаємо через API route
-      const pathWithoutSlash = trimmedImg.slice(1);
-      return `${webappUrl}/api/images/${pathWithoutSlash}`;
-    }
+    // Або: listings/file.webp -> https://tradegrnd.com/api/images/listings/file.webp
+    const pathWithSlash = trimmedImg.startsWith('/') ? trimmedImg : '/' + trimmedImg;
     
-    // Якщо немає слешу, додаємо через API route
-    return `${webappUrl}/api/images/${trimmedImg}`;
+    // Завжди використовуємо API route для зображень з listings
+    return `${webappUrl}/api/images${pathWithSlash}`;
   });
 
   // Фільтруємо дублікати та обмежуємо до 10 фото

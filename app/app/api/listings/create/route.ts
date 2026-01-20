@@ -104,16 +104,38 @@ export async function POST(request: NextRequest) {
 
     console.log('[Create Listing] Package deducted successfully');
 
-    // Обробляємо зображення
-    const imageUrls = await processAndUploadImages(images);
-
-    // Створюємо оголошення зі статусом draft
+    // Створюємо оголошення одразу з порожнім масивом зображень
+    // Обробку зображень виконуємо асинхронно в фоні
     const listingId = await createDraftListing(
       user.id,
       { title, description, price, currency, isFree, category, subcategory, condition, location },
-      imageUrls
+      [] // Тимчасово порожній масив
     );
 
+    console.log('[Create Listing] Listing created with ID:', listingId, '- processing images asynchronously');
+
+    // Обробляємо зображення асинхронно (не блокуємо відповідь)
+    processAndUploadImages(images).then(async (imageUrls) => {
+      if (imageUrls.length > 0) {
+        try {
+          const { prisma } = await import('@/lib/prisma');
+          await prisma.$executeRawUnsafe(
+            `UPDATE Listing SET images = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+            JSON.stringify(imageUrls),
+            listingId
+          );
+          console.log('[Create Listing] Images processed and updated for listing:', listingId, 'images count:', imageUrls.length);
+        } catch (error) {
+          console.error('[Create Listing] Error updating listing with images:', error);
+        }
+      } else {
+        console.warn('[Create Listing] No images were processed for listing:', listingId);
+      }
+    }).catch((error) => {
+      console.error('[Create Listing] Error processing images asynchronously:', error);
+    });
+
+    // Повертаємо відповідь одразу, не чекаючи на обробку зображень
     return NextResponse.json({
       success: true,
       message: 'Listing created successfully',
