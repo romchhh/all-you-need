@@ -21,7 +21,15 @@ export async function POST(request: NextRequest) {
     const subcategory = formData.get('subcategory') as string | null;
     const location = formData.get('location') as string;
     const condition = formData.get('condition') as string;
-    const images = formData.getAll('images') as File[];
+    const allImages = formData.getAll('images') as File[];
+    const MAX_PHOTOS = 10;
+
+    // Обмежуємо кількість фото до максимуму (приймаємо тільки перші 10)
+    const images = allImages.slice(0, MAX_PHOTOS);
+    
+    if (allImages.length > MAX_PHOTOS) {
+      console.warn(`[Create Listing] Received ${allImages.length} images, limiting to ${MAX_PHOTOS}`);
+    }
 
     console.log('[Create Listing] Request data:', {
       telegramId,
@@ -30,6 +38,7 @@ export async function POST(request: NextRequest) {
       location,
       category,
       imagesCount: images.length,
+      originalImagesCount: allImages.length,
     });
 
     // Валідація

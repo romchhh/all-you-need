@@ -89,6 +89,7 @@ export async function deductListingPackage(user: User): Promise<boolean> {
 
 /**
  * Обробляє та завантажує зображення
+ * Оптимізовано для швидкої паралельної обробки
  */
 export async function processAndUploadImages(
   imageFiles: File[],
@@ -103,34 +104,44 @@ export async function processAndUploadImages(
     await mkdir(uploadsDir, { recursive: true });
   }
 
-  const imageUrls: string[] = [];
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
   
-  for (const file of imageFiles) {
-    // Перевірка розміру файлу перед обробкою
-    if (file.size > MAX_FILE_SIZE) {
-      console.warn(`[processAndUploadImages] File ${file.name} exceeds 5MB limit (${(file.size / 1024 / 1024).toFixed(2)}MB), skipping`);
-      continue; // Пропускаємо файл, який перевищує ліміт
-    }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    
-    // Оптимізована обробка: менший розмір, нижча якість, менший effort для швидшої обробки
-    const optimizedBuffer = await sharp(buffer)
-      .rotate() // Автоматично виправляє орієнтацію
-      .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 75, effort: 3 })
-      .toBuffer();
-
-    const filename = generateImageFilename();
-    const filepath = join(uploadsDir, filename);
-    
-    await writeFile(filepath, optimizedBuffer);
-    imageUrls.push(`/listings/${filename}`);
-  }
+  // Фільтруємо файли за розміром перед обробкою
+  const validFiles = imageFiles.filter(file => file.size > 0 && file.size <= MAX_FILE_SIZE);
   
-  // Якщо всі файли були занадто великі, повертаємо існуючі зображення
+  if (validFiles.length === 0) {
+    console.warn('[processAndUploadImages] No valid files to process');
+    return existingImages || [];
+  }
+
+  // Обробляємо всі фото паралельно для швидкості
+  const imageProcessingPromises = validFiles.map(async (file) => {
+    try {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      
+      // Оптимізована обробка: менший розмір, нижча якість, мінімальний effort для максимальної швидкості
+      const optimizedBuffer = await sharp(buffer)
+        .rotate() // Автоматично виправляє орієнтацію
+        .resize(800, 800, { fit: 'inside', withoutEnlargement: true }) // Зменшено з 1000 до 800 для швидкості
+        .webp({ quality: 70, effort: 1 }) // Мінімальний effort (1 замість 3) для швидкості, якість 70 замість 75
+        .toBuffer();
+
+      const filename = generateImageFilename();
+      const filepath = join(uploadsDir, filename);
+      
+      await writeFile(filepath, optimizedBuffer);
+      return `/listings/${filename}`;
+    } catch (error) {
+      console.error(`[processAndUploadImages] Error processing file ${file.name}:`, error);
+      return null; // Повертаємо null при помилці, фільтруємо пізніше
+    }
+  });
+
+  // Чекаємо на завершення всіх обробок паралельно
+  const imageUrls = (await Promise.all(imageProcessingPromises)).filter((url): url is string => url !== null);
+  
+  // Якщо всі файли не вдалося обробити, повертаємо існуючі зображення
   if (imageUrls.length === 0 && existingImages) {
     console.warn('[processAndUploadImages] No valid images processed, returning existing images');
     return existingImages;
@@ -374,27 +385,13 @@ export async function updateListingData(
 /**
  * Відправляє оголошення на модерацію
  */
-export async function submitListingToModeration(listingId: number): Promise<void> {
-  console.log('[submitListingToModeration] Starting for listing:', listingId);
+export async function submitListingToModeration(
+  listingId: number, 
+  isEdit?: boolean
+): Promise<void> {
+  console.log('[submitListingToModeration] Starting for listing:', listingId, 'isEdit:', isEdit);
   
-  // Надсилаємо в групу модерації
-  const { sendListingToModerationGroup } = await import('./sendToModerationGroup');
-  const sent = await sendListingToModerationGroup(listingId, 'marketplace').catch(err => {
-    console.error('[submitListingToModeration] Failed to send listing to moderation group:', {
-      listingId,
-      error: err,
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
-    });
-    return false;
-  });
-  
-  if (!sent) {
-    console.warn('[submitListingToModeration] Failed to send to moderation group, but continuing with status update');
-  } else {
-    console.log('[submitListingToModeration] Successfully sent to moderation group');
-  }
-  
+  // Спочатку оновлюємо статус, щоб отримати актуальні дані при відправці
   const nowStr = nowSQLite();
   
   await executeWithRetry(() =>
@@ -406,6 +403,24 @@ export async function submitListingToModeration(listingId: number): Promise<void
   );
   
   console.log('[submitListingToModeration] Status updated to pending_moderation');
+  
+  // Надсилаємо в групу модерації після оновлення статусу (щоб отримати актуальні дані)
+  const { sendListingToModerationGroup } = await import('./sendToModerationGroup');
+  const sent = await sendListingToModerationGroup(listingId, 'marketplace', undefined, isEdit).catch(err => {
+    console.error('[submitListingToModeration] Failed to send listing to moderation group:', {
+      listingId,
+      error: err,
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    return false;
+  });
+  
+  if (!sent) {
+    console.warn('[submitListingToModeration] Failed to send to moderation group, but status was updated');
+  } else {
+    console.log('[submitListingToModeration] Successfully sent to moderation group');
+  }
 }
 
 /**

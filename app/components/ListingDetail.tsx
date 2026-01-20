@@ -591,8 +591,8 @@ export const ListingDetail = ({
 
         {/* Статистика */}
         <div className="flex gap-4 mb-6 text-sm text-white/70">
-          <div className="flex items-center gap-1">
-            <MapPin size={16} className="text-white/70" />
+          <div className="flex items-center gap-2">
+            <MapPin size={16} className="text-white/70 flex-shrink-0" />
             <span>{listing.location}</span>
           </div>
           <div className="flex items-center gap-1">
@@ -855,6 +855,7 @@ export const ListingDetail = ({
           onClose={() => setShowPromotionModal(false)}
           listingId={listing.id}
           currentPromotion={listing.promotionType}
+          promotionEnds={listing.promotionEnds}
           telegramId={String(currentUser?.id || profile?.telegramId || '')}
           // Тут користувач явно натискає «Рекламувати» — кнопка «Опублікувати без реклами» не потрібна
           showSkipButton={false}

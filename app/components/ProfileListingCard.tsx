@@ -285,22 +285,28 @@ export const ProfileListingCard = ({
             </div>
           )}
 
-          {/* Кнопка редагувати - прихована для проданих */}
+          {/* Кнопка редагувати - прихована для проданих та заблокована для модерації */}
           {!isSold && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                if (isPendingModeration) {
+                  // Не дозволяємо редагувати оголошення на модерації
+                  tg?.HapticFeedback.notificationOccurred('error');
+                  return;
+                }
                 onEdit();
                 tg?.HapticFeedback.impactOccurred('light');
               }}
+              disabled={isPendingModeration}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                 isPendingModeration
-                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed opacity-50'
                   : isDeactivated
                   ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
                   : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
               }`}
-              title={t('common.edit')}
+              title={isPendingModeration ? t('editListing.cannotEditOnModeration') || 'Не можна редагувати під час модерації' : t('common.edit')}
             >
               <Edit2 size={12} />
             </button>

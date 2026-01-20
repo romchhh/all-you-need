@@ -32,7 +32,8 @@ interface ListingData {
 export async function sendListingToModerationGroup(
   listingId: number,
   source: 'marketplace' | 'telegram',
-  listingData?: ListingData
+  listingData?: ListingData,
+  isEdit?: boolean
 ): Promise<boolean> {
   if (!MODERATION_GROUP_ID || !BOT_TOKEN) {
     console.warn('MODERATION_GROUP_ID or TELEGRAM_BOT_TOKEN not set');
@@ -79,8 +80,8 @@ export async function sendListingToModerationGroup(
       return false;
     }
 
-    // Формуємо текст
-    const text = formatListingText(listingData, source, listingId);
+    // Формуємо текст (з пометкою про редагування якщо потрібно)
+    const text = formatListingText(listingData, source, listingId, isEdit);
 
     // Отримуємо зображення
     const images = getImages(listingData.images);
@@ -708,7 +709,8 @@ export async function sendListingToModerationGroup(
 function formatListingText(
   listing: ListingData,
   source: string,
-  listingId: number
+  listingId: number,
+  isEdit?: boolean
 ): string {
   const sourceEmoji = source === 'marketplace' ? '🌐' : '📱';
   const sourceText = source === 'marketplace' ? 'Маркетплейс' : 'Telegram бот';
@@ -739,7 +741,10 @@ function formatListingText(
     ? `\n\n🔗 <a href="${webappUrl}/admin/listings/${listingId}">Переглянути в адмінці</a>`
     : '';
 
-  return `${sourceEmoji} <b>Оголошення на модерацію</b> #${listingId}
+  // Додаємо пометку про редагування якщо потрібно
+  const editNote = isEdit ? '\n\n⚠️ <b>ОГОЛОШЕННЯ ОНОВЛЕНО</b> - потрібна повторна модерація' : '';
+
+  return `${sourceEmoji} <b>Оголошення на модерацію</b> #${listingId}${editNote}
 
 📌 <b>Назва:</b> ${listing.title || 'Без назви'}
 

@@ -80,6 +80,8 @@ export const germanCities = [
   'Siegen',
   'Hildesheim',
   'Salzgitter',
+  
+  // Популярні туристичні та важливі міста
   'Wedel',
   'Pinneberg',
   'Ahrensburg',
@@ -87,6 +89,18 @@ export const germanCities = [
   'Barsbüttel',
   'Elmshorn',
   'Buxtehude',
+  'Lüneburg',
+  'Norderstedt',
+  'Bargteheide',
+  'Bad Segeberg',
+  'Eutin',
+  'Bad Oldesloe',
+  'Neumünster',
+  'Rendsburg',
+  'Eckernförde',
+  'Flensburg',
+  'Sylt',
+  'Helgoland',
   
   // Середні міста (50,000-100,000)
   'Cottbus',
@@ -100,7 +114,6 @@ export const germanCities = [
   'Düren',
   'Ratingen',
   'Tübingen',
-  'Flensburg',
   'Lünen',
   'Villingen-Schwenningen',
   'Marl',
@@ -108,8 +121,6 @@ export const germanCities = [
   'Minden',
   'Worms',
   'Velbert',
-  'Neumünster',
-  'Norderstedt',
   'Delmenhorst',
   'Wilhelmshaven',
   'Viersen',
@@ -119,7 +130,6 @@ export const germanCities = [
   'Detmold',
   'Troisdorf',
   'Castrop-Rauxel',
-  'Lüneburg',
   'Marburg',
   'Arnsberg',
   'Lüdenscheid',
@@ -248,7 +258,6 @@ export const germanCities = [
   'Falkensee',
   'Ketzin',
   'Brandenburg',
-  'Potsdam',
   'Werder (Havel)',
   'Teltow',
   'Stahnsdorf',
@@ -266,7 +275,6 @@ export const germanCities = [
   'Schulzendorf',
   'Zeuthen',
   'Wildau',
-  'Königswusterhausen',
   'Bestensee',
   'Märkisch Buchholz',
   'Lieberose',
@@ -304,25 +312,100 @@ export const germanCities = [
   'Ralbitz-Rosenthal',
   'Göda',
   'Doberschau-Gaußig',
-  'Königswartha',
-  'Neschwitz',
-  'Radibor',
-  'Großdubrau',
-  'Malschwitz',
-  'Bautzen',
-  'Kirschau',
-  'Schirgiswalde-Kirschau',
-  'Crostwitz',
-  'Puschwitz',
-  'Nebelschütz',
-  'Räckelwitz',
-  'Panschwitz-Kuckau',
-  'Ralbitz-Rosenthal',
-  'Göda',
-  'Doberschau-Gaußig',
+  'Meissen',
+  'Döbeln',
+  'Freiberg',
+  'Aue',
+  'Schwarzenberg',
+  'Annaberg-Buchholz',
+  'Marienberg',
+  'Brand-Erbisdorf',
+  'Glauchau',
+  'Crimmitschau',
+  'Werdau',
+  'Reichenbach im Vogtland',
+  'Markneukirchen',
+  'Oelsnitz',
+  'Auerbach',
+  'Falkenstein',
+  'Rodewisch',
+  'Treuen',
+  'Pöhl',
+  'Elsterberg',
+  'Greiz',
+  'Zeulenroda-Triebes',
+  'Schleiz',
+  'Lößnitz',
+  'Eibenstock',
+  'Johanngeorgenstadt',
+  'Schneeberg',
+  'Lauter',
+  'Raschau-Markersbach',
+  'Breitenbrunn',
+  'Grünhain-Beierfeld',
+  'Zwönitz',
+  'Thum',
+  'Geyer',
+  'Ehrenfriedersdorf',
+  'Buchholz',
+  'Stollberg',
+  'Lugau',
+  'Oelsnitz',
+  'Hartenstein',
+  'Hartenstein',
+  'Wilkau-Haßlau',
+  'Kirchberg',
+  'Wildenfels',
+  'Mülsen',
+  'Lichtenstein',
+  'Oberlungwitz',
+  'Limbach-Oberfrohna',
+  'Burgstädt',
+  'Penig',
+  'Rochlitz',
+  'Geithain',
+  'Borna',
+  'Regis-Breitingen',
+  'Rötha',
+  'Markkleeberg',
+  'Taucha',
+  'Schkeuditz',
+  'Delitzsch',
+  'Bad Düben',
+  'Eilenburg',
+  'Torgau',
+  'Belgern-Schildau',
+  'Dommitzsch',
+  'Prettin',
+  'Annaburg',
+  'Schweinitz',
+  'Jessen',
+  'Elster',
+  'Bad Liebenwerda',
+  'Mühlberg',
+  'Herzberg',
+  'Falkenberg',
+  'Uebigau-Wahrenbrück',
+  'Doberlug-Kirchhain',
+  'Finsterwalde',
+  'Sonnewalde',
+  'Crinitz',
+  'Massen-Niederlausitz',
+  'Schlieben',
+  'Schönewalde',
+  'Hohenleipisch',
+  'Döllingen',
+  'Plessa',
+  'Gröden',
+  'Hirschfeld',
+  'Rückersdorf',
+  'Elsterwerda',
+  'Bad Liebenwerda',
+  'Mühlberg',
+  'Uebigau-Wahrenbrück',
 ].sort((a, b) => a.localeCompare(b, 'de'));
 
-// Функція пошуку міст
+// Функція пошуку міст (локально, для обратної совместимости)
 export function searchGermanCities(query: string, limit: number = 10): string[] {
   const normalizedQuery = query.toLowerCase().trim();
   
@@ -331,6 +414,37 @@ export function searchGermanCities(query: string, limit: number = 10): string[] 
   return germanCities
     .filter(city => city.toLowerCase().includes(normalizedQuery))
     .slice(0, limit);
+}
+
+// Функція загрузки міст из API
+export async function fetchGermanCitiesFromAPI(query: string = '', limit: number = 100): Promise<{ cities: string[]; total: number; hasMore: boolean }> {
+  try {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    params.set('limit', limit.toString());
+
+    const response = await fetch(`/api/german-cities?${params.toString()}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch cities: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+      cities: data.cities || [],
+      total: data.total || 0,
+      hasMore: data.hasMore || false
+    };
+  } catch (error) {
+    console.error('[fetchGermanCitiesFromAPI] Error:', error);
+    // Fallback на локальный список
+    const filtered = searchGermanCities(query, limit);
+    return {
+      cities: filtered,
+      total: filtered.length,
+      hasMore: false
+    };
+  }
 }
 
 // Функція перевірки чи є місто в списку

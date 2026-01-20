@@ -8,6 +8,7 @@ import {
   updateListingToDraft,
   updateListingData,
   needsReactivation,
+  submitListingToModeration,
 } from '@/utils/listingHelpers';
 
 interface Listing {
@@ -158,7 +159,39 @@ export async function PUT(
       });
     }
 
-    // Звичайне оновлення без реактивації (не змінюємо статус на 'active')
+    // Перевіряємо поточний статус оголошення
+    const currentStatus = listing.status;
+    
+    // Якщо оголошення активне - обов'язково відправляємо на модерацію після редагування
+    // Також відправляємо на модерацію для інших статусів (крім draft та pending_moderation)
+    const isActiveListing = currentStatus === 'active';
+    const shouldSendToModeration = isActiveListing || 
+      (currentStatus !== 'draft' && currentStatus !== 'pending_moderation' && !requestedStatus);
+    
+    if (shouldSendToModeration) {
+      console.log('[Update Listing] Listing edited, sending to moderation. Current status:', currentStatus);
+      
+      // Оновлюємо дані оголошення зі статусом pending_moderation
+      await updateListingData(listingId, listingData, imageUrls, 'pending_moderation');
+      
+      // Відправляємо на модерацію після оновлення БД (щоб отримати актуальні дані)
+      // Передаємо isEdit=true щоб додати пометку про редагування
+      try {
+        await submitListingToModeration(listingId, true);
+        console.log('[Update Listing] Active listing sent to moderation after edit');
+      } catch (error) {
+        console.error('[Update Listing] Error sending to moderation:', error);
+        // Продовжуємо виконання, навіть якщо відправка не вдалася
+      }
+      
+      return NextResponse.json({ 
+        success: true,
+        needsModeration: true,
+        message: 'Listing updated and sent to moderation'
+      });
+    }
+
+    // Звичайне оновлення без реактивації (для draft або якщо вказано конкретний статус)
     await updateListingData(listingId, listingData, imageUrls, requestedStatus || undefined);
 
     return NextResponse.json({ success: true });

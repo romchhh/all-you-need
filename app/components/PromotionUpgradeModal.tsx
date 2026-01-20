@@ -11,6 +11,7 @@ interface PromotionUpgradeModalProps {
   onSelectPromotion: (promotionType: string | null, paymentMethod?: 'balance' | 'direct') => void;
   listingId: number;
   currentPromotion?: string | null;
+  promotionEnds?: string | null;
   telegramId?: string;
   // Чи показувати кнопку «Опублікувати без реклами»
   showSkipButton?: boolean;
@@ -22,6 +23,7 @@ export default function PromotionUpgradeModal({
   onSelectPromotion,
   listingId,
   currentPromotion,
+  promotionEnds,
   telegramId,
   showSkipButton = true,
 }: PromotionUpgradeModalProps) {
@@ -71,6 +73,26 @@ export default function PromotionUpgradeModal({
       fetchBalance();
     } else if (isOpen && !userId) {
       console.warn('Modal opened but no userId available');
+    }
+
+    // Блокуємо скролл body коли модальне вікно відкрите
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalPosition = document.body.style.position;
+      const scrollY = window.scrollY;
+      
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.position = originalPosition;
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      };
     }
   }, [isOpen, userId]);
 
@@ -126,8 +148,42 @@ export default function PromotionUpgradeModal({
   // Фільтруємо тільки ті рекламні пакети, що вищі за поточний
   const availableUpgrades = promotionLevels.filter(p => p.level > currentLevel);
 
+  // Обчислюємо кількість днів, що залишилися для VIP реклами
+  const getDaysLeftForVIP = (): number | null => {
+    if (currentPromotion === 'vip' && promotionEnds) {
+      const endsAt = new Date(promotionEnds);
+      const now = new Date();
+      if (endsAt > now) {
+        const diffTime = endsAt.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+      }
+    }
+    return null;
+  };
+
+  const daysLeft = getDaysLeftForVIP();
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 overflow-hidden"
+      style={{ position: 'fixed' }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      onWheel={(e) => {
+        // Блокуємо скролл фонового контенту
+        e.stopPropagation();
+      }}
+      onTouchMove={(e) => {
+        // Блокуємо скролл на мобільних пристроях
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+        }
+      }}
+    >
       <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col relative z-[10000]">
         {/* Header */}
         <div className="flex-shrink-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
@@ -150,15 +206,30 @@ export default function PromotionUpgradeModal({
               <p className="text-sm text-white">
                 <span className="font-semibold">{t('promotions.current')}:</span> {t(`promotions.${currentPromotion}`)}
               </p>
-              <p className="text-xs text-white/70 mt-1">
-                {t('promotions.upgradeDescription')}
-              </p>
+              {currentPromotion === 'vip' && daysLeft !== null && daysLeft > 0 && (
+                <p className="text-sm text-[#D3F1A7] mt-2 font-medium">
+                  {daysLeft === 1 
+                    ? t('promotions.vipActiveOneDay', { days: String(daysLeft) })
+                    : t('promotions.vipActiveDays', { days: String(daysLeft) })}
+                </p>
+              )}
+              {currentPromotion !== 'vip' && (
+                <p className="text-xs text-white/70 mt-1">
+                  {t('promotions.upgradeDescription')}
+                </p>
+              )}
             </div>
           )}
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-4">
+        <div 
+          className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-4"
+          onWheel={(e) => {
+            // Дозволяємо скролл тільки всередині контенту
+            e.stopPropagation();
+          }}
+        >
           {/* Показуємо баланс */}
           <div className="bg-[#1C1C1C] rounded-xl p-4 border border-white/20">
             <div className="flex justify-between items-center">

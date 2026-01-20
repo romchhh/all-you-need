@@ -4,7 +4,7 @@ import { Category } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { getCategories } from '@/constants/categories';
-import { germanCities } from '@/constants/german-cities';
+import { germanCities, fetchGermanCitiesFromAPI } from '@/constants/german-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
@@ -39,6 +39,7 @@ export const CreateListingModal = ({
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isConditionOpen, setIsConditionOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
@@ -115,23 +116,49 @@ export const CreateListingModal = ({
   ];
 
   // Фільтруємо міста за запитом (по ключових літерах, як на головній сторінці)
-  const filteredCities = useMemo(() => {
-    if (!locationQuery.trim()) {
-      return defaultCities;
-    }
-    const query = locationQuery.toLowerCase().trim();
-    // Спочатку шукаємо в defaultCities
-    const defaultMatches = defaultCities.filter(city =>
-      city.toLowerCase().startsWith(query) || city.toLowerCase().includes(query)
-    );
-    // Якщо знайдено в defaultCities, повертаємо їх
-    if (defaultMatches.length > 0) {
-      return defaultMatches;
-    }
-    // Якщо не знайдено, шукаємо в повному списку міст
-    return germanCities.filter(city =>
-      city.toLowerCase().startsWith(query) || city.toLowerCase().includes(query)
-    ).slice(0, 10);
+  const [filteredCities, setFilteredCities] = useState<string[]>(defaultCities);
+  const [loadingCities, setLoadingCities] = useState(false);
+
+  // Загружаємо міста з API при зміні запиту
+  useEffect(() => {
+    const loadCities = async () => {
+      if (!locationQuery.trim()) {
+        setFilteredCities(defaultCities);
+        return;
+      }
+
+      setLoadingCities(true);
+      try {
+        const result = await fetchGermanCitiesFromAPI(locationQuery, 20);
+        // Об'єднуємо з defaultCities, видаляючи дублікати
+        const allCities = [...new Set([...defaultCities, ...result.cities])];
+        setFilteredCities(allCities.slice(0, 20));
+      } catch (error) {
+        console.error('Error loading cities:', error);
+        // Fallback на локальний пошук
+        const query = locationQuery.toLowerCase().trim();
+        const defaultMatches = defaultCities.filter(city =>
+          city.toLowerCase().startsWith(query) || city.toLowerCase().includes(query)
+        );
+        if (defaultMatches.length > 0) {
+          setFilteredCities(defaultMatches);
+        } else {
+          const localResults = germanCities.filter(city =>
+            city.toLowerCase().startsWith(query) || city.toLowerCase().includes(query)
+          ).slice(0, 10);
+          setFilteredCities(localResults);
+        }
+      } finally {
+        setLoadingCities(false);
+      }
+    };
+
+    // Debounce запиту
+    const timeoutId = setTimeout(() => {
+      loadCities();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
   }, [locationQuery]);
 
   // Блокуємо скрол body при відкритому модальному вікні
@@ -212,18 +239,23 @@ export const CreateListingModal = ({
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
+    const MAX_PHOTOS = 10;
     
-    if (files.length + images.length > 10) {
+    // Якщо вже досягнуто ліміт, не приймаємо нові фото
+    if (images.length >= MAX_PHOTOS) {
       if (tg) {
         tg.showAlert(t('createListing.maxPhotos'));
       } else {
         showToast(t('createListing.maxPhotos'), 'error');
       }
+      e.target.value = '';
       return;
     }
 
-    // Перевірка розміру файлів
+    // Перевірка розміру файлів перед обробкою
+    const validFiles = files.filter(file => file.size <= MAX_FILE_SIZE);
     const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
+    
     if (oversizedFiles.length > 0) {
       const errorMessage = t('createListing.errors.fileSizeExceeded');
       if (tg) {
@@ -231,27 +263,85 @@ export const CreateListingModal = ({
       } else {
         showToast(errorMessage, 'error');
       }
-      // Скидаємо input, щоб користувач міг вибрати інші файли
+    }
+
+    // Обчислюємо скільки фото можна додати
+    const availableSlots = MAX_PHOTOS - images.length;
+    let filesToAdd = validFiles.slice(0, availableSlots);
+    const rejectedCount = validFiles.length - filesToAdd.length;
+
+    // Якщо є файли, які не вмістилися, показуємо уведомлення
+    if (rejectedCount > 0) {
+      const message = t('createListing.maxPhotos');
+      if (tg) {
+        tg.showAlert(message);
+      } else {
+        showToast(message, 'error');
+      }
+    }
+
+    // Якщо немає валідних файлів для додавання, скидаємо input
+    if (filesToAdd.length === 0) {
       e.target.value = '';
       return;
     }
 
-    const newImages = [...images, ...files];
+    const newImages = [...images, ...filesToAdd];
     setImages(newImages);
 
-    // Створюємо прев'ю
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreviews(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
+    // Створюємо прев'ю для всіх файлів одночасно, зберігаючи правильний порядок
+    const previewPromises = filesToAdd.map(file => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      });
     });
+
+    Promise.all(previewPromises).then(previews => {
+      setImagePreviews(prev => [...prev, ...previews]);
+    });
+
+    // Скидаємо input для наступного вибору
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    setImages(prev => {
+      const newImages = [...prev];
+      const [removed] = newImages.splice(fromIndex, 1);
+      newImages.splice(toIndex, 0, removed);
+      return newImages;
+    });
+    setImagePreviews(prev => {
+      const newPreviews = [...prev];
+      const [removed] = newPreviews.splice(fromIndex, 1);
+      newPreviews.splice(toIndex, 0, removed);
+      return newPreviews;
+    });
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    moveImage(draggedIndex, index);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
   };
 
   const validate = (): boolean => {
@@ -387,19 +477,32 @@ export const CreateListingModal = ({
               <div className="w-full px-4 py-3 bg-transparent rounded-xl">
                 <div className="grid grid-cols-3 gap-2 mb-2">
                   {imagePreviews.map((preview, index) => (
-                    <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C]">
+                    <div 
+                      key={index} 
+                      className={`relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] cursor-move ${
+                        draggedIndex === index ? 'opacity-50' : ''
+                      }`}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnd={handleDragEnd}
+                    >
                       <img 
                         src={preview} 
                         alt={`Preview ${index + 1}`} 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover pointer-events-none"
                         loading="lazy"
                         decoding="async"
+                        draggable={false}
                       />
                       <button
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage(index);
+                        }}
+                        className="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center text-xs hover:bg-black/70 transition-colors z-10"
                       >
-                        ×
+                        <X size={14} className="text-white" />
                       </button>
                     </div>
                   ))}
@@ -423,13 +526,10 @@ export const CreateListingModal = ({
 
           {/* Заголовок */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2">
               <label className="block text-sm font-medium text-white">
                 {t('createListing.titleLabel')}
               </label>
-              <span className={`text-xs ${title.length > TITLE_MAX_LENGTH * 0.9 ? 'text-yellow-400' : 'text-white/50'}`}>
-                {title.length}/{TITLE_MAX_LENGTH}
-              </span>
             </div>
             <input
               type="text"
@@ -453,18 +553,10 @@ export const CreateListingModal = ({
 
           {/* Опис */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2">
               <label className="block text-sm font-medium text-white">
                 {t('createListing.descriptionLabel')}
               </label>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs ${calculateTotalTextLength > TELEGRAM_CAPTION_LIMIT ? 'text-red-400' : calculateTotalTextLength > TELEGRAM_CAPTION_LIMIT * 0.9 ? 'text-yellow-400' : 'text-white/50'}`}>
-                  Загалом: {calculateTotalTextLength}/{TELEGRAM_CAPTION_LIMIT}
-                </span>
-                <span className={`text-xs ${description.length > DESCRIPTION_MAX_LENGTH * 0.9 ? 'text-yellow-400' : 'text-white/50'}`}>
-                  Опис: {description.length}/{DESCRIPTION_MAX_LENGTH}
-                </span>
-              </div>
             </div>
             <textarea
               value={description}
@@ -977,13 +1069,14 @@ export const CreateListingModal = ({
                 }}
                 placeholder={t('createListing.searchCity')}
                 autoFocus
-                className="w-full px-4 py-3 pl-12 pr-10 bg-[#1C1C1C] rounded-xl border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50"
+                className="w-full px-4 py-3 pl-10 pr-10 bg-[#1C1C1C] rounded-xl border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50"
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
               />
               <MapPin 
                 size={18} 
-                className="absolute left-5 top-1/2 -translate-y-1/2 text-[#D3F1A7] pointer-events-none"
+                className="absolute top-1/2 -translate-y-1/2 text-[#D3F1A7] pointer-events-none"
+                style={{ left: '12px' }}
               />
               {locationQuery && (
                 <button
@@ -1004,7 +1097,12 @@ export const CreateListingModal = ({
 
           {/* Список міст */}
           <div className="flex-1 overflow-y-auto overscroll-contain">
-            {filteredCities.length > 0 ? (
+            {loadingCities ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4">
+                <div className="w-8 h-8 border-2 border-[#D3F1A7] border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-white/70 text-sm">Завантаження міст...</p>
+              </div>
+            ) : filteredCities.length > 0 ? (
               <div className="divide-y divide-white/10">
                 {filteredCities.map((city) => (
                   <button

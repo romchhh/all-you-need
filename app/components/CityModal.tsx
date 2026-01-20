@@ -4,7 +4,7 @@ import { X, MapPin, Search, Check } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useState, useEffect, Fragment, useMemo, useRef } from 'react';
-import { germanCities } from '@/constants/german-cities';
+import { germanCities, fetchGermanCitiesFromAPI } from '@/constants/german-cities';
 
 interface TouchStart {
   y: number;
@@ -104,6 +104,8 @@ export const CityModal = ({
   const { t } = useLanguage();
   const [localSelectedCities, setLocalSelectedCities] = useState<string[]>(selectedCities);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
   
   // Зберігаємо функції в ref для гарантії актуальності
   const onCloseRef = useRef(onClose);
@@ -151,43 +153,81 @@ export const CityModal = ({
     };
   }, [isOpen, selectedCities]);
 
-  // Фільтруємо результати пошуку (по ключових літерах, як на головній сторінці)
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return [];
-    }
-    const query = searchQuery.toLowerCase().trim();
-    // Спочатку перевіряємо чи це індекс (5 цифр)
-    const isPostalCode = /^\d{5}$/.test(query);
-    
-    if (isPostalCode) {
-      // Пошук по індексу
-      const mappedCity = postalCodeToCity[query];
-      if (mappedCity) {
-        const cityExists = germanCities.some(c => 
-          c.toLowerCase() === mappedCity.toLowerCase()
-        );
-        if (cityExists) {
-          return [mappedCity];
-        }
-        return [mappedCity];
+  // Загружаємо міста з API при зміні запиту
+  useEffect(() => {
+    const loadCities = async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
       }
-      // Якщо немає в маппінгу, шукаємо в назвах
-      return germanCities.filter(city => 
-        city.toLowerCase().includes(query)
-      ).slice(0, 10);
-    }
-    
-    // Пошук по назві (по ключових літерах - починається з або містить)
-    const lowerQuery = query;
-    const startsWith = germanCities.filter(city => 
-      city.toLowerCase().startsWith(lowerQuery)
-    );
-    const includes = germanCities.filter(city => 
-      city.toLowerCase().includes(lowerQuery) && !city.toLowerCase().startsWith(lowerQuery)
-    );
-    // Спочатку ті, що починаються з запиту, потім ті, що містять
-    return [...startsWith, ...includes].slice(0, 10);
+
+      const query = searchQuery.toLowerCase().trim();
+      
+      // Спочатку перевіряємо чи це індекс (5 цифр)
+      const isPostalCode = /^\d{5}$/.test(query);
+      
+      if (isPostalCode) {
+        // Пошук по індексу - спочатку перевіряємо маппінг
+        const mappedCity = postalCodeToCity[query];
+        if (mappedCity) {
+          setSearchResults([mappedCity]);
+          return;
+        }
+      }
+
+      setLoadingCities(true);
+      try {
+        // Загружаємо з API
+        const result = await fetchGermanCitiesFromAPI(searchQuery, 20);
+        
+        // Якщо це індекс і є результат з API, використовуємо його
+        if (isPostalCode) {
+          setSearchResults(result.cities.slice(0, 20));
+        } else {
+          // Для пошуку по назві сортуємо: спочатку ті що починаються з запиту
+          const lowerQuery = query.toLowerCase();
+          const startsWith = result.cities.filter(city => 
+            city.toLowerCase().startsWith(lowerQuery)
+          );
+          const includes = result.cities.filter(city => 
+            city.toLowerCase().includes(lowerQuery) && !city.toLowerCase().startsWith(lowerQuery)
+          );
+          setSearchResults([...startsWith, ...includes].slice(0, 20));
+        }
+      } catch (error) {
+        console.error('Error loading cities:', error);
+        // Fallback на локальний пошук
+        if (isPostalCode) {
+          const mappedCity = postalCodeToCity[query];
+          if (mappedCity) {
+            setSearchResults([mappedCity]);
+          } else {
+            const localResults = germanCities.filter(city => 
+              city.toLowerCase().includes(query)
+            ).slice(0, 10);
+            setSearchResults(localResults);
+          }
+        } else {
+          const lowerQuery = query.toLowerCase();
+          const startsWith = germanCities.filter(city => 
+            city.toLowerCase().startsWith(lowerQuery)
+          );
+          const includes = germanCities.filter(city => 
+            city.toLowerCase().includes(lowerQuery) && !city.toLowerCase().startsWith(lowerQuery)
+          );
+          setSearchResults([...startsWith, ...includes].slice(0, 10));
+        }
+      } finally {
+        setLoadingCities(false);
+      }
+    };
+
+    // Debounce запиту
+    const timeoutId = setTimeout(() => {
+      loadCities();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
   // Обробка вибору/зняття вибору міста
@@ -317,7 +357,11 @@ export const CityModal = ({
             <div className="p-6 space-y-4">
               {/* Пошук */}
               <div className="relative">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-white/80" size={18} />
+                <Search 
+                  className="absolute top-1/2 -translate-y-1/2 text-white/80" 
+                  size={18} 
+                  style={{ left: '12px' }}
+                />
                 <input
                   ref={(el) => {
                     if (el && isOpen) {
@@ -336,8 +380,7 @@ export const CityModal = ({
                     }
                   }}
                   placeholder={t('bazaar.searchCity') || 'Пошук по назві або індексу (наприклад: 22880 або Wedel)'}
-                  className="w-full pr-4 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder:text-white/60"
-                  style={{ paddingLeft: '52px' }}
+                  className="w-full pr-4 py-3 pl-10 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder:text-white/60"
                 />
               </div>
 
@@ -351,7 +394,7 @@ export const CityModal = ({
                       : 'border-white text-white bg-transparent hover:bg-white/10'
                   }`}
                 >
-                  <MapPin size={16} className={localSelectedCities.length === 0 ? 'text-[#D3F1A7]' : 'text-white'} />
+                  <MapPin size={16} className={`flex-shrink-0 mr-2 ${localSelectedCities.length === 0 ? 'text-[#D3F1A7]' : 'text-white'}`} />
                   <span className="font-medium">{t('bazaar.allCities') || 'Всі міста'}</span>
                 </button>
               </div>
@@ -394,7 +437,7 @@ export const CityModal = ({
                               : 'border-white text-white bg-transparent hover:bg-white/10'
                           }`}
                         >
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                             isSelected 
                               ? 'border-[#D3F1A7] bg-[#D3F1A7]' 
                               : 'border-white'
@@ -403,7 +446,7 @@ export const CityModal = ({
                               <Check size={12} className="text-black" strokeWidth={3} />
                             )}
                           </div>
-                          <MapPin size={16} className={isSelected ? 'text-[#D3F1A7]' : 'text-white'} />
+                          <MapPin size={16} className={`flex-shrink-0 ${isSelected ? 'text-[#D3F1A7]' : 'text-white'}`} />
                           <span>{city}</span>
                         </button>
                       );
@@ -413,45 +456,51 @@ export const CityModal = ({
               )}
 
               {/* Результати пошуку */}
-              {searchQuery && searchResults.length > 0 && (
+              {searchQuery && (
                 <div>
-                  <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.searchResults')}</h4>
-                  <div className="space-y-2">
-                    {searchResults.map((city) => {
-                      const isSelected = localSelectedCities.includes(city);
-                      return (
-                        <button
-                          key={city}
-                          onClick={() => toggleCity(city)}
-                          className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
-                            isSelected
-                              ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-                              : 'border-white text-white bg-transparent hover:bg-white/10'
-                          }`}
-                        >
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                            isSelected 
-                              ? 'border-[#D3F1A7] bg-[#D3F1A7]' 
-                              : 'border-white'
-                          }`}>
-                            {isSelected && (
-                              <Check size={12} className="text-black" strokeWidth={3} />
-                            )}
-                          </div>
-                          <MapPin size={16} className={isSelected ? 'text-[#D3F1A7]' : 'text-white'} />
-                          <span>{city}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Повідомлення якщо нічого не знайдено */}
-              {searchQuery && searchResults.length === 0 && (
-                <div className="text-center py-8 text-white/60">
-                  <p>{t('common.nothingFound')}</p>
-                  <p className="text-sm mt-2">{t('bazaar.tryPostalCode')}</p>
+                  {loadingCities ? (
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <div className="w-6 h-6 border-2 border-[#D3F1A7] border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <p className="text-white/70 text-sm">Завантаження міст...</p>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <>
+                      <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.searchResults')}</h4>
+                      <div className="space-y-2">
+                        {searchResults.map((city) => {
+                          const isSelected = localSelectedCities.includes(city);
+                          return (
+                            <button
+                              key={city}
+                              onClick={() => toggleCity(city)}
+                              className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
+                                isSelected
+                                  ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                                  : 'border-white text-white bg-transparent hover:bg-white/10'
+                              }`}
+                            >
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                isSelected 
+                                  ? 'border-[#D3F1A7] bg-[#D3F1A7]' 
+                                  : 'border-white'
+                              }`}>
+                                {isSelected && (
+                                  <Check size={12} className="text-black" strokeWidth={3} />
+                                )}
+                              </div>
+                              <MapPin size={16} className={`flex-shrink-0 ${isSelected ? 'text-[#D3F1A7]' : 'text-white'}`} />
+                              <span>{city}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-white/60">
+                      <p>{t('common.nothingFound')}</p>
+                      <p className="text-sm mt-2">{t('bazaar.tryPostalCode')}</p>
+                    </div>
+                  )}
                 </div>
               )}
 

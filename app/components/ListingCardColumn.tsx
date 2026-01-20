@@ -162,7 +162,7 @@ const ListingCardColumnComponent = ({
           {/* Нижня частина: розташування та час */}
           <div className="flex flex-col gap-1 text-[10px] min-w-0">
             {listing.location && (
-              <div className="flex items-center gap-1 text-white/80">
+              <div className="flex items-center gap-1.5 text-white/80">
                 <MapPin size={10} className="text-white/80 flex-shrink-0" />
                 <span className="line-clamp-1 truncate">{listing.location.split(',')[0]}</span>
               </div>

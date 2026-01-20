@@ -1,4 +1,4 @@
-import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2, Sparkles, Wrench, CheckCircle, Tag, EyeOff } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2, Sparkles, Wrench, CheckCircle, Tag, EyeOff, GripVertical } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Listing } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -41,6 +41,7 @@ export const EditListingModal = ({
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>(listing.images || [listing.image]);
   const [loading, setLoading] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isConditionOpen, setIsConditionOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
@@ -79,6 +80,17 @@ export const EditListingModal = ({
 
   useEffect(() => {
     if (isOpen) {
+      // Перевіряємо, чи оголошення на модерації - забороняємо редагування
+      if (listing.status === 'pending_moderation') {
+        tg?.HapticFeedback.notificationOccurred('error');
+        // Закриваємо модальне вікно та показуємо повідомлення
+        setTimeout(() => {
+          onClose();
+          // Показуємо повідомлення через toast (потрібно передати showToast через пропси або використати глобальний)
+        }, 0);
+        return;
+      }
+      
       setTitle(listing.title);
       setDescription(listing.description);
       setPrice(listing.isFree ? '' : listing.price);
@@ -95,7 +107,7 @@ export const EditListingModal = ({
       setStatus(listing.status || 'active');
       setErrors({});
     }
-  }, [isOpen, listing]);
+  }, [isOpen, listing, onClose, tg]);
 
   // Блокуємо скрол body та html при відкритому модальному вікні
   useEffect(() => {
@@ -195,12 +207,19 @@ export const EditListingModal = ({
       return;
     }
     
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreviews(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
+    // Створюємо прев'ю для нових фото з правильним порядком
+    const previewPromises = files.map(file => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(previewPromises).then(previews => {
+      setImagePreviews(prev => [...prev, ...previews]);
     });
     
     setImages(prev => [...prev, ...files]);
@@ -217,6 +236,63 @@ export const EditListingModal = ({
       setImages(prev => prev.filter((_, i) => i !== newIndex));
       setImagePreviews(prev => prev.filter((_, i) => i !== index));
     }
+  };
+
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    // Определяем, какие элементы перемещаем (старые или новые)
+    const oldImagesCount = imagePreviews.length - images.length;
+    
+    if (fromIndex < oldImagesCount && toIndex < oldImagesCount) {
+      // Перемещаем только старые изображения (только превью)
+      setImagePreviews(prev => {
+        const newPreviews = [...prev];
+        const [removed] = newPreviews.splice(fromIndex, 1);
+        newPreviews.splice(toIndex, 0, removed);
+        return newPreviews;
+      });
+    } else if (fromIndex >= oldImagesCount && toIndex >= oldImagesCount) {
+      // Перемещаем только новые изображения (и файлы, и превью)
+      const fromNewIndex = fromIndex - oldImagesCount;
+      const toNewIndex = toIndex - oldImagesCount;
+      
+      setImages(prev => {
+        const newImages = [...prev];
+        const [removed] = newImages.splice(fromNewIndex, 1);
+        newImages.splice(toNewIndex, 0, removed);
+        return newImages;
+      });
+      
+      setImagePreviews(prev => {
+        const newPreviews = [...prev];
+        const [removed] = newPreviews.splice(fromIndex, 1);
+        newPreviews.splice(toIndex, 0, removed);
+        return newPreviews;
+      });
+    } else {
+      // Перемещаем между старыми и новыми - перемещаем все превью, но не файлы
+      setImagePreviews(prev => {
+        const newPreviews = [...prev];
+        const [removed] = newPreviews.splice(fromIndex, 1);
+        newPreviews.splice(toIndex, 0, removed);
+        return newPreviews;
+      });
+    }
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    moveImage(draggedIndex, index);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
   };
 
   const validate = (): boolean => {
@@ -303,6 +379,11 @@ export const EditListingModal = ({
 
   if (!isOpen) return null;
 
+  // Додаткова захист: якщо оголошення на модерації, не показуємо модальне вікно
+  if (listing.status === 'pending_moderation') {
+    return null;
+  }
+
   return (
     <div className="fixed inset-0 bg-[#000000] flex flex-col overflow-hidden" style={{ zIndex: 9999, isolation: 'isolate' }}>
       <div className="bg-[#000000] w-full h-full flex flex-col relative">
@@ -327,7 +408,16 @@ export const EditListingModal = ({
             </label>
             <div className="grid grid-cols-3 gap-2">
               {imagePreviews.map((preview, index) => (
-                <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] border border-white/20">
+                <div 
+                  key={index} 
+                  className={`relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] border border-white/20 cursor-move ${
+                    draggedIndex === index ? 'opacity-50' : ''
+                  }`}
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
+                >
                   <img 
                     src={(() => {
                       if (typeof preview === 'string') {
@@ -343,7 +433,8 @@ export const EditListingModal = ({
                       return '';
                     })()}
                     alt={`Preview ${index + 1}`} 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover pointer-events-none"
+                    draggable={false}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
@@ -353,10 +444,17 @@ export const EditListingModal = ({
                       }
                     }}
                   />
+                  <div className="absolute top-1 left-1 flex items-center gap-1 bg-black/50 rounded px-1">
+                    <GripVertical size={12} className="text-white/70" />
+                    <span className="text-white text-xs font-bold">{index + 1}</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImage(index);
+                    }}
+                    className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors z-10"
                   >
                     <X size={16} />
                   </button>
@@ -709,13 +807,13 @@ export const EditListingModal = ({
                 }}
                 onFocus={() => setIsLocationOpen(true)}
                 placeholder="Оберіть або введіть місто"
-                className={`w-full px-4 py-3 pl-12 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
+                className={`w-full px-4 py-3 pl-10 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                   errors.location ? 'border-red-500' : 'border-white/20'
                 } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
               />
               <MapPin 
                 size={18} 
-                className="absolute left-5 top-1/2 -translate-y-1/2 text-white/70"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70"
               />
             </div>
             
@@ -731,9 +829,9 @@ export const EditListingModal = ({
                       setIsLocationOpen(false);
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
-                    className="w-full px-4 py-3 text-left hover:bg-white/10 transition-colors flex items-center gap-2 text-white"
+                    className="w-full px-4 py-3 text-left hover:bg-white/10 transition-colors flex items-center gap-2.5 text-white"
                   >
-                    <MapPin size={16} className="text-white/70" />
+                    <MapPin size={16} className="text-white/70 flex-shrink-0" />
                     <span>{city}</span>
                   </button>
                 ))}

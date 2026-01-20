@@ -454,11 +454,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               <span className="text-white">
                 {selectedStatus === 'all' ? t('sales.allStatuses') : 
                  selectedStatus === 'active' ? t('listing.active') :
-                 selectedStatus === 'sold' ? t('listing.sold') :
-                 selectedStatus === 'expired' ? t('sales.expired') :
                  selectedStatus === 'pending_moderation' ? t('profile.onModeration') :
-                 selectedStatus === 'pending' ? t('sales.pending') :
-                 selectedStatus === 'deactivated' ? t('sales.deactivated') : selectedStatus}
+                 selectedStatus === 'deactivated' ? t('sales.deactivated') :
+                 selectedStatus === 'sold' ? t('listing.sold') : selectedStatus}
               </span>
               <ChevronDown size={16} className={`text-white/70 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -494,6 +492,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               onClick={() => {
                 setIsStatusFilterOpen(false);
               }}
+              onWheel={(e) => {
+                // Предотвращаем закрытие меню при скролле фона
+                e.stopPropagation();
+              }}
+              onTouchMove={(e) => {
+                // Предотвращаем закрытие меню при скролле на мобильных
+                e.stopPropagation();
+              }}
             />
           )}
 
@@ -501,15 +507,23 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           {isStatusFilterOpen && (
             <div 
               id="status-filter-menu"
-              className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000]"
+              className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] max-h-[50vh] overflow-y-auto overscroll-contain"
               style={{
                 top: `${statusMenuPosition.top + 8}px`,
                 left: `${statusMenuPosition.left}px`,
                 width: `${statusMenuPosition.width}px`
               }}
               onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => {
+                // Разрешаем скролл внутри меню
+                e.stopPropagation();
+              }}
+              onTouchMove={(e) => {
+                // Разрешаем скролл на мобильных устройствах
+                e.stopPropagation();
+              }}
             >
-              {['all', 'active', 'sold', 'expired', 'pending_moderation', 'pending', 'deactivated'].map(status => (
+              {['all', 'active', 'pending_moderation', 'deactivated', 'sold'].map(status => (
                 <button
                   key={status}
                   type="button"
@@ -526,11 +540,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 >
                   {status === 'all' ? t('sales.allStatuses') : 
                    status === 'active' ? t('listing.active') :
-                   status === 'sold' ? t('listing.sold') :
-                   status === 'expired' ? t('sales.expired') :
                    status === 'pending_moderation' ? t('profile.onModeration') :
-                   status === 'pending' ? t('sales.pending') :
-                   status === 'deactivated' ? t('sales.deactivated') : status}
+                   status === 'deactivated' ? t('sales.deactivated') :
+                   status === 'sold' ? t('listing.sold') : status}
                   {selectedStatus === status && <span className="text-[#D3F1A7] ml-2">✓</span>}
                 </button>
               ))}
@@ -544,6 +556,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               onClick={() => {
                 setIsCategoryFilterOpen(false);
               }}
+              onWheel={(e) => {
+                // Предотвращаем закрытие меню при скролле фона
+                e.stopPropagation();
+              }}
+              onTouchMove={(e) => {
+                // Предотвращаем закрытие меню при скролле на мобильных
+                e.stopPropagation();
+              }}
             />
           )}
 
@@ -551,13 +571,21 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           {isCategoryFilterOpen && (
             <div 
               id="category-filter-menu"
-              className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] max-h-[70vh] overflow-y-auto"
+              className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] max-h-[70vh] overflow-y-auto overscroll-contain"
               style={{
                 top: `${categoryMenuPosition.top + 8}px`,
                 left: `${categoryMenuPosition.left}px`,
                 width: `${categoryMenuPosition.width}px`
               }}
               onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => {
+                // Разрешаем скролл внутри меню
+                e.stopPropagation();
+              }}
+              onTouchMove={(e) => {
+                // Разрешаем скролл на мобильных устройствах
+                e.stopPropagation();
+              }}
             >
               <button
                 type="button"
@@ -628,6 +656,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                           }
                         }}
                       onEdit={() => {
+                        // Забороняємо редагувати оголошення на модерації
+                        if (listing.status === 'pending_moderation') {
+                          showToast(t('editListing.cannotEditOnModeration') || 'Не можна редагувати оголошення під час модерації', 'error');
+                          tg?.HapticFeedback.notificationOccurred('error');
+                          return;
+                        }
                         setEditingListing(listing);
                       }}
                       onReactivate={() => {
@@ -1034,6 +1068,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           }}
           listingId={selectedListingForPromotion.id}
           currentPromotion={selectedListingForPromotion.promotionType}
+          promotionEnds={selectedListingForPromotion.promotionEnds}
           telegramId={profile?.telegramId}
           // Кнопка «Опублікувати без реклами» повинна бути скрізь,
           // ОКРІМ випадку, коли користувач сам натиснув «Рекламувати»
