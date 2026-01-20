@@ -40,6 +40,13 @@ export const CreateListingModal = ({
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [touchStartIndex, setTouchStartIndex] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [touchPosition, setTouchPosition] = useState<{ x: number; y: number } | null>(null);
+  const [touchElementRect, setTouchElementRect] = useState<DOMRect | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const isDraggingRef = useRef(false);
   const [isConditionOpen, setIsConditionOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
@@ -314,6 +321,8 @@ export const CreateListingModal = ({
   };
 
   const moveImage = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    
     setImages(prev => {
       const newImages = [...prev];
       const [removed] = newImages.splice(fromIndex, 1);
@@ -342,6 +351,156 @@ export const CreateListingModal = ({
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
+  };
+
+  // Touch handlers для мобильных устройств
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    // Не начинаем drag если кликнули на кнопку удаления
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
+    
+    // Предотвращаем выделение текста и стандартное поведение
+    e.preventDefault();
+    e.stopPropagation();
+    
+    isDraggingRef.current = true;
+    
+    // Получаем позицию элемента для визуального эффекта
+    const element = e.currentTarget as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    setTouchElementRect(rect);
+    
+    // Предотвращаем выделение текста через глобальный обработчик
+    const preventSelection = (e: Event) => {
+      e.preventDefault();
+    };
+    document.addEventListener('selectstart', preventSelection);
+    
+    // Предотвращаем закрытие приложения при свайпе вниз
+    const preventPullToClose = (e: TouchEvent) => {
+      if (isDraggingRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    
+    document.addEventListener('touchmove', preventPullToClose, { passive: false });
+    
+    // Удаляем обработчики после завершения touch
+    const cleanup = () => {
+      isDraggingRef.current = false;
+      document.removeEventListener('selectstart', preventSelection);
+      document.removeEventListener('touchmove', preventPullToClose);
+      document.removeEventListener('touchend', cleanup);
+      document.removeEventListener('touchcancel', cleanup);
+    };
+    document.addEventListener('touchend', cleanup, { once: true });
+    document.addEventListener('touchcancel', cleanup, { once: true });
+    
+    const touch = e.touches[0];
+    setTouchStartIndex(index);
+    setTouchStartY(touch.clientY);
+    setTouchPosition({ x: touch.clientX, y: touch.clientY });
+    setDraggedIndex(index);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartIndex === null || touchStartY === null || touchElementRect === null) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const touch = e.touches[0];
+    const currentX = touch.clientX;
+    const currentY = touch.clientY;
+    
+    // Обновляем позицию для визуального эффекта (следует за пальцем)
+    setTouchPosition({ x: currentX, y: currentY });
+    
+    // Получаем центр перетаскиваемого элемента
+    const draggedCenterX = currentX;
+    const draggedCenterY = currentY;
+    
+    // Проверяем все фото элементы
+    const allPhotoElements = document.querySelectorAll('[data-photo-index]');
+    let targetIndex: number | null = null;
+    
+    for (const photoElement of allPhotoElements) {
+      const indexAttr = photoElement.getAttribute('data-photo-index');
+      if (!indexAttr) continue;
+      
+      const elementIndex = parseInt(indexAttr, 10);
+      
+      // Пропускаем само перетаскиваемое фото
+      if (elementIndex === touchStartIndex) continue;
+      
+      // Получаем позицию и размер элемента
+      const rect = photoElement.getBoundingClientRect();
+      
+      // Вычисляем центр элемента
+      const elementCenterX = rect.left + rect.width / 2;
+      const elementCenterY = rect.top + rect.height / 2;
+      
+      // Вычисляем расстояние от центра перетаскиваемого элемента до центра текущего элемента
+      const distanceX = Math.abs(draggedCenterX - elementCenterX);
+      const distanceY = Math.abs(draggedCenterY - elementCenterY);
+      
+      // Проверяем 90% площади
+      const thresholdX = rect.width * 0.45;
+      const thresholdY = rect.height * 0.45;
+      
+      if (distanceX <= thresholdX && distanceY <= thresholdY) {
+        targetIndex = elementIndex;
+        break;
+      }
+    }
+    
+    // Обновляем hoveredIndex для визуальной подсказки
+    setHoveredIndex(targetIndex);
+    
+    // Если фото перетащено на 90% другого фото, "приземляем" его
+    if (targetIndex !== null && touchStartIndex !== targetIndex && !isLocked) {
+      // Блокируем дальнейшие перемещения
+      setIsLocked(true);
+      
+      // Выполняем перемещение
+      moveImage(touchStartIndex, targetIndex);
+      
+      // Плавно фиксируем фото на новом месте
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const newPhotoElement = document.querySelector(`[data-photo-index="${targetIndex}"]`) as HTMLElement;
+          if (newPhotoElement) {
+            const newRect = newPhotoElement.getBoundingClientRect();
+            // Фиксируем на новом месте
+            setTouchElementRect(newRect);
+            setTouchPosition({ x: newRect.left + newRect.width / 2, y: newRect.top + newRect.height / 2 });
+          }
+          setTouchStartIndex(targetIndex);
+          setDraggedIndex(targetIndex);
+          
+          // Разблокируем через небольшую задержку для плавности
+          setTimeout(() => setIsLocked(false), 250);
+        });
+      });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isDraggingRef.current = false;
+    
+    // Даем время для завершения анимации перед сбросом состояния
+    setTimeout(() => {
+      setTouchStartIndex(null);
+      setTouchStartY(null);
+      setDraggedIndex(null);
+      setTouchPosition(null);
+      setTouchElementRect(null);
+      setHoveredIndex(null);
+      setIsLocked(false);
+    }, 100);
   };
 
   const validate = (): boolean => {
@@ -434,7 +593,19 @@ export const CreateListingModal = ({
     <div 
       className="fixed inset-0 z-[70] flex flex-col overflow-hidden font-montserrat"
       style={{
-        background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+        background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000',
+        touchAction: 'pan-y', // Разрешаем вертикальный скролл, но предотвращаем горизонтальный swipe
+        position: 'fixed',
+        width: '100%',
+        height: '100%',
+        top: 0,
+        left: 0
+      }}
+      onTouchMove={(e) => {
+        // Предотвращаем закрытие приложения во время перетаскивания
+        if (isDraggingRef.current) {
+          e.preventDefault();
+        }
       }}
     >
       <div className="w-full h-full flex flex-col">
@@ -475,37 +646,77 @@ export const CreateListingModal = ({
               </label>
             ) : (
               <div className="w-full px-4 py-3 bg-transparent rounded-xl">
-                <div className="grid grid-cols-3 gap-2 mb-2">
-                  {imagePreviews.map((preview, index) => (
-                    <div 
-                      key={index} 
-                      className={`relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] cursor-move ${
-                        draggedIndex === index ? 'opacity-50' : ''
-                      }`}
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <img 
-                        src={preview} 
-                        alt={`Preview ${index + 1}`} 
-                        className="w-full h-full object-cover pointer-events-none"
-                        loading="lazy"
-                        decoding="async"
-                        draggable={false}
-                      />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeImage(index);
+                <div className="grid grid-cols-3 gap-2 mb-2 relative">
+                  {imagePreviews.map((preview, index) => {
+                    const isDragging = draggedIndex === index && touchPosition !== null && touchElementRect !== null && !isLocked;
+                    const isHovered = hoveredIndex === index && draggedIndex !== index;
+                    const isSnapping = isLocked && draggedIndex === index;
+                    
+                    // Вычисляем позицию для перетаскиваемого элемента
+                    let dragTransform = '';
+                    let dragScale = 1;
+                    
+                    if (isDragging && touchPosition && touchElementRect && !isLocked) {
+                      // Вычисляем смещение от начальной позиции элемента
+                      const offsetX = touchPosition.x - (touchElementRect.left + touchElementRect.width / 2);
+                      const offsetY = touchPosition.y - (touchElementRect.top + touchElementRect.height / 2);
+                      dragScale = 1.08;
+                      dragTransform = `translate(${offsetX}px, ${offsetY}px) scale(${dragScale})`;
+                    } else if (isSnapping) {
+                      // Когда фото зафиксировано, плавно возвращаем его на место с небольшим "bounce"
+                      dragTransform = 'translate(0px, 0px) scale(1.02)';
+                    }
+                    
+                    return (
+                      <div
+                        key={`${index}-${preview.substring(0, 20)}`}
+                        data-photo-index={index}
+                        className={`relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] border cursor-move select-none ${
+                          isDragging ? 'opacity-95 z-50 shadow-2xl border-[#D3F1A7]/50' : 
+                          isHovered ? 'ring-2 ring-[#D3F1A7] ring-offset-2 ring-offset-[#0A0A0A] border-[#D3F1A7]/30' : 
+                          isSnapping ? 'border-[#D3F1A7]/40' :
+                          'border-white/20'
+                        }`}
+                        draggable
+                        onDragStart={() => handleDragStart(index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onTouchStart={(e) => handleTouchStart(e, index)}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        style={{ 
+                          touchAction: 'none', 
+                          userSelect: 'none', 
+                          WebkitUserSelect: 'none',
+                          transform: dragTransform || undefined,
+                          transition: isDragging && !isLocked
+                            ? 'box-shadow 0.15s ease-out, border-color 0.15s ease-out' 
+                            : isSnapping
+                            ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease-out, border-color 0.25s ease-out, box-shadow 0.25s ease-out'
+                            : 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-out, border-color 0.2s ease-out',
+                          willChange: isDragging ? 'transform' : 'auto'
                         }}
-                        className="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center text-xs hover:bg-black/70 transition-colors z-10"
                       >
-                        <X size={14} className="text-white" />
-                      </button>
-                    </div>
-                  ))}
+                        <img 
+                          src={preview} 
+                          alt={`Preview ${index + 1}`} 
+                          className="w-full h-full object-cover pointer-events-none"
+                          loading="lazy"
+                          decoding="async"
+                          draggable={false}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeImage(index);
+                          }}
+                          className="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center text-xs hover:bg-black/70 transition-colors z-10"
+                        >
+                          <X size={14} className="text-white" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
                 {images.length < 10 && (
                   <label className="w-full px-4 py-4 bg-transparent rounded-xl border-2 border-dashed border-white flex items-center justify-center cursor-pointer hover:border-white/70 transition-colors">

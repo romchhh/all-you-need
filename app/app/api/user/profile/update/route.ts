@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import sharp from 'sharp';
 
 async function handleRequest(request: NextRequest) {
   try {
@@ -23,60 +22,37 @@ async function handleRequest(request: NextRequest) {
     const telegramIdNum = parseInt(telegramId);
     let avatarPath: string | null = null;
 
-    // Завантажуємо нове фото якщо є
+    // Завантажуємо нове фото якщо є - просто замінюємо без обробки
     if (avatarFile && avatarFile.size > 0) {
-      try {
-        // Перевіряємо тип файлу
-        const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-        if (!validImageTypes.includes(avatarFile.type)) {
-          return NextResponse.json(
-            { error: 'Invalid file type. Only images are allowed.' },
-            { status: 400 }
-          );
-        }
-
-        // Перевіряємо розмір файлу (максимум 5 МБ)
-        const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
-        if (avatarFile.size > MAX_FILE_SIZE) {
-          return NextResponse.json(
-            { error: 'File size exceeds 5MB limit' },
-            { status: 400 }
-          );
-        }
-
-        const uploadsDir = join(process.cwd(), 'public', 'avatars');
-        if (!existsSync(uploadsDir)) {
-          await mkdir(uploadsDir, { recursive: true });
-        }
-
-        const bytes = await avatarFile.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        
-        // Конвертуємо в WebP з оптимізацією
-        const optimizedBuffer = await sharp(buffer)
-          .resize(400, 400, {
-            fit: 'cover',
-            position: 'center',
-          })
-          .webp({ quality: 85, effort: 4 })
-          .toBuffer();
-        
-        // Стабільне ім'я файлу, щоб не створювати новий аватар при кожному оновленні
-        const filename = `avatar_${telegramId}.webp`;
-        const filepath = join(uploadsDir, filename);
-        
-        await writeFile(filepath, optimizedBuffer);
-        avatarPath = `/avatars/${filename}`;
-      } catch (error) {
-        console.error('Error processing avatar file:', error);
+      // Перевіряємо розмір файлу (максимум 5 МБ)
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
+      if (avatarFile.size > MAX_FILE_SIZE) {
         return NextResponse.json(
-          { 
-            error: 'Failed to process avatar file', 
-            details: error instanceof Error ? error.message : 'Unknown error' 
-          },
-          { status: 500 }
+          { error: 'File size exceeds 5MB limit' },
+          { status: 400 }
         );
       }
+
+      const uploadsDir = join(process.cwd(), 'public', 'avatars');
+      if (!existsSync(uploadsDir)) {
+        await mkdir(uploadsDir, { recursive: true });
+      }
+
+      // Визначаємо розширення файлу
+      const originalName = avatarFile.name;
+      const extension = originalName.split('.').pop()?.toLowerCase() || 'jpg';
+      const validExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+      const finalExtension = validExtensions.includes(extension) ? extension : 'jpg';
+      
+      // Стабільне ім'я файлу
+      const filename = `avatar_${telegramId}.${finalExtension}`;
+      const filepath = join(uploadsDir, filename);
+      
+      // Просто зберігаємо файл без обробки
+      const bytes = await avatarFile.arrayBuffer();
+      await writeFile(filepath, Buffer.from(bytes));
+      
+      avatarPath = `/avatars/${filename}`;
     }
 
     // Оновлюємо профіль

@@ -358,6 +358,9 @@ export async function updateListingData(
     }
   } else {
     // Якщо статус не передано, оновлюємо тільки дані без зміни статусу
+    const imagesJson = JSON.stringify(imageUrls);
+    console.log('[updateListingData] Updating listing without status change, images count:', imageUrls.length);
+    
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
         `UPDATE Listing SET
@@ -374,11 +377,27 @@ export async function updateListingData(
         data.subcategory || null,
         data.condition || null,
         data.location,
-        JSON.stringify(imageUrls),
+        imagesJson,
         updateTime,
         listingId
       )
     );
+    
+    // Проверяем что изображения действительно сохранились
+    const verifyResult = await prisma.$queryRawUnsafe(
+      `SELECT images FROM Listing WHERE id = ?`,
+      listingId
+    ) as Array<{ images: string }>;
+    
+    if (verifyResult.length > 0) {
+      const savedImages = verifyResult[0].images;
+      const parsedSaved = typeof savedImages === 'string' ? JSON.parse(savedImages) : savedImages;
+      console.log('[updateListingData] Verified saved images count:', Array.isArray(parsedSaved) ? parsedSaved.length : 'not array');
+      
+      if (Array.isArray(parsedSaved) && parsedSaved.length !== imageUrls.length) {
+        console.error('[updateListingData] WARNING: Image count mismatch! Expected:', imageUrls.length, 'Got:', parsedSaved.length);
+      }
+    }
   }
 }
 

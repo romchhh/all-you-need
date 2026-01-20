@@ -919,6 +919,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 (preview: string) => !preview.startsWith('data:')
               );
               
+              console.log('[ProfileTab] Existing image URLs to send:', existingImageUrls);
+              
               // Передаємо старі зображення як окреме поле для обробки на бекенді
               existingImageUrls.forEach((url: string) => {
                 formData.append('existingImages', url);
