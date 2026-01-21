@@ -89,9 +89,10 @@ export async function POST(request: NextRequest) {
 
       // Назви пакетів
       const packageNames: Record<string, string> = {
-        'pack_1': '1 оголошення',
+        'pack_3': '3 оголошення',
         'pack_5': '5 оголошень',
         'pack_10': '10 оголошень',
+        'pack_30': '30 оголошень',
       };
       const packageName = packageNames[packageType] || packageType;
 

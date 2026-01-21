@@ -23,11 +23,22 @@ class PaymentManager:
         tariff_names = {
             'standard': 'Звичайна публікація',
             'highlighted': 'Виділене оголошення',
-            'pinned': 'Закріп у каналі',
-            'story': 'Сторіс у каналі',
+            'pinned_12h': 'Закріп на 12 годин',
+            'pinned_24h': 'Закріп на 24 години',
+            'story': 'Сторіс на 24 години',
             'refresh': 'Оновити оголошення'
         }
-        tariff_name = tariff_names.get(tariff_type, 'Публікація оголошення')
+        
+        # Перевіряємо чи tariff_type це JSON масив (для множинних тарифів)
+        try:
+            import json
+            if tariff_type.startswith('['):
+                tariff_list = json.loads(tariff_type)
+                tariff_name = ', '.join([tariff_names.get(t, t) for t in tariff_list if t in tariff_names])
+            else:
+                tariff_name = tariff_names.get(tariff_type, 'Публікація оголошення')
+        except:
+            tariff_name = tariff_names.get(tariff_type, 'Публікація оголошення')
         
         payload = {
             "amount": amount_cents,

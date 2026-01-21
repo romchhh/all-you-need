@@ -1,9 +1,10 @@
 // Client-safe payment constants (no server dependencies)
 
 export const PACKAGE_PRICES = {
-  single_1: { count: 1, price: 2.0 },
+  pack_3: { count: 3, price: 5.0 },
   pack_5: { count: 5, price: 8.0 },
-  pack_10: { count: 10, price: 14.0 },
+  pack_10: { count: 10, price: 15.0 },
+  pack_30: { count: 30, price: 30.0 },
 } as const;
 
 export const PROMOTION_PRICES = {

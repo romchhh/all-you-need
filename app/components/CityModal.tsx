@@ -184,15 +184,29 @@ export const CityModal = ({
         if (isPostalCode) {
           setSearchResults(result.cities.slice(0, 20));
         } else {
-          // Для пошуку по назві сортуємо: спочатку ті що починаються з запиту
+          // Для пошуку по назві сортуємо: спочатку точні збіги, потім починаються з запиту, потім містять запит
           const lowerQuery = query.toLowerCase();
+          const queryTrimmed = searchQuery.trim();
+          
+          const exactMatches = result.cities.filter(city => 
+            city.toLowerCase() === lowerQuery
+          );
           const startsWith = result.cities.filter(city => 
-            city.toLowerCase().startsWith(lowerQuery)
+            city.toLowerCase().startsWith(lowerQuery) && city.toLowerCase() !== lowerQuery
           );
           const includes = result.cities.filter(city => 
             city.toLowerCase().includes(lowerQuery) && !city.toLowerCase().startsWith(lowerQuery)
           );
-          setSearchResults([...startsWith, ...includes].slice(0, 20));
+          
+          const allResults = [...exactMatches, ...startsWith, ...includes];
+          
+          // Додаємо введений текст першим, якщо він не точно збігається
+          const hasExactMatch = allResults.some(city => city.toLowerCase() === lowerQuery);
+          if (!hasExactMatch && queryTrimmed) {
+            allResults.unshift(queryTrimmed);
+          }
+          
+          setSearchResults(allResults.slice(0, 30));
         }
       } catch (error) {
         console.error('Error loading cities:', error);
@@ -209,13 +223,27 @@ export const CityModal = ({
           }
         } else {
           const lowerQuery = query.toLowerCase();
+          const queryTrimmed = searchQuery.trim();
+          
+          const exactMatches = germanCities.filter(city => 
+            city.toLowerCase() === lowerQuery
+          );
           const startsWith = germanCities.filter(city => 
-            city.toLowerCase().startsWith(lowerQuery)
+            city.toLowerCase().startsWith(lowerQuery) && city.toLowerCase() !== lowerQuery
           );
           const includes = germanCities.filter(city => 
             city.toLowerCase().includes(lowerQuery) && !city.toLowerCase().startsWith(lowerQuery)
           );
-          setSearchResults([...startsWith, ...includes].slice(0, 10));
+          
+          const allResults = [...exactMatches, ...startsWith, ...includes];
+          
+          // Додаємо введений текст першим, якщо він не точно збігається
+          const hasExactMatch = allResults.some(city => city.toLowerCase() === lowerQuery);
+          if (!hasExactMatch && queryTrimmed) {
+            allResults.unshift(queryTrimmed);
+          }
+          
+          setSearchResults(allResults.slice(0, 20));
         }
       } finally {
         setLoadingCities(false);
@@ -327,6 +355,7 @@ export const CityModal = ({
           <div 
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto"
+            style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
             onTouchStart={(e) => {
               e.stopPropagation();
               if (scrollContainerRef.current) {
@@ -461,7 +490,7 @@ export const CityModal = ({
                   {loadingCities ? (
                     <div className="flex flex-col items-center justify-center py-8">
                       <div className="w-6 h-6 border-2 border-[#D3F1A7] border-t-transparent rounded-full animate-spin mb-2"></div>
-                      <p className="text-white/70 text-sm">Завантаження міст...</p>
+                      <p className="text-white/70 text-sm">{t('common.loading')}</p>
                     </div>
                   ) : searchResults.length > 0 ? (
                     <>

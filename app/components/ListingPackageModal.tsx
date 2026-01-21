@@ -20,9 +20,10 @@ interface ListingPackageModalProps {
 }
 
 const PACKAGES: ListingPackage[] = [
-  { type: 'single_1', count: 1, price: 2.0 },
+  { type: 'pack_3', count: 3, price: 5.0 },
   { type: 'pack_5', count: 5, price: 8.0, save: '20%', badge: 'mostPopular' },
-  { type: 'pack_10', count: 10, price: 14.0, save: '30%', badge: 'bestValue' },
+  { type: 'pack_10', count: 10, price: 15.0, save: '30%', badge: 'bestValue' },
+  { type: 'pack_30', count: 30, price: 30.0, save: '40%' },
 ];
 
 export default function ListingPackageModal({
@@ -157,11 +158,13 @@ export default function ListingPackageModal({
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-lg text-white">
-                      {pkg.count === 1 
-                        ? t('listingPackages.single') 
+                      {pkg.count === 3 
+                        ? t('listingPackages.pack3')
                         : pkg.count === 5 
                           ? t('listingPackages.pack5')
-                          : t('listingPackages.pack10')}
+                          : pkg.count === 10
+                            ? t('listingPackages.pack10')
+                            : t('listingPackages.pack30')}
                     </h3>
                     {pkg.badge && (
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${

@@ -33,6 +33,7 @@ export const ProfileListingCard = ({
 
   // Перевіряємо статус модерації
   const isPendingModeration = listing.status === 'pending_moderation';
+  const isRejected = listing.status === 'rejected';
   const isExpired = listing.status === 'expired';
   
   // Перевіряємо чи закінчується термін дії
@@ -79,13 +80,16 @@ export const ProfileListingCard = ({
     if (isSold) {
       return 'bg-[#000000] border-2 border-gray-600 opacity-75';
     }
+    if (isRejected) {
+      return 'bg-[#000000] border-2 border-red-600 opacity-75';
+    }
     if (isPendingModeration) {
       return 'bg-[#000000] border-2 border-yellow-600 opacity-75';
     }
     if (isDeactivated) {
       return 'bg-[#000000] border-2 border-orange-600 opacity-75';
     }
-    if (hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated) {
+    if (hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && !isRejected) {
       return 'bg-[#000000] border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.3)]';
     }
     return 'bg-[#000000] border-2 border-white/20';
@@ -96,17 +100,27 @@ export const ProfileListingCard = ({
       className={`${getCardStyles()} rounded-2xl overflow-hidden transition-all`}
     >
       {/* Напівпрозора смуга зверху для статусів */}
-      {(isSold || isPendingModeration || isDeactivated) && (
+      {(isSold || isPendingModeration || isDeactivated || isRejected) && (
         <div className={`absolute top-0 left-0 right-0 h-1 z-20 ${
           isSold ? 'bg-green-600/80' : 
+          isRejected ? 'bg-red-600/80' :
           isPendingModeration ? 'bg-yellow-600/80' : 
           'bg-orange-600/80'
         }`} />
       )}
       
       <div className="flex gap-3 p-3 relative">
+        {/* Бейдж "Відхилено" - у верхньому лівому куті картки (найвищий пріоритет) */}
+        {isRejected && (
+          <div className="absolute top-3 left-3 z-10">
+            <div className="px-3 py-1.5 bg-red-600/90 text-white text-xs font-bold rounded-full shadow-lg border border-red-400">
+              {t('profile.rejected') || 'Відхилено'}
+            </div>
+          </div>
+        )}
+        
         {/* Бейдж "На модерації" - у верхньому лівому куті картки */}
-        {isPendingModeration && (
+        {isPendingModeration && !isRejected && (
           <div className="absolute top-3 left-3 z-10">
             <div className="px-3 py-1.5 bg-yellow-600/90 text-white text-xs font-bold rounded-full shadow-lg border border-yellow-400">
               {t('profile.onModeration')}
@@ -115,7 +129,7 @@ export const ProfileListingCard = ({
         )}
         
         {/* Бейдж "Деактивовано" - у верхньому лівому куті картки */}
-        {isDeactivated && !isPendingModeration && (
+        {isDeactivated && !isPendingModeration && !isRejected && (
           <div className="absolute top-3 left-3 z-10">
             <div className="px-3 py-1.5 bg-orange-600/90 text-white text-xs font-bold rounded-full shadow-lg border border-orange-400">
               {t('sales.deactivated')}
@@ -124,7 +138,7 @@ export const ProfileListingCard = ({
         )}
         
         {/* Бейдж "Продано" - у верхньому лівому куті картки */}
-        {isSold && (
+        {isSold && !isRejected && (
           <div className="absolute top-3 left-3 z-10">
             <div className="px-3 py-1.5 bg-green-600/90 text-white text-xs font-bold rounded-full shadow-lg border border-green-400">
               {t('listing.sold')}
@@ -232,7 +246,7 @@ export const ProfileListingCard = ({
               }`}>
                 {isPendingModeration && <Loader2 size={10} className="animate-spin text-gray-500" />}
                 <span>{t('sales.expires')}: {formatDate(expiresAt)}</span>
-                {isExpiringSoon && !isPendingModeration && !isSold && !isDeactivated && ` (${daysUntilExpiry} ${daysUntilExpiry === 1 ? t('profile.day') : t('profile.days')})`}
+                {isExpiringSoon && !isPendingModeration && !isSold && !isDeactivated && !isRejected && ` (${daysUntilExpiry} ${daysUntilExpiry === 1 ? t('profile.day') : t('profile.days')})`}
               </div>
             )}
             {isExpired && expiresAt && (
@@ -240,14 +254,21 @@ export const ProfileListingCard = ({
                 Закінчилось: {formatDate(expiresAt)}
               </div>
             )}
+            {/* Причина відхилення для відхилених оголошень */}
+            {isRejected && listing.rejectionReason && (
+              <div className="text-red-400 text-sm mt-1">
+                <div className="font-semibold mb-1">{t('profile.rejectionReason') || 'Причина відхилення:'}</div>
+                <div className="text-red-300">{listing.rejectionReason}</div>
+              </div>
+            )}
             {/* Інформація про рекламу */}
             {hasPromotion && isPromotionActive && promotionDaysLeft !== null && (
-              <div className={isSold || isPendingModeration || isDeactivated ? 'text-gray-500 font-semibold' : 'text-[#D3F1A7] font-semibold'}>
+              <div className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500 font-semibold' : 'text-[#D3F1A7] font-semibold'}>
                 Реклама: {promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}
               </div>
             )}
             {hasPromotion && !isPromotionActive && (
-              <div className={isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : 'text-white/50'}>
+              <div className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : 'text-white/50'}>
                 Реклама закінчилась
               </div>
             )}
@@ -255,15 +276,15 @@ export const ProfileListingCard = ({
 
           {/* Статистика */}
           <div className={`flex items-center gap-3 text-xs mt-2 ${
-            isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : 'text-white/70'
+            isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : 'text-white/70'
           }`}>
             <div className="flex items-center gap-1">
-              <Eye size={14} className={isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : ''} />
+              <Eye size={14} className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : ''} />
               <span>{listing.views || 0}</span>
             </div>
             <div className="flex items-center gap-1">
               <Heart size={14} className={
-                isSold || isPendingModeration || isDeactivated
+                isSold || isPendingModeration || isDeactivated || isRejected
                   ? 'text-gray-500' 
                   : isFavorite 
                   ? 'fill-[#D3F1A7] text-[#D3F1A7]' 
@@ -277,7 +298,7 @@ export const ProfileListingCard = ({
         {/* Кнопки дій */}
         <div className="flex flex-col gap-2 justify-center relative">
           {/* Тег реклами - над іконками */}
-          {hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && (
+          {hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && !isRejected && (
             <div className="absolute -top-12 right-0 z-10">
               <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded inline-block max-w-fit w-auto">
                 VIP
@@ -313,7 +334,7 @@ export const ProfileListingCard = ({
           )}
 
           {/* Кнопка відмітити як продане */}
-          {!isSold && (
+          {!isSold && !isPendingModeration && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -321,9 +342,7 @@ export const ProfileListingCard = ({
                 tg?.HapticFeedback.impactOccurred('light');
               }}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                isPendingModeration
-                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
-                  : isDeactivated
+                isDeactivated
                   ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
                   : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
               }`}

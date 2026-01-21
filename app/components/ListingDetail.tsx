@@ -23,8 +23,11 @@ import { formatTimeAgo } from '@/utils/formatTime';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 
-// Динамічний імпорт PromotionUpgradeModal
-const PromotionUpgradeModal = dynamic(() => import('./PromotionUpgradeModal'), {
+// Динамічний імпорт PromotionModal та PaymentSummaryModal
+const PromotionModal = dynamic(() => import('./PromotionModal'), {
+  ssr: false,
+});
+const PaymentSummaryModal = dynamic(() => import('./PaymentSummaryModal').then(mod => ({ default: mod.PaymentSummaryModal })), {
   ssr: false,
 });
 
@@ -88,6 +91,9 @@ export const ListingDetail = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState(false);
+  const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
+  const [userBalance, setUserBalance] = useState<number>(0);
   const [showMarkSoldConfirm, setShowMarkSoldConfirm] = useState(false);
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
@@ -230,14 +236,84 @@ export const ListingDetail = ({
     recordView();
   }, [listing.id, currentUser?.id]);
 
+  // Завантаження балансу користувача
+  const fetchUserBalance = async () => {
+    const userTelegramId = currentUser?.id || profile?.telegramId;
+    if (!userTelegramId) return;
+    try {
+      const response = await fetch(`/api/user/balance?telegramId=${userTelegramId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserBalance(data.balance || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching user balance:', error);
+    }
+  };
+
+  // Обробка підтвердження оплати в PaymentSummaryModal
+  const handlePaymentConfirm = async (paymentMethod: 'balance' | 'direct') => {
+    if (!selectedPromotionType) return;
+    
+    try {
+      const userTelegramId = currentUser?.id || profile?.telegramId;
+      if (!userTelegramId) {
+        showToast(t('common.error'), 'error');
+        return;
+      }
+      
+      const response = await fetch('/api/listings/promotions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: userTelegramId,
+          listingId: listing.id,
+          promotionType: selectedPromotionType,
+          paymentMethod,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to purchase promotion');
+      }
+
+      if (data.paymentRequired && data.pageUrl) {
+        tg?.HapticFeedback.notificationOccurred('success');
+        showToast(t('payments.paymentInfo'), 'info');
+        
+        // Перенаправляємо на сторінку оплати
+        if (tg?.openLink) {
+          tg.openLink(data.pageUrl);
+        } else {
+          window.location.href = data.pageUrl;
+        }
+        return;
+      } else {
+        showToast(t('promotions.promotionSuccess'), 'success');
+        tg?.HapticFeedback.notificationOccurred('success');
+      }
+
+      setShowPaymentSummaryModal(false);
+      setShowPromotionModal(false);
+      setSelectedPromotionType(null);
+    } catch (error: any) {
+      console.error('Error purchasing promotion:', error);
+      showToast(error.message || t('promotions.promotionError'), 'error');
+      tg?.HapticFeedback.notificationOccurred('error');
+    }
+  };
+
   useEffect(() => {
     const fetchRelatedListings = async () => {
       try {
         setLoading(true);
-        // Завантажуємо оголошення продавця (передаємо viewerId, щоб приховати продані для інших користувачів)
+        // Завантажуємо оголошення продавця (тільки активні)
         if (listing.seller.telegramId) {
           const viewerId = currentUser?.id?.toString() || '';
-          const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&limit=16&offset=0`);
+          // Додаємо фільтр status=active, щоб показувати тільки активні оголошення
+          const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=16&offset=0`);
           if (sellerResponse.ok) {
             const sellerData = await sellerResponse.json();
             const filtered = (sellerData.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -271,7 +347,9 @@ export const ListingDetail = ({
   const loadMoreSellerListings = async () => {
     if (!listing.seller.telegramId) return;
     try {
-      const response = await fetch(`/api/listings?userId=${listing.seller.telegramId}&limit=16&offset=${sellerOffset}`);
+      const viewerId = currentUser?.id?.toString() || '';
+      // Додаємо фільтр status=active, щоб показувати тільки активні оголошення
+      const response = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=16&offset=${sellerOffset}`);
       if (response.ok) {
         const data = await response.json();
         const filtered = (data.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -328,10 +406,11 @@ export const ListingDetail = ({
         setViews(updatedListing.views);
       }
 
-      // Оновлюємо пов'язані оголошення
+      // Оновлюємо пов'язані оголошення (тільки активні)
       if (listing.seller.telegramId) {
         const viewerIdStr = currentUser?.id?.toString() || '';
-        const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerIdStr}&limit=16&offset=0`);
+        // Додаємо фільтр status=active, щоб показувати тільки активні оголошення
+        const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerIdStr}&status=active&limit=16&offset=0`);
         if (sellerResponse.ok) {
           const sellerData = await sellerResponse.json();
           const filtered = (sellerData.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -837,7 +916,7 @@ export const ListingDetail = ({
 
       {/* Модальне вікно реклами/апгрейду */}
       {showPromotionModal && (
-        <PromotionUpgradeModal
+        <PromotionModal
           isOpen={showPromotionModal}
           onClose={() => setShowPromotionModal(false)}
           listingId={listing.id}
@@ -846,48 +925,48 @@ export const ListingDetail = ({
           telegramId={String(currentUser?.id || profile?.telegramId || '')}
           // Тут користувач явно натискає «Рекламувати» — кнопка «Опублікувати без реклами» не потрібна
           showSkipButton={false}
-          onSelectPromotion={async (promotionType, paymentMethod) => {
-            try {
-              const userTelegramId = currentUser?.id || profile?.telegramId;
-              console.log('Purchasing promotion:', { userTelegramId, promotionType, paymentMethod });
-              
-              const response = await fetch('/api/listings/promotions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  telegramId: userTelegramId,
-                  listingId: listing.id,
-                  promotionType,
-                  paymentMethod,
-                }),
-              });
-
-              const data = await response.json();
-
-              if (!response.ok) {
-                throw new Error(data.error || 'Failed to purchase promotion');
-              }
-
-              if (data.paymentRequired && data.pageUrl) {
-                // Використовуємо той самий метод, що й TopUpBalanceModal
-                tg?.HapticFeedback.notificationOccurred('success');
-                showToast(t('payments.paymentInfo'), 'info');
-                
-                // Перенаправляємо на сторінку оплати
-                window.location.href = data.pageUrl;
-                return;
-              } else {
-                showToast(t('promotions.promotionSuccess'), 'success');
-                tg?.HapticFeedback.notificationOccurred('success');
-              }
-
+          onSelectPromotion={(promotionType) => {
+            if (promotionType) {
+              // Користувач вибрав рекламу - зберігаємо і відкриваємо PaymentSummaryModal
+              setSelectedPromotionType(promotionType);
               setShowPromotionModal(false);
-            } catch (error: any) {
-              console.error('Error purchasing promotion:', error);
-              showToast(error.message || t('promotions.promotionError'), 'error');
-              tg?.HapticFeedback.notificationOccurred('error');
+              setShowPaymentSummaryModal(true);
+              fetchUserBalance(); // Оновлюємо баланс перед показом PaymentSummaryModal
+            } else {
+              // Користувач пропустив рекламу - просто закриваємо
+              setShowPromotionModal(false);
             }
           }}
+        />
+      )}
+
+      {/* Модальне вікно підтвердження оплати */}
+      {selectedPromotionType && (
+        <PaymentSummaryModal
+          isOpen={showPaymentSummaryModal}
+          onClose={() => {
+            setShowPaymentSummaryModal(false);
+            setSelectedPromotionType(null);
+          }}
+          onConfirm={handlePaymentConfirm}
+          promotionType={selectedPromotionType}
+          userBalance={userBalance}
+          tg={tg}
+        />
+      )}
+
+      {/* Модальне вікно підтвердження оплати */}
+      {selectedPromotionType && (
+        <PaymentSummaryModal
+          isOpen={showPaymentSummaryModal}
+          onClose={() => {
+            setShowPaymentSummaryModal(false);
+            setSelectedPromotionType(null);
+          }}
+          onConfirm={handlePaymentConfirm}
+          promotionType={selectedPromotionType}
+          userBalance={userBalance}
+          tg={tg}
         />
       )}
 
@@ -913,6 +992,13 @@ export const ListingDetail = ({
         onClose={() => setShowMarkSoldConfirm(false)}
         onConfirm={async () => {
           try {
+            // Перевіряємо статус модерації перед позначенням як продане
+            if (listing.status === 'pending_moderation') {
+              showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+              setShowMarkSoldConfirm(false);
+              return;
+            }
+
             const userTelegramId = currentUser?.id || profile?.telegramId;
             if (!userTelegramId) {
               showToast(t('editListing.updateError'), 'error');

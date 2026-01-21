@@ -124,19 +124,47 @@ export async function processPromotionPurchaseFromBalance(
     // Якщо оголошення НЕ в статусі active або pending_moderation, відправляємо на модерацію
     // (це означає, що воно було реактивовано і потребує модерації)
     if (currentStatus !== 'active' && currentStatus !== 'pending_moderation') {
-      await prisma.$executeRawUnsafe(
-        `UPDATE Listing SET 
-          promotionType = ?, 
-          promotionEnds = ?, 
-          status = 'pending_moderation',
-          moderationStatus = 'pending',
-          updatedAt = ? 
-        WHERE id = ?`,
-        promotionType,
-        endsAt.toISOString(),
-        nowStr,
-        listingId
-      );
+      // Для відхилених оголошень очищаємо причину відхилення
+      if (currentStatus === 'rejected') {
+        await prisma.$executeRawUnsafe(
+          `UPDATE Listing SET 
+            promotionType = ?, 
+            promotionEnds = ?, 
+            status = 'pending_moderation',
+            moderationStatus = 'pending',
+            rejectionReason = NULL,
+            updatedAt = ? 
+          WHERE id = ?`,
+          promotionType,
+          endsAt.toISOString(),
+          nowStr,
+          listingId
+        );
+      } else {
+        await prisma.$executeRawUnsafe(
+          `UPDATE Listing SET 
+            promotionType = ?, 
+            promotionEnds = ?, 
+            status = 'pending_moderation',
+            moderationStatus = 'pending',
+            updatedAt = ? 
+          WHERE id = ?`,
+          promotionType,
+          endsAt.toISOString(),
+          nowStr,
+          listingId
+        );
+      }
+      
+      // Відправляємо на модерацію в Telegram групу
+      try {
+        const { submitListingToModeration } = await import('./listingHelpers');
+        await submitListingToModeration(listingId, currentStatus === 'rejected');
+        console.log('[processPromotionPurchaseFromBalance] Listing sent to moderation group after promotion purchase');
+      } catch (error) {
+        console.error('[processPromotionPurchaseFromBalance] Error sending listing to moderation:', error);
+        // Продовжуємо виконання навіть якщо відправка не вдалася
+      }
     } else {
       // Якщо вже active або pending_moderation, просто оновлюємо рекламу
       await prisma.$executeRawUnsafe(

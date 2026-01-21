@@ -25,6 +25,7 @@ interface UserProfilePageProps {
   onToggleFavorite: (id: number) => void;
   favorites: Set<number>;
   tg: TelegramWebApp | null;
+  onBackToPreviousListing?: (() => void) | null;
 }
 
 export const UserProfilePage = ({
@@ -37,7 +38,8 @@ export const UserProfilePage = ({
   onSelectListing,
   onToggleFavorite,
   favorites,
-  tg
+  tg,
+  onBackToPreviousListing
 }: UserProfilePageProps) => {
   const { t } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
@@ -140,11 +142,19 @@ export const UserProfilePage = ({
   const loadMoreListings = async () => {
     try {
       const viewerId = currentUser?.id?.toString() || '';
-      const response = await fetch(`/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=${listingsOffset}`);
+      const isOwnProfile = viewerId && parseInt(viewerId) === parseInt(sellerTelegramId);
+      // Для чужого профілю використовуємо profile-full endpoint, який фільтрує тільки активні
+      const endpoint = isOwnProfile 
+        ? `/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=${listingsOffset}`
+        : `/api/user/profile-full?telegramId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=${listingsOffset}`;
+      
+      const response = await fetch(endpoint);
       if (response.ok) {
         const data = await response.json();
-        setListings(prev => [...prev, ...(data.listings || [])]);
-        setHasMore((listingsOffset + (data.listings?.length || 0)) < (data.total || 0));
+        const newListings = data.listings?.listings || data.listings || [];
+        setListings(prev => [...prev, ...newListings]);
+        const total = data.listings?.total || data.total || 0;
+        setHasMore((listingsOffset + newListings.length) < total);
         setListingsOffset(prev => prev + 16);
         tg?.HapticFeedback.impactOccurred('light');
       }
@@ -162,7 +172,14 @@ export const UserProfilePage = ({
 
   // Додаємо свайп зліва для повернення назад
   useSwipeBack({
-    onSwipeBack: onClose,
+    onSwipeBack: () => {
+      // Якщо є функція повернення до попередньої картки товару, використовуємо її
+      if (onBackToPreviousListing) {
+        onBackToPreviousListing();
+      } else {
+        onClose();
+      }
+    },
     enabled: true,
     tg
   });
@@ -177,7 +194,12 @@ export const UserProfilePage = ({
         <div className="mb-4">
           <button
             onClick={() => {
-              onClose();
+              // Якщо є функція повернення до попередньої картки товару, використовуємо її
+              if (onBackToPreviousListing) {
+                onBackToPreviousListing();
+              } else {
+                onClose();
+              }
               tg?.HapticFeedback.impactOccurred('light');
             }}
             className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
@@ -257,22 +279,49 @@ export const UserProfilePage = ({
             <div className="space-y-1.5 mt-3">
               {stats && (
                 <>
-                  <div className="flex items-center gap-2 text-base text-white/70">
-                    <Package size={18} className="text-white/70 flex-shrink-0" />
-                    <span>{stats.totalListings} {t('profile.listings')}</span>
-                  </div>
-                  {stats.soldListings > 0 && (
-                    <div className="flex items-center gap-2 text-base text-white/70">
-                      <Megaphone size={18} className="text-white/70 flex-shrink-0" />
-                      <span>{stats.soldListings} {t('profile.sold')}</span>
-                    </div>
-                  )}
-                  {stats.activeListings > 0 && (
-                    <div className="flex items-center gap-2 text-base text-white/70">
-                      <Megaphone size={18} className="text-white/70 flex-shrink-0" />
-                      <span>{stats.activeListings} {t('sales.active')}</span>
-                    </div>
-                  )}
+                  {/* Для чужого профілю показуємо тільки активні та продані */}
+                  {(() => {
+                    const isOwnProfile = currentUser?.id && parseInt(currentUser.id.toString()) === parseInt(sellerTelegramId);
+                    if (isOwnProfile) {
+                      // Власний профіль - показуємо всю статистику
+                      return (
+                        <>
+                          <div className="flex items-center gap-2 text-base text-white/70">
+                            <Package size={18} className="text-white/70 flex-shrink-0" />
+                            <span>{stats.totalListings} {t('profile.listings')}</span>
+                          </div>
+                          {stats.soldListings > 0 && (
+                            <div className="flex items-center gap-2 text-base text-white/70">
+                              <Megaphone size={18} className="text-white/70 flex-shrink-0" />
+                              <span>{stats.soldListings} {t('profile.sold')}</span>
+                            </div>
+                          )}
+                          {stats.activeListings > 0 && (
+                            <div className="flex items-center gap-2 text-base text-white/70">
+                              <Megaphone size={18} className="text-white/70 flex-shrink-0" />
+                              <span>{stats.activeListings} {t('sales.active')}</span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    } else {
+                      // Чужій профіль - показуємо тільки активні та продані
+                      return (
+                        <>
+                          <div className="flex items-center gap-2 text-base text-white/70">
+                            <Package size={18} className="text-white/70 flex-shrink-0" />
+                            <span>{stats.activeListings} {t('userProfile.activeListings')}</span>
+                          </div>
+                          {stats.soldListings > 0 && (
+                            <div className="flex items-center gap-2 text-base text-white/70">
+                              <Megaphone size={18} className="text-white/70 flex-shrink-0" />
+                              <span>{stats.soldListings} {t('userProfile.soldListings')}</span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    }
+                  })()}
                   {stats.createdAt && (
                     <div className="flex items-center gap-2 text-base text-white/70">
                       <span>

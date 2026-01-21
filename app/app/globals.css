@@ -251,11 +251,23 @@ html.smooth-scroll {
   scrollbar-width: none;
 }
 
-/* Safe area для мобільних пристроїв */
+/* Safe area для мобільних пристроїв - тільки для модальних вікон */
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 80px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .mb-safe {
-  margin-bottom: env(safe-area-inset-bottom, 80px);
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Запобігаємо підтягуванню BottomNavigation при відкритті клавіатури */
+[class*="BottomNavigation"] > div[class*="fixed"][class*="bottom-0"],
+div[class*="fixed"][class*="bottom-0"]:has([class*="BottomNavigation"]) {
+  position: fixed !important;
+  bottom: 0 !important;
+  transform: translateZ(0);
+  will-change: transform;
+  /* Запобігаємо зміні позиції при зміні viewport */
+  max-height: none !important;
+  height: auto !important;
 }

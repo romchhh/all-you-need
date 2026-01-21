@@ -16,9 +16,10 @@ interface PaymentSummaryModalProps {
 }
 
 const PACKAGE_PRICES: Record<string, number> = {
-  'single_1': 2.0,
+  'pack_3': 5.0,
   'pack_5': 8.0,
-  'pack_10': 14.0,
+  'pack_10': 15.0,
+  'pack_30': 30.0,
 };
 
 const PROMOTION_PRICES: Record<string, number> = {
@@ -61,9 +62,10 @@ export const PaymentSummaryModal = ({
 
   const getPackageName = (type: string) => {
     const names: Record<string, string> = {
-      'single_1': t('listingPackages.single') || '1 оголошення',
+      'pack_3': t('listingPackages.pack3') || '3 оголошення',
       'pack_5': t('listingPackages.pack5') || '5 оголошень',
       'pack_10': t('listingPackages.pack10') || '10 оголошень',
+      'pack_30': t('listingPackages.pack30') || '30 оголошень',
     };
     return names[type] || type;
   };
@@ -78,22 +80,27 @@ export const PaymentSummaryModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[70] flex flex-col">
-      <div className="bg-[#000000] w-full h-full flex flex-col border-2 border-white">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-white/20 flex-shrink-0">
-          <h2 className="text-xl font-bold text-white">
-            {t('payment.summary') || 'Підтвердження оплати'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors"
-          >
-            <X size={20} className="text-white" />
-          </button>
+    <div className="fixed inset-0 bg-black/50 z-[99999] flex items-center justify-center p-4 pb-24 overflow-hidden" style={{ position: 'fixed', paddingBottom: '100px' }}>
+      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[calc(100vh-80px)] overflow-hidden flex flex-col relative z-[100000]">
+        {/* Header */}
+        <div className="flex-shrink-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white">
+              {t('payment.summary') || 'Підтвердження оплати'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-white/70 hover:text-white transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-6">
           {/* Деталі замовлення */}
           <div className="bg-[#1C1C1C] rounded-2xl p-4 space-y-3 border border-white/20">
             <h3 className="font-semibold text-white mb-3">
@@ -211,18 +218,22 @@ export const PaymentSummaryModal = ({
           </div>
         </div>
 
-        {/* Кнопки */}
-        <div className="border-t border-white/20 px-4 py-4 space-y-3 flex-shrink-0">
+        {/* Footer */}
+        <div className="flex-shrink-0 bg-[#000000] border-t border-white/20 px-6 py-4 rounded-b-2xl space-y-2">
           <button
             onClick={() => onConfirm(paymentMethod)}
             disabled={paymentMethod === 'balance' && !canPayWithBalance}
-            className="w-full px-4 py-4 bg-[#D3F1A7] text-black rounded-2xl text-base font-semibold hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full py-4 rounded-xl font-semibold text-black transition-all ${
+              paymentMethod === 'balance' && !canPayWithBalance
+                ? 'bg-white/20 cursor-not-allowed text-white/50'
+                : 'bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 shadow-lg hover:shadow-xl'
+            }`}
           >
             {t('payment.confirm') || `Підтвердити оплату ${totalPrice} €`}
           </button>
           <button
             onClick={onClose}
-            className="w-full px-4 py-3 bg-transparent border border-white/20 text-white rounded-2xl text-base font-medium hover:bg-white/10 transition-colors"
+            className="w-full py-3 rounded-xl font-semibold text-white bg-transparent border border-white/20 hover:bg-white/10 transition-all"
           >
             {t('common.cancel') || 'Скасувати'}
           </button>

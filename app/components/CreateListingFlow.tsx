@@ -174,10 +174,101 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
     }
   };
 
+  // Функція для стискання зображень на клієнті
+  const compressImageOnClient = async (file: File, maxSizeMB: number = 2): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const img = new Image();
+        
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          const MAX_WIDTH = 1920;
+          const MAX_HEIGHT = 1920;
+          
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            if (width > height) {
+              height = (height / width) * MAX_WIDTH;
+              width = MAX_WIDTH;
+            } else {
+              width = (width / height) * MAX_HEIGHT;
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          let quality = 0.8;
+          const estimatedSize = (width * height * 4) / 1024 / 1024;
+          
+          if (estimatedSize > maxSizeMB) {
+            quality = Math.max(0.5, maxSizeMB / estimatedSize * 0.8);
+          }
+          
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Failed to compress image'));
+                return;
+              }
+              
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              });
+              
+              console.log(`[compressImageOnClient] Original: ${(file.size / 1024 / 1024).toFixed(2)}MB, Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+              resolve(compressedFile);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const createListingWithData = async (data: any, telegramId: string, promotionType: string | null, paymentMethod: 'balance' | 'direct' = 'balance') => {
     try {
       setLoading(true);
       console.log('[CreateListingFlow] Creating listing with promotion:', promotionType, 'payment method:', paymentMethod);
+      
+      // Стискаємо зображення перед відправкою
+      const compressedImages: File[] = [];
+      for (const image of data.images) {
+        try {
+          // Якщо файл більше 2MB, стискаємо
+          if (image.size > 2 * 1024 * 1024) {
+            console.log('[CreateListingFlow] Compressing image:', image.name);
+            const compressed = await compressImageOnClient(image, 2);
+            compressedImages.push(compressed);
+          } else {
+            compressedImages.push(image);
+          }
+        } catch (error) {
+          console.error('[CreateListingFlow] Failed to compress image, using original:', error);
+          compressedImages.push(image);
+        }
+      }
       
       const formData = new FormData();
       formData.append('telegramId', telegramId);
@@ -191,14 +282,57 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       formData.append('location', data.location);
       formData.append('condition', data.condition);
 
-      data.images.forEach((image: File) => {
+      compressedImages.forEach((image: File) => {
         formData.append('images', image);
       });
 
-      const response = await fetch('/api/listings/create', {
-        method: 'POST',
-        body: formData,
-      });
+      // Створюємо AbortController для таймауту
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 секунд (2 хвилини)
+
+      let response;
+      try {
+        response = await fetch('/api/listings/create', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        // Перевіряємо чи це таймаут або скасування
+        if (fetchError.name === 'AbortError') {
+          console.warn('[CreateListingFlow] Request timed out, but listing may have been created');
+          showToast('Запит перевищив час очікування. Перевірте свої оголошення через кілька хвилин.', 'info');
+          
+          // Чекаємо трохи і перевіряємо чи створилось оголошення
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          const userListingsResponse = await fetch(`/api/listings?userId=${telegramId}&limit=1`);
+          if (userListingsResponse.ok) {
+            const userListingsData = await userListingsResponse.json();
+            if (userListingsData.listings && userListingsData.listings.length > 0) {
+              const latestListing = userListingsData.listings[0];
+              // Перевіряємо чи це нове оголошення (створене менше 5 хвилин тому)
+              const createdAt = new Date(latestListing.createdAt).getTime();
+              const now = Date.now();
+              if (now - createdAt < 5 * 60 * 1000) {
+                console.log('[CreateListingFlow] Found recently created listing:', latestListing.id);
+                showToast('Оголошення успішно створено!', 'success');
+                onSuccess?.();
+                onClose();
+                return;
+              }
+            }
+          }
+          
+          throw new Error('Не вдалося створити оголошення. Спробуйте ще раз.');
+        }
+        
+        throw fetchError;
+      }
+      
+      clearTimeout(timeoutId);
 
       const result = await response.json();
 
@@ -208,7 +342,30 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         throw new Error(result.error || 'Failed to create listing');
       }
 
-      const listingId = result.listingId;
+      // Отримуємо listingId - якщо його немає в результаті, чекаємо трохи і перевіряємо знову
+      let listingId = result.listingId;
+      
+      // Якщо listingId не повернуто одразу (через асинхронне створення), чекаємо трохи
+      if (!listingId) {
+        console.log('[CreateListingFlow] Listing ID not in response, waiting for async creation...');
+        // Чекаємо 1 секунду і перевіряємо останнє створене оголошення користувача
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Отримуємо останнє оголошення користувача
+        const userListingsResponse = await fetch(`/api/listings?userId=${telegramId}&limit=1`);
+        if (userListingsResponse.ok) {
+          const userListingsData = await userListingsResponse.json();
+          if (userListingsData.listings && userListingsData.listings.length > 0) {
+            listingId = userListingsData.listings[0].id;
+            console.log('[CreateListingFlow] Found listing ID:', listingId);
+          }
+        }
+      }
+
+      if (!listingId) {
+        throw new Error('Failed to get listing ID');
+      }
+
       console.log('[CreateListingFlow] Listing created successfully, ID:', listingId);
 
       // Якщо обрано промо, застосовуємо його
@@ -217,29 +374,33 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         const needsPayment = await applyPromotion(listingId, promotionType, telegramId, paymentMethod);
         
         // Якщо потрібна оплата через Monobank, зупиняємо флоу і чекаємо на оплату
+        // applyPromotion вже виконав редирект на сторінку оплати, тому просто виходимо
         if (needsPayment) {
-          console.log('[CreateListingFlow] Waiting for payment, stopping flow');
-          showToast('Оголошення створено. Завершіть оплату реклами в боті.', 'info');
-          onClose();
-          return;
+          console.log('[CreateListingFlow] Payment required - redirecting to payment page (already done in applyPromotion)');
+          // Не закриваємо модальне вікно і не показуємо додаткові повідомлення
+          // Редирект вже виконано в applyPromotion
+          return; // НЕ показуємо повідомлення про відправку на модерацію, бо оплата ще не завершена
         }
         
         // Після успішної оплати реклами з балансу, статус вже змінився на pending_moderation
-        // Відправляємо на модерацію через API
-        console.log('[CreateListingFlow] Promotion paid from balance, submitting to moderation');
-        await submitToModeration(listingId, telegramId);
+        // Відправка на модерацію відбудеться автоматично після обробки зображень на бекенді
+        console.log('[CreateListingFlow] Promotion paid from balance, images processing and moderation submission will happen asynchronously');
+        
+        // Показуємо повідомлення тільки якщо оплата завершена (не needsPayment)
+        showToast(t('createListing.listingSentToModeration') || 'Оголошення відправлено на модерацію', 'success');
+        tg?.HapticFeedback.notificationOccurred('success');
+        onSuccess?.();
+        onClose();
       } else {
         // Якщо реклама не обрана, оголошення вже створене зі статусом pending_moderation
-        // Відправляємо на модерацію через API
-        console.log('[CreateListingFlow] No promotion selected, submitting to moderation');
-        await submitToModeration(listingId, telegramId);
+        // Відправка на модерацію відбудеться автоматично після обробки зображень на бекенді
+        console.log('[CreateListingFlow] No promotion selected, images processing and moderation submission will happen asynchronously');
+        
+        showToast(t('createListing.listingSentToModeration') || 'Оголошення відправлено на модерацію', 'success');
+        tg?.HapticFeedback.notificationOccurred('success');
+        onSuccess?.();
+        onClose();
       }
-
-      // Успіх!
-      showToast(t('createListing.listingCreated'), 'success');
-      tg?.HapticFeedback.notificationOccurred('success');
-      onSuccess?.();
-      onClose();
     } catch (error: any) {
       console.error('[CreateListingFlow] Error creating listing:', error);
       showToast(error.message || t('common.error'), 'error');
@@ -296,7 +457,14 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         showToast(t('payments.paymentInfo'), 'info');
         
         // Перенаправляємо на сторінку оплати
-        window.location.href = data.pageUrl;
+        // Використовуємо Telegram WebApp API якщо доступно, інакше window.location.href
+        if (tg?.openLink) {
+          console.log('[CreateListingFlow] Using tg.openLink for redirect');
+          tg.openLink(data.pageUrl);
+        } else {
+          console.log('[CreateListingFlow] Using window.location.href for redirect');
+          window.location.href = data.pageUrl;
+        }
         
         console.log('[CreateListingFlow] ✅ RETURNING TRUE - Should stop flow');
         return true; // Зупиняємо флоу - чекаємо на оплату
@@ -325,11 +493,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
     console.log('[CreateListingFlow] Listing submitted to moderation successfully');
   };
 
-  const handlePromotionSelect = async (promotionType: string | null) => {
-    console.log('[CreateListingFlow] Promotion selected:', promotionType);
+  const handlePromotionSelect = async (promotionType: string | null, paymentMethod?: 'balance' | 'direct') => {
+    console.log('[CreateListingFlow] Promotion selected:', promotionType, 'paymentMethod:', paymentMethod);
     setSelectedPromotionType(promotionType);
     
     // Якщо обрано промо, показуємо фінальне вікно оплати
+    // (paymentMethod ігноруємо тут, бо він вибирається в PaymentSummaryModal)
     if (promotionType) {
       setStep('payment_summary');
     } else {
@@ -378,7 +547,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
           showToast(t('payments.paymentInfo'), 'info');
           
           // Перенаправляємо на сторінку оплати
-          window.location.href = packageData.pageUrl;
+          // Використовуємо Telegram WebApp API якщо доступно, інакше window.location.href
+          if (tg?.openLink) {
+            tg.openLink(packageData.pageUrl);
+          } else {
+            window.location.href = packageData.pageUrl;
+          }
           return;
         }
       }

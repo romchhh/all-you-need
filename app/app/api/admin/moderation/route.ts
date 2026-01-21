@@ -421,7 +421,18 @@ ${reason}
           message: 'Telegram listing rejected',
         });
       } else {
-        const refundInfo = await rejectListing(listing, reason);
+        // Отримуємо admin ID якщо можливо
+        let adminId: number | undefined;
+        try {
+          const adminUser = await isAdminAuthenticated();
+          if (adminUser && typeof adminUser === 'object' && 'id' in adminUser) {
+            adminId = (adminUser as any).id;
+          }
+        } catch (e) {
+          // Якщо не вдалося отримати admin ID, продовжуємо без нього
+        }
+        
+        const refundInfo = await rejectListing(listing, reason, adminId);
         return NextResponse.json({
           success: true,
           message: 'Listing rejected and funds refunded',

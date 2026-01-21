@@ -185,9 +185,30 @@ function filterCities(cities: string[], query: string, limit: number) {
   let filtered = cities;
   
   if (normalizedQuery) {
-    filtered = cities.filter(city => 
-      city.toLowerCase().includes(normalizedQuery)
-    );
+    // Сортируем: сначала точные совпадения, потом начинаются с запроса, потом содержат запрос
+    const exactMatches: string[] = [];
+    const startsWith: string[] = [];
+    const includes: string[] = [];
+    
+    cities.forEach(city => {
+      const cityLower = city.toLowerCase();
+      if (cityLower === normalizedQuery) {
+        exactMatches.push(city);
+      } else if (cityLower.startsWith(normalizedQuery)) {
+        startsWith.push(city);
+      } else if (cityLower.includes(normalizedQuery)) {
+        includes.push(city);
+      }
+    });
+    
+    // Объединяем в правильном порядке
+    filtered = [...exactMatches, ...startsWith, ...includes];
+  }
+
+  // Добавляем введенный текст первым, если он не точно совпадает с каким-то городом
+  const queryTrimmed = query.trim();
+  if (queryTrimmed && !filtered.some(city => city.toLowerCase() === normalizedQuery)) {
+    filtered = [queryTrimmed, ...filtered];
   }
 
   const limited = filtered.slice(0, limit);

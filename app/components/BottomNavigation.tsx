@@ -2,6 +2,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useParams, usePathname } from 'next/navigation';
 import { NavIcon } from './NavIcon';
+import { useEffect, useRef, useState } from 'react';
 
 interface BottomNavigationProps {
   activeTab?: string;
@@ -18,6 +19,173 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
   const params = useParams();
   const pathname = usePathname();
   const lang = (params?.lang as string) || 'uk';
+  const navRef = useRef<HTMLDivElement>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  
+  // Відстежуємо фокус на полях введення для приховування меню
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let focusTimeout: NodeJS.Timeout | null = null;
+    let blurTimeout: NodeJS.Timeout | null = null;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      // Скасовуємо попередній blur timeout якщо він є
+      if (blurTimeout) {
+        clearTimeout(blurTimeout);
+        blurTimeout = null;
+      }
+
+      const target = e.target;
+      // Перевіряємо, чи це поле введення
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+         target.tagName === 'TEXTAREA' ||
+         target.isContentEditable)
+      ) {
+        // Миттєво приховуємо меню
+        setIsInputFocused(true);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      // Скасовуємо попередній focus timeout якщо він є
+      if (focusTimeout) {
+        clearTimeout(focusTimeout);
+        focusTimeout = null;
+      }
+
+      // Невелика затримка, щоб переконатися, що фокус дійсно втрачено
+      blurTimeout = setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (
+          !activeElement ||
+          (activeElement instanceof HTMLElement &&
+           activeElement.tagName !== 'INPUT' &&
+           activeElement.tagName !== 'TEXTAREA' &&
+           !activeElement.isContentEditable)
+        ) {
+          setIsInputFocused(false);
+        }
+      }, 150);
+    };
+
+    // Відстежуємо зміни висоти viewport (відкриття/закриття клавіатури)
+    const handleVisualViewportChange = () => {
+      if (window.visualViewport) {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        // Якщо viewport менший за window, значить клавіатура відкрита
+        const keyboardOpen = viewportHeight < windowHeight * 0.75;
+        
+        // Миттєво оновлюємо стан
+        if (keyboardOpen) {
+          setIsInputFocused(true);
+        } else {
+          // Перевіряємо, чи дійсно немає фокусу перед приховуванням
+          const activeElement = document.activeElement;
+          if (
+            !activeElement ||
+            (activeElement instanceof HTMLElement &&
+             activeElement.tagName !== 'INPUT' &&
+             activeElement.tagName !== 'TEXTAREA' &&
+             !activeElement.isContentEditable)
+          ) {
+            setIsInputFocused(false);
+          }
+        }
+      }
+    };
+
+    // Додаткова перевірка при зміні розміру вікна
+    const handleResize = () => {
+      if (window.visualViewport) {
+        handleVisualViewportChange();
+      }
+    };
+
+    // Перевіряємо початковий стан
+    const checkInitialState = () => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        (activeElement.tagName === 'INPUT' ||
+         activeElement.tagName === 'TEXTAREA' ||
+         activeElement.isContentEditable)
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+
+    // Перевіряємо початковий стан
+    checkInitialState();
+
+    document.addEventListener('focusin', handleFocusIn, true); // Використовуємо capture phase
+    document.addEventListener('focusout', handleFocusOut, true);
+    window.addEventListener('resize', handleResize);
+    
+    // Використовуємо Visual Viewport API для точного визначення клавіатури
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+    }
+
+    return () => {
+      if (focusTimeout) clearTimeout(focusTimeout);
+      if (blurTimeout) clearTimeout(blurTimeout);
+      document.removeEventListener('focusin', handleFocusIn, true);
+      document.removeEventListener('focusout', handleFocusOut, true);
+      window.removeEventListener('resize', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
+      }
+    };
+  }, []);
+  
+  // Запобігаємо підтягуванню меню при відкритті клавіатури
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navRef.current) return;
+
+    const navElement = navRef.current;
+    
+    // Функція для фіксації позиції - запобігає підтягуванню при зміні viewport
+    const fixPosition = () => {
+      if (navElement) {
+        // Використовуємо requestAnimationFrame для синхронізації
+        requestAnimationFrame(() => {
+          if (navElement) {
+            const transformValue = isInputFocused ? 'translateY(100%)' : 'translateY(0) translateZ(0)';
+            navElement.style.position = 'fixed';
+            navElement.style.bottom = '0';
+            navElement.style.left = '0';
+            navElement.style.right = '0';
+            // Використовуємо translateY(0) замість translateZ(0) для кращої фіксації
+            navElement.style.transform = transformValue;
+            navElement.style.setProperty('-webkit-transform', transformValue);
+          }
+        });
+      }
+    };
+
+    // Встановлюємо позицію при завантаженні
+    fixPosition();
+
+    // Обробляємо зміни viewport (відкриття/закриття клавіатури)
+    const handleResize = () => {
+      fixPosition();
+    };
+
+    // Викликаємо fixPosition при зміні isInputFocused
+    fixPosition();
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isInputFocused]);
   
   // Визначаємо активну вкладку з URL, якщо не передано явно
   const getActiveTab = () => {
@@ -65,7 +233,29 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
 
   return (
   <>
-    <div className="fixed bottom-0 left-0 right-0 bg-[#000000] safe-area-bottom z-50 pb-4">
+    <div 
+      ref={navRef}
+      className="fixed bottom-0 left-0 right-0 bg-[#000000] safe-area-bottom z-50 pb-4 transition-transform duration-200 ease-in-out"
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        transform: isInputFocused ? 'translateY(100%)' : 'translateY(0) translateZ(0)',
+        willChange: 'transform',
+        // Запобігаємо підтягуванню при відкритті клавіатури
+        maxHeight: 'none',
+        height: 'auto',
+        // Додаткова фіксація для мобільних пристроїв (використовуємо setProperty в useEffect)
+        backfaceVisibility: 'hidden',
+        perspective: '1000px',
+        // Приховуємо меню, коли активне поле введення
+        visibility: isInputFocused ? 'hidden' : 'visible',
+        opacity: isInputFocused ? 0 : 1,
+        // Додаткова фіксація - не дозволяємо меню підтягуватися
+        pointerEvents: isInputFocused ? 'none' : 'auto'
+      }}
+    >
       <div className="max-w-2xl mx-auto flex justify-around items-center px-2 py-2 border-t-2 border-white rounded-t-3xl bg-[#000000]">
       {/* Головна */}
       <button

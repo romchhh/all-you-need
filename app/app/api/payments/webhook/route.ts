@@ -116,28 +116,55 @@ export async function POST(request: NextRequest) {
           promotion.id
         );
 
+        // Перевіряємо поточний статус оголошення перед оновленням
+        const listingStatus = await prisma.$queryRawUnsafe(
+          `SELECT status FROM Listing WHERE id = ?`,
+          promotion.listingId
+        ) as Array<{ status: string }>;
+        
+        const currentStatus = listingStatus[0]?.status;
+        const isRejected = currentStatus === 'rejected';
+        
         // Оновлюємо оголошення: встановлюємо рекламу та статус pending_moderation
         const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
         const endsAt = new Date();
         endsAt.setDate(endsAt.getDate() + (promotion.promotionType === 'vip' ? 7 : promotion.promotionType === 'top_category' ? 3 : 1));
         
-        await prisma.$executeRawUnsafe(
-          `UPDATE Listing SET 
-            promotionType = ?, 
-            promotionEnds = ?, 
-            status = 'pending_moderation',
-            moderationStatus = 'pending',
-            updatedAt = ? 
-          WHERE id = ?`,
-          promotion.promotionType,
-          endsAt.toISOString(),
-          nowStr,
-          promotion.listingId
-        );
+        // Для відхилених оголошень також очищаємо причину відхилення
+        if (isRejected) {
+          await prisma.$executeRawUnsafe(
+            `UPDATE Listing SET 
+              promotionType = ?, 
+              promotionEnds = ?, 
+              status = 'pending_moderation',
+              moderationStatus = 'pending',
+              rejectionReason = NULL,
+              updatedAt = ? 
+            WHERE id = ?`,
+            promotion.promotionType,
+            endsAt.toISOString(),
+            nowStr,
+            promotion.listingId
+          );
+        } else {
+          await prisma.$executeRawUnsafe(
+            `UPDATE Listing SET 
+              promotionType = ?, 
+              promotionEnds = ?, 
+              status = 'pending_moderation',
+              moderationStatus = 'pending',
+              updatedAt = ? 
+            WHERE id = ?`,
+            promotion.promotionType,
+            endsAt.toISOString(),
+            nowStr,
+            promotion.listingId
+          );
+        }
 
         // Відправляємо на модерацію в ТГ групу
         const { submitListingToModeration } = await import('@/utils/listingHelpers');
-        await submitListingToModeration(promotion.listingId).catch(err => {
+        await submitListingToModeration(promotion.listingId, isRejected).catch(err => {
           console.error('[Webhook] Failed to send listing to moderation group:', err);
         });
 

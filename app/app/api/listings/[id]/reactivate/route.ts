@@ -48,7 +48,8 @@ export async function POST(
     const listing = listings[0];
 
     // Перевіряємо що це оголошення належить користувачу
-    if (listing.user_telegramId !== telegramIdNum) {
+    // Використовуємо String() для порівняння, щоб уникнути проблем з типами (BIGINT)
+    if (String(listing.user_telegramId) !== String(telegramId)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -104,11 +105,23 @@ export async function POST(
 
     console.log('[Reactivate Listing] Listing reactivated to pending_moderation status for moderation');
 
+    // Форматуємо дату безпечно
+    let expiresAtISO: string;
+    try {
+      expiresAtISO = expiresAt.toISOString();
+    } catch (e) {
+      console.error('[Reactivate Listing] Error formatting expiresAt:', e);
+      // Якщо помилка форматування, використовуємо поточну дату + 30 днів
+      const fallbackDate = new Date();
+      fallbackDate.setDate(fallbackDate.getDate() + 30);
+      expiresAtISO = fallbackDate.toISOString();
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Listing reactivated successfully',
       listingId,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: expiresAtISO,
       needsPromotionSelection: true, // Потрібно обрати промо
     });
   } catch (error) {

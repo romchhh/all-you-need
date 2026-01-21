@@ -51,6 +51,7 @@ const FavoritesPage = () => {
 
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [selectedSeller, setSelectedSeller] = useState<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
+  const previousListingRef = useRef<Listing | null>(null); // Зберігаємо картку товару перед відкриттям профілю продавця
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -671,7 +672,21 @@ const FavoritesPage = () => {
           sellerAvatar={selectedSeller.avatar}
           sellerUsername={selectedSeller.username}
           sellerPhone={selectedSeller.phone}
-          onClose={() => setSelectedSeller(null)}
+          onClose={() => {
+            previousListingRef.current = null; // Очищаємо збережену картку
+            setSelectedSeller(null);
+          }}
+          onBackToPreviousListing={
+            // Перевіряємо, чи є збережена картка товару
+            previousListingRef.current 
+              ? () => {
+                  // Відновлюємо картку товару
+                  setSelectedListing(previousListingRef.current);
+                  previousListingRef.current = null; // Очищаємо після використання
+                  setSelectedSeller(null);
+                }
+              : null
+          }
           onSelectListing={setSelectedListing}
           onToggleFavorite={toggleFavorite}
           favorites={favorites}
@@ -696,6 +711,8 @@ const FavoritesPage = () => {
           onToggleFavorite={toggleFavorite}
           onSelectListing={setSelectedListing}
           onViewSellerProfile={(telegramId, name, avatar, username, phone) => {
+            // Зберігаємо посилання на картку товару перед відкриттям профілю
+            previousListingRef.current = selectedListing;
             setSelectedSeller({ 
               telegramId, 
               name, 

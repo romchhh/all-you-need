@@ -19,12 +19,22 @@ export const ListingCardSkeleton = () => {
   );
 };
 
-export const ListingGridSkeleton = ({ count = 6 }: { count?: number }) => {
+export const ListingGridSkeleton = ({ count = 6, showLoadingText = false, loadingText }: { count?: number; showLoadingText?: boolean; loadingText?: string }) => {
   return (
-    <div className="px-4 grid grid-cols-2 gap-3">
-      {Array.from({ length: count }).map((_, i) => (
-        <ListingCardSkeleton key={i} />
-      ))}
+    <div className="px-4">
+      {showLoadingText && loadingText && (
+        <div className="flex items-center justify-center py-8">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-[#D3F1A7] border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-white/70 text-sm">{loadingText}</p>
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        {Array.from({ length: count }).map((_, i) => (
+          <ListingCardSkeleton key={i} />
+        ))}
+      </div>
     </div>
   );
 };

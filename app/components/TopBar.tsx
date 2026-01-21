@@ -19,6 +19,7 @@ interface TopBarProps {
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
   onSearchClear?: () => void;
   tg: TelegramWebApp | null;
+  searchSuggestions?: React.ReactNode;
 }
 
 export const TopBar = ({
@@ -36,7 +37,8 @@ export const TopBar = ({
   hasActiveFilters = false,
   searchInputRef,
   onSearchClear,
-  tg
+  tg,
+  searchSuggestions
 }: TopBarProps) => {
   const { t } = useLanguage();
 
@@ -81,6 +83,9 @@ export const TopBar = ({
               <X size={14} className="text-white" />
             </button>
           )}
+          
+          {/* Підказки автодоповнення - позиціоновані під полем вводу */}
+          {searchSuggestions}
         </div>
         <button
           onClick={() => {

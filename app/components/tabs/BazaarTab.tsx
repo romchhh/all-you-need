@@ -572,83 +572,84 @@ const BazaarTabComponent = ({
     <div className="pb-24">
       {/* Пошук з TopBar */}
       <div className="relative">
-        <div className="p-4 sticky top-0 z-20 border-b border-gray-800/50">
-          <div className="flex gap-1 items-center" ref={suggestionsRef}>
-            <TopBar
-              variant="main"
-              onSearchChange={(query) => {
-                onSearchChange(query);
-                setShowSuggestions(true);
-              }}
-              onSearchSubmit={(query) => {
-                // Обробка натискання Enter/Search
-                onSearchChange(query);
-                setShowSuggestions(false);
-                addToSearchHistory(query);
-                setSearchHistory(getSearchHistory());
-                searchInputRef.current?.blur();
-              }}
-              onFilterClick={() => {
-                setShowSortModal(true);
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              onSearchClear={() => {
-                onSearchChange('');
-                setShowSuggestions(false);
-              }}
-              searchQuery={searchQuery}
-              searchPlaceholder={selectedCities.length > 0 ? t('bazaar.searchInCity', { city: selectedCities[0] }) : t('bazaar.whatInterestsYou')}
-              searchInputRef={searchInputRef}
-              hasActiveFilters={hasActiveFilters}
-              tg={tg}
-            />
-            
-            {/* Підказки автодоповнення */}
-            {showSuggestions && searchSuggestions.length > 0 && (
-              <div className="absolute left-4 right-4 mt-2 bg-gray-900 rounded-xl border border-gray-700 shadow-lg z-30 max-h-60 overflow-y-auto">
-                {searchSuggestions.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => {
-                      // При кліку на підказку виконуємо пошук
-                      onSearchChange(suggestion);
-                      addToSearchHistory(suggestion);
-                      setSearchHistory(getSearchHistory());
-                      setShowSuggestions(false);
-                      searchInputRef.current?.blur();
-                      tg?.HapticFeedback.impactOccurred('light');
-                      // Після вибору підказки виконуємо пошук (сторінка оновлюється автоматично через onSearchChange)
-                    }}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-800 transition-colors flex items-center gap-2 text-white border-b border-gray-700 last:border-b-0"
-                  >
-                    {!searchQuery.trim() ? (
-                      <Clock size={16} className="text-gray-400" />
-                    ) : (
-                      <Search size={16} className="text-gray-400" />
-                    )}
-                    <span>{suggestion}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            {/* Кнопка вибору міста */}
-            <button
-              onClick={() => setIsCityModalOpen(true)}
-              className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors relative border ${
-                selectedCities.length > 0
-                  ? 'border-[#D3F1A7] bg-transparent'
-                  : 'border-white bg-transparent hover:bg-white/10'
-              }`}
-            >
-              <MapPin size={18} className="text-white" />
-              {selectedCities.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#D3F1A7] text-black text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                  {selectedCities.length > 9 ? '9+' : selectedCities.length}
-                </span>
-              )}
-            </button>
+        <div className="p-4 sticky top-0 z-20">
+          <div className="relative" ref={suggestionsRef}>
+            <div className="flex gap-1 items-center">
+              <TopBar
+                variant="main"
+                onSearchChange={(query) => {
+                  onSearchChange(query);
+                  setShowSuggestions(true);
+                }}
+                onSearchSubmit={(query) => {
+                  // Обробка натискання Enter/Search
+                  onSearchChange(query);
+                  setShowSuggestions(false);
+                  addToSearchHistory(query);
+                  setSearchHistory(getSearchHistory());
+                  searchInputRef.current?.blur();
+                }}
+                onFilterClick={() => {
+                  setShowSortModal(true);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                onSearchClear={() => {
+                  onSearchChange('');
+                  setShowSuggestions(false);
+                }}
+                searchQuery={searchQuery}
+                searchPlaceholder={selectedCities.length > 0 ? t('bazaar.searchInCity', { city: selectedCities[0] }) : t('bazaar.whatInterestsYou')}
+                searchInputRef={searchInputRef}
+                hasActiveFilters={hasActiveFilters}
+                tg={tg}
+                searchSuggestions={
+                  showSuggestions && searchSuggestions.length > 0 ? (
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-gray-900 rounded-xl border border-gray-700 shadow-lg z-50 max-h-60 overflow-y-auto">
+                      {searchSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => {
+                            // При кліку на підказку виконуємо пошук
+                            onSearchChange(suggestion);
+                            addToSearchHistory(suggestion);
+                            setSearchHistory(getSearchHistory());
+                            setShowSuggestions(false);
+                            searchInputRef.current?.blur();
+                            tg?.HapticFeedback.impactOccurred('light');
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-800 transition-colors flex items-center gap-2 text-white border-b border-gray-700 last:border-b-0"
+                        >
+                          {!searchQuery.trim() ? (
+                            <Clock size={16} className="text-gray-400" />
+                          ) : (
+                            <Search size={16} className="text-gray-400" />
+                          )}
+                          <span>{suggestion}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : undefined
+                }
+              />
+              
+              {/* Кнопка вибору міста */}
+              <button
+                onClick={() => setIsCityModalOpen(true)}
+                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors relative border ${
+                  selectedCities.length > 0
+                    ? 'border-[#D3F1A7] bg-transparent'
+                    : 'border-white bg-transparent hover:bg-white/10'
+                }`}
+              >
+                <MapPin size={18} className={selectedCities.length > 0 ? 'text-[#D3F1A7]' : 'text-white'} />
+                {selectedCities.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#D3F1A7] text-black text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {selectedCities.length > 9 ? '9+' : selectedCities.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -876,19 +877,17 @@ const BazaarTabComponent = ({
           )}
           
           {/* Кнопка "Показати ще" - після списку товарів, перед нижнім меню */}
-          {hasMore && filteredAndSortedListings.length > 0 && (
+          {hasMore && filteredAndSortedListings.length > 0 && onLoadMore && (
             <div className="px-4 py-4 pb-24 text-center">
-              {onLoadMore && (
-                <button
-                  onClick={() => {
-                    onLoadMore();
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
-                >
-                  {t('common.showMore')}
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  onLoadMore();
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+              >
+                {t('common.showMore')}
+              </button>
             </div>
           )}
         </>

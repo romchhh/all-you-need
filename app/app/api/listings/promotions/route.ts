@@ -126,6 +126,10 @@ export async function POST(request: NextRequest) {
           invoiceId
         );
 
+        // Не змінюємо статус оголошення - залишаємо як є
+        // Після підтвердження оплати через webhook статус буде змінений на pending_moderation
+        console.log('[Promotions API] Invoice created, waiting for payment confirmation via webhook');
+
         console.log('[Promotions API] Returning success response with pageUrl:', pageUrl);
 
         return NextResponse.json({

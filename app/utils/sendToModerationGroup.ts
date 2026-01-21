@@ -181,20 +181,80 @@ export async function sendListingToModerationGroup(
               }
               
               console.log('[sendToModerationGroup] Fetching image via HTTP:', fetchUrl);
-              const imageResponse = await fetch(fetchUrl);
-              if (!imageResponse.ok) {
+              
+              // Retry логіка для завантаження зображення (до 3 спроб)
+              let imageResponse: Response | null = null;
+              let retryCount = 0;
+              const maxRetries = 3;
+              
+              while (retryCount < maxRetries && !imageResponse) {
+                try {
+                  imageResponse = await fetch(fetchUrl, {
+                    signal: AbortSignal.timeout(10000), // Таймаут 10 секунд
+                  });
+                  
+                  if (imageResponse.ok) {
+                    break;
+                  } else if (retryCount < maxRetries - 1) {
+                    console.log(`[sendToModerationGroup] Fetch failed (${imageResponse.status}), retrying... (${retryCount + 1}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Збільшуємо затримку з кожною спробою
+                    imageResponse = null;
+                    retryCount++;
+                  }
+                } catch (error: any) {
+                  if (error.code === 'ECONNRESET' || error.name === 'AbortError') {
+                    if (retryCount < maxRetries - 1) {
+                      console.log(`[sendToModerationGroup] Connection error, retrying... (${retryCount + 1}/${maxRetries})`);
+                      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+                      imageResponse = null;
+                      retryCount++;
+                    } else {
+                      throw error;
+                    }
+                  } else {
+                    throw error;
+                  }
+                }
+              }
+              
+              if (!imageResponse || !imageResponse.ok) {
                 // Якщо API route не спрацював, спробуємо прямий шлях
                 if (fetchUrl.includes('/api/images/') && imageUrl !== fetchUrl) {
                   console.log('[sendToModerationGroup] API route failed, trying direct path:', imageUrl);
-                  const directResponse = await fetch(imageUrl);
-                  if (directResponse.ok) {
-                    const imageBuffer = await directResponse.arrayBuffer();
-                    buffer = Buffer.from(imageBuffer);
-                  } else {
-                    throw new Error(`Failed to fetch image: ${directResponse.status} ${directResponse.statusText}`);
+                  let directResponse: Response | null = null;
+                  retryCount = 0;
+                  
+                  while (retryCount < maxRetries && !directResponse) {
+                    try {
+                      directResponse = await fetch(imageUrl, {
+                        signal: AbortSignal.timeout(10000),
+                      });
+                      
+                      if (directResponse.ok) {
+                        const imageBuffer = await directResponse.arrayBuffer();
+                        buffer = Buffer.from(imageBuffer);
+                        break;
+                      } else if (retryCount < maxRetries - 1) {
+                        console.log(`[sendToModerationGroup] Direct fetch failed (${directResponse.status}), retrying... (${retryCount + 1}/${maxRetries})`);
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+                        directResponse = null;
+                        retryCount++;
+                      } else {
+                        throw new Error(`Failed to fetch image: ${directResponse.status} ${directResponse.statusText}`);
+                      }
+                    } catch (error: any) {
+                      if ((error.code === 'ECONNRESET' || error.name === 'AbortError') && retryCount < maxRetries - 1) {
+                        console.log(`[sendToModerationGroup] Direct connection error, retrying... (${retryCount + 1}/${maxRetries})`);
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+                        directResponse = null;
+                        retryCount++;
+                      } else {
+                        throw error;
+                      }
+                    }
                   }
                 } else {
-                  throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
+                  throw new Error(`Failed to fetch image after ${maxRetries} retries: ${imageResponse?.status || 'unknown'} ${imageResponse?.statusText || 'unknown'}`);
                 }
               } else {
                 const imageBuffer = await imageResponse.arrayBuffer();
@@ -253,21 +313,93 @@ export async function sendListingToModerationGroup(
               source,
               message: error instanceof Error ? error.message : String(error),
             });
-            // Fallback: надсилаємо як URL (може не спрацювати, але спробуємо)
-            response = await fetch(
-              `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  chat_id: MODERATION_GROUP_ID,
-                  photo: imageUrl,
-                  caption: truncatedText,
-                  parse_mode: 'HTML',
-                  reply_markup: keyboard,
-                }),
+            
+            // Якщо не вдалося завантажити зображення, спробуємо ще раз через локальний шлях
+            // або відправимо без фото (тільки текст)
+            try {
+              // Спробуємо знайти файл локально
+              let localPath: string | null = null;
+              if (imageUrl.includes('/listings/')) {
+                const pathMatch = imageUrl.match(/\/listings\/[^\/]+$/);
+                if (pathMatch) {
+                  localPath = join(process.cwd(), 'public', pathMatch[0]);
+                }
               }
-            );
+              
+              if (localPath && existsSync(localPath)) {
+                console.log('[sendToModerationGroup] Retrying with local file:', localPath);
+                const localBuffer = await readFile(localPath);
+                
+                const boundary = `----WebKitFormBoundary${Date.now()}${Math.random().toString(36).substring(7)}`;
+                const formDataParts: Buffer[] = [];
+                
+                const appendField = (name: string, value: string) => {
+                  formDataParts.push(Buffer.from(`--${boundary}\r\n`));
+                  formDataParts.push(Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n`));
+                  formDataParts.push(Buffer.from(`${value}\r\n`));
+                };
+                
+                const appendFile = (name: string, buffer: Buffer, filename: string, contentType: string) => {
+                  formDataParts.push(Buffer.from(`--${boundary}\r\n`));
+                  formDataParts.push(Buffer.from(`Content-Disposition: form-data; name="${name}"; filename="${filename}"\r\n`));
+                  formDataParts.push(Buffer.from(`Content-Type: ${contentType}\r\n\r\n`));
+                  formDataParts.push(buffer);
+                  formDataParts.push(Buffer.from(`\r\n`));
+                };
+                
+                appendFile('photo', localBuffer, 'image.webp', 'image/webp');
+                appendField('chat_id', MODERATION_GROUP_ID!);
+                appendField('caption', truncatedText);
+                appendField('parse_mode', 'HTML');
+                appendField('reply_markup', JSON.stringify(keyboard));
+                formDataParts.push(Buffer.from(`--${boundary}--\r\n`));
+                
+                const formDataBuffer = Buffer.concat(formDataParts);
+                response = await fetch(
+                  `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                      'Content-Length': formDataBuffer.length.toString(),
+                    },
+                    body: formDataBuffer,
+                  }
+                );
+              } else {
+                // Якщо не знайдено локально, відправляємо тільки текст без фото
+                console.warn('[sendToModerationGroup] Cannot load image, sending text only');
+                response = await fetch(
+                  `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      chat_id: MODERATION_GROUP_ID,
+                      text: `⚠️ <b>Не вдалося завантажити зображення</b>\n\n${truncatedText}`,
+                      parse_mode: 'HTML',
+                      reply_markup: keyboard,
+                    }),
+                  }
+                );
+              }
+            } catch (fallbackError) {
+              console.error('[sendToModerationGroup] Fallback also failed:', fallbackError);
+              // Останній fallback - відправляємо тільки текст
+              response = await fetch(
+                `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: MODERATION_GROUP_ID,
+                    text: `⚠️ <b>Не вдалося завантажити зображення</b>\n\n${truncatedText}`,
+                    parse_mode: 'HTML',
+                    reply_markup: keyboard,
+                  }),
+                }
+              );
+            }
           }
         } else {
           // Для Telegram file_id або якщо це не URL

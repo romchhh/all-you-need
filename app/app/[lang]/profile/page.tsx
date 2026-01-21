@@ -59,6 +59,7 @@ const ProfilePage = () => {
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
+  const previousListingRef = useRef<Listing | null>(null); // Зберігаємо картку товару перед відкриттям профілю продавця
   
   // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {
@@ -206,7 +207,21 @@ const ProfilePage = () => {
           sellerAvatar={selectedSeller.avatar}
           sellerUsername={selectedSeller.username}
           sellerPhone={selectedSeller.phone}
-          onClose={() => setSelectedSeller(null)}
+          onClose={() => {
+            previousListingRef.current = null; // Очищаємо збережену картку
+            setSelectedSeller(null);
+          }}
+          onBackToPreviousListing={
+            // Перевіряємо, чи є збережена картка товару
+            previousListingRef.current 
+              ? () => {
+                  // Відновлюємо картку товару
+                  setSelectedListing(previousListingRef.current);
+                  previousListingRef.current = null; // Очищаємо після використання
+                  setSelectedSeller(null);
+                }
+              : null
+          }
           onSelectListing={setSelectedListing}
           onToggleFavorite={toggleFavorite}
           favorites={favorites}
@@ -236,6 +251,8 @@ const ProfilePage = () => {
           onToggleFavorite={toggleFavorite}
           onSelectListing={setSelectedListing}
           onViewSellerProfile={(telegramId, name, avatar, username, phone) => {
+            // Зберігаємо посилання на картку товару перед відкриттям профілю
+            previousListingRef.current = selectedListing;
             setSelectedSeller({ 
               telegramId, 
               name, 

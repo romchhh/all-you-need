@@ -257,40 +257,54 @@ def get_listing_confirmation_keyboard(user_id: int) -> InlineKeyboardMarkup:
     ])
 
 
-def get_publication_tariff_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Створює клавіатуру для вибору тарифу публікації"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
+def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None) -> InlineKeyboardMarkup:
+    """Створює клавіатуру для вибору тарифів публікації з множинним вибором"""
+    if selected_tariffs is None:
+        selected_tariffs = []
+    
+    # Визначаємо ціни та назви тарифів
+    tariff_info = {
+        'standard': {'name': 'Звичайна публікація', 'price': 3.0, 'icon': '📌'},
+        'highlighted': {'name': 'Виділене оголошення', 'price': 4.5, 'icon': '⭐'},
+        'pinned_12h': {'name': 'Закріп на 12 годин', 'price': 5.5, 'icon': '📌'},
+        'pinned_24h': {'name': 'Закріп на 24 години', 'price': 7.5, 'icon': '📌'},
+        'story': {'name': 'Сторіс на 24 години', 'price': 5.0, 'icon': '📸'}
+    }
+    
+    keyboard = []
+    
+    # Додаємо кнопки для кожного тарифу з чекбоксами
+    for tariff_type, info in tariff_info.items():
+        is_selected = tariff_type in selected_tariffs
+        checkbox = '✅' if is_selected else '☐'
+        button_text = f"{checkbox} {info['icon']} {info['name']} — {info['price']}€"
+        
+        keyboard.append([
             InlineKeyboardButton(
-                text="📌 Звичайна публікація — 3€",
-                callback_data="tariff_standard"
+                text=button_text,
+                callback_data=f"tariff_toggle_{tariff_type}"
             )
-        ],
-        [
+        ])
+    
+    # Кнопка "Готово" якщо вибрано хоча б один тариф
+    if selected_tariffs:
+        total_price = sum(tariff_info[tariff]['price'] for tariff in selected_tariffs if tariff in tariff_info)
+        keyboard.append([
             InlineKeyboardButton(
-                text="⭐ Виділене оголошення — 4,5€",
-                callback_data="tariff_highlighted"
+                text=f"✅ Готово (Разом: {total_price}€)",
+                callback_data="tariff_confirm"
             )
-        ],
-        [
-            InlineKeyboardButton(
-                text="📌 Закріп у каналі — 5,5€ / 12 годин",
-                callback_data="tariff_pinned"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="📸 Сторіс у каналі — 5€ / 24 години",
-                callback_data="tariff_story"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="❌ Скасувати",
-                callback_data="cancel_listing"
-            )
-        ]
+        ])
+    
+    # Кнопка скасувати
+    keyboard.append([
+        InlineKeyboardButton(
+            text="❌ Скасувати",
+            callback_data="cancel_listing"
+        )
     ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def get_payment_method_keyboard(user_id: int, balance: float, amount: float, payment_url: str = None) -> InlineKeyboardMarkup:

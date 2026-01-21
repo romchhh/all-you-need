@@ -145,12 +145,19 @@ export async function GET(request: NextRequest) {
       const queryParams: any[] = [parseInt(userId)];
       
       if (!isOwnProfile) {
-        whereClause += " AND l.status != 'sold' AND l.status != 'hidden'";
+        whereClause += " AND l.status != 'sold' AND l.status != 'hidden' AND l.status != 'deactivated'";
       }
       // Додаємо фільтр за статусом, якщо він вказаний
       if (status && status !== 'all') {
-        whereClause += " AND l.status = ?";
-        queryParams.push(status);
+        // Підтримка обох варіантів для сумісності
+        if (status === 'deactivated') {
+          whereClause += " AND (l.status = 'deactivated' OR l.status = 'hidden')";
+        } else if (status === 'hidden') {
+          whereClause += " AND (l.status = 'deactivated' OR l.status = 'hidden')";
+        } else {
+          whereClause += " AND l.status = ?";
+          queryParams.push(status);
+        }
       }
       // Додаємо фільтр за категорією, якщо він вказаний
       if (categoryFilter && categoryFilter !== 'all') {
@@ -178,6 +185,7 @@ export async function GET(request: NextRequest) {
           l.promotionEnds,
           l.expiresAt,
           l.images,
+          l.optimizedImages,
           l.tags,
           l.createdAt,
           u.username as sellerUsername,
@@ -491,7 +499,12 @@ export async function GET(request: NextRequest) {
     // Форматуємо дані для фронтенду
     const formattedListings = sortedListings.map((listing: any) => {
       // Обробляємо різні формати даних (з Prisma або raw query)
-      const images = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+      const originalImages = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+      const optimizedImages = listing.optimizedImages 
+        ? (typeof listing.optimizedImages === 'string' ? JSON.parse(listing.optimizedImages) : listing.optimizedImages)
+        : null;
+      // Використовуємо оптимізовані версії якщо є, інакше оригінали
+      const images = optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
       const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
       const createdAt = listing.createdAt instanceof Date ? listing.createdAt : new Date(listing.createdAt);
       

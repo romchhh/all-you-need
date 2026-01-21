@@ -130,22 +130,20 @@ export const FavoritesTab = ({
           ))}
         </div>
         
-        {hasMore && (
+        {hasMore && favoritedListings.length > 0 && onLoadMore && (
           <div className="px-4 py-4 text-center">
             {loadingMore ? (
               <div className="text-gray-400 text-sm">{t('common.loading')}</div>
             ) : (
-              onLoadMore && (
-                <button
-                  onClick={() => {
-                    onLoadMore();
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
-                >
-                  {t('common.showMore')}
-                </button>
-              )
+              <button
+                onClick={() => {
+                  onLoadMore();
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+              >
+                {t('common.showMore')}
+              </button>
             )}
           </div>
         )}

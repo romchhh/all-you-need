@@ -25,8 +25,11 @@ import { useRouter } from 'next/navigation';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { CategoryIcon } from '../CategoryIcon';
 
-// Динамічний імпорт PromotionUpgradeModal та ReactivateListingFlow
-const PromotionUpgradeModal = dynamic(() => import('../PromotionUpgradeModal'), {
+// Динамічний імпорт PromotionModal, PaymentSummaryModal та ReactivateListingFlow
+const PromotionModal = dynamic(() => import('../PromotionModal'), {
+  ssr: false,
+});
+const PaymentSummaryModal = dynamic(() => import('../PaymentSummaryModal').then(mod => ({ default: mod.PaymentSummaryModal })), {
   ssr: false,
 });
 const ReactivateListingFlow = dynamic(() => import('../ReactivateListingFlow'), {
@@ -58,7 +61,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [showShareModal, setShowShareModal] = useState(false);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState(false);
   const [selectedListingForPromotion, setSelectedListingForPromotion] = useState<Listing | null>(null);
+  const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
+  const [userBalance, setUserBalance] = useState<number>(0);
   // Звідки відкрито модалку реклами: 'auto' (система запропонувала) або 'manual' (користувач натиснув «Рекламувати»)
   const [promotionOpenSource, setPromotionOpenSource] = useState<'auto' | 'manual' | null>(null);
   const [showReactivateFlow, setShowReactivateFlow] = useState(false);
@@ -178,15 +184,28 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     };
   }, [isStatusFilterOpen, isCategoryFilterOpen]);
 
+  // Завантаження балансу користувача
+  const fetchUserBalance = async () => {
+    if (!profile?.telegramId) return;
+    try {
+      const response = await fetch(`/api/user/balance?telegramId=${profile.telegramId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserBalance(data.balance || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching user balance:', error);
+    }
+  };
+
   // Функція для завантаження оголошень з фільтрами
   const fetchListingsWithFilters = async (offset = 0, reset = false) => {
     if (!profile?.telegramId) return;
     
     let url = `/api/listings?userId=${profile.telegramId}&viewerId=${profile.telegramId}&limit=16&offset=${offset}`;
     if (selectedStatus !== 'all') {
-      // Конвертуємо 'deactivated' в 'hidden' для API
-      const apiStatus = selectedStatus === 'deactivated' ? 'hidden' : selectedStatus;
-      url += `&status=${apiStatus}`;
+      // API підтримує обидва варіанти 'deactivated' та 'hidden'
+      url += `&status=${selectedStatus}`;
     }
     if (selectedCategory !== 'all') {
       url += `&category=${selectedCategory}`;
@@ -220,6 +239,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   useEffect(() => {
     if (profile?.telegramId) {
       fetchListingsWithFilters(0, true);
+      fetchUserBalance();
 
       // Завантажуємо статистику
       fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
@@ -237,6 +257,130 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         .catch(err => console.error('Error fetching stats:', err));
     }
   }, [profile]);
+
+  // Обробка пропуску реклами
+  const handlePromotionSkipped = async () => {
+    if (!selectedListingForPromotion) return;
+    
+    try {
+      const listingId = selectedListingForPromotion.id;
+      
+      // Перевіряємо чи оголошення потребує відправки на модерацію
+      const listingResponse = await fetch(`/api/listings/${listingId}`);
+      if (listingResponse.ok) {
+        const listing = await listingResponse.json();
+        
+        // Якщо оголошення НЕ в статусі active або pending_moderation, відправляємо на модерацію
+        if (listing.status !== 'active' && listing.status !== 'pending_moderation') {
+          const submitResponse = await fetch(`/api/listings/${listingId}/submit-moderation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegramId: profile?.telegramId,
+            }),
+          });
+
+          const submitData = await submitResponse.json();
+
+          if (!submitResponse.ok) {
+            throw new Error(submitData.error || 'Failed to submit listing for moderation');
+          }
+
+          showToast(t('editListing.sentToModeration'), 'success');
+        }
+      }
+      
+      tg?.HapticFeedback.notificationOccurred('success');
+      await fetchListingsWithFilters(0, true);
+      setShowPromotionModal(false);
+      setSelectedListingForPromotion(null);
+      setPromotionOpenSource(null);
+    } catch (error: any) {
+      console.error('Error skipping promotion:', error);
+      showToast(error.message || t('common.error'), 'error');
+      tg?.HapticFeedback.notificationOccurred('error');
+    }
+  };
+
+  // Обробка підтвердження оплати в PaymentSummaryModal
+  const handlePaymentConfirm = async (paymentMethod: 'balance' | 'direct') => {
+    if (!selectedListingForPromotion || !selectedPromotionType) return;
+    
+    try {
+      const listingId = selectedListingForPromotion.id;
+      
+      const response = await fetch('/api/listings/promotions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: profile?.telegramId,
+          listingId: listingId,
+          promotionType: selectedPromotionType,
+          paymentMethod,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to purchase promotion');
+      }
+
+      if (data.paymentRequired && data.pageUrl) {
+        tg?.HapticFeedback.notificationOccurred('success');
+        showToast(t('payments.paymentInfo'), 'info');
+        
+        // Перенаправляємо на сторінку оплати
+        if (tg?.openLink) {
+          tg.openLink(data.pageUrl);
+        } else {
+          window.location.href = data.pageUrl;
+        }
+        return;
+      }
+
+      // Успішна оплата з балансу
+      // Перевіряємо чи оголошення потребує відправки на модерацію
+      const listingResponse = await fetch(`/api/listings/${listingId}`);
+      if (listingResponse.ok) {
+        const listing = await listingResponse.json();
+        
+        if (listing.status !== 'active' && listing.status !== 'pending_moderation') {
+          const submitResponse = await fetch(`/api/listings/${listingId}/submit-moderation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegramId: profile?.telegramId,
+            }),
+          });
+
+          if (!submitResponse.ok) {
+            const submitData = await submitResponse.json();
+            throw new Error(submitData.error || 'Failed to submit listing for moderation');
+          }
+
+          showToast(t('editListing.sentToModeration'), 'success');
+        } else if (listing.status === 'pending_moderation') {
+          showToast(t('promotions.promotionSuccess'), 'success');
+          showToast(t('editListing.sentToModeration'), 'success');
+        } else {
+          showToast(t('promotions.promotionSuccess'), 'success');
+        }
+      }
+      
+      tg?.HapticFeedback.notificationOccurred('success');
+      await fetchListingsWithFilters(0, true);
+      setShowPaymentSummaryModal(false);
+      setShowPromotionModal(false);
+      setSelectedListingForPromotion(null);
+      setSelectedPromotionType(null);
+      setPromotionOpenSource(null);
+    } catch (error: any) {
+      console.error('Error in payment confirmation:', error);
+      showToast(error.message || t('promotions.promotionError'), 'error');
+      tg?.HapticFeedback.notificationOccurred('error');
+    }
+  };
 
   const loadMoreListings = async () => {
     await fetchListingsWithFilters(listingsOffset, false);
@@ -455,6 +599,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 {selectedStatus === 'all' ? t('sales.allStatuses') : 
                  selectedStatus === 'active' ? t('listing.active') :
                  selectedStatus === 'pending_moderation' ? t('profile.onModeration') :
+                 selectedStatus === 'rejected' ? t('sales.rejected') :
                  selectedStatus === 'deactivated' ? t('sales.deactivated') :
                  selectedStatus === 'sold' ? t('listing.sold') : selectedStatus}
               </span>
@@ -523,7 +668,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 e.stopPropagation();
               }}
             >
-              {['all', 'active', 'pending_moderation', 'deactivated', 'sold'].map(status => (
+              {['all', 'active', 'pending_moderation', 'rejected', 'deactivated', 'sold'].map(status => (
                 <button
                   key={status}
                   type="button"
@@ -541,6 +686,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   {status === 'all' ? t('sales.allStatuses') : 
                    status === 'active' ? t('listing.active') :
                    status === 'pending_moderation' ? t('profile.onModeration') :
+                   status === 'rejected' ? t('sales.rejected') :
                    status === 'deactivated' ? t('sales.deactivated') :
                    status === 'sold' ? t('listing.sold') : status}
                   {selectedStatus === status && <span className="text-[#D3F1A7] ml-2">✓</span>}
@@ -634,7 +780,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               <div className="space-y-3">
                 {userListings.map(listing => {
                   const isSold = listing.status === 'sold';
-                  const isDeactivated = listing.status === 'hidden';
+                  const isDeactivated = (listing.status as string) === 'deactivated' || (listing.status as string) === 'hidden'; // Підтримка обох варіантів для сумісності
+                  const isRejected = listing.status === 'rejected';
                   const isExpired = listing.status === 'expired';
                   return (
                     <ProfileListingCard
@@ -657,11 +804,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                         }}
                       onEdit={() => {
                         // Забороняємо редагувати оголошення на модерації
+                        // Але дозволяємо редагувати відхилені оголошення
                         if (listing.status === 'pending_moderation') {
                           showToast(t('editListing.cannotEditOnModeration') || 'Не можна редагувати оголошення під час модерації', 'error');
                           tg?.HapticFeedback.notificationOccurred('error');
                           return;
                         }
+                        // Відхилені оголошення можна редагувати
                         setEditingListing(listing);
                       }}
                       onReactivate={() => {
@@ -672,6 +821,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                         tg?.HapticFeedback.impactOccurred('light');
                       }}
                       onMarkAsSold={() => {
+                        if (listing.status === 'pending_moderation') {
+                          showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+                          return;
+                        }
                         setConfirmModal({
                           isOpen: true,
                           title: t('editListing.markAsSold'),
@@ -746,7 +899,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   );
                 })}
               </div>
-              {hasMore && (
+              {hasMore && userListings.length > 0 && userListings.length < totalListings && (
                 <div className="py-6">
                   <button
                     onClick={loadMoreListings}
@@ -772,7 +925,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         
         <button
           onClick={() => {
-            const supportManager = process.env.NEXT_PUBLIC_SUPPORT_MANAGER || 'https://t.me/tradeground_support';
+            const supportManager = process.env.NEXT_PUBLIC_SUPPORT_MANAGER || 'https://t.me/opluger';
             if (tg && tg.openTelegramLink) {
               tg.openTelegramLink(supportManager);
               tg.HapticFeedback?.impactOccurred('medium');
@@ -913,26 +1066,59 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             
             // Передаємо інформацію про старі зображення, які залишаються
             // imagePreviews містить шляхи до існуючих зображень
+            // ВАЖЛИВО: Завжди передаємо поле existingImages, навіть якщо воно порожнє
+            // Це дозволяє бекенду розрізнити "користувач видалив всі старі фото" від "поле не передано"
             if (listingData.imagePreviews && Array.isArray(listingData.imagePreviews)) {
               // Фільтруємо тільки URL (старі зображення), а не data URLs (нові)
               const existingImageUrls = listingData.imagePreviews.filter(
                 (preview: string) => !preview.startsWith('data:')
               );
               
-              console.log('[ProfileTab] Existing image URLs to send:', existingImageUrls);
+              console.log('[ProfileTab] Existing image URLs to send:', existingImageUrls.length, 'items');
               
-              // Передаємо старі зображення як окреме поле для обробки на бекенді
-              existingImageUrls.forEach((url: string) => {
-                formData.append('existingImages', url);
-              });
+              // Завжди передаємо поле existingImages, навіть якщо масив порожній
+              // Якщо користувач видалив всі старі фото, передаємо порожній масив
+              if (existingImageUrls.length > 0) {
+                existingImageUrls.forEach((url: string) => {
+                  formData.append('existingImages', url);
+                });
+              } else {
+                // Передаємо порожнє поле, щоб бекенд знав, що всі старі фото видалені
+                formData.append('existingImages', '');
+              }
+            } else {
+              // Якщо imagePreviews взагалі немає, також передаємо порожнє поле
+              formData.append('existingImages', '');
             }
 
             console.log('[ProfileTab] Updating listing with status:', listingData.status);
 
-            const response = await fetch(`/api/listings/${editingListing.id}/update`, {
-              method: 'PUT',
-              body: formData,
-            });
+            // Створюємо AbortController для таймауту
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 секунд (2 хвилини)
+
+            let response;
+            try {
+              response = await fetch(`/api/listings/${editingListing.id}/update`, {
+                method: 'PUT',
+                body: formData,
+                signal: controller.signal,
+              });
+            } catch (fetchError: any) {
+              clearTimeout(timeoutId);
+              
+              // Перевіряємо чи це таймаут або скасування
+              if (fetchError.name === 'AbortError') {
+                console.warn('[ProfileTab] Request timed out, but listing may have been updated');
+                showToast('Запит перевищив час очікування. Перевірте свої оголошення через кілька хвилин.', 'info');
+                setEditingListing(null);
+                return;
+              }
+              
+              throw fetchError;
+            }
+            
+            clearTimeout(timeoutId);
 
             const result = await response.json();
             console.log('[ProfileTab] Update response:', result);
@@ -1059,11 +1245,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
       {/* Модальне вікно реклами/апгрейду */}
       {selectedListingForPromotion && (
-        <PromotionUpgradeModal
+        <PromotionModal
           isOpen={showPromotionModal}
           onClose={() => {
             // Просто закриваємо модальне вікно без відправки на модерацію
-            // Оголошення залишається в статусі draft до явного вибору користувача
+            // Оголошення залишається в поточному статусі до явного вибору користувача
             setShowPromotionModal(false);
             setSelectedListingForPromotion(null);
             setPromotionOpenSource(null);
@@ -1075,92 +1261,33 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           // Кнопка «Опублікувати без реклами» повинна бути скрізь,
           // ОКРІМ випадку, коли користувач сам натиснув «Рекламувати»
           showSkipButton={promotionOpenSource !== 'manual'}
-          onSelectPromotion={async (promotionType, paymentMethod) => {
-            try {
-              const listingId = selectedListingForPromotion.id;
-              
-              if (promotionType) {
-                // Користувач вибрав рекламу
-                const response = await fetch('/api/listings/promotions', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    telegramId: profile?.telegramId,
-                    listingId: listingId,
-                    promotionType,
-                    paymentMethod,
-                  }),
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                  throw new Error(data.error || 'Failed to purchase promotion');
-                }
-
-                if (data.paymentRequired && data.pageUrl) {
-                  // Використовуємо той самий метод, що й TopUpBalanceModal
-                  tg?.HapticFeedback.notificationOccurred('success');
-                  showToast(t('payments.paymentInfo'), 'info');
-                  
-                  // Перенаправляємо на сторінку оплати
-                  window.location.href = data.pageUrl;
-                  return;
-                }
-              }
-
-              // Користувач пропустив рекламу АБО успішно оплатив з балансу
-              // Перевіряємо чи оголошення потребує відправки на модерацію
-              const listingResponse = await fetch(`/api/listings/${listingId}`);
-              if (listingResponse.ok) {
-                const listing = await listingResponse.json();
-                
-                // Якщо оголошення НЕ в статусі active або pending_moderation, відправляємо на модерацію
-                if (listing.status !== 'active' && listing.status !== 'pending_moderation') {
-                  console.log('[ProfileTab] Submitting listing to moderation after promotion selection...');
-                  
-                  const submitResponse = await fetch(`/api/listings/${listingId}/submit-moderation`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      telegramId: profile?.telegramId,
-                    }),
-                  });
-
-                  const submitData = await submitResponse.json();
-
-                  if (!submitResponse.ok) {
-                    throw new Error(submitData.error || 'Failed to submit listing for moderation');
-                  }
-
-                  console.log('[ProfileTab] Listing submitted to moderation successfully');
-                  showToast(t('editListing.sentToModeration'), 'success');
-                } else if (listing.status === 'pending_moderation') {
-                  // Оголошення вже на модерації (було відправлено автоматично після оплати реклами)
-                  if (promotionType) {
-                    showToast(t('promotions.promotionSuccess'), 'success');
-                  }
-                  showToast(t('editListing.sentToModeration'), 'success');
-                } else {
-                  // Оголошення вже активне, просто показуємо успішне повідомлення про рекламу
-                  if (promotionType) {
-                    showToast(t('promotions.promotionSuccess'), 'success');
-                  }
-                }
-              }
-              
-              tg?.HapticFeedback.notificationOccurred('success');
-              // Оновлюємо список оголошень
-              await fetchListingsWithFilters(0, true);
-
+          onSelectPromotion={(promotionType) => {
+            if (promotionType) {
+              // Користувач вибрав рекламу - зберігаємо і відкриваємо PaymentSummaryModal
+              setSelectedPromotionType(promotionType);
               setShowPromotionModal(false);
-              setSelectedListingForPromotion(null);
-            } catch (error: any) {
-              console.error('Error in promotion flow:', error);
-              showToast(error.message || t('promotions.promotionError'), 'error');
-              tg?.HapticFeedback.notificationOccurred('error');
+              setShowPaymentSummaryModal(true);
+              fetchUserBalance(); // Оновлюємо баланс перед показом PaymentSummaryModal
+            } else {
+              // Користувач пропустив рекламу - обробляємо без оплати
+              handlePromotionSkipped();
             }
           }}
+        />
+      )}
+
+      {/* Модальне вікно підтвердження оплати */}
+      {selectedListingForPromotion && selectedPromotionType && (
+        <PaymentSummaryModal
+          isOpen={showPaymentSummaryModal}
+          onClose={() => {
+            setShowPaymentSummaryModal(false);
+            setSelectedPromotionType(null);
+          }}
+          onConfirm={handlePaymentConfirm}
+          promotionType={selectedPromotionType}
+          userBalance={userBalance}
+          tg={tg}
         />
       )}
 

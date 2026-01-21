@@ -166,8 +166,8 @@ export default function PromotionUpgradeModal({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 overflow-hidden"
-      style={{ position: 'fixed' }}
+      className="fixed inset-0 bg-black/50 z-[99999] flex items-center justify-center p-4 pb-24 overflow-hidden"
+      style={{ position: 'fixed', paddingBottom: '100px' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -184,7 +184,7 @@ export default function PromotionUpgradeModal({
         }
       }}
     >
-      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col relative z-[10000]">
+      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full overflow-y-auto flex flex-col relative z-[100000]" style={{ maxHeight: 'calc(100vh - 200px)' }}>
         {/* Header */}
         <div className="flex-shrink-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
           <div className="flex items-center justify-between">

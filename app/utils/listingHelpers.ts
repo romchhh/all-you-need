@@ -88,6 +88,162 @@ export async function deductListingPackage(user: User): Promise<boolean> {
 }
 
 /**
+ * Швидко зберігає оригінальні зображення БЕЗ обробки
+ * З покращеною обробкою помилок та retry логікою
+ * Зберігає файли по 2 одночасно для зменшення навантаження
+ */
+export async function saveOriginalImages(
+  imageFiles: File[]
+): Promise<string[]> {
+  if (!imageFiles.length || imageFiles[0].size === 0) {
+    return [];
+  }
+
+  const uploadsDir = join(process.cwd(), 'public', 'listings', 'originals');
+  if (!existsSync(uploadsDir)) {
+    await mkdir(uploadsDir, { recursive: true });
+  }
+
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1 секунда
+  const BATCH_SIZE = 2; // Зберігаємо по 2 файли одночасно
+  
+  // Фільтруємо файли за розміром
+  const validFiles = imageFiles.filter(file => file.size > 0 && file.size <= MAX_FILE_SIZE);
+  
+  if (validFiles.length === 0) {
+    console.warn('[saveOriginalImages] No valid files to save');
+    return [];
+  }
+
+  // Функція для повторної спроби збереження файлу
+  const saveFileWithRetry = async (file: File, index: number): Promise<string | null> => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const ext = file.type.split('/')[1] || 'jpg';
+        const filename = `listing_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+        const filepath = join(uploadsDir, filename);
+        
+        // Конвертуємо File в Buffer
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        
+        // Зберігаємо з timeout для запобігання зависанню
+        await Promise.race([
+          writeFile(filepath, buffer, { 
+            flag: 'w',
+            mode: 0o666
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('File write timeout')), 30000) // 30 секунд
+          )
+        ]);
+        
+        console.log(`[saveOriginalImages] Saved file ${index + 1}/${validFiles.length}: ${filename}`);
+        return `/listings/originals/${filename}`;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[saveOriginalImages] Attempt ${attempt}/${MAX_RETRIES} failed for file ${file.name}:`, error);
+        
+        if (attempt < MAX_RETRIES) {
+          // Чекаємо перед повторною спробою
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
+        }
+      }
+    }
+    
+    // Якщо всі спроби невдалі
+    console.error(`[saveOriginalImages] Failed to save file ${file.name} after ${MAX_RETRIES} attempts:`, lastError);
+    return null;
+  };
+
+  // Зберігаємо файли батчами по 2 для зменшення навантаження
+  const startTime = Date.now();
+  const imageUrls: string[] = [];
+  
+  for (let i = 0; i < validFiles.length; i += BATCH_SIZE) {
+    const batch = validFiles.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map((file, batchIndex) => 
+      saveFileWithRetry(file, i + batchIndex)
+    );
+    
+    const batchResults = await Promise.all(batchPromises);
+    const successfulUrls = batchResults.filter((url): url is string => url !== null);
+    imageUrls.push(...successfulUrls);
+    
+    console.log(`[saveOriginalImages] Batch ${Math.floor(i / BATCH_SIZE) + 1} completed: ${successfulUrls.length}/${batch.length} files saved`);
+  }
+  
+  const totalDuration = Date.now() - startTime;
+  
+  if (imageUrls.length > 0) {
+    console.log(`[saveOriginalImages] Saved ${imageUrls.length}/${validFiles.length} images in ${totalDuration}ms`);
+  }
+  
+  if (imageUrls.length === 0) {
+    throw new Error('Failed to save any images. Please try again with smaller files.');
+  }
+  
+  return imageUrls;
+}
+
+/**
+ * Оптимізує вже збережені оригінальні зображення (асинхронно в фоні)
+ * Створює оптимізовані версії для показу в каталозі
+ */
+export async function optimizeImages(
+  originalImageUrls: string[]
+): Promise<string[]> {
+  if (!originalImageUrls.length) {
+    return [];
+  }
+
+  const optimizedDir = join(process.cwd(), 'public', 'listings', 'optimized');
+  if (!existsSync(optimizedDir)) {
+    await mkdir(optimizedDir, { recursive: true });
+  }
+
+  const optimizationPromises = originalImageUrls.map(async (url) => {
+    try {
+      // Отримуємо шлях до оригіналу
+      const originalPath = join(process.cwd(), 'public', url);
+      
+      if (!existsSync(originalPath)) {
+        console.warn(`[optimizeImages] Original file not found: ${originalPath}`);
+        return url; // Повертаємо оригінальний URL якщо файл не знайдено
+      }
+
+      // Читаємо оригінал
+      const buffer = await import('fs/promises').then(fs => fs.readFile(originalPath));
+      
+      // Оптимізуємо: WebP, 1200x1200, якість 75
+      const optimizedBuffer = await sharp(buffer)
+        .rotate() // Автоматично виправляє орієнтацію
+        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 75, effort: 4 })
+        .toBuffer();
+
+      const filename = `opt_${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
+      const filepath = join(optimizedDir, filename);
+      
+      await writeFile(filepath, optimizedBuffer);
+      return `/listings/optimized/${filename}`;
+    } catch (error) {
+      console.error(`[optimizeImages] Error optimizing ${url}:`, error);
+      return url; // Повертаємо оригінальний URL при помилці
+    }
+  });
+
+  const optimizedUrls = await Promise.all(optimizationPromises);
+  console.log(`[optimizeImages] Optimized ${optimizedUrls.length} images`);
+  return optimizedUrls;
+}
+
+/**
+ * DEPRECATED: Стара функція - використовуйте saveOriginalImages + optimizeImages
  * Обробляє та завантажує зображення
  * Оптимізовано для швидкої паралельної обробки
  */
@@ -186,28 +342,28 @@ export async function createDraftListing(
   const createTime = toSQLiteDate(now);
   const expiresTime = toSQLiteDate(addDays(now, 30));
   
-  await executeWithRetry(() =>
-    prisma.$executeRawUnsafe(
-      `INSERT INTO Listing (
-        userId, title, description, price, currency, isFree, category, subcategory,
-        condition, location, images, status, moderationStatus, expiresAt, createdAt, updatedAt, publishedAt
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, NULL)`,
-      userId,
-      data.title,
-      data.description,
-      data.price,
-      data.currency,
-      data.isFree ? 1 : 0,
-      data.category,
-      data.subcategory || null,
-      data.condition || null,
-      data.location,
-      JSON.stringify(imageUrls),
-      expiresTime,
-      createTime,
-      createTime
+  // Використовуємо executeRawUnsafe без executeWithRetry для швидкості
+  // executeWithRetry додає затримки, що сповільнює створення
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO Listing (
+      userId, title, description, price, currency, isFree, category, subcategory,
+      condition, location, images, status, moderationStatus, expiresAt, createdAt, updatedAt, publishedAt
     )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, NULL)`,
+    userId,
+    data.title,
+    data.description,
+    data.price,
+    data.currency,
+    data.isFree ? 1 : 0,
+    data.category,
+    data.subcategory || null,
+    data.condition || null,
+    data.location,
+    JSON.stringify(imageUrls),
+    expiresTime,
+    createTime,
+    createTime
   );
 
   // Отримуємо ID створеного оголошення
@@ -410,7 +566,37 @@ export async function submitListingToModeration(
 ): Promise<void> {
   console.log('[submitListingToModeration] Starting for listing:', listingId, 'isEdit:', isEdit);
   
-  // Спочатку оновлюємо статус, щоб отримати актуальні дані при відправці
+  // Спочатку перевіряємо, чи є зображення (критично важливо для модерації)
+  const listingResult = await prisma.$queryRawUnsafe(
+    `SELECT images FROM Listing WHERE id = ?`,
+    listingId
+  ) as Array<{ images: string }>;
+  
+  if (listingResult.length === 0) {
+    throw new Error(`Listing ${listingId} not found`);
+  }
+  
+  const images = listingResult[0].images;
+  let imageArray: string[] = [];
+  
+  try {
+    imageArray = typeof images === 'string' ? JSON.parse(images) : images;
+    if (!Array.isArray(imageArray)) {
+      imageArray = [];
+    }
+  } catch (e) {
+    console.warn('[submitListingToModeration] Failed to parse images:', e);
+    imageArray = [];
+  }
+  
+  if (imageArray.length === 0) {
+    console.error('[submitListingToModeration] Listing has no images - cannot send to moderation:', listingId);
+    throw new Error('Listing must have images before sending to moderation. Images are critical for content moderation.');
+  }
+  
+  console.log('[submitListingToModeration] Listing has', imageArray.length, 'images - proceeding with moderation');
+  
+  // Оновлюємо статус, щоб отримати актуальні дані при відправці
   const nowStr = nowSQLite();
   
   await executeWithRetry(() =>

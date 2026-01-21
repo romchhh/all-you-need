@@ -55,7 +55,9 @@ export const CreateListingModal = ({
   const conditionRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLDivElement>(null);
   const currencyRef = useRef<HTMLButtonElement>(null);
+  const buttonsRef = useRef<HTMLDivElement>(null);
   const [currencyMenuPosition, setCurrencyMenuPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   // Ліміти для Telegram (caption до фото має ліміт 1024 символи)
   // Базовий текст (~120 символів): emoji, HTML теги, структура, ціна, категорія, локація, хештеги
@@ -136,25 +138,67 @@ export const CreateListingModal = ({
 
       setLoadingCities(true);
       try {
-        const result = await fetchGermanCitiesFromAPI(locationQuery, 20);
-        // Об'єднуємо з defaultCities, видаляючи дублікати
-        const allCities = [...new Set([...defaultCities, ...result.cities])];
-        setFilteredCities(allCities.slice(0, 20));
+        const result = await fetchGermanCitiesFromAPI(locationQuery, 30);
+        // API вже відсортував результати і додав введений текст першим (якщо потрібно)
+        // Зберігаємо порядок з API, додаючи defaultCities тільки якщо їх немає в результатах
+        const resultCitiesLower = new Set(result.cities.map(c => c.toLowerCase()));
+        const allCities: string[] = [];
+        
+        // Додаємо результати з API (вони вже в правильному порядку)
+        allCities.push(...result.cities);
+        
+        // Додаємо defaultCities які не знайдені в результатах
+        defaultCities.forEach(city => {
+          if (!resultCitiesLower.has(city.toLowerCase())) {
+            allCities.push(city);
+          }
+        });
+        
+        setFilteredCities(allCities.slice(0, 30));
       } catch (error) {
         console.error('Error loading cities:', error);
         // Fallback на локальний пошук
         const query = locationQuery.toLowerCase().trim();
-        const defaultMatches = defaultCities.filter(city =>
-          city.toLowerCase().startsWith(query) || city.toLowerCase().includes(query)
-        );
-        if (defaultMatches.length > 0) {
-          setFilteredCities(defaultMatches);
-        } else {
-          const localResults = germanCities.filter(city =>
-            city.toLowerCase().startsWith(query) || city.toLowerCase().includes(query)
-          ).slice(0, 10);
-          setFilteredCities(localResults);
+        const queryTrimmed = locationQuery.trim();
+        const exactMatches: string[] = [];
+        const startsWith: string[] = [];
+        const includes: string[] = [];
+        
+        // Пошук серед defaultCities
+        defaultCities.forEach(city => {
+          const cityLower = city.toLowerCase();
+          if (cityLower === query) {
+            exactMatches.push(city);
+          } else if (cityLower.startsWith(query)) {
+            startsWith.push(city);
+          } else if (cityLower.includes(query)) {
+            includes.push(city);
+          }
+        });
+        
+        // Пошук серед germanCities якщо не знайдено в defaultCities
+        if (exactMatches.length === 0 && startsWith.length === 0 && includes.length === 0) {
+          germanCities.forEach(city => {
+            const cityLower = city.toLowerCase();
+            if (cityLower === query) {
+              exactMatches.push(city);
+            } else if (cityLower.startsWith(query)) {
+              startsWith.push(city);
+            } else if (cityLower.includes(query)) {
+              includes.push(city);
+            }
+          });
         }
+        
+        const allResults = [...exactMatches, ...startsWith, ...includes];
+        
+        // Додаємо введений текст першим, якщо він не точно збігається
+        const hasExactMatch = allResults.some(city => city.toLowerCase() === query);
+        if (!hasExactMatch && queryTrimmed) {
+          allResults.unshift(queryTrimmed);
+        }
+        
+        setFilteredCities(allResults.slice(0, 20));
       } finally {
         setLoadingCities(false);
       }
@@ -168,26 +212,191 @@ export const CreateListingModal = ({
     return () => clearTimeout(timeoutId);
   }, [locationQuery]);
 
-  // Блокуємо скрол body при відкритому модальному вікні
+  // Відстежуємо фокус на полях введення для приховування кнопок
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let focusTimeout: NodeJS.Timeout | null = null;
+    let blurTimeout: NodeJS.Timeout | null = null;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      // Скасовуємо попередній blur timeout якщо він є
+      if (blurTimeout) {
+        clearTimeout(blurTimeout);
+        blurTimeout = null;
+      }
+
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+         target.tagName === 'TEXTAREA' ||
+         target.isContentEditable)
+      ) {
+        // Миттєво приховуємо кнопки
+        setIsInputFocused(true);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      // Скасовуємо попередній focus timeout якщо він є
+      if (focusTimeout) {
+        clearTimeout(focusTimeout);
+        focusTimeout = null;
+      }
+
+      // Невелика затримка, щоб переконатися, що фокус дійсно втрачено
+      blurTimeout = setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (
+          !activeElement ||
+          (activeElement instanceof HTMLElement &&
+           activeElement.tagName !== 'INPUT' &&
+           activeElement.tagName !== 'TEXTAREA' &&
+           !activeElement.isContentEditable)
+        ) {
+          setIsInputFocused(false);
+        }
+      }, 150);
+    };
+
+    // Відстежуємо зміни висоти viewport (відкриття/закриття клавіатури)
+    const handleVisualViewportChange = () => {
+      if (window.visualViewport) {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const keyboardOpen = viewportHeight < windowHeight * 0.75;
+        
+        // Миттєво оновлюємо стан
+        if (keyboardOpen) {
+          setIsInputFocused(true);
+        } else {
+          // Перевіряємо, чи дійсно немає фокусу перед приховуванням
+          const activeElement = document.activeElement;
+          if (
+            !activeElement ||
+            (activeElement instanceof HTMLElement &&
+             activeElement.tagName !== 'INPUT' &&
+             activeElement.tagName !== 'TEXTAREA' &&
+             !activeElement.isContentEditable)
+          ) {
+            setIsInputFocused(false);
+          }
+        }
+      }
+    };
+
+    // Перевіряємо початковий стан
+    const checkInitialState = () => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        (activeElement.tagName === 'INPUT' ||
+         activeElement.tagName === 'TEXTAREA' ||
+         activeElement.isContentEditable)
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+
+    // Перевіряємо початковий стан
+    checkInitialState();
+
+    document.addEventListener('focusin', handleFocusIn, true); // Використовуємо capture phase
+    document.addEventListener('focusout', handleFocusOut, true);
+    
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+    }
+
+    return () => {
+      if (focusTimeout) clearTimeout(focusTimeout);
+      if (blurTimeout) clearTimeout(blurTimeout);
+      document.removeEventListener('focusin', handleFocusIn, true);
+      document.removeEventListener('focusout', handleFocusOut, true);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
+      }
+    };
+  }, [isOpen]);
+
+  // Фіксуємо позицію кнопок, щоб вони не підтягувалися при відкритті клавіатури
+  useEffect(() => {
+    if (!isOpen || !buttonsRef.current) return;
+
+    const buttonsElement = buttonsRef.current;
+    
+    const fixButtonsPosition = () => {
+      if (buttonsElement) {
+        requestAnimationFrame(() => {
+          if (buttonsElement) {
+            buttonsElement.style.position = 'fixed';
+            buttonsElement.style.bottom = '0';
+            buttonsElement.style.left = '0';
+            buttonsElement.style.right = '0';
+            // Фіксуємо transform в залежності від стану
+            const transformValue = isInputFocused ? 'translateY(100%)' : 'translateY(0)';
+            buttonsElement.style.transform = transformValue;
+            buttonsElement.style.setProperty('-webkit-transform', transformValue);
+          }
+        });
+      }
+    };
+
+    fixButtonsPosition();
+
+    // Обробляємо зміни viewport
+    const handleResize = () => {
+      if (!isInputFocused) {
+        fixButtonsPosition();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isOpen, isInputFocused]);
+
+  // Блокуємо скрол body при відкритому модальному вікні (оптимізовано для плавності)
   useEffect(() => {
     if (isOpen) {
+      // Використовуємо requestAnimationFrame для плавної зміни
       const scrollY = window.scrollY;
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
+      // Зберігаємо scrollY в data-атрибуті для подальшого відновлення
+      document.body.setAttribute('data-scroll-y', scrollY.toString());
       
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
+      requestAnimationFrame(() => {
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = '100%';
+        document.documentElement.style.overflow = 'hidden';
+      });
+    } else {
+      // Плавне відновлення
+      const savedScrollY = document.body.getAttribute('data-scroll-y');
+      
+      requestAnimationFrame(() => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.documentElement.style.overflow = '';
+        document.body.removeAttribute('data-scroll-y');
+        
+        // Відновлюємо позицію без стрибків
+        if (savedScrollY) {
+          const scrollPosition = parseInt(savedScrollY, 10);
+          // Використовуємо requestAnimationFrame для плавного скролу
+          requestAnimationFrame(() => {
+            window.scrollTo(0, scrollPosition);
+          });
+        }
+      });
     }
     return () => {
       document.body.style.overflow = '';
@@ -195,6 +404,7 @@ export const CreateListingModal = ({
       document.body.style.top = '';
       document.body.style.width = '';
       document.documentElement.style.overflow = '';
+      document.body.removeAttribute('data-scroll-y');
     };
   }, [isOpen]);
 
@@ -243,7 +453,80 @@ export const CreateListingModal = ({
 
   if (!isOpen) return null;
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Функція для стискання зображень на клієнті
+  const compressImageOnClient = async (file: File, maxSizeMB: number = 2): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          const MAX_WIDTH = 1920;
+          const MAX_HEIGHT = 1920;
+          
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            if (width > height) {
+              height = (height / width) * MAX_WIDTH;
+              width = MAX_WIDTH;
+            } else {
+              width = (width / height) * MAX_HEIGHT;
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          let quality = 0.8;
+          const estimatedSize = (width * height * 4) / 1024 / 1024;
+          
+          if (estimatedSize > maxSizeMB) {
+            quality = Math.max(0.5, maxSizeMB / estimatedSize * 0.8);
+          }
+          
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Failed to compress image'));
+                return;
+              }
+              
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              });
+              
+              console.log(`[compressImageOnClient] Original: ${(file.size / 1024 / 1024).toFixed(2)}MB, Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+              resolve(compressedFile);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
     const MAX_PHOTOS = 10;
@@ -259,23 +542,10 @@ export const CreateListingModal = ({
       return;
     }
 
-    // Перевірка розміру файлів перед обробкою
-    const validFiles = files.filter(file => file.size <= MAX_FILE_SIZE);
-    const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
-    
-    if (oversizedFiles.length > 0) {
-      const errorMessage = t('createListing.errors.fileSizeExceeded');
-      if (tg) {
-        tg.showAlert(errorMessage);
-      } else {
-        showToast(errorMessage, 'error');
-      }
-    }
-
     // Обчислюємо скільки фото можна додати
     const availableSlots = MAX_PHOTOS - images.length;
-    let filesToAdd = validFiles.slice(0, availableSlots);
-    const rejectedCount = validFiles.length - filesToAdd.length;
+    let filesToAdd = files.slice(0, availableSlots);
+    const rejectedCount = files.length - filesToAdd.length;
 
     // Якщо є файли, які не вмістилися, показуємо уведомлення
     if (rejectedCount > 0) {
@@ -287,17 +557,36 @@ export const CreateListingModal = ({
       }
     }
 
-    // Якщо немає валідних файлів для додавання, скидаємо input
+    // Якщо немає файлів для додавання, скидаємо input
     if (filesToAdd.length === 0) {
       e.target.value = '';
       return;
     }
 
-    const newImages = [...images, ...filesToAdd];
+    // Стискаємо зображення перед додаванням
+    const compressedFiles: File[] = [];
+    for (const file of filesToAdd) {
+      try {
+        // Якщо файл більше 2MB, стискаємо
+        if (file.size > 2 * 1024 * 1024) {
+          console.log('[CreateListingModal] Compressing image:', file.name);
+          const compressed = await compressImageOnClient(file, 2);
+          compressedFiles.push(compressed);
+        } else {
+          compressedFiles.push(file);
+        }
+      } catch (error) {
+        console.error('[CreateListingModal] Failed to compress image, using original:', error);
+        compressedFiles.push(file);
+      }
+    }
+
+    // Додаємо стиснуті файли
+    const newImages = [...images, ...compressedFiles];
     setImages(newImages);
 
-    // Створюємо прев'ю для всіх файлів одночасно, зберігаючи правильний порядок
-    const previewPromises = filesToAdd.map(file => {
+    // Створюємо прев'ю для всіх файлів одночасно
+    const previewPromises = compressedFiles.map((file: File) => {
       return new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -609,7 +898,7 @@ export const CreateListingModal = ({
       }}
     >
       <div className="w-full h-full flex flex-col">
-        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32">
+        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}>
           {/* Лого Trade Ground */}
           <div className="w-full pt-4 pb-3 flex items-center justify-center">
             <Image 
@@ -632,6 +921,7 @@ export const CreateListingModal = ({
             <label className="block text-sm font-medium text-white mb-2">
               {t('createListing.photosLabel')}
             </label>
+            {/* Прогрес-бар стиснення зображень */}
             {imagePreviews.length === 0 ? (
               <label className="w-full px-4 py-8 bg-transparent rounded-xl border-2 border-dashed border-white flex flex-col items-center justify-center cursor-pointer hover:border-white/70 transition-colors">
                 <Upload size={32} className="text-white mb-2" />
@@ -1116,7 +1406,23 @@ export const CreateListingModal = ({
         </div>
 
         {/* Кнопки - фіксовані знизу поверх головного меню */}
-        <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-white/20 px-4 pt-3 pb-3 flex gap-2 z-[80] safe-area-bottom" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))', bottom: '8px' }}>
+        <div 
+          ref={buttonsRef}
+          className="fixed bottom-0 left-0 right-0 bg-black border-t border-white/20 px-4 pt-3 pb-3 flex gap-2 z-[80] safe-area-bottom transition-transform duration-200 ease-in-out" 
+          style={{ 
+            paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))', 
+            bottom: 0,
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            transform: isInputFocused ? 'translateY(100%)' : 'translateY(0)',
+            visibility: isInputFocused ? 'hidden' : 'visible',
+            opacity: isInputFocused ? 0 : 1,
+            pointerEvents: isInputFocused ? 'none' : 'auto',
+            // Додаткова фіксація для запобігання підтягуванню
+            willChange: 'transform'
+          } as React.CSSProperties}
+        >
           <button
             onClick={onClose}
             className="flex-1 px-4 py-1.5 bg-transparent text-white rounded-xl text-base font-semibold border border-white hover:bg-white/10 transition-colors font-montserrat"
@@ -1307,11 +1613,11 @@ export const CreateListingModal = ({
           </div>
 
           {/* Список міст */}
-          <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
             {loadingCities ? (
               <div className="flex flex-col items-center justify-center py-16 px-4">
                 <div className="w-8 h-8 border-2 border-[#D3F1A7] border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-white/70 text-sm">Завантаження міст...</p>
+                <p className="text-white/70 text-sm">{t('common.loading')}</p>
               </div>
             ) : filteredCities.length > 0 ? (
               <div className="divide-y divide-white/10">

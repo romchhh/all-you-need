@@ -68,6 +68,10 @@ export async function GET(request: NextRequest) {
 
     const userId = userData.id;
 
+    // Визначаємо, чи це власний профіль
+    const viewerIdNum = viewerId ? parseInt(viewerId) : null;
+    const isOwnProfile = viewerIdNum !== null && viewerIdNum === telegramIdNum;
+
     // Отримуємо статистику
     const stats = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
@@ -95,8 +99,13 @@ export async function GET(request: NextRequest) {
     };
 
     // Отримуємо оголошення користувача
-    const whereClause = "WHERE l.userId = ?";
+    // Для чужого профілю показуємо тільки активні оголошення
+    let whereClause = "WHERE l.userId = ?";
     const queryParams: any[] = [userId];
+    
+    if (!isOwnProfile) {
+      whereClause += " AND l.status = 'active'";
+    }
     
     const query = `SELECT 
         l.id,
@@ -113,6 +122,7 @@ export async function GET(request: NextRequest) {
         l.views,
         l.status,
         l.images,
+        l.optimizedImages,
         l.tags,
         l.createdAt,
         u.username as sellerUsername,
@@ -164,13 +174,18 @@ export async function GET(request: NextRequest) {
     const totalCount = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
         countQuery,
-        userId
+        ...queryParams.slice(0, -2) // Виключаємо limit та offset
       ) as Promise<Array<{ count: bigint }>>
     );
 
     // Форматуємо оголошення
     const formattedListings = userListings.map((listing: any) => {
-      const images = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+      const originalImages = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+      const optimizedImages = listing.optimizedImages 
+        ? (typeof listing.optimizedImages === 'string' ? JSON.parse(listing.optimizedImages) : listing.optimizedImages)
+        : null;
+      // Використовуємо оптимізовані версії якщо є, інакше оригінали
+      const images = optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
       const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
       const createdAt = listing.createdAt instanceof Date ? listing.createdAt : new Date(listing.createdAt);
       

@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // Вимкнути Server Actions для уникнення помилок
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      bodySizeLimit: '100mb',
     },
   },
   // Додати обробку помилок

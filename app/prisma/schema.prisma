@@ -61,7 +61,8 @@ model Listing {
   promotionType     String?  // null, highlighted, top_category, vip
   promotionEnds     DateTime?
   expiresAt         DateTime? // Дата закінчення активності оголошення (30 днів)
-  images            String   // JSON array of image URLs
+  images            String   // JSON array of original image URLs
+  optimizedImages   String?  // JSON array of optimized image URLs (WebP, 1200x1200)
   tags              String?  // JSON array of tags
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -270,7 +271,7 @@ model SystemSettings {
 model ListingPackagePurchase {
   id                Int      @id @default(autoincrement())
   userId            Int
-  packageType       String   // "single_1", "pack_5", "pack_10"
+  packageType       String   // "pack_3", "pack_5", "pack_10", "pack_30"
   listingsCount     Int      // Кількість оголошень в пакеті
   price             Float    // Ціна в EUR
   paymentMethod     String   // "balance", "direct"

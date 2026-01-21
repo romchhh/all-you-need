@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { getCategories } from '@/constants/categories';
 import { germanCities } from '@/constants/german-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useToast } from '@/hooks/useToast';
 import { ConfirmModal } from './ConfirmModal';
 import { CategoryIcon } from './CategoryIcon';
 
@@ -26,6 +27,7 @@ export const EditListingModal = ({
   tg
 }: EditListingModalProps) => {
   const { t } = useLanguage();
+  const { showToast } = useToast();
   const categories = getCategories(t);
   const [title, setTitle] = useState(listing.title);
   const [description, setDescription] = useState(listing.description);
@@ -57,9 +59,11 @@ export const EditListingModal = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSoldConfirm, setShowSoldConfirm] = useState(false);
   const [status, setStatus] = useState<string>(listing.status || 'active');
+  const isRejected = (listing.status as string) === 'rejected';
   const conditionRef = useRef<HTMLDivElement>(null);
   const locationRef = useRef<HTMLDivElement>(null);
   const currencyRef = useRef<HTMLButtonElement>(null);
+  const buttonsRef = useRef<HTMLDivElement>(null);
   const [currencyMenuPosition, setCurrencyMenuPosition] = useState({ top: 0, left: 0, width: 0 });
 
   const selectedCategoryData = categories.find(cat => cat.id === category);
@@ -79,10 +83,33 @@ export const EditListingModal = ({
       return isLocationOpen ? germanCities.slice(0, 10) : [];
     }
     const query = locationQuery.toLowerCase().trim();
-    // Пошук по ключових літерах (починається з або містить)
-    return germanCities.filter(city =>
-      city.toLowerCase().startsWith(query) || city.toLowerCase().includes(query)
-    ).slice(0, 10);
+    const queryTrimmed = locationQuery.trim();
+    
+    // Сортуємо: спочатку точні збіги, потім починаються з запиту, потім містять запит
+    const exactMatches: string[] = [];
+    const startsWith: string[] = [];
+    const includes: string[] = [];
+    
+    germanCities.forEach(city => {
+      const cityLower = city.toLowerCase();
+      if (cityLower === query) {
+        exactMatches.push(city);
+      } else if (cityLower.startsWith(query)) {
+        startsWith.push(city);
+      } else if (cityLower.includes(query)) {
+        includes.push(city);
+      }
+    });
+    
+    const allResults = [...exactMatches, ...startsWith, ...includes];
+    
+    // Додаємо введений текст першим, якщо він не точно збігається
+    const hasExactMatch = allResults.some(city => city.toLowerCase() === query);
+    if (!hasExactMatch && queryTrimmed) {
+      allResults.unshift(queryTrimmed);
+    }
+    
+    return allResults.slice(0, 15);
   }, [locationQuery, isLocationOpen]);
 
   useEffect(() => {
@@ -116,44 +143,190 @@ export const EditListingModal = ({
     }
   }, [isOpen, listing, onClose, tg]);
 
-  // Блокуємо скрол body та html при відкритому модальному вікні
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  // Відстежуємо фокус на полях введення для приховування кнопок
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let focusTimeout: NodeJS.Timeout | null = null;
+    let blurTimeout: NodeJS.Timeout | null = null;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      if (blurTimeout) {
+        clearTimeout(blurTimeout);
+        blurTimeout = null;
+      }
+
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+         target.tagName === 'TEXTAREA' ||
+         target.isContentEditable)
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      if (focusTimeout) {
+        clearTimeout(focusTimeout);
+        focusTimeout = null;
+      }
+
+      blurTimeout = setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (
+          !activeElement ||
+          (activeElement instanceof HTMLElement &&
+           activeElement.tagName !== 'INPUT' &&
+           activeElement.tagName !== 'TEXTAREA' &&
+           !activeElement.isContentEditable)
+        ) {
+          setIsInputFocused(false);
+        }
+      }, 150);
+    };
+
+    const handleVisualViewportChange = () => {
+      if (window.visualViewport) {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const keyboardOpen = viewportHeight < windowHeight * 0.75;
+        
+        if (keyboardOpen) {
+          setIsInputFocused(true);
+        } else {
+          const activeElement = document.activeElement;
+          if (
+            !activeElement ||
+            (activeElement instanceof HTMLElement &&
+             activeElement.tagName !== 'INPUT' &&
+             activeElement.tagName !== 'TEXTAREA' &&
+             !activeElement.isContentEditable)
+          ) {
+            setIsInputFocused(false);
+          }
+        }
+      }
+    };
+
+    const checkInitialState = () => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        (activeElement.tagName === 'INPUT' ||
+         activeElement.tagName === 'TEXTAREA' ||
+         activeElement.isContentEditable)
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+
+    checkInitialState();
+
+    document.addEventListener('focusin', handleFocusIn, true);
+    document.addEventListener('focusout', handleFocusOut, true);
+    
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+    }
+
+    return () => {
+      if (focusTimeout) clearTimeout(focusTimeout);
+      if (blurTimeout) clearTimeout(blurTimeout);
+      document.removeEventListener('focusin', handleFocusIn, true);
+      document.removeEventListener('focusout', handleFocusOut, true);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
+      }
+    };
+  }, [isOpen]);
+
+  // Фіксуємо позицію кнопок, щоб вони не підтягувалися при відкритті клавіатури
+  useEffect(() => {
+    if (!isOpen || !buttonsRef.current) return;
+
+    const buttonsElement = buttonsRef.current;
+    
+    const fixButtonsPosition = () => {
+      if (buttonsElement) {
+        requestAnimationFrame(() => {
+          if (buttonsElement) {
+            buttonsElement.style.position = 'fixed';
+            buttonsElement.style.bottom = '0';
+            buttonsElement.style.left = '0';
+            buttonsElement.style.right = '0';
+            // Фіксуємо transform в залежності від стану
+            const transformValue = isInputFocused ? 'translateY(100%)' : 'translateY(0)';
+            buttonsElement.style.transform = transformValue;
+            buttonsElement.style.setProperty('-webkit-transform', transformValue);
+          }
+        });
+      }
+    };
+
+    fixButtonsPosition();
+
+    // Обробляємо зміни viewport
+    const handleResize = () => {
+      if (!isInputFocused) {
+        fixButtonsPosition();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isOpen, isInputFocused]);
+
+  // Блокуємо скрол body та html при відкритому модальному вікні (оптимізовано для плавності)
   useEffect(() => {
     if (isOpen) {
-      // Зберігаємо поточну позицію скролу
       const scrollY = window.scrollY;
+      document.body.setAttribute('data-scroll-y', scrollY.toString());
       
-      // Блокуємо скрол на body та html
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-      
-      // Для мобільних пристроїв
-      document.body.style.touchAction = 'none';
+      requestAnimationFrame(() => {
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = '100%';
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.touchAction = 'none';
+      });
     } else {
-      // Відновлюємо скрол
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      document.body.style.touchAction = '';
+      const savedScrollY = document.body.getAttribute('data-scroll-y');
       
-      // Відновлюємо позицію скролу
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
+      requestAnimationFrame(() => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.documentElement.style.overflow = '';
+        document.body.style.touchAction = '';
+        document.body.removeAttribute('data-scroll-y');
+        
+        if (savedScrollY) {
+          const scrollPosition = parseInt(savedScrollY, 10);
+          requestAnimationFrame(() => {
+            window.scrollTo(0, scrollPosition);
+          });
+        }
+      });
     }
     return () => {
-      // Cleanup
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.width = '';
       document.documentElement.style.overflow = '';
       document.body.style.touchAction = '';
+      document.body.removeAttribute('data-scroll-y');
     };
   }, [isOpen]);
 
@@ -196,26 +369,111 @@ export const EditListingModal = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Функція для стискання зображень на клієнті
+  const compressImageOnClient = async (file: File, maxSizeMB: number = 2): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          const MAX_WIDTH = 1920;
+          const MAX_HEIGHT = 1920;
+          
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            if (width > height) {
+              height = (height / width) * MAX_WIDTH;
+              width = MAX_WIDTH;
+            } else {
+              width = (width / height) * MAX_HEIGHT;
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          let quality = 0.8;
+          const estimatedSize = (width * height * 4) / 1024 / 1024;
+          
+          if (estimatedSize > maxSizeMB) {
+            quality = Math.max(0.5, maxSizeMB / estimatedSize * 0.8);
+          }
+          
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Failed to compress image'));
+                return;
+              }
+              
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              });
+              
+              console.log(`[compressImageOnClient] Original: ${(file.size / 1024 / 1024).toFixed(2)}MB, Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+              resolve(compressedFile);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 МБ
     
     if (files.length + imagePreviews.length > 10) {
       setErrors(prev => ({ ...prev, images: t('createListing.errors.imagesMax') }));
-      return;
-    }
-
-    // Перевірка розміру файлів
-    const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
-    if (oversizedFiles.length > 0) {
-      setErrors(prev => ({ ...prev, images: t('createListing.errors.fileSizeExceeded') }));
-      // Скидаємо input, щоб користувач міг вибрати інші файли
       e.target.value = '';
       return;
     }
+
+    // Стискаємо зображення перед додаванням
+    const compressedFiles: File[] = [];
+    for (const file of files) {
+      try {
+        // Якщо файл більше 2MB, стискаємо
+        if (file.size > 2 * 1024 * 1024) {
+          console.log('[EditListingModal] Compressing image:', file.name);
+          const compressed = await compressImageOnClient(file, 2);
+          compressedFiles.push(compressed);
+        } else {
+          compressedFiles.push(file);
+        }
+      } catch (error) {
+        console.error('[EditListingModal] Failed to compress image, using original:', error);
+        compressedFiles.push(file);
+      }
+    }
+
+    // Додаємо стиснуті файли
+    setImages(prev => [...prev, ...compressedFiles]);
     
-    // Створюємо прев'ю для нових фото з правильним порядком
-    const previewPromises = files.map(file => {
+    // Створюємо прев'ю для нових фото
+    const previewPromises = compressedFiles.map((file: File) => {
       return new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -228,9 +486,8 @@ export const EditListingModal = ({
     Promise.all(previewPromises).then(previews => {
       setImagePreviews(prev => [...prev, ...previews]);
     });
-    
-    setImages(prev => [...prev, ...files]);
     if (errors.images) setErrors(prev => ({ ...prev, images: '' }));
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {
@@ -501,6 +758,10 @@ export const EditListingModal = ({
 
     setLoading(true);
     try {
+      // Для відхилених оголошень автоматично встановлюємо статус, який призведе до відправки на модерацію
+      // API endpoint автоматично відправить rejected оголошення на модерацію при збереженні
+      const statusToSend = isRejected ? 'rejected' : (status || 'active');
+      
       await onSave({
         title,
         description,
@@ -511,7 +772,7 @@ export const EditListingModal = ({
         subcategory: subcategory || null,
         condition: condition || null,
         location,
-        status: status || 'active',
+        status: statusToSend,
         images,
         imagePreviews,
       });
@@ -575,14 +836,30 @@ export const EditListingModal = ({
           </button>
         </div>
 
-        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32" style={{
+        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32" style={{ 
+          paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))',
           background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000'
         }}>
+          {/* Інформація про відхилення для відхилених оголошень */}
+          {isRejected && listing.rejectionReason && (
+            <div className="bg-red-600/20 border border-red-500/50 rounded-xl p-4 mb-4">
+              <div className="text-red-400 font-semibold text-sm mb-2">
+                {t('profile.rejectionReason') || 'Причина відхилення:'}
+              </div>
+              <div className="text-red-300 text-sm">
+                {listing.rejectionReason}
+              </div>
+              <div className="text-red-400/70 text-xs mt-2">
+                {t('editListing.submitAgain') || 'Подати на модерацію'} - щоб відправити виправлене оголошення на повторну перевірку
+              </div>
+            </div>
+          )}
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-white mb-3">
               Фото * {imagePreviews.length}/10
             </label>
+            {/* Прогрес-бар стиснення зображень */}
             <div className="grid grid-cols-3 gap-2 relative">
               {imagePreviews.map((preview, index) => {
                 const isDragging = draggedIndex === index && touchPosition !== null && touchElementRect !== null && !isLocked;
@@ -1033,7 +1310,7 @@ export const EditListingModal = ({
             </div>
             
             {isLocationOpen && filteredCities.length > 0 && (
-              <div className="absolute z-50 w-full mt-2 bg-[#1C1C1C] rounded-xl border border-white/20 shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-2 bg-[#1C1C1C] rounded-xl border border-white/20 shadow-lg max-h-60 overflow-y-auto" style={{ maxHeight: 'calc(15rem - env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
                 {filteredCities.map((city) => (
                   <button
                     key={city}
@@ -1081,11 +1358,20 @@ export const EditListingModal = ({
               <button
                 type="button"
                 onClick={() => {
+                  const isPendingModeration = (listing.status as string) === 'pending_moderation';
+                  if (isPendingModeration) {
+                    showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+                    tg?.HapticFeedback.notificationOccurred('error');
+                    return;
+                  }
                   setShowSoldConfirm(true);
-                    tg?.HapticFeedback.impactOccurred('light');
+                  tg?.HapticFeedback.impactOccurred('light');
                 }}
+                disabled={(listing.status as string) === 'pending_moderation'}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
-                  status === 'sold'
+                  (listing.status as string) === 'pending_moderation'
+                    ? 'border-white/10 bg-[#1C1C1C]/50 text-white/50 cursor-not-allowed opacity-50'
+                    : status === 'sold'
                     ? 'border-white/40 bg-white/10 text-white shadow-sm'
                     : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
@@ -1096,11 +1382,11 @@ export const EditListingModal = ({
               <button
                 type="button"
                 onClick={() => {
-                  setStatus('hidden');
+                  setStatus('deactivated');
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
-                  status === 'hidden'
+                  status === 'deactivated'
                     ? 'border-orange-500/70 bg-orange-500/20 text-orange-400 shadow-sm'
                     : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
@@ -1113,14 +1399,24 @@ export const EditListingModal = ({
         </div>
 
         {/* Кнопки - фіксовані знизу поверх головного меню */}
-        <div className="bg-[#000000] border-t border-white/20 px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg" style={{ 
-          paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))', 
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 99999
-        }}>
+        <div 
+          ref={buttonsRef}
+          className="bg-[#000000] border-t border-white/20 px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg transition-transform duration-200 ease-in-out" 
+          style={{ 
+            paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))', 
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 99999,
+            transform: isInputFocused ? 'translateY(100%)' : 'translateY(0)',
+            visibility: isInputFocused ? 'hidden' : 'visible',
+            opacity: isInputFocused ? 0 : 1,
+            pointerEvents: isInputFocused ? 'none' : 'auto',
+            // Додаткова фіксація для запобігання підтягуванню
+            willChange: 'transform'
+          } as React.CSSProperties}
+        >
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={loading}
@@ -1140,7 +1436,10 @@ export const EditListingModal = ({
             disabled={loading}
             className="flex-1 px-4 py-3 bg-[#D3F1A7] text-black rounded-xl text-sm font-medium hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? t('editListing.saving') : t('common.save')}
+            {loading 
+              ? (isRejected ? t('editListing.savingAndSubmitting') : t('editListing.saving'))
+              : (isRejected ? t('editListing.submitAgain') : t('common.save'))
+            }
           </button>
         </div>
 
@@ -1227,6 +1526,12 @@ export const EditListingModal = ({
           isOpen={showSoldConfirm}
           onClose={() => setShowSoldConfirm(false)}
           onConfirm={() => {
+            const isPendingModeration = (listing.status as string) === 'pending_moderation';
+            if (isPendingModeration) {
+              showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+              setShowSoldConfirm(false);
+              return;
+            }
             setStatus('sold');
             setShowSoldConfirm(false);
             tg?.HapticFeedback.impactOccurred('light');

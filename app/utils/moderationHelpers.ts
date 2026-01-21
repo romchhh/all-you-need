@@ -187,9 +187,11 @@ async function deleteListingImages(images: string | string[]): Promise<void> {
  * Повертає кошти за рекламу
  */
 async function refundPromotions(listingId: number, userId: number, reason: string): Promise<boolean> {
+  // Шукаємо промоції, які ще не були повернуті (pending, paid, active)
+  // Виключаємо вже повернуті (refunded) та скасовані (cancelled)
   const promotions = await prisma.$queryRawUnsafe(
     `SELECT id, price, promotionType FROM PromotionPurchase
-     WHERE listingId = ? AND status = 'pending'`,
+     WHERE listingId = ? AND status IN ('pending', 'paid', 'active')`,
     listingId
   ) as Array<{ id: number; price: number; promotionType: string }>;
 
@@ -235,11 +237,13 @@ async function refundPromotions(listingId: number, userId: number, reason: strin
 }
 
 /**
- * Відхиляє оголошення, повертає кошти та видаляє його разом з фотографіями
+ * Відхиляє оголошення, повертає кошти та встановлює статус 'rejected'
+ * Оголошення залишається в системі для можливості редагування
  */
 export async function rejectListing(
   listing: ListingWithUser, 
-  reason: string
+  reason: string,
+  moderatedBy?: number
 ): Promise<{ refundedPackage: boolean; refundedPromotions: boolean }> {
   const nowStr = nowSQLite();
   
@@ -258,7 +262,25 @@ export async function rejectListing(
   // Повертаємо кошти за рекламу
   refundedPromotions = await refundPromotions(listing.id, listing.userId, reason);
 
-  // Надсилаємо повідомлення перед видаленням
+  // Оновлюємо статус оголошення на 'rejected' замість видалення
+  // Це дозволяє користувачу редагувати оголошення та повторно подати на модерацію
+  await prisma.$executeRawUnsafe(
+    `UPDATE Listing 
+     SET status = 'rejected',
+         moderationStatus = 'rejected',
+         rejectionReason = ?,
+         moderatedAt = ?,
+         moderatedBy = ?,
+         updatedAt = ?
+     WHERE id = ?`,
+    reason,
+    nowStr,
+    moderatedBy || null,
+    nowStr,
+    listing.id
+  );
+
+  // Надсилаємо повідомлення користувачу
   await sendListingRejectedNotification(
     listing.telegramId,
     listing.title,
@@ -268,34 +290,7 @@ export async function rejectListing(
     console.error('[rejectListing] Failed to send Telegram notification:', err);
   });
 
-  // Видаляємо фотографії з диска
-  if (listing.images) {
-    await deleteListingImages(listing.images);
-  }
-
-  // Видаляємо пов'язані записи перед видаленням оголошення
-  await prisma.$executeRawUnsafe(
-    `DELETE FROM PromotionPurchase WHERE listingId = ?`,
-    listing.id
-  );
-
-  await prisma.$executeRawUnsafe(
-    `DELETE FROM Favorite WHERE listingId = ?`,
-    listing.id
-  );
-
-  await prisma.$executeRawUnsafe(
-    `DELETE FROM ListingView WHERE listingId = ?`,
-    listing.id
-  );
-
-  // Видаляємо саме оголошення
-  await prisma.$executeRawUnsafe(
-    `DELETE FROM Listing WHERE id = ?`,
-    listing.id
-  );
-
-  console.log(`[rejectListing] Listing ${listing.id} deleted with all related data and images`);
+  console.log(`[rejectListing] Listing ${listing.id} rejected (status set to 'rejected'). User can edit and resubmit.`);
 
   return { refundedPackage, refundedPromotions };
 }

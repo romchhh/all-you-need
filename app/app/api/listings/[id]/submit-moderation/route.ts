@@ -57,6 +57,18 @@ export async function POST(
       });
     }
 
+    // Для відхилених оголошень очищаємо причину відхилення перед відправкою на модерацію
+    if (listing.status === 'rejected') {
+      console.log('[Submit Moderation] Rejected listing - clearing rejection reason before moderation');
+      const { nowSQLite } = await import('@/utils/dateHelpers');
+      const nowStr = nowSQLite();
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing SET rejectionReason = NULL, updatedAt = ? WHERE id = ?`,
+        nowStr,
+        listingId
+      );
+    }
+
     // Відправляємо на модерацію (змінює статус на pending_moderation)
     await submitListingToModeration(listingId);
 

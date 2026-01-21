@@ -147,7 +147,7 @@ async def process_description(message: types.Message, state: FSMContext):
     
     await state.update_data(description=description)
     await state.set_state(CreateListing.waiting_for_photos)
-    await state.update_data(photos=[])
+    await state.update_data(photos=[], media_group_limit_notified=[])
     
     # Видаляємо попереднє повідомлення про опис (промпт) та повідомлення користувача
     data = await state.get_data()
@@ -179,13 +179,31 @@ async def process_media_group_photo(message: types.Message, state: FSMContext):
     photos = data.get('photos', [])
     media_group_id = message.media_group_id
     media_group_responses = data.get('media_group_responses', {})
+    media_group_limit_notified = set(data.get('media_group_limit_notified', []))
     
+    # Перевіряємо ліміт ПЕРЕД додаванням фото
     if len(photos) >= MAX_PHOTOS:
         # Видаляємо фото від користувача
         try:
             await message.delete()
         except:
             pass
+        # Відправляємо повідомлення про досягнення ліміту тільки один раз для медіа-групи
+        if media_group_id not in media_group_limit_notified:
+            media_group_limit_notified.add(media_group_id)
+            await state.update_data(media_group_limit_notified=list(media_group_limit_notified))
+            # Видаляємо старе повідомлення про фото якщо є
+            last_photo_message_id = data.get('last_photo_message_id')
+            if last_photo_message_id:
+                try:
+                    await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
+                except:
+                    pass
+            sent_message = await message.answer(
+                t(user_id, 'create_listing.photo_limit_reached'),
+                reply_markup=get_continue_photos_keyboard(user_id)
+            )
+            await state.update_data(last_photo_message_id=sent_message.message_id)
         return
     
     file_id = message.photo[-1].file_id
@@ -276,16 +294,25 @@ async def process_photo(message: types.Message, state: FSMContext):
     last_photo_message_id = data.get('last_photo_message_id')
     last_message_id = data.get('last_message_id')  # Промпт про фото
     
+    # Перевіряємо ліміт ПЕРЕД додаванням фото
     if len(photos) >= MAX_PHOTOS:
         # Видаляємо фото від користувача
         try:
             await message.delete()
         except:
             pass
-        await message.answer(
+        # Видаляємо старе повідомлення про ліміт якщо є
+        if last_photo_message_id:
+            try:
+                await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
+            except:
+                pass
+        # Відправляємо повідомлення про досягнення ліміту
+        sent_message = await message.answer(
             t(user_id, 'create_listing.photo_limit_reached'),
             reply_markup=get_continue_photos_keyboard(user_id)
         )
+        await state.update_data(last_photo_message_id=sent_message.message_id)
         return
     
     file_id = message.photo[-1].file_id
@@ -338,7 +365,7 @@ async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext
         return
     
     # Очищаємо оброблені медіа групи при переході до наступного кроку
-    await state.update_data(processed_media_groups={}, media_group_responses={})
+    await state.update_data(processed_media_groups={}, media_group_responses={}, media_group_limit_notified=[])
     
     # Видаляємо останнє повідомлення "Фото додано!" при переході до наступного кроку
     data = await state.get_data()
@@ -841,9 +868,14 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         # Отримуємо баланс користувача
         user_balance = get_user_balance(user_id)
         
-        tariff_text = f"""💰 <b>Оберіть тариф для публікації оголошення:</b>
+        # Ініціалізуємо список вибраних тарифів
+        await state.update_data(selected_tariffs=[])
+        
+        tariff_text = f"""💰 <b>Оберіть тарифи для публікації оголошення:</b>
 
 💵 <b>Ваш баланс:</b> {user_balance:.2f}€
+
+<b>Можна вибрати кілька тарифів одночасно:</b>
 
 📌 <b>Звичайна публікація</b> — 3€
 • Стандартний пост
@@ -854,23 +886,26 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
 • Емодзі на початку
 • Жирний заголовок
 • Візуально виділяється серед звичайних
-• Публікується в загальному потоці
 
-📌 <b>Закріп у каналі</b> — 5,5€ / 12 годин
+📌 <b>Закріп на 12 годин</b> — 5,5€
 • Закріплюється зверху каналу
 • Автоматично знімається після закінчення терміну
 
-📸 <b>Сторіс у каналі</b> — 5€ / 24 години
+📌 <b>Закріп на 24 години</b> — 7,5€
+• Закріплюється зверху каналу
+• На 24 години
+
+📸 <b>Сторіс на 24 години</b> — 5€
 • 1 сторіс
 • Формат: текст + кнопка
 • Посилання на оголошення / профіль
 
-<i>Без оплати оголошення не буде опубліковане.</i>"""
+<i>Натисніть на тариф, щоб вибрати/зняти вибір. Коли виберете всі потрібні тарифи, натисніть "Готово".</i>"""
         
         await callback.message.answer(
             tariff_text,
             parse_mode="HTML",
-            reply_markup=get_publication_tariff_keyboard(user_id)
+            reply_markup=get_publication_tariff_keyboard(user_id, [])
         )
         await callback.answer()
         
@@ -1295,9 +1330,9 @@ async def refresh_listing(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer("❌ Помилка при оновленні оголошення", show_alert=True)
 
 
-@router.callback_query(F.data.startswith("tariff_"), CreateListing.waiting_for_publication_tariff)
-async def process_publication_tariff(callback: types.CallbackQuery, state: FSMContext):
-    """Обробляє вибір тарифу та переходить до вибору способу оплати"""
+@router.callback_query(F.data.startswith("tariff_toggle_"), CreateListing.waiting_for_publication_tariff)
+async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMContext):
+    """Перемикає вибір тарифу (додає/прибирає з вибраних)"""
     user_id = callback.from_user.id
     data = await state.get_data()
     listing_id = data.get('listing_id')
@@ -1307,13 +1342,14 @@ async def process_publication_tariff(callback: types.CallbackQuery, state: FSMCo
         await state.clear()
         return
     
-    tariff_type = callback.data.replace("tariff_", "")
+    tariff_type = callback.data.replace("tariff_toggle_", "")
     
-    # Визначаємо ціну тарифу
+    # Визначаємо ціни тарифів
     tariff_prices = {
         'standard': 3.0,
         'highlighted': 4.5,
-        'pinned': 5.5,
+        'pinned_12h': 5.5,
+        'pinned_24h': 7.5,
         'story': 5.0
     }
     
@@ -1321,48 +1357,145 @@ async def process_publication_tariff(callback: types.CallbackQuery, state: FSMCo
         await callback.answer("❌ Невірний тариф", show_alert=True)
         return
     
-    amount = tariff_prices[tariff_type]
+    # Отримуємо поточний список вибраних тарифів
+    selected_tariffs = data.get('selected_tariffs', [])
+    if not isinstance(selected_tariffs, list):
+        selected_tariffs = []
+    
+    # Перемикаємо вибір
+    if tariff_type in selected_tariffs:
+        selected_tariffs.remove(tariff_type)
+        await callback.answer(f"❌ {tariff_type} видалено з вибраних")
+    else:
+        # Якщо вибирається pinned_24h, видаляємо pinned_12h і навпаки (взаємовиключні)
+        if tariff_type == 'pinned_24h' and 'pinned_12h' in selected_tariffs:
+            selected_tariffs.remove('pinned_12h')
+        elif tariff_type == 'pinned_12h' and 'pinned_24h' in selected_tariffs:
+            selected_tariffs.remove('pinned_24h')
+        
+        selected_tariffs.append(tariff_type)
+        await callback.answer(f"✅ {tariff_type} додано до вибраних")
+    
+    # Оновлюємо список у стані
+    await state.update_data(selected_tariffs=selected_tariffs)
+    
+    # Отримуємо баланс користувача
+    user_balance = get_user_balance(user_id)
+    
+    # Перераховуємо загальну суму
+    total_amount = sum(tariff_prices[t] for t in selected_tariffs if t in tariff_prices)
+    
+    # Оновлюємо повідомлення
+    tariff_text = f"""💰 <b>Оберіть тарифи для публікації оголошення:</b>
+
+💵 <b>Ваш баланс:</b> {user_balance:.2f}€
+💰 <b>Загальна сума:</b> {total_amount:.2f}€
+
+<b>Можна вибрати кілька тарифів одночасно:</b>
+
+📌 <b>Звичайна публікація</b> — 3€
+⭐ <b>Виділене оголошення</b> — 4,5€
+📌 <b>Закріп на 12 годин</b> — 5,5€
+📌 <b>Закріп на 24 години</b> — 7,5€
+📸 <b>Сторіс на 24 години</b> — 5€
+
+<i>Натисніть на тариф, щоб вибрати/зняти вибір. Коли виберете всі потрібні тарифи, натисніть "Готово".</i>"""
+    
+    try:
+        await callback.message.edit_text(
+            tariff_text,
+            parse_mode="HTML",
+            reply_markup=get_publication_tariff_keyboard(user_id, selected_tariffs)
+        )
+    except:
+        await callback.message.answer(
+            tariff_text,
+            parse_mode="HTML",
+            reply_markup=get_publication_tariff_keyboard(user_id, selected_tariffs)
+        )
+
+
+@router.callback_query(F.data == "tariff_confirm", CreateListing.waiting_for_publication_tariff)
+async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMContext):
+    """Підтверджує вибір тарифів та переходить до вибору способу оплати"""
+    user_id = callback.from_user.id
+    data = await state.get_data()
+    listing_id = data.get('listing_id')
+    selected_tariffs = data.get('selected_tariffs', [])
+    
+    if not listing_id:
+        await callback.answer("❌ Помилка: оголошення не знайдено", show_alert=True)
+        await state.clear()
+        return
+    
+    if not selected_tariffs or len(selected_tariffs) == 0:
+        await callback.answer("❌ Будь ласка, виберіть хоча б один тариф", show_alert=True)
+        return
+    
+    # Визначаємо ціни тарифів
+    tariff_prices = {
+        'standard': 3.0,
+        'highlighted': 4.5,
+        'pinned_12h': 5.5,
+        'pinned_24h': 7.5,
+        'story': 5.0
+    }
+    
     tariff_names = {
         'standard': 'Звичайна публікація',
         'highlighted': 'Виділене оголошення',
-        'pinned': 'Закріп у каналі',
-        'story': 'Сторіс у каналі'
+        'pinned_12h': 'Закріп на 12 годин',
+        'pinned_24h': 'Закріп на 24 години',
+        'story': 'Сторіс на 24 години'
     }
     
-    # Оновлюємо тариф в БД
-    update_telegram_listing_publication_tariff(listing_id, tariff_type, 'pending')
+    # Розраховуємо загальну суму
+    total_amount = sum(tariff_prices[t] for t in selected_tariffs if t in tariff_prices)
     
-    # Створюємо платіжне посилання для картки заздалегідь
+    # Зберігаємо тарифи як JSON у БД
+    import json
+    tariffs_json = json.dumps(selected_tariffs)
+    update_telegram_listing_publication_tariff(listing_id, tariffs_json, 'pending')
+    
+    # Створюємо платіжне посилання для картки
+    # Для множинних тарифів передаємо JSON рядок як tariff_type
     payment_result = create_publication_payment_link(
         user_id=user_id,
         listing_id=listing_id,
-        tariff_type=tariff_type,
-        amount=amount
+        tariff_type=tariffs_json,
+        amount=total_amount
     )
     
     payment_url = None
     if payment_result.get('success'):
         payment_url = payment_result['payment_url']
-        # Зберігаємо дані про платіж
         await state.update_data(
-            tariff_type=tariff_type,
-            tariff_amount=amount,
+            selected_tariffs=selected_tariffs,
+            tariff_amount=total_amount,
             payment_invoice_id=payment_result['invoice_id'],
             payment_local_id=payment_result['local_payment_id']
         )
     else:
-        # Якщо не вдалося створити платіж, все одно показуємо вибір способу оплати
-        await state.update_data(tariff_type=tariff_type, tariff_amount=amount)
+        await state.update_data(selected_tariffs=selected_tariffs, tariff_amount=total_amount)
     
     await state.set_state(CreateListing.waiting_for_payment_method)
     
     # Отримуємо баланс користувача
     user_balance = get_user_balance(user_id)
     
+    # Формуємо список вибраних тарифів для відображення
+    selected_tariffs_text = "\n".join([
+        f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€"
+        for t in selected_tariffs
+        if t in tariff_prices
+    ])
+    
     payment_method_text = f"""💳 <b>Оберіть спосіб оплати:</b>
 
-📋 <b>Тариф:</b> {tariff_names.get(tariff_type, tariff_type)}
-💰 <b>Сума:</b> {amount}€
+📋 <b>Вибрані тарифи:</b>
+{selected_tariffs_text}
+
+💰 <b>Загальна сума:</b> {total_amount}€
 💵 <b>Ваш баланс:</b> {user_balance:.2f}€
 
 Яким чином бажаєте оплатити?"""
@@ -1371,13 +1504,13 @@ async def process_publication_tariff(callback: types.CallbackQuery, state: FSMCo
         await callback.message.edit_text(
             payment_method_text,
             parse_mode="HTML",
-            reply_markup=get_payment_method_keyboard(user_id, user_balance, amount, payment_url)
+            reply_markup=get_payment_method_keyboard(user_id, user_balance, total_amount, payment_url)
         )
     except:
         await callback.message.answer(
             payment_method_text,
             parse_mode="HTML",
-            reply_markup=get_payment_method_keyboard(user_id, user_balance, amount, payment_url)
+            reply_markup=get_payment_method_keyboard(user_id, user_balance, total_amount, payment_url)
         )
     
     await callback.answer()
@@ -1389,10 +1522,10 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
     user_id = callback.from_user.id
     data = await state.get_data()
     listing_id = data.get('listing_id')
-    tariff_type = data.get('tariff_type')
+    selected_tariffs = data.get('selected_tariffs', [])
     amount = data.get('tariff_amount')
     
-    if not listing_id or not tariff_type or not amount:
+    if not listing_id or not selected_tariffs or not amount:
         await callback.answer("❌ Помилка: дані не знайдено", show_alert=True)
         await state.clear()
         return
@@ -1409,8 +1542,10 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
         await callback.answer("❌ Помилка списання з балансу", show_alert=True)
         return
     
-    # Оновлюємо тариф в БД як оплачений
-    update_telegram_listing_publication_tariff(listing_id, tariff_type, 'paid')
+    # Оновлюємо тарифи в БД як оплачені (зберігаємо як JSON)
+    import json
+    tariffs_json = json.dumps(selected_tariffs)
+    update_telegram_listing_publication_tariff(listing_id, tariffs_json, 'paid')
     
     # Очищаємо стан
     await state.clear()
@@ -1418,9 +1553,25 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
     tariff_names = {
         'standard': 'Звичайна публікація',
         'highlighted': 'Виділене оголошення',
-        'pinned': 'Закріп у каналі',
-        'story': 'Сторіс у каналі'
+        'pinned_12h': 'Закріп на 12 годин',
+        'pinned_24h': 'Закріп на 24 години',
+        'story': 'Сторіс на 24 години'
     }
+    
+    tariff_prices = {
+        'standard': 3.0,
+        'highlighted': 4.5,
+        'pinned_12h': 5.5,
+        'pinned_24h': 7.5,
+        'story': 5.0
+    }
+    
+    # Формуємо список вибраних тарифів
+    selected_tariffs_text = "\n".join([
+        f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€"
+        for t in selected_tariffs
+        if t in tariff_names
+    ])
     
     # Відправляємо на модерацію
     try:
@@ -1433,7 +1584,9 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
         new_balance = get_user_balance(user_id)
         success_text = f"""✅ <b>Оплата з балансу успішна!</b>
 
-📋 <b>Тариф:</b> {tariff_names.get(tariff_type, tariff_type)}
+📋 <b>Вибрані тарифи:</b>
+{selected_tariffs_text}
+
 💰 <b>Списано:</b> {amount}€
 💵 <b>Залишок на балансі:</b> {new_balance:.2f}€
 
@@ -1467,11 +1620,11 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
     user_id = callback.from_user.id
     data = await state.get_data()
     listing_id = data.get('listing_id')
-    tariff_type = data.get('tariff_type')
+    selected_tariffs = data.get('selected_tariffs', [])
     amount = data.get('tariff_amount')
     payment_url = data.get('payment_url')
     
-    if not listing_id or not tariff_type or not amount:
+    if not listing_id or not selected_tariffs or not amount:
         await callback.answer("❌ Помилка: дані не знайдено", show_alert=True)
         await state.clear()
         return
@@ -1482,14 +1635,16 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
         return
     
     # Якщо посилання немає, створюємо його
-    # Оновлюємо тариф в БД
-    update_telegram_listing_publication_tariff(listing_id, tariff_type, 'pending')
+    # Оновлюємо тарифи в БД
+    import json
+    tariffs_json = json.dumps(selected_tariffs)
+    update_telegram_listing_publication_tariff(listing_id, tariffs_json, 'pending')
     
     # Створюємо платіж
     payment_result = create_publication_payment_link(
         user_id=user_id,
         listing_id=listing_id,
-        tariff_type=tariff_type,
+        tariff_type=tariffs_json,
         amount=amount
     )
     
@@ -1510,9 +1665,24 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
     tariff_names = {
         'standard': 'Звичайна публікація',
         'highlighted': 'Виділене оголошення',
-        'pinned': 'Закріп у каналі',
-        'story': 'Сторіс у каналі'
+        'pinned_12h': 'Закріп на 12 годин',
+        'pinned_24h': 'Закріп на 24 години',
+        'story': 'Сторіс на 24 години'
     }
+    
+    tariff_prices = {
+        'standard': 3.0,
+        'highlighted': 4.5,
+        'pinned_12h': 5.5,
+        'pinned_24h': 7.5,
+        'story': 5.0
+    }
+    
+    selected_tariffs_text = "\n".join([
+        f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€"
+        for t in selected_tariffs
+        if t in tariff_names
+    ])
     
     payment_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -1523,9 +1693,12 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
         ]
     ])
     
-    payment_text = f"""💳 <b>Оплата тарифу: {tariff_names.get(tariff_type, tariff_type)}</b>
+    payment_text = f"""💳 <b>Оплата тарифів</b>
 
-💰 <b>Сума:</b> {amount}€
+📋 <b>Вибрані тарифи:</b>
+{selected_tariffs_text}
+
+💰 <b>Загальна сума:</b> {amount}€
 
 Натисніть кнопку "Оплатити" для переходу до оплати через Monobank.
 

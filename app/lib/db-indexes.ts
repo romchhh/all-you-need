@@ -1,6 +1,9 @@
 import { prisma } from './prisma';
 import { executeWithRetry } from './prisma';
 
+// Кешуємо результат, щоб не викликати повторно
+let indexesCreated = false;
+
 /**
  * Створює індекси для оптимізації SQL запитів
  * Викликається один раз при старті сервера
@@ -22,6 +25,10 @@ async function executeDDLSafely(sql: string): Promise<void> {
 }
 
 export async function createDatabaseIndexes(): Promise<void> {
+  // Якщо індекси вже створені, не повторюємо
+  if (indexesCreated) {
+    return;
+  }
   try {
     // Індекс для пошуку користувачів за telegramId
     await executeDDLSafely(`
@@ -64,6 +71,7 @@ export async function createDatabaseIndexes(): Promise<void> {
       ON Listing(status, category, createdAt DESC)
     `);
 
+    indexesCreated = true;
     if (process.env.NODE_ENV === 'development') {
       console.log('Database indexes created successfully');
     }
@@ -74,5 +82,7 @@ export async function createDatabaseIndexes(): Promise<void> {
         console.log('Note: Error creating database indexes:', error.message);
       }
     }
+    // Відмічаємо як створені навіть при помилці, щоб не повторювати
+    indexesCreated = true;
   }
 }

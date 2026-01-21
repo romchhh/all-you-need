@@ -201,18 +201,42 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
   };
 
   const submitToModeration = async (telegramId: string) => {
-    const response = await fetch(`/api/listings/${listingId}/submit-moderation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramId }),
-    });
+    try {
+      const response = await fetch(`/api/listings/${listingId}/submit-moderation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramId }),
+      });
 
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to submit listing for moderation');
+      if (!response.ok) {
+        let errorMessage = 'Failed to submit listing for moderation';
+        try {
+          const data = await response.json();
+          errorMessage = data.error || errorMessage;
+        } catch (e) {
+          // Якщо не вдалося парсити JSON, використовуємо текст помилки
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Перевіряємо, чи є контент для парсингу
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          const data = await response.json();
+          console.log('[ReactivateListingFlow] Listing submitted to moderation successfully:', data);
+        } catch (e) {
+          console.log('[ReactivateListingFlow] Listing submitted to moderation (no JSON response)');
+        }
+      } else {
+        console.log('[ReactivateListingFlow] Listing submitted to moderation successfully');
+      }
+    } catch (error) {
+      console.error('[ReactivateListingFlow] Error submitting to moderation:', error);
+      throw error;
     }
-
-    console.log('[ReactivateListingFlow] Listing submitted to moderation successfully');
   };
 
   const reactivateListingWithData = async (telegramId: string, promotionType: string | null, paymentMethod: 'balance' | 'direct' = 'balance') => {
@@ -260,13 +284,29 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
         }),
       });
 
-      const reactivateResult = await reactivateResponse.json();
-
+      // Перевіряємо статус перед парсингом JSON
       if (!reactivateResponse.ok) {
-        throw new Error(reactivateResult.error || 'Failed to reactivate listing');
+        let errorMessage = 'Failed to reactivate listing';
+        try {
+          const reactivateResult = await reactivateResponse.json();
+          errorMessage = reactivateResult.error || errorMessage;
+        } catch (e) {
+          const text = await reactivateResponse.text();
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      console.log('[ReactivateListingFlow] Listing reactivated successfully');
+      // Парсимо JSON тільки якщо відповідь успішна
+      let reactivateResult;
+      try {
+        reactivateResult = await reactivateResponse.json();
+      } catch (e) {
+        console.error('[ReactivateListingFlow] Failed to parse reactivate response:', e);
+        throw new Error('Invalid response from server');
+      }
+
+      console.log('[ReactivateListingFlow] Listing reactivated successfully:', reactivateResult);
 
       // Якщо обрано промо, застосовуємо його
       if (promotionType) {
@@ -284,7 +324,18 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
 
       // Відправляємо на модерацію
       console.log('[ReactivateListingFlow] Submitting to moderation');
-      await submitToModeration(telegramId);
+      try {
+        await submitToModeration(telegramId);
+      } catch (modError: any) {
+        console.error('[ReactivateListingFlow] Error submitting to moderation:', modError);
+        // Якщо помилка при відправці на модерацію, все одно закриваємо вікно
+        // Оголошення вже реактивовано, просто не відправлено в групу
+        showToast(t('editListing.listingReactivated') || 'Оголошення реактивовано', 'success');
+        tg?.HapticFeedback.notificationOccurred('success');
+        onSuccess?.();
+        onClose();
+        return;
+      }
 
       // Успіх!
       showToast(t('editListing.listingReactivated'), 'success');
@@ -295,25 +346,37 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
       console.error('[ReactivateListingFlow] Error reactivating listing:', error);
       showToast(error.message || t('common.error'), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
+      // Закриваємо вікно навіть при помилці, щоб користувач міг спробувати знову
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePromotionSelect = async (promotionType: string | null) => {
-    console.log('[ReactivateListingFlow] Promotion selected:', promotionType);
+  const handlePromotionSelect = async (promotionType: string | null, paymentMethod?: 'balance' | 'direct') => {
+    console.log('[ReactivateListingFlow] Promotion selected:', promotionType, 'paymentMethod:', paymentMethod);
+    
+    // Якщо promotionType === null, це означає що користувач натиснув "Пропустити"
+    // Перевіряємо telegramId перед будь-якими діями
+    const telegramId = getTelegramId();
+    if (!telegramId) {
+      console.error('[ReactivateListingFlow] No telegramId available');
+      showToast(t('common.error') || 'Помилка: не вдалося отримати ID користувача', 'error');
+      tg?.HapticFeedback.notificationOccurred('error');
+      return;
+    }
+    
     setSelectedPromotionType(promotionType);
     
     // Якщо обрано промо, показуємо фінальне вікно оплати
     if (promotionType) {
       setStep('payment_summary');
     } else {
-      // Якщо промо не обрано, одразу реактивуємо без реклами
-      const telegramId = getTelegramId();
-      if (telegramId) {
-        console.log('[ReactivateListingFlow] No promotion selected, reactivating without ads');
-        await reactivateListingWithData(telegramId, null);
-      }
+      // Якщо промо не обрано (натиснуто "Пропустити"), одразу реактивуємо без реклами
+      console.log('[ReactivateListingFlow] No promotion selected, reactivating without ads');
+      await reactivateListingWithData(telegramId, null, paymentMethod || 'balance');
     }
   };
 
@@ -395,15 +458,15 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
         <PromotionModal
           isOpen={true}
           onClose={() => {
-            // Якщо закриває без вибору - реактивуємо без промо
-            const telegramId = getTelegramId();
-            if (telegramId) {
-              reactivateListingWithData(telegramId, null);
-            }
+            // Просто закриваємо модальне вікно без реактивації
+            // Користувач може закрити вікно, не вибравши промо
+            onClose();
           }}
           onSelectPromotion={handlePromotionSelect}
           listingId={listingId}
           telegramId={getTelegramId() || undefined}
+          // Показуємо кнопку "Пропустити", яка викличе реактивацію без промо
+          showSkipButton={true}
         />
       )}
 

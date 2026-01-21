@@ -14,9 +14,13 @@ interface Promotion {
 interface PromotionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectPromotion: (promotionType: string | null) => void;
+  onSelectPromotion: (promotionType: string | null, paymentMethod?: 'balance' | 'direct') => void;
   listingId?: number | null;
   telegramId?: string;
+  // Опціональні пропси для сумісності (не використовуються, але дозволяють передавати)
+  currentPromotion?: string | null;
+  promotionEnds?: string | null;
+  showSkipButton?: boolean;
 }
 
 const PROMOTIONS: Promotion[] = [
@@ -31,6 +35,9 @@ export default function PromotionModal({
   onSelectPromotion,
   listingId,
   telegramId,
+  currentPromotion, // Ігноруємо для сумісності
+  promotionEnds, // Ігноруємо для сумісності
+  showSkipButton = true, // Використовуємо для показу кнопки "Пропустити"
 }: PromotionModalProps) {
   const { t } = useLanguage();
   const { user } = useTelegram();
@@ -54,6 +61,7 @@ export default function PromotionModal({
     if (!selectedPromotion) return;
 
     setLoading(true);
+    // Не передаємо paymentMethod - він буде вибраний в PaymentSummaryModal
     onSelectPromotion(selectedPromotion);
   };
 
@@ -64,8 +72,8 @@ export default function PromotionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col relative z-[10000]">
+    <div className="fixed inset-0 bg-black/50 z-[99999] flex items-center justify-center p-4 pb-24 overflow-hidden" style={{ position: 'fixed', paddingBottom: '100px' }}>
+      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[calc(100vh-80px)] overflow-hidden flex flex-col relative z-[100000]">
         {/* Header */}
         <div className="flex-shrink-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
           <div className="flex items-center justify-between">
@@ -189,13 +197,15 @@ export default function PromotionModal({
             {loading ? t('common.loading') : t('common.continue')}
           </button>
           
-          <button
-            onClick={handleSkip}
-            disabled={loading}
-            className="w-full py-3 rounded-xl font-semibold text-white bg-transparent border border-white/20 hover:bg-white/10 transition-all"
-          >
-            {t('promotions.noPromotion')}
-          </button>
+          {showSkipButton && (
+            <button
+              onClick={handleSkip}
+              disabled={loading}
+              className="w-full py-3 rounded-xl font-semibold text-white bg-transparent border border-white/20 hover:bg-white/10 transition-all"
+            >
+              {t('promotions.noPromotion')}
+            </button>
+          )}
         </div>
       </div>
     </div>

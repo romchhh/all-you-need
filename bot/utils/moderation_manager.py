@@ -5,6 +5,7 @@ from datetime import datetime
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from dotenv import load_dotenv
+import aiohttp
 
 import sqlite3
 from pathlib import Path
@@ -162,16 +163,34 @@ class ModerationManager:
                 tariff_names = {
                     'standard': '📌 Звичайна публікація — 3€',
                     'highlighted': '⭐ Виділене оголошення — 4,5€',
-                    'pinned': '📌 Закріп у каналі — 5,5€ / 12 годин',
-                    'story': '📸 Сторіс у каналі — 5€ / 24 години',
+                    'pinned_12h': '📌 Закріп на 12 годин — 5,5€',
+                    'pinned_24h': '📌 Закріп на 24 години — 7,5€',
+                    'story': '📸 Сторіс на 24 години — 5€',
                     'refresh': '🔄 Оновити оголошення — 1,5€'
                 }
-                tariff_name = tariff_names.get(publication_tariff, publication_tariff)
+                
+                # Перевіряємо чи це JSON масив (множинні тарифи)
+                tariff_list = []
+                try:
+                    import json
+                    if publication_tariff.startswith('['):
+                        tariff_list = json.loads(publication_tariff)
+                        tariff_name = ', '.join([tariff_names.get(t, t) for t in tariff_list if t in tariff_names])
+                    else:
+                        tariff_name = tariff_names.get(publication_tariff, publication_tariff)
+                        tariff_list = [publication_tariff]
+                except:
+                    tariff_name = tariff_names.get(publication_tariff, publication_tariff)
+                    tariff_list = [publication_tariff] if publication_tariff else []
                 
                 payment_emoji = "✅" if payment_status == 'paid' else "⏳"
                 payment_text = "Оплачено" if payment_status == 'paid' else "Очікує оплати"
                 
                 tariff_info = f"\n\n💳 <b>Тариф:</b> {tariff_name}\n{payment_emoji} <b>Статус оплати:</b> {payment_text}"
+                
+                # Додаємо повідомлення про сторіс, якщо обрано тариф "story"
+                if 'story' in tariff_list:
+                    tariff_info += "\n\n📸 <b>⚠️ ПОТРІБНО ВИКЛАСТИ СТОРІС!</b>"
         
         text = f"""{source_emoji} <b>Оголошення на модерацію</b> #{listing_id}
 
@@ -357,27 +376,75 @@ class ModerationManager:
                 
                 return success
             else:
-                conn = get_db_connection()
-                cursor = conn.cursor()
+                # Для marketplace listings викликаємо Node.js API для повернення коштів
+                webapp_url = os.getenv('WEBAPP_URL') or os.getenv('NEXT_PUBLIC_BASE_URL') or 'http://localhost:3000'
+                api_url = f"{webapp_url}/api/admin/moderation"
                 
-                admin_id = None
-                if admin_telegram_id:
-                    admin_id = self._get_admin_id_by_telegram_id(admin_telegram_id)
-                
-                cursor.execute("""
-                    UPDATE Listing
-                    SET moderationStatus = 'rejected',
-                        rejectionReason = ?,
-                        moderatedAt = ?,
-                        moderatedBy = ?,
-                        updatedAt = ?
-                    WHERE id = ?
-                """, (reason, datetime.now(), admin_id, datetime.now(), listing_id))
-                
-                success = cursor.rowcount > 0
-                conn.commit()
-                conn.close()
-                return success
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        # Отримуємо admin ID для передачі в API
+                        admin_id = None
+                        if admin_telegram_id:
+                            admin_id = self._get_admin_id_by_telegram_id(admin_telegram_id)
+                        
+                        # Викликаємо API endpoint для відхилення (він поверне кошти)
+                        payload = {
+                            "listingId": listing_id,
+                            "action": "reject",
+                            "reason": reason,
+                            "source": "marketplace"
+                        }
+                        
+                        async with session.post(api_url, json=payload) as response:
+                            if response.status == 200:
+                                result = await response.json()
+                                print(f"Оголошення {listing_id} відхилено через API, кошти повернуто: {result.get('refundInfo', {})}")
+                                return True
+                            else:
+                                error_text = await response.text()
+                                print(f"Помилка при виклику API для відхилення оголошення {listing_id}: {response.status} - {error_text}")
+                                # Fallback: оновлюємо статус вручну
+                                conn = get_db_connection()
+                                cursor = conn.cursor()
+                                cursor.execute("""
+                                    UPDATE Listing
+                                    SET status = 'rejected',
+                                        moderationStatus = 'rejected',
+                                        rejectionReason = ?,
+                                        moderatedAt = ?,
+                                        moderatedBy = ?,
+                                        updatedAt = ?
+                                    WHERE id = ?
+                                """, (reason, datetime.now(), admin_id, datetime.now(), listing_id))
+                                success = cursor.rowcount > 0
+                                conn.commit()
+                                conn.close()
+                                return success
+                except Exception as api_error:
+                    print(f"Помилка при виклику API для відхилення оголошення {listing_id}: {api_error}")
+                    # Fallback: оновлюємо статус вручну
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    
+                    admin_id = None
+                    if admin_telegram_id:
+                        admin_id = self._get_admin_id_by_telegram_id(admin_telegram_id)
+                    
+                    cursor.execute("""
+                        UPDATE Listing
+                        SET status = 'rejected',
+                            moderationStatus = 'rejected',
+                            rejectionReason = ?,
+                            moderatedAt = ?,
+                            moderatedBy = ?,
+                            updatedAt = ?
+                        WHERE id = ?
+                    """, (reason, datetime.now(), admin_id, datetime.now(), listing_id))
+                    
+                    success = cursor.rowcount > 0
+                    conn.commit()
+                    conn.close()
+                    return success
                 
         except Exception as e:
             print(f"Помилка відхилення оголошення: {e}")
@@ -473,22 +540,38 @@ class ModerationManager:
             }
             condition_text = condition_map.get(condition, condition)
             
-            tariff = listing.get('publicationTariff', 'standard')
+            tariff_raw = listing.get('publicationTariff', 'standard')
+            
+            # Парсимо тарифи (може бути JSON масив або один тариф)
+            tariffs = []
+            try:
+                import json
+                if tariff_raw and tariff_raw.startswith('['):
+                    tariffs = json.loads(tariff_raw)
+                elif tariff_raw:
+                    tariffs = [tariff_raw]
+            except:
+                if tariff_raw:
+                    tariffs = [tariff_raw]
+            
+            if not tariffs:
+                tariffs = ['standard']
+            
+            # Визначаємо title_prefix та title_style на основі вибраних тарифів
             title_prefix = ''
             title_style = title
             
-            if tariff == 'highlighted':
+            # Якщо є highlighted, додаємо префікс
+            if 'highlighted' in tariffs:
                 title_prefix = '⭐ '
                 title_style = f"<b>{title}</b>"
-            elif tariff == 'pinned':
-                title_prefix = ''
-                title_style = f"<b>{title}</b>"
-            elif tariff == 'story':
+            # Якщо є story, додаємо префікс
+            elif 'story' in tariffs:
                 title_prefix = '📸 '
                 title_style = f"<b>{title}</b>"
-            else:
-                title_prefix = ''
-                title_style = title
+            # Якщо є pinned (будь-який), робимо жирним
+            elif any(t.startswith('pinned') for t in tariffs):
+                title_style = f"<b>{title}</b>"
             
             # Отримуємо інформацію про продавця
             seller_first_name = listing.get('firstName', '')
@@ -560,7 +643,9 @@ class ModerationManager:
                         conn.commit()
                     conn.close()
                     
-                    if tariff == 'pinned' and message_id:
+                    # Застосовуємо всі вибрані тарифи
+                    # Закріплення (pinned_12h або pinned_24h)
+                    if message_id and any(t.startswith('pinned') for t in tariffs):
                         try:
                             await self.bot.pin_chat_message(
                                 chat_id=channel_id,
@@ -570,7 +655,7 @@ class ModerationManager:
                             print(f"Error pinning message: {e}")
                     
                     # Для виділеного оголошення відправляємо додаткове повідомлення
-                    if tariff == 'highlighted' and message_id:
+                    if 'highlighted' in tariffs and message_id:
                         try:
                             await self.bot.send_message(
                                 chat_id=channel_id,
@@ -618,7 +703,9 @@ class ModerationManager:
                             conn.commit()
                         conn.close()
                     
-                    if tariff == 'pinned' and message_id:
+                    # Застосовуємо всі вибрані тарифи
+                    # Закріплення (pinned_12h або pinned_24h)
+                    if message_id and any(t.startswith('pinned') for t in tariffs):
                         try:
                             await self.bot.pin_chat_message(
                                 chat_id=channel_id,
@@ -628,7 +715,7 @@ class ModerationManager:
                             print(f"Error pinning message: {e}")
                     
                     # Для виділеного оголошення відправляємо додаткове повідомлення
-                    if tariff == 'highlighted' and message_id:
+                    if 'highlighted' in tariffs and message_id:
                         try:
                             await self.bot.send_message(
                                 chat_id=channel_id,
@@ -646,7 +733,9 @@ class ModerationManager:
                 )
                 message_id = message.message_id
                 
-                if tariff == 'pinned' and message_id:
+                # Застосовуємо всі вибрані тарифи
+                # Закріплення (pinned_12h або pinned_24h)
+                if message_id and any(t.startswith('pinned') for t in tariffs):
                     try:
                         await self.bot.pin_chat_message(
                             chat_id=channel_id,
@@ -656,7 +745,7 @@ class ModerationManager:
                         print(f"Error pinning message: {e}")
                 
                 # Для виділеного оголошення відправляємо додаткове повідомлення
-                if tariff == 'highlighted' and message_id:
+                if 'highlighted' in tariffs and message_id:
                     try:
                         await self.bot.send_message(
                             chat_id=channel_id,
