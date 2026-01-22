@@ -359,20 +359,64 @@ def format_statistics_message():
     }
     
     languages_text = ""
-    for lang, count in stats['languages']:
-        emoji = language_emoji.get(lang, '🌐')
-        percentage = (count / stats['total_users'] * 100) if stats['total_users'] > 0 else 0
-        languages_text += f"   {emoji} {lang or 'Невідомо'}: {count} ({percentage:.1f}%)"
-    
-    top_links_text = ""
-    if stats['top_links']:
-        for i, (link_name, clicks) in enumerate(stats['top_links'], 1):
-            top_links_text += f"   {i}. {link_name}: {clicks} переходів"
+    if stats['languages']:
+        for lang, count in stats['languages']:
+            emoji = language_emoji.get(lang, '🌐')
+            percentage = (count / stats['total_users'] * 100) if stats['total_users'] > 0 else 0
+            lang_name = 'Українська' if lang == 'uk' else 'Русский' if lang == 'ru' else lang
+            languages_text += f"   {emoji} {lang_name}: <b>{count}</b> ({percentage:.1f}%)\n"
     else:
-        top_links_text = "   Немає даних\n"
+        languages_text = "   Немає даних\n"
     
     phone_percentage = (stats['users_with_phone'] / stats['total_users'] * 100) if stats['total_users'] > 0 else 0
-    links_percentage = (stats['users_from_links'] / stats['total_users'] * 100) if stats['total_users'] > 0 else 0
+    
+    # Форматуємо статистику Telegram оголошень
+    telegram_status_text = ""
+    if stats['telegram_listings_by_status']:
+        status_names = {
+            'pending': '⏳ Очікують',
+            'active': '✅ Активні',
+            'rejected': '❌ Відхилені',
+            'expired': '⏰ Закінчились',
+            'sold': '💰 Продано'
+        }
+        for status, count in stats['telegram_listings_by_status'].items():
+            status_name = status_names.get(status, status)
+            telegram_status_text += f"   {status_name}: <b>{count}</b>\n"
+    else:
+        telegram_status_text = "   Немає даних\n"
+    
+    # Форматуємо статистику модерації Telegram оголошень
+    telegram_moderation_text = ""
+    if stats['telegram_listings_by_moderation']:
+        moderation_names = {
+            'pending': '⏳ Очікують модерації',
+            'approved': '✅ Схвалені',
+            'rejected': '❌ Відхилені',
+            None: '📝 Без статусу модерації'
+        }
+        for status, count in stats['telegram_listings_by_moderation'].items():
+            status_name = moderation_names.get(status, status or 'Без статусу')
+            telegram_moderation_text += f"   {status_name}: <b>{count}</b>\n"
+    else:
+        telegram_moderation_text = "   Немає даних\n"
+    
+    # Форматуємо статистику маркетплейс оголошень
+    marketplace_status_text = ""
+    if stats['marketplace_listings_by_status']:
+        status_names = {
+            'pending': '⏳ Очікують',
+            'active': '✅ Активні',
+            'rejected': '❌ Відхилені',
+            'expired': '⏰ Закінчились',
+            'sold': '💰 Продано',
+            'draft': '📝 Чернетки'
+        }
+        for status, count in stats['marketplace_listings_by_status'].items():
+            status_name = status_names.get(status, status)
+            marketplace_status_text += f"   {status_name}: <b>{count}</b>\n"
+    else:
+        marketplace_status_text = "   Немає даних\n"
     
     message = f"""<b>📊 ДЕТАЛЬНА СТАТИСТИКА БОТА</b>
 
@@ -390,16 +434,29 @@ def format_statistics_message():
 • За тиждень: <b>{stats['active_week']}</b>
 • За місяць: <b>{stats['active_month']}</b>
 
+<b>📢 ОГОЛОШЕННЯ В ТЕЛЕГРАМ БОТІ</b>
+• Всього оголошень: <b>{stats['telegram_listings_total']}</b>
+• За сьогодні: <b>{stats['telegram_listings_today']}</b>
+• За тиждень: <b>{stats['telegram_listings_week']}</b>
+• За місяць: <b>{stats['telegram_listings_month']}</b>
+
+<b>📊 Telegram оголошення по статусах:</b>
+{telegram_status_text}
+
+<b>🔍 Telegram оголошення по модерації:</b>
+{telegram_moderation_text}
+
+<b>🛒 ОГОЛОШЕННЯ НА МАРКЕТПЛЕЙСІ</b>
+• Всього оголошень: <b>{stats['marketplace_listings_total']}</b>
+• За сьогодні: <b>{stats['marketplace_listings_today']}</b>
+• За тиждень: <b>{stats['marketplace_listings_week']}</b>
+• За місяць: <b>{stats['marketplace_listings_month']}</b>
+
+<b>📊 Маркетплейс оголошення по статусах:</b>
+{marketplace_status_text}
+
 <b>🌍 СТАТИСТИКА ПО МОВАХ</b>
 {languages_text}
-
-<b>🔗 СТАТИСТИКА ПО ПОСИЛАННЯХ</b>
-• Всього посилань: <b>{stats['total_links']}</b>
-• Всього переходів: <b>{stats['total_clicks']}</b>
-• Користувачів з посилань: <b>{stats['users_from_links']}</b> ({links_percentage:.1f}%)
-
-<b>🏆 ТОП-5 ПОСИЛАНЬ:</b>
-{top_links_text}
 
 <i>📅 Оновлено: {datetime.now().strftime('%d.%m.%Y %H:%M')}</i>"""
     

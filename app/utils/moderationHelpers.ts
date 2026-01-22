@@ -37,7 +37,11 @@ export async function getListingWithUser(listingId: number): Promise<ListingWith
     return null;
   }
 
-  return result[0];
+  const listing = result[0];
+  // Конвертуємо hasUsedFreeAd з INTEGER (0/1) в boolean
+  listing.hasUsedFreeAd = Boolean(listing.hasUsedFreeAd);
+  
+  return listing;
 }
 
 /**
@@ -190,41 +194,52 @@ async function refundPromotions(listingId: number, userId: number, reason: strin
   // Шукаємо промоції, які ще не були повернуті (pending, paid, active)
   // Виключаємо вже повернуті (refunded) та скасовані (cancelled)
   const promotions = await prisma.$queryRawUnsafe(
-    `SELECT id, price, promotionType FROM PromotionPurchase
+    `SELECT id, price, promotionType, paymentMethod FROM PromotionPurchase
      WHERE listingId = ? AND status IN ('pending', 'paid', 'active')`,
     listingId
-  ) as Array<{ id: number; price: number; promotionType: string }>;
+  ) as Array<{ id: number; price: number; promotionType: string; paymentMethod: string }>;
 
   if (promotions.length === 0) {
+    console.log(`[refundPromotions] No promotions to refund for listing ${listingId}`);
     return false;
   }
 
   const nowStr = nowSQLite();
+  let refundedAny = false;
 
   for (const promo of promotions) {
-    // Повертаємо кошти
-    await prisma.$executeRawUnsafe(
-      `UPDATE User 
-       SET balance = balance + ?,
-           updatedAt = ?
-       WHERE id = ?`,
-      promo.price,
-      nowStr,
-      userId
-    );
+    // Повертаємо кошти тільки якщо оплата була з балансу
+    // Якщо оплата була через direct (Monobank), кошти не повертаємо на баланс
+    if (promo.paymentMethod === 'balance') {
+      // Повертаємо кошти на баланс
+      await prisma.$executeRawUnsafe(
+        `UPDATE User 
+         SET balance = balance + ?,
+             updatedAt = ?
+         WHERE id = ?`,
+        promo.price,
+        nowStr,
+        userId
+      );
 
-    // Створюємо транзакцію
-    await createTransaction({
-      userId,
-      type: 'refund',
-      amount: promo.price,
-      currency: 'EUR',
-      status: 'completed',
-      description: 'Повернення коштів за рекламу (оголошення відхилено)',
-      metadata: { listingId, promotionType: promo.promotionType, reason },
-    });
+      // Створюємо транзакцію
+      await createTransaction({
+        userId,
+        type: 'refund',
+        amount: promo.price,
+        currency: 'EUR',
+        status: 'completed',
+        description: 'Повернення коштів за рекламу (оголошення відхилено)',
+        metadata: { listingId, promotionType: promo.promotionType, reason },
+      });
 
-    // Оновлюємо статус реклами
+      console.log(`[refundPromotions] Refunded ${promo.price} EUR to balance for promotion ${promo.id} (listing ${listingId})`);
+      refundedAny = true;
+    } else {
+      console.log(`[refundPromotions] Promotion ${promo.id} paid via ${promo.paymentMethod}, no balance refund needed`);
+    }
+
+    // Оновлюємо статус реклами на 'refunded' незалежно від способу оплати
     await prisma.$executeRawUnsafe(
       `UPDATE PromotionPurchase 
        SET status = 'refunded'
@@ -233,7 +248,7 @@ async function refundPromotions(listingId: number, userId: number, reason: strin
     );
   }
 
-  return true;
+  return refundedAny;
 }
 
 /**
@@ -254,12 +269,22 @@ export async function rejectListing(
   let refundedPromotions = false;
 
   // Повертаємо пакет якщо це було платне оголошення
-  if (paidListingsEnabled && listing.hasUsedFreeAd) {
+  // Якщо hasUsedFreeAd = true, значить користувач вже використав безкоштовне оголошення
+  // і це оголошення створене через платний пакет
+  // Конвертуємо hasUsedFreeAd в boolean на випадок якщо прийшло як число
+  const hasUsedFreeAd = Boolean(listing.hasUsedFreeAd);
+  
+  if (paidListingsEnabled && hasUsedFreeAd) {
     await refundListingPackage(listing.userId, listing.id, listing.title, reason);
     refundedPackage = true;
+    console.log(`[rejectListing] Package refunded for listing ${listing.id}, user ${listing.userId}, hasUsedFreeAd: ${hasUsedFreeAd}`);
+  } else if (!paidListingsEnabled) {
+    console.log(`[rejectListing] Paid listings disabled, no package refund needed for listing ${listing.id}`);
+  } else if (!hasUsedFreeAd) {
+    console.log(`[rejectListing] First free listing (hasUsedFreeAd: ${hasUsedFreeAd}), no package refund needed for listing ${listing.id}`);
   }
 
-  // Повертаємо кошти за рекламу
+  // Повертаємо кошти за рекламу (тільки якщо оплачено з балансу)
   refundedPromotions = await refundPromotions(listing.id, listing.userId, reason);
 
   // Оновлюємо статус оголошення на 'rejected' замість видалення

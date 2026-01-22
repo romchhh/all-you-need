@@ -39,10 +39,13 @@ def get_all_users_data():
 
 
 def get_all_links_data():
-    cursor.execute('SELECT id, link_name, link_url FROM links')
-    links_data = cursor.fetchall()
-    links_columns = [description[0] for description in cursor.description]
-    return links_data, links_columns
+    try:
+        cursor.execute('SELECT id, link_name, link_url FROM links')
+        links_data = cursor.fetchall()
+        links_columns = [description[0] for description in cursor.description]
+        return links_data, links_columns
+    except sqlite3.OperationalError:
+        return [], []
 
 
 def get_new_users_count(days: int):
@@ -66,30 +69,169 @@ def get_users_with_phone():
 
 
 def get_users_by_language():
-    return []
+    """Отримує статистику користувачів по мовах (рахує унікальних користувачів)"""
+    try:
+        language_counts = {}
+        
+        # Спочатку перевіряємо таблицю User (якщо там є колонка language)
+        try:
+            cursor.execute("PRAGMA table_info(User)")
+            columns = cursor.fetchall()
+            has_language_column = any(col[1] == 'language' for col in columns)
+            
+            if has_language_column:
+                cursor.execute("""
+                    SELECT language, COUNT(*) as count 
+                    FROM User 
+                    WHERE language IS NOT NULL AND language != ''
+                    GROUP BY language
+                """)
+                user_results = cursor.fetchall()
+                for lang, count in user_results:
+                    if lang:
+                        language_counts[lang] = count
+        except sqlite3.OperationalError:
+            pass
+        
+        # Якщо в User немає даних про мови, беремо з users_legacy
+        # Але рахуємо унікальних користувачів (DISTINCT user_id)
+        if not language_counts:
+            try:
+                cursor.execute("""
+                    SELECT language, COUNT(DISTINCT user_id) as count 
+                    FROM users_legacy 
+                    WHERE language IS NOT NULL AND language != ''
+                    GROUP BY language
+                """)
+                results = cursor.fetchall()
+                language_counts = {lang: count for lang, count in results if lang}
+            except sqlite3.OperationalError:
+                pass
+        
+        # Сортуємо за кількістю (спочатку найбільші)
+        sorted_languages = sorted(language_counts.items(), key=lambda x: x[1], reverse=True)
+        return sorted_languages
+    except sqlite3.OperationalError:
+        return []
 
 
 def get_total_links_count():
-    cursor.execute("SELECT COUNT(*) FROM links")
-    count = cursor.fetchone()[0]
-    return count
+    try:
+        cursor.execute("SELECT COUNT(*) FROM links")
+        count = cursor.fetchone()[0]
+        return count
+    except sqlite3.OperationalError:
+        return 0
 
 
 def get_total_link_clicks():
-    cursor.execute("SELECT COALESCE(SUM(link_count), 0) FROM links")
-    count = cursor.fetchone()[0]
-    return count
+    try:
+        cursor.execute("SELECT COALESCE(SUM(link_count), 0) FROM links")
+        count = cursor.fetchone()[0]
+        return count
+    except sqlite3.OperationalError:
+        return 0
 
 
 def get_top_links(limit: int = 5):
-    cursor.execute("SELECT link_name, link_count FROM links ORDER BY link_count DESC LIMIT ?", (limit,))
-    return cursor.fetchall()
+    try:
+        cursor.execute("SELECT link_name, link_count FROM links ORDER BY link_count DESC LIMIT ?", (limit,))
+        return cursor.fetchall()
+    except sqlite3.OperationalError:
+        return []
 
 
 def get_users_with_ref_link():
-    cursor.execute("SELECT COUNT(*) FROM users WHERE ref_link IS NOT NULL")
-    count = cursor.fetchone()[0]
-    return count
+    try:
+        cursor.execute("SELECT COUNT(*) FROM User WHERE ref_link IS NOT NULL")
+        count = cursor.fetchone()[0]
+        return count
+    except sqlite3.OperationalError:
+        return 0
+
+
+def get_telegram_listings_count():
+    """Отримує загальну кількість оголошень в TelegramListing"""
+    try:
+        cursor.execute("SELECT COUNT(*) FROM TelegramListing")
+        count = cursor.fetchone()[0]
+        return count
+    except sqlite3.OperationalError:
+        return 0
+
+
+def get_telegram_listings_by_status():
+    """Отримує кількість оголошень в TelegramListing по статусах"""
+    try:
+        cursor.execute("""
+            SELECT status, COUNT(*) as count 
+            FROM TelegramListing 
+            GROUP BY status
+        """)
+        results = cursor.fetchall()
+        return {status: count for status, count in results}
+    except sqlite3.OperationalError:
+        return {}
+
+
+def get_telegram_listings_by_moderation_status():
+    """Отримує кількість оголошень в TelegramListing по статусах модерації"""
+    try:
+        cursor.execute("""
+            SELECT COALESCE(moderationStatus, 'none') as status, COUNT(*) as count 
+            FROM TelegramListing 
+            GROUP BY moderationStatus
+        """)
+        results = cursor.fetchall()
+        return {status if status != 'none' else None: count for status, count in results}
+    except sqlite3.OperationalError:
+        return {}
+
+
+def get_new_telegram_listings_count(days: int):
+    """Отримує кількість нових оголошень в TelegramListing за період"""
+    try:
+        date_threshold = datetime.now() - timedelta(days=days)
+        cursor.execute("SELECT COUNT(*) FROM TelegramListing WHERE createdAt >= ?", (date_threshold,))
+        count = cursor.fetchone()[0]
+        return count
+    except sqlite3.OperationalError:
+        return 0
+
+
+def get_marketplace_listings_count():
+    """Отримує загальну кількість оголошень в Listing (маркетплейс)"""
+    try:
+        cursor.execute("SELECT COUNT(*) FROM Listing")
+        count = cursor.fetchone()[0]
+        return count
+    except sqlite3.OperationalError:
+        return 0
+
+
+def get_marketplace_listings_by_status():
+    """Отримує кількість оголошень в Listing по статусах"""
+    try:
+        cursor.execute("""
+            SELECT status, COUNT(*) as count 
+            FROM Listing 
+            GROUP BY status
+        """)
+        results = cursor.fetchall()
+        return {status: count for status, count in results}
+    except sqlite3.OperationalError:
+        return {}
+
+
+def get_new_marketplace_listings_count(days: int):
+    """Отримує кількість нових оголошень в Listing за період"""
+    try:
+        date_threshold = datetime.now() - timedelta(days=days)
+        cursor.execute("SELECT COUNT(*) FROM Listing WHERE createdAt >= ?", (date_threshold,))
+        count = cursor.fetchone()[0]
+        return count
+    except sqlite3.OperationalError:
+        return 0
 
 
 def get_statistics_summary():
@@ -110,6 +252,20 @@ def get_statistics_summary():
     top_links = get_top_links(5)
     users_from_links = get_users_with_ref_link()
     
+    # Статистика оголошень
+    telegram_listings_total = get_telegram_listings_count()
+    telegram_listings_by_status = get_telegram_listings_by_status()
+    telegram_listings_by_moderation = get_telegram_listings_by_moderation_status()
+    telegram_listings_today = get_new_telegram_listings_count(1)
+    telegram_listings_week = get_new_telegram_listings_count(7)
+    telegram_listings_month = get_new_telegram_listings_count(30)
+    
+    marketplace_listings_total = get_marketplace_listings_count()
+    marketplace_listings_by_status = get_marketplace_listings_by_status()
+    marketplace_listings_today = get_new_marketplace_listings_count(1)
+    marketplace_listings_week = get_new_marketplace_listings_count(7)
+    marketplace_listings_month = get_new_marketplace_listings_count(30)
+    
     return {
         'total_users': total_users,
         'new_today': new_today,
@@ -123,7 +279,18 @@ def get_statistics_summary():
         'total_links': total_links,
         'total_clicks': total_clicks,
         'top_links': top_links,
-        'users_from_links': users_from_links
+        'users_from_links': users_from_links,
+        'telegram_listings_total': telegram_listings_total,
+        'telegram_listings_by_status': telegram_listings_by_status,
+        'telegram_listings_by_moderation': telegram_listings_by_moderation,
+        'telegram_listings_today': telegram_listings_today,
+        'telegram_listings_week': telegram_listings_week,
+        'telegram_listings_month': telegram_listings_month,
+        'marketplace_listings_total': marketplace_listings_total,
+        'marketplace_listings_by_status': marketplace_listings_by_status,
+        'marketplace_listings_today': marketplace_listings_today,
+        'marketplace_listings_week': marketplace_listings_week,
+        'marketplace_listings_month': marketplace_listings_month
     }
 
 

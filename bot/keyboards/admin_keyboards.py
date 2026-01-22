@@ -7,7 +7,7 @@ from database_functions.links_db import get_all_links
 def admin_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         [KeyboardButton(text="Розсилка") ,KeyboardButton(text="Статистика")], 
-        [KeyboardButton(text="Адміністратори"), KeyboardButton(text="Посилання")],
+        [KeyboardButton(text="Адміністратори")],
     ]
 
     keyboard = ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
