@@ -191,16 +191,28 @@ async function deleteListingImages(images: string | string[]): Promise<void> {
  * Повертає кошти за рекламу
  */
 async function refundPromotions(listingId: number, userId: number, reason: string): Promise<{ refunded: boolean; totalAmount: number }> {
-  // Шукаємо промоції, які ще не були повернуті (pending, paid, active)
+  // Спочатку перевіряємо всі промоції для цього оголошення (для діагностики)
+  const allPromotions = await prisma.$queryRawUnsafe(
+    `SELECT id, price, promotionType, paymentMethod, status FROM PromotionPurchase
+     WHERE listingId = ?`,
+    listingId
+  ) as Array<{ id: number; price: number; promotionType: string; paymentMethod: string; status: string }>;
+  
+  console.log(`[refundPromotions] All promotions for listing ${listingId}:`, allPromotions);
+  
+  // Шукаємо промоції, які ще не були повернуті (pending, paid, active, completed)
   // Виключаємо вже повернуті (refunded) та скасовані (cancelled)
+  // 'completed' - статус для оплати з балансу
   const promotions = await prisma.$queryRawUnsafe(
     `SELECT id, price, promotionType, paymentMethod FROM PromotionPurchase
-     WHERE listingId = ? AND status IN ('pending', 'paid', 'active')`,
+     WHERE listingId = ? AND status IN ('pending', 'paid', 'active', 'completed')`,
     listingId
   ) as Array<{ id: number; price: number; promotionType: string; paymentMethod: string }>;
 
+  console.log(`[refundPromotions] Promotions to refund for listing ${listingId}:`, promotions.length, promotions);
+
   if (promotions.length === 0) {
-    console.log(`[refundPromotions] No promotions to refund for listing ${listingId}`);
+    console.log(`[refundPromotions] No promotions to refund for listing ${listingId}. All promotions:`, allPromotions.map(p => ({ id: p.id, status: p.status, paymentMethod: p.paymentMethod })));
     return { refunded: false, totalAmount: 0 };
   }
 
@@ -288,9 +300,11 @@ export async function rejectListing(
   }
 
   // Повертаємо кошти за рекламу (тільки якщо оплачено з балансу)
+  console.log(`[rejectListing] Starting refund promotions for listing ${listing.id}, user ${listing.userId}`);
   const promotionRefund = await refundPromotions(listing.id, listing.userId, reason);
   refundedPromotions = promotionRefund.refunded;
   promotionRefundAmount = promotionRefund.totalAmount;
+  console.log(`[rejectListing] Promotion refund result:`, { refunded: refundedPromotions, amount: promotionRefundAmount });
 
   // Оновлюємо статус оголошення на 'rejected' замість видалення
   // Це дозволяє користувачу редагувати оголошення та повторно подати на модерацію

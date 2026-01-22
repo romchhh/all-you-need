@@ -757,6 +757,9 @@ export const EditListingModal = ({
     if (!validate()) return;
 
     setLoading(true);
+    // Показуємо індикатор завантаження одразу
+    tg?.HapticFeedback.impactOccurred('light');
+    
     try {
       // Для відхилених оголошень автоматично встановлюємо статус, який призведе до відправки на модерацію
       // API endpoint автоматично відправить rejected оголошення на модерацію при збереженні
@@ -779,6 +782,8 @@ export const EditListingModal = ({
       onClose();
     } catch (error) {
       console.error('Error saving listing:', error);
+      showToast(t('editListing.updateError') || 'Помилка оновлення оголошення', 'error');
+      tg?.HapticFeedback.notificationOccurred('error');
     } finally {
       setLoading(false);
     }
@@ -1434,12 +1439,16 @@ export const EditListingModal = ({
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-[#D3F1A7] text-black rounded-xl text-sm font-medium hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-[#D3F1A7] text-black rounded-xl text-sm font-medium hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading 
-              ? (isRejected ? t('editListing.savingAndSubmitting') : t('editListing.saving'))
-              : (isRejected ? t('editListing.submitAgain') : t('common.save'))
-            }
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
+                <span>{isRejected ? t('editListing.savingAndSubmitting') : t('editListing.saving')}</span>
+              </>
+            ) : (
+              <span>{isRejected ? t('editListing.submitAgain') : t('common.save')}</span>
+            )}
           </button>
         </div>
 

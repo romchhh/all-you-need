@@ -111,6 +111,15 @@ export async function processPromotionPurchaseFromBalance(
     description: `Реклама: ${promotionType}`,
   });
 
+  // Створюємо запис про покупку реклами (для можливості повернення коштів)
+  await createPromotionPurchaseRecord(
+    userId,
+    promotionType,
+    'balance',
+    listingId || undefined,
+    'completed' // Статус 'completed' для оплати з балансу
+  );
+
   // Якщо є listingId, оновлюємо оголошення (promotionType, promotionEnds, і відправляємо на модерацію)
   if (listingId) {
     // Перевіряємо поточний статус оголошення

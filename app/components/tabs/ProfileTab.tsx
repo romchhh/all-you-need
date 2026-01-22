@@ -52,6 +52,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
+  const [isSavingListing, setIsSavingListing] = useState(false);
   
   // Повідомляємо батьківський компонент про зміну стану модального вікна
   useEffect(() => {
@@ -1037,11 +1038,17 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       {editingListing && profile && (
         <EditListingModal
           isOpen={!!editingListing}
-          onClose={() => setEditingListing(null)}
+          onClose={() => {
+            if (!isSavingListing) {
+              setEditingListing(null);
+            }
+          }}
           listing={editingListing}
           onSave={async (listingData) => {
-            const formData = new FormData();
-            formData.append('title', listingData.title);
+            setIsSavingListing(true);
+            try {
+              const formData = new FormData();
+              formData.append('title', listingData.title);
             formData.append('description', listingData.description);
             formData.append('price', listingData.price);
             formData.append('currency', listingData.currency || 'UAH');
@@ -1183,6 +1190,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             setEditingListing(null);
             // Оновлюємо сторінку
             router.refresh();
+            } catch (error) {
+              console.error('[ProfileTab] Error saving listing:', error);
+              showToast(t('editListing.updateError') || 'Помилка оновлення оголошення', 'error');
+            } finally {
+              setIsSavingListing(false);
+            }
           }}
           onDelete={async () => {
             const response = await fetch(`/api/listings/${editingListing.id}/delete?telegramId=${profile.telegramId}`, {
