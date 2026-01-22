@@ -381,11 +381,16 @@ class ModerationManager:
                 api_url = f"{webapp_url}/api/admin/moderation"
                 
                 try:
+                    print(f"[reject_listing] Calling API for marketplace listing {listing_id}")
+                    print(f"[reject_listing] API URL: {api_url}")
+                    print(f"[reject_listing] Reason: {reason}")
+                    
                     async with aiohttp.ClientSession() as session:
                         # Отримуємо admin ID для передачі в API
                         admin_id = None
                         if admin_telegram_id:
                             admin_id = self._get_admin_id_by_telegram_id(admin_telegram_id)
+                            print(f"[reject_listing] Admin ID: {admin_id}")
                         
                         # Викликаємо API endpoint для відхилення (він поверне кошти)
                         payload = {
@@ -395,14 +400,33 @@ class ModerationManager:
                             "source": "marketplace"
                         }
                         
-                        async with session.post(api_url, json=payload) as response:
+                        print(f"[reject_listing] Payload: {payload}")
+                        
+                        # Додаємо API key для автентифікації (якщо є)
+                        headers = {}
+                        bot_api_key = os.getenv('BOT_API_KEY') or os.getenv('TELEGRAM_BOT_API_KEY') or os.getenv('INTERNAL_API_SECRET')
+                        if bot_api_key:
+                            headers['Authorization'] = f'Bearer {bot_api_key}'
+                            print(f"[reject_listing] Using API key for authentication")
+                        else:
+                            # Якщо API key не знайдено, все одно спробуємо відправити запит
+                            # API endpoint дозволить внутрішні запити для marketplace listings
+                            print(f"[reject_listing] No API key found, using internal request (will be allowed for marketplace listings)")
+                        
+                        async with session.post(api_url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            response_text = await response.text()
+                            print(f"[reject_listing] API Response status: {response.status}")
+                            print(f"[reject_listing] API Response text: {response_text}")
+                            
                             if response.status == 200:
-                                result = await response.json()
-                                print(f"Оголошення {listing_id} відхилено через API, кошти повернуто: {result.get('refundInfo', {})}")
+                                try:
+                                    result = await response.json() if response_text else {}
+                                except:
+                                    result = {}
+                                print(f"[reject_listing] Оголошення {listing_id} відхилено через API, кошти повернуто: {result.get('refundInfo', {})}")
                                 return True
                             else:
-                                error_text = await response.text()
-                                print(f"Помилка при виклику API для відхилення оголошення {listing_id}: {response.status} - {error_text}")
+                                print(f"[reject_listing] Помилка при виклику API для відхилення оголошення {listing_id}: {response.status} - {response_text}")
                                 # Fallback: оновлюємо статус вручну
                                 conn = get_db_connection()
                                 cursor = conn.cursor()

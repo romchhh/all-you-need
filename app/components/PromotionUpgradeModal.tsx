@@ -77,21 +77,27 @@ export default function PromotionUpgradeModal({
 
     // Блокуємо скролл body коли модальне вікно відкрите
     if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      const originalPosition = document.body.style.position;
+      // Зберігаємо поточну позицію скролу
       const scrollY = window.scrollY;
-      
+      // Блокуємо скрол на body та html
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
+      document.documentElement.style.overflow = 'hidden';
 
       return () => {
-        document.body.style.overflow = originalOverflow;
-        document.body.style.position = originalPosition;
+        // Відновлюємо скрол
+        const scrollY = document.body.style.top;
+        document.body.style.overflow = '';
+        document.body.style.position = '';
         document.body.style.top = '';
         document.body.style.width = '';
-        window.scrollTo(0, scrollY);
+        document.documentElement.style.overflow = '';
+        // Відновлюємо позицію скролу
+        if (scrollY) {
+          window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        }
       };
     }
   }, [isOpen, userId]);
@@ -167,7 +173,18 @@ export default function PromotionUpgradeModal({
   return (
     <div 
       className="fixed inset-0 bg-black/50 z-[99999] flex items-center justify-center p-4 pb-24 overflow-hidden"
-      style={{ position: 'fixed', paddingBottom: '100px' }}
+      style={{ 
+        position: 'fixed',
+        paddingBottom: '100px',
+        touchAction: 'none',
+        overscrollBehavior: 'none'
+      }}
+      onTouchMove={(e) => {
+        // Блокуємо скрол при дотику до модального вікна
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+        }
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -176,12 +193,6 @@ export default function PromotionUpgradeModal({
       onWheel={(e) => {
         // Блокуємо скролл фонового контенту
         e.stopPropagation();
-      }}
-      onTouchMove={(e) => {
-        // Блокуємо скролл на мобільних пристроях
-        if (e.target === e.currentTarget) {
-          e.preventDefault();
-        }
       }}
     >
       <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full overflow-y-auto flex flex-col relative z-[100000]" style={{ maxHeight: 'calc(100vh - 200px)' }}>
@@ -225,6 +236,7 @@ export default function PromotionUpgradeModal({
         {/* Content */}
         <div 
           className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-4"
+          data-scrollable
           onWheel={(e) => {
             // Дозволяємо скролл тільки всередині контенту
             e.stopPropagation();

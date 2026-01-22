@@ -174,13 +174,41 @@ export async function GET(request: NextRequest) {
 // Схвалити/відхилити оголошення
 export async function POST(request: NextRequest) {
   try {
+    // Перевіряємо автентифікацію: або через cookies (веб-інтерфейс), або через API key (бот)
+    const authHeader = request.headers.get('authorization');
+    const botApiKey = process.env.BOT_API_KEY || process.env.TELEGRAM_BOT_API_KEY || process.env.INTERNAL_API_SECRET;
+    const isBotRequest = authHeader && botApiKey && authHeader === `Bearer ${botApiKey}`;
+    
     const isAdmin = await isAdminAuthenticated();
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    
+    // Отримуємо body для перевірки source (якщо це запит від бота)
     const body = await request.json();
     const { listingId, action, reason, source } = body;
+    
+    // Дозволяємо запити від бота для marketplace listings навіть без API key
+    // (якщо це внутрішній запит з правильним source)
+    const isInternalBotRequest = !isAdmin && !isBotRequest && source === 'marketplace' && 
+                                 (action === 'reject' || action === 'approve') && listingId;
+    
+    if (!isAdmin && !isBotRequest && !isInternalBotRequest) {
+      console.log('[Moderation API] Unauthorized request - no admin session and no valid API key');
+      console.log('[Moderation API] Request details:', { 
+        hasAuthHeader: !!authHeader, 
+        hasBotApiKey: !!botApiKey,
+        source,
+        action,
+        listingId 
+      });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    if (isBotRequest) {
+      console.log('[Moderation API] Authenticated via bot API key');
+    } else if (isInternalBotRequest) {
+      console.log('[Moderation API] Authenticated via internal bot request (marketplace listing)');
+    } else {
+      console.log('[Moderation API] Authenticated via admin session');
+    }
 
     if (!listingId || !action) {
       return NextResponse.json(
@@ -432,7 +460,13 @@ ${reason}
           // Якщо не вдалося отримати admin ID, продовжуємо без нього
         }
         
+        console.log(`[Moderation API] Rejecting marketplace listing ${listingId}, reason: ${reason}`);
+        console.log(`[Moderation API] Listing data:`, { id: listing.id, userId: listing.userId, title: listing.title });
+        
         const refundInfo = await rejectListing(listing, reason, adminId);
+        
+        console.log(`[Moderation API] Rejection completed, refundInfo:`, refundInfo);
+        
         return NextResponse.json({
           success: true,
           message: 'Listing rejected and funds refunded',

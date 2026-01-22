@@ -43,13 +43,39 @@ export const PaymentSummaryModal = ({
   // Блокуємо скрол при відкритті модального вікна
   useEffect(() => {
     if (isOpen) {
+      // Зберігаємо поточну позицію скролу
+      const scrollY = window.scrollY;
+      // Блокуємо скрол на body та html
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.documentElement.style.overflow = 'hidden';
     } else {
+      // Відновлюємо скрол
+      const scrollY = document.body.style.top;
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      // Відновлюємо позицію скролу
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
     
     return () => {
+      // Очищення при розмонтуванні
+      const scrollY = document.body.style.top;
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     };
   }, [isOpen]);
 
@@ -80,8 +106,35 @@ export const PaymentSummaryModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[99999] flex items-center justify-center p-4 pb-24 overflow-hidden" style={{ position: 'fixed', paddingBottom: '100px' }}>
-      <div className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[calc(100vh-80px)] overflow-hidden flex flex-col relative z-[100000]">
+    <div 
+      className="fixed inset-0 bg-black/50 z-[99999] flex items-center justify-center p-4 pb-24 overflow-hidden" 
+      style={{ 
+        position: 'fixed', 
+        paddingBottom: '100px',
+        touchAction: 'none',
+        overscrollBehavior: 'none'
+      }}
+      onTouchMove={(e) => {
+        // Блокуємо скрол при дотику до модального вікна
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+        }
+      }}
+    >
+      <div 
+        className="bg-[#000000] rounded-2xl border-2 border-white max-w-md w-full max-h-[calc(100vh-80px)] overflow-hidden flex flex-col relative z-[100000]"
+        onTouchMove={(e) => {
+          // Дозволяємо скрол тільки всередині контенту модального вікна
+          const target = e.currentTarget;
+          const content = target.querySelector('[data-scrollable]') as HTMLElement;
+          if (content && content.contains(e.target as Node)) {
+            // Дозволяємо скрол всередині контенту
+            return;
+          }
+          // Блокуємо скрол поза контентом
+          e.stopPropagation();
+        }}
+      >
         {/* Header */}
         <div className="flex-shrink-0 bg-[#000000] border-b border-white/20 px-6 py-4 rounded-t-2xl">
           <div className="flex items-center justify-between">
