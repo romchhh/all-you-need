@@ -185,6 +185,38 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     };
   }, [isStatusFilterOpen, isCategoryFilterOpen]);
 
+  // Перевірка параметра payment=success після оплати карткою
+  useEffect(() => {
+    if (typeof window === 'undefined' || !profile?.telegramId) return;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    
+    if (paymentStatus === 'success') {
+      // Показуємо повідомлення про модерацію
+      setTimeout(() => {
+        showToast(
+          t('payments.paymentSuccessModeration') || 'Оплата успішна! Оголошення відправлено на модерацію.',
+          'success'
+        );
+        tg?.HapticFeedback.notificationOccurred('success');
+      }, 500);
+      
+      // Видаляємо параметр з URL
+      urlParams.delete('payment');
+      const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+      window.history.replaceState({}, '', newUrl);
+      
+      // Оновлюємо список оголошень
+      setTimeout(() => {
+        if (profile?.telegramId) {
+          fetchListingsWithFilters(0, true);
+        }
+      }, 1000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.telegramId]);
+
   // Завантаження балансу користувача
   const fetchUserBalance = async () => {
     if (!profile?.telegramId) return;

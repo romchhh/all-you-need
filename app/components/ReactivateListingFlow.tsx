@@ -244,9 +244,18 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
       setLoading(true);
       console.log('[ReactivateListingFlow] Reactivating listing with promotion:', promotionType, 'payment method:', paymentMethod);
       
+      // Показуємо індикатор завантаження одразу
+      tg?.HapticFeedback.impactOccurred('light');
+      
       // Спочатку оплачуємо пакет (якщо потрібен)
       if (selectedPackageType) {
         console.log('[ReactivateListingFlow] Purchasing package:', selectedPackageType, 'method:', paymentMethod);
+        
+        // Показуємо індикатор завантаження при списанні коштів
+        if (paymentMethod === 'balance') {
+          showToast(t('payments.processing') || 'Обробка платежу...', 'info');
+        }
+        
         const packageRes = await fetch('/api/listings/packages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -271,6 +280,11 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
           window.location.href = packageData.pageUrl;
           return;
         }
+      }
+
+      // Показуємо індикатор завантаження при списанні коштів за реактивацію
+      if (paymentMethod === 'balance') {
+        showToast(t('payments.processing') || 'Списання коштів з балансу...', 'info');
       }
 
       // Реактивуємо оголошення
@@ -311,6 +325,12 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
       // Якщо обрано промо, застосовуємо його
       if (promotionType) {
         console.log('[ReactivateListingFlow] Applying promotion:', promotionType, 'with method:', paymentMethod);
+        
+        // Показуємо індикатор завантаження при списанні коштів за рекламу
+        if (paymentMethod === 'balance') {
+          showToast(t('payments.processing') || 'Списання коштів за рекламу...', 'info');
+        }
+        
         const needsPayment = await applyPromotion(promotionType, telegramId, paymentMethod);
         
         // Якщо потрібна оплата, зупиняємо флоу і чекаємо на оплату
@@ -445,6 +465,23 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
 
   return (
     <>
+      {/* Loading overlay */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[99999] flex items-center justify-center">
+          <div className="bg-[#000000] rounded-2xl border-2 border-white p-6 max-w-sm w-full mx-4">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-[#D3F1A7] border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-white text-center font-medium">
+                {t('payments.processing') || 'Обробка платежу...'}
+              </p>
+              <p className="text-white/70 text-sm text-center">
+                {t('payments.pleaseWait') || 'Будь ласка, зачекайте'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {step === 'buy_package' && (
         <ListingPackageModal
           isOpen={true}

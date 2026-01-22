@@ -233,7 +233,7 @@ export const EditProfileModal = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4"
       onTouchStart={(e) => e.stopPropagation()}
       onTouchMove={(e) => {
         // Запобігаємо свайпу вниз для закриття додатку
@@ -242,7 +242,7 @@ export const EditProfileModal = ({
       onTouchEnd={(e) => e.stopPropagation()}
       style={{ touchAction: 'none' }}
     >
-      <div className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl">
+      <div className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl relative z-[100000]">
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white">{t('profile.editProfile')}</h2>

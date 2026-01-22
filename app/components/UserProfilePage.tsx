@@ -292,29 +292,29 @@ export const UserProfilePage = ({
         </div>
 
         {/* Блоки зі статистикою */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {/* Блок 1: Оголошень */}
-          <div className="rounded-2xl p-4 border border-white text-center">
-            <div className="text-2xl font-bold text-white mb-1">
+          <div className="rounded-2xl p-3 sm:p-4 border border-white text-center">
+            <div className="text-xl sm:text-2xl font-bold text-white mb-1">
               {stats ? (currentUser?.id && parseInt(currentUser.id.toString()) === parseInt(sellerTelegramId) ? stats.totalListings : stats.activeListings) : 0}
             </div>
-            <div className="text-sm text-white/70">{t('profile.listings')}</div>
+            <div className="text-xs sm:text-sm text-white/70 leading-tight">{t('profile.listings')}</div>
           </div>
 
           {/* Блок 2: Продано */}
-          <div className="rounded-2xl p-4 border border-white text-center">
-            <div className="text-2xl font-bold text-white mb-1">
+          <div className="rounded-2xl p-3 sm:p-4 border border-white text-center">
+            <div className="text-xl sm:text-2xl font-bold text-white mb-1">
               {stats?.soldListings || 0}
             </div>
-            <div className="text-sm text-white/70">{t('profile.sold')}</div>
+            <div className="text-xs sm:text-sm text-white/70 leading-tight">{t('profile.sold')}</div>
           </div>
 
           {/* Блок 3: На сервісі */}
-          <div className="rounded-2xl p-4 border border-white text-center">
-            <div className="text-2xl font-bold text-white mb-1">
+          <div className="rounded-2xl p-3 sm:p-4 border border-white text-center">
+            <div className="text-xl sm:text-2xl font-bold text-white mb-1">
               {getServiceTime || '0 ' + t('profile.days')}
             </div>
-            <div className="text-sm text-white/70">{t('profile.onService')}</div>
+            <div className="text-xs sm:text-sm text-white/70 leading-tight">{t('profile.onService')}</div>
           </div>
         </div>
       </div>
