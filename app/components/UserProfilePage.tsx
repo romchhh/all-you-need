@@ -209,7 +209,7 @@ export const UserProfilePage = ({
     <div className="pb-24 min-h-screen">
       {/* Хедер з заголовком */}
       <div className="px-4 pt-4 pb-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           {/* Кнопка назад */}
           <button
             onClick={() => {
@@ -225,10 +225,8 @@ export const UserProfilePage = ({
             <ArrowLeft size={20} />
           </button>
 
-          {/* Заголовок по центру */}
-          <h1 className="text-lg font-bold text-white absolute left-1/2 transform -translate-x-1/2">
-            {t('profile.sellerProfile')}
-          </h1>
+          {/* Текст "Профіль продавця" */}
+          <h2 className="text-lg font-semibold text-white">{t('profile.sellerProfile')}</h2>
 
           {/* Кнопка поділу */}
           <button
