@@ -323,7 +323,7 @@ async def handle_contact(message: types.Message):
         print(f"Phone {phone} saved for user {user_id}")
         
         await message.answer(
-            f"{t(user_id, 'phone.saved')}\n\n{t(user_id, 'welcome.greeting')}",
+            f"{t(user_id, 'phone.saved')}\n\n{t(user_id, 'phone.instructions')}",
             reply_markup=get_main_menu_keyboard(user_id),
             parse_mode="HTML"
         )
