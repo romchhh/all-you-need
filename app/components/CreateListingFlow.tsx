@@ -469,6 +469,16 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         tg?.HapticFeedback.notificationOccurred('success');
         showToast(t('payments.paymentInfo'), 'info');
         
+        // Закриваємо мінідодаток перед редиректом на оплату
+        try {
+          if (tg?.close) {
+            console.log('[CreateListingFlow] Closing WebApp before redirect');
+            tg.close();
+          }
+        } catch (e) {
+          console.error('[CreateListingFlow] Error closing WebApp:', e);
+        }
+        
         // Перенаправляємо на сторінку оплати
         // Використовуємо Telegram WebApp API якщо доступно, інакше window.location.href
         if (tg?.openLink) {
@@ -558,6 +568,16 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
           // Використовуємо той самий метод, що й TopUpBalanceModal
           tg?.HapticFeedback.notificationOccurred('success');
           showToast(t('payments.paymentInfo'), 'info');
+          
+          // Закриваємо мінідодаток перед редиректом на оплату
+          try {
+            if (tg?.close) {
+              console.log('[CreateListingFlow] Closing WebApp before redirect');
+              tg.close();
+            }
+          } catch (e) {
+            console.error('[CreateListingFlow] Error closing WebApp:', e);
+          }
           
           // Перенаправляємо на сторінку оплати
           // Використовуємо Telegram WebApp API якщо доступно, інакше window.location.href

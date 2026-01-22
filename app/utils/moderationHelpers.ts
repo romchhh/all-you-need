@@ -86,13 +86,14 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
     const promoEndsAtStr = toSQLiteDate(promoEndsAt);
     
     // Активуємо промо
+    const nowISO = new Date().toISOString();
     await prisma.$executeRawUnsafe(
       `UPDATE PromotionPurchase 
        SET status = 'active',
            startsAt = ?,
            endsAt = ?
        WHERE id = ?`,
-      nowStr,
+      nowISO,
       promoEndsAtStr,
       promo.id
     );

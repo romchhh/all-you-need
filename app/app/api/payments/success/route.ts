@@ -8,31 +8,39 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const telegramId = searchParams.get('telegramId');
   
-  // Редиректимо на профіль користувача
-  const lang = 'uk'; // Можна додати визначення мови
-  const WEBAPP_URL = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const redirectUrl = telegramId 
-    ? `${WEBAPP_URL}/${lang}/profile?telegramId=${telegramId}&payment=success`
-    : `${WEBAPP_URL}/${lang}/profile?payment=success`;
+  // Отримуємо посилання на бота
+  const botUrl = process.env.NEXT_PUBLIC_BOT_URL 
+    ? process.env.NEXT_PUBLIC_BOT_URL.replace(/\/$/, '')
+    : process.env.NEXT_PUBLIC_BOT_USERNAME 
+      ? `https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME}` 
+      : 'https://t.me/your_bot';
   
-  // Повертаємо HTML сторінку з JavaScript редиректом для Telegram Mini App
+  // Повертаємо HTML сторінку з JavaScript редиректом в бот
   return new NextResponse(
     `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Redirecting...</title>
+  <title>Оплата успішна</title>
   <script>
     if (window.Telegram && window.Telegram.WebApp) {
       window.Telegram.WebApp.ready();
-      window.location.href = '${redirectUrl}';
+      // Закриваємо мінідодаток і повертаємося в бот
+      try {
+        window.Telegram.WebApp.close();
+      } catch (e) {
+        console.error('Error closing WebApp:', e);
+        // Якщо не вдалося закрити, відкриваємо посилання на бота
+        window.location.href = '${botUrl}';
+      }
     } else {
-      window.location.href = '${redirectUrl}';
+      // Якщо не в Telegram, просто відкриваємо бот
+      window.location.href = '${botUrl}';
     }
   </script>
 </head>
 <body>
-  <p>Redirecting...</p>
+  <p>Оплата успішна! Повертаємося в бот...</p>
 </body>
 </html>`,
     {

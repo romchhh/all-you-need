@@ -17,6 +17,7 @@ interface TelegramInitData {
 export interface TelegramWebApp {
   ready(): void;
   expand(): void;
+  close(): void;
   enableClosingConfirmation?(): void;
   disableClosingConfirmation?(): void;
   showAlert(message: string): void;

@@ -56,49 +56,8 @@ export async function POST(request: NextRequest) {
       invoiceId
     );
 
-    // Якщо платіж успішний (status === 'success'), поповнюємо баланс
-    if (status === 'success' && payment.status !== 'success') {
-      // Використовуємо суму в EUR (збережену в amountEur)
-      const amountInEur = payment.amountEur;
-
-      // Оновлюємо баланс користувача (атомарно)
-      await prisma.$executeRawUnsafe(
-        `UPDATE User 
-         SET balance = balance + ?, updatedAt = ?
-         WHERE id = ?`,
-        amountInEur,
-        updateTime,
-        payment.userId
-      );
-
-      // Створюємо транзакцію
-      const { executeWithRetry } = await import('@/lib/prisma');
-      await executeWithRetry(() =>
-        prisma.$executeRawUnsafe(
-          `INSERT INTO "Transaction" (userId, type, amount, currency, paymentMethod, status, description, metadata, createdAt, completedAt)
-          VALUES (?, 'payment', ?, 'EUR', 'monobank', 'completed', ?, ?, ?, ?)`,
-          payment.userId,
-          amountInEur,
-          `Поповнення балансу через Monobank (${invoiceId})`,
-          JSON.stringify({ invoiceId, webhookData }),
-          updateTime,
-          updateTime
-        )
-      );
-
-      // Оновлюємо completedAt для платежу
-      await prisma.$executeRawUnsafe(
-        `UPDATE Payment SET completedAt = ? WHERE invoiceId = ?`,
-        updateTime,
-        invoiceId
-      );
-
-      console.log(`Balance updated for user ${payment.userId}: +${amountInEur} EUR`);
-    } else {
-      console.log(`Payment status updated to: ${status} for invoiceId: ${invoiceId}`);
-    }
-
-    // Перевіряємо чи це оплата промо або пакету
+    // Перевіряємо чи це оплата промо або пакету ПЕРЕД поповненням балансу
+    let isPromotionOrPackagePayment = false;
     if (status === 'success') {
       // Перевіряємо PromotionPurchase
       const promotions = await prisma.$queryRawUnsafe(
@@ -107,6 +66,7 @@ export async function POST(request: NextRequest) {
       ) as Array<{ id: number; listingId: number; promotionType: string }>;
 
       if (promotions.length > 0) {
+        isPromotionOrPackagePayment = true;
         console.log(`Processing promotion payment for invoiceId: ${invoiceId}`);
         const promotion = promotions[0];
         
@@ -178,6 +138,7 @@ export async function POST(request: NextRequest) {
       ) as Array<{ id: number; listingsCount: number }>;
 
       if (packages.length > 0) {
+        isPromotionOrPackagePayment = true;
         console.log(`Processing package payment for invoiceId: ${invoiceId}`);
         const pkg = packages[0];
         
@@ -198,6 +159,56 @@ export async function POST(request: NextRequest) {
 
         console.log(`Package added to user ${payment.userId}: +${pkg.listingsCount} listings`);
       }
+    }
+
+    // Якщо платіж успішний (status === 'success') і це НЕ оплата реклами/пакету, поповнюємо баланс
+    if (status === 'success' && payment.status !== 'success' && !isPromotionOrPackagePayment) {
+      // Використовуємо суму в EUR (збережену в amountEur)
+      const amountInEur = payment.amountEur;
+
+      // Оновлюємо баланс користувача (атомарно)
+      await prisma.$executeRawUnsafe(
+        `UPDATE User 
+         SET balance = balance + ?, updatedAt = ?
+         WHERE id = ?`,
+        amountInEur,
+        updateTime,
+        payment.userId
+      );
+
+      // Створюємо транзакцію
+      const { executeWithRetry } = await import('@/lib/prisma');
+      await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `INSERT INTO "Transaction" (userId, type, amount, currency, paymentMethod, status, description, metadata, createdAt, completedAt)
+          VALUES (?, 'payment', ?, 'EUR', 'monobank', 'completed', ?, ?, ?, ?)`,
+          payment.userId,
+          amountInEur,
+          `Поповнення балансу через Monobank (${invoiceId})`,
+          JSON.stringify({ invoiceId, webhookData }),
+          updateTime,
+          updateTime
+        )
+      );
+
+      // Оновлюємо completedAt для платежу
+      await prisma.$executeRawUnsafe(
+        `UPDATE Payment SET completedAt = ? WHERE invoiceId = ?`,
+        updateTime,
+        invoiceId
+      );
+
+      console.log(`Balance updated for user ${payment.userId}: +${amountInEur} EUR`);
+    } else if (status === 'success' && payment.status !== 'success' && isPromotionOrPackagePayment) {
+      // Оновлюємо completedAt для платежу навіть якщо це оплата реклами/пакету
+      await prisma.$executeRawUnsafe(
+        `UPDATE Payment SET completedAt = ? WHERE invoiceId = ?`,
+        updateTime,
+        invoiceId
+      );
+      console.log(`Payment completed for promotion/package (no balance update): ${invoiceId}`);
+    } else {
+      console.log(`Payment status updated to: ${status} for invoiceId: ${invoiceId}`);
     }
 
     return NextResponse.json({ success: true });

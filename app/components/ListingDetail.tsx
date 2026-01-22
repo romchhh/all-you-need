@@ -283,6 +283,15 @@ export const ListingDetail = ({
         tg?.HapticFeedback.notificationOccurred('success');
         showToast(t('payments.paymentInfo'), 'info');
         
+        // Закриваємо мінідодаток перед редиректом на оплату
+        try {
+          if (tg?.close) {
+            tg.close();
+          }
+        } catch (e) {
+          console.error('[ListingDetail] Error closing WebApp:', e);
+        }
+        
         // Перенаправляємо на сторінку оплати
         if (tg?.openLink) {
           tg.openLink(data.pageUrl);
