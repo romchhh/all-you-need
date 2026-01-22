@@ -997,12 +997,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         onClose={() => setIsEditModalOpen(false)}
         currentFirstName={profile.firstName}
         currentLastName={profile.lastName}
+        currentPhone={profile.phone}
         currentAvatar={profile.avatar}
-        onSave={async (firstName, lastName, avatarFile) => {
+        onSave={async (firstName, lastName, phone, avatarFile) => {
           const formData = new FormData();
           formData.append('telegramId', profile.telegramId);
           formData.append('firstName', firstName);
           formData.append('lastName', lastName);
+          formData.append('phone', phone || '');
           if (avatarFile) {
             formData.append('avatar', avatarFile);
           }

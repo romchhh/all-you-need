@@ -11,8 +11,9 @@ interface EditProfileModalProps {
   onClose: () => void;
   currentFirstName: string | null;
   currentLastName: string | null;
+  currentPhone: string | null;
   currentAvatar: string | null;
-  onSave: (firstName: string, lastName: string, avatar: File | null) => void;
+  onSave: (firstName: string, lastName: string, phone: string, avatar: File | null) => void;
   tg: TelegramWebApp | null;
 }
 
@@ -21,27 +22,91 @@ export const EditProfileModal = ({
   onClose,
   currentFirstName,
   currentLastName,
+  currentPhone,
   currentAvatar,
   onSave,
   tg
 }: EditProfileModalProps) => {
   const [firstName, setFirstName] = useState(currentFirstName || '');
   const [lastName, setLastName] = useState(currentLastName || '');
+  const [phone, setPhone] = useState(currentPhone || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(currentAvatar);
   const [loading, setLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState<string>('');
   const { toast, showToast, hideToast } = useToast();
   const { t } = useLanguage();
+
+  // Валідація номера телефону
+  const validatePhone = (phoneNumber: string): boolean => {
+    if (!phoneNumber.trim()) {
+      setPhoneError('');
+      return true; // Телефон не обов'язковий
+    }
+    
+    // Видаляємо всі символи крім цифр та +
+    const cleaned = phoneNumber.replace(/[^\d+]/g, '');
+    
+    // Перевіряємо формат: +380XXXXXXXXX або 380XXXXXXXXX або 0XXXXXXXXX
+    const ukrainianPattern = /^(\+?380|0)?[0-9]{9}$/;
+    const internationalPattern = /^\+[1-9]\d{1,14}$/;
+    
+    if (cleaned.startsWith('+380') || cleaned.startsWith('380') || cleaned.startsWith('0')) {
+      // Український формат
+      const digitsOnly = cleaned.replace(/^\+?380|^0/, '');
+      if (digitsOnly.length === 9 && /^[0-9]{9}$/.test(digitsOnly)) {
+        setPhoneError('');
+        return true;
+      }
+      setPhoneError(t('profile.phoneInvalid') || 'Невірний формат телефону. Використовуйте формат: +380XXXXXXXXX');
+      return false;
+    } else if (cleaned.startsWith('+')) {
+      // Міжнародний формат
+      if (internationalPattern.test(cleaned)) {
+        setPhoneError('');
+        return true;
+      }
+      setPhoneError(t('profile.phoneInvalid') || 'Невірний формат телефону');
+      return false;
+    }
+    
+    setPhoneError(t('profile.phoneInvalid') || 'Невірний формат телефону. Використовуйте формат: +380XXXXXXXXX');
+    return false;
+  };
+
+  // Обробка зміни номера телефону з автоматичним форматуванням
+  const handlePhoneChange = (value: string) => {
+    // Видаляємо всі символи крім цифр та +
+    let cleaned = value.replace(/[^\d+]/g, '');
+    
+    // Якщо починається з 380, додаємо +
+    if (cleaned.startsWith('380') && !cleaned.startsWith('+380')) {
+      cleaned = '+' + cleaned;
+    }
+    // Якщо починається з 0, замінюємо на +380
+    if (cleaned.startsWith('0') && cleaned.length > 1) {
+      cleaned = '+380' + cleaned.substring(1);
+    }
+    // Якщо починається з цифри (не 0), додаємо +380
+    if (/^[1-9]/.test(cleaned) && !cleaned.startsWith('+')) {
+      cleaned = '+380' + cleaned;
+    }
+    
+    setPhone(cleaned);
+    validatePhone(cleaned);
+  };
 
   // Оновлюємо локальний стан при зміні props
   useEffect(() => {
     if (isOpen) {
       setFirstName(currentFirstName || '');
       setLastName(currentLastName || '');
+      setPhone(currentPhone || '');
       setAvatarPreview(currentAvatar);
       setAvatarFile(null);
+      setPhoneError('');
     }
-  }, [isOpen, currentFirstName, currentLastName, currentAvatar]);
+  }, [isOpen, currentFirstName, currentLastName, currentPhone, currentAvatar]);
 
   // Блокуємо скрол body та html при відкритому модальному вікні та запобігаємо свайпу вниз
   useEffect(() => {
@@ -142,9 +207,15 @@ export const EditProfileModal = ({
   };
 
   const handleSave = async () => {
+    // Валідація перед збереженням
+    if (!validatePhone(phone)) {
+      tg?.HapticFeedback.notificationOccurred('error');
+      return;
+    }
+    
     setLoading(true);
     try {
-      await onSave(firstName, lastName, avatarFile);
+      await onSave(firstName, lastName, phone.trim(), avatarFile);
       tg?.HapticFeedback.notificationOccurred('success');
       onClose();
     } catch (error) {
@@ -238,7 +309,7 @@ export const EditProfileModal = ({
         </div>
 
         {/* Прізвище */}
-        <div className="mb-6">
+        <div className="mb-4">
           <label className="block text-sm font-medium text-white mb-2">
             {t('profile.lastName')}
           </label>
@@ -249,6 +320,30 @@ export const EditProfileModal = ({
             placeholder={t('profile.lastNamePlaceholder')}
             className="w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]"
           />
+        </div>
+
+        {/* Телефон */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-white mb-2">
+            {t('profile.phone') || 'Номер телефону'}
+          </label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => handlePhoneChange(e.target.value)}
+            placeholder={t('profile.phonePlaceholder') || '+380XXXXXXXXX'}
+            className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border ${
+              phoneError 
+                ? 'border-red-500 focus:ring-2 focus:ring-red-500/50' 
+                : 'border-white/20 focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]'
+            } text-white placeholder:text-white/50 focus:outline-none`}
+          />
+          {phoneError && (
+            <p className="mt-1 text-sm text-red-500">{phoneError}</p>
+          )}
+          <p className="mt-1 text-xs text-white/50">
+            {t('profile.phoneHint') || 'Формат: +380XXXXXXXXX (не обов\'язково)'}
+          </p>
         </div>
 
         {/* Кнопки */}

@@ -186,15 +186,33 @@ export const UserProfilePage = ({
 
   const displayUsername = (userData?.username || sellerUsername) ? `@${userData?.username || sellerUsername}` : '';
 
+  // Розраховуємо час на сервісі
+  const getServiceTime = useMemo(() => {
+    if (!stats?.createdAt) return null;
+    const createdDate = new Date(stats.createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffMonths = Math.floor(diffDays / 30);
+    const diffYears = Math.floor(diffDays / 365);
+    
+    if (diffYears > 0) {
+      return `${diffYears} ${diffYears === 1 ? t('profile.year') : diffYears < 5 ? t('profile.years') : t('profile.yearsMany')}`;
+    } else if (diffMonths > 0) {
+      return `${diffMonths} ${diffMonths === 1 ? t('profile.month') : diffMonths < 5 ? t('profile.months') : t('profile.monthsMany')}`;
+    } else {
+      return `${diffDays} ${diffDays === 1 ? t('profile.day') : diffDays < 5 ? t('profile.days') : t('profile.daysMany')}`;
+    }
+  }, [stats?.createdAt, t]);
+
   return (
     <div className="pb-24 min-h-screen">
-      {/* Профіль хедер */}
-      <div className="px-4 pt-4 pb-4">
-        {/* Кнопка назад */}
-        <div className="mb-4">
+      {/* Хедер з заголовком */}
+      <div className="px-4 pt-4 pb-6">
+        <div className="flex items-center justify-between mb-6">
+          {/* Кнопка назад */}
           <button
             onClick={() => {
-              // Якщо є функція повернення до попередньої картки товару, використовуємо її
               if (onBackToPreviousListing) {
                 onBackToPreviousListing();
               } else {
@@ -206,12 +224,28 @@ export const UserProfilePage = ({
           >
             <ArrowLeft size={20} />
           </button>
+
+          {/* Заголовок по центру */}
+          <h1 className="text-lg font-bold text-white absolute left-1/2 transform -translate-x-1/2">
+            {t('profile.sellerProfile')}
+          </h1>
+
+          {/* Кнопка поділу */}
+          <button
+            onClick={() => {
+              setShowShareModal(true);
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+          >
+            <Share2 size={18} />
+          </button>
         </div>
 
-        <div className="flex items-start gap-4">
-          {/* Фото профілю */}
+        {/* Фото профілю по центру */}
+        <div className="flex justify-center mb-4">
           <div 
-            className="w-20 h-20 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 border-white"
+            className="w-24 h-24 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 border-white"
             {...avatarLongPress}
           >
             {sellerAvatar && (sellerAvatar.startsWith('/') || sellerAvatar.startsWith('http')) ? (
@@ -240,115 +274,54 @@ export const UserProfilePage = ({
                     }
                   }}
                 />
-                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gray-800 text-white text-2xl font-bold relative z-10`}>
+                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center ${getAvatarColor(sellerName)} text-white text-2xl font-bold relative z-10`}>
                   {sellerName.charAt(0).toUpperCase()}
                 </div>
               </>
             ) : (
-              <div className={`w-full h-full flex items-center justify-center bg-gray-800 text-white text-2xl font-bold`}>
+              <div className={`w-full h-full flex items-center justify-center ${getAvatarColor(sellerName)} text-white text-2xl font-bold`}>
                 {sellerName.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
-          
-          {/* Інформація */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-2xl font-bold text-white mb-1 truncate">{sellerName}</h2>
-                {displayUsername && (
-                  <p className="text-lg text-white/70 truncate">{displayUsername}</p>
-                )}
-              </div>
-              
-              {/* Кнопка поділу */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={() => {
-                    setShowShareModal(true);
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
-                >
-                  <Share2 size={18} />
-                </button>
-              </div>
+        </div>
+
+        {/* Ім'я продавця */}
+        <div className="text-center mb-6">
+          <h2 className="text-xl font-bold text-white">{sellerName}</h2>
+        </div>
+
+        {/* Блоки зі статистикою */}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Блок 1: Оголошень */}
+          <div className="rounded-2xl p-4 border border-white text-center">
+            <div className="text-2xl font-bold text-white mb-1">
+              {stats ? (currentUser?.id && parseInt(currentUser.id.toString()) === parseInt(sellerTelegramId) ? stats.totalListings : stats.activeListings) : 0}
             </div>
-            
-            {/* Статистика */}
-            <div className="space-y-1.5 mt-3">
-              {stats && (
-                <>
-                  {/* Для чужого профілю показуємо тільки активні та продані */}
-                  {(() => {
-                    const isOwnProfile = currentUser?.id && parseInt(currentUser.id.toString()) === parseInt(sellerTelegramId);
-                    if (isOwnProfile) {
-                      // Власний профіль - показуємо всю статистику
-                      return (
-                        <>
-                          <div className="flex items-center gap-2 text-base text-white/70">
-                            <Package size={18} className="text-white/70 flex-shrink-0" />
-                            <span>{stats.totalListings} {t('profile.listings')}</span>
-                          </div>
-                          {stats.soldListings > 0 && (
-                            <div className="flex items-center gap-2 text-base text-white/70">
-                              <Megaphone size={18} className="text-white/70 flex-shrink-0" />
-                              <span>{stats.soldListings} {t('profile.sold')}</span>
-                            </div>
-                          )}
-                          {stats.activeListings > 0 && (
-                            <div className="flex items-center gap-2 text-base text-white/70">
-                              <Megaphone size={18} className="text-white/70 flex-shrink-0" />
-                              <span>{stats.activeListings} {t('sales.active')}</span>
-                            </div>
-                          )}
-                        </>
-                      );
-                    } else {
-                      // Чужій профіль - показуємо тільки активні та продані
-                      return (
-                        <>
-                          <div className="flex items-center gap-2 text-base text-white/70">
-                            <Package size={18} className="text-white/70 flex-shrink-0" />
-                            <span>{stats.activeListings} {t('userProfile.activeListings')}</span>
-                          </div>
-                          {stats.soldListings > 0 && (
-                            <div className="flex items-center gap-2 text-base text-white/70">
-                              <Megaphone size={18} className="text-white/70 flex-shrink-0" />
-                              <span>{stats.soldListings} {t('userProfile.soldListings')}</span>
-                            </div>
-                          )}
-                        </>
-                      );
-                    }
-                  })()}
-                  {stats.createdAt && (
-                    <div className="flex items-center gap-2 text-base text-white/70">
-                      <span>
-                        {(() => {
-                          const createdDate = new Date(stats.createdAt);
-                          const now = new Date();
-                          const diffTime = Math.abs(now.getTime() - createdDate.getTime());
-                          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                          const diffMonths = Math.floor(diffDays / 30);
-                          const diffYears = Math.floor(diffDays / 365);
-                          
-                          if (diffYears > 0) {
-                            return `${diffYears} ${diffYears === 1 ? t('profile.year') : diffYears < 5 ? t('profile.years') : t('profile.yearsMany')} ${t('profile.onService')}`;
-                          } else if (diffMonths > 0) {
-                            return `${diffMonths} ${diffMonths === 1 ? t('profile.month') : diffMonths < 5 ? t('profile.months') : t('profile.monthsMany')} ${t('profile.onService')}`;
-                          } else {
-                            return `${diffDays} ${diffDays === 1 ? t('profile.day') : diffDays < 5 ? t('profile.days') : t('profile.daysMany')} ${t('profile.onService')}`;
-                          }
-                        })()}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
+            <div className="text-sm text-white/70">{t('profile.listings')}</div>
+          </div>
+
+          {/* Блок 2: Продано */}
+          <div className="rounded-2xl p-4 border border-white text-center">
+            <div className="text-2xl font-bold text-white mb-1">
+              {stats?.soldListings || 0}
             </div>
+            <div className="text-sm text-white/70">{t('profile.sold')}</div>
+          </div>
+
+          {/* Блок 3: На сервісі */}
+          <div className="rounded-2xl p-4 border border-white text-center">
+            <div className="text-2xl font-bold text-white mb-1">
+              {getServiceTime || '0 ' + t('profile.days')}
+            </div>
+            <div className="text-sm text-white/70">{t('profile.onService')}</div>
           </div>
         </div>
+      </div>
+
+      {/* Розділювач */}
+      <div className="px-4 pb-4">
+        <div className="border-t border-white/20"></div>
       </div>
 
       {/* Кнопка дії */}

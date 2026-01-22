@@ -10,6 +10,7 @@ async function handleRequest(request: NextRequest) {
     const telegramId = formData.get('telegramId') as string;
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
+    const phone = formData.get('phone') as string | null;
     const avatarFile = formData.get('avatar') as File | null;
 
     if (!telegramId) {
@@ -55,10 +56,37 @@ async function handleRequest(request: NextRequest) {
       avatarPath = `/avatars/${filename}`;
     }
 
+    // Валідація та нормалізація номера телефону
+    let normalizedPhone: string | null = null;
+    if (phone && phone.trim()) {
+      // Видаляємо всі символи крім цифр та +
+      let cleaned = phone.trim().replace(/[^\d+]/g, '');
+      
+      // Нормалізуємо до формату +380XXXXXXXXX
+      if (cleaned.startsWith('+380')) {
+        normalizedPhone = cleaned;
+      } else if (cleaned.startsWith('380')) {
+        normalizedPhone = '+' + cleaned;
+      } else if (cleaned.startsWith('0') && cleaned.length === 10) {
+        normalizedPhone = '+380' + cleaned.substring(1);
+      } else if (cleaned.length === 9 && /^[0-9]{9}$/.test(cleaned)) {
+        normalizedPhone = '+380' + cleaned;
+      } else if (cleaned.startsWith('+')) {
+        // Міжнародний формат
+        normalizedPhone = cleaned;
+      } else {
+        return NextResponse.json(
+          { error: 'Invalid phone number format' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Оновлюємо профіль
     const updateData: any = {
       firstName: firstName || null,
       lastName: lastName || null,
+      phone: normalizedPhone,
     };
 
     if (avatarPath) {
@@ -68,24 +96,37 @@ async function handleRequest(request: NextRequest) {
     const updateTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
     
     if (avatarPath) {
-      await prisma.$executeRaw`
-        UPDATE User 
-        SET 
-          firstName = ${updateData.firstName},
-          lastName = ${updateData.lastName},
-          avatar = ${avatarPath},
-          updatedAt = ${updateTime}
-        WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-      `;
+      await prisma.$executeRawUnsafe(
+        `UPDATE User 
+         SET 
+           firstName = ?,
+           lastName = ?,
+           phone = ?,
+           avatar = ?,
+           updatedAt = ?
+         WHERE CAST(telegramId AS INTEGER) = ?`,
+        updateData.firstName,
+        updateData.lastName,
+        updateData.phone,
+        avatarPath,
+        updateTime,
+        telegramIdNum
+      );
     } else {
-      await prisma.$executeRaw`
-        UPDATE User 
-        SET 
-          firstName = ${updateData.firstName},
-          lastName = ${updateData.lastName},
-          updatedAt = ${updateTime}
-        WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-      `;
+      await prisma.$executeRawUnsafe(
+        `UPDATE User 
+         SET 
+           firstName = ?,
+           lastName = ?,
+           phone = ?,
+           updatedAt = ?
+         WHERE CAST(telegramId AS INTEGER) = ?`,
+        updateData.firstName,
+        updateData.lastName,
+        updateData.phone,
+        updateTime,
+        telegramIdNum
+      );
     }
 
     // Отримуємо оновлені дані
@@ -96,6 +137,7 @@ async function handleRequest(request: NextRequest) {
         username,
         firstName,
         lastName,
+        phone,
         avatar,
         balance,
         rating,
@@ -110,6 +152,7 @@ async function handleRequest(request: NextRequest) {
       username: string | null;
       firstName: string | null;
       lastName: string | null;
+      phone: string | null;
       avatar: string | null;
       balance: number;
       rating: number;
@@ -125,6 +168,7 @@ async function handleRequest(request: NextRequest) {
       username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,
+      phone: user.phone,
       avatar: user.avatar,
       balance: user.balance,
       rating: user.rating,
