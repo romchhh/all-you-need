@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:init": "tsx scripts/init-db.ts"
+    "db:init": "tsx scripts/init-db.ts",
+    "db:apply-migration": "tsx scripts/apply-migration.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",

@@ -194,6 +194,8 @@ export async function executeWithRetry<T>(
 // Кешуємо результат перевірки колонки currency
 let currencyColumnChecked = globalForPrisma.currencyColumnChecked ?? false;
 let currencyColumnExists = globalForPrisma.currencyColumnExists ?? false;
+let optimizedImagesColumnChecked = false;
+let optimizedImagesColumnExists = false;
 let viewHistoryTableChecked = false;
 
 export async function ensureCurrencyColumn(): Promise<boolean> {
@@ -246,6 +248,54 @@ export async function ensureCurrencyColumn(): Promise<boolean> {
     // Якщо не вдалося перевірити - припускаємо, що колонки немає
     currencyColumnChecked = true;
     globalForPrisma.currencyColumnChecked = true;
+    return false;
+  }
+}
+
+// Кешуємо результат перевірки колонки optimizedImages
+export async function ensureOptimizedImagesColumn(): Promise<boolean> {
+  // Якщо вже перевіряли - повертаємо кешований результат
+  if (optimizedImagesColumnChecked) {
+    return optimizedImagesColumnExists;
+  }
+
+  try {
+    // Перевіряємо, чи існує колонка optimizedImages
+    const tableInfo = await prisma.$queryRawUnsafe(`
+      PRAGMA table_info(Listing)
+    `) as Array<{ name: string; type: string }>;
+    
+    optimizedImagesColumnExists = tableInfo.some(col => col.name === 'optimizedImages');
+    optimizedImagesColumnChecked = true;
+
+    // Якщо колонки немає, намагаємося її додати (тільки один раз)
+    if (!optimizedImagesColumnExists) {
+      try {
+        await prisma.$executeRawUnsafe(`
+          ALTER TABLE Listing ADD COLUMN optimizedImages TEXT
+        `);
+        optimizedImagesColumnExists = true;
+        console.log('OptimizedImages column added successfully');
+      } catch (error: any) {
+        // Якщо колонка вже існує або база заблокована - це нормально
+        if (error.message?.includes('duplicate column name') || 
+            error.message?.includes('duplicate column') ||
+            error.message?.includes('already exists')) {
+          optimizedImagesColumnExists = true;
+        } else if (error.message?.includes('database is locked')) {
+          // Якщо база заблокована - просто логуємо, не блокуємо запит
+          console.log('Note: Database is locked, optimizedImages column will be added later');
+        } else {
+          console.log('Note: Could not add optimizedImages column:', error.message);
+        }
+      }
+    }
+
+    return optimizedImagesColumnExists;
+  } catch (error: any) {
+    console.log('Note: Could not check optimizedImages column:', error.message);
+    // Якщо не вдалося перевірити - припускаємо, що колонки немає
+    optimizedImagesColumnChecked = true;
     return false;
   }
 }
