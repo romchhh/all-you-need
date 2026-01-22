@@ -141,16 +141,15 @@ async def process_reject_reason(message: types.Message, state: FSMContext):
         )
         
         if success:
-            # Отримуємо дані оголошення для повідомлення користувачу
+            # Для marketplace listings повідомлення надсилається через API
+            # Тому тут не надсилаємо повідомлення для marketplace
             if source == 'telegram':
+                # Отримуємо дані оголошення для повідомлення користувачу
                 listing_data = get_telegram_listing_by_id(listing_id)
-            else:
-                listing_data = db.get_listing_by_id(listing_id)
-            
-            if listing_data:
-                telegram_id = listing_data.get('sellerTelegramId')
-                if telegram_id:
-                    await send_rejection_notification(telegram_id, listing_data, reason, source)
+                if listing_data:
+                    telegram_id = listing_data.get('sellerTelegramId')
+                    if telegram_id:
+                        await send_rejection_notification(telegram_id, listing_data, reason, source)
             
             # Видаляємо inline кнопки та надсилаємо нове повідомлення
             status_text = f"❌ <b>Оголошення #{listing_id} відхилено</b>\n\n<b>Причина:</b> {reason}\n\nМодератор: @{message.from_user.username or message.from_user.first_name}"
@@ -287,20 +286,37 @@ async def send_rejection_notification(
     telegram_id: int,
     listing_data: dict,
     reason: str,
-    source: str
+    source: str,
+    refund_info: dict = None
 ):
     """Надсилає повідомлення користувачу про відхилення оголошення"""
     try:
         title = listing_data.get('title', 'Оголошення')
+        
+        # Формуємо інформацію про повернення коштів
+        refund_parts = []
+        if refund_info:
+            if refund_info.get('refundedPackage'):
+                refund_parts.append('• Повернено 1 пакет оголошення')
+            if refund_info.get('refundedPromotions') and refund_info.get('promotionRefundAmount'):
+                amount = refund_info.get('promotionRefundAmount', 0)
+                if amount > 0:
+                    refund_parts.append(f"• Повернено кошти за рекламу: <b>{amount:.2f} EUR</b> на баланс")
+        
+        refund_text = ""
+        if refund_parts:
+            refund_text = f"\n\n💰 <b>Повернення коштів:</b>\n" + "\n".join(refund_parts)
+        elif not refund_info or (not refund_info.get('refundedPackage') and not refund_info.get('refundedPromotions')):
+            refund_text = "\n\n💰 <b>Повернення коштів:</b>\n• Не було списано коштів (перше безкоштовне оголошення)"
         
         message_text = f"""❌ <b>Оголошення відхилено</b>
 
 Ваше оголошення "<b>{title}</b>" не пройшло модерацію.
 
 📝 <b>Причина відхилення:</b>
-{reason}
+{reason}{refund_text}
 
-Ви можете створити нове оголошення з урахуванням зауважень модератора."""
+✏️ Ви можете <b>відредагувати</b> це оголошення з урахуванням зауважень модератора та подати його на модерацію знову."""
         
         await bot.send_message(
             chat_id=telegram_id,

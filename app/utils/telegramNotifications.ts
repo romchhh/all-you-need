@@ -121,6 +121,7 @@ export async function sendListingRejectedNotification(
   refundInfo: {
     refundedPackage: boolean;
     refundedPromotions: boolean;
+    promotionRefundAmount?: number;
   }
 ): Promise<boolean> {
   // Формуємо інформацію про повернення коштів
@@ -128,8 +129,8 @@ export async function sendListingRejectedNotification(
   if (refundInfo.refundedPackage) {
     refundParts.push('• Повернено 1 пакет оголошення');
   }
-  if (refundInfo.refundedPromotions) {
-    refundParts.push('• Повернено кошти за рекламу');
+  if (refundInfo.refundedPromotions && refundInfo.promotionRefundAmount && refundInfo.promotionRefundAmount > 0) {
+    refundParts.push(`• Повернено кошти за рекламу: <b>${refundInfo.promotionRefundAmount.toFixed(2)} EUR</b> на баланс`);
   }
 
   const refundText =

@@ -190,7 +190,7 @@ async function deleteListingImages(images: string | string[]): Promise<void> {
 /**
  * Повертає кошти за рекламу
  */
-async function refundPromotions(listingId: number, userId: number, reason: string): Promise<boolean> {
+async function refundPromotions(listingId: number, userId: number, reason: string): Promise<{ refunded: boolean; totalAmount: number }> {
   // Шукаємо промоції, які ще не були повернуті (pending, paid, active)
   // Виключаємо вже повернуті (refunded) та скасовані (cancelled)
   const promotions = await prisma.$queryRawUnsafe(
@@ -201,11 +201,12 @@ async function refundPromotions(listingId: number, userId: number, reason: strin
 
   if (promotions.length === 0) {
     console.log(`[refundPromotions] No promotions to refund for listing ${listingId}`);
-    return false;
+    return { refunded: false, totalAmount: 0 };
   }
 
   const nowStr = nowSQLite();
   let refundedAny = false;
+  let totalRefunded = 0;
 
   for (const promo of promotions) {
     // Повертаємо кошти тільки якщо оплата була з балансу
@@ -233,6 +234,7 @@ async function refundPromotions(listingId: number, userId: number, reason: strin
         metadata: { listingId, promotionType: promo.promotionType, reason },
       });
 
+      totalRefunded += promo.price;
       console.log(`[refundPromotions] Refunded ${promo.price} EUR to balance for promotion ${promo.id} (listing ${listingId})`);
       refundedAny = true;
     } else {
@@ -248,7 +250,7 @@ async function refundPromotions(listingId: number, userId: number, reason: strin
     );
   }
 
-  return refundedAny;
+  return { refunded: refundedAny, totalAmount: totalRefunded };
 }
 
 /**
@@ -259,7 +261,7 @@ export async function rejectListing(
   listing: ListingWithUser, 
   reason: string,
   moderatedBy?: number
-): Promise<{ refundedPackage: boolean; refundedPromotions: boolean }> {
+): Promise<{ refundedPackage: boolean; refundedPromotions: boolean; promotionRefundAmount: number }> {
   const nowStr = nowSQLite();
   
   // Перевіряємо чи платні оголошення увімкнені
@@ -267,6 +269,7 @@ export async function rejectListing(
 
   let refundedPackage = false;
   let refundedPromotions = false;
+  let promotionRefundAmount = 0;
 
   // Повертаємо пакет якщо це було платне оголошення
   // Якщо hasUsedFreeAd = true, значить користувач вже використав безкоштовне оголошення
@@ -285,7 +288,9 @@ export async function rejectListing(
   }
 
   // Повертаємо кошти за рекламу (тільки якщо оплачено з балансу)
-  refundedPromotions = await refundPromotions(listing.id, listing.userId, reason);
+  const promotionRefund = await refundPromotions(listing.id, listing.userId, reason);
+  refundedPromotions = promotionRefund.refunded;
+  promotionRefundAmount = promotionRefund.totalAmount;
 
   // Оновлюємо статус оголошення на 'rejected' замість видалення
   // Це дозволяє користувачу редагувати оголошення та повторно подати на модерацію
@@ -310,12 +315,16 @@ export async function rejectListing(
     listing.telegramId,
     listing.title,
     reason,
-    { refundedPackage, refundedPromotions }
+    { 
+      refundedPackage, 
+      refundedPromotions, 
+      promotionRefundAmount: promotionRefundAmount || 0
+    }
   ).catch(err => {
     console.error('[rejectListing] Failed to send Telegram notification:', err);
   });
 
   console.log(`[rejectListing] Listing ${listing.id} rejected (status set to 'rejected'). User can edit and resubmit.`);
 
-  return { refundedPackage, refundedPromotions };
+  return { refundedPackage, refundedPromotions, promotionRefundAmount };
 }
