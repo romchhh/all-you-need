@@ -115,8 +115,9 @@ async def cancel_handler(message: types.Message, state: FSMContext):
     await state.clear()
     
     await message.answer(
-        t(user_id, 'menu.main_menu'),
-        reply_markup=get_main_menu_keyboard(user_id)
+        f"<b>{t(user_id, 'menu.main_menu')}</b>",
+        reply_markup=get_main_menu_keyboard(user_id),
+        parse_mode="HTML"
     )
 
 

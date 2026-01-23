@@ -14,7 +14,7 @@ router = Router()
 
 @router.message(IsAdmin(), F.text.in_(["Адмін панель 💻", "/admin"]))
 async def admin_panel(message: types.Message):
-    await message.answer("Вітаю в адмін панелі. Ось ваші доступні опції.", reply_markup=admin_keyboard())
+    await message.answer("<b>💻 Вітаю в адмін панелі</b>\n\nОсь ваші доступні опції.", reply_markup=admin_keyboard(), parse_mode="HTML")
     
     
 @router.message(IsAdmin(), F.text.in_(["Статистика"]))
@@ -37,10 +37,11 @@ async def export_database(callback: types.CallbackQuery):
     await bot.send_document(
         callback.message.chat.id, 
         document=file, 
-        caption=f"📊 База даних експортована\n\n"
-                f"👥 Користувачів: {users_count}\n"
-                f"🔗 Посилань: {links_count}\n"
-                f"📅 Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+        caption=f"<b>📊 База даних експортована</b>\n\n"
+                f"👥 <b>Користувачів:</b> {users_count}\n"
+                f"🔗 <b>Посилань:</b> {links_count}\n"
+                f"📅 <b>Дата:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}",
+        parse_mode="HTML"
     )
     
     if os.path.exists(filename):

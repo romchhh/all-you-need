@@ -98,7 +98,8 @@ async def start_command(message: types.Message):
     if not user_phone:
         await message.answer(
             t(user_id, 'phone.request'),
-            reply_markup=get_phone_share_keyboard(user_id)
+            reply_markup=get_phone_share_keyboard(user_id),
+            parse_mode="HTML"
         )
         return
 
@@ -200,8 +201,9 @@ async def start_command(message: types.Message):
         ])
         await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
         await message.answer(
-            t(user_id, 'menu.main_menu'),
-            reply_markup=get_main_menu_keyboard(user_id)
+            f"<b>{t(user_id, 'menu.main_menu')}</b>",
+            reply_markup=get_main_menu_keyboard(user_id),
+            parse_mode="HTML"
         )
 
 
@@ -231,7 +233,8 @@ async def agree_agreement(callback: types.CallbackQuery):
         
         await callback.message.answer(
             f"{t(user_id, 'agreement.agreed')}\n\n{t(user_id, 'phone.request')}",
-            reply_markup=get_phone_share_keyboard(user_id)
+            reply_markup=get_phone_share_keyboard(user_id),
+            parse_mode="HTML"
         )
         
         await callback.answer()
@@ -246,7 +249,8 @@ async def agree_agreement(callback: types.CallbackQuery):
 async def decline_agreement(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     await callback.message.edit_text(
-        t(user_id, 'agreement.declined')
+        t(user_id, 'agreement.declined'),
+        parse_mode="HTML"
     )
     await callback.answer()
 
@@ -272,7 +276,8 @@ async def handle_language_selection(callback: types.CallbackQuery):
         await callback.answer(t(user_id, 'language.changed'), show_alert=False)
         
         await callback.message.edit_text(
-            f"🌐 {t(user_id, 'language.changed')}"
+            f"🌐 {t(user_id, 'language.changed')}",
+            parse_mode="HTML"
         )
         
         # Після вибору мови показуємо оферту (якщо не погоджено)
@@ -328,7 +333,7 @@ async def handle_contact(message: types.Message):
             parse_mode="HTML"
         )
     else:
-        await message.answer(t(user_id, 'phone.invalid'))
+        await message.answer(t(user_id, 'phone.invalid'), parse_mode="HTML")
 
 
 # on_startup та on_shutdown тепер в client_handlers.py

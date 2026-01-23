@@ -121,14 +121,14 @@ async def process_reject_reason(message: types.Message, state: FSMContext):
     message_id = data.get('message_id')
     
     if not source or not listing_id:
-        await message.answer("❌ Помилка: дані не знайдені")
+        await message.answer("<b>❌ Помилка:</b> дані не знайдені", parse_mode="HTML")
         await state.clear()
         return
     
     reason = message.text.strip()
     
     if not reason or len(reason) < 5:
-        await message.answer("❌ Причина відхилення повинна містити мінімум 5 символів. Спробуйте ще раз:")
+        await message.answer("<b>❌ Причина відхилення повинна містити мінімум 5 символів.</b>\n\nСпробуйте ще раз:", parse_mode="HTML")
         return
     
     try:
@@ -174,13 +174,13 @@ async def process_reject_reason(message: types.Message, state: FSMContext):
             except Exception as e:
                 print(f"Помилка надсилання повідомлення: {e}")
             
-            await message.answer("✅ Оголошення відхилено")
+            await message.answer("<b>✅ Оголошення відхилено</b>", parse_mode="HTML")
         else:
-            await message.answer("❌ Помилка при відхиленні")
+            await message.answer("<b>❌ Помилка при відхиленні</b>", parse_mode="HTML")
             
     except Exception as e:
         print(f"Помилка відхилення оголошення: {e}")
-        await message.answer("❌ Помилка при відхиленні")
+        await message.answer("<b>❌ Помилка при відхиленні</b>", parse_mode="HTML")
     
     await state.clear()
 

@@ -46,7 +46,7 @@ async def start_create_listing(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     
     if not check_user(user_id):
-        await message.answer("Будь ласка, спочатку зареєструйтесь: /start")
+        await message.answer("<b>⚠️ Будь ласка, спочатку зареєструйтесь:</b> /start", parse_mode="HTML")
         return
     
     await state.set_state(CreateListing.waiting_for_title)
@@ -82,7 +82,7 @@ async def process_title(message: types.Message, state: FSMContext):
     title = message.text.strip()
     
     if not title or len(title) < 3:
-        await message.answer("❌ Назва повинна містити мінімум 3 символи. Спробуйте ще раз:")
+        await message.answer("<b>❌ Назва повинна містити мінімум 3 символи.</b>\n\nСпробуйте ще раз:", parse_mode="HTML")
         return
     
     if len(title) > MAX_TITLE_LENGTH:
@@ -131,7 +131,7 @@ async def process_description(message: types.Message, state: FSMContext):
     description = message.text.strip()
     
     if not description or len(description) < 10:
-        await message.answer("❌ Опис повинен містити мінімум 10 символів. Спробуйте ще раз:")
+        await message.answer("<b>❌ Опис повинен містити мінімум 10 символів.</b>\n\nСпробуйте ще раз:", parse_mode="HTML")
         return
     
     if len(description) > MAX_DESCRIPTION_LENGTH:
@@ -407,7 +407,7 @@ async def process_category_selection(message: types.Message, state: FSMContext):
     categories = get_categories()
     
     if not categories:
-        await message.answer("❌ Помилка: категорії не знайдені. Спробуйте пізніше.")
+        await message.answer("<b>❌ Помилка:</b> категорії не знайдені. Спробуйте пізніше.", parse_mode="HTML")
         await state.clear()
         return
     
@@ -599,8 +599,9 @@ async def cancel_listing_from_city_selection(callback: types.CallbackQuery, stat
     
     await callback.answer()
     await callback.message.answer(
-        "Головне меню:",
-        reply_markup=get_main_menu_keyboard(user_id)
+        "<b>📋 Головне меню</b>",
+        reply_markup=get_main_menu_keyboard(user_id),
+        parse_mode="HTML"
     )
 
 
@@ -680,7 +681,7 @@ async def process_location(message: types.Message, state: FSMContext):
     location = message.text.strip()
     
     if not location or len(location) < 2:
-        await message.answer("❌ Місто повинно містити мінімум 2 символи. Спробуйте ще раз:", reply_markup=get_german_cities_keyboard(user_id))
+        await message.answer("<b>❌ Місто повинно містити мінімум 2 символи.</b>\n\nСпробуйте ще раз:", reply_markup=get_german_cities_keyboard(user_id), parse_mode="HTML")
         return
     
     # Видаляємо повідомлення користувача з локацією
@@ -940,8 +941,9 @@ async def cancel_listing_callback(callback: types.CallbackQuery, state: FSMConte
     )
     await callback.answer()
     await callback.message.answer(
-        "Головне меню:",
-        reply_markup=get_main_menu_keyboard(user_id)
+        "<b>📋 Головне меню</b>",
+        reply_markup=get_main_menu_keyboard(user_id),
+        parse_mode="HTML"
     )
 
 
