@@ -62,82 +62,6 @@ export const useTelegram = () => {
       const handleResize = () => updateViewport();
       window.addEventListener('resize', handleResize);
       
-      // Запобігаємо свайпу зверху вниз та горизонтальним свайпам для закриття додатка
-      // Захоплюємо події touchmove на верхній частині екрану
-      let touchStartY: number | null = null;
-      let touchStartX: number | null = null;
-      let touchStartScrollY: number | null = null;
-      
-      const handleTouchStart = (e: TouchEvent) => {
-        const touch = e.touches[0];
-        if (touch) {
-          touchStartY = touch.clientY;
-          touchStartX = touch.clientX;
-          touchStartScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        }
-      };
-      
-      const preventPullToClose = (e: TouchEvent) => {
-        // Якщо ми на самому верху сторінки (scrollY === 0 або дуже близько до 0)
-        const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        
-        if (touchStartY === null || touchStartX === null || touchStartScrollY === null) {
-          return;
-        }
-        
-        const touch = e.touches[0];
-        if (!touch) return;
-        
-        const deltaY = touch.clientY - touchStartY;
-        const deltaX = touch.clientX - touchStartX;
-        
-        // Якщо починали на верхній частині екрану (верхні 150px) і на початку скролу
-        if (touchStartScrollY <= 10 && touchStartY < 150) {
-          // Запобігаємо свайпу зверху вниз
-          if (deltaY > 0 && deltaY > 5) {
-            e.preventDefault();
-            e.stopPropagation();
-          }
-        }
-        
-        // Запобігаємо випадковим горизонтальним свайпам, які можуть закрити додаток
-        // Якщо горизонтальний рух більший за вертикальний і рух досить значний
-        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
-          // Дозволяємо горизонтальний свайп тільки якщо це явно намірений свайп
-          // (наприклад, для горизонтальної прокрутки)
-          const target = e.target as HTMLElement;
-          const isScrollableElement = target.closest('[style*="overflow-x"], [style*="overflow-x-auto"], .overflow-x-auto, .overflow-x-scroll');
-          
-          // Якщо це не елемент з горизонтальною прокруткою, запобігаємо свайпу
-          if (!isScrollableElement) {
-            // Але не блокуємо, якщо це маленький рух (можлива помилка)
-            if (Math.abs(deltaX) > 50) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }
-        }
-      };
-      
-      const handleTouchEnd = () => {
-        touchStartY = null;
-        touchStartX = null;
-        touchStartScrollY = null;
-      };
-      
-      // Додаємо обробники для запобігання свайпу зверху вниз та горизонтальним свайпам
-      document.addEventListener('touchstart', handleTouchStart, { passive: true });
-      document.addEventListener('touchmove', preventPullToClose, { passive: false });
-      document.addEventListener('touchend', handleTouchEnd, { passive: true });
-      document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
-      
-      // Cleanup для видалення обробників
-      const removePreventPullToClose = () => {
-        document.removeEventListener('touchstart', handleTouchStart);
-        document.removeEventListener('touchmove', preventPullToClose);
-        document.removeEventListener('touchend', handleTouchEnd);
-      };
-      
       if (telegram.enableClosingConfirmation) {
         telegram.enableClosingConfirmation();
       }
@@ -203,7 +127,6 @@ export const useTelegram = () => {
       
       // Cleanup function
       return () => {
-        removePreventPullToClose();
         window.removeEventListener('resize', handleResize);
         if (telegram.offEvent) {
           telegram.offEvent('viewportChanged', updateViewport);

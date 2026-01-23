@@ -78,6 +78,25 @@ export default function OfertaPage() {
                     <li>{t('oferta.payment.item4')}</li>
                     <li>{t('oferta.payment.item5')}</li>
                   </ul>
+                  
+                  {/* Інформація про поповнення за реквізитами */}
+                  <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <h3 className="font-semibold text-gray-900 mb-3">{t('oferta.payment.requisites.title') || 'Поповнення за реквізитами'}</h3>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>{t('oferta.payment.requisites.receiver') || 'Отримувач:'}</strong> {t('business.companyName') || 'ФОП Свіріденко Іван Олександрович'}</p>
+                      <p><strong>{t('oferta.payment.requisites.edrpou') || 'ІПН/ЄДРПОУ:'}</strong> {t('business.edrpou') || '3606401739'}</p>
+                      <p className="mt-3"><strong>{t('oferta.payment.requisites.uah') || 'Гривня (Україна):'}</strong></p>
+                      <p className="pl-4"><strong>IBAN:</strong> {t('business.ibanUAH') || 'UA843220010000026003370043487'}</p>
+                      <p className="pl-4"><strong>{t('oferta.payment.requisites.bank') || 'Банк:'}</strong> {t('business.bank') || 'Акціонерне товариство УНІВЕРСАЛ БАНК'}</p>
+                      <p className="pl-4"><strong>МФО:</strong> {t('business.mfo') || '322001'}</p>
+                      <p className="pl-4"><strong>{t('oferta.payment.requisites.bankEdrpou') || 'ЄДРПОУ Банку:'}</strong> {t('business.bankEdrpou') || '21133352'}</p>
+                      <p className="mt-3"><strong>{t('oferta.payment.requisites.eur') || 'Євро (У межах Європи):'}</strong></p>
+                      <p className="pl-4"><strong>IBAN:</strong> {t('business.ibanEUR') || 'UA513220010000026005370036447'}</p>
+                      <p className="pl-4"><strong>SWIFT/BIC Code:</strong> {t('business.swift') || 'UNJSUAUKXXX'}</p>
+                      <p className="pl-4"><strong>{t('oferta.payment.requisites.receiver') || 'Receiver:'}</strong> {t('business.receiver') || 'PE SVIRIDENKO IVAN'}</p>
+                      <p className="pl-4"><strong>{t('oferta.payment.requisites.address') || 'Address:'}</strong> {t('business.address') || '94, fl. 3, 04078, Ukraine, c. Kyiv, st. Zamkovetska'}</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div>

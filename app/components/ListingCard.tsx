@@ -42,14 +42,23 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   }, [listing.id, listing.promotionType, listing.promotionEnds]);
   
   // Визначаємо стилі в залежності від типу реклами
-  // Лаймова рамка тільки для VIP, не для TOP
+  // Правила:
+  // - ТОП (top_category) - без рамки (тільки бейдж, якщо немає іншої реклами)
+  // - Выделение цветом (highlighted) - рамка без бейджа
+  // - ВИП (vip) - рамка + бейдж VIP
+  // - ТОП + Выделение - рамка + бейдж TOP
   const getPromotionStyles = () => {
     if (!promotionType) return 'border border-white/20';
     
     switch (promotionType) {
       case 'vip':
+        // ВИП - рамка з тінню
         return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+      case 'highlighted':
+        // Выделение цветом - рамка без тіні
+        return 'border-2 border-[#D3F1A7]';
       case 'top_category':
+        // ТОП - без рамки (стандартна рамка)
         return 'border border-white/20';
       default:
         return 'border border-white/20';
@@ -58,6 +67,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   
   const getPromotionBadge = () => {
     if (promotionType === 'vip') {
+      // ВИП - бейдж VIP
       return (
         <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           VIP
@@ -65,12 +75,14 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       );
     }
     if (promotionType === 'top_category') {
+      // ТОП - бейдж TOP (показуємо тільки якщо немає іншої реклами, але оскільки promotionType може бути тільки одним, показуємо завжди для ТОП)
       return (
         <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           TOP
         </div>
       );
     }
+    // highlighted - без бейджа (тільки рамка)
     return null;
   };
   
@@ -175,9 +187,10 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   return (
     <div 
       data-listing-id={listing.id}
-      className={`${getCardBackgroundStyles()} rounded-2xl overflow-hidden transition-all cursor-pointer relative select-none ${
+      className={`${getCardBackgroundStyles()} rounded-2xl overflow-hidden transition-all cursor-pointer relative select-none flex flex-col ${
         isSold || isDeactivated ? 'opacity-60' : ''
       } ${getPromotionStyles()}`}
+      style={{ height: '100%', minHeight: '400px' }}
       onClick={() => {
         if (!isSold && !isDeactivated) {
           onSelect(listing);
@@ -186,7 +199,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       }}
     >
       {/* Зображення товару - займає більшу частину картки */}
-      <div className="relative w-full" style={{ height: '65%', minHeight: '200px' }}>
+      <div className="relative w-full flex-shrink-0" style={{ height: '260px', minHeight: '260px', maxHeight: '260px' }}>
         {/* Бейдж реклами (VIP/TOP) - лівий верхній кут */}
         <div className="absolute top-3 left-3 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           {getPromotionBadge()}
@@ -259,7 +272,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       </div>
       
       {/* Темний overlay з інформацією - нижня частина з заокругленими верхніми кутами */}
-      <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl -mt-6 pt-6 px-4 pb-4 flex flex-col min-h-0">
+      <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl -mt-6 pt-6 px-4 pb-5 flex flex-col flex-1" style={{ minHeight: '140px' }}>
         {/* Ціна та тег стану */}
         <div className="flex items-start justify-between mb-2">
           <span className={`font-bold text-white ${listing.isFree ? 'text-2xl' : 'text-2xl'}`}>
@@ -278,7 +291,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
         </p>
         
         {/* Локація та час */}
-        <div className="flex flex-col gap-1 text-[10px] text-white/60 mt-auto">
+        <div className="flex flex-col gap-1 text-[10px] text-white/60 mt-auto mb-1">
           <div className="flex items-center gap-1">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60 flex-shrink-0">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>

@@ -855,7 +855,7 @@ export const EditListingModal = ({
                 {listing.rejectionReason}
               </div>
               <div className="text-red-400/70 text-xs mt-2">
-                {t('editListing.submitAgain') || 'Подати на модерацію'} - щоб відправити виправлене оголошення на повторну перевірку
+                {t('editListing.submitAgain') || 'Активувати'} - щоб відправити виправлене оголошення на повторну перевірку
               </div>
             </div>
           )}
@@ -1425,7 +1425,7 @@ export const EditListingModal = ({
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={loading}
-            className="px-4 py-3 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-3 bg-transparent border border-red-500/50 text-red-500 rounded-xl text-sm font-medium hover:bg-red-500/10 hover:border-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Trash2 size={16} />
             {t('common.delete')}

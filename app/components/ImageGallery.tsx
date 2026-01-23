@@ -28,11 +28,17 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   }, [currentIndex]);
 
   const nextImage = () => {
-    setCurrentIndex((prev) => (prev + 1) % images.length);
+    setCurrentIndex((prev) => {
+      const next = (prev + 1) % images.length;
+      return next;
+    });
   };
 
   const prevImage = () => {
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+    setCurrentIndex((prev) => {
+      const prevIndex = (prev - 1 + images.length) % images.length;
+      return prevIndex;
+    });
   };
 
   const goToImage = (index: number) => {
@@ -43,55 +49,70 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   const minSwipeDistance = 50;
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const touchStartY = useRef<number | null>(null);
   const touchEndY = useRef<number | null>(null);
+  const lastMoveTime = useRef<number>(0);
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchEndX.current = null;
     touchEndY.current = null;
     touchStartX.current = e.targetTouches[0].clientX;
     touchStartY.current = e.targetTouches[0].clientY;
-    setIsSwiping(false); // Спочатку вважаємо, що це не свайп
+    setIsSwiping(false);
     setSwipeOffset(0);
+    lastMoveTime.current = Date.now();
+    // Не блокуємо подію - дозволяємо передати на батьківський елемент для скролу сторінки
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
     if (touchStartX.current === null || touchStartY.current === null) return;
+    
+    const currentTime = Date.now();
+    lastMoveTime.current = currentTime;
+    
     const currentX = e.targetTouches[0].clientX;
     const currentY = e.targetTouches[0].clientY;
     touchEndX.current = currentX;
     touchEndY.current = currentY;
     const diffX = touchEndX.current - touchStartX.current;
-    const diffY = Math.abs(currentY - touchStartY.current);
+    const diffY = currentY - touchStartY.current;
+    const absDiffY = Math.abs(diffY);
     const absX = Math.abs(diffX);
     
-    // Перевіряємо, чи це горизонтальний рух (переважно горизонтальний)
-    // Горизонтальний рух має бути значно більшим за вертикальний (в 2 рази)
-    const isHorizontalSwipe = absX > diffY * 2;
+    // Якщо рух ще невеликий - чекаємо більше руху для визначення напрямку
+    if (absX < 10 && absDiffY < 10) {
+      return; // Не визначено напрямок - чекаємо
+    }
     
-    // Запобігаємо дефолтній поведінці ТІЛЬКИ якщо це явно горизонтальний рух
-    // і він достатньо великий, щоб не заважати вертикальному скролу
-    if (isHorizontalSwipe && absX > 15) {
+    // Якщо вертикальний рух значно більший за горизонтальний (в 2+ рази) - дозволяємо скрол сторінки
+    if (absDiffY > absX * 2 && absDiffY > 15) {
+      // Це вертикальний скрол - повністю ігноруємо та дозволяємо події пройти далі
+      touchStartX.current = null;
+      touchStartY.current = null;
+      touchEndX.current = null;
+      touchEndY.current = null;
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      // НЕ викликаємо preventDefault, щоб дозволити скрол сторінки
+      return;
+    }
+    
+    // Якщо горизонтальний рух більший за вертикальний або горизонтальний рух достатньо великий
+    const isHorizontalSwipe = absX > absDiffY || (absX > 20 && absDiffY < absX * 0.7);
+    
+    if (isHorizontalSwipe) {
       e.preventDefault();
       e.stopPropagation();
       setIsSwiping(true);
-      // Обмежуємо зміщення для плавності
-      setSwipeOffset(Math.max(-200, Math.min(200, diffX)));
-    } else if (diffY > 5) {
-      // Якщо це вертикальний рух - запобігаємо pull-to-close та згортанню додатку
-      e.preventDefault();
-      e.stopPropagation();
-      setIsSwiping(false);
-      setSwipeOffset(0);
-    } else {
-      // Якщо це змішаний рух, скидаємо offset і не запобігаємо скролу
-      setIsSwiping(false);
-      setSwipeOffset(0);
+      const maxOffset = 250;
+      const smoothOffset = diffX * 0.8;
+      setSwipeOffset(Math.max(-maxOffset, Math.min(maxOffset, smoothOffset)));
     }
   };
 
-  const onTouchEnd = () => {
+  const onTouchEnd = (e: React.TouchEvent) => {
     if (!touchStartX.current || touchEndX.current === null || touchStartY.current === null || touchEndY.current === null) {
       setIsSwiping(false);
       setSwipeOffset(0);
@@ -107,8 +128,9 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
     const absX = Math.abs(distanceX);
     const absY = Math.abs(distanceY);
     
-    // Перевіряємо, чи це дійсно горизонтальний свайп (більш горизонтальний, ніж вертикальний)
-    const isHorizontalSwipe = absX > absY * 1.5; // Горизонтальний рух має бути в 1.5 рази більшим за вертикальний
+    // Перевіряємо, чи це дійсно горизонтальний свайп
+    // Горизонтальний рух має бути більшим за вертикальний або достатньо великим
+    const isHorizontalSwipe = (absX > absY && absX > minSwipeDistance) || (absX > 30 && absY < absX * 0.7);
 
     setIsSwiping(false);
     setSwipeOffset(0);
@@ -118,16 +140,17 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
     touchEndY.current = null;
 
     // Обробляємо тільки якщо це явно горизонтальний свайп
-    if (isHorizontalSwipe && absX > minSwipeDistance) {
+    if (isHorizontalSwipe) {
       const isLeftSwipe = distanceX < 0; // Свайп вліво = наступне фото
       const isRightSwipe = distanceX > 0; // Свайп вправо = попереднє фото
 
-    if (isLeftSwipe) {
-      nextImage(); // Свайп вліво = наступне фото
-    } else if (isRightSwipe) {
-      prevImage(); // Свайп вправо = попереднє фото
+      if (isLeftSwipe) {
+        nextImage(); // Свайп вліво = наступне фото
+      } else if (isRightSwipe) {
+        prevImage(); // Свайп вправо = попереднє фото
       }
     }
+    // Для вертикальних свайпів не блокуємо подію - дозволяємо скрол сторінки
   };
 
   // Мемоізуємо URL зображень, щоб уникнути зайвих запитів
@@ -147,7 +170,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
 
   if (images.length === 0) {
     return (
-      <div className="relative aspect-square flex items-center justify-center rounded-2xl overflow-hidden" style={{ background: 'rgba(0, 0, 0, 0.5)' }}>
+      <div className="relative aspect-square flex items-center justify-center rounded-2xl overflow-hidden" style={{ background: 'rgba(0, 0, 0, 0.5)', minHeight: '400px' }}>
         <div className="text-center">
           <ImageIcon size={64} className="mx-auto mb-2" style={{ color: 'rgba(211, 241, 167, 0.5)' }} />
           <p className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Немає фото</p>
@@ -158,28 +181,48 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
 
   return (
     <div 
-      className="relative w-full aspect-square overflow-hidden ImageGallery rounded-2xl"
+      ref={containerRef}
+      className="relative w-full overflow-hidden ImageGallery rounded-2xl"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onClick={() => onImageClick?.(currentIndex)}
       style={{ 
-        touchAction: 'none',
+        touchAction: 'pan-x pan-y pinch-zoom', // Дозволяємо горизонтальні та вертикальні свайпи
         position: 'relative',
         width: '100%',
         maxWidth: '100%',
+        height: '100%',
+        minHeight: '400px',
         cursor: onImageClick ? 'pointer' : 'default',
-        background: 'rgba(0, 0, 0, 0.5)'
+        background: 'rgba(0, 0, 0, 0.5)',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'none', // Забороняємо власний скрол контейнера
+        WebkitTapHighlightColor: 'transparent',
+        pointerEvents: 'auto',
+        overflow: 'hidden' // Забороняємо скрол всередині контейнера
       }}
     >
       {/* Skeleton loader */}
       {imageLoading && !imageError && (
-        <div className="absolute inset-0 animate-pulse" style={{ background: 'rgba(63, 83, 49, 0.5)' }} />
+        <div 
+          className="absolute inset-0 animate-pulse" 
+          style={{ 
+            background: 'rgba(63, 83, 49, 0.5)',
+            transition: 'opacity 0.3s ease-in-out'
+          }} 
+        />
       )}
       
       {/* Placeholder або зображення */}
       {imageError ? (
-        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0, 0, 0, 0.5)' }}>
+        <div 
+          className="absolute inset-0 flex items-center justify-center" 
+          style={{ 
+            background: 'rgba(0, 0, 0, 0.5)',
+            touchAction: 'none' // Блокуємо скрол в плейсхолдері
+          }}
+        >
           <div className="text-center">
             <ImageIcon size={64} className="mx-auto mb-2" style={{ color: 'rgba(211, 241, 167, 0.5)' }} />
             <p className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Помилка завантаження</p>
@@ -187,15 +230,32 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
         </div>
       ) : (
         <div 
-          className="absolute inset-0 flex items-center justify-center transition-transform duration-200 ease-out"
+          className="absolute inset-0 flex items-center justify-center"
           style={{
             transform: `translateX(${swipeOffset}px)`,
+            transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            willChange: isSwiping ? 'transform' : 'auto',
+            touchAction: 'pan-y pinch-zoom', // Дозволяємо вертикальний скрол для передачі на батьківський елемент
+            pointerEvents: 'auto'
           }}
         >
+          {imageLoading && (
+            <div 
+              className="absolute inset-0 flex items-center justify-center"
+              style={{
+                touchAction: 'none', // Блокуємо скрол в плейсхолдері завантаження
+                zIndex: 1
+              }}
+            >
+              <div className="text-center">
+                <ImageIcon size={64} className="mx-auto mb-2" style={{ color: 'rgba(211, 241, 167, 0.5)' }} />
+              </div>
+            </div>
+          )}
           <img 
             src={imageUrls[currentIndex]}
             alt={`${title} - фото ${currentIndex + 1}`}
-            className={`w-full h-full object-cover transition-opacity duration-300 ease-in-out ${
+            className={`w-full object-cover ${
               imageLoading ? 'opacity-0' : 'opacity-100'
             }`}
             loading={currentIndex === 0 ? 'eager' : 'lazy'}
@@ -214,7 +274,15 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
             style={{
               display: 'block',
               visibility: 'visible',
-              opacity: imageError ? 0 : 1
+              opacity: imageError ? 0 : 1,
+              transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              touchAction: 'pan-y pinch-zoom', // Дозволяємо вертикальний скрол для передачі на батьківський елемент
+              pointerEvents: 'auto',
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
             }}
           />
         </div>

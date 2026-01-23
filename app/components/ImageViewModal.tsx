@@ -1,5 +1,6 @@
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ImageViewModalProps {
   isOpen: boolean;
@@ -116,20 +117,34 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
 
   if (!isOpen || imageList.length === 0) return null;
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100]"
+      className="fixed inset-0 flex items-center justify-center"
       onClick={onClose}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      style={{ touchAction: 'none', padding: '0', width: '100vw', maxWidth: '100vw' }}
+      style={{ 
+        touchAction: 'none', 
+        padding: '0', 
+        width: '100vw', 
+        maxWidth: '100vw',
+        zIndex: 99999,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#000000',
+        background: '#000000'
+      }}
     >
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-20"
+        className="absolute top-4 right-4 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-[100000] shrink-0 flex-shrink-0"
+        style={{ minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
       >
-        <X size={24} />
+        <X size={24} style={{ flexShrink: 0 }} />
       </button>
       
       {imageList.length > 1 && (
@@ -139,22 +154,21 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
               e.stopPropagation();
               prevImage();
             }}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-20"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-[100000] shrink-0 flex-shrink-0"
+            style={{ minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={24} style={{ flexShrink: 0 }} />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               nextImage();
             }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-20"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white z-[100000] shrink-0 flex-shrink-0"
+            style={{ minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
           >
-            <ChevronRight size={24} />
+            <ChevronRight size={24} style={{ flexShrink: 0 }} />
           </button>
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#1C1C1C] border border-white/20 backdrop-blur-sm text-white text-sm font-medium px-3 py-1.5 rounded-full z-20">
-            {currentIndex + 1} / {imageList.length}
-          </div>
         </>
       )}
       
@@ -180,5 +194,12 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
       </div>
     </div>
   );
+
+  // Рендеримо через portal безпосередньо в body для гарантованого відображення над всіма елементами
+  if (typeof window !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 };
 

@@ -12,13 +12,18 @@ export default function BusinessPage() {
   const { tg } = useTelegram();
   const lang = (params?.lang as string) || 'uk';
 
-  // Реквізити ФОП - потрібно заповнити реальними даними
+  // Реквізити ФОП
   const businessInfo = {
-    companyName: t('business.companyName') || 'ФОП "Trade Ground"',
-    edrpou: t('business.edrpou') || '12345678',
-    iban: t('business.iban') || 'UA123456789012345678901234567',
-    bank: t('business.bank') || 'ПАТ "ПриватБанк"',
-    address: t('business.address') || 'м. Київ, вул. Прикладная, 123',
+    companyName: t('business.companyName') || 'ФОП Свіріденко Іван Олександрович',
+    edrpou: t('business.edrpou') || '3606401739',
+    ibanUAH: t('business.ibanUAH') || 'UA843220010000026003370043487',
+    ibanEUR: t('business.ibanEUR') || 'UA513220010000026005370036447',
+    swift: t('business.swift') || 'UNJSUAUKXXX',
+    bank: t('business.bank') || 'Акціонерне товариство УНІВЕРСАЛ БАНК',
+    mfo: t('business.mfo') || '322001',
+    bankEdrpou: t('business.bankEdrpou') || '21133352',
+    receiver: t('business.receiver') || 'PE SVIRIDENKO IVAN',
+    address: t('business.address') || '94, fl. 3, 04078, Ukraine, c. Kyiv, st. Zamkovetska',
     phone: t('business.phone') || '+380 (XX) XXX-XX-XX',
     email: t('business.email') || 'info@tradeground.com',
     catalogUrl: `/${lang}/bazaar`,
@@ -121,69 +126,66 @@ export default function BusinessPage() {
             <div className="flex items-center gap-3 mb-4">
               <Building2 size={24} className="text-[#D3F1A7]" />
               <h2 className="text-xl font-bold text-white">
-                {t('business.details.title') || 'Реквізити'}
+                {t('business.details.title') || 'Реквізити для поповнення'}
               </h2>
             </div>
 
             <div className="space-y-4">
               <div>
-                <span className="text-white/70 text-sm">{t('business.details.companyName') || 'Назва:'}</span>
+                <span className="text-white/70 text-sm font-semibold">{t('business.details.receiver') || 'Отримувач:'}</span>
                 <p className="text-white font-medium mt-1">{businessInfo.companyName}</p>
               </div>
 
               <div>
-                <span className="text-white/70 text-sm">{t('business.details.edrpou') || 'ЄДРПОУ:'}</span>
+                <span className="text-white/70 text-sm font-semibold">{t('business.details.edrpou') || 'ІПН/ЄДРПОУ:'}</span>
                 <p className="text-white font-medium mt-1">{businessInfo.edrpou}</p>
               </div>
 
-              <div>
-                <span className="text-white/70 text-sm">{t('business.details.iban') || 'IBAN:'}</span>
-                <p className="text-white font-medium mt-1 break-all">{businessInfo.iban}</p>
+              {/* Гривня - Україна */}
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <h3 className="text-white font-semibold mb-3">{t('business.details.uah') || 'Гривня (Україна):'}</h3>
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-white/70 text-sm">{t('business.details.iban') || 'IBAN:'}</span>
+                    <p className="text-white font-medium mt-1 break-all font-mono text-sm">{businessInfo.ibanUAH}</p>
+                  </div>
+                  <div>
+                    <span className="text-white/70 text-sm">{t('business.details.bank') || 'Банк:'}</span>
+                    <p className="text-white font-medium mt-1">{businessInfo.bank}</p>
+                  </div>
+                  <div>
+                    <span className="text-white/70 text-sm">{t('business.details.mfo') || 'МФО:'}</span>
+                    <p className="text-white font-medium mt-1">{businessInfo.mfo}</p>
+                  </div>
+                  <div>
+                    <span className="text-white/70 text-sm">{t('business.details.bankEdrpou') || 'ЄДРПОУ Банку:'}</span>
+                    <p className="text-white font-medium mt-1">{businessInfo.bankEdrpou}</p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <span className="text-white/70 text-sm">{t('business.details.bank') || 'Банк:'}</span>
-                <p className="text-white font-medium mt-1">{businessInfo.bank}</p>
+              {/* Євро - Європа */}
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <h3 className="text-white font-semibold mb-3">{t('business.details.eur') || 'Євро (У межах Європи):'}</h3>
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-white/70 text-sm">{t('business.details.iban') || 'IBAN:'}</span>
+                    <p className="text-white font-medium mt-1 break-all font-mono text-sm">{businessInfo.ibanEUR}</p>
+                  </div>
+                  <div>
+                    <span className="text-white/70 text-sm">{t('business.details.swift') || 'SWIFT/BIC Code:'}</span>
+                    <p className="text-white font-medium mt-1 font-mono">{businessInfo.swift}</p>
+                  </div>
+                  <div>
+                    <span className="text-white/70 text-sm">{t('business.details.receiver') || 'Receiver:'}</span>
+                    <p className="text-white font-medium mt-1">{businessInfo.receiver}</p>
+                  </div>
+                  <div>
+                    <span className="text-white/70 text-sm">{t('business.details.address') || 'Address:'}</span>
+                    <p className="text-white font-medium mt-1 text-sm">{businessInfo.address}</p>
+                  </div>
+                </div>
               </div>
-
-              <div>
-                <span className="text-white/70 text-sm">{t('business.details.address') || 'Адреса:'}</span>
-                <p className="text-white font-medium mt-1">{businessInfo.address}</p>
-              </div>
-
-              {businessInfo.phone && (
-                <div>
-                  <span className="text-white/70 text-sm">{t('business.details.phone') || 'Телефон:'}</span>
-                  <p className="text-white font-medium mt-1">{businessInfo.phone}</p>
-                </div>
-              )}
-
-              {businessInfo.email && (
-                <div>
-                  <span className="text-white/70 text-sm">{t('business.details.email') || 'Email:'}</span>
-                  <a 
-                    href={`mailto:${businessInfo.email}`}
-                    className="text-[#D3F1A7] font-medium mt-1 hover:underline block"
-                  >
-                    {businessInfo.email}
-                  </a>
-                </div>
-              )}
-
-              {businessInfo.instagram && (
-                <div>
-                  <span className="text-white/70 text-sm">{t('business.details.instagram') || 'Instagram:'}</span>
-                  <a 
-                    href={businessInfo.instagram}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#D3F1A7] font-medium mt-1 hover:underline flex items-center gap-2"
-                  >
-                    {businessInfo.instagram}
-                    <ExternalLink size={14} />
-                  </a>
-                </div>
-              )}
             </div>
           </div>
 

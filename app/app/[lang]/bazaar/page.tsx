@@ -1027,6 +1027,13 @@ const BazaarPage = () => {
       <BottomNavigation
         activeTab="bazaar"
         onTabChange={(tab) => {
+          // Закриваємо деталі товару перед переходом
+          const hasOpenDetails = selectedListing || selectedSeller;
+          if (hasOpenDetails) {
+            setSelectedListing(null);
+            setSelectedSeller(null);
+          }
+          
           // Зберігаємо telegramId при навігації
           let telegramId = new URLSearchParams(window.location.search).get('telegramId');
           
@@ -1037,7 +1044,16 @@ const BazaarPage = () => {
           
           const queryString = telegramId ? `?telegramId=${telegramId}` : '';
           const targetPath = tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories';
-          router.push(`/${lang}/${targetPath}${queryString}`);
+          
+          // Якщо були відкриті деталі, використовуємо більшу затримку для закриття перед переходом
+          if (hasOpenDetails) {
+            setTimeout(() => {
+              router.push(`/${lang}/${targetPath}${queryString}`);
+            }, 100);
+          } else {
+            // Якщо деталі не відкриті, переходимо одразу
+            router.push(`/${lang}/${targetPath}${queryString}`);
+          }
         }}
         onCloseDetail={() => {
           setSelectedListing(null);

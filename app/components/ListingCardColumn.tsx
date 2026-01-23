@@ -98,7 +98,7 @@ const ListingCardColumnComponent = ({
         tg?.HapticFeedback.impactOccurred('light');
       }}
     >
-      <div className="flex gap-3 p-3.5">
+      <div className="flex gap-3 p-3.5 pb-4">
         {/* Фото */}
         <div 
           className="relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden bg-[#1A1A1A]"
@@ -160,7 +160,7 @@ const ListingCardColumnComponent = ({
           </div>
 
           {/* Нижня частина: розташування та час */}
-          <div className="flex flex-col gap-1 text-[10px] min-w-0">
+          <div className="flex flex-col gap-1 text-[10px] min-w-0 mb-1">
             {listing.location && (
               <div className="flex items-center gap-1.5 text-white/80">
                 <MapPin size={10} className="text-white/80 flex-shrink-0" />

@@ -465,61 +465,18 @@ const FavoritesPage = () => {
   useEffect(() => {
     if (tg && !selectedListing && !selectedSeller) {
       tg.expand();
-      
-      // Запобігаємо pull-to-close (свайп вниз для закриття)
-      // Використовуємо preventPullToClose для всіх свайпів вниз
-      let touchStartY: number | null = null;
-      let touchStartScrollY: number | null = null;
-      
-      const handleTouchStart = (e: TouchEvent) => {
-        const touch = e.touches[0];
-        if (touch) {
-          touchStartY = touch.clientY;
-          touchStartScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        }
-      };
-      
-      const preventPullToClose = (e: TouchEvent) => {
-        if (touchStartY === null || touchStartScrollY === null) {
-          return;
-        }
-        
-        const touch = e.touches[0];
-        if (!touch) return;
-        
-        const deltaY = touch.clientY - touchStartY;
-        const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        
-        // Запобігаємо свайпу вниз на будь-якій позиції сторінки
-        // Якщо користувач свайпає вниз і це не стандартний скрол
-        if (deltaY > 0 && deltaY > 5) {
-          // Якщо ми на початку скролу або свайп більший за скрол
-          if (touchStartScrollY <= 10 || (currentScrollY === 0 && deltaY > 10)) {
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-        }
-      };
-      
-      const handleTouchEnd = () => {
-        touchStartY = null;
-        touchStartScrollY = null;
-      };
-      
-      // Додаємо обробники для запобігання свайпу вниз
-      document.addEventListener('touchstart', handleTouchStart, { passive: true });
-      document.addEventListener('touchmove', preventPullToClose, { passive: false });
-      document.addEventListener('touchend', handleTouchEnd, { passive: true });
-      document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
-      
-      return () => {
-        document.removeEventListener('touchstart', handleTouchStart);
-        document.removeEventListener('touchmove', preventPullToClose);
-        document.removeEventListener('touchend', handleTouchEnd);
-        document.removeEventListener('touchcancel', handleTouchEnd);
-      };
+      // Увімкнення підтвердження закриття для запобігання випадковому згортанню
+      if (tg.enableClosingConfirmation) {
+        tg.enableClosingConfirmation();
+      }
     }
+    
+    return () => {
+      // Вимкнення підтвердження закриття при виході
+      if (tg?.disableClosingConfirmation) {
+        tg.disableClosingConfirmation();
+      }
+    };
   }, [tg, selectedListing, selectedSeller]);
 
   useEffect(() => {
@@ -852,6 +809,13 @@ const FavoritesPage = () => {
       <BottomNavigation
         activeTab="favorites"
         onTabChange={(tab) => {
+          // Закриваємо деталі товару перед переходом
+          const hasOpenDetails = selectedListing || selectedSeller;
+          if (hasOpenDetails) {
+            setSelectedListing(null);
+            setSelectedSeller(null);
+          }
+          
           // Зберігаємо telegramId при навігації
           let telegramId = new URLSearchParams(window.location.search).get('telegramId');
           
@@ -862,7 +826,16 @@ const FavoritesPage = () => {
           
           const queryString = telegramId ? `?telegramId=${telegramId}` : '';
           const targetPath = tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories';
-          router.push(`/${lang}/${targetPath}${queryString}`);
+          
+          // Якщо були відкриті деталі, використовуємо більшу затримку для закриття перед переходом
+          if (hasOpenDetails) {
+            setTimeout(() => {
+              router.push(`/${lang}/${targetPath}${queryString}`);
+            }, 100);
+          } else {
+            // Якщо деталі не відкриті, переходимо одразу
+            router.push(`/${lang}/${targetPath}${queryString}`);
+          }
         }}
         onCloseDetail={() => {
           setSelectedListing(null);

@@ -202,6 +202,11 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
   const currentActiveTab = getActiveTab();
   
   const handleTabChange = (tab: string) => {
+    // Якщо це той самий таб, не робимо нічого
+    if (tab === currentActiveTab) {
+      return;
+    }
+    
     // Зберігаємо позицію скролу поточної сторінки перед переходом
     if (typeof window !== 'undefined') {
       const currentScrollKey = `${currentActiveTab}ScrollPosition`;
@@ -209,15 +214,27 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
       localStorage.setItem(currentScrollKey, scrollY.toString());
     }
     
-    // Закриваємо деталі товару/профілю при зміні вкладки
-    if (onCloseDetail) {
-      onCloseDetail();
-    }
-    
     // Якщо є onTabChange callback, використовуємо його (для старої реалізації)
     if (onTabChange) {
-      onTabChange(tab);
+      // Спочатку закриваємо деталі товару/профілю, якщо вони відкриті
+      const hasOpenDetails = onCloseDetail !== undefined;
+      if (onCloseDetail) {
+        onCloseDetail();
+      }
+      // Якщо були відкриті деталі, використовуємо затримку для закриття перед переходом
+      if (hasOpenDetails) {
+        setTimeout(() => {
+          onTabChange(tab);
+        }, 100);
+      } else {
+        onTabChange(tab);
+      }
     } else {
+      // Спочатку закриваємо деталі товару/профілю, якщо вони відкриті
+      const hasOpenDetails = onCloseDetail !== undefined;
+      if (onCloseDetail) {
+        onCloseDetail();
+      }
       // Інакше використовуємо router для навігації
       const routeMap: Record<string, string> = {
         'bazaar': 'bazaar',
@@ -226,7 +243,14 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
         'profile': 'profile'
       };
       const route = routeMap[tab] || 'bazaar';
-      router.push(`/${lang}/${route}`);
+      // Якщо були відкриті деталі, використовуємо затримку для закриття перед переходом
+      if (hasOpenDetails) {
+        setTimeout(() => {
+          router.push(`/${lang}/${route}`);
+        }, 100);
+      } else {
+        router.push(`/${lang}/${route}`);
+      }
     }
     tg?.HapticFeedback.impactOccurred('light');
   };

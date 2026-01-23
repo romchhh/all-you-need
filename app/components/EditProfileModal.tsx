@@ -143,14 +143,30 @@ export const EditProfileModal = ({
         const deltaY = touch.clientY - touchStartY;
         const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
         
-        // Запобігаємо свайпу вниз на будь-якій позиції сторінки
-        // Якщо користувач свайпає вниз і це не стандартний скрол
+        // Ніколи не блокуємо скрол вгору (негативний deltaY)
+        if (deltaY < 0) {
+          return;
+        }
+        
+        // Дозволяємо згортання тільки якщо користувач тягне за саму верхню частину (білу смужку/header)
+        // AppHeader має висоту ~52.5px, додаємо невеликий запас - 60px
+        const headerHeight = 60;
+        const isPullingFromHeader = touchStartY < headerHeight;
+        
+        // Якщо користувач тягне за header (верхні 60px) і на початку скролу - дозволяємо згортання
+        if (touchStartScrollY <= 10 && isPullingFromHeader && deltaY > 0 && deltaY > 5) {
+          // Дозволяємо згортання - не запобігаємо
+          return;
+        }
+        
+        // Якщо користувач тягне не з header - запобігаємо згортанню тільки на початку скролу
         if (deltaY > 0 && deltaY > 5) {
-          // Якщо ми на початку скролу або свайп більший за скрол
           if (touchStartScrollY <= 10 || (currentScrollY === 0 && deltaY > 10)) {
-            e.preventDefault();
-            e.stopPropagation();
-            return;
+            if (!isPullingFromHeader) {
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
           }
         }
       };

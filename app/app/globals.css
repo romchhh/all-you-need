@@ -93,6 +93,13 @@ div[role="main"] {
   display: none;
 }
 
+/* Запобігаємо зуму при фокусі на input (iOS Safari) */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
+
 /* Запобігаємо виходу елементів за межі */
 img,
 video,

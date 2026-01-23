@@ -211,6 +211,36 @@ export const ListingDetail = ({
     };
   }, [listing.id]);
 
+  // Заборона згортання міні-додатку на сторінці товару (як на головній сторінці)
+  useEffect(() => {
+    if (!tg) return;
+
+    // Розгортаємо додаток на весь екран
+    tg.expand();
+    
+    // Увімкнення підтвердження закриття для запобігання випадковому згортанню
+    // Викликаємо при кожному рендері для надійності
+    if (tg.enableClosingConfirmation) {
+      tg.enableClosingConfirmation();
+    }
+
+    // Додатково перевіряємо та розгортаємо при скролі
+    const handleScroll = () => {
+      if (tg && tg.expand) {
+        tg.expand();
+      }
+    };
+
+    // Додаємо обробник скролу для підтримки розгорнутого стану
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      // НЕ вимикаємо підтвердження закриття при виході, 
+      // щоб воно залишалося активним (як на головній сторінці)
+    };
+  }, [tg, listing.id]);
+
   // Фіксуємо перегляд при відкритті оголошення
   useEffect(() => {
     const recordView = async () => {
@@ -302,6 +332,25 @@ export const ListingDetail = ({
       } else {
         showToast(t('promotions.promotionSuccess'), 'success');
         tg?.HapticFeedback.notificationOccurred('success');
+        
+        // Оновлюємо дані оголошення після успішної покупки реклами
+        const viewerId = currentUser?.id;
+        const url = viewerId 
+          ? `/api/listings/${listing.id}?viewerId=${viewerId}`
+          : `/api/listings/${listing.id}`;
+        
+        try {
+          const updatedResponse = await fetch(url, {
+            method: 'GET',
+          });
+          if (updatedResponse.ok) {
+            const updatedListing = await updatedResponse.json();
+            // Оновлюємо дані через router.refresh() або оновлюємо локальний стан
+            router.refresh();
+          }
+        } catch (error) {
+          console.error('Error fetching updated listing:', error);
+        }
       }
 
       setShowPaymentSummaryModal(false);
@@ -639,7 +688,7 @@ export const ListingDetail = ({
         }}
       >
         {/* Галерея фото */}
-        <div className="px-4 pt-4">
+        <div className="px-4 pt-4" style={{ height: '400px' }}>
           <ImageGallery 
             images={images} 
             title={listing.title}
@@ -704,6 +753,28 @@ export const ListingDetail = ({
         {listing.createdAt && (
           <div className="mb-6 text-sm text-white/70">
             <span>{t('listing.publishedDate')}: {formatPublicationDate(listing.createdAt, language)}</span>
+          </div>
+        )}
+
+        {/* Інформація про рекламу для своїх оголошень */}
+        {isOwnListing && listing.promotionType && listing.promotionEnds && new Date(listing.promotionEnds) > new Date() && (
+          <div className="mb-6 flex items-center gap-2 text-sm">
+            <span className="text-white/70">{t('sales.promotion')}:</span>
+            <div className="flex items-center gap-2">
+              {listing.promotionType === 'vip' && (
+                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                  VIP
+                </div>
+              )}
+              {listing.promotionType === 'top_category' && (
+                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                  TOP
+                </div>
+              )}
+              {listing.promotionType === 'highlighted' && (
+                <span className="text-[#D3F1A7] font-semibold">{t('promotions.highlighted')}</span>
+              )}
+            </div>
           </div>
         )}
 
@@ -784,7 +855,7 @@ export const ListingDetail = ({
             <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', position: 'relative', zIndex: 10, width: '100vw' }}>
               <div className="flex gap-3 pl-4" style={{ minWidth: 'max-content' }}>
               {sellerListings.map(sellerListing => (
-                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px] h-full" style={{ position: 'relative', zIndex: 10 }}>
+                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ position: 'relative', zIndex: 10, height: '400px' }}>
                 <ListingCard 
                   listing={sellerListing}
                   isFavorite={favorites.has(sellerListing.id)}
@@ -812,7 +883,7 @@ export const ListingDetail = ({
             <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', position: 'relative', zIndex: 10, width: '100vw' }}>
               <div className="flex gap-3 pl-4" style={{ minWidth: 'max-content' }}>
               {categoryListings.map(categoryListing => (
-                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px] h-full" style={{ position: 'relative', zIndex: 10 }}>
+                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ position: 'relative', zIndex: 10, height: '400px' }}>
                 <ListingCard 
                   listing={categoryListing}
                   isFavorite={favorites.has(categoryListing.id)}

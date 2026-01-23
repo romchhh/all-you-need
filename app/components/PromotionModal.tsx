@@ -35,14 +35,41 @@ export default function PromotionModal({
   onSelectPromotion,
   listingId,
   telegramId,
-  currentPromotion, // Ігноруємо для сумісності
-  promotionEnds, // Ігноруємо для сумісності
-  showSkipButton = true, // Використовуємо для показу кнопки "Пропустити"
+  currentPromotion,
+  promotionEnds,
+  showSkipButton = true,
 }: PromotionModalProps) {
   const { t } = useLanguage();
   const { user } = useTelegram();
   const [selectedPromotion, setSelectedPromotion] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Перевіряємо чи активна реклама
+  const isPromotionActive = currentPromotion && promotionEnds 
+    ? new Date(promotionEnds) > new Date() 
+    : false;
+
+  // Функція для форматування залишкового часу
+  const getTimeRemaining = (endsAt: string): string => {
+    const now = new Date();
+    const ends = new Date(endsAt);
+    const diff = ends.getTime() - now.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    if (days > 0) {
+      if (days === 1) {
+        return `1 ${t('profile.day') || 'день'}`;
+      } else if (days <= 4) {
+        return `${days} ${t('profile.days') || 'дні'}`;
+      } else {
+        return `${days} ${t('profile.days') || 'днів'}`;
+      }
+    } else if (hours > 0) {
+      return `${hours} ${hours === 1 ? t('common.hour') : t('common.hours')}`;
+    }
+    return t('common.soon');
+  };
 
   // Блокуємо скрол при відкритті модального вікна
   useEffect(() => {
@@ -149,13 +176,35 @@ export default function PromotionModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-4" data-scrollable>
+          {/* Інформація про активну рекламу */}
+          {isPromotionActive && currentPromotion && promotionEnds && (
+            <div className="mb-4 p-4 rounded-xl bg-[#D3F1A7]/10 border-2 border-[#D3F1A7]">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[#D3F1A7] font-semibold">{t('sales.promotion')}:</span>
+                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                  {currentPromotion === 'vip' ? 'VIP' : currentPromotion === 'top_category' ? 'TOP' : t('promotions.highlighted')}
+                </div>
+              </div>
+              <p className="text-sm text-white/70">
+                {t('common.activeUntil') || 'Активна до'}: {getTimeRemaining(promotionEnds)}
+              </p>
+            </div>
+          )}
+
           {/* Типи реклами */}
-          {PROMOTIONS.map((promo) => (
+          {PROMOTIONS.map((promo) => {
+            const isCurrentPromotion = currentPromotion === promo.type && isPromotionActive;
+            const isDisabled = isCurrentPromotion;
+            
+            return (
             <button
               key={promo.type}
-              onClick={() => setSelectedPromotion(promo.type)}
+              onClick={() => !isDisabled && setSelectedPromotion(promo.type)}
+              disabled={isDisabled}
               className={`w-full text-left rounded-xl p-5 border-2 transition-all ${
-                selectedPromotion === promo.type
+                isDisabled
+                  ? 'border-white/10 bg-[#1C1C1C]/50 opacity-50 cursor-not-allowed'
+                  : selectedPromotion === promo.type
                   ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 shadow-lg scale-[1.02]'
                   : 'border-white/20 bg-[#1C1C1C] hover:border-white/40 hover:bg-white/5'
               }`}
@@ -210,30 +259,46 @@ export default function PromotionModal({
                   
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-2xl font-bold text-[#D3F1A7]">
-                        {promo.price.toFixed(1)}€
-                      </p>
-                      <p className="text-xs text-white/70">
-                        {t('promotions.duration')}
-                      </p>
+                      {isCurrentPromotion ? (
+                        <>
+                          <p className="text-sm font-semibold text-[#D3F1A7]">
+                            {t('common.active') || 'Активна'}
+                          </p>
+                          <p className="text-xs text-white/70">
+                            {t('common.cannotBuySame') || 'Не можна купити поки активна'}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-2xl font-bold text-[#D3F1A7]">
+                            {promo.price.toFixed(1)}€
+                          </p>
+                          <p className="text-xs text-white/70">
+                            {t('promotions.duration')}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
                 
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
-                  selectedPromotion === promo.type
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
-                    : 'border-white/30'
-                }`}>
-                  {selectedPromotion === promo.type && (
-                    <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
+                {!isDisabled && (
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
+                    selectedPromotion === promo.type
+                      ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                      : 'border-white/30'
+                  }`}>
+                    {selectedPromotion === promo.type && (
+                      <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                )}
               </div>
             </button>
-          ))}
+          );
+          })}
         </div>
 
         {/* Footer */}

@@ -49,7 +49,7 @@ export const TopBar = ({
           <Search 
             className="absolute top-1/2 -translate-y-1/2 text-white/80" 
             size={18} 
-            style={{ left: '36px' }}
+            style={{ left: '16px' }}
           />
           <input
             ref={searchInputRef}
@@ -70,7 +70,10 @@ export const TopBar = ({
               // Можна додати логіку для показу підказок
             }}
             className="w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 transition-all text-white placeholder:text-white/60"
-            style={{ paddingLeft: '60px' }}
+            style={{ 
+              paddingLeft: '44px',
+              fontSize: '16px' // Запобігаємо зуму на iOS при фокусі
+            }}
           />
           {searchQuery && onSearchClear && (
             <button

@@ -124,6 +124,24 @@ const CategoriesPage = () => {
   const [totalListings, setTotalListings] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const { tg } = useTelegram();
+  
+  // Забезпечуємо розгортання вікна при завантаженні та запобігаємо згортанню
+  useEffect(() => {
+    if (tg && !selectedListing && !selectedSeller) {
+      tg.expand();
+      // Увімкнення підтвердження закриття для запобігання випадковому згортанню
+      if (tg.enableClosingConfirmation) {
+        tg.enableClosingConfirmation();
+      }
+    }
+    
+    return () => {
+      // Вимкнення підтвердження закриття при виході
+      if (tg?.disableClosingConfirmation) {
+        tg.disableClosingConfirmation();
+      }
+    };
+  }, [tg, selectedListing, selectedSeller]);
   const { toast, showToast, hideToast } = useToast();
   
   // Відновлюємо скролл до останнього переглянутого оголошення при завантаженні сторінки
@@ -823,6 +841,13 @@ const CategoriesPage = () => {
       <BottomNavigation
         activeTab="categories"
         onTabChange={(tab) => {
+          // Закриваємо деталі товару перед переходом
+          const hasOpenDetails = selectedListing || selectedSeller;
+          if (hasOpenDetails) {
+            setSelectedListing(null);
+            setSelectedSeller(null);
+          }
+          
           // Зберігаємо telegramId при навігації
           let telegramId = new URLSearchParams(window.location.search).get('telegramId');
           
@@ -833,7 +858,16 @@ const CategoriesPage = () => {
           
           const queryString = telegramId ? `?telegramId=${telegramId}` : '';
           const targetPath = tab === 'bazaar' ? 'bazaar' : tab === 'favorites' ? 'favorites' : tab === 'profile' ? 'profile' : 'categories';
-          router.push(`/${lang}/${targetPath}${queryString}`);
+          
+          // Якщо були відкриті деталі, використовуємо більшу затримку для закриття перед переходом
+          if (hasOpenDetails) {
+            setTimeout(() => {
+              router.push(`/${lang}/${targetPath}${queryString}`);
+            }, 100);
+          } else {
+            // Якщо деталі не відкриті, переходимо одразу
+            router.push(`/${lang}/${targetPath}${queryString}`);
+          }
         }}
         onCloseDetail={() => {
           setSelectedListing(null);
