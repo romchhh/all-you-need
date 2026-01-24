@@ -199,7 +199,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       }}
     >
       {/* Зображення товару - займає більшу частину картки */}
-      <div className="relative w-full flex-shrink-0 rounded-t-2xl overflow-hidden" style={{ height: '240px', minHeight: '240px', maxHeight: '240px' }}>
+      <div className="relative w-full flex-shrink-0 rounded-t-2xl overflow-hidden" style={{ height: '240px', minHeight: '240px', maxHeight: '240px', zIndex: 1 }}>
         {/* Бейдж реклами (VIP/TOP) - лівий верхній кут */}
         <div className="absolute top-3 left-3 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           {getPromotionBadge()}
@@ -272,7 +272,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       </div>
       
       {/* Темний overlay з інформацією - нижня частина з заокругленими верхніми кутами */}
-      <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl rounded-b-2xl -mt-5 pt-3 px-4 pb-1.5 flex flex-col flex-1 z-30" style={{ minHeight: '110px' }}>
+      <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl rounded-b-2xl -mt-5 pt-3 px-4 pb-1.5 flex flex-col flex-1 z-30" style={{ minHeight: '110px', position: 'relative', zIndex: 30 }}>
         {/* Ціна та тег стану */}
         <div className="flex items-start justify-between mb-1">
           <span className={`font-bold text-white ${listing.isFree ? 'text-2xl' : 'text-2xl'}`}>

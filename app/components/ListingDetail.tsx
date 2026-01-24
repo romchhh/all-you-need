@@ -684,7 +684,8 @@ export const ListingDetail = ({
         style={{
           transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
           transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
-          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1
+          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
+          overflow: 'visible'
         }}
       >
         {/* Галерея фото */}
@@ -850,9 +851,9 @@ export const ListingDetail = ({
 
         {/* Інші оголошення продавця */}
         {sellerListings.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-6" style={{ overflow: 'visible' }}>
             <h2 className="text-lg font-semibold mb-3 px-4" style={{ color: '#FFFFFF' }}>{t('listing.otherSellerListings')}</h2>
-            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', width: '100vw', overflowY: 'visible' }}>
+            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', width: '100vw', overflowY: 'visible', paddingTop: '0.5rem', marginTop: '-0.5rem' }}>
               <div className="flex gap-3 pl-4 pb-2" style={{ minWidth: 'max-content' }}>
               {sellerListings.map(sellerListing => (
                   <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ overflow: 'visible' }}>
@@ -878,9 +879,9 @@ export const ListingDetail = ({
 
         {/* Оголошення з категорії */}
         {categoryListings.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-6" style={{ overflow: 'visible' }}>
             <h2 className="text-lg font-semibold mb-3 px-4" style={{ color: '#FFFFFF' }}>{t('listing.similarListings')}</h2>
-            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', width: '100vw', overflowY: 'visible' }}>
+            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', width: '100vw', overflowY: 'visible', paddingTop: '0.5rem', marginTop: '-0.5rem' }}>
               <div className="flex gap-3 pl-4 pb-2" style={{ minWidth: 'max-content' }}>
               {categoryListings.map(categoryListing => (
                   <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ overflow: 'visible' }}>
