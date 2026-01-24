@@ -146,7 +146,8 @@
     "moderationRejected": "Отклонено модератором",
     "rejected": "Отклонено",
     "rejectionReason": "Причина отклонения:",
-    "profileUpdated": "Профиль обновлен"
+    "profileUpdated": "Профиль обновлен",
+    "promotion": "Реклама"
   },
   "bazaar": {
     "allListings": "Все объявления",

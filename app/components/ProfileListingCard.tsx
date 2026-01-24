@@ -49,6 +49,42 @@ export const ProfileListingCard = ({
   const promotionDaysLeft = promotionEndsAt && isPromotionActive 
     ? Math.ceil((promotionEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) 
     : null;
+  
+  // Функція для отримання значка реклами
+  const getPromotionBadge = () => {
+    if (!hasPromotion || !isPromotionActive || !listing.promotionType) return null;
+    
+    const promotionType = listing.promotionType;
+    
+    // Для ВИП - показуємо значок VIP
+    if (promotionType === 'vip') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+          VIP
+        </span>
+      );
+    }
+    
+    // Для ТОП - показуємо значок TOP
+    if (promotionType === 'top_category') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+          TOP
+        </span>
+      );
+    }
+    
+    // Для Выделение цветом - показуємо значок
+    if (promotionType === 'highlighted') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+          Рамка
+        </span>
+      );
+    }
+    
+    return null;
+  };
 
   const imageUrl = useMemo(() => {
     if (listing.image) {
@@ -75,7 +111,12 @@ export const ProfileListingCard = ({
     return date.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  // Визначаємо стилі залежно від статусу
+  // Визначаємо стилі залежно від статусу та типу реклами
+  // Правила:
+  // - ТОП (top_category) - без рамки (стандартна рамка)
+  // - Выделение цветом (highlighted) - рамка без тіні
+  // - ВИП (vip) - рамка з тінню
+  // - ТОП + Выделение - рамка (як для Выделение)
   const getCardStyles = () => {
     if (isSold) {
       return 'bg-[#000000] border-2 border-gray-600 opacity-75';
@@ -89,9 +130,23 @@ export const ProfileListingCard = ({
     if (isDeactivated) {
       return 'bg-[#000000] border-2 border-orange-600 opacity-75';
     }
-    if (hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && !isRejected) {
-      return 'bg-[#000000] border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.3)]';
+    
+    // Стилі для реклами (тільки якщо активна)
+    if (hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && !isRejected && listing.promotionType) {
+      const promotionType = listing.promotionType;
+      
+      if (promotionType === 'vip') {
+        // ВИП - рамка з тінню
+        return 'bg-[#000000] border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+      } else if (promotionType === 'highlighted') {
+        // Выделение цветом - рамка без тіні
+        return 'bg-[#000000] border-2 border-[#D3F1A7]';
+      } else if (promotionType === 'top_category') {
+        // ТОП - без рамки (стандартна рамка)
+        return 'bg-[#000000] border-2 border-white/20';
+      }
     }
+    
     return 'bg-[#000000] border-2 border-white/20';
   };
 
@@ -263,13 +318,15 @@ export const ProfileListingCard = ({
             )}
             {/* Інформація про рекламу */}
             {hasPromotion && isPromotionActive && promotionDaysLeft !== null && (
-              <div className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500 font-semibold' : 'text-[#D3F1A7] font-semibold'}>
-                Реклама: {promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}
+              <div className={`flex items-center gap-1.5 ${isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500 font-semibold' : 'text-[#D3F1A7] font-semibold'}`}>
+                <span>{t('profile.promotion') || 'Реклама'}:</span>
+                {getPromotionBadge()}
+                <span>{promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}</span>
               </div>
             )}
             {hasPromotion && !isPromotionActive && (
               <div className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : 'text-white/50'}>
-                Реклама закінчилась
+                {t('profile.promotion') || 'Реклама'} закінчилась
               </div>
             )}
           </div>
@@ -298,11 +355,23 @@ export const ProfileListingCard = ({
         {/* Кнопки дій */}
         <div className="flex flex-col gap-2 justify-center relative">
           {/* Тег реклами - над іконками */}
-          {hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && !isRejected && (
+          {hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && !isRejected && listing.promotionType && (
             <div className="absolute -top-12 right-0 z-10">
-              <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded inline-block max-w-fit w-auto">
-                VIP
-              </div>
+              {listing.promotionType === 'vip' && (
+                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded inline-block max-w-fit w-auto whitespace-nowrap">
+                  VIP
+                </div>
+              )}
+              {listing.promotionType === 'top_category' && (
+                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded inline-block max-w-fit w-auto whitespace-nowrap">
+                  TOP
+                </div>
+              )}
+              {listing.promotionType === 'highlighted' && (
+                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded inline-block max-w-fit w-auto whitespace-nowrap">
+                  Рамка
+                </div>
+              )}
             </div>
           )}
 

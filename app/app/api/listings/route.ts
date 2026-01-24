@@ -352,12 +352,18 @@ export async function GET(request: NextRequest) {
       }
       
       // Правильне сортування з урахуванням реклами
-      // VIP > TOP > Highlighted > звичайні
+      // VIP - завжди в топі (приоритет 1)
+      // TOP категории - в топі тільки в своїй категорії (приоритет 2), на головній як звичайне (приоритет 4)
+      // Выделение цветом - завжди як звичайне (приоритет 4), тільки візуально відрізняється
+      // Перевіряємо, чи є фільтр по категорії для визначення приоритету TOP
+      const hasCategoryFilter = !!(category || subcategory);
       let orderByClause = `ORDER BY 
         CASE 
           WHEN l.promotionType = 'vip' AND datetime(l.promotionEnds) > datetime('now') THEN 1
-          WHEN l.promotionType = 'top_category' AND datetime(l.promotionEnds) > datetime('now') THEN 2
-          WHEN l.promotionType = 'highlighted' AND datetime(l.promotionEnds) > datetime('now') THEN 3
+          ${hasCategoryFilter 
+            ? "WHEN l.promotionType = 'top_category' AND datetime(l.promotionEnds) > datetime('now') THEN 2"
+            : "WHEN l.promotionType = 'top_category' AND datetime(l.promotionEnds) > datetime('now') THEN 4"
+          }
           ELSE 4
         END,`;
       

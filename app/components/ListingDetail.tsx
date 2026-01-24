@@ -850,12 +850,12 @@ export const ListingDetail = ({
 
         {/* Інші оголошення продавця */}
         {sellerListings.length > 0 && (
-          <div className="mb-6" style={{ position: 'relative', zIndex: 10 }}>
+          <div className="mb-6">
             <h2 className="text-lg font-semibold mb-3 px-4" style={{ color: '#FFFFFF' }}>{t('listing.otherSellerListings')}</h2>
-            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', position: 'relative', zIndex: 10, width: '100vw' }}>
-              <div className="flex gap-3 pl-4" style={{ minWidth: 'max-content' }}>
+            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', width: '100vw', overflowY: 'visible' }}>
+              <div className="flex gap-3 pl-4 pb-2" style={{ minWidth: 'max-content' }}>
               {sellerListings.map(sellerListing => (
-                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ position: 'relative', zIndex: 10, height: '400px' }}>
+                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ overflow: 'visible' }}>
                 <ListingCard 
                   listing={sellerListing}
                   isFavorite={favorites.has(sellerListing.id)}
@@ -878,12 +878,12 @@ export const ListingDetail = ({
 
         {/* Оголошення з категорії */}
         {categoryListings.length > 0 && (
-          <div className="mb-6" style={{ position: 'relative', zIndex: 10 }}>
+          <div className="mb-6">
             <h2 className="text-lg font-semibold mb-3 px-4" style={{ color: '#FFFFFF' }}>{t('listing.similarListings')}</h2>
-            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', position: 'relative', zIndex: 10, width: '100vw' }}>
-              <div className="flex gap-3 pl-4" style={{ minWidth: 'max-content' }}>
+            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', width: '100vw', overflowY: 'visible' }}>
+              <div className="flex gap-3 pl-4 pb-2" style={{ minWidth: 'max-content' }}>
               {categoryListings.map(categoryListing => (
-                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ position: 'relative', zIndex: 10, height: '400px' }}>
+                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ overflow: 'visible' }}>
                 <ListingCard 
                   listing={categoryListing}
                   isFavorite={favorites.has(categoryListing.id)}

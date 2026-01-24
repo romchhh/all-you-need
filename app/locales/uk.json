@@ -146,7 +146,8 @@
     "moderationRejected": "Відхилено модератором",
     "rejected": "Відхилено",
     "rejectionReason": "Причина відхилення:",
-    "profileUpdated": "Профіль оновлено"
+    "profileUpdated": "Профіль оновлено",
+    "promotion": "Реклама"
   },
   "bazaar": {
     "allListings": "Всі оголошення",
@@ -646,7 +647,7 @@
     "description": "Виберіть тип реклами для вашого оголошення",
     "skip": "Пропустити",
     "addPromotion": "Додати рекламу",
-    "highlighted": "Виділення кольором",
+    "highlighted": "Рамка",
     "highlightedDesc": "Кольоровий фон або рамка",
     "highlightedFeatures": "• Показується вище звичайних оголошень\n• Виділяється кольором\n• Привертає більше уваги",
     "highlightedPrice": "1,5€ / 7 днів",
