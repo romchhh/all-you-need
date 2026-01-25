@@ -3,7 +3,7 @@ import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from aiogram import Bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, FSInputFile
 from dotenv import load_dotenv
 import aiohttp
 
@@ -106,13 +106,28 @@ class ModerationManager:
                         return buttons_message.message_id
                     return None
             else:
-                message = await self.bot.send_message(
-                    chat_id=self.group_id,
-                    text=text,
-                    parse_mode="HTML",
-                    reply_markup=keyboard
-                )
-                return message.message_id
+                # Немає фото - використовуємо дефолтне фото
+                default_photo_path = self._get_default_photo_path()
+                
+                if default_photo_path:
+                    photo_file = FSInputFile(default_photo_path)
+                    message = await self.bot.send_photo(
+                        chat_id=self.group_id,
+                        photo=photo_file,
+                        caption=text,
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+                    return message.message_id
+                else:
+                    # Якщо дефолтного фото немає, надсилаємо тільки текст
+                    message = await self.bot.send_message(
+                        chat_id=self.group_id,
+                        text=text,
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+                    return message.message_id
                 
         except Exception as e:
             print(f"Помилка надсилання оголошення в групу модерації: {e}")
@@ -519,6 +534,20 @@ class ModerationManager:
         
         return result
     
+    def _get_default_photo_path(self) -> Optional[str]:
+        """Повертає шлях до дефолтного зображення"""
+        default_image_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            'Content',
+            'tgground.jpg'
+        )
+        
+        if not os.path.exists(default_image_path):
+            print(f"Default image not found at: {default_image_path}")
+            return None
+        
+        return default_image_path
+    
     async def _publish_to_channel(self, listing_id: int) -> Optional[int]:
         try:
             channel_id = os.getenv('TRADE_CHANNEL_ID')
@@ -782,12 +811,62 @@ class ModerationManager:
                     
                     return message_id
             else:
-                message = await self.bot.send_message(
-                    chat_id=channel_id,
-                    text=text,
-                    parse_mode="HTML"
-                )
-                message_id = message.message_id
+                # Немає фото - використовуємо дефолтне фото або текст з посиланням на бота
+                default_photo_path = self._get_default_photo_path()
+                
+                if default_photo_path:
+                    # Використовуємо дефолтне фото з кнопкою посилання на бота
+                    text_with_bot = text + bot_text
+                    
+                    # Отримуємо текст кнопки залежно від мови користувача
+                    if seller_telegram_id:
+                        button_text = t(seller_telegram_id, 'listing.submit_ad_button')
+                    else:
+                        # Якщо немає user_id, використовуємо російську мову (дефолт для каналу)
+                        button_text = "💼 Подать своё объявление"
+                    
+                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(
+                            text=button_text,
+                            url=bot_link
+                        )]
+                    ])
+                    
+                    photo_file = FSInputFile(default_photo_path)
+                    message = await self.bot.send_photo(
+                        chat_id=channel_id,
+                        photo=photo_file,
+                        caption=text_with_bot,
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+                    message_id = message.message_id
+                    
+                    # Зберігаємо message_id як JSON масив
+                    import json
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("PRAGMA table_info(TelegramListing)")
+                    columns = [row[1] for row in cursor.fetchall()]
+                    has_channel_message_id = 'channelMessageId' in columns
+                    
+                    if has_channel_message_id:
+                        cursor.execute("""
+                            UPDATE TelegramListing
+                            SET channelMessageId = ?
+                            WHERE id = ?
+                        """, (json.dumps([message_id]), listing_id))
+                        conn.commit()
+                    conn.close()
+                else:
+                    # Якщо дефолтного фото немає, надсилаємо текст з посиланням на бота
+                    text_with_bot = text + bot_text
+                    message = await self.bot.send_message(
+                        chat_id=channel_id,
+                        text=text_with_bot,
+                        parse_mode="HTML"
+                    )
+                    message_id = message.message_id
                 
                 # Застосовуємо всі вибрані тарифи
                 # Закріплення (pinned_12h або pinned_24h)
