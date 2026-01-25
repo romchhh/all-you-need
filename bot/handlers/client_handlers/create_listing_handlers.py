@@ -787,7 +787,7 @@ def capitalize_first_letter(text: str) -> str:
 
 def get_default_photo_path() -> str:
     """Повертає шлях до дефолтного зображення"""
-    default_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content', 'IMAGE 2026-01-25 16:23:45.jpg')
+    default_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content', 'tgground.jpg')
     
     # Перевіряємо чи файл існує
     if not os.path.exists(default_image_path):
