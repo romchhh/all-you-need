@@ -142,6 +142,13 @@ export const ListingDetail = ({
 
   // Скролимо нагору при відкритті нового оголошення - ЗАВЖДИ
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Вимкнення автоматичного відновлення позиції скролу браузером
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
     // Функція для скролу нагору - використовуємо кілька методів для надійності
     const forceScrollToTop = () => {
       if (typeof window === 'undefined') return;
@@ -155,21 +162,34 @@ export const ListingDetail = ({
         
         // Миттєвий скрол всіма можливими способами
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        window.scrollTo(0, 0);
         html.scrollTop = 0;
         body.scrollTop = 0;
         
         // Для Telegram WebApp та інших браузерів
-        if (window.scrollY !== 0) {
+        if (window.scrollY !== 0 || window.pageYOffset !== 0) {
           window.scroll(0, 0);
+          window.scrollTo(0, 0);
         }
         
         // Також скролимо всі можливі контейнери
-        const scrollableElements = document.querySelectorAll('[data-scroll-container]');
+        const scrollableElements = document.querySelectorAll('[data-scroll-container], [style*="overflow"], main, #__next');
         scrollableElements.forEach(el => {
           if (el instanceof HTMLElement) {
             el.scrollTop = 0;
+            el.scrollLeft = 0;
           }
         });
+
+        // Додатково скролимо body та html
+        if (document.body) {
+          document.body.scrollTop = 0;
+          document.body.scrollLeft = 0;
+        }
+        if (document.documentElement) {
+          document.documentElement.scrollTop = 0;
+          document.documentElement.scrollLeft = 0;
+        }
         
         // Відновлюємо smooth scroll через невелику затримку
         setTimeout(() => {
@@ -204,21 +224,28 @@ export const ListingDetail = ({
     // Додаткова перевірка після завантаження зображень та контенту
     const timeoutId5 = setTimeout(() => {
       // Перевіряємо, чи сторінка дійсно на верху
-      if (window.scrollY > 50) {
+      if (window.scrollY > 10 || window.pageYOffset > 10) {
         forceScrollToTop();
       }
     }, 300);
     
     const timeoutId6 = setTimeout(() => {
       // Фінальна перевірка після повного завантаження
-      if (window.scrollY > 50) {
+      if (window.scrollY > 10 || window.pageYOffset > 10) {
         forceScrollToTop();
       }
     }, 500);
 
+    const timeoutId7 = setTimeout(() => {
+      // Остання перевірка після повного рендерингу
+      if (window.scrollY > 10 || window.pageYOffset > 10) {
+        forceScrollToTop();
+      }
+    }, 800);
+
     // Слухаємо події завантаження зображень
     const handleImageLoad = () => {
-      if (window.scrollY > 50) {
+      if (window.scrollY > 10 || window.pageYOffset > 10) {
         forceScrollToTop();
       }
     };
@@ -231,8 +258,57 @@ export const ListingDetail = ({
         handleImageLoad();
       } else {
         img.addEventListener('load', handleImageLoad, { once: true });
+        img.addEventListener('error', handleImageLoad, { once: true });
       }
     });
+
+    // MutationObserver для відстеження змін DOM і скролу назад нагору
+    // Тільки протягом перших 2 секунд після відкриття
+    let observerActive = true;
+    const observer = new MutationObserver(() => {
+      if (observerActive && (window.scrollY > 10 || window.pageYOffset > 10)) {
+        // Якщо сторінка прокрутилася вниз через зміни DOM - скролимо назад
+        requestAnimationFrame(() => {
+          if (window.scrollY > 10 || window.pageYOffset > 10) {
+            forceScrollToTop();
+          }
+        });
+      }
+    });
+
+    // Спостерігаємо за змінами в DOM (тільки значні зміни)
+    observer.observe(document.body, {
+      childList: true,
+      subtree: false, // Тільки прямі дочірні елементи для кращої продуктивності
+      attributes: false // Не відстежуємо зміни атрибутів
+    });
+
+    // Вимкнення observer через 2 секунди
+    const observerTimeout = setTimeout(() => {
+      observerActive = false;
+      observer.disconnect();
+    }, 2000);
+
+    // Додатковий обробник для події scroll - перевіряємо позицію протягом перших 2 секунд
+    let scrollCheckActive = true;
+    const handleScroll = () => {
+      if (scrollCheckActive && (window.scrollY > 10 || window.pageYOffset > 10)) {
+        // Якщо сторінка прокрутилася вниз - скролимо назад
+        requestAnimationFrame(() => {
+          if (window.scrollY > 10 || window.pageYOffset > 10) {
+            forceScrollToTop();
+          }
+        });
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Через 2 секунди вимикаємо перевірку скролу
+    const scrollCheckTimeout = setTimeout(() => {
+      scrollCheckActive = false;
+      window.removeEventListener('scroll', handleScroll);
+    }, 2000);
 
     return () => {
       cancelAnimationFrame(rafId1);
@@ -243,8 +319,16 @@ export const ListingDetail = ({
       clearTimeout(timeoutId4);
       clearTimeout(timeoutId5);
       clearTimeout(timeoutId6);
+      clearTimeout(timeoutId7);
+      clearTimeout(observerTimeout);
+      clearTimeout(scrollCheckTimeout);
+      observerActive = false;
+      scrollCheckActive = false;
+      observer.disconnect();
+      window.removeEventListener('scroll', handleScroll);
       images.forEach(img => {
         img.removeEventListener('load', handleImageLoad);
+        img.removeEventListener('error', handleImageLoad);
       });
     };
   }, [listing.id]);
