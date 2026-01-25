@@ -253,6 +253,54 @@ def get_listing_confirmation_keyboard(user_id: int) -> InlineKeyboardMarkup:
                 text=t(user_id, 'create_listing.cancel_button'),
                 callback_data="cancel_listing"
             )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.edit_button'),
+                callback_data="edit_listing_preview"
+            )
+        ]
+    ])
+
+
+def get_edit_listing_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Клавіатура для вибору поля для редагування"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.edit_title'),
+                callback_data="edit_field_title"
+            ),
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.edit_description'),
+                callback_data="edit_field_description"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.edit_photos'),
+                callback_data="edit_field_photos"
+            ),
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.edit_category'),
+                callback_data="edit_field_category"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.edit_price'),
+                callback_data="edit_field_price"
+            ),
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.edit_location'),
+                callback_data="edit_field_location"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.back_to_preview'),
+                callback_data="back_to_preview"
+            )
         ]
     ])
 
@@ -262,13 +310,18 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
     if selected_tariffs is None:
         selected_tariffs = []
     
+    # Завжди включаємо базову публікацію
+    if 'standard' not in selected_tariffs:
+        selected_tariffs.append('standard')
+    
     # Визначаємо ціни та назви тарифів
+    # Для рекламних тарифів показуємо тільки додаткову вартість
     tariff_info = {
-        'standard': {'name': 'Звичайна публікація', 'price': 3.0, 'icon': '📌'},
-        'highlighted': {'name': 'Виділене оголошення', 'price': 4.5, 'icon': '⭐'},
-        'pinned_12h': {'name': 'Закріп на 12 годин', 'price': 5.5, 'icon': '📌'},
-        'pinned_24h': {'name': 'Закріп на 24 години', 'price': 7.5, 'icon': '📌'},
-        'story': {'name': 'Сторіс на 24 години', 'price': 5.0, 'icon': '📸'}
+        'standard': {'name': 'Звичайна публікація', 'price': 3.0, 'icon': '📌', 'base': True},
+        'highlighted': {'name': 'Виділене оголошення', 'price': 1.5, 'icon': '⭐', 'base': False},
+        'pinned_12h': {'name': 'Закріп на 12 годин', 'price': 2.5, 'icon': '📌', 'base': False},
+        'pinned_24h': {'name': 'Закріп на 24 години', 'price': 4.5, 'icon': '📌', 'base': False},
+        'story': {'name': 'Сторіс на 24 години', 'price': 5.0, 'icon': '📸', 'base': False}
     }
     
     keyboard = []
@@ -276,31 +329,38 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
     # Додаємо кнопки для кожного тарифу з чекбоксами
     for tariff_type, info in tariff_info.items():
         is_selected = tariff_type in selected_tariffs
-        checkbox = '✅' if is_selected else '☐'
-        button_text = f"{checkbox} {info['icon']} {info['name']} — {info['price']}€"
         
-        keyboard.append([
-            InlineKeyboardButton(
-                text=button_text,
-                callback_data=f"tariff_toggle_{tariff_type}"
-            )
-        ])
+        # Базова публікація завжди вибрана і не може бути знята
+        if info['base']:
+            checkbox = '✅'
+            button_text = f"{checkbox} {info['icon']} {info['name']} — {info['price']}€ (базова)"
+            # Не додаємо callback для базової публікації - вона не може бути знята
+            keyboard.append([
+                InlineKeyboardButton(
+                    text=button_text,
+                    callback_data="tariff_base_locked"
+                )
+            ])
+        else:
+            checkbox = '✅' if is_selected else '☐'
+            button_text = f"{checkbox} {info['icon']} {info['name']} — {info['price']}€"
+            
+            keyboard.append([
+                InlineKeyboardButton(
+                    text=button_text,
+                    callback_data=f"tariff_toggle_{tariff_type}"
+                )
+            ])
     
-    # Кнопка "Готово" якщо вибрано хоча б один тариф
-    if selected_tariffs:
-        total_price = sum(tariff_info[tariff]['price'] for tariff in selected_tariffs if tariff in tariff_info)
-        keyboard.append([
-            InlineKeyboardButton(
-                text=f"✅ Готово (Разом: {total_price}€)",
-                callback_data="tariff_confirm"
-            )
-        ])
+    # Завжди показуємо кнопку "Готово" (базова публікація завжди вибрана)
+    base_price = tariff_info['standard']['price']
+    additional_price = sum(tariff_info[tariff]['price'] for tariff in selected_tariffs if tariff != 'standard' and tariff in tariff_info)
+    total_price = base_price + additional_price
     
-    # Кнопка скасувати
     keyboard.append([
         InlineKeyboardButton(
-            text="❌ Скасувати",
-            callback_data="cancel_listing"
+            text=f"✅ Готово (Разом: {total_price}€)",
+            callback_data="tariff_confirm"
         )
     ])
     
@@ -336,14 +396,6 @@ def get_payment_method_keyboard(user_id: int, balance: float, amount: float, pay
                 callback_data="payment_card"
             )
         ])
-    
-    # Кнопка скасувати
-    keyboard.append([
-        InlineKeyboardButton(
-            text="❌ Скасувати",
-            callback_data="cancel_listing"
-        )
-    ])
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 

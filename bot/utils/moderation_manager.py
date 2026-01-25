@@ -15,6 +15,7 @@ from database_functions.telegram_listing_db import (
     update_telegram_listing_moderation_status,
     get_connection as get_db_connection
 )
+from utils.translations import t
 
 load_dotenv()
 
@@ -621,6 +622,18 @@ class ModerationManager:
             else:
                 seller_text = f"👤 <b>Продавець:</b> {seller_full_name}"
             
+            # Отримуємо username бота з .env
+            bot_username = os.getenv('BOT_USERNAME', 'TradeGroundBot')
+            bot_link = f"https://t.me/{bot_username}"
+            
+            # Отримуємо мову користувача для перекладу (використовуємо seller_telegram_id або дефолтну мову)
+            user_id_for_lang = seller_telegram_id if seller_telegram_id else None
+            if user_id_for_lang:
+                bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
+            else:
+                # Якщо немає user_id, використовуємо російську мову (дефолт для каналу)
+                bot_text = f"\n\n💼 <b>Хотите подать своё объявление?</b> <a href=\"{bot_link}\">Нажмите здесь 👉</a>"
+            
             text = f"""{title_prefix}{title_style}
 
 📄 {description}
@@ -641,11 +654,27 @@ class ModerationManager:
             
             if images and len(images) > 0:
                 if len(images) == 1:
+                    # Для одного фото - додаємо інлайн кнопку
+                    # Отримуємо текст кнопки залежно від мови користувача
+                    if seller_telegram_id:
+                        button_text = t(seller_telegram_id, 'listing.submit_ad_button')
+                    else:
+                        # Якщо немає user_id, використовуємо російську мову (дефолт для каналу)
+                        button_text = "💼 Подать своё объявление"
+                    
+                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(
+                            text=button_text,
+                            url=bot_link
+                        )]
+                    ])
+                    
                     message = await self.bot.send_photo(
                         chat_id=channel_id,
                         photo=images[0],
                         caption=text,
-                        parse_mode="HTML"
+                        parse_mode="HTML",
+                        reply_markup=keyboard
                     )
                     message_id = message.message_id
                     
@@ -690,12 +719,15 @@ class ModerationManager:
                     
                     return message_id
                 else:
+                    # Для медіа-групи - додаємо текст з посиланням в кінець caption
+                    text_with_bot = text + bot_text
+                    
                     media = []
                     for i, img in enumerate(images):
                         if i == 0:
                             media.append(InputMediaPhoto(
                                 media=img,
-                                caption=text,
+                                caption=text_with_bot,
                                 parse_mode="HTML"
                             ))
                         else:

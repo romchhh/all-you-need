@@ -316,6 +316,47 @@ function generateImageFilename(): string {
 }
 
 /**
+ * Безпечно парсить JSON рядок в масив
+ * Використовується для парсингу images та optimizedImages
+ */
+function safeParseJsonArray(jsonString: string | null | undefined, fallback: any[] = []): any[] {
+  if (!jsonString || typeof jsonString !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = jsonString.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  // Перевіряємо, чи це виглядає як JSON
+  const looksLikeJson = trimmed.startsWith('[') || trimmed.startsWith('{');
+  
+  if (!looksLikeJson) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    } else if (typeof parsed === 'string') {
+      return [parsed];
+    } else {
+      console.warn('[safeParseJsonArray] Parsed JSON is not an array or string:', typeof parsed);
+      return fallback;
+    }
+  } catch (e) {
+    console.error('[safeParseJsonArray] Failed to parse JSON:', {
+      error: e instanceof Error ? e.message : String(e),
+      jsonLength: trimmed.length,
+      jsonPreview: trimmed.substring(0, 100),
+    });
+    return fallback;
+  }
+}
+
+/**
  * Парсить існуючі зображення з JSON
  */
 export function parseExistingImages(images: string | string[]): string[] {
@@ -323,10 +364,42 @@ export function parseExistingImages(images: string | string[]): string[] {
     return images;
   }
   
-  try {
-    return typeof images === 'string' ? JSON.parse(images) : [];
-  } catch {
+  if (typeof images !== 'string') {
     return [];
+  }
+
+  const trimmed = images.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  // Перевіряємо, чи це виглядає як JSON
+  const looksLikeJson = trimmed.startsWith('[') || trimmed.startsWith('{');
+  
+  if (looksLikeJson) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((img: any) => img && typeof img === 'string' && img.trim());
+      } else if (typeof parsed === 'string') {
+        return [parsed];
+      } else {
+        console.warn('[parseExistingImages] Parsed JSON is not an array or string:', typeof parsed);
+        return [];
+      }
+    } catch (e) {
+      // Детальне логування помилки парсингу
+      console.error('[parseExistingImages] Failed to parse JSON:', {
+        error: e instanceof Error ? e.message : String(e),
+        imagesLength: trimmed.length,
+        imagesPreview: trimmed.substring(0, 100),
+      });
+      // Якщо не JSON, спробуємо як один рядок
+      return trimmed ? [trimmed] : [];
+    }
+  } else {
+    // Не JSON, використовуємо як один рядок
+    return trimmed ? [trimmed] : [];
   }
 }
 
@@ -579,15 +652,43 @@ export async function submitListingToModeration(
   const images = listingResult[0].images;
   let imageArray: string[] = [];
   
-  try {
-    imageArray = typeof images === 'string' ? JSON.parse(images) : images;
-    if (!Array.isArray(imageArray)) {
+  if (typeof images === 'string') {
+    const trimmed = images.trim();
+    if (!trimmed) {
       imageArray = [];
+    } else {
+      const looksLikeJson = trimmed.startsWith('[') || trimmed.startsWith('{');
+      if (looksLikeJson) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            imageArray = parsed;
+          } else if (typeof parsed === 'string') {
+            imageArray = [parsed];
+          } else {
+            console.warn('[submitListingToModeration] Parsed JSON is not an array or string');
+            imageArray = [];
+          }
+        } catch (e) {
+          console.error('[submitListingToModeration] Failed to parse images JSON:', {
+            error: e instanceof Error ? e.message : String(e),
+            imagesLength: trimmed.length,
+            imagesPreview: trimmed.substring(0, 100),
+          });
+          // Якщо не JSON, спробуємо як один рядок
+          imageArray = trimmed ? [trimmed] : [];
+        }
+      } else {
+        // Не JSON, використовуємо як один рядок
+        imageArray = trimmed ? [trimmed] : [];
+      }
     }
-  } catch (e) {
-    console.warn('[submitListingToModeration] Failed to parse images:', e);
-    imageArray = [];
+  } else if (Array.isArray(images)) {
+    imageArray = images;
   }
+  
+  // Фільтруємо порожні значення
+  imageArray = imageArray.filter(img => img && typeof img === 'string' && img.trim());
   
   if (imageArray.length === 0) {
     console.error('[submitListingToModeration] Listing has no images - cannot send to moderation:', listingId);

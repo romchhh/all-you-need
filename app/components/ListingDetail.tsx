@@ -154,7 +154,7 @@ export const ListingDetail = ({
         html.classList.remove('smooth-scroll');
         
         // Миттєвий скрол всіма можливими способами
-        window.scrollTo(0, 0);
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         html.scrollTop = 0;
         body.scrollTop = 0;
         
@@ -200,6 +200,39 @@ export const ListingDetail = ({
     const timeoutId2 = setTimeout(forceScrollToTop, 50);
     const timeoutId3 = setTimeout(forceScrollToTop, 100);
     const timeoutId4 = setTimeout(forceScrollToTop, 200);
+    
+    // Додаткова перевірка після завантаження зображень та контенту
+    const timeoutId5 = setTimeout(() => {
+      // Перевіряємо, чи сторінка дійсно на верху
+      if (window.scrollY > 50) {
+        forceScrollToTop();
+      }
+    }, 300);
+    
+    const timeoutId6 = setTimeout(() => {
+      // Фінальна перевірка після повного завантаження
+      if (window.scrollY > 50) {
+        forceScrollToTop();
+      }
+    }, 500);
+
+    // Слухаємо події завантаження зображень
+    const handleImageLoad = () => {
+      if (window.scrollY > 50) {
+        forceScrollToTop();
+      }
+    };
+    
+    // Додаємо обробники для всіх зображень
+    const images = document.querySelectorAll('img');
+    images.forEach(img => {
+      if (img.complete) {
+        // Зображення вже завантажене
+        handleImageLoad();
+      } else {
+        img.addEventListener('load', handleImageLoad, { once: true });
+      }
+    });
 
     return () => {
       cancelAnimationFrame(rafId1);
@@ -208,6 +241,11 @@ export const ListingDetail = ({
       clearTimeout(timeoutId2);
       clearTimeout(timeoutId3);
       clearTimeout(timeoutId4);
+      clearTimeout(timeoutId5);
+      clearTimeout(timeoutId6);
+      images.forEach(img => {
+        img.removeEventListener('load', handleImageLoad);
+      });
     };
   }, [listing.id]);
 
@@ -225,17 +263,31 @@ export const ListingDetail = ({
     }
 
     // Додатково перевіряємо та розгортаємо при скролі
+    // Але НЕ дозволяємо скрол вниз при відкритті - тільки вгору
+    let lastScrollY = window.scrollY;
     const handleScroll = () => {
       if (tg && tg.expand) {
         tg.expand();
       }
+      
+      // Якщо хтось намагається скролити вниз відразу після відкриття - блокуємо
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY && currentScrollY > 100 && Date.now() - (window as any).__listingOpenedAt < 1000) {
+        // Блокуємо скрол вниз, якщо сторінка була відкрита нещодавно
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
+      lastScrollY = currentScrollY;
     };
+
+    // Встановлюємо час відкриття для перевірки
+    (window as any).__listingOpenedAt = Date.now();
 
     // Додаємо обробник скролу для підтримки розгорнутого стану
     window.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
+      delete (window as any).__listingOpenedAt;
       // НЕ вимикаємо підтвердження закриття при виході, 
       // щоб воно залишалося активним (як на головній сторінці)
     };
@@ -313,21 +365,9 @@ export const ListingDetail = ({
         tg?.HapticFeedback.notificationOccurred('success');
         showToast(t('payments.paymentInfo'), 'info');
         
-        // Закриваємо мінідодаток перед редиректом на оплату
-        try {
-          if (tg?.close) {
-            tg.close();
-          }
-        } catch (e) {
-          console.error('[ListingDetail] Error closing WebApp:', e);
-        }
-        
-        // Перенаправляємо на сторінку оплати
-        if (tg?.openLink) {
-          tg.openLink(data.pageUrl);
-        } else {
-          window.location.href = data.pageUrl;
-        }
+        // Відкриваємо посилання на оплату всередині WebApp (не закриваємо його)
+        // Використовуємо window.location.href для відкриття в тому ж вікні
+        window.location.href = data.pageUrl;
         return;
       } else {
         showToast(t('promotions.promotionSuccess'), 'success');
@@ -689,7 +729,16 @@ export const ListingDetail = ({
         }}
       >
         {/* Галерея фото */}
-        <div className="px-4 pt-4" style={{ height: '400px' }}>
+        <div 
+          className="px-0 pt-4 pb-0" 
+          style={{ 
+            height: window.innerWidth < 768 ? '60vh' : '85vh',
+            minHeight: window.innerWidth < 768 ? '400px' : '500px',
+            maxHeight: window.innerWidth < 768 ? '500px' : '600px',
+            width: '100%',
+            ...(tg ? { paddingBottom: '0px' } : {})
+          }}
+        >
           <ImageGallery 
             images={images} 
             title={listing.title}
@@ -698,7 +747,12 @@ export const ListingDetail = ({
         </div>
 
         {/* Контент */}
-        <div className="p-4">
+        <div 
+          className="px-4 pb-4"
+          style={{
+            ...(tg ? { paddingTop: '0.25rem' } : { paddingTop: '0.5rem' })
+          }}
+        >
             {/* Ціна */}
             <div className="mb-4">
               <div className="flex items-center gap-2">

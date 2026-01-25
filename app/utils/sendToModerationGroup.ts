@@ -915,21 +915,52 @@ function getImages(images: string | string[]): string[] {
   let imageArray: string[] = [];
 
   if (typeof images === 'string') {
-    try {
-      imageArray = JSON.parse(images);
-    } catch {
-      // Якщо не JSON, спробуємо як один рядок
-      if (images.trim()) {
-        imageArray = [images];
-      } else {
-        imageArray = [];
+    // Перевіряємо, чи рядок не порожній
+    const trimmed = images.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    // Перевіряємо, чи це виглядає як JSON (починається з [ або {)
+    const looksLikeJson = trimmed.startsWith('[') || trimmed.startsWith('{');
+    
+    if (looksLikeJson) {
+      try {
+        // Валідуємо JSON перед парсингом
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          imageArray = parsed;
+        } else if (typeof parsed === 'string') {
+          // Якщо JSON повернув рядок, використовуємо його як один елемент
+          imageArray = [parsed];
+        } else {
+          console.warn('[getImages] Parsed JSON is not an array or string:', typeof parsed);
+          imageArray = [];
+        }
+      } catch (e) {
+        // Детальне логування помилки парсингу
+        console.error('[getImages] Failed to parse JSON:', {
+          error: e instanceof Error ? e.message : String(e),
+          imagesLength: trimmed.length,
+          imagesPreview: trimmed.substring(0, 100),
+          hasInvalidChars: /[^\x20-\x7E\u00A0-\uFFFF]/.test(trimmed),
+        });
+        // Якщо не JSON, спробуємо як один рядок
+        if (trimmed) {
+          imageArray = [trimmed];
+        } else {
+          imageArray = [];
+        }
       }
+    } else {
+      // Не JSON, використовуємо як один рядок
+      imageArray = [trimmed];
     }
   } else if (Array.isArray(images)) {
     imageArray = images;
   }
 
-  // Фільтруємо порожні значення
+  // Фільтруємо порожні значення та перевіряємо тип
   imageArray = imageArray.filter(img => img && typeof img === 'string' && img.trim());
 
   // Конвертуємо відносні URL в абсолютні для маркетплейсу

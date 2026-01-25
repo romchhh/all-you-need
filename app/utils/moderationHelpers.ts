@@ -161,9 +161,28 @@ async function refundListingPackage(
  */
 async function deleteListingImages(images: string | string[]): Promise<void> {
   try {
-    const imageArray = typeof images === 'string' ? JSON.parse(images) : images;
+    let imageArray: string[] = [];
+    if (typeof images === 'string') {
+      const trimmed = images.trim();
+      if (trimmed) {
+        const looksLikeJson = trimmed.startsWith('[') || trimmed.startsWith('{');
+        if (looksLikeJson) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            imageArray = Array.isArray(parsed) ? parsed : (typeof parsed === 'string' ? [parsed] : []);
+          } catch (e) {
+            console.error('[deleteListingImages] Failed to parse images JSON:', e);
+            imageArray = [trimmed];
+          }
+        } else {
+          imageArray = [trimmed];
+        }
+      }
+    } else if (Array.isArray(images)) {
+      imageArray = images;
+    }
     
-    if (!Array.isArray(imageArray)) {
+    if (!Array.isArray(imageArray) || imageArray.length === 0) {
       return;
     }
 

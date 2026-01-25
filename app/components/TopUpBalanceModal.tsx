@@ -98,22 +98,10 @@ export const TopUpBalanceModal = ({
       }
 
       if (data.pageUrl) {
-        // Закриваємо мінідодаток перед редиректом на оплату
-        try {
-          if (tg?.close) {
-            tg.close();
-          }
-        } catch (e) {
-          console.error('[TopUpBalanceModal] Error closing WebApp:', e);
-        }
-        
-        // Перенаправляємо на сторінку оплати
+        // Відкриваємо посилання на оплату всередині WebApp (не закриваємо його)
         tg?.HapticFeedback.notificationOccurred('success');
-        if (tg?.openLink) {
-          tg.openLink(data.pageUrl);
-        } else {
-          window.location.href = data.pageUrl;
-        }
+        // Використовуємо window.location.href для відкриття в тому ж вікні
+        window.location.href = data.pageUrl;
       } else {
         throw new Error('Payment page URL not received');
       }

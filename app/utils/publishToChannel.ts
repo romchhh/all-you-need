@@ -86,11 +86,19 @@ export async function publishListingToChannel(
     // Отримуємо зображення
     let images: string[] = [];
     if (typeof listingData.images === 'string') {
-      try {
-        images = JSON.parse(listingData.images);
-      } catch {
-        if (listingData.images.trim()) {
-          images = [listingData.images];
+      const trimmed = listingData.images.trim();
+      if (trimmed) {
+        const looksLikeJson = trimmed.startsWith('[') || trimmed.startsWith('{');
+        if (looksLikeJson) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            images = Array.isArray(parsed) ? parsed : (typeof parsed === 'string' ? [parsed] : []);
+          } catch (e) {
+            console.error('[publishToChannel] Failed to parse images JSON:', e);
+            images = [trimmed];
+          }
+        } else {
+          images = [trimmed];
         }
       }
     } else if (Array.isArray(listingData.images)) {

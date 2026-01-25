@@ -465,29 +465,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       if (data.paymentRequired && data.pageUrl) {
         console.log('[CreateListingFlow] ✅ PAYMENT REQUIRED - Redirecting to payment page:', data.pageUrl);
         
-        // Використовуємо той самий метод, що й TopUpBalanceModal
         tg?.HapticFeedback.notificationOccurred('success');
         showToast(t('payments.paymentInfo'), 'info');
         
-        // Закриваємо мінідодаток перед редиректом на оплату
-        try {
-          if (tg?.close) {
-            console.log('[CreateListingFlow] Closing WebApp before redirect');
-            tg.close();
-          }
-        } catch (e) {
-          console.error('[CreateListingFlow] Error closing WebApp:', e);
-        }
-        
-        // Перенаправляємо на сторінку оплати
-        // Використовуємо Telegram WebApp API якщо доступно, інакше window.location.href
-        if (tg?.openLink) {
-          console.log('[CreateListingFlow] Using tg.openLink for redirect');
-          tg.openLink(data.pageUrl);
-        } else {
-          console.log('[CreateListingFlow] Using window.location.href for redirect');
-          window.location.href = data.pageUrl;
-        }
+        // Відкриваємо посилання на оплату всередині WebApp (не закриваємо його)
+        // Використовуємо window.location.href для відкриття в тому ж вікні
+        window.location.href = data.pageUrl;
         
         console.log('[CreateListingFlow] ✅ RETURNING TRUE - Should stop flow');
         return true; // Зупиняємо флоу - чекаємо на оплату
@@ -565,27 +548,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         }
 
         if (packageData.paymentRequired && packageData.pageUrl) {
-          // Використовуємо той самий метод, що й TopUpBalanceModal
           tg?.HapticFeedback.notificationOccurred('success');
           showToast(t('payments.paymentInfo'), 'info');
           
-          // Закриваємо мінідодаток перед редиректом на оплату
-          try {
-            if (tg?.close) {
-              console.log('[CreateListingFlow] Closing WebApp before redirect');
-              tg.close();
-            }
-          } catch (e) {
-            console.error('[CreateListingFlow] Error closing WebApp:', e);
-          }
-          
-          // Перенаправляємо на сторінку оплати
-          // Використовуємо Telegram WebApp API якщо доступно, інакше window.location.href
-          if (tg?.openLink) {
-            tg.openLink(packageData.pageUrl);
-          } else {
-            window.location.href = packageData.pageUrl;
-          }
+          // Відкриваємо посилання на оплату всередині WebApp (не закриваємо його)
+          // Використовуємо window.location.href для відкриття в тому ж вікні
+          window.location.href = packageData.pageUrl;
           return;
         }
       }

@@ -85,50 +85,64 @@ export async function POST(request: NextRequest) {
         const currentStatus = listingStatus[0]?.status;
         const isRejected = currentStatus === 'rejected';
         
-        // Оновлюємо оголошення: встановлюємо рекламу та статус pending_moderation
+        // Оновлюємо оголошення
         const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
         const endsAt = new Date();
         endsAt.setDate(endsAt.getDate() + (promotion.promotionType === 'vip' ? 7 : promotion.promotionType === 'top_category' ? 3 : 1));
         
-        // Для відхилених оголошень також очищаємо причину відхилення
-        if (isRejected) {
-          await prisma.$executeRawUnsafe(
-            `UPDATE Listing SET 
-              promotionType = ?, 
-              promotionEnds = ?, 
-              status = 'pending_moderation',
-              moderationStatus = 'pending',
-              rejectionReason = NULL,
-              updatedAt = ? 
-            WHERE id = ?`,
-            promotion.promotionType,
-            endsAt.toISOString(),
-            nowStr,
-            promotion.listingId
-          );
+        // Якщо оголошення НЕ в статусі active або pending_moderation, відправляємо на модерацію
+        // (це означає, що воно було реактивовано і потребує модерації)
+        if (currentStatus !== 'active' && currentStatus !== 'pending_moderation') {
+          // Для відхилених оголошень також очищаємо причину відхилення
+          if (isRejected) {
+            await prisma.$executeRawUnsafe(
+              `UPDATE Listing SET 
+                promotionType = ?, 
+                promotionEnds = ?, 
+                status = 'pending_moderation',
+                moderationStatus = 'pending',
+                rejectionReason = NULL,
+                updatedAt = ? 
+              WHERE id = ?`,
+              promotion.promotionType,
+              endsAt.toISOString(),
+              nowStr,
+              promotion.listingId
+            );
+          } else {
+            await prisma.$executeRawUnsafe(
+              `UPDATE Listing SET 
+                promotionType = ?, 
+                promotionEnds = ?, 
+                status = 'pending_moderation',
+                moderationStatus = 'pending',
+                updatedAt = ? 
+              WHERE id = ?`,
+              promotion.promotionType,
+              endsAt.toISOString(),
+              nowStr,
+              promotion.listingId
+            );
+          }
+
+          // Відправляємо на модерацію в ТГ групу
+          const { submitListingToModeration } = await import('@/utils/listingHelpers');
+          await submitListingToModeration(promotion.listingId, isRejected).catch(err => {
+            console.error('[Webhook] Failed to send listing to moderation group:', err);
+          });
+
+          console.log(`Promotion payment confirmed for listing ${promotion.listingId}: ${promotion.promotionType}, status set to pending_moderation`);
         } else {
+          // Якщо вже active або pending_moderation, просто оновлюємо рекламу
           await prisma.$executeRawUnsafe(
-            `UPDATE Listing SET 
-              promotionType = ?, 
-              promotionEnds = ?, 
-              status = 'pending_moderation',
-              moderationStatus = 'pending',
-              updatedAt = ? 
-            WHERE id = ?`,
+            `UPDATE Listing SET promotionType = ?, promotionEnds = ?, updatedAt = ? WHERE id = ?`,
             promotion.promotionType,
             endsAt.toISOString(),
             nowStr,
             promotion.listingId
           );
+          console.log(`Promotion payment confirmed for listing ${promotion.listingId}: ${promotion.promotionType}, promotion updated without moderation`);
         }
-
-        // Відправляємо на модерацію в ТГ групу
-        const { submitListingToModeration } = await import('@/utils/listingHelpers');
-        await submitListingToModeration(promotion.listingId, isRejected).catch(err => {
-          console.error('[Webhook] Failed to send listing to moderation group:', err);
-        });
-
-        console.log(`Promotion payment confirmed for listing ${promotion.listingId}: ${promotion.promotionType}, status set to pending_moderation`);
       }
 
       // Перевіряємо ListingPackagePurchase

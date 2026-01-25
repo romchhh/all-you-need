@@ -170,9 +170,18 @@ export async function PUT(
                     listingId
                   ) as Array<{ optimizedImages: string | null }>;
                   
-                  const currentOptimized = existingOptimized[0]?.optimizedImages 
-                    ? JSON.parse(existingOptimized[0].optimizedImages) 
-                    : [];
+                  let currentOptimized: string[] = [];
+                  try {
+                    if (existingOptimized[0]?.optimizedImages) {
+                      const parsed = typeof existingOptimized[0].optimizedImages === 'string' 
+                        ? JSON.parse(existingOptimized[0].optimizedImages) 
+                        : existingOptimized[0].optimizedImages;
+                      currentOptimized = Array.isArray(parsed) ? parsed : [];
+                    }
+                  } catch (e) {
+                    console.error('[Update Listing] Error parsing optimizedImages:', e);
+                    currentOptimized = [];
+                  }
                   const finalOptimized = [...currentOptimized, ...optimizedUrls];
                   
                   await prisma.$executeRawUnsafe(
@@ -364,9 +373,18 @@ export async function PUT(
                     listingId
                   ) as Array<{ optimizedImages: string | null }>;
                   
-                  const currentOptimized = existingOptimized[0]?.optimizedImages 
-                    ? JSON.parse(existingOptimized[0].optimizedImages) 
-                    : [];
+                  let currentOptimized: string[] = [];
+                  try {
+                    if (existingOptimized[0]?.optimizedImages) {
+                      const parsed = typeof existingOptimized[0].optimizedImages === 'string' 
+                        ? JSON.parse(existingOptimized[0].optimizedImages) 
+                        : existingOptimized[0].optimizedImages;
+                      currentOptimized = Array.isArray(parsed) ? parsed : [];
+                    }
+                  } catch (e) {
+                    console.error('[Update Listing] Error parsing optimizedImages:', e);
+                    currentOptimized = [];
+                  }
                   const finalOptimized = [...currentOptimized, ...optimizedUrls];
                   
                   await prisma.$executeRawUnsafe(
@@ -436,9 +454,18 @@ export async function PUT(
                     listingId
                   ) as Array<{ optimizedImages: string | null }>;
                   
-                  const currentOptimized = existingOptimized[0]?.optimizedImages 
-                    ? JSON.parse(existingOptimized[0].optimizedImages) 
-                    : [];
+                  let currentOptimized: string[] = [];
+                  try {
+                    if (existingOptimized[0]?.optimizedImages) {
+                      const parsed = typeof existingOptimized[0].optimizedImages === 'string' 
+                        ? JSON.parse(existingOptimized[0].optimizedImages) 
+                        : existingOptimized[0].optimizedImages;
+                      currentOptimized = Array.isArray(parsed) ? parsed : [];
+                    }
+                  } catch (e) {
+                    console.error('[Update Listing] Error parsing optimizedImages:', e);
+                    currentOptimized = [];
+                  }
                   const finalOptimized = [...currentOptimized, ...optimizedUrls];
                   
                   await prisma.$executeRawUnsafe(
@@ -594,9 +621,18 @@ export async function PUT(
                     listingId
                   ) as Array<{ optimizedImages: string | null }>;
                   
-                  const currentOptimized = existingOptimized[0]?.optimizedImages 
-                    ? JSON.parse(existingOptimized[0].optimizedImages) 
-                    : [];
+                  let currentOptimized: string[] = [];
+                  try {
+                    if (existingOptimized[0]?.optimizedImages) {
+                      const parsed = typeof existingOptimized[0].optimizedImages === 'string' 
+                        ? JSON.parse(existingOptimized[0].optimizedImages) 
+                        : existingOptimized[0].optimizedImages;
+                      currentOptimized = Array.isArray(parsed) ? parsed : [];
+                    }
+                  } catch (e) {
+                    console.error('[Update Listing] Error parsing optimizedImages:', e);
+                    currentOptimized = [];
+                  }
                   const finalOptimized = [...currentOptimized, ...optimizedUrls];
                   
                   await prisma.$executeRawUnsafe(

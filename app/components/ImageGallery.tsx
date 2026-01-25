@@ -1,5 +1,5 @@
 import { Image as ImageIcon } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 
 interface ImageGalleryProps {
   images: string[];
@@ -8,150 +8,8 @@ interface ImageGalleryProps {
 }
 
 export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [imageLoading, setImageLoading] = useState(true);
-  const [imageError, setImageError] = useState(false);
-  const touchStartX = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
-
-  // Скидаємо currentIndex до 0 при зміні images (новий товар)
-  // Використовуємо JSON.stringify для надійного відстеження змін масиву
-  useEffect(() => {
-    setCurrentIndex(0);
-    setImageLoading(true);
-    setImageError(false);
-  }, [JSON.stringify(images)]);
-
-  useEffect(() => {
-    setImageLoading(true);
-    setImageError(false);
-  }, [currentIndex]);
-
-  const nextImage = () => {
-    setCurrentIndex((prev) => {
-      const next = (prev + 1) % images.length;
-      return next;
-    });
-  };
-
-  const prevImage = () => {
-    setCurrentIndex((prev) => {
-      const prevIndex = (prev - 1 + images.length) % images.length;
-      return prevIndex;
-    });
-  };
-
-  const goToImage = (index: number) => {
-    setCurrentIndex(index);
-  };
-
-  // Swipe жести з плавністю
-  const minSwipeDistance = 50;
-  const [swipeOffset, setSwipeOffset] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const touchStartY = useRef<number | null>(null);
-  const touchEndY = useRef<number | null>(null);
-  const lastMoveTime = useRef<number>(0);
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchEndX.current = null;
-    touchEndY.current = null;
-    touchStartX.current = e.targetTouches[0].clientX;
-    touchStartY.current = e.targetTouches[0].clientY;
-    setIsSwiping(false);
-    setSwipeOffset(0);
-    lastMoveTime.current = Date.now();
-    // Не блокуємо подію - дозволяємо передати на батьківський елемент для скролу сторінки
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (touchStartX.current === null || touchStartY.current === null) return;
-    
-    const currentTime = Date.now();
-    lastMoveTime.current = currentTime;
-    
-    const currentX = e.targetTouches[0].clientX;
-    const currentY = e.targetTouches[0].clientY;
-    touchEndX.current = currentX;
-    touchEndY.current = currentY;
-    const diffX = touchEndX.current - touchStartX.current;
-    const diffY = currentY - touchStartY.current;
-    const absDiffY = Math.abs(diffY);
-    const absX = Math.abs(diffX);
-    
-    // Якщо рух ще невеликий - чекаємо більше руху для визначення напрямку
-    if (absX < 10 && absDiffY < 10) {
-      return; // Не визначено напрямок - чекаємо
-    }
-    
-    // Якщо вертикальний рух значно більший за горизонтальний (в 2+ рази) - дозволяємо скрол сторінки
-    if (absDiffY > absX * 2 && absDiffY > 15) {
-      // Це вертикальний скрол - повністю ігноруємо та дозволяємо події пройти далі
-      touchStartX.current = null;
-      touchStartY.current = null;
-      touchEndX.current = null;
-      touchEndY.current = null;
-      setIsSwiping(false);
-      setSwipeOffset(0);
-      // НЕ викликаємо preventDefault, щоб дозволити скрол сторінки
-      return;
-    }
-    
-    // Якщо горизонтальний рух більший за вертикальний або горизонтальний рух достатньо великий
-    const isHorizontalSwipe = absX > absDiffY || (absX > 20 && absDiffY < absX * 0.7);
-    
-    if (isHorizontalSwipe) {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsSwiping(true);
-      const maxOffset = 250;
-      const smoothOffset = diffX * 0.8;
-      setSwipeOffset(Math.max(-maxOffset, Math.min(maxOffset, smoothOffset)));
-    }
-  };
-
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartX.current || touchEndX.current === null || touchStartY.current === null || touchEndY.current === null) {
-      setIsSwiping(false);
-      setSwipeOffset(0);
-      touchStartX.current = null;
-      touchStartY.current = null;
-      touchEndX.current = null;
-      touchEndY.current = null;
-      return;
-    }
-    
-    const distanceX = touchEndX.current - touchStartX.current;
-    const distanceY = touchEndY.current - touchStartY.current;
-    const absX = Math.abs(distanceX);
-    const absY = Math.abs(distanceY);
-    
-    // Перевіряємо, чи це дійсно горизонтальний свайп
-    // Горизонтальний рух має бути більшим за вертикальний або достатньо великим
-    const isHorizontalSwipe = (absX > absY && absX > minSwipeDistance) || (absX > 30 && absY < absX * 0.7);
-
-    setIsSwiping(false);
-    setSwipeOffset(0);
-    touchStartX.current = null;
-    touchStartY.current = null;
-    touchEndX.current = null;
-    touchEndY.current = null;
-
-    // Обробляємо тільки якщо це явно горизонтальний свайп
-    if (isHorizontalSwipe) {
-      const isLeftSwipe = distanceX < 0; // Свайп вліво = наступне фото
-      const isRightSwipe = distanceX > 0; // Свайп вправо = попереднє фото
-
-      if (isLeftSwipe) {
-        nextImage(); // Свайп вліво = наступне фото
-      } else if (isRightSwipe) {
-        prevImage(); // Свайп вправо = попереднє фото
-      }
-    }
-    // Для вертикальних свайпів не блокуємо подію - дозволяємо скрол сторінки
-  };
+  const [activeIndex, setActiveIndex] = useState(0);
 
   // Мемоізуємо URL зображень, щоб уникнути зайвих запитів
   const imageUrls = useMemo(() => {
@@ -168,164 +26,112 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
     });
   }, [images]);
 
-  if (images.length === 0) {
+  // Скидаємо activeIndex до 0 при зміні images (новий товар)
+  useEffect(() => {
+    setActiveIndex(0);
+    if (containerRef.current) {
+      containerRef.current.scrollLeft = 0;
+    }
+  }, [JSON.stringify(images)]);
+
+  const onScroll = () => {
+    if (!containerRef.current) return;
+    const scrollLeft = containerRef.current.scrollLeft;
+    const width = containerRef.current.clientWidth;
+    setActiveIndex(Math.round(scrollLeft / width));
+  };
+
+  const goToImage = (index: number) => {
+    if (!containerRef.current) return;
+    const width = containerRef.current.clientWidth;
+    containerRef.current.scrollTo({
+      left: width * index,
+      behavior: 'smooth',
+    });
+  };
+
+  if (!images.length) {
+    const placeholderHeight = typeof window !== 'undefined' && window.innerWidth < 768 ? '300px' : '400px';
     return (
-      <div className="relative aspect-square flex items-center justify-center rounded-2xl overflow-hidden" style={{ background: 'rgba(0, 0, 0, 0.5)', minHeight: '400px' }}>
+      <div className="flex items-center justify-center rounded-2xl bg-black/50" style={{ height: placeholderHeight, width: '100%' }}>
         <div className="text-center">
-          <ImageIcon size={64} className="mx-auto mb-2" style={{ color: 'rgba(211, 241, 167, 0.5)' }} />
-          <p className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Немає фото</p>
+          <ImageIcon size={window.innerWidth < 768 ? 48 : 64} className="mx-auto mb-2 text-white/40" />
+          <p className="text-sm text-white/70">Немає фото</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className="relative w-full overflow-hidden ImageGallery rounded-2xl"
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onClick={() => onImageClick?.(currentIndex)}
-      style={{ 
-        touchAction: 'pan-x pan-y pinch-zoom', // Дозволяємо горизонтальні та вертикальні свайпи
-        position: 'relative',
-        width: '100%',
-        maxWidth: '100%',
-        height: '100%',
-        minHeight: '400px',
-        cursor: onImageClick ? 'pointer' : 'default',
-        background: 'rgba(0, 0, 0, 0.5)',
-        WebkitOverflowScrolling: 'touch',
-        overscrollBehavior: 'none', // Забороняємо власний скрол контейнера
-        WebkitTapHighlightColor: 'transparent',
-        pointerEvents: 'auto',
-        overflow: 'hidden' // Забороняємо скрол всередині контейнера
-      }}
-    >
-      {/* Skeleton loader */}
-      {imageLoading && !imageError && (
-        <div 
-          className="absolute inset-0 animate-pulse" 
-          style={{ 
-            background: 'rgba(63, 83, 49, 0.5)',
-            transition: 'opacity 0.3s ease-in-out'
-          }} 
-        />
-      )}
-      
-      {/* Placeholder або зображення */}
-      {imageError ? (
-        <div 
-          className="absolute inset-0 flex items-center justify-center" 
-          style={{ 
-            background: 'rgba(0, 0, 0, 0.5)',
-            touchAction: 'none' // Блокуємо скрол в плейсхолдері
-          }}
-        >
-          <div className="text-center">
-            <ImageIcon size={64} className="mx-auto mb-2" style={{ color: 'rgba(211, 241, 167, 0.5)' }} />
-            <p className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Помилка завантаження</p>
-          </div>
-        </div>
-      ) : (
-        <div 
-          className="absolute inset-0 flex items-center justify-center"
-          style={{
-            transform: `translateX(${swipeOffset}px)`,
-            transition: isSwiping ? 'none' : 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-            willChange: isSwiping ? 'transform' : 'auto',
-            touchAction: 'pan-y pinch-zoom', // Дозволяємо вертикальний скрол для передачі на батьківський елемент
-            pointerEvents: 'auto'
-          }}
-        >
-          {imageLoading && (
-            <div 
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                touchAction: 'none', // Блокуємо скрол в плейсхолдері завантаження
-                zIndex: 1
-              }}
+    <div className="relative w-full h-full">
+      {/* Scroll container */}
+      <div
+        ref={containerRef}
+        onScroll={onScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth rounded-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {imageUrls.map((src, index) => (
+          <div
+            key={`${images[index]}-${index}`}
+            className="snap-start shrink-0 w-full h-full relative"
+            style={{ minWidth: '100%' }}
+            onClick={() => onImageClick?.(index)}
+          >
+            {src ? (
+              <img
+                src={src}
+                alt={`${title} ${index + 1}`}
+                className="w-full h-full object-cover select-none"
+                draggable={false}
+                loading={index === 0 ? 'eager' : 'lazy'}
+                decoding="async"
+                onError={(e) => {
+                  console.error('Error loading image:', images[index], src);
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const placeholder = target.parentElement?.querySelector('.error-placeholder');
+                  if (placeholder) {
+                    (placeholder as HTMLElement).style.display = 'flex';
+                  }
+                }}
+              />
+            ) : null}
+            {/* Placeholder для помилки завантаження */}
+            <div
+              className="error-placeholder absolute inset-0 flex items-center justify-center bg-black/50"
+              style={{ display: src ? 'none' : 'flex' }}
             >
               <div className="text-center">
-                <ImageIcon size={64} className="mx-auto mb-2" style={{ color: 'rgba(211, 241, 167, 0.5)' }} />
+                <ImageIcon size={64} className="mx-auto mb-2 text-white/40" />
+                <p className="text-sm text-white/70">Помилка завантаження</p>
               </div>
             </div>
-          )}
-          <img 
-            src={imageUrls[currentIndex]}
-            alt={`${title} - фото ${currentIndex + 1}`}
-            className={`w-full object-cover ${
-              imageLoading ? 'opacity-0' : 'opacity-100'
-            }`}
-            loading={currentIndex === 0 ? 'eager' : 'lazy'}
-            decoding="async"
-            sizes="100vw"
-            key={`img-${currentIndex}-${images.length}-${images[currentIndex]}`}
-            onLoad={() => {
-              setImageLoading(false);
-              setImageError(false);
-            }}
-            onError={(e) => {
-              setImageLoading(false);
-              setImageError(true);
-              console.error('Error loading image:', images[currentIndex]);
-            }}
-            style={{
-              display: 'block',
-              visibility: 'visible',
-              opacity: imageError ? 0 : 1,
-              transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-              touchAction: 'pan-y pinch-zoom', // Дозволяємо вертикальний скрол для передачі на батьківський елемент
-              pointerEvents: 'auto',
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover'
-            }}
-          />
-        </div>
-      )}
-      
+          </div>
+        ))}
+      </div>
+
+      {/* Dots */}
       {images.length > 1 && (
-        <>
-          {/* Індикатор фото - зверху справа */}
-          <div 
-            className="absolute top-4 right-4 backdrop-blur-sm text-xs font-medium px-3 py-1.5 rounded-full z-20"
-            style={{ 
-              position: 'absolute',
-              top: '1rem',
-              right: '1rem',
-              left: 'auto',
-              zIndex: 20,
-              pointerEvents: 'none',
-              background: 'rgba(211, 241, 167, 0.9)',
-              color: '#000000'
-            }}
-          >
-            {currentIndex + 1} / {images.length}
-          </div>
-
-
-          {/* Точки індикації - знизу по центру */}
-          <div 
-            className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-2 z-20"
-          >
-            {images.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`w-2 h-2 rounded-full transition-all`}
-                style={{
-                  background: index === currentIndex ? '#D3F1A7' : 'rgba(211, 241, 167, 0.5)',
-                  width: index === currentIndex ? '24px' : '8px'
-                }}
-                aria-label={`Перейти до фото ${index + 1}`}
-              />
-            ))}
-          </div>
-        </>
+        <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2 z-20">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              onClick={(e) => {
+                e.stopPropagation();
+                goToImage(i);
+              }}
+              className="h-2 rounded-full transition-all cursor-pointer"
+              style={{
+                width: i === activeIndex ? 20 : 8,
+                background: i === activeIndex ? '#D3F1A7' : 'rgba(211,241,167,.5)',
+              }}
+              aria-label={`Перейти до фото ${i + 1}`}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

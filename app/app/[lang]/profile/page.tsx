@@ -60,6 +60,10 @@ const ProfilePage = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const previousListingRef = useRef<Listing | null>(null); // Зберігаємо картку товару перед відкриттям профілю продавця
+  const scrollPositionKey = 'profileScrollPosition';
+  const lastViewedListingIdKey = 'profileLastViewedListingId';
+  const isReturningFromListing = useRef(false);
+  const hasScrolledOnThisMount = useRef(false);
   
   // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {
@@ -167,9 +171,107 @@ const ProfilePage = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [selectedListing, selectedSeller]);
 
+  // Зберігаємо позицію скролу при скролі
+  useEffect(() => {
+    if (selectedListing || selectedSeller) return;
+    
+    const handleScroll = () => {
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(scrollPositionKey, scrollY.toString());
+      }
+    };
+    
+    // Throttle scroll events
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    
+    window.addEventListener('scroll', throttledScroll, { passive: true });
+    return () => window.removeEventListener('scroll', throttledScroll);
+  }, [selectedListing, selectedSeller]);
+
+  // Функція для скролу до останнього переглянутого оголошення
+  const scrollToLastViewedListing = useCallback(() => {
+    // Скролимо тільки якщо користувач повертається назад з товару
+    if (!isReturningFromListing.current) {
+      return;
+    }
+    
+    if (typeof window === 'undefined' || selectedListing || selectedSeller) {
+      return;
+    }
+    
+    const lastViewedId = localStorage.getItem(lastViewedListingIdKey);
+    if (!lastViewedId) {
+      // Якщо немає ID, використовуємо збережену позицію скролу
+      const savedPosition = localStorage.getItem(scrollPositionKey);
+      if (savedPosition) {
+        const position = parseInt(savedPosition, 10);
+        if (!isNaN(position) && position > 0) {
+          window.scrollTo({ top: position, behavior: 'auto' });
+        }
+      }
+      isReturningFromListing.current = false;
+      return;
+    }
+    
+    const listingId = parseInt(lastViewedId, 10);
+    if (isNaN(listingId)) {
+      isReturningFromListing.current = false;
+      return;
+    }
+    
+    // Спробуємо знайти елемент кілька разів з різними затримками
+    const tryScroll = (attempt: number = 0) => {
+      const listingElement = document.querySelector(`[data-listing-id="${listingId}"]`) as HTMLElement;
+      
+      if (listingElement) {
+        // Елемент знайдено - прокручуємо до нього
+        listingElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+        isReturningFromListing.current = false;
+        return true;
+      } else if (attempt < 10) {
+        // Елемент не знайдено - спробуємо ще раз через деякий час
+        setTimeout(() => tryScroll(attempt + 1), 300);
+        return false;
+      } else {
+        // Елемент не знайдено після багатьох спроб - використовуємо fallback
+        const savedPosition = localStorage.getItem(scrollPositionKey);
+        if (savedPosition) {
+          const position = parseInt(savedPosition, 10);
+          if (!isNaN(position) && position > 0) {
+            window.scrollTo({ top: position, behavior: 'auto' });
+          }
+        }
+        isReturningFromListing.current = false;
+        return false;
+      }
+    };
+    
+    // Починаємо спроби через невелику затримку, щоб DOM встиг відрендеритися
+    setTimeout(() => tryScroll(), 300);
+  }, [selectedListing, selectedSeller]);
+
   useEffect(() => {
     if (selectedListing || selectedSeller) {
       savedScrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
+      
+      // Зберігаємо ID оголошення перед відкриттям
+      if (selectedListing && typeof window !== 'undefined') {
+        localStorage.setItem(lastViewedListingIdKey, selectedListing.id.toString());
+      }
       
       const scrollToTop = () => {
         window.scrollTo({ top: 0, behavior: 'auto' });
@@ -188,7 +290,13 @@ const ProfilePage = () => {
         });
       });
     } else {
-      if (savedScrollPositionRef.current > 0) {
+      // Відновлюємо позицію скролу при закритті деталей
+      if (isReturningFromListing.current && !hasScrolledOnThisMount.current) {
+        hasScrolledOnThisMount.current = true;
+        setTimeout(() => {
+          scrollToLastViewedListing();
+        }, 500);
+      } else if (savedScrollPositionRef.current > 0) {
         const scrollPos = savedScrollPositionRef.current;
         setTimeout(() => {
           window.scrollTo({ top: scrollPos, behavior: 'smooth' });
@@ -196,7 +304,7 @@ const ProfilePage = () => {
         }, 150);
       }
     }
-  }, [selectedListing, selectedSeller]);
+  }, [selectedListing, selectedSeller, scrollToLastViewedListing]);
 
   const renderContent = () => {
     if (selectedSeller) {
@@ -236,17 +344,34 @@ const ProfilePage = () => {
           listing={selectedListing}
           isFavorite={favorites.has(selectedListing.id)}
           onClose={() => {
-            savedScrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
+            // Встановлюємо прапорець, що користувач повертається з товару
+            isReturningFromListing.current = true;
+            hasScrolledOnThisMount.current = false;
+            
+            // Зберігаємо позицію перед закриттям (на випадок, якщо вона змінилася)
+            const currentScroll = window.scrollY || document.documentElement.scrollTop;
+            if (currentScroll > 0) {
+              savedScrollPositionRef.current = currentScroll;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(scrollPositionKey, currentScroll.toString());
+              }
+            }
             setSelectedListing(null);
           }}
           onBack={() => {
-            // Якщо є selectedSeller, повертаємося до профілю, інакше закриваємо товар
-            if (selectedSeller) {
-              setSelectedListing(null);
-            } else {
-              savedScrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
-              setSelectedListing(null);
+            // Встановлюємо прапорець, що користувач повертається з товару
+            isReturningFromListing.current = true;
+            hasScrolledOnThisMount.current = false;
+            
+            // Зберігаємо позицію перед закриттям (на випадок, якщо вона змінилася)
+            const currentScroll = window.scrollY || document.documentElement.scrollTop;
+            if (currentScroll > 0) {
+              savedScrollPositionRef.current = currentScroll;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(scrollPositionKey, currentScroll.toString());
+              }
             }
+            setSelectedListing(null);
           }}
           onToggleFavorite={toggleFavorite}
           onSelectListing={setSelectedListing}
@@ -268,8 +393,47 @@ const ProfilePage = () => {
       );
     }
 
-    return <ProfileTab key={refreshKey} tg={tg} onSelectListing={setSelectedListing} onCreateListing={() => setIsCreateListingModalOpen(true)} onEditModalChange={setIsEditModalOpen} />;
+    return (
+      <ProfileTab 
+        key={refreshKey} 
+        tg={tg} 
+        onSelectListing={(listing) => {
+          // Зберігаємо ID оголошення перед відкриттям
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(lastViewedListingIdKey, listing.id.toString());
+          }
+          setSelectedListing(listing);
+        }} 
+        onCreateListing={() => setIsCreateListingModalOpen(true)} 
+        onEditModalChange={setIsEditModalOpen} 
+      />
+    );
   };
+
+  // Відновлюємо позицію скролу при монтуванні ProfileTab (якщо повертаємося з товару)
+  useEffect(() => {
+    if (!selectedListing && !selectedSeller && isReturningFromListing.current && !hasScrolledOnThisMount.current) {
+      hasScrolledOnThisMount.current = true;
+      setTimeout(() => {
+        scrollToLastViewedListing();
+      }, 500);
+    }
+  }, [refreshKey, selectedListing, selectedSeller, scrollToLastViewedListing]);
+
+  // Скидаємо прапорець при першому завантаженні сторінки
+  useEffect(() => {
+    // При першому завантаженні (коли немає selectedListing) скидаємо прапорець
+    if (!selectedListing && !selectedSeller) {
+      // Невелика затримка, щоб переконатися, що це не повернення з товару
+      const timer = setTimeout(() => {
+        if (!selectedListing && !selectedSeller) {
+          isReturningFromListing.current = false;
+          hasScrolledOnThisMount.current = false;
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Функція для оновлення даних (pull-to-refresh)
   const handleRefresh = useCallback(async () => {

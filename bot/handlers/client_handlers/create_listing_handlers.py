@@ -12,7 +12,8 @@ from keyboards.client_keyboards import (
     get_publication_tariff_keyboard,
     get_payment_method_keyboard,
     get_german_cities_keyboard,
-    get_continue_photos_keyboard
+    get_continue_photos_keyboard,
+    get_edit_listing_keyboard
 )
 from database_functions.telegram_listing_db import (
     get_user_id_by_telegram_id,
@@ -26,7 +27,7 @@ from database_functions.client_db import check_user, get_user_balance, deduct_us
 from utils.moderation_manager import ModerationManager
 from utils.monopay_functions import create_publication_payment_link
 from main import bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, FSInputFile
 import os
 from datetime import datetime, timedelta
 
@@ -97,10 +98,24 @@ async def process_title(message: types.Message, state: FSMContext):
         return
     
     await state.update_data(title=title)
+    
+    # Перевіряємо, чи це редагування (є дані про інші поля)
+    data = await state.get_data()
+    is_editing = data.get('description') is not None or data.get('category_name') is not None
+    
+    if is_editing:
+        # Якщо редагуємо, повертаємося до preview
+        try:
+            await message.delete()
+        except:
+            pass
+        await show_preview(user_id, state, message=message)
+        return
+    
+    # Якщо створюємо нове, переходимо до наступного кроку
     await state.set_state(CreateListing.waiting_for_description)
     
     # Видаляємо попереднє повідомлення про назву (промпт) та повідомлення користувача
-    data = await state.get_data()
     last_message_id = data.get('last_message_id')
     if last_message_id:
         try:
@@ -146,11 +161,25 @@ async def process_description(message: types.Message, state: FSMContext):
         return
     
     await state.update_data(description=description)
+    
+    # Перевіряємо, чи це редагування
+    data = await state.get_data()
+    is_editing = data.get('category_name') is not None or data.get('location') is not None
+    
+    if is_editing:
+        # Якщо редагуємо, повертаємося до preview
+        try:
+            await message.delete()
+        except:
+            pass
+        await show_preview(user_id, state, message=message)
+        return
+    
+    # Якщо створюємо нове, переходимо до наступного кроку
     await state.set_state(CreateListing.waiting_for_photos)
     await state.update_data(photos=[], media_group_limit_notified=[])
     
     # Видаляємо попереднє повідомлення про опис (промпт) та повідомлення користувача
-    data = await state.get_data()
     last_message_id = data.get('last_message_id')
     if last_message_id:
         try:
@@ -166,7 +195,8 @@ async def process_description(message: types.Message, state: FSMContext):
     
     sent_message = await message.answer(
         t(user_id, 'create_listing.photos_prompt'),
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=get_continue_photos_keyboard(user_id)
     )
     await state.update_data(last_message_id=sent_message.message_id)
 
@@ -360,9 +390,11 @@ async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext
     data = await state.get_data()
     photos = data.get('photos', [])
     
+    # Якщо фото немає, позначаємо що використовується дефолтне зображення
     if not photos or len(photos) == 0:
-        await callback.answer("❌ Обов'язково потрібно додати хоча б одне фото!", show_alert=True)
-        return
+        default_photo_path = get_default_photo_path()
+        if default_photo_path:
+            await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
     
     # Очищаємо оброблені медіа групи при переході до наступного кроку
     await state.update_data(processed_media_groups={}, media_group_responses={}, media_group_limit_notified=[])
@@ -376,14 +408,37 @@ async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext
         except:
             pass
     
+    # Видаляємо промпт про фото
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    # Перевіряємо, чи це редагування
+    is_editing = data.get('category_name') is not None or data.get('location') is not None
+    
     await callback.answer()
-    await process_category_selection(callback.message, state)
+    
+    if is_editing:
+        # Якщо редагуємо, повертаємося до preview
+        await show_preview(user_id, state, callback=callback)
+    else:
+        # Якщо створюємо нове, переходимо до наступного кроку
+        await process_category_selection(callback.message, state)
 
 
 @router.message(CreateListing.waiting_for_photos, F.text == "/skip")
 async def skip_photos_handler(message: types.Message, state: FSMContext):   
     user_id = message.from_user.id
-    await message.answer("❌ <b>Не можна пропустити додавання фото!</b>\n\nБудь ласка, надішліть хоча б одне фото. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
+    # Видаляємо повідомлення користувача
+    try:
+        await message.delete()
+    except:
+        pass
+    # Можна пропустити фото - використовується дефолтне зображення
+    await message.answer("✅ <b>Фото пропущено.</b> Буде використано стандартне зображення.\n\nНатисніть кнопку 'Продовжити' для продовження.", parse_mode="HTML")
 
 
 @router.message(CreateListing.waiting_for_photos, F.text)
@@ -442,8 +497,20 @@ async def process_category(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer("❌ Категорія не знайдена", show_alert=True)
         return
     
-    await state.set_state(CreateListing.waiting_for_price)
     await state.update_data(category_id=category_id, category_name=selected_category['name'])
+    
+    # Перевіряємо, чи це редагування
+    data = await state.get_data()
+    is_editing = data.get('location') is not None or data.get('price') is not None
+    
+    if is_editing:
+        # Якщо редагуємо, повертаємося до preview
+        await callback.answer()
+        await show_preview(user_id, state, callback=callback)
+        return
+    
+    # Якщо створюємо нове, переходимо до наступного кроку
+    await state.set_state(CreateListing.waiting_for_price)
     
     # Створюємо клавіатуру з кнопкою "Договірна"
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -487,12 +554,22 @@ async def process_price_negotiable(callback: types.CallbackQuery, state: FSMCont
     
     # Зберігаємо "Договірна" як ціну
     await state.update_data(price="Договірна", isNegotiable=True)
+    
+    # Перевіряємо, чи це редагування
+    data = await state.get_data()
+    is_editing = data.get('location') is not None
+    
+    if is_editing:
+        # Якщо редагуємо, повертаємося до preview
+        await callback.answer(t(user_id, 'create_listing.price_negotiable_set'))
+        await show_preview(user_id, state, callback=callback)
+        return
+    
+    # Якщо створюємо нове, переходимо до наступного кроку
     await state.set_state(CreateListing.waiting_for_location)
     
-    location_text = t(user_id, 'create_listing.location_prompt') + "\n\n<i>Або оберіть місто зі списку:</i>"
-    
     await callback.message.edit_text(
-        location_text,
+        t(user_id, 'create_listing.location_prompt'),
         parse_mode="HTML",
         reply_markup=get_german_cities_keyboard(user_id)
     )
@@ -523,12 +600,24 @@ async def process_price(message: types.Message, state: FSMContext):
                 # Зберігаємо як рядок діапазону
                 price = f"{price_min}-{price_max}"
                 await state.update_data(price=price, priceMin=price_min, priceMax=price_max)
+                
+                # Перевіряємо, чи це редагування
+                data = await state.get_data()
+                is_editing = data.get('location') is not None
+                
+                if is_editing:
+                    # Якщо редагуємо, повертаємося до preview
+                    try:
+                        await message.delete()
+                    except:
+                        pass
+                    await show_preview(user_id, state, message=message)
+                    return
+                
+                # Якщо створюємо нове, переходимо до наступного кроку
                 await state.set_state(CreateListing.waiting_for_location)
                 
-                location_text = t(user_id, 'create_listing.location_prompt') + "\n\n<i>Або оберіть місто зі списку:</i>"
-                
                 # Видаляємо попереднє повідомлення якщо є
-                data = await state.get_data()
                 last_message_id = data.get('last_message_id')
                 if last_message_id:
                     try:
@@ -537,7 +626,7 @@ async def process_price(message: types.Message, state: FSMContext):
                         pass
                 
                 sent_message = await message.answer(
-                    location_text,
+                    t(user_id, 'create_listing.location_prompt'),
                     parse_mode="HTML",
                     reply_markup=get_german_cities_keyboard(user_id)
                 )
@@ -557,12 +646,24 @@ async def process_price(message: types.Message, state: FSMContext):
         return
     
     await state.update_data(price=price)
+    
+    # Перевіряємо, чи це редагування
+    data = await state.get_data()
+    is_editing = data.get('location') is not None
+    
+    if is_editing:
+        # Якщо редагуємо, повертаємося до preview
+        try:
+            await message.delete()
+        except:
+            pass
+        await show_preview(user_id, state, message=message)
+        return
+    
+    # Якщо створюємо нове, переходимо до наступного кроку
     await state.set_state(CreateListing.waiting_for_location)
     
-    location_text = t(user_id, 'create_listing.location_prompt') + "\n\n<i>Або оберіть місто зі списку:</i>"
-    
     # Видаляємо попереднє повідомлення якщо є
-    data = await state.get_data()
     last_message_id = data.get('last_message_id')
     if last_message_id:
         try:
@@ -571,7 +672,7 @@ async def process_price(message: types.Message, state: FSMContext):
             pass
     
     sent_message = await message.answer(
-        location_text,
+        t(user_id, 'create_listing.location_prompt'),
         parse_mode="HTML",
         reply_markup=get_german_cities_keyboard(user_id)
     )
@@ -614,50 +715,18 @@ async def process_city_selection(callback: types.CallbackQuery, state: FSMContex
     
     await state.update_data(location=city_name)
     
+    # Перевіряємо, чи це редагування (якщо вже є всі дані)
     data = await state.get_data()
-    preview_text = build_preview(user_id, data)
-    photos = data.get('photos', [])
-    
-    await state.set_state(CreateListing.waiting_for_confirmation)
-    
-    # Видаляємо попереднє повідомлення з клавіатурою міст
-    try:
-        await callback.message.delete()
-    except:
-        pass
-    
-    # Відправляємо фото/медіа-групу з preview
-    if photos and len(photos) > 0:
-        if len(photos) == 1:
-            # Для одного фото
-            await callback.message.answer_photo(
-                photo=photos[0],
-                caption=preview_text,
-                parse_mode="HTML"
-            )
-        else:
-            # Для кількох фото - медіа-група
-            media = []
-            for i, photo_id in enumerate(photos):
-                if i == 0:
-                    media.append(InputMediaPhoto(
-                        media=photo_id,
-                        caption=preview_text,
-                        parse_mode="HTML"
-                    ))
-                else:       
-                    media.append(InputMediaPhoto(media=photo_id))
-            
-            await callback.message.answer_media_group(media=media)
-    
-    # Відправляємо окреме повідомлення з кнопками підтвердження (без дублювання інформації)
-    await callback.message.answer(
-        t(user_id, 'create_listing.preview_confirm'),
-        parse_mode="HTML",
-        reply_markup=get_listing_confirmation_keyboard(user_id)
-    )
+    is_editing = data.get('title') is not None and data.get('description') is not None and data.get('category_name') is not None
     
     await callback.answer()
+    
+    if is_editing:
+        # Якщо редагуємо, повертаємося до preview
+        await show_preview(user_id, state, callback=callback)
+    else:
+        # Якщо створюємо нове, показуємо preview
+        await show_preview(user_id, state, callback=callback)
 
 
 @router.message(CreateListing.waiting_for_location)
@@ -701,53 +770,12 @@ async def process_location(message: types.Message, state: FSMContext):
         except:
             pass
     
-    preview_text = build_preview(user_id, data)
-    photos = data.get('photos', [])
-    
-    await state.set_state(CreateListing.waiting_for_confirmation)
-    
-    if photos and len(photos) > 0:
-        if len(photos) == 1:
-            # Для одного фото - попередній перегляд в caption, потім окреме повідомлення з кнопками
-            await message.answer_photo(
-                photo=photos[0],
-                caption=preview_text,
-                parse_mode="HTML"
-            )
-            # Відправляємо окреме повідомлення з кнопками підтвердження (без дублювання інформації)
-            await message.answer(
-                t(user_id, 'create_listing.preview_confirm'),
-                parse_mode="HTML",
-                reply_markup=get_listing_confirmation_keyboard(user_id)
-            )
-        else:
-            # Для кількох фото - попередній перегляд в caption першого фото
-            media = []
-            for i, photo_id in enumerate(photos):
-                if i == 0:
-                    media.append(InputMediaPhoto(
-                        media=photo_id,
-                        caption=preview_text,
-                        parse_mode="HTML"
-                    ))
-                else:       
-                    media.append(InputMediaPhoto(media=photo_id))
-            
-            sent_messages = await message.answer_media_group(media=media)
-            
-            # Відправляємо окреме повідомлення з кнопками підтвердження (без дублювання інформації)
-            await message.answer(
-                t(user_id, 'create_listing.preview_confirm'),
-                parse_mode="HTML",
-                reply_markup=get_listing_confirmation_keyboard(user_id)
-            )
-    else:
-        # Якщо немає фото (не повинно бути, але на всяк випадок)
-        await message.answer(
-            preview_text,
-            parse_mode="HTML",
-            reply_markup=get_listing_confirmation_keyboard(user_id)
-        )
+    # Показуємо preview (працює і для створення, і для редагування)
+    try:
+        await message.delete()
+    except:
+        pass
+    await show_preview(user_id, state, message=message)
 
 
 def capitalize_first_letter(text: str) -> str:
@@ -755,6 +783,18 @@ def capitalize_first_letter(text: str) -> str:
     if not text:
         return text
     return text[0].upper() + text[1:] if len(text) > 1 else text.upper()
+
+
+def get_default_photo_path() -> str:
+    """Повертає шлях до дефолтного зображення"""
+    default_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content', 'IMAGE 2026-01-25 16:23:45.jpg')
+    
+    # Перевіряємо чи файл існує
+    if not os.path.exists(default_image_path):
+        print(f"Default image not found at: {default_image_path}")
+        return None
+    
+    return default_image_path
 
 
 def build_preview(user_id: int, data: dict) -> str:
@@ -803,9 +843,14 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     
     photos = data.get('photos', [])
+    # Якщо фото немає, перевіряємо чи є дефолтне зображення
     if not photos or len(photos) == 0:
-        await callback.answer("❌ Помилка: потрібно додати хоча б одне фото!", show_alert=True)
-        return
+        default_photo_path = get_default_photo_path()
+        if not default_photo_path:
+            await callback.answer("❌ Помилка: не вдалося знайти дефолтне зображення!", show_alert=True)
+            return
+        # Позначаємо що використовується дефолтне фото (шлях буде використаний при публікації)
+        await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
     
     db_user_id = get_user_id_by_telegram_id(user_id)
     if not db_user_id:
@@ -869,30 +914,30 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         # Отримуємо баланс користувача
         user_balance = get_user_balance(user_id)
         
-        # Ініціалізуємо список вибраних тарифів
-        await state.update_data(selected_tariffs=[])
+        # Ініціалізуємо список вибраних тарифів (базова публікація завжди включена)
+        await state.update_data(selected_tariffs=['standard'])
         
         tariff_text = f"""💰 <b>Оберіть тарифи для публікації оголошення:</b>
 
 💵 <b>Ваш баланс:</b> {user_balance:.2f}€
 
-<b>Можна вибрати кілька тарифів одночасно:</b>
-
-📌 <b>Звичайна публікація</b> — 3€
+📌 <b>Звичайна публікація</b> — 3€ (базова, обов'язкова)
 • Стандартний пост
 • Без виділень
 • Публікується в загальний потік
 
-⭐ <b>Виділене оголошення</b> — 4,5€
+<b>Додаткові рекламні опції:</b>
+
+⭐ <b>Виділене оголошення</b> — 1,5€
 • Емодзі на початку
 • Жирний заголовок
 • Візуально виділяється серед звичайних
 
-📌 <b>Закріп на 12 годин</b> — 5,5€
+📌 <b>Закріп на 12 годин</b> — 2,5€
 • Закріплюється зверху каналу
 • Автоматично знімається після закінчення терміну
 
-📌 <b>Закріп на 24 години</b> — 7,5€
+📌 <b>Закріп на 24 години</b> — 4,5€
 • Закріплюється зверху каналу
 • На 24 години
 
@@ -901,12 +946,12 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
 • Формат: текст + кнопка
 • Посилання на оголошення / профіль
 
-<i>Натисніть на тариф, щоб вибрати/зняти вибір. Коли виберете всі потрібні тарифи, натисніть "Готово".</i>"""
+<i>Базова публікація (3€) включена за замовчуванням. Оберіть додаткові рекламні опції, якщо потрібно.</i>"""
         
         await callback.message.answer(
             tariff_text,
             parse_mode="HTML",
-            reply_markup=get_publication_tariff_keyboard(user_id, [])
+            reply_markup=get_publication_tariff_keyboard(user_id, ['standard'])
         )
         await callback.answer()
         
@@ -929,6 +974,268 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
             "✅",
             reply_markup=get_main_menu_keyboard(user_id)
         )
+
+
+async def show_preview(user_id: int, state: FSMContext, message: types.Message = None, callback: types.CallbackQuery = None):
+    """Показує preview оголошення з кнопками підтвердження"""
+    data = await state.get_data()
+    preview_text = build_preview(user_id, data)
+    photos = data.get('photos', [])
+    
+    await state.set_state(CreateListing.waiting_for_confirmation)
+    
+    # Якщо фото немає, використовуємо дефолтне зображення
+    use_default_photo = False
+    if not photos or len(photos) == 0:
+        default_photo_path = get_default_photo_path()
+        if default_photo_path:
+            use_default_photo = True
+            # Зберігаємо маркер, що використовується дефолтне фото
+            await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
+    
+    target_message = callback.message if callback else message
+    
+    if photos and len(photos) > 0:
+        if len(photos) == 1:
+            # Для одного фото
+            if callback:
+                try:
+                    await callback.message.delete()
+                except:
+                    pass
+                await callback.message.answer_photo(
+                    photo=photos[0],
+                    caption=preview_text,
+                    parse_mode="HTML"
+                )
+            else:
+                await message.answer_photo(
+                    photo=photos[0],
+                    caption=preview_text,
+                    parse_mode="HTML"
+                )
+        else:
+            # Для кількох фото - медіа-група
+            media = []
+            for i, photo_id in enumerate(photos):
+                if i == 0:
+                    media.append(InputMediaPhoto(
+                        media=photo_id,
+                        caption=preview_text,
+                        parse_mode="HTML"
+                    ))
+                else:       
+                    media.append(InputMediaPhoto(media=photo_id))
+            
+            if callback:
+                try:
+                    await callback.message.delete()
+                except:
+                    pass
+                await callback.message.answer_media_group(media=media)
+            else:
+                await message.answer_media_group(media=media)
+    elif use_default_photo:
+        # Використовуємо дефолтне фото безпосередньо з FSInputFile
+        default_photo_path = get_default_photo_path()
+        if default_photo_path:
+            photo_file = FSInputFile(default_photo_path)
+            if callback:
+                try:
+                    await callback.message.delete()
+                except:
+                    pass
+                await callback.message.answer_photo(
+                    photo=photo_file,
+                    caption=preview_text,
+                    parse_mode="HTML"
+                )
+            else:
+                await message.answer_photo(
+                    photo=photo_file,
+                    caption=preview_text,
+                    parse_mode="HTML"
+                )
+    
+    # Відправляємо окреме повідомлення з кнопками підтвердження
+    if callback:
+        await callback.message.answer(
+            t(user_id, 'create_listing.preview_confirm'),
+            parse_mode="HTML",
+            reply_markup=get_listing_confirmation_keyboard(user_id)
+        )
+        await callback.answer()
+    else:
+        await message.answer(
+            t(user_id, 'create_listing.preview_confirm'),
+            parse_mode="HTML",
+            reply_markup=get_listing_confirmation_keyboard(user_id)
+        )
+
+
+@router.callback_query(F.data == "edit_listing_preview", CreateListing.waiting_for_confirmation)
+async def edit_listing_preview(callback: types.CallbackQuery, state: FSMContext):
+    """Показує клавіатуру для вибору поля для редагування"""
+    user_id = callback.from_user.id
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.edit_select_field'),
+            parse_mode="HTML",
+            reply_markup=get_edit_listing_keyboard(user_id)
+        )
+    except:
+        await callback.message.answer(
+            t(user_id, 'create_listing.edit_select_field'),
+            parse_mode="HTML",
+            reply_markup=get_edit_listing_keyboard(user_id)
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_preview", CreateListing.waiting_for_confirmation)
+async def back_to_preview(callback: types.CallbackQuery, state: FSMContext):
+    """Повертає до preview після редагування"""
+    user_id = callback.from_user.id
+    await show_preview(user_id, state, callback=callback)
+
+
+@router.callback_query(F.data == "edit_field_title", CreateListing.waiting_for_confirmation)
+async def edit_field_title(callback: types.CallbackQuery, state: FSMContext):
+    """Починає редагування назви"""
+    user_id = callback.from_user.id
+    await state.set_state(CreateListing.waiting_for_title)
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.title_prompt'),
+            parse_mode="HTML"
+        )
+    except:
+        await callback.message.answer(
+            t(user_id, 'create_listing.title_prompt'),
+            parse_mode="HTML"
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_field_description", CreateListing.waiting_for_confirmation)
+async def edit_field_description(callback: types.CallbackQuery, state: FSMContext):
+    """Починає редагування опису"""
+    user_id = callback.from_user.id
+    await state.set_state(CreateListing.waiting_for_description)
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.description_prompt'),
+            parse_mode="HTML"
+        )
+    except:
+        await callback.message.answer(
+            t(user_id, 'create_listing.description_prompt'),
+            parse_mode="HTML"
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_field_photos", CreateListing.waiting_for_confirmation)
+async def edit_field_photos(callback: types.CallbackQuery, state: FSMContext):
+    """Починає редагування фото"""
+    user_id = callback.from_user.id
+    await state.set_state(CreateListing.waiting_for_photos)
+    await state.update_data(photos=[], media_group_limit_notified=[])
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.photos_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_continue_photos_keyboard(user_id)
+        )
+    except:
+        await callback.message.answer(
+            t(user_id, 'create_listing.photos_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_continue_photos_keyboard(user_id)
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_field_category", CreateListing.waiting_for_confirmation)
+async def edit_field_category(callback: types.CallbackQuery, state: FSMContext):
+    """Починає редагування категорії"""
+    user_id = callback.from_user.id
+    categories = get_categories()
+    
+    if not categories:
+        await callback.answer("❌ Помилка: категорії не знайдені", show_alert=True)
+        return
+    
+    await state.set_state(CreateListing.waiting_for_category)
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.category_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_categories_keyboard(user_id, categories)
+        )
+    except:
+        await callback.message.answer(
+            t(user_id, 'create_listing.category_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_categories_keyboard(user_id, categories)
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_field_price", CreateListing.waiting_for_confirmation)
+async def edit_field_price(callback: types.CallbackQuery, state: FSMContext):
+    """Починає редагування ціни"""
+    user_id = callback.from_user.id
+    await state.set_state(CreateListing.waiting_for_price)
+    
+    # Створюємо клавіатуру з кнопкою "Договірна"
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="💬 Договірна",
+            callback_data="price_negotiable"
+        )]
+    ])
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.price_prompt'),
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+    except:
+        await callback.message.answer(
+            t(user_id, 'create_listing.price_prompt'),
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "edit_field_location", CreateListing.waiting_for_confirmation)
+async def edit_field_location(callback: types.CallbackQuery, state: FSMContext):
+    """Починає редагування міста"""
+    user_id = callback.from_user.id
+    await state.set_state(CreateListing.waiting_for_location)
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.location_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_german_cities_keyboard(user_id)
+        )
+    except:
+        await callback.message.answer(
+            t(user_id, 'create_listing.location_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_german_cities_keyboard(user_id)
+        )
+    await callback.answer()
 
 
 @router.callback_query(F.data == "cancel_listing")
@@ -1332,6 +1639,12 @@ async def refresh_listing(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer("❌ Помилка при оновленні оголошення", show_alert=True)
 
 
+@router.callback_query(F.data == "tariff_base_locked", CreateListing.waiting_for_publication_tariff)
+async def tariff_base_locked(callback: types.CallbackQuery):
+    """Обробник для заблокованої базової публікації"""
+    await callback.answer("📌 Базова публікація (3€) обов'язкова та не може бути знята", show_alert=True)
+
+
 @router.callback_query(F.data.startswith("tariff_toggle_"), CreateListing.waiting_for_publication_tariff)
 async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMContext):
     """Перемикає вибір тарифу (додає/прибирає з вибраних)"""
@@ -1346,13 +1659,18 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
     
     tariff_type = callback.data.replace("tariff_toggle_", "")
     
-    # Визначаємо ціни тарифів
+    # Не дозволяємо зняти базову публікацію
+    if tariff_type == 'standard':
+        await callback.answer("📌 Базова публікація обов'язкова та не може бути знята", show_alert=True)
+        return
+    
+    # Визначаємо ціни тарифів (додаткова вартість для рекламних)
     tariff_prices = {
-        'standard': 3.0,
-        'highlighted': 4.5,
-        'pinned_12h': 5.5,
-        'pinned_24h': 7.5,
-        'story': 5.0
+        'standard': 3.0,  # Базова публікація
+        'highlighted': 1.5,  # Додаткова вартість
+        'pinned_12h': 2.5,  # Додаткова вартість
+        'pinned_24h': 4.5,  # Додаткова вартість
+        'story': 5.0  # Додаткова вартість
     }
     
     if tariff_type not in tariff_prices:
@@ -1364,10 +1682,20 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
     if not isinstance(selected_tariffs, list):
         selected_tariffs = []
     
+    # Завжди включаємо базову публікацію
+    if 'standard' not in selected_tariffs:
+        selected_tariffs.append('standard')
+    
     # Перемикаємо вибір
     if tariff_type in selected_tariffs:
         selected_tariffs.remove(tariff_type)
-        await callback.answer(f"❌ {tariff_type} видалено з вибраних")
+        tariff_names = {
+            'highlighted': 'Виділене оголошення',
+            'pinned_12h': 'Закріп на 12 годин',
+            'pinned_24h': 'Закріп на 24 години',
+            'story': 'Сторіс на 24 години'
+        }
+        await callback.answer(f"❌ {tariff_names.get(tariff_type, tariff_type)} видалено")
     else:
         # Якщо вибирається pinned_24h, видаляємо pinned_12h і навпаки (взаємовиключні)
         if tariff_type == 'pinned_24h' and 'pinned_12h' in selected_tariffs:
@@ -1376,7 +1704,13 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
             selected_tariffs.remove('pinned_24h')
         
         selected_tariffs.append(tariff_type)
-        await callback.answer(f"✅ {tariff_type} додано до вибраних")
+        tariff_names = {
+            'highlighted': 'Виділене оголошення',
+            'pinned_12h': 'Закріп на 12 годин',
+            'pinned_24h': 'Закріп на 24 години',
+            'story': 'Сторіс на 24 години'
+        }
+        await callback.answer(f"✅ {tariff_names.get(tariff_type, tariff_type)} додано")
     
     # Оновлюємо список у стані
     await state.update_data(selected_tariffs=selected_tariffs)
@@ -1384,8 +1718,10 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
     # Отримуємо баланс користувача
     user_balance = get_user_balance(user_id)
     
-    # Перераховуємо загальну суму
-    total_amount = sum(tariff_prices[t] for t in selected_tariffs if t in tariff_prices)
+    # Перераховуємо загальну суму (базова + додаткові)
+    base_price = tariff_prices['standard']
+    additional_price = sum(tariff_prices[t] for t in selected_tariffs if t != 'standard' and t in tariff_prices)
+    total_amount = base_price + additional_price
     
     # Оновлюємо повідомлення
     tariff_text = f"""💰 <b>Оберіть тарифи для публікації оголошення:</b>
@@ -1393,15 +1729,32 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
 💵 <b>Ваш баланс:</b> {user_balance:.2f}€
 💰 <b>Загальна сума:</b> {total_amount:.2f}€
 
-<b>Можна вибрати кілька тарифів одночасно:</b>
+📌 <b>Звичайна публікація</b> — 3€ (базова, обов'язкова)
+• Стандартний пост
+• Без виділень
+• Публікується в загальний потік
 
-📌 <b>Звичайна публікація</b> — 3€
-⭐ <b>Виділене оголошення</b> — 4,5€
-📌 <b>Закріп на 12 годин</b> — 5,5€
-📌 <b>Закріп на 24 години</b> — 7,5€
+<b>Додаткові рекламні опції:</b>
+
+⭐ <b>Виділене оголошення</b> — 1,5€
+• Емодзі на початку
+• Жирний заголовок
+• Візуально виділяється серед звичайних
+
+📌 <b>Закріп на 12 годин</b> — 2,5€
+• Закріплюється зверху каналу
+• Автоматично знімається після закінчення терміну
+
+📌 <b>Закріп на 24 години</b> — 4,5€
+• Закріплюється зверху каналу
+• На 24 години
+
 📸 <b>Сторіс на 24 години</b> — 5€
+• 1 сторіс
+• Формат: текст + кнопка
+• Посилання на оголошення / профіль
 
-<i>Натисніть на тариф, щоб вибрати/зняти вибір. Коли виберете всі потрібні тарифи, натисніть "Готово".</i>"""
+<i>Базова публікація (3€) включена за замовчуванням. Оберіть додаткові рекламні опції, якщо потрібно.</i>"""
     
     try:
         await callback.message.edit_text(
@@ -1430,17 +1783,21 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
         await state.clear()
         return
     
+    # Завжди включаємо базову публікацію
+    if 'standard' not in selected_tariffs:
+        selected_tariffs.append('standard')
+    
     if not selected_tariffs or len(selected_tariffs) == 0:
-        await callback.answer("❌ Будь ласка, виберіть хоча б один тариф", show_alert=True)
+        await callback.answer("❌ Помилка: базовий тариф не знайдено", show_alert=True)
         return
     
-    # Визначаємо ціни тарифів
+    # Визначаємо ціни тарифів (додаткова вартість для рекламних)
     tariff_prices = {
-        'standard': 3.0,
-        'highlighted': 4.5,
-        'pinned_12h': 5.5,
-        'pinned_24h': 7.5,
-        'story': 5.0
+        'standard': 3.0,  # Базова публікація
+        'highlighted': 1.5,  # Додаткова вартість
+        'pinned_12h': 2.5,  # Додаткова вартість
+        'pinned_24h': 4.5,  # Додаткова вартість
+        'story': 5.0  # Додаткова вартість
     }
     
     tariff_names = {
@@ -1451,8 +1808,10 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
         'story': 'Сторіс на 24 години'
     }
     
-    # Розраховуємо загальну суму
-    total_amount = sum(tariff_prices[t] for t in selected_tariffs if t in tariff_prices)
+    # Розраховуємо загальну суму (базова + додаткові)
+    base_price = tariff_prices['standard']
+    additional_price = sum(tariff_prices[t] for t in selected_tariffs if t != 'standard' and t in tariff_prices)
+    total_amount = base_price + additional_price
     
     # Зберігаємо тарифи як JSON у БД
     import json
@@ -1486,11 +1845,14 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
     user_balance = get_user_balance(user_id)
     
     # Формуємо список вибраних тарифів для відображення
-    selected_tariffs_text = "\n".join([
-        f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€"
-        for t in selected_tariffs
-        if t in tariff_prices
-    ])
+    selected_tariffs_text = []
+    for t in selected_tariffs:
+        if t in tariff_prices:
+            if t == 'standard':
+                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (базова)")
+            else:
+                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (додатково)")
+    selected_tariffs_text = "\n".join(selected_tariffs_text)
     
     payment_method_text = f"""💳 <b>Оберіть спосіб оплати:</b>
 
@@ -1561,19 +1923,22 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
     }
     
     tariff_prices = {
-        'standard': 3.0,
-        'highlighted': 4.5,
-        'pinned_12h': 5.5,
-        'pinned_24h': 7.5,
-        'story': 5.0
+        'standard': 3.0,  # Базова публікація
+        'highlighted': 1.5,  # Додаткова вартість
+        'pinned_12h': 2.5,  # Додаткова вартість
+        'pinned_24h': 4.5,  # Додаткова вартість
+        'story': 5.0  # Додаткова вартість
     }
     
     # Формуємо список вибраних тарифів
-    selected_tariffs_text = "\n".join([
-        f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€"
-        for t in selected_tariffs
-        if t in tariff_names
-    ])
+    selected_tariffs_text = []
+    for t in selected_tariffs:
+        if t in tariff_names:
+            if t == 'standard':
+                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (базова)")
+            else:
+                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (додатково)")
+    selected_tariffs_text = "\n".join(selected_tariffs_text)
     
     # Відправляємо на модерацію
     try:
@@ -1673,18 +2038,21 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
     }
     
     tariff_prices = {
-        'standard': 3.0,
-        'highlighted': 4.5,
-        'pinned_12h': 5.5,
-        'pinned_24h': 7.5,
-        'story': 5.0
+        'standard': 3.0,  # Базова публікація
+        'highlighted': 1.5,  # Додаткова вартість
+        'pinned_12h': 2.5,  # Додаткова вартість
+        'pinned_24h': 4.5,  # Додаткова вартість
+        'story': 5.0  # Додаткова вартість
     }
     
-    selected_tariffs_text = "\n".join([
-        f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€"
-        for t in selected_tariffs
-        if t in tariff_names
-    ])
+    selected_tariffs_text = []
+    for t in selected_tariffs:
+        if t in tariff_names:
+            if t == 'standard':
+                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (базова)")
+            else:
+                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (додатково)")
+    selected_tariffs_text = "\n".join(selected_tariffs_text)
     
     payment_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -1781,27 +2149,23 @@ async def confirm_mark_sold(callback: types.CallbackQuery):
     
     listing = get_telegram_listing_by_id(listing_id)
     if not listing or listing.get('sellerTelegramId') != user_id:
-        await callback.answer("❌ Оголошення не знайдено", show_alert=True)
+        await callback.answer(t(user_id, 'my_listings.listing_not_found'), show_alert=True)
         return
     
-    title = listing.get('title', 'Оголошення')
+    title = listing.get('title', t(user_id, 'my_listings.listing_default_title'))
     
-    confirmation_text = f"""⚠️ <b>Підтвердження</b>
-
-Ви впевнені, що хочете позначити оголошення "<b>{title}</b>" як продане?
-
-Оголошення буде видалено з каналу та змінить статус на "Продане"."""
+    confirmation_text = t(user_id, 'my_listings.confirm_mark_sold_text', title=title)
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text="✅ Так, позначити як продане",
+                text=t(user_id, 'my_listings.confirm_mark_sold_button'),
                 callback_data=f"mark_sold_{listing_id}"
             )
         ],
         [
             InlineKeyboardButton(
-                text="❌ Скасувати",
+                text=t(user_id, 'my_listings.cancel'),
                 callback_data=f"view_telegram_listing_{listing_id}"
             )
         ]
@@ -1832,11 +2196,11 @@ async def mark_listing_as_sold(callback: types.CallbackQuery):
         listing = get_telegram_listing_by_id(listing_id)
         
         if not listing:
-            await callback.answer("❌ Оголошення не знайдено", show_alert=True)
+            await callback.answer(t(user_id, 'my_listings.listing_not_found'), show_alert=True)
             return
         
         if listing.get('sellerTelegramId') != user_id:
-            await callback.answer("❌ Це не ваше оголошення", show_alert=True)
+            await callback.answer(t(user_id, 'my_listings.not_your_listing'), show_alert=True)
             return
         
         # Видаляємо з каналу
@@ -1863,7 +2227,7 @@ async def mark_listing_as_sold(callback: types.CallbackQuery):
         
         conn.close()
         
-        await callback.answer("✅ Оголошення позначено як продане та видалено з каналу")
+        await callback.answer(t(user_id, 'my_listings.mark_sold_success'))
         
         # Повертаємо до списку оголошень
         await back_to_my_listings(callback)
@@ -1872,7 +2236,7 @@ async def mark_listing_as_sold(callback: types.CallbackQuery):
         print(f"Error marking listing as sold: {e}")
         import traceback
         traceback.print_exc()
-        await callback.answer("❌ Помилка при позначенні оголошення", show_alert=True)
+        await callback.answer(t(user_id, 'my_listings.mark_sold_error'), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("confirm_delete_"))
@@ -1883,27 +2247,23 @@ async def confirm_delete(callback: types.CallbackQuery):
     
     listing = get_telegram_listing_by_id(listing_id)
     if not listing or listing.get('sellerTelegramId') != user_id:
-        await callback.answer("❌ Оголошення не знайдено", show_alert=True)
+        await callback.answer(t(user_id, 'my_listings.listing_not_found'), show_alert=True)
         return
     
-    title = listing.get('title', 'Оголошення')
+    title = listing.get('title', t(user_id, 'my_listings.listing_default_title'))
     
-    confirmation_text = f"""⚠️ <b>Підтвердження видалення</b>
-
-Ви впевнені, що хочете видалити оголошення "<b>{title}</b>"?
-
-Оголошення буде видалено з каналу та прибрано з вашого списку. Цю дію неможливо скасувати."""
+    confirmation_text = t(user_id, 'my_listings.confirm_delete_text', title=title)
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text="🗑️ Так, видалити",
+                text=t(user_id, 'my_listings.confirm_delete_button'),
                 callback_data=f"delete_listing_{listing_id}"
             )
         ],
         [
             InlineKeyboardButton(
-                text="❌ Скасувати",
+                text=t(user_id, 'my_listings.cancel'),
                 callback_data=f"view_telegram_listing_{listing_id}"
             )
         ]
@@ -1934,11 +2294,11 @@ async def delete_listing(callback: types.CallbackQuery):
         listing = get_telegram_listing_by_id(listing_id)
         
         if not listing:
-            await callback.answer("❌ Оголошення не знайдено", show_alert=True)
+            await callback.answer(t(user_id, 'my_listings.listing_not_found'), show_alert=True)
             return
         
         if listing.get('sellerTelegramId') != user_id:
-            await callback.answer("❌ Це не ваше оголошення", show_alert=True)
+            await callback.answer(t(user_id, 'my_listings.not_your_listing'), show_alert=True)
             return
         
         # Видаляємо з каналу
@@ -1965,7 +2325,7 @@ async def delete_listing(callback: types.CallbackQuery):
         
         conn.close()
         
-        await callback.answer("✅ Оголошення видалено та прибрано з каналу")
+        await callback.answer(t(user_id, 'my_listings.delete_success'))
         
         # Повертаємо до списку оголошень
         await back_to_my_listings(callback)
@@ -1974,4 +2334,4 @@ async def delete_listing(callback: types.CallbackQuery):
         print(f"Error deleting listing: {e}")
         import traceback
         traceback.print_exc()
-        await callback.answer("❌ Помилка при видаленні оголошення", show_alert=True)
+        await callback.answer(t(user_id, 'my_listings.delete_error'), show_alert=True)

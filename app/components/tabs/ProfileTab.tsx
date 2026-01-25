@@ -363,52 +363,16 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         tg?.HapticFeedback.notificationOccurred('success');
         showToast(t('payments.paymentInfo'), 'info');
         
-        // Закриваємо мінідодаток перед редиректом на оплату
-        try {
-          if (tg?.close) {
-            tg.close();
-          }
-        } catch (e) {
-          console.error('[ProfileTab] Error closing WebApp:', e);
-        }
-        
-        // Перенаправляємо на сторінку оплати
-        if (tg?.openLink) {
-          tg.openLink(data.pageUrl);
-        } else {
-          window.location.href = data.pageUrl;
-        }
+        // Відкриваємо посилання на оплату всередині WebApp (не закриваємо його)
+        // Використовуємо window.location.href для відкриття в тому ж вікні
+        window.location.href = data.pageUrl;
         return;
       }
 
       // Успішна оплата з балансу
-      // Перевіряємо чи оголошення потребує відправки на модерацію
-      const listingResponse = await fetch(`/api/listings/${listingId}`);
-      if (listingResponse.ok) {
-        const listing = await listingResponse.json();
-        
-        if (listing.status !== 'active' && listing.status !== 'pending_moderation') {
-          const submitResponse = await fetch(`/api/listings/${listingId}/submit-moderation`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegramId: profile?.telegramId,
-            }),
-          });
-
-          if (!submitResponse.ok) {
-            const submitData = await submitResponse.json();
-            throw new Error(submitData.error || 'Failed to submit listing for moderation');
-          }
-
-          showToast(t('editListing.sentToModeration'), 'success');
-        } else if (listing.status === 'pending_moderation') {
-          showToast(t('promotions.promotionSuccess'), 'success');
-          showToast(t('editListing.sentToModeration'), 'success');
-        } else {
-          showToast(t('promotions.promotionSuccess'), 'success');
-        }
-      }
+      // Логіка відправки на модерацію вже обробляється в API (processPromotionPurchaseFromBalance)
+      // Тут просто показуємо успішне повідомлення
+      showToast(t('promotions.promotionSuccess'), 'success');
       
       tg?.HapticFeedback.notificationOccurred('success');
       await fetchListingsWithFilters(0, true);
