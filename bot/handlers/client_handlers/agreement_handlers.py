@@ -12,13 +12,16 @@ from database_functions.prisma_db import PrismaDB
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, set_language as set_user_language, get_user_lang, get_welcome_message
 from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard, get_language_selection_keyboard
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, FSInputFile
 import aiohttp
 
 
 load_dotenv()
 
 router = Router()
+
+# Шлях до фото привітання
+HELLO_PHOTO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content', 'hello.jpg')
 
 
 @router.message(CommandStart())
@@ -62,9 +65,14 @@ async def start_command(message: types.Message):
     
     # Крок 2: Вибір мови (якщо оферта не погоджена - значить користувач новий)
     if not has_agreed:
-        # Для нових користувачів показуємо привітання з HTML форматуванням
+        # Для нових користувачів показуємо привітання з HTML форматуванням та фото
         welcome_text = get_welcome_message(telegram_lang)
-        await message.answer(welcome_text, parse_mode="HTML")
+        try:
+            photo_file = FSInputFile(HELLO_PHOTO_PATH)
+            await message.answer_photo(photo_file, caption=welcome_text, parse_mode="HTML")
+        except Exception as e:
+            print(f"Error sending hello photo: {e}")
+            await message.answer(welcome_text, parse_mode="HTML")
         
         # Показуємо вибір мови
         await message.answer(
@@ -149,7 +157,12 @@ async def start_command(message: types.Message):
     if not (shared_item and shared_data):
         # greeting вже містить весь текст з HTML тегами
         welcome_text = t(user_id, 'welcome.greeting')
-        await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+        try:
+            photo_file = FSInputFile(HELLO_PHOTO_PATH)
+            await message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+        except Exception as e:
+            print(f"Error sending hello photo: {e}")
+            await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
         return
     
     # Якщо є shared_item, показуємо інформацію про нього
@@ -297,11 +310,13 @@ async def handle_language_selection(callback: types.CallbackQuery):
             )
         else:
             # Якщо оферта вже погоджена, показуємо головне меню
-            await callback.message.answer(
-                t(user_id, 'welcome.greeting'),
-                reply_markup=get_main_menu_keyboard(user_id),
-                parse_mode="HTML"
-            )
+            welcome_text = t(user_id, 'welcome.greeting')
+            try:
+                photo_file = FSInputFile(HELLO_PHOTO_PATH)
+                await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+            except Exception as e:
+                print(f"Error sending hello photo: {e}")
+                await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
     else:
         await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
 
