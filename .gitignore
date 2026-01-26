@@ -73,6 +73,8 @@ app/public/listings/*.jpg
 app/public/listings/*.png
 app/public/listings/*.jpeg
 app/public/listings/*.webp
+app/public/listings/optimized/*
+app/public/listings/originals/*
 !app/public/avatars/.gitkeep
 !app/public/listings/.gitkeep
 
