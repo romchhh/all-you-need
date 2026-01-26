@@ -4,6 +4,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { ListingCard } from './ListingCard';
 import { ImageViewModal } from './ImageViewModal';
 import { ShareModal } from './ShareModal';
+import { PhoneModal } from './PhoneModal';
 import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getProfileShareLink } from '@/utils/botLinks';
@@ -58,6 +59,7 @@ export const UserProfilePage = ({
   } | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
   const { user: currentUser } = useTelegram();
 
   const avatarLongPress = useLongPress({
@@ -335,9 +337,9 @@ export const UserProfilePage = ({
             // Якщо немає username - показуємо телефон
             if (!username || username.trim() === '') {
               if (phone && phone.trim() !== '') {
-                // Відкриваємо телефон
-                window.location.href = `tel:${phone.trim()}`;
-                tg?.HapticFeedback?.impactOccurred('medium');
+                // Відкриваємо модальне вікно телефону
+                setShowPhoneModal(true);
+                tg?.HapticFeedback?.impactOccurred('light');
                 return;
               } else {
                 // Немає ні username, ні телефону
@@ -468,6 +470,16 @@ export const UserProfilePage = ({
         shareText={`👤 Профіль ${sellerName}${sellerUsername ? ` (@${sellerUsername})` : ''} в Trade Ground Marketplace`}
         tg={tg}
       />
+
+      {/* Модальне вікно телефону */}
+      {(userData?.phone || sellerPhone) && (
+        <PhoneModal
+          isOpen={showPhoneModal}
+          onClose={() => setShowPhoneModal(false)}
+          phoneNumber={(userData?.phone || sellerPhone) || ''}
+          tg={tg}
+        />
+      )}
 
       {/* Toast сповіщення */}
       <Toast

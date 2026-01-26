@@ -78,7 +78,7 @@ export const ProfileListingCard = ({
     if (promotionType === 'highlighted') {
       return (
         <span className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
-          Рамка
+          {t('promotions.highlighted')}
         </span>
       );
     }
@@ -243,7 +243,7 @@ export const ProfileListingCard = ({
               )}
               {listing.promotionType === 'highlighted' && (
                 <div className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
-                  Рамка
+                  {t('promotions.highlighted')}
                 </div>
               )}
             </div>

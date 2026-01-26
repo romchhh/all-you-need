@@ -969,18 +969,6 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         </button>
       </div>
 
-      {/* Помітка TeleBots */}
-      <div className="px-4 py-6">
-        <a
-          href={`https://new.telebots.site/uk`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-center text-white/60 hover:text-white/80 transition-colors text-sm"
-        >
-          {t('common.telebotsBranding')}
-        </a>
-      </div>
-
       {/* Модальне вікно перегляду аватара */}
       {showAvatarModal && profile?.avatar && (
         <ImageViewModal

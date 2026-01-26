@@ -5,6 +5,7 @@ import { ImageGallery } from './ImageGallery';
 import { ListingCard } from './ListingCard';
 import { ShareModal } from './ShareModal';
 import { ImageViewModal } from './ImageViewModal';
+import { PhoneModal } from './PhoneModal';
 import dynamic from 'next/dynamic';
 import { TopBar } from './TopBar';
 import { getAvatarColor } from '@/utils/avatarColors';
@@ -91,6 +92,7 @@ export const ListingDetail = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState(false);
   const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
   const [userBalance, setUserBalance] = useState<number>(0);
@@ -887,9 +889,9 @@ export const ListingDetail = ({
             // Якщо немає username - показуємо телефон
             if (!username || username.trim() === '') {
               if (phone && phone.trim() !== '') {
-                // Відкриваємо телефон
-                window.location.href = `tel:${phone.trim()}`;
-                tg?.HapticFeedback?.impactOccurred('medium');
+                // Відкриваємо модальне вікно телефону
+                setShowPhoneModal(true);
+                tg?.HapticFeedback?.impactOccurred('light');
                 return;
               } else {
                 // Немає ні username, ні телефону
@@ -1071,6 +1073,16 @@ export const ListingDetail = ({
         confirmButtonClass="bg-green-500 hover:bg-green-600"
         tg={tg}
       />
+
+      {/* Модальне вікно телефону */}
+      {sellerPhone && (
+        <PhoneModal
+          isOpen={showPhoneModal}
+          onClose={() => setShowPhoneModal(false)}
+          phoneNumber={sellerPhone}
+          tg={tg}
+        />
+      )}
 
       {/* Toast сповіщення */}
       <Toast

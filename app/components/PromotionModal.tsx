@@ -25,8 +25,8 @@ interface PromotionModalProps {
 
 const PROMOTIONS: Promotion[] = [
   { type: 'highlighted', price: 1.5, duration: 7 },
-  { type: 'top_category', price: 2.0, duration: 7, badge: 'recommended' },
-  { type: 'vip', price: 4.5, duration: 7 },
+  { type: 'top_category', price: 2.0, duration: 7 },
+  { type: 'vip', price: 4.5, duration: 7, badge: 'recommended' },
 ];
 
 export default function PromotionModal({
