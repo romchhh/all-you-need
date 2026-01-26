@@ -264,32 +264,36 @@ const ProfilePage = () => {
     setTimeout(() => tryScroll(), 300);
   }, [selectedListing, selectedSeller]);
 
+  // Зберігаємо позицію скролу перед відкриттям деталей товару/профілю
+  const prevListingIdRef = useRef<number | null>(null);
+  
   useEffect(() => {
     if (selectedListing || selectedSeller) {
-      savedScrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
+      const currentListingId = selectedListing?.id || null;
+      
+      // Якщо це НОВЕ оголошення (змінився ID), очищаємо збережену позицію
+      if (currentListingId !== null && prevListingIdRef.current !== null && currentListingId !== prevListingIdRef.current) {
+        savedScrollPositionRef.current = 0;
+      }
+      
+      // Зберігаємо позицію тільки якщо це перше відкриття або те саме оголошення
+      if (prevListingIdRef.current === null || currentListingId === prevListingIdRef.current) {
+        savedScrollPositionRef.current = window.scrollY || document.documentElement.scrollTop;
+      }
       
       // Зберігаємо ID оголошення перед відкриттям
       if (selectedListing && typeof window !== 'undefined') {
         localStorage.setItem(lastViewedListingIdKey, selectedListing.id.toString());
       }
       
-      const scrollToTop = () => {
-        window.scrollTo({ top: 0, behavior: 'auto' });
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-      };
-
-      scrollToTop();
-      requestAnimationFrame(() => {
-        scrollToTop();
-        requestAnimationFrame(() => {
-          scrollToTop();
-          setTimeout(() => {
-            scrollToTop();
-          }, 100);
-        });
-      });
+      // Оновлюємо ref
+      prevListingIdRef.current = currentListingId;
+      
+      // НЕ скролимо до верху тут - це робить ListingDetail через key={listing.id}
     } else {
+      // Якщо закрили - скидаємо ref
+      prevListingIdRef.current = null;
+      
       // Відновлюємо позицію скролу при закритті деталей
       if (isReturningFromListing.current && !hasScrolledOnThisMount.current) {
         hasScrolledOnThisMount.current = true;
@@ -341,6 +345,7 @@ const ProfilePage = () => {
     if (selectedListing) {
       return (
         <ListingDetail
+          key={selectedListing.id}
           listing={selectedListing}
           isFavorite={favorites.has(selectedListing.id)}
           onClose={() => {

@@ -100,10 +100,18 @@ const BazaarPage = () => {
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
   const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
   const [selectedCategoryFromModal, setSelectedCategoryFromModal] = useState<string | null>(null);
-  const savedScrollPositionRef = useRef<number>(0);
   const previousListingRef = useRef<Listing | null>(null); // Зберігаємо картку товару перед відкриттям профілю продавця
-  const scrollPositionKey = 'bazaarScrollPosition';
-  const lastViewedListingIdKey = 'bazaarLastViewedListingId';
+  const prevSelectedSeller = useRef<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
+  const lastViewedListingIdRef = useRef<number | null>(null); // Зберігаємо ID останнього переглянутого товару
+  const viewModeRef = useRef<'catalog' | 'listing'>('catalog'); // Явний режим перегляду
+  
+  // КРИТИЧНО: Вимикаємо автоматичне відновлення scroll браузером
+  // Це обов'язково для мобільних WebView
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
   
   // Зберігаємо пошуковий запит в localStorage
   useEffect(() => {
@@ -148,32 +156,7 @@ const BazaarPage = () => {
     };
   });
   
-  // Зберігаємо позицію скролу при скролі
-  useEffect(() => {
-    if (selectedListing || selectedSeller) return;
-    
-    const handleScroll = () => {
-      const scrollY = window.scrollY || document.documentElement.scrollTop;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(scrollPositionKey, scrollY.toString());
-      }
-    };
-    
-    // Throttle scroll events
-    let ticking = false;
-    const throttledScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          handleScroll();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-    
-    window.addEventListener('scroll', throttledScroll, { passive: true });
-    return () => window.removeEventListener('scroll', throttledScroll);
-  }, [selectedListing, selectedSeller]);
+  // ВИДАЛЕНО: Збереження скролу при скролі - не потрібно, зберігаємо тільки перед відкриттям
 
   // Зберігаємо стан в localStorage
   useEffect(() => {
@@ -196,170 +179,9 @@ const BazaarPage = () => {
   const { tg } = useTelegram();
   const { toast, showToast, hideToast } = useToast();
   
-  // Перевіряємо, чи користувач повертається назад з товару
-  const isReturningFromListing = useRef(false);
-  
-  useEffect(() => {
-    // Перевіряємо sessionStorage - чи було відкрито товар в цій сесії
-    if (typeof window !== 'undefined') {
-      const wasViewingListing = sessionStorage.getItem('wasViewingListing');
-      if (wasViewingListing === 'true') {
-        // Додаткова перевірка - чи це дійсно повернення з товару
-        // Якщо referrer не містить поточний URL, значить це не повернення назад
-        const referrer = document.referrer;
-        const currentUrl = window.location.href;
-        const isBackNavigation = referrer && referrer.includes(currentUrl.split('?')[0]);
-        
-        if (isBackNavigation || referrer === '') {
-          isReturningFromListing.current = true;
-        }
-        // Очищаємо прапорець після використання
-        sessionStorage.removeItem('wasViewingListing');
-      }
-    }
-  }, []);
-  
-  // Відстежуємо відкриття товару
-  useEffect(() => {
-    if (selectedListing && typeof window !== 'undefined') {
-      // Зберігаємо прапорець, що користувач переглядає товар
-      sessionStorage.setItem('wasViewingListing', 'true');
-    }
-  }, [selectedListing]);
-  
-  // Функція для скролу до останнього переглянутого оголошення
-  const scrollToLastViewedListing = useCallback(() => {
-    // Скролимо тільки якщо користувач повертається назад з товару
-    if (!isReturningFromListing.current) {
-      return;
-    }
-    
-    if (typeof window === 'undefined' || selectedListing || selectedSeller || listings.length === 0) {
-      return;
-    }
-    
-    const lastViewedId = localStorage.getItem(lastViewedListingIdKey);
-    if (!lastViewedId) {
-      return;
-    }
-    
-    const listingId = parseInt(lastViewedId, 10);
-    if (isNaN(listingId)) {
-      return;
-    }
-    
-    // Перевіряємо, чи є це оголошення в поточному списку
-    const listingExists = listings.some(l => l.id === listingId);
-    if (!listingExists) {
-      // Оголошення немає в списку (можливо, фільтрується) - використовуємо fallback
-      const savedPosition = localStorage.getItem(scrollPositionKey);
-      if (savedPosition) {
-        const position = parseInt(savedPosition, 10);
-        if (!isNaN(position) && position > 0) {
-          window.scrollTo({ top: position, behavior: 'auto' });
-        }
-      }
-      return;
-    }
-    
-    // Спробуємо знайти елемент кілька разів з різними затримками
-    const tryScroll = (attempt: number = 0) => {
-      // Шукаємо елемент, навіть якщо він прихований
-      const listingElement = document.querySelector(`[data-listing-id="${listingId}"]`) as HTMLElement;
-      
-      if (listingElement) {
-        // Елемент знайдено - прокручуємо до нього
-        // Використовуємо scrollIntoView для надійності
-        listingElement.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center',
-          inline: 'nearest'
-        });
-        // Скидаємо прапорець після успішного скролу
-        isReturningFromListing.current = false;
-        return true;
-      } else if (attempt < 10) {
-        // Елемент не знайдено - спробуємо ще раз через деякий час
-        // Збільшуємо кількість спроб, бо елемент може завантажуватися
-        setTimeout(() => tryScroll(attempt + 1), 300);
-        return false;
-      } else {
-        // Елемент не знайдено після багатьох спроб - використовуємо fallback
-        const savedPosition = localStorage.getItem(scrollPositionKey);
-        if (savedPosition) {
-          const position = parseInt(savedPosition, 10);
-          if (!isNaN(position) && position > 0) {
-            window.scrollTo({ top: position, behavior: 'auto' });
-          }
-        }
-        // Скидаємо прапорець навіть якщо не знайшли елемент
-        isReturningFromListing.current = false;
-        return false;
-      }
-    };
-    
-    // Починаємо спроби через невелику затримку, щоб DOM встиг відрендеритися
-    setTimeout(() => tryScroll(), 300);
-  }, [selectedListing, selectedSeller, listings]);
-  
-  // Відновлюємо скролл при першому завантаженні або поверненні на сторінку
-  const isInitialMount = useRef(true);
-  const lastPathname = useRef<string | null>(null);
-  const hasScrolledOnThisMount = useRef(false);
-  
-  useEffect(() => {
-    // Перевіряємо, чи це повернення на сторінку bazaar
-    const isBazaarPage = pathname?.includes('/bazaar');
-    const wasOnBazaar = lastPathname.current?.includes('/bazaar');
-    const returnedToBazaar = !wasOnBazaar && isBazaarPage;
-    
-    // Якщо повернулися на сторінку, скидаємо прапорець
-    if (returnedToBazaar) {
-      hasScrolledOnThisMount.current = false;
-    }
-    
-    // НЕ відновлюємо скрол, якщо щось відкрите
-    if (selectedListing || selectedSeller) {
-      return;
-    }
-    
-    // Скролимо до товару тільки якщо користувач повертається назад з товару
-    if (isReturningFromListing.current && listings.length > 0 && !selectedListing && !selectedSeller && !hasScrolledOnThisMount.current) {
-      hasScrolledOnThisMount.current = true;
-      
-      // Невелика затримка, щоб DOM встиг відрендеритися
-      setTimeout(() => {
-        scrollToLastViewedListing();
-      }, 500);
-    } else if (isInitialMount.current) {
-      // При першому завантаженні або заході з інших сторінок - залишаємося зверху
-      isInitialMount.current = false;
-      hasScrolledOnThisMount.current = true;
-    }
-    
-    lastPathname.current = pathname || null;
-  }, [pathname, listings.length, selectedListing, selectedSeller, scrollToLastViewedListing]);
-  
-  // Відновлюємо скролл при закритті деталей оголошення
-  const prevSelectedListing = useRef<Listing | null>(null);
-  useEffect(() => {
-    const wasOpen = prevSelectedListing.current !== null;
-    const isNowClosed = selectedListing === null;
-    
-    if (wasOpen && isNowClosed && listings.length > 0) {
-      // Користувач щойно закрив деталі - прокручуємо до оголошення
-      // Перевіряємо, чи встановлений прапорець повернення
-      if (isReturningFromListing.current && !hasScrolledOnThisMount.current) {
-        hasScrolledOnThisMount.current = true;
-        // Затримка, щоб DOM встиг оновитися
-      setTimeout(() => {
-        scrollToLastViewedListing();
-        }, 600);
-      }
-    }
-    
-    prevSelectedListing.current = selectedListing;
-  }, [selectedListing, listings.length, scrollToLastViewedListing]);
+  // ВИДАЛЕНО: Вся складна логіка з isReturningFromListing, scrollToLastViewedListing, 
+  // isInitialMount, hasScrolledOnThisMount, sessionStorage, referrer
+  // Замість неї проста логіка нижче (рядки 650-687)
 
   // Обробка параметрів з URL (для поділених товарів/профілів)
   useEffect(() => {
@@ -374,7 +196,9 @@ const BazaarPage = () => {
           .then(res => res.json())
           .then(data => {
             if (data.id) {
-              savedScrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
+              lastViewedListingIdRef.current = data.id;
+              // Скролимо нагору перед відкриттям
+              window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
               setSelectedListing(data);
             }
           })
@@ -387,7 +211,6 @@ const BazaarPage = () => {
           .then(res => res.json())
           .then(data => {
             if (data.telegramId) {
-              savedScrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
               setSelectedSeller({
                 telegramId: data.telegramId.toString(),
                 name: data.firstName && data.lastName 
@@ -507,7 +330,7 @@ const BazaarPage = () => {
     
     // Скидаємо позицію скролу після оновлення
     if (typeof window !== 'undefined') {
-      localStorage.setItem(scrollPositionKey, '0');
+      // ВИДАЛЕНО: scrollPositionKey більше не використовується
     }
   };
 
@@ -647,126 +470,78 @@ const BazaarPage = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [selectedListing, selectedSeller]);
 
-  // Зберігаємо позицію скролу та стан списку перед відкриттям деталей товару/профілю
-  useEffect(() => {
-    if (selectedListing || selectedSeller) {
-      const currentScroll = window.scrollY || document.documentElement.scrollTop;
-      savedScrollPositionRef.current = currentScroll;
+  // ПРОСТА ЛОГІКА СКРОЛУ: зберігаємо ID товару, при закритті скролимо до нього
+  const prevSelectedListing = useRef<Listing | null>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Функція для скролу до товару за ID (тільки в режимі каталогу)
+  const scrollToListing = useCallback((listingId: number) => {
+    if (typeof window === 'undefined' || viewModeRef.current !== 'catalog') return;
+    
+    const scrollToElement = (attempt: number = 0) => {
+      // Перевіряємо, що ми все ще в каталозі
+      if (viewModeRef.current !== 'catalog') return false;
       
-      // Зберігаємо в localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(scrollPositionKey, currentScroll.toString());
-        
-        // Зберігаємо поточний стан списку в localStorage для надійного збереження
-        if (listings.length > 0) {
-          localStorage.setItem('bazaarListingsState', JSON.stringify({
-            listings: listings,
-            total: totalListings,
-            hasMore: hasMore,
-            offset: listingsOffset,
-            timestamp: Date.now()
-          }));
-        }
+      const element = document.querySelector(`[data-listing-id="${listingId}"]`) as HTMLElement;
+      
+      if (element) {
+        // Знайшли елемент - скролимо до нього (auto для миттєвості)
+        element.scrollIntoView({ 
+          behavior: 'auto', 
+          block: 'center',
+          inline: 'nearest'
+        });
+        return true;
+      } else if (attempt < 10) {
+        // Елемент не знайдено - спробуємо ще раз
+        setTimeout(() => scrollToElement(attempt + 1), 200);
+        return false;
       }
-      
-      // НЕ скролимо до верху тут - це робить ListingDetail
-      // Просто зберігаємо позицію
-    }
-  }, [selectedListing, selectedSeller, listings, totalListings, hasMore, listingsOffset]);
-  
-  // Окремий useEffect для відновлення позиції при закритті
-  const shouldRestoreScroll = useRef(false);
-  
-  useEffect(() => {
-    // Якщо щойно закрили оголошення або профіль
-    const wasOpen = prevSelectedListing.current !== null;
-    const isNowClosed = selectedListing === null;
+      return false;
+    };
     
-    if (wasOpen && isNowClosed) {
-      shouldRestoreScroll.current = true;
+    // Починаємо спроби через затримку для мобільних WebView
+    setTimeout(() => scrollToElement(), 300);
+  }, []);
+  
+  // Відновлюємо скрол до товару ПІСЛЯ закриття ListingDetail
+  useEffect(() => {
+    const wasOpen = prevSelectedListing.current !== null || prevSelectedSeller.current !== null;
+    const isNowClosed = selectedListing === null && selectedSeller === null;
+    const isNewListing = prevSelectedListing.current !== null && selectedListing !== null && prevSelectedListing.current.id !== selectedListing.id;
+    
+    // Скасовуємо попередній таймаут скролу (якщо є)
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = null;
     }
     
-    // Оновлюємо ref
-    prevSelectedListing.current = selectedListing;
-  }, [selectedListing]);
-  
-  // Відновлюємо позицію після рендеру, коли оголошення закрите
-  useEffect(() => {
-    // НЕ відновлюємо скрол, якщо щось відкрите
-    if (selectedListing || selectedSeller) {
+    // Якщо відкрили НОВИЙ товар - залишаємося в режимі товару
+    if (isNewListing) {
+      prevSelectedListing.current = selectedListing;
+      prevSelectedSeller.current = selectedSeller;
       return;
     }
     
-    if (shouldRestoreScroll.current && selectedListing === null && selectedSeller === null) {
-      shouldRestoreScroll.current = false;
+    // Якщо щойно закрили - переходимо в режим каталогу і скролимо до товару
+    if (wasOpen && isNowClosed) {
+      viewModeRef.current = 'catalog';
       
-      // Відновлюємо позицію скролу
-      const savedPosition = savedScrollPositionRef.current > 0 
-        ? savedScrollPositionRef.current 
-        : (typeof window !== 'undefined' ? parseInt(localStorage.getItem(scrollPositionKey) || '0', 10) : 0);
-      
-      if (savedPosition > 0) {
-        // Використовуємо кілька спроб для надійного відновлення
-        const restoreScroll = () => {
-          // Не відновлюємо скрол, якщо відкрите оголошення або профіль
-          if (selectedListing || selectedSeller) {
-            return;
-          }
-          
-          if (typeof window !== 'undefined') {
-            const currentScroll = window.scrollY || document.documentElement.scrollTop;
-            // Відновлюємо тільки якщо позиція не така, яку ми хочемо
-            if (Math.abs(currentScroll - savedPosition) > 10) {
-              window.scrollTo({ top: savedPosition, behavior: 'auto' });
-              document.documentElement.scrollTop = savedPosition;
-              document.body.scrollTop = savedPosition;
-            }
-          }
-        };
+      if (lastViewedListingIdRef.current !== null) {
+        const listingId = lastViewedListingIdRef.current;
         
-        // Відновлюємо після рендеру з кількома спробами, але з більшою затримкою
-        // щоб дати час ListingDetail завершити свій скрол до верху
-        const restoreAttempts = [500, 700, 1000, 1500, 2000];
-        restoreAttempts.forEach((delay) => {
-          setTimeout(() => {
-            requestAnimationFrame(restoreScroll);
-          }, delay);
-        });
-        
-        savedScrollPositionRef.current = 0;
+        // Затримка для мобільних WebView (вони потребують більше часу)
+        scrollTimeoutRef.current = setTimeout(() => {
+          scrollToListing(listingId);
+          scrollTimeoutRef.current = null;
+        }, 300);
       }
     }
-  }, [selectedListing, selectedSeller]);
-  
-  // Додаткова перевірка - якщо хтось скинув скролл на 0, відновлюємо позицію
-  useEffect(() => {
-    if (!selectedListing && !selectedSeller && !shouldRestoreScroll.current) {
-      const savedPosition = typeof window !== 'undefined' 
-        ? parseInt(localStorage.getItem(scrollPositionKey) || '0', 10) 
-        : 0;
-      
-      if (savedPosition > 0) {
-        const checkAndRestore = () => {
-          // Не відновлюємо скрол, якщо відкрите оголошення або профіль
-          if (selectedListing || selectedSeller) {
-            return;
-          }
-          
-          const currentScroll = window.scrollY || document.documentElement.scrollTop;
-          // Якщо скролл на 0, але ми мали збережену позицію, відновлюємо
-          if (currentScroll === 0 && savedPosition > 100) {
-            window.scrollTo({ top: savedPosition, behavior: 'auto' });
-            document.documentElement.scrollTop = savedPosition;
-            document.body.scrollTop = savedPosition;
-          }
-        };
-        
-        // Перевіряємо через невеликі інтервали
-        setTimeout(checkAndRestore, 200);
-        setTimeout(checkAndRestore, 500);
-      }
-    }
-  }, [selectedListing, selectedSeller]);
+    
+    // Оновлюємо refs
+    prevSelectedListing.current = selectedListing;
+    prevSelectedSeller.current = selectedSeller;
+  }, [selectedListing, selectedSeller, scrollToListing]);
   
   // Мемоізуємо callbacks для запобігання непотрібних перерендерів (на верхньому рівні!)
   const handleSearchChange = useCallback((query: string) => {
@@ -803,14 +578,6 @@ const BazaarPage = () => {
           sellerUsername={selectedSeller.username}
           sellerPhone={selectedSeller.phone}
           onClose={() => {
-            // Зберігаємо позицію перед закриттям
-            const currentScroll = window.scrollY || document.documentElement.scrollTop;
-            if (currentScroll > 0) {
-              savedScrollPositionRef.current = currentScroll;
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(scrollPositionKey, currentScroll.toString());
-              }
-            }
             previousListingRef.current = null; // Очищаємо збережену картку
             setSelectedSeller(null);
           }}
@@ -825,7 +592,17 @@ const BazaarPage = () => {
                 }
               : null
           }
-          onSelectListing={setSelectedListing}
+          onSelectListing={(listing) => {
+            // Зберігаємо ID товару для скролу при поверненні
+            lastViewedListingIdRef.current = listing.id;
+            
+            // Скролимо нагору ПЕРЕД встановленням selectedListing
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+            
+            setSelectedListing(listing);
+          }}
           onToggleFavorite={toggleFavorite}
           favorites={favorites}
           tg={tg}
@@ -836,40 +613,31 @@ const BazaarPage = () => {
     if (selectedListing) {
       return (
         <ListingDetail
+          key={selectedListing.id}
           listing={selectedListing}
           isFavorite={favorites.has(selectedListing.id)}
           onClose={() => {
-            // Встановлюємо прапорець, що користувач повертається з товару
-            isReturningFromListing.current = true;
-            hasScrolledOnThisMount.current = false;
-            
-            // Зберігаємо позицію перед закриттям (на випадок, якщо вона змінилася)
-            const currentScroll = window.scrollY || document.documentElement.scrollTop;
-            if (currentScroll > 0) {
-              savedScrollPositionRef.current = currentScroll;
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(scrollPositionKey, currentScroll.toString());
-              }
-            }
             setSelectedListing(null);
           }}
           onBack={() => {
-            // Встановлюємо прапорець, що користувач повертається з товару
-            isReturningFromListing.current = true;
-            hasScrolledOnThisMount.current = false;
-            
-            // Зберігаємо позицію перед закриттям (на випадок, якщо вона змінилася)
-            const currentScroll = window.scrollY || document.documentElement.scrollTop;
-            if (currentScroll > 0) {
-              savedScrollPositionRef.current = currentScroll;
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(scrollPositionKey, currentScroll.toString());
-              }
-            }
             setSelectedListing(null);
           }}
           onToggleFavorite={toggleFavorite}
-          onSelectListing={setSelectedListing}
+          onSelectListing={(listing) => {
+            // Переходимо в режим товару
+            viewModeRef.current = 'listing';
+            
+            // Зберігаємо ID товару для скролу при поверненні
+            lastViewedListingIdRef.current = listing.id;
+            
+            // ЖОРСТКО фіксуємо scroll на 0 - СИНХРОННО
+            document.body.style.scrollBehavior = 'auto';
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+            
+            setSelectedListing(listing);
+          }}
           onViewSellerProfile={(telegramId, name, avatar, username, phone) => {
             // Зберігаємо посилання на картку товару перед відкриттям профілю
             previousListingRef.current = selectedListing;
@@ -901,10 +669,31 @@ const BazaarPage = () => {
         onSearchChange={handleSearchChange}
         favorites={favorites}
         onSelectListing={(listing) => {
-          // Зберігаємо ID оголошення перед відкриттям
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(lastViewedListingIdKey, listing.id.toString());
+          // Переходимо в режим товару
+          viewModeRef.current = 'listing';
+          
+          // Зберігаємо ID товару для скролу при поверненні
+          lastViewedListingIdRef.current = listing.id;
+          
+          // ЖОРСТКО фіксуємо scroll на 0 - СИНХРОННО, без behavior, без затримок
+          // Це критично для мобільних WebView
+          document.body.style.scrollBehavior = 'auto';
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+          
+          // Зберігаємо поточний стан списку в localStorage
+          if (typeof window !== 'undefined' && listings.length > 0) {
+            localStorage.setItem('bazaarListingsState', JSON.stringify({
+              listings: listings,
+              total: totalListings,
+              hasMore: hasMore,
+              offset: listingsOffset,
+              timestamp: Date.now()
+            }));
           }
+          
+          // Встановлюємо selectedListing ПІСЛЯ фіксації scroll
           setSelectedListing(listing);
         }}
         onToggleFavorite={toggleFavorite}

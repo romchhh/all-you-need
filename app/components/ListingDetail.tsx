@@ -17,7 +17,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
 import Image from 'next/image';
@@ -103,6 +103,15 @@ export const ListingDetail = ({
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
   
+  // Визначення мобільної версії (безпечно для SSR)
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 768);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   // Форматуємо час на клієнті з перекладами
   const formattedTime = useMemo(() => {
     if (listing.createdAt) {
@@ -140,8 +149,9 @@ export const ListingDetail = ({
     return isOwn;
   }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
 
-  // Скролимо нагору при відкритті нового оголошення - ЗАВЖДИ
-  useEffect(() => {
+  // Скролимо нагору при відкритті нового оголошення
+  // useLayoutEffect виконується СИНХРОННО перед рендером - це ключ до успіху
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
 
     // Вимкнення автоматичного відновлення позиції скролу браузером
@@ -149,188 +159,32 @@ export const ListingDetail = ({
       window.history.scrollRestoration = 'manual';
     }
 
-    // Функція для скролу нагору - використовуємо кілька методів для надійності
-    const forceScrollToTop = () => {
-      if (typeof window === 'undefined') return;
-      
-      try {
-        // Додаємо клас для вимкнення smooth scroll
-        const html = document.documentElement;
-        const body = document.body;
-        html.classList.add('no-smooth-scroll');
-        html.classList.remove('smooth-scroll');
-        
-        // Миттєвий скрол всіма можливими способами
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    // ЖОРСТКО фіксуємо scroll на 0 - СИНХРОННО, без behavior
+    // Це критично для мобільних WebView
+    document.body.style.scrollBehavior = 'auto';
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [listing.id]);
+  
+  // Додаткова перевірка через useEffect для мобільних WebView
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Перевіряємо і фіксуємо scroll після рендеру (для мобільних)
+    const checkAndFixScroll = () => {
+      if (window.scrollY > 10 || document.documentElement.scrollTop > 10) {
+        document.body.style.scrollBehavior = 'auto';
         window.scrollTo(0, 0);
-        html.scrollTop = 0;
-        body.scrollTop = 0;
-        
-        // Для Telegram WebApp та інших браузерів
-        if (window.scrollY !== 0 || window.pageYOffset !== 0) {
-          window.scroll(0, 0);
-          window.scrollTo(0, 0);
-        }
-        
-        // Також скролимо всі можливі контейнери
-        const scrollableElements = document.querySelectorAll('[data-scroll-container], [style*="overflow"], main, #__next');
-        scrollableElements.forEach(el => {
-          if (el instanceof HTMLElement) {
-            el.scrollTop = 0;
-            el.scrollLeft = 0;
-          }
-        });
-
-        // Додатково скролимо body та html
-        if (document.body) {
-          document.body.scrollTop = 0;
-          document.body.scrollLeft = 0;
-        }
-        if (document.documentElement) {
-          document.documentElement.scrollTop = 0;
-          document.documentElement.scrollLeft = 0;
-        }
-        
-        // Відновлюємо smooth scroll через невелику затримку
-        setTimeout(() => {
-          html.classList.remove('no-smooth-scroll');
-          html.classList.add('smooth-scroll');
-        }, 100);
-      } catch (error) {
-        console.error('Error scrolling to top:', error);
-      }
-    };
-
-    // Виконуємо скрол негайно, синхронно
-    forceScrollToTop();
-
-    // Через мікротаск (Promise) - виконається після поточного рендеру
-    Promise.resolve().then(forceScrollToTop);
-
-    // Через requestAnimationFrame - виконається перед наступним рендером
-    const rafId1 = requestAnimationFrame(forceScrollToTop);
-    
-    // Через другий requestAnimationFrame - для подвійної гарантії
-    const rafId2 = requestAnimationFrame(() => {
-      requestAnimationFrame(forceScrollToTop);
-    });
-
-    // Через невеликі затримки для надійності на повільних пристроях
-    const timeoutId1 = setTimeout(forceScrollToTop, 0);
-    const timeoutId2 = setTimeout(forceScrollToTop, 50);
-    const timeoutId3 = setTimeout(forceScrollToTop, 100);
-    const timeoutId4 = setTimeout(forceScrollToTop, 200);
-    
-    // Додаткова перевірка після завантаження зображень та контенту
-    const timeoutId5 = setTimeout(() => {
-      // Перевіряємо, чи сторінка дійсно на верху
-      if (window.scrollY > 10 || window.pageYOffset > 10) {
-        forceScrollToTop();
-      }
-    }, 300);
-    
-    const timeoutId6 = setTimeout(() => {
-      // Фінальна перевірка після повного завантаження
-      if (window.scrollY > 10 || window.pageYOffset > 10) {
-        forceScrollToTop();
-      }
-    }, 500);
-
-    const timeoutId7 = setTimeout(() => {
-      // Остання перевірка після повного рендерингу
-      if (window.scrollY > 10 || window.pageYOffset > 10) {
-        forceScrollToTop();
-      }
-    }, 800);
-
-    // Слухаємо події завантаження зображень
-    const handleImageLoad = () => {
-      if (window.scrollY > 10 || window.pageYOffset > 10) {
-        forceScrollToTop();
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
       }
     };
     
-    // Додаємо обробники для всіх зображень
-    const images = document.querySelectorAll('img');
-    images.forEach(img => {
-      if (img.complete) {
-        // Зображення вже завантажене
-        handleImageLoad();
-      } else {
-        img.addEventListener('load', handleImageLoad, { once: true });
-        img.addEventListener('error', handleImageLoad, { once: true });
-      }
-    });
-
-    // MutationObserver для відстеження змін DOM і скролу назад нагору
-    // Тільки протягом перших 2 секунд після відкриття
-    let observerActive = true;
-    const observer = new MutationObserver(() => {
-      if (observerActive && (window.scrollY > 10 || window.pageYOffset > 10)) {
-        // Якщо сторінка прокрутилася вниз через зміни DOM - скролимо назад
-        requestAnimationFrame(() => {
-          if (window.scrollY > 10 || window.pageYOffset > 10) {
-            forceScrollToTop();
-          }
-        });
-      }
-    });
-
-    // Спостерігаємо за змінами в DOM (тільки значні зміни)
-    observer.observe(document.body, {
-      childList: true,
-      subtree: false, // Тільки прямі дочірні елементи для кращої продуктивності
-      attributes: false // Не відстежуємо зміни атрибутів
-    });
-
-    // Вимкнення observer через 2 секунди
-    const observerTimeout = setTimeout(() => {
-      observerActive = false;
-      observer.disconnect();
-    }, 2000);
-
-    // Додатковий обробник для події scroll - перевіряємо позицію протягом перших 2 секунд
-    let scrollCheckActive = true;
-    const handleScroll = () => {
-      if (scrollCheckActive && (window.scrollY > 10 || window.pageYOffset > 10)) {
-        // Якщо сторінка прокрутилася вниз - скролимо назад
-        requestAnimationFrame(() => {
-          if (window.scrollY > 10 || window.pageYOffset > 10) {
-            forceScrollToTop();
-          }
-        });
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Через 2 секунди вимикаємо перевірку скролу
-    const scrollCheckTimeout = setTimeout(() => {
-      scrollCheckActive = false;
-      window.removeEventListener('scroll', handleScroll);
-    }, 2000);
-
-    return () => {
-      cancelAnimationFrame(rafId1);
-      cancelAnimationFrame(rafId2);
-      clearTimeout(timeoutId1);
-      clearTimeout(timeoutId2);
-      clearTimeout(timeoutId3);
-      clearTimeout(timeoutId4);
-      clearTimeout(timeoutId5);
-      clearTimeout(timeoutId6);
-      clearTimeout(timeoutId7);
-      clearTimeout(observerTimeout);
-      clearTimeout(scrollCheckTimeout);
-      observerActive = false;
-      scrollCheckActive = false;
-      observer.disconnect();
-      window.removeEventListener('scroll', handleScroll);
-      images.forEach(img => {
-        img.removeEventListener('load', handleImageLoad);
-        img.removeEventListener('error', handleImageLoad);
-      });
-    };
+    // Кілька спроб для мобільних WebView
+    requestAnimationFrame(checkAndFixScroll);
+    setTimeout(checkAndFixScroll, 50);
+    setTimeout(checkAndFixScroll, 100);
   }, [listing.id]);
 
   // Заборона згортання міні-додатку на сторінці товару (як на головній сторінці)
@@ -341,40 +195,9 @@ export const ListingDetail = ({
     tg.expand();
     
     // Увімкнення підтвердження закриття для запобігання випадковому згортанню
-    // Викликаємо при кожному рендері для надійності
     if (tg.enableClosingConfirmation) {
       tg.enableClosingConfirmation();
     }
-
-    // Додатково перевіряємо та розгортаємо при скролі
-    // Але НЕ дозволяємо скрол вниз при відкритті - тільки вгору
-    let lastScrollY = window.scrollY;
-    const handleScroll = () => {
-      if (tg && tg.expand) {
-        tg.expand();
-      }
-      
-      // Якщо хтось намагається скролити вниз відразу після відкриття - блокуємо
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY && currentScrollY > 100 && Date.now() - (window as any).__listingOpenedAt < 1000) {
-        // Блокуємо скрол вниз, якщо сторінка була відкрита нещодавно
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      }
-      lastScrollY = currentScrollY;
-    };
-
-    // Встановлюємо час відкриття для перевірки
-    (window as any).__listingOpenedAt = Date.now();
-
-    // Додаємо обробник скролу для підтримки розгорнутого стану
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      delete (window as any).__listingOpenedAt;
-      // НЕ вимикаємо підтвердження закриття при виході, 
-      // щоб воно залишалося активним (як на головній сторінці)
-    };
   }, [tg, listing.id]);
 
   // Фіксуємо перегляд при відкритті оголошення
@@ -524,7 +347,7 @@ export const ListingDetail = ({
     };
 
     fetchRelatedListings();
-  }, [listing.id, listing.seller.telegramId, listing.category, listing.price, listing.isFree]);
+  }, [listing.id, listing.seller.telegramId, listing.category, currentUser?.id]);
 
   const loadMoreSellerListings = async () => {
     if (!listing.seller.telegramId) return;
@@ -814,12 +637,9 @@ export const ListingDetail = ({
       >
         {/* Галерея фото */}
         <div 
-          className="px-0 pt-4 pb-0" 
+          className="px-0 pt-4 pb-0 w-full min-h-[400px] md:min-h-[500px] max-h-[500px] md:max-h-[600px]"
           style={{ 
-            height: window.innerWidth < 768 ? '60vh' : '85vh',
-            minHeight: window.innerWidth < 768 ? '400px' : '500px',
-            maxHeight: window.innerWidth < 768 ? '500px' : '600px',
-            width: '100%',
+            height: isMobile ? '60svh' : '85svh',
             ...(tg ? { paddingBottom: '0px' } : {})
           }}
         >
@@ -1156,21 +976,6 @@ export const ListingDetail = ({
               setShowPromotionModal(false);
             }
           }}
-        />
-      )}
-
-      {/* Модальне вікно підтвердження оплати */}
-      {selectedPromotionType && (
-        <PaymentSummaryModal
-          isOpen={showPaymentSummaryModal}
-          onClose={() => {
-            setShowPaymentSummaryModal(false);
-            setSelectedPromotionType(null);
-          }}
-          onConfirm={handlePaymentConfirm}
-          promotionType={selectedPromotionType}
-          userBalance={userBalance}
-          tg={tg}
         />
       )}
 

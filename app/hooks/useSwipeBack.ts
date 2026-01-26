@@ -50,8 +50,9 @@ export const useSwipeBack = ({
         const deltaX = touch.clientX - touchStartX.current;
         const deltaY = Math.abs((touch.clientY || 0) - (touchStartY.current || 0));
         
-        // Перевіряємо, чи це горизонтальний свайп
-        if (deltaY <= maxVerticalDistance && deltaX > 0) {
+        // Перевіряємо, чи це горизонтальний свайп (вертикальна відстань має бути меншою)
+        // Якщо вертикальний рух більший - це скрол, не чіпаємо його
+        if (deltaX > Math.abs(deltaY) && deltaY <= maxVerticalDistance && deltaX > 0) {
           // Використовуємо easing функцію для плавнішого прогресу
           const rawProgress = deltaX / threshold;
           // Застосовуємо cubic-bezier easing для більш природного руху
@@ -61,6 +62,7 @@ export const useSwipeBack = ({
           const progress = Math.min(easedProgress * 100, 120); // Дозволяємо трохи перевищити для ефекту
           onSwipeProgress(progress);
         } else {
+          // Вертикальний скрол - скидаємо прогрес і не заважаємо
           onSwipeProgress(0);
         }
       }

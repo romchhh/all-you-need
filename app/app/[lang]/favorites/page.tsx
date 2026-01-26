@@ -508,18 +508,40 @@ const FavoritesPage = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [selectedListing, selectedSeller]);
 
+  // Зберігаємо позицію скролу перед відкриттям деталей товару/профілю
+  const prevListingIdRef = useRef<number | null>(null);
+  
   useEffect(() => {
     if (selectedListing || selectedSeller) {
-      const currentScroll = window.scrollY || document.documentElement.scrollTop;
-      savedScrollPositionRef.current = currentScroll;
+      const currentListingId = selectedListing?.id || null;
       
-      // Зберігаємо в localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(scrollPositionKey, currentScroll.toString());
+      // Якщо це НОВЕ оголошення (змінився ID), очищаємо збережену позицію
+      if (currentListingId !== null && prevListingIdRef.current !== null && currentListingId !== prevListingIdRef.current) {
+        savedScrollPositionRef.current = 0;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(scrollPositionKey, '0');
+        }
       }
+      
+      // Зберігаємо позицію тільки якщо це перше відкриття або те саме оголошення
+      if (prevListingIdRef.current === null || currentListingId === prevListingIdRef.current) {
+        const currentScroll = window.scrollY || document.documentElement.scrollTop;
+        savedScrollPositionRef.current = currentScroll;
+        
+        // Зберігаємо в localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(scrollPositionKey, currentScroll.toString());
+        }
+      }
+      
+      // Оновлюємо ref
+      prevListingIdRef.current = currentListingId;
       
       // НЕ скролимо до верху тут - це робить ListingDetail
       // Просто зберігаємо позицію
+    } else {
+      // Якщо закрили - скидаємо ref
+      prevListingIdRef.current = null;
     }
   }, [selectedListing, selectedSeller]);
   
@@ -590,35 +612,8 @@ const FavoritesPage = () => {
     }
   }, [selectedListing, selectedSeller]);
   
-  // Додаткова перевірка - якщо хтось скинув скролл на 0, відновлюємо позицію
-  useEffect(() => {
-    if (!selectedListing && !selectedSeller && !shouldRestoreScroll.current) {
-      const savedPosition = typeof window !== 'undefined' 
-        ? parseInt(localStorage.getItem(scrollPositionKey) || '0', 10) 
-        : 0;
-      
-      if (savedPosition > 0) {
-        const checkAndRestore = () => {
-          // Не відновлюємо скрол, якщо відкрите оголошення або профіль
-          if (selectedListing || selectedSeller) {
-            return;
-          }
-          
-          const currentScroll = window.scrollY || document.documentElement.scrollTop;
-          // Якщо скролл на 0, але ми мали збережену позицію, відновлюємо
-          if (currentScroll === 0 && savedPosition > 100) {
-            window.scrollTo({ top: savedPosition, behavior: 'auto' });
-            document.documentElement.scrollTop = savedPosition;
-            document.body.scrollTop = savedPosition;
-          }
-        };
-        
-        // Перевіряємо через невеликі інтервали
-        setTimeout(checkAndRestore, 200);
-        setTimeout(checkAndRestore, 500);
-      }
-    }
-  }, [selectedListing, selectedSeller]);
+  // ВИДАЛЕНО: Додаткова перевірка, яка відновлювала скрол навіть при відкритті нового оголошення
+  // Тепер відновлення скролу відбувається тільки при закритті через shouldRestoreScroll
 
   const renderContent = () => {
     if (selectedSeller) {
@@ -655,6 +650,7 @@ const FavoritesPage = () => {
     if (selectedListing) {
       return (
         <ListingDetail
+          key={selectedListing.id}
           listing={selectedListing}
           isFavorite={favorites.has(selectedListing.id)}
           onClose={() => {
