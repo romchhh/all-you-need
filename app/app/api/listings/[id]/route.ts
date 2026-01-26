@@ -43,6 +43,8 @@ export async function GET(
         l.location,
         l.views,
         l.status,
+        l.promotionType,
+        l.promotionEnds,
         l.images,
         l.tags,
         l.createdAt,
@@ -71,6 +73,8 @@ export async function GET(
       location: string;
       views: number;
       status: string;
+      promotionType: string | null;
+      promotionEnds: string | null;
       images: string;
       tags: string | null;
       createdAt: string;
@@ -172,6 +176,8 @@ export async function GET(
         tags: listing.tags ? JSON.parse(listing.tags) : [],
         isFree: listing.isFree === 1,
         status: listing.status || 'active',
+        promotionType: listing.promotionType || null,
+        promotionEnds: listing.promotionEnds || null,
       };
 
     return NextResponse.json(formattedListing);

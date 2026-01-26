@@ -72,6 +72,14 @@ export async function PUT(
       );
     }
 
+    // Забороняємо позначення як продане для відхилених оголошень
+    if (requestedStatus === 'sold' && listing.status === 'rejected') {
+      return NextResponse.json(
+        { error: 'Cannot mark rejected listing as sold' },
+        { status: 400 }
+      );
+    }
+
     // Якщо встановлюється статус 'sold' або 'deactivated' (або 'hidden' для сумісності) - просто оновлюємо, не відправляємо на модерацію
     // Ця перевірка має бути ПЕРШОЮ, щоб уникнути відправки на модерацію
     if (requestedStatus === 'sold' || requestedStatus === 'deactivated' || requestedStatus === 'hidden') {

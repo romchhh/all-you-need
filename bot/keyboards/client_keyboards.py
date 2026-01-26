@@ -183,12 +183,47 @@ def get_support_keyboard(user_id: int) -> InlineKeyboardMarkup:
     ])
 
 
+def get_category_translation(user_id: int, category_name: str) -> str:
+    """Отримує переклад назви категорії з урахуванням мови користувача"""
+    # Мапінг українських назв категорій (як вони зберігаються в БД) до ключів перекладу
+    category_map = {
+        'Послуги': 'categories.services',
+        'Вакансія/пошук роботи': 'categories.vacancy',
+        'Доставка/перевезення': 'categories.delivery',
+        'Нерухомість': 'categories.realestate',
+        'Автопослуги': 'categories.auto_services',
+        'Реклама бізнесу': 'categories.business_ad',
+        'Послуги для дітей': 'categories.kids_services',
+        'Інше': 'categories.other',
+        # Російські назви (на випадок якщо в БД будуть російські)
+        'Услуги': 'categories.services',
+        'Вакансия/поиск работы': 'categories.vacancy',
+        'Доставка/перевозки': 'categories.delivery',
+        'Недвижимость': 'categories.realestate',
+        'Автоуслуги': 'categories.auto_services',
+        'Реклама бизнеса': 'categories.business_ad',
+        'Услуги для детей': 'categories.kids_services',
+        'Другое': 'categories.other'
+    }
+    
+    # Отримуємо ключ перекладу для категорії
+    translation_key = category_map.get(category_name)
+    
+    # Якщо знайшли ключ, використовуємо переклад з урахуванням мови користувача
+    if translation_key:
+        return t(user_id, translation_key)
+    
+    # Якщо не знайшли, повертаємо оригінальну назву
+    return category_name
+
+
 def get_categories_keyboard(user_id: int, categories: list) -> InlineKeyboardMarkup:
     keyboard = []
     for category in categories:
+        category_name = get_category_translation(user_id, category['name'])
         keyboard.append([
             InlineKeyboardButton(
-                text=f"{category.get('icon', '📂')} {category['name']}",
+                text=f"{category.get('icon', '📂')} {category_name}",
                 callback_data=f"cat_{category['id']}"
             )
         ])
@@ -204,15 +239,17 @@ def get_categories_keyboard(user_id: int, categories: list) -> InlineKeyboardMar
 def get_subcategories_keyboard(user_id: int, subcategories: list, category_id: int) -> InlineKeyboardMarkup:
     keyboard = []
     for subcat in subcategories:
+        # Для підкатегорій також використовуємо переклад, якщо він є
+        subcat_name = get_category_translation(user_id, subcat['name'])
         keyboard.append([
             InlineKeyboardButton(
-                text=subcat['name'],
+                text=subcat_name,
                 callback_data=f"subcat_{subcat['id']}_{category_id}"
             )
         ])
     keyboard.append([
         InlineKeyboardButton(
-            text="⬅️ Назад",
+            text=t(user_id, 'create_listing.back'),
             callback_data="back_to_categories"
         )
     ])
@@ -317,11 +354,11 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
     # Визначаємо ціни та назви тарифів
     # Для рекламних тарифів показуємо тільки додаткову вартість
     tariff_info = {
-        'standard': {'name': 'Звичайна публікація', 'price': 3.0, 'icon': '📌', 'base': True},
-        'highlighted': {'name': 'Виділене оголошення', 'price': 1.5, 'icon': '⭐', 'base': False},
-        'pinned_12h': {'name': 'Закріп на 12 годин', 'price': 2.5, 'icon': '📌', 'base': False},
-        'pinned_24h': {'name': 'Закріп на 24 години', 'price': 4.5, 'icon': '📌', 'base': False},
-        'story': {'name': 'Сторіс на 24 години', 'price': 5.0, 'icon': '📸', 'base': False}
+        'standard': {'name': t(user_id, 'tariffs.standard_name'), 'price': 3.0, 'icon': '📌', 'base': True},
+        'highlighted': {'name': t(user_id, 'tariffs.highlighted_name'), 'price': 1.5, 'icon': '⭐', 'base': False},
+        'pinned_12h': {'name': t(user_id, 'tariffs.pinned_12h_name'), 'price': 2.5, 'icon': '📌', 'base': False},
+        'pinned_24h': {'name': t(user_id, 'tariffs.pinned_24h_name'), 'price': 4.5, 'icon': '📌', 'base': False},
+        'story': {'name': t(user_id, 'tariffs.story_name'), 'price': 5.0, 'icon': '📸', 'base': False}
     }
     
     keyboard = []
@@ -333,7 +370,7 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
         # Базова публікація завжди вибрана і не може бути знята
         if info['base']:
             checkbox = '✅'
-            button_text = f"{checkbox} {info['icon']} {info['name']} — {info['price']}€ (базова)"
+            button_text = f"{checkbox} {info['icon']} {info['name']} — {info['price']}€ {t(user_id, 'tariffs.base_label')}"
             # Не додаємо callback для базової публікації - вона не може бути знята
             keyboard.append([
                 InlineKeyboardButton(
@@ -359,7 +396,7 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
     
     keyboard.append([
         InlineKeyboardButton(
-            text=f"✅ Готово (Разом: {total_price}€)",
+            text=t(user_id, 'tariffs.done_button', total=total_price),
             callback_data="tariff_confirm"
         )
     ])
@@ -375,7 +412,7 @@ def get_payment_method_keyboard(user_id: int, balance: float, amount: float, pay
     if balance >= amount:
         keyboard.append([
             InlineKeyboardButton(
-                text=f"💰 Оплатити з балансу ({balance:.2f}€)",
+                text=t(user_id, 'payment.pay_from_balance', balance=balance),
                 callback_data="payment_balance"
             )
         ])
@@ -384,7 +421,7 @@ def get_payment_method_keyboard(user_id: int, balance: float, amount: float, pay
     if payment_url:
         keyboard.append([
             InlineKeyboardButton(
-                text="💳 Оплатити картою",
+                text=t(user_id, 'payment.pay_by_card'),
                 url=payment_url
             )
         ])
@@ -392,10 +429,18 @@ def get_payment_method_keyboard(user_id: int, balance: float, amount: float, pay
         # Fallback на callback якщо посилання ще не готове
         keyboard.append([
             InlineKeyboardButton(
-                text="💳 Оплатити картою",
+                text=t(user_id, 'payment.pay_by_card'),
                 callback_data="payment_card"
             )
         ])
+    
+    # Кнопка "Назад" для повернення до вибору тарифів
+    keyboard.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'create_listing.back'),
+            callback_data="back_to_tariffs"
+        )
+    ])
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 

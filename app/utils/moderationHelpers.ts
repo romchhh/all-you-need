@@ -73,45 +73,71 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
   const promotionResult = await prisma.$queryRawUnsafe(
     `SELECT id, promotionType, duration FROM PromotionPurchase 
      WHERE listingId = ? AND status IN ('pending', 'paid')
-     ORDER BY id DESC LIMIT 1`,
+     ORDER BY id DESC`,
     listing.id
   ) as Array<{ id: number; promotionType: string; duration: number }>;
 
   if (promotionResult.length > 0) {
-    const promo = promotionResult[0];
+    // Активуємо всі pending/paid реклами
+    const activeTypes: string[] = [];
+    let latestEndsAt: Date | null = null;
     
-    // Розраховуємо дату закінчення промо
-    const promoEndsAt = new Date();
-    promoEndsAt.setDate(promoEndsAt.getDate() + promo.duration);
-    const promoEndsAtStr = toSQLiteDate(promoEndsAt);
+    for (const promo of promotionResult) {
+      // Розраховуємо дату закінчення промо
+      const promoEndsAt = new Date();
+      promoEndsAt.setDate(promoEndsAt.getDate() + promo.duration);
+      const promoEndsAtStr = toSQLiteDate(promoEndsAt);
+      
+      // Активуємо промо
+      const nowISO = new Date().toISOString();
+      await prisma.$executeRawUnsafe(
+        `UPDATE PromotionPurchase 
+         SET status = 'active',
+             startsAt = ?,
+             endsAt = ?
+         WHERE id = ?`,
+        nowISO,
+        promoEndsAtStr,
+        promo.id
+      );
+      
+      activeTypes.push(promo.promotionType);
+      if (!latestEndsAt || promoEndsAt > latestEndsAt) {
+        latestEndsAt = promoEndsAt;
+      }
+    }
     
-    // Активуємо промо
-    const nowISO = new Date().toISOString();
-    await prisma.$executeRawUnsafe(
-      `UPDATE PromotionPurchase 
-       SET status = 'active',
-           startsAt = ?,
-           endsAt = ?
-       WHERE id = ?`,
-      nowISO,
-      promoEndsAtStr,
-      promo.id
-    );
+    // Формуємо комбінований тип реклами
+    let combinedType: string;
+    if (activeTypes.includes('highlighted') && activeTypes.includes('top_category')) {
+      combinedType = 'highlighted,top_category';
+    } else if (activeTypes.includes('vip')) {
+      combinedType = 'vip';
+    } else if (activeTypes.includes('top_category')) {
+      combinedType = 'top_category';
+    } else if (activeTypes.includes('highlighted')) {
+      combinedType = 'highlighted';
+    } else {
+      combinedType = activeTypes[0] || '';
+    }
     
     // Оновлюємо Listing з promotionType та promotionEnds
-    await prisma.$executeRawUnsafe(
-      `UPDATE Listing 
-       SET promotionType = ?, 
-           promotionEnds = ?, 
-           updatedAt = ? 
-       WHERE id = ?`,
-      promo.promotionType,
-      promoEndsAtStr,
-      nowStr,
-      listing.id
-    );
-    
-    console.log(`[approveListing] Promotion activated: ${promo.promotionType} for listing ${listing.id}`);
+    if (latestEndsAt) {
+      const latestEndsAtStr = toSQLiteDate(latestEndsAt);
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing 
+         SET promotionType = ?, 
+             promotionEnds = ?, 
+             updatedAt = ? 
+         WHERE id = ?`,
+        combinedType,
+        latestEndsAtStr,
+        nowStr,
+        listing.id
+      );
+      
+      console.log(`[approveListing] Promotions activated: ${combinedType} for listing ${listing.id}`);
+    }
   }
 
   // Надсилаємо повідомлення

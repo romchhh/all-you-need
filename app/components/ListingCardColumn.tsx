@@ -28,21 +28,34 @@ const ListingCardColumnComponent = ({
     ? new Date(listing.promotionEnds) > new Date() 
     : false;
   
-  const promotionType = hasPromotion ? listing.promotionType : null;
+  // Парсимо promotionType - може бути одним типом або комбінацією "highlighted,top_category"
+  const promotionTypes = hasPromotion && listing.promotionType
+    ? listing.promotionType.split(',').map(t => t.trim())
+    : [];
+  
+  const promotionType = promotionTypes.length > 0 ? promotionTypes[0] : null;
   
   // Визначаємо стилі в залежності від типу реклами
   // Лаймова рамка тільки для VIP, не для TOP
   const getPromotionStyles = () => {
-    if (!promotionType) return 'border border-white/20';
+    if (promotionTypes.length === 0) return 'border border-white/20';
     
-    switch (promotionType) {
-      case 'vip':
-        return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
-      case 'top_category':
-        return 'border border-white/20';
-      default:
-        return 'border border-white/20';
+    // Якщо є VIP - показуємо VIP стиль
+    if (promotionTypes.includes('vip')) {
+      return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
     }
+    
+    // Якщо є highlighted - показуємо рамку
+    if (promotionTypes.includes('highlighted')) {
+      return 'border-2 border-[#D3F1A7]';
+    }
+    
+    // Якщо тільки top_category - без рамки
+    if (promotionTypes.includes('top_category')) {
+      return 'border border-white/20';
+    }
+    
+    return 'border border-white/20';
   };
   
   const getCardBackgroundStyles = () => {
@@ -50,20 +63,24 @@ const ListingCardColumnComponent = ({
   };
   
   const getPromotionBadge = () => {
-    if (promotionType === 'vip') {
+    // Якщо є VIP - показуємо VIP бейдж
+    if (promotionTypes.includes('vip')) {
       return (
         <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           VIP
         </div>
       );
     }
-    if (promotionType === 'top_category') {
+    
+    // Якщо є top_category - показуємо TOP бейдж
+    if (promotionTypes.includes('top_category')) {
       return (
         <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           TOP
         </div>
       );
     }
+    
     return null;
   };
 

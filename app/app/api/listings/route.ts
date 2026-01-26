@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
       const queryParams: any[] = [parseInt(userId)];
       
       if (!isOwnProfile) {
-        whereClause += " AND l.status != 'sold' AND l.status != 'hidden' AND l.status != 'deactivated'";
+        whereClause += " AND l.status != 'sold' AND l.status != 'hidden' AND l.status != 'deactivated' AND l.status != 'rejected'";
       }
       // Додаємо фільтр за статусом, якщо він вказаний
       if (status && status !== 'all') {
@@ -204,9 +204,10 @@ export async function GET(request: NextRequest) {
             WHEN l.status = 'pending_moderation' THEN 2
             WHEN l.status = 'sold' THEN 3
             WHEN l.status = 'expired' THEN 4
-            WHEN l.status = 'deactivated' THEN 5
-            WHEN l.status = 'hidden' THEN 6
-            ELSE 7
+            WHEN l.status = 'rejected' THEN 5
+            WHEN l.status = 'deactivated' THEN 6
+            WHEN l.status = 'hidden' THEN 7
+            ELSE 8
           END,
           l.createdAt DESC
         LIMIT ? OFFSET ?`;
@@ -303,7 +304,7 @@ export async function GET(request: NextRequest) {
           condition: normalizeCondition(listing.condition),
           tags: tags,
           isFree: listing.isFree === 1 || listing.isFree === true,
-          status: listing.status || 'active',
+          status: listing.status ?? 'active',
           moderationStatus: listing.moderationStatus || null,
           rejectionReason: listing.rejectionReason || null,
           promotionType: listing.promotionType || null,
@@ -359,10 +360,10 @@ export async function GET(request: NextRequest) {
       const hasCategoryFilter = !!(category || subcategory);
       let orderByClause = `ORDER BY 
         CASE 
-          WHEN l.promotionType = 'vip' AND datetime(l.promotionEnds) > datetime('now') THEN 1
+          WHEN (l.promotionType = 'vip' OR l.promotionType LIKE '%vip%') AND datetime(l.promotionEnds) > datetime('now') THEN 1
           ${hasCategoryFilter 
-            ? "WHEN l.promotionType = 'top_category' AND datetime(l.promotionEnds) > datetime('now') THEN 2"
-            : "WHEN l.promotionType = 'top_category' AND datetime(l.promotionEnds) > datetime('now') THEN 4"
+            ? "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND datetime(l.promotionEnds) > datetime('now') THEN 2"
+            : "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND datetime(l.promotionEnds) > datetime('now') THEN 4"
           }
           ELSE 4
         END,`;
@@ -567,7 +568,7 @@ export async function GET(request: NextRequest) {
                condition: normalizeCondition(listing.condition),
                tags: tags,
                isFree: listing.isFree === 1 || listing.isFree === true,
-               status: listing.status || 'active',
+               status: listing.status ?? 'active',
                moderationStatus: listing.moderationStatus || null,
                rejectionReason: listing.rejectionReason || null,
                promotionType: listing.promotionType || null,

@@ -32,6 +32,7 @@ export const CreateListingModal = ({
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState<'UAH' | 'EUR' | 'USD'>('EUR');
   const [isFree, setIsFree] = useState(false);
+  const [isNegotiable, setIsNegotiable] = useState(false);
   const [category, setCategory] = useState<string>('');
   const [subcategory, setSubcategory] = useState<string>('');
   const [location, setLocation] = useState('');
@@ -813,7 +814,7 @@ export const CreateListingModal = ({
       newErrors.description = `Текст перевищує ліміт Telegram на ${excess} символів. Скоротіть заголовок або опис.`;
     }
 
-    if (!isFree) {
+    if (!isFree && !isNegotiable) {
       if (!price.trim()) {
         newErrors.price = t('createListing.errors.priceRequired');
       } else {
@@ -852,9 +853,10 @@ export const CreateListingModal = ({
       await onSave({
         title,
         description,
-        price: isFree ? t('common.free') : price,
+        price: isFree ? t('common.free') : (isNegotiable ? t('common.negotiable') : price),
         currency: currency,
         isFree,
+        isNegotiable,
         category,
         subcategory: subcategory || null,
         location,
@@ -1086,16 +1088,63 @@ export const CreateListingModal = ({
 
           {/* Ціна */}
           <div>
-            <label className="flex items-center gap-2 mb-2">
-              <input
-                type="checkbox"
-                checked={isFree}
-                onChange={(e) => setIsFree(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm font-medium text-white">{t('common.free')}</span>
-            </label>
-            {!isFree && (
+            <div className="flex items-center gap-3 mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFree(!isFree);
+                  if (!isFree) {
+                    setIsNegotiable(false);
+                  }
+                }}
+                className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  isFree
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  isFree
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    : 'border-white/40 bg-transparent'
+                }`}>
+                  {isFree && (
+                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span>{t('common.free')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNegotiable(!isNegotiable);
+                  if (!isNegotiable) {
+                    setIsFree(false);
+                  }
+                }}
+                className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  isNegotiable
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  isNegotiable
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    : 'border-white/40 bg-transparent'
+                }`}>
+                  {isNegotiable && (
+                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span>{t('common.negotiable')}</span>
+              </button>
+            </div>
+            {!isFree && !isNegotiable && (
               <>
                 <div className="flex gap-2 mb-2">
                   <input

@@ -1,4 +1,4 @@
-import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2, Sparkles, Wrench, CheckCircle, Tag, EyeOff } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2, Sparkles, Wrench, CheckCircle, Tag, EyeOff, Check } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Listing } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -34,6 +34,9 @@ export const EditListingModal = ({
   const [price, setPrice] = useState(listing.isFree ? '' : listing.price);
   const [currency, setCurrency] = useState<'UAH' | 'EUR' | 'USD'>(listing.currency || 'UAH');
   const [isFree, setIsFree] = useState(listing.isFree || false);
+  const [isNegotiable, setIsNegotiable] = useState(
+    listing.price === t('common.negotiable') || listing.price === 'Договорная' || listing.price === 'Договірна'
+  );
   const [category, setCategory] = useState(listing.category);
   const [subcategory, setSubcategory] = useState(listing.subcategory || '');
   const [location, setLocation] = useState(listing.location);
@@ -129,6 +132,9 @@ export const EditListingModal = ({
       setDescription(listing.description);
       setPrice(listing.isFree ? '' : listing.price);
       setIsFree(listing.isFree || false);
+      setIsNegotiable(
+        listing.price === t('common.negotiable') || listing.price === 'Договорная' || listing.price === 'Договірна'
+      );
       setCategory(listing.category);
       setSubcategory(listing.subcategory || '');
       setLocation(listing.location);
@@ -715,38 +721,38 @@ export const EditListingModal = ({
     const newErrors: Record<string, string> = {};
 
     if (!title.trim()) {
-      newErrors.title = 'Введіть назву товару';
+      newErrors.title = t('editListing.errors.titleRequired');
     } else if (title.trim().length < 3) {
-      newErrors.title = 'Назва має містити мінімум 3 символи';
+      newErrors.title = t('editListing.errors.titleMinLength');
     }
 
     if (!description.trim()) {
-      newErrors.description = 'Введіть опис товару';
+      newErrors.description = t('editListing.errors.descriptionRequired');
     } else if (description.trim().length < 10) {
-      newErrors.description = 'Опис має містити мінімум 10 символів';
+      newErrors.description = t('editListing.errors.descriptionMinLength');
     }
 
-    if (!isFree) {
+    if (!isFree && !isNegotiable) {
       if (!price.trim()) {
-        newErrors.price = 'Введіть ціну';
+        newErrors.price = t('editListing.errors.priceRequired');
       } else {
         const priceNum = parseFloat(price.replace(/[^\d.,]/g, '').replace(',', '.'));
         if (isNaN(priceNum) || priceNum <= 0) {
-          newErrors.price = 'Введіть коректну ціну';
+          newErrors.price = t('editListing.errors.priceInvalid');
         }
       }
     }
 
     if (!category) {
-      newErrors.category = 'Оберіть розділ';
+      newErrors.category = t('editListing.errors.categoryRequired');
     }
 
     if (imagePreviews.length === 0) {
-      newErrors.images = 'Додайте хоча б одне фото';
+      newErrors.images = t('createListing.addPhoto');
     }
 
     if (!location.trim()) {
-      newErrors.location = 'Введіть локацію';
+      newErrors.location = t('editListing.errors.locationRequired');
     }
 
     setErrors(newErrors);
@@ -768,9 +774,10 @@ export const EditListingModal = ({
       await onSave({
         title,
         description,
-        price: isFree ? t('common.free') : price,
+        price: isFree ? t('common.free') : (isNegotiable ? t('common.negotiable') : price),
         currency: currency,
         isFree,
+        isNegotiable,
         category,
         subcategory: subcategory || null,
         condition: condition || null,
@@ -855,14 +862,14 @@ export const EditListingModal = ({
                 {listing.rejectionReason}
               </div>
               <div className="text-red-400/70 text-xs mt-2">
-                {t('editListing.submitAgain') || 'Активувати'} - щоб відправити виправлене оголошення на повторну перевірку
+                {t('editListing.submitAgain') || 'Активувати'} - {t('editListing.submitAgainDescription')}
               </div>
             </div>
           )}
           {/* Фото */}
           <div>
             <label className="block text-sm font-medium text-white mb-3">
-              Фото * {imagePreviews.length}/10
+              {t('editListing.photosLabel')} {imagePreviews.length}/10
             </label>
             {/* Прогрес-бар стиснення зображень */}
             <div className="grid grid-cols-3 gap-2 relative">
@@ -961,7 +968,7 @@ export const EditListingModal = ({
                 <label className="aspect-square rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-[#D3F1A7] transition-colors">
                   <div className="text-center">
                     <Upload size={24} className="text-white/70 mx-auto mb-1" />
-                    <span className="text-xs text-white/70">Додати</span>
+                    <span className="text-xs text-white/70">{t('editListing.addPhoto')}</span>
                   </div>
                   <input
                     type="file"
@@ -981,7 +988,7 @@ export const EditListingModal = ({
           {/* Заголовок */}
           <div>
             <label className="block text-sm font-medium text-white mb-2">
-              Заголовок *
+              {t('editListing.titleLabel')}
             </label>
             <input
               type="text"
@@ -990,7 +997,7 @@ export const EditListingModal = ({
                 setTitle(e.target.value);
                 if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
               }}
-              placeholder="Наприклад: iPhone 13 Pro Max"
+              placeholder={t('editListing.titlePlaceholder')}
               className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                 errors.title ? 'border-red-500' : 'border-white/20'
               } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
@@ -1004,7 +1011,7 @@ export const EditListingModal = ({
           {/* Опис */}
           <div>
             <label className="block text-sm font-medium text-white mb-2">
-              Опис *
+              {t('editListing.descriptionLabel')}
             </label>
             <textarea
               value={description}
@@ -1012,7 +1019,7 @@ export const EditListingModal = ({
                 setDescription(e.target.value);
                 if (errors.description) setErrors(prev => ({ ...prev, description: '' }));
               }}
-              placeholder="Детальний опис товару..."
+              placeholder={t('editListing.descriptionPlaceholder')}
               rows={4}
               className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                 errors.description ? 'border-red-500' : 'border-white/20'
@@ -1026,17 +1033,63 @@ export const EditListingModal = ({
 
           {/* Ціна */}
           <div>
-            <label className="flex items-center gap-2 mb-2">
-              <input
-                type="checkbox"
-                checked={isFree}
-                onChange={(e) => setIsFree(e.target.checked)}
-                className="w-4 h-4 rounded border-white/20 text-[#D3F1A7] focus:ring-[#D3F1A7] bg-transparent"
-                style={{ accentColor: '#D3F1A7' }}
-              />
-              <span className="text-sm font-medium text-white">{t('common.free')}</span>
-            </label>
-            {!isFree && (
+            <div className="flex items-center gap-3 mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFree(!isFree);
+                  if (!isFree) {
+                    setIsNegotiable(false);
+                  }
+                }}
+                className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  isFree
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  isFree
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    : 'border-white/40 bg-transparent'
+                }`}>
+                  {isFree && (
+                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span>{t('common.free')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNegotiable(!isNegotiable);
+                  if (!isNegotiable) {
+                    setIsFree(false);
+                  }
+                }}
+                className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  isNegotiable
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  isNegotiable
+                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    : 'border-white/40 bg-transparent'
+                }`}>
+                  {isNegotiable && (
+                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span>{t('common.negotiable')}</span>
+              </button>
+            </div>
+            {!isFree && !isNegotiable && (
               <>
                 <div className="flex gap-2 mb-2">
                   <input
@@ -1046,7 +1099,7 @@ export const EditListingModal = ({
                       setPrice(e.target.value);
                       if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                     }}
-                    placeholder="Ціна"
+                    placeholder={t('editListing.pricePlaceholder')}
                     className={`flex-1 px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                       errors.price ? 'border-red-500' : 'border-white/20'
                     } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
@@ -1076,7 +1129,7 @@ export const EditListingModal = ({
           {/* Розділ */}
           <div>
             <label className="block text-sm font-medium text-white mb-3">
-              Розділ *
+              {t('editListing.categoryLabel')}
             </label>
             <div className="grid grid-cols-2 gap-2">
               {categories.map(cat => (
@@ -1113,7 +1166,7 @@ export const EditListingModal = ({
           {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-white mb-3">
-                Тип (необов'язково)
+                {t('editListing.subcategoryLabel')}
               </label>
               {(() => {
                 // Для категорії "Послуги та робота" розділяємо підкатегорії на дві групи
@@ -1230,7 +1283,7 @@ export const EditListingModal = ({
           {/* Стан */}
           <div className="relative" ref={conditionRef}>
             <label className="block text-sm font-medium text-white mb-2">
-              Стан (необов'язково)
+              {t('editListing.conditionLabel')}
             </label>
             <button
               type="button"
@@ -1245,7 +1298,7 @@ export const EditListingModal = ({
                   </>
                 )}
                 {!selectedCondition && (
-                  <span className="text-white/50">Оберіть стан</span>
+                  <span className="text-white/50">{t('editListing.selectCondition')}</span>
                 )}
               </div>
               <ChevronDown size={20} className={`text-white/70 transition-transform ${isConditionOpen ? 'rotate-180' : ''}`} />
@@ -1282,7 +1335,7 @@ export const EditListingModal = ({
           {/* Локація */}
           <div className="relative" ref={locationRef}>
             <label className="block text-sm font-medium text-white mb-2">
-              Локація *
+              {t('editListing.locationLabel')}
             </label>
             <div className="relative">
               <input
@@ -1303,7 +1356,7 @@ export const EditListingModal = ({
                   }
                 }}
                 onFocus={() => setIsLocationOpen(true)}
-                placeholder="Оберіть або введіть місто"
+                placeholder={t('editListing.locationPlaceholder')}
                 className={`w-full px-4 py-3 pl-10 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                   errors.location ? 'border-red-500' : 'border-white/20'
                 } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
@@ -1364,17 +1417,23 @@ export const EditListingModal = ({
                 type="button"
                 onClick={() => {
                   const isPendingModeration = (listing.status as string) === 'pending_moderation';
+                  const isRejectedStatus = isRejected || (listing.status as string) === 'rejected';
                   if (isPendingModeration) {
                     showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+                    tg?.HapticFeedback.notificationOccurred('error');
+                    return;
+                  }
+                  if (isRejectedStatus) {
+                    showToast(t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення', 'error');
                     tg?.HapticFeedback.notificationOccurred('error');
                     return;
                   }
                   setShowSoldConfirm(true);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                disabled={(listing.status as string) === 'pending_moderation'}
+                disabled={(listing.status as string) === 'pending_moderation' || isRejected || (listing.status as string) === 'rejected'}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
-                  (listing.status as string) === 'pending_moderation'
+                  (listing.status as string) === 'pending_moderation' || isRejected || (listing.status as string) === 'rejected'
                     ? 'border-white/10 bg-[#1C1C1C]/50 text-white/50 cursor-not-allowed opacity-50'
                     : status === 'sold'
                     ? 'border-white/40 bg-white/10 text-white shadow-sm'
@@ -1425,16 +1484,10 @@ export const EditListingModal = ({
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={loading}
-            className="px-4 py-3 bg-transparent border border-red-500/50 text-red-500 rounded-xl text-sm font-medium hover:bg-red-500/10 hover:border-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="flex-1 px-4 py-3 bg-transparent border border-red-500/50 text-red-500 rounded-xl text-sm font-medium hover:bg-red-500/10 hover:border-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Trash2 size={16} />
             {t('common.delete')}
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-3 bg-transparent border border-white/20 text-white rounded-xl text-sm font-medium hover:bg-white/10 transition-colors"
-          >
-            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
@@ -1447,7 +1500,10 @@ export const EditListingModal = ({
                 <span>{isRejected ? t('editListing.savingAndSubmitting') : t('editListing.saving')}</span>
               </>
             ) : (
-              <span>{isRejected ? t('editListing.submitAgain') : t('common.save')}</span>
+              <>
+                <Check size={18} />
+                <span>{isRejected ? t('editListing.submitAgain') : t('common.save')}</span>
+              </>
             )}
           </button>
         </div>
@@ -1536,8 +1592,14 @@ export const EditListingModal = ({
           onClose={() => setShowSoldConfirm(false)}
           onConfirm={() => {
             const isPendingModeration = (listing.status as string) === 'pending_moderation';
+            const isRejectedStatus = isRejected || (listing.status as string) === 'rejected';
             if (isPendingModeration) {
               showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+              setShowSoldConfirm(false);
+              return;
+            }
+            if (isRejectedStatus) {
+              showToast(t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення', 'error');
               setShowSoldConfirm(false);
               return;
             }

@@ -25,6 +25,7 @@
     "currency": "Валюта",
     "selectCurrency": "Выберите валюту",
     "free": "FREE",
+    "negotiable": "Договорная",
     "language": "Язык",
     "languageLabel": "Язык",
     "all": "Все",
@@ -238,7 +239,8 @@
     "call": "Позвонить",
     "numberCopied": "Номер скопирован!",
     "copyError": "Ошибка копирования номера",
-    "cancel": "Отмена"
+    "cancel": "Отмена",
+    "explanation": "У пользователя нет username в Telegram, поэтому напрямую написать сообщение нельзя. Используйте номер телефона для связи."
   },
   "emptyState": {
     "noResults": "Ничего не найдено",
@@ -322,7 +324,32 @@
     "deleteConfirmTitle": "Удалить объявление?",
     "active": "Активное",
     "openDetails": "Открыть детали",
-    "cannotEditOnModeration": "Нельзя редактировать объявление во время модерации"
+    "cannotEditOnModeration": "Нельзя редактировать объявление во время модерации",
+    "cannotMarkSoldRejected": "Нельзя пометить как проданное отклоненное объявление",
+    "submitAgainDescription": "чтобы отправить исправленное объявление на повторную проверку",
+    "addPhoto": "Добавить",
+    "photosLabel": "Фото *",
+    "titleLabel": "Заголовок *",
+    "titlePlaceholder": "Например: iPhone 13 Pro Max",
+    "descriptionLabel": "Описание *",
+    "descriptionPlaceholder": "Подробное описание товара...",
+    "pricePlaceholder": "Цена",
+    "categoryLabel": "Раздел *",
+    "subcategoryLabel": "Тип (необязательно)",
+    "conditionLabel": "Состояние (необязательно)",
+    "selectCondition": "Выберите состояние",
+    "locationLabel": "Локация *",
+    "locationPlaceholder": "Выберите или введите город",
+    "errors": {
+      "titleRequired": "Введите название товара",
+      "titleMinLength": "Название должно содержать минимум 3 символа",
+      "descriptionRequired": "Введите описание товара",
+      "descriptionMinLength": "Описание должно содержать минимум 10 символов",
+      "priceRequired": "Введите цену",
+      "priceInvalid": "Введите корректную цену",
+      "categoryRequired": "Выберите раздел",
+      "locationRequired": "Введите локацию"
+    }
   },
   "userProfile": {
     "noListings": "Нет объявлений",
@@ -682,7 +709,8 @@
     "upgradeNow": "Улучшить рекламу",
     "maxLevel": "Достигнут максимальный уровень",
     "maxLevelDesc": "Ваше объявление уже имеет лучшую рекламу",
-    "comingSoon": "Функция рекламы будет доступна в ближайшее время"
+    "comingSoon": "Функция рекламы будет доступна в ближайшее время",
+    "bothActive": "Обе рекламы уже активны"
   },
   "moderation": {
     "title": "Модерация объявлений",

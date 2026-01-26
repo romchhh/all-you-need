@@ -24,7 +24,12 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
     ? new Date(listing.promotionEnds) > new Date() 
     : false;
   
-  const promotionType = hasPromotion ? listing.promotionType : null;
+  // Парсимо promotionType - може бути одним типом або комбінацією "highlighted,top_category"
+  const promotionTypes = hasPromotion && listing.promotionType
+    ? listing.promotionType.split(',').map(t => t.trim())
+    : [];
+  
+  const promotionType = promotionTypes.length > 0 ? promotionTypes[0] : null;
   
   // Логування для діагностики
   useEffect(() => {
@@ -48,40 +53,45 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   // - ВИП (vip) - рамка + бейдж VIP
   // - ТОП + Выделение - рамка + бейдж TOP
   const getPromotionStyles = () => {
-    if (!promotionType) return 'border border-white/20';
+    if (promotionTypes.length === 0) return 'border border-white/20';
     
-    switch (promotionType) {
-      case 'vip':
-        // ВИП - рамка з тінню
-        return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
-      case 'highlighted':
-        // Выделение цветом - рамка без тіні
-        return 'border-2 border-[#D3F1A7]';
-      case 'top_category':
-        // ТОП - без рамки (стандартна рамка)
-        return 'border border-white/20';
-      default:
-        return 'border border-white/20';
+    // Якщо є VIP - показуємо VIP стиль
+    if (promotionTypes.includes('vip')) {
+      return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
     }
+    
+    // Якщо є highlighted - показуємо рамку
+    if (promotionTypes.includes('highlighted')) {
+      return 'border-2 border-[#D3F1A7]';
+    }
+    
+    // Якщо тільки top_category - без рамки
+    if (promotionTypes.includes('top_category')) {
+      return 'border border-white/20';
+    }
+    
+    return 'border border-white/20';
   };
   
   const getPromotionBadge = () => {
-    if (promotionType === 'vip') {
-      // ВИП - бейдж VIP
+    // Якщо є VIP - показуємо VIP бейдж
+    if (promotionTypes.includes('vip')) {
       return (
         <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           VIP
         </div>
       );
     }
-    if (promotionType === 'top_category') {
-      // ТОП - бейдж TOP (показуємо тільки якщо немає іншої реклами, але оскільки promotionType може бути тільки одним, показуємо завжди для ТОП)
+    
+    // Якщо є top_category - показуємо TOP бейдж
+    if (promotionTypes.includes('top_category')) {
       return (
         <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           TOP
         </div>
       );
     }
+    
     // highlighted - без бейджа (тільки рамка)
     return null;
   };

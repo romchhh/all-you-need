@@ -161,9 +161,48 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Отримати доступні типи реклами
-export async function GET() {
+// Отримати доступні типи реклами або активні реклами для оголошення
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams;
+    const listingId = searchParams.get('listingId');
+    
+    // Якщо передано listingId, повертаємо активні реклами для цього оголошення
+    if (listingId) {
+      const { prisma } = await import('@/lib/prisma');
+      const parsedListingId = parseInt(listingId);
+      
+      if (isNaN(parsedListingId)) {
+        return NextResponse.json(
+          { error: 'Invalid listingId' },
+          { status: 400 }
+        );
+      }
+      
+      // Отримуємо всі активні реклами для цього оголошення
+      const activePromotions = await prisma.$queryRawUnsafe(
+        `SELECT promotionType, endsAt 
+         FROM PromotionPurchase 
+         WHERE listingId = ? 
+           AND status IN ('active', 'paid', 'completed')
+           AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))
+         ORDER BY createdAt DESC`,
+        parsedListingId
+      ) as Array<{ promotionType: string; endsAt: string | null }>;
+      
+      // Повертаємо список активних типів реклами
+      const activeTypes = activePromotions.map(p => p.promotionType);
+      const latestEndsAt = activePromotions.length > 0 
+        ? activePromotions[0].endsAt 
+        : null;
+      
+      return NextResponse.json({
+        activePromotions: activeTypes,
+        promotionEnds: latestEndsAt,
+      });
+    }
+    
+    // Якщо listingId не передано, повертаємо доступні типи реклами
     return NextResponse.json({
       promotions: PROMOTION_PRICES,
     });

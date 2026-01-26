@@ -13,7 +13,8 @@ from keyboards.client_keyboards import (
     get_payment_method_keyboard,
     get_german_cities_keyboard,
     get_continue_photos_keyboard,
-    get_edit_listing_keyboard
+    get_edit_listing_keyboard,
+    get_category_translation
 )
 from database_functions.telegram_listing_db import (
     get_user_id_by_telegram_id,
@@ -426,7 +427,7 @@ async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext
         await show_preview(user_id, state, callback=callback)
     else:
         # Якщо створюємо нове, переходимо до наступного кроку
-        await process_category_selection(callback.message, state)
+        await process_category_selection(callback.message, state, user_id)
 
 
 @router.message(CreateListing.waiting_for_photos, F.text == "/skip")
@@ -457,12 +458,11 @@ async def handle_text_in_photos_state(message: types.Message, state: FSMContext)
     await message.answer("📸 <b>Будь ласка, надішліть фото!</b>\n\nВи можете надіслати до 10 фото. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
 
 
-async def process_category_selection(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
+async def process_category_selection(message: types.Message, state: FSMContext, user_id: int):
     categories = get_categories()
     
     if not categories:
-        await message.answer("<b>❌ Помилка:</b> категорії не знайдені. Спробуйте пізніше.", parse_mode="HTML")
+        await message.answer(f"<b>{t(user_id, 'create_listing.categories_not_found')}</b>", parse_mode="HTML")
         await state.clear()
         return
     
@@ -476,6 +476,10 @@ async def process_category_selection(message: types.Message, state: FSMContext):
             await bot.delete_message(chat_id=user_id, message_id=last_message_id)
         except:
             pass
+
+    print(t(user_id, 'create_listing.category_prompt'))
+    print(user_id)
+    print(categories)
     
     sent_message = await message.answer(
         t(user_id, 'create_listing.category_prompt'),
@@ -494,7 +498,7 @@ async def process_category(callback: types.CallbackQuery, state: FSMContext):
     selected_category = next((c for c in categories if c['id'] == category_id), None)
     
     if not selected_category:
-        await callback.answer("❌ Категорія не знайдена", show_alert=True)
+        await callback.answer(t(user_id, 'create_listing.category_not_found'), show_alert=True)
         return
     
     await state.update_data(category_id=category_id, category_name=selected_category['name'])
@@ -516,7 +520,7 @@ async def process_category(callback: types.CallbackQuery, state: FSMContext):
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text="🤝 Договірна",
+            text=t(user_id, 'create_listing.price_negotiable_button_alt'),
             callback_data="price_negotiable"
         )]
     ])
@@ -552,8 +556,9 @@ async def process_category(callback: types.CallbackQuery, state: FSMContext):
 async def process_price_negotiable(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     
-    # Зберігаємо "Договірна" як ціну
-    await state.update_data(price="Договірна", isNegotiable=True)
+    # Зберігаємо "Договірна" як ціну (використовуємо переклад)
+    negotiable_text = t(user_id, 'moderation.negotiable')
+    await state.update_data(price=negotiable_text, isNegotiable=True)
     
     # Перевіряємо, чи це редагування
     data = await state.get_data()
@@ -700,7 +705,7 @@ async def cancel_listing_from_city_selection(callback: types.CallbackQuery, stat
     
     await callback.answer()
     await callback.message.answer(
-        "<b>📋 Головне меню</b>",
+        f"<b>{t(user_id, 'menu.main_menu')}</b>",
         reply_markup=get_main_menu_keyboard(user_id),
         parse_mode="HTML"
     )
@@ -807,13 +812,18 @@ def build_preview(user_id: int, data: dict) -> str:
     preview += t(user_id, 'create_listing.preview_description').format(description=description)
     
     category_text = data.get('category_name', '')
+    # Використовуємо переклад категорії
+    category_text = get_category_translation(user_id, category_text)
     preview += t(user_id, 'create_listing.preview_category').format(category=category_text)
     
     # Форматуємо ціну для відображення
     price_display = data.get('price', 0)
+    negotiable_text = t(user_id, 'moderation.negotiable')
+    
     if isinstance(price_display, str):
-        if price_display == "Договірна":
-            price_display = "Договірна"
+        # Перевіряємо обидві мови для "Договірна"
+        if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная":
+            price_display = negotiable_text
         elif '-' in price_display:
             # Діапазон ціни - вже містить формат "50-100"
             price_display = f"{price_display} EUR"
@@ -825,8 +835,8 @@ def build_preview(user_id: int, data: dict) -> str:
         price_display = f"{price_display} EUR"
     
     # Використовуємо спеціальний формат для "Договірна"
-    if price_display == "Договірна":
-        preview += f"💰 <b>Ціна:</b> Договірна\n"
+    if price_display == negotiable_text:
+        preview += t(user_id, 'create_listing.preview_price_negotiable').format(price=negotiable_text)
     else:
         preview += t(user_id, 'create_listing.preview_price').format(price=price_display.replace(' EUR', ''))
     # Убрано preview_condition - не показуємо стан для послуг
@@ -867,11 +877,13 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         price_value = data.get('price', 0)
         is_negotiable = data.get('isNegotiable', False)
         price_display = None  # Оригінальне значення для відображення
+        negotiable_text = t(user_id, 'moderation.negotiable')
         
         if isinstance(price_value, str):
-            if price_value == "Договірна" or is_negotiable:
+            # Перевіряємо обидві мови для "Договірна"
+            if price_value == negotiable_text or price_value == "Договірна" or price_value == "Договорная" or is_negotiable:
                 # Для "Договірна" зберігаємо як 0, але зберігаємо оригінальне значення
-                price_display = "Договірна"
+                price_display = negotiable_text
                 price_value = 0
             elif '-' in price_value:
                 # Для діапазону беремо мінімальне значення для сортування, але зберігаємо діапазон
@@ -895,7 +907,7 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
             category=data['category_name'],
             subcategory=None,
             condition='service',  # Для послуг завжди 'service'
-            location=data.get('location', 'Не вказано'),
+            location=data.get('location', t(user_id, 'moderation.not_specified')),
             images=photos,
             price_display=price_display  # Передаємо оригінальне значення
         )
@@ -917,36 +929,28 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         # Ініціалізуємо список вибраних тарифів (базова публікація завжди включена)
         await state.update_data(selected_tariffs=['standard'])
         
-        tariff_text = f"""💰 <b>Оберіть тарифи для публікації оголошення:</b>
+        tariff_text = f"""{t(user_id, 'tariffs.select_title')}
 
-💵 <b>Ваш баланс:</b> {user_balance:.2f}€
+{t(user_id, 'tariffs.standard_title')}
+{t(user_id, 'tariffs.standard_desc')}
 
-📌 <b>Звичайна публікація</b> — 3€ (базова, обов'язкова)
-• Стандартний пост
-• Без виділень
-• Публікується в загальний потік
+{t(user_id, 'tariffs.additional_options')}
 
-<b>Додаткові рекламні опції:</b>
+{t(user_id, 'tariffs.highlighted_title')}
+{t(user_id, 'tariffs.highlighted_desc')}
 
-⭐ <b>Виділене оголошення</b> — 1,5€
-• Емодзі на початку
-• Жирний заголовок
-• Візуально виділяється серед звичайних
+{t(user_id, 'tariffs.pinned_12h_title')}
+{t(user_id, 'tariffs.pinned_12h_desc')}
 
-📌 <b>Закріп на 12 годин</b> — 2,5€
-• Закріплюється зверху каналу
-• Автоматично знімається після закінчення терміну
+{t(user_id, 'tariffs.pinned_24h_title')}
+{t(user_id, 'tariffs.pinned_24h_desc')}
 
-📌 <b>Закріп на 24 години</b> — 4,5€
-• Закріплюється зверху каналу
-• На 24 години
+{t(user_id, 'tariffs.story_title')}
+{t(user_id, 'tariffs.story_desc')}
 
-📸 <b>Сторіс на 24 години</b> — 5€
-• 1 сторіс
-• Формат: текст + кнопка
-• Посилання на оголошення / профіль
+{t(user_id, 'tariffs.your_balance', balance=user_balance)}
 
-<i>Базова публікація (3€) включена за замовчуванням. Оберіть додаткові рекламні опції, якщо потрібно.</i>"""
+{t(user_id, 'tariffs.default_note')}"""
         
         await callback.message.answer(
             tariff_text,
@@ -1167,7 +1171,7 @@ async def edit_field_category(callback: types.CallbackQuery, state: FSMContext):
     categories = get_categories()
     
     if not categories:
-        await callback.answer("❌ Помилка: категорії не знайдені", show_alert=True)
+        await callback.answer(t(user_id, 'create_listing.categories_not_found_short'), show_alert=True)
         return
     
     await state.set_state(CreateListing.waiting_for_category)
@@ -1197,7 +1201,7 @@ async def edit_field_price(callback: types.CallbackQuery, state: FSMContext):
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text="💬 Договірна",
+            text=t(user_id, 'create_listing.price_negotiable_button'),
             callback_data="price_negotiable"
         )]
     ])
@@ -1248,7 +1252,7 @@ async def cancel_listing_callback(callback: types.CallbackQuery, state: FSMConte
     )
     await callback.answer()
     await callback.message.answer(
-        "<b>📋 Головне меню</b>",
+        f"<b>{t(user_id, 'menu.main_menu')}</b>",
         reply_markup=get_main_menu_keyboard(user_id),
         parse_mode="HTML"
     )
@@ -1284,7 +1288,7 @@ async def show_my_listings(message: types.Message):
     
     keyboard_buttons = []
     for listing in listings:
-        title = listing.get('title', 'Без назви')
+        title = listing.get('title', t(user_id, 'moderation.no_title'))
         status = listing.get('status', 'pending')
         status_emoji = {
             'pending_moderation': '⏳',
@@ -1327,13 +1331,13 @@ async def view_telegram_listing(callback: types.CallbackQuery):
             return
         
         title = listing.get('title', 'Без назви')
-        description = listing.get('description', 'Без опису')
+        description = listing.get('description', t(user_id, 'moderation.no_description'))
         price = listing.get('price', 0)
         currency = listing.get('currency', 'EUR')
-        category = listing.get('category', 'Не вказано')
+        category = listing.get('category', t(user_id, 'moderation.not_specified'))
         subcategory = listing.get('subcategory')
-        condition = listing.get('condition', 'Не вказано')
-        location = listing.get('location', 'Не вказано')
+        condition = listing.get('condition', t(user_id, 'moderation.not_specified'))
+        location = listing.get('location', t(user_id, 'moderation.not_specified'))
         status = listing.get('status', 'pending')
         created_at = listing.get('createdAt', '')
         
@@ -1346,14 +1350,14 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         status_text = status_translations.get(status, status)
         
         message_text = f"""📦 <b>{title}</b>\n\n"""
-        message_text += f"📝 <b>Опис:</b> {description[:500]}{'...' if len(description) > 500 else ''}\n\n"
-        message_text += f"💰 <b>Ціна:</b> {price} {currency}\n"
-        message_text += f"📂 <b>Категорія:</b> {category}"
+        message_text += f"{t(user_id, 'listing.details.description')} {description[:500]}{'...' if len(description) > 500 else ''}\n\n"
+        message_text += f"{t(user_id, 'listing.details.price')} {price} {currency}\n"
+        message_text += f"{t(user_id, 'listing.details.category')} {category}"
         if subcategory:
             message_text += f" / {subcategory}"
         message_text += f"\n"
-        message_text += f"📍 <b>Розташування:</b> {location}\n"
-        message_text += f"📊 <b>Статус:</b> {status_text}\n"
+        message_text += f"{t(user_id, 'listing.details.location')} {location}\n"
+        message_text += f"{t(user_id, 'listing.details.status')} {status_text}\n"
         if created_at:
             # Форматуємо дату в нормальний формат
             from datetime import datetime
@@ -1384,13 +1388,13 @@ async def view_telegram_listing(callback: types.CallbackQuery):
                 
                 if dt:
                     formatted_date = dt.strftime("%d.%m.%Y %H:%M")
-                    message_text += f"📅 <b>Створено:</b> {formatted_date}\n"
+                    message_text += f"{t(user_id, 'listing.details.created')} {formatted_date}\n"
                 else:
                     # Якщо не вдалося розпарсити, виводимо як є
-                    message_text += f"📅 <b>Створено:</b> {created_at}\n"
+                    message_text += f"{t(user_id, 'listing.details.created')} {created_at}\n"
             except Exception as e:
                 # Якщо не вдалося розпарсити, виводимо як є
-                message_text += f"📅 <b>Створено:</b> {created_at}\n"
+                message_text += f"{t(user_id, 'listing.details.created')} {created_at}\n"
         
         keyboard_buttons = []
         
@@ -1410,7 +1414,7 @@ async def view_telegram_listing(callback: types.CallbackQuery):
             if channel_link:
                 keyboard_buttons.append([
                     InlineKeyboardButton(
-                        text="🔗 Переглянути в каналі",
+                        text=t(user_id, 'my_listings.view_in_channel'),
                         url=channel_link
                     )
                 ])
@@ -1448,7 +1452,7 @@ async def view_telegram_listing(callback: types.CallbackQuery):
                     # Доступно після 1 години (без обмеження 24 годинами)
                     keyboard_buttons.append([
                         InlineKeyboardButton(
-                            text="🔄 Оновити оголошення — 1,5€",
+                            text=t(user_id, 'my_listings.refresh_button'),
                             callback_data=f"refresh_listing_{listing_id}"
                         )
                     ])
@@ -1459,7 +1463,7 @@ async def view_telegram_listing(callback: types.CallbackQuery):
                     if minutes_left > 0:
                         keyboard_buttons.append([
                             InlineKeyboardButton(
-                                text=f"⏳ Оновлення доступне через {minutes_left} хв",
+                                text=t(user_id, 'my_listings.refresh_available_in', minutes=minutes_left),
                                 callback_data="refresh_not_available"
                             )
                         ])
@@ -1474,18 +1478,18 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         if not is_sold and (status in ['approved', 'published'] or moderation_status == 'approved'):
             keyboard_buttons.append([
                 InlineKeyboardButton(
-                    text="✅ Позначити як продане",
+                    text=t(user_id, 'my_listings.mark_sold_button'),
                     callback_data=f"confirm_mark_sold_{listing_id}"
                 ),
                 InlineKeyboardButton(
-                    text="🗑️ Видалити",
+                    text=t(user_id, 'my_listings.delete_button'),
                     callback_data=f"confirm_delete_{listing_id}"
                 )
             ])
         
         keyboard_buttons.append([
             InlineKeyboardButton(
-                text="⬅️ Назад до списку",
+                text=t(user_id, 'my_listings.back_to_list'),
                 callback_data="back_to_my_listings"
             )
         ])
@@ -1605,19 +1609,19 @@ async def refresh_listing(callback: types.CallbackQuery, state: FSMContext):
         payment_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="💳 Оплатити 1,5€",
+                    text=t(user_id, 'payment.refresh_button'),
                     url=payment_url
                 )
             ]
         ])
         
-        payment_text = """🔄 <b>Оновити оголошення (Refresh)</b>
+        payment_text = f"""{t(user_id, 'payment.refresh_title')}
 
-💰 <b>Сума:</b> 1,5€
+{t(user_id, 'payment.refresh_amount')}
 
-Натисніть кнопку "Оплатити" для переходу до оплати через Monobank.
+{t(user_id, 'payment.refresh_instruction')}
 
-<i>Платіж перевіряється автоматично. Після підтвердження оплати ваше оголошення буде повторно опубліковане в каналі.</i>"""
+{t(user_id, 'payment.refresh_note')}"""
         
         try:
             await callback.message.edit_text(
@@ -1636,13 +1640,14 @@ async def refresh_listing(callback: types.CallbackQuery, state: FSMContext):
         
     except Exception as e:
         print(f"Error refreshing listing: {e}")
-        await callback.answer("❌ Помилка при оновленні оголошення", show_alert=True)
+        await callback.answer(t(user_id, 'payment.refresh_error'), show_alert=True)
 
 
 @router.callback_query(F.data == "tariff_base_locked", CreateListing.waiting_for_publication_tariff)
 async def tariff_base_locked(callback: types.CallbackQuery):
     """Обробник для заблокованої базової публікації"""
-    await callback.answer("📌 Базова публікація (3€) обов'язкова та не може бути знята", show_alert=True)
+    user_id = callback.from_user.id
+    await callback.answer(t(user_id, 'tariffs.base_locked'), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("tariff_toggle_"), CreateListing.waiting_for_publication_tariff)
@@ -1674,7 +1679,7 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
     }
     
     if tariff_type not in tariff_prices:
-        await callback.answer("❌ Невірний тариф", show_alert=True)
+        await callback.answer(f"❌ {t(user_id, 'tariffs.invalid')}", show_alert=True)
         return
     
     # Отримуємо поточний список вибраних тарифів
@@ -1690,12 +1695,12 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
     if tariff_type in selected_tariffs:
         selected_tariffs.remove(tariff_type)
         tariff_names = {
-            'highlighted': 'Виділене оголошення',
-            'pinned_12h': 'Закріп на 12 годин',
-            'pinned_24h': 'Закріп на 24 години',
-            'story': 'Сторіс на 24 години'
+            'highlighted': t(user_id, 'tariffs.highlighted_name'),
+            'pinned_12h': t(user_id, 'tariffs.pinned_12h_name'),
+            'pinned_24h': t(user_id, 'tariffs.pinned_24h_name'),
+            'story': t(user_id, 'tariffs.story_name')
         }
-        await callback.answer(f"❌ {tariff_names.get(tariff_type, tariff_type)} видалено")
+        await callback.answer(f"❌ {tariff_names.get(tariff_type, tariff_type)} {t(user_id, 'tariffs.removed')}")
     else:
         # Якщо вибирається pinned_24h, видаляємо pinned_12h і навпаки (взаємовиключні)
         if tariff_type == 'pinned_24h' and 'pinned_12h' in selected_tariffs:
@@ -1705,12 +1710,12 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
         
         selected_tariffs.append(tariff_type)
         tariff_names = {
-            'highlighted': 'Виділене оголошення',
-            'pinned_12h': 'Закріп на 12 годин',
-            'pinned_24h': 'Закріп на 24 години',
-            'story': 'Сторіс на 24 години'
+            'highlighted': t(user_id, 'tariffs.highlighted_name'),
+            'pinned_12h': t(user_id, 'tariffs.pinned_12h_name'),
+            'pinned_24h': t(user_id, 'tariffs.pinned_24h_name'),
+            'story': t(user_id, 'tariffs.story_name')
         }
-        await callback.answer(f"✅ {tariff_names.get(tariff_type, tariff_type)} додано")
+        await callback.answer(f"✅ {tariff_names.get(tariff_type, tariff_type)} {t(user_id, 'tariffs.added')}")
     
     # Оновлюємо список у стані
     await state.update_data(selected_tariffs=selected_tariffs)
@@ -1724,37 +1729,29 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
     total_amount = base_price + additional_price
     
     # Оновлюємо повідомлення
-    tariff_text = f"""💰 <b>Оберіть тарифи для публікації оголошення:</b>
+    tariff_text = f"""{t(user_id, 'tariffs.select_title')}
 
-💵 <b>Ваш баланс:</b> {user_balance:.2f}€
-💰 <b>Загальна сума:</b> {total_amount:.2f}€
+{t(user_id, 'tariffs.standard_title')}
+{t(user_id, 'tariffs.standard_desc')}
 
-📌 <b>Звичайна публікація</b> — 3€ (базова, обов'язкова)
-• Стандартний пост
-• Без виділень
-• Публікується в загальний потік
+{t(user_id, 'tariffs.additional_options')}
 
-<b>Додаткові рекламні опції:</b>
+{t(user_id, 'tariffs.highlighted_title')}
+{t(user_id, 'tariffs.highlighted_desc')}
 
-⭐ <b>Виділене оголошення</b> — 1,5€
-• Емодзі на початку
-• Жирний заголовок
-• Візуально виділяється серед звичайних
+{t(user_id, 'tariffs.pinned_12h_title')}
+{t(user_id, 'tariffs.pinned_12h_desc')}
 
-📌 <b>Закріп на 12 годин</b> — 2,5€
-• Закріплюється зверху каналу
-• Автоматично знімається після закінчення терміну
+{t(user_id, 'tariffs.pinned_24h_title')}
+{t(user_id, 'tariffs.pinned_24h_desc')}
 
-📌 <b>Закріп на 24 години</b> — 4,5€
-• Закріплюється зверху каналу
-• На 24 години
+{t(user_id, 'tariffs.story_title')}
+{t(user_id, 'tariffs.story_desc')}
 
-📸 <b>Сторіс на 24 години</b> — 5€
-• 1 сторіс
-• Формат: текст + кнопка
-• Посилання на оголошення / профіль
+{t(user_id, 'tariffs.your_balance', balance=user_balance)}
+{t(user_id, 'tariffs.total_amount', amount=total_amount)}
 
-<i>Базова публікація (3€) включена за замовчуванням. Оберіть додаткові рекламні опції, якщо потрібно.</i>"""
+{t(user_id, 'tariffs.default_note')}"""
     
     try:
         await callback.message.edit_text(
@@ -1788,7 +1785,7 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
         selected_tariffs.append('standard')
     
     if not selected_tariffs or len(selected_tariffs) == 0:
-        await callback.answer("❌ Помилка: базовий тариф не знайдено", show_alert=True)
+        await callback.answer(t(user_id, 'tariffs.base_not_found'), show_alert=True)
         return
     
     # Визначаємо ціни тарифів (додаткова вартість для рекламних)
@@ -1801,11 +1798,11 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
     }
     
     tariff_names = {
-        'standard': 'Звичайна публікація',
-        'highlighted': 'Виділене оголошення',
-        'pinned_12h': 'Закріп на 12 годин',
-        'pinned_24h': 'Закріп на 24 години',
-        'story': 'Сторіс на 24 години'
+        'standard': t(user_id, 'tariffs.standard_name'),
+        'highlighted': t(user_id, 'tariffs.highlighted_name'),
+        'pinned_12h': t(user_id, 'tariffs.pinned_12h_name'),
+        'pinned_24h': t(user_id, 'tariffs.pinned_24h_name'),
+        'story': t(user_id, 'tariffs.story_name')
     }
     
     # Розраховуємо загальну суму (базова + додаткові)
@@ -1845,24 +1842,31 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
     user_balance = get_user_balance(user_id)
     
     # Формуємо список вибраних тарифів для відображення
+    tariff_names_display = {
+        'standard': t(user_id, 'tariffs.standard_name'),
+        'highlighted': t(user_id, 'tariffs.highlighted_name'),
+        'pinned_12h': t(user_id, 'tariffs.pinned_12h_name'),
+        'pinned_24h': t(user_id, 'tariffs.pinned_24h_name'),
+        'story': t(user_id, 'tariffs.story_name')
+    }
     selected_tariffs_text = []
-    for t in selected_tariffs:
-        if t in tariff_prices:
-            if t == 'standard':
-                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (базова)")
+    for tariff_type in selected_tariffs:
+        if tariff_type in tariff_prices:
+            if tariff_type == 'standard':
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.base_label')}")
             else:
-                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (додатково)")
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.additional_label')}")
     selected_tariffs_text = "\n".join(selected_tariffs_text)
     
-    payment_method_text = f"""💳 <b>Оберіть спосіб оплати:</b>
+    payment_method_text = f"""{t(user_id, 'payment.select_method_title')}
 
-📋 <b>Вибрані тарифи:</b>
+{t(user_id, 'payment.selected_tariffs')}
 {selected_tariffs_text}
 
-💰 <b>Загальна сума:</b> {total_amount}€
-💵 <b>Ваш баланс:</b> {user_balance:.2f}€
+{t(user_id, 'payment.how_to_pay')}
 
-Яким чином бажаєте оплатити?"""
+{t(user_id, 'payment.total_amount', amount=total_amount)}
+{t(user_id, 'payment.your_balance', balance=user_balance)}"""
     
     try:
         await callback.message.edit_text(
@@ -1875,6 +1879,84 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
             payment_method_text,
             parse_mode="HTML",
             reply_markup=get_payment_method_keyboard(user_id, user_balance, total_amount, payment_url)
+        )
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_tariffs", CreateListing.waiting_for_payment_method)
+async def back_to_tariffs_selection(callback: types.CallbackQuery, state: FSMContext):
+    """Повертає користувача до вибору тарифів"""
+    user_id = callback.from_user.id
+    data = await state.get_data()
+    listing_id = data.get('listing_id')
+    selected_tariffs = data.get('selected_tariffs', [])
+    
+    if not listing_id:
+        await callback.answer("❌ Помилка: оголошення не знайдено", show_alert=True)
+        await state.clear()
+        return
+    
+    # Завжди включаємо базову публікацію
+    if 'standard' not in selected_tariffs:
+        selected_tariffs.append('standard')
+    
+    # Змінюємо стан на вибір тарифів
+    await state.set_state(CreateListing.waiting_for_publication_tariff)
+    
+    # Отримуємо баланс користувача
+    user_balance = get_user_balance(user_id)
+    
+    # Визначаємо ціни тарифів
+    tariff_prices = {
+        'standard': 3.0,  # Базова публікація
+        'highlighted': 1.5,  # Додаткова вартість
+        'pinned_12h': 2.5,  # Додаткова вартість
+        'pinned_24h': 4.5,  # Додаткова вартість
+        'story': 5.0  # Додаткова вартість
+    }
+    
+    # Розраховуємо загальну суму
+    base_price = tariff_prices['standard']
+    additional_price = sum(tariff_prices[t] for t in selected_tariffs if t != 'standard' and t in tariff_prices)
+    total_amount = base_price + additional_price
+    
+    # Формуємо текст для вибору тарифів
+    tariff_text = f"""{t(user_id, 'tariffs.select_title')}
+
+{t(user_id, 'tariffs.standard_title')}
+{t(user_id, 'tariffs.standard_desc')}
+
+{t(user_id, 'tariffs.additional_options')}
+
+{t(user_id, 'tariffs.highlighted_title')}
+{t(user_id, 'tariffs.highlighted_desc')}
+
+{t(user_id, 'tariffs.pinned_12h_title')}
+{t(user_id, 'tariffs.pinned_12h_desc')}
+
+{t(user_id, 'tariffs.pinned_24h_title')}
+{t(user_id, 'tariffs.pinned_24h_desc')}
+
+{t(user_id, 'tariffs.story_title')}
+{t(user_id, 'tariffs.story_desc')}
+
+{t(user_id, 'tariffs.your_balance', balance=user_balance)}
+{t(user_id, 'tariffs.total_amount', amount=total_amount)}
+
+{t(user_id, 'tariffs.default_note')}"""
+    
+    try:
+        await callback.message.edit_text(
+            tariff_text,
+            parse_mode="HTML",
+            reply_markup=get_publication_tariff_keyboard(user_id, selected_tariffs)
+        )
+    except:
+        await callback.message.answer(
+            tariff_text,
+            parse_mode="HTML",
+            reply_markup=get_publication_tariff_keyboard(user_id, selected_tariffs)
         )
     
     await callback.answer()
@@ -1897,13 +1979,13 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
     # Перевіряємо баланс
     current_balance = get_user_balance(user_id)
     if current_balance < amount:
-        await callback.answer(f"❌ Недостатньо коштів на балансі. Потрібно: {amount}€, на балансі: {current_balance:.2f}€", show_alert=True)
+        await callback.answer(t(user_id, 'payment.insufficient_balance', required=amount, current=current_balance), show_alert=True)
         return
     
     # Списуємо з балансу
     success = deduct_user_balance(user_id, amount)
     if not success:
-        await callback.answer("❌ Помилка списання з балансу", show_alert=True)
+        await callback.answer(t(user_id, 'payment.balance_deduction_error'), show_alert=True)
         return
     
     # Оновлюємо тарифи в БД як оплачені (зберігаємо як JSON)
@@ -1914,12 +1996,12 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
     # Очищаємо стан
     await state.clear()
     
-    tariff_names = {
-        'standard': 'Звичайна публікація',
-        'highlighted': 'Виділене оголошення',
-        'pinned_12h': 'Закріп на 12 годин',
-        'pinned_24h': 'Закріп на 24 години',
-        'story': 'Сторіс на 24 години'
+    tariff_names_display = {
+        'standard': t(user_id, 'tariffs.standard_name'),
+        'highlighted': t(user_id, 'tariffs.highlighted_name'),
+        'pinned_12h': t(user_id, 'tariffs.pinned_12h_name'),
+        'pinned_24h': t(user_id, 'tariffs.pinned_24h_name'),
+        'story': t(user_id, 'tariffs.story_name')
     }
     
     tariff_prices = {
@@ -1932,12 +2014,12 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
     
     # Формуємо список вибраних тарифів
     selected_tariffs_text = []
-    for t in selected_tariffs:
-        if t in tariff_names:
-            if t == 'standard':
-                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (базова)")
+    for tariff_type in selected_tariffs:
+        if tariff_type in tariff_names_display:
+            if tariff_type == 'standard':
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.base_label')}")
             else:
-                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (додатково)")
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.additional_label')}")
     selected_tariffs_text = "\n".join(selected_tariffs_text)
     
     # Відправляємо на модерацію
@@ -1949,15 +2031,15 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
         )
         
         new_balance = get_user_balance(user_id)
-        success_text = f"""✅ <b>Оплата з балансу успішна!</b>
+        success_text = f"""{t(user_id, 'payment.balance_success_title')}
 
-📋 <b>Вибрані тарифи:</b>
+{t(user_id, 'payment.balance_success_tariffs')}
 {selected_tariffs_text}
 
-💰 <b>Списано:</b> {amount}€
-💵 <b>Залишок на балансі:</b> {new_balance:.2f}€
+{t(user_id, 'payment.balance_success_charged', amount=amount)}
+{t(user_id, 'payment.balance_success_remaining', balance=new_balance)}
 
-Ваше оголошення відправлено на модерацію. Після схвалення воно буде опубліковане в каналі."""
+{t(user_id, 'payment.balance_success_message')}"""
         
         try:
             await callback.message.edit_text(
@@ -1972,7 +2054,7 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
                 reply_markup=get_main_menu_keyboard(user_id)
             )
         
-        await callback.answer("✅ Оплата успішна! Оголошення відправлено на модерацію")
+        await callback.answer(t(user_id, 'payment.balance_success_notification'))
         
     except Exception as e:
         print(f"Error processing balance payment: {e}")
@@ -2029,12 +2111,12 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
     )
     await state.set_state(CreateListing.waiting_for_payment)
     
-    tariff_names = {
-        'standard': 'Звичайна публікація',
-        'highlighted': 'Виділене оголошення',
-        'pinned_12h': 'Закріп на 12 годин',
-        'pinned_24h': 'Закріп на 24 години',
-        'story': 'Сторіс на 24 години'
+    tariff_names_display = {
+        'standard': t(user_id, 'tariffs.standard_name'),
+        'highlighted': t(user_id, 'tariffs.highlighted_name'),
+        'pinned_12h': t(user_id, 'tariffs.pinned_12h_name'),
+        'pinned_24h': t(user_id, 'tariffs.pinned_24h_name'),
+        'story': t(user_id, 'tariffs.story_name')
     }
     
     tariff_prices = {
@@ -2046,33 +2128,33 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
     }
     
     selected_tariffs_text = []
-    for t in selected_tariffs:
-        if t in tariff_names:
-            if t == 'standard':
-                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (базова)")
+    for tariff_type in selected_tariffs:
+        if tariff_type in tariff_names_display:
+            if tariff_type == 'standard':
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.base_label')}")
             else:
-                selected_tariffs_text.append(f"• {tariff_names.get(t, t)} — {tariff_prices.get(t, 0)}€ (додатково)")
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.additional_label')}")
     selected_tariffs_text = "\n".join(selected_tariffs_text)
     
     payment_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text="💳 Оплатити",
+                text=t(user_id, 'payment.pay_button'),
                 url=payment_url
             )
         ]
     ])
     
-    payment_text = f"""💳 <b>Оплата тарифів</b>
+    payment_text = f"""{t(user_id, 'payment.pay_tariffs_title')}
 
-📋 <b>Вибрані тарифи:</b>
+{t(user_id, 'payment.selected_tariffs')}
 {selected_tariffs_text}
 
-💰 <b>Загальна сума:</b> {amount}€
+{t(user_id, 'payment.pay_tariffs_instruction')}
 
-Натисніть кнопку "Оплатити" для переходу до оплати через Monobank.
+{t(user_id, 'payment.pay_tariffs_note')}
 
-<i>Платіж перевіряється автоматично. Після підтвердження оплати ваше оголошення буде відправлено на модерацію.</i>"""
+{t(user_id, 'payment.total_amount', amount=amount)}"""
     
     try:
         await callback.message.edit_text(
@@ -2106,7 +2188,7 @@ async def back_to_my_listings(callback: types.CallbackQuery):
 
     keyboard_buttons = []
     for listing in listings:
-        title = listing.get('title', 'Без назви')
+        title = listing.get('title', t(user_id, 'moderation.no_title'))
         status = listing.get('status', 'pending')
         status_emoji = {
             'pending_moderation': '⏳',

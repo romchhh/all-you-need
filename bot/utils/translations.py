@@ -15,7 +15,11 @@ DEFAULT_LANGUAGE = 'uk'
 
 def get_user_lang(user_id: int) -> str:
     lang = get_user_language(user_id)
-    return lang if lang in TRANSLATIONS else DEFAULT_LANGUAGE
+    result = lang if lang in TRANSLATIONS else DEFAULT_LANGUAGE
+    # Діагностика (можна видалити після виправлення)
+    if user_id and user_id > 0:
+        print(f"[DEBUG] User {user_id} language: {result} (from DB: {lang})")
+    return result
 
 
 def t(user_id: int, key: str, **kwargs) -> str:

@@ -97,9 +97,11 @@ class ModerationManager:
                     )
                     
                     if messages:
+                        # Отримуємо user_id для перекладу
+                        user_id = listing_data.get('sellerTelegramId') or listing_data.get('telegramId') or listing_data.get('userId') or 0
                         buttons_message = await self.bot.send_message(
                             chat_id=self.group_id,
-                            text=f"🔔 <b>Оголошення #{listing_id}</b>\n\nОберіть дію:",
+                            text=f"🔔 <b>{t(user_id, 'moderation.listing_number', listing_id=listing_id)}</b>\n\n{t(user_id, 'moderation.choose_action')}",
                             parse_mode="HTML",
                             reply_markup=keyboard
                         )
@@ -134,8 +136,13 @@ class ModerationManager:
             return None
     
     def _format_listing_text(self, listing: Dict[str, Any], source: str, listing_id: int) -> str:
+        # Отримуємо user_id для перекладу (використовуємо мову користувача, який створив оголошення)
+        user_id = listing.get('sellerTelegramId') or listing.get('telegramId') or listing.get('userId')
+        if not user_id:
+            user_id = 0  # Дефолтна мова (українська)
+        
         source_emoji = "🌐" if source == 'marketplace' else "📱"
-        source_text = "Маркетплейс" if source == 'marketplace' else "Telegram бот"
+        source_text = t(user_id, 'moderation.source') + " " + ("Маркетплейс" if source == 'marketplace' else "Telegram бот")
         
         username = listing.get('username') or ''
         first_name = listing.get('firstName') or ''
@@ -151,24 +158,25 @@ class ModerationManager:
         price_display = listing.get('priceDisplay')
         price = listing.get('price', '0')
         currency = listing.get('currency', 'EUR')
+        negotiable_text = t(user_id, 'moderation.negotiable')
         
         if price_display:
             # Використовуємо оригінальне значення (діапазон або "Договірна")
-            price_text = price_display if price_display == "Договірна" else f"{price_display} {currency}"
+            price_text = price_display if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная" else f"{price_display} {currency}"
         else:
             # Якщо price == 0 і немає priceDisplay, можливо це "Договірна"
             if float(price) == 0:
-                price_text = "Договірна"
+                price_text = negotiable_text
             else:
                 price_text = f"{price} {currency}"
         
-        category = listing.get('category', 'Не вказано')
+        category = listing.get('category', t(user_id, 'moderation.not_specified'))
         subcategory = listing.get('subcategory')
         category_text = category
         if subcategory:
             category_text += f" / {subcategory}"
         
-        location = listing.get('location', 'Не вказано')
+        location = listing.get('location', t(user_id, 'moderation.not_specified'))
         
         tariff_info = ""
         if source == 'telegram':
@@ -200,29 +208,29 @@ class ModerationManager:
                     tariff_list = [publication_tariff] if publication_tariff else []
                 
                 payment_emoji = "✅" if payment_status == 'paid' else "⏳"
-                payment_text = "Оплачено" if payment_status == 'paid' else "Очікує оплати"
+                payment_text = t(user_id, 'moderation.paid') if payment_status == 'paid' else t(user_id, 'moderation.pending_payment')
                 
-                tariff_info = f"\n\n💳 <b>Тариф:</b> {tariff_name}\n{payment_emoji} <b>Статус оплати:</b> {payment_text}"
+                tariff_info = f"\n\n{t(user_id, 'moderation.tariff')} {tariff_name}\n{payment_emoji} {t(user_id, 'moderation.payment_status')} {payment_text}"
                 
                 # Додаємо повідомлення про сторіс, якщо обрано тариф "story"
                 if 'story' in tariff_list:
                     tariff_info += "\n\n📸 <b>⚠️ ПОТРІБНО ВИКЛАСТИ СТОРІС!</b>"
         
-        text = f"""{source_emoji} <b>Оголошення на модерацію</b> #{listing_id}
+        text = f"""{source_emoji} <b>{t(user_id, 'moderation.title')}</b> #{listing_id}
 
-<b>Назва:</b> {listing.get('title', 'Без назви')}
+<b>{t(user_id, 'listing.details.title')}</b> {listing.get('title', t(user_id, 'moderation.no_title'))}
 
-📄 <b>Опис:</b>
-{listing.get('description', 'Без опису')}
+{t(user_id, 'listing.details.description')}
+{listing.get('description', t(user_id, 'moderation.no_description'))}
 
-💰 <b>Ціна:</b> {price_text}
-📂 <b>Категорія:</b> {category_text}
-📍 <b>Розташування:</b> {location}{tariff_info}
+{t(user_id, 'listing.details.price')} {price_text}
+{t(user_id, 'listing.details.category')} {category_text}
+{t(user_id, 'listing.details.location')} {location}{tariff_info}
 
-👤 <b>Продавець:</b> {seller_info}
-📅 <b>Створено:</b> {self._format_date(listing.get('createdAt'))}
+{t(user_id, 'listing.details.seller')} {seller_info}
+        {t(user_id, 'listing.details.created')} {self._format_date(listing.get('createdAt'), user_id)}
 
-<i>Джерело: {source_text}</i>"""
+<i>{source_text}</i>"""
         
         return text
     
@@ -254,9 +262,9 @@ class ModerationManager:
             ]
         ])
     
-    def _format_date(self, date_str: Optional[str]) -> str:
+    def _format_date(self, date_str: Optional[str], user_id: int = 0) -> str:
         if not date_str:
-            return "Не вказано"
+            return t(user_id, 'moderation.not_specified')
         
         try:
             if isinstance(date_str, str):
@@ -569,14 +577,20 @@ class ModerationManager:
             price = listing.get('price', 0)
             currency = listing.get('currency', 'EUR')
             
+            # Отримуємо user_id для перекладу (потрібно отримати до формування тексту ціни)
+            seller_telegram_id = listing.get('sellerTelegramId') or listing.get('telegramId')
+            user_id_for_lang = seller_telegram_id if seller_telegram_id else 0
+            negotiable_text = t(user_id_for_lang, 'moderation.negotiable')
+            
             # Формуємо текст ціни
             if price_display:
-                if price_display == "Договірна":
-                    price_text = "Договірна"
+                # Перевіряємо обидві мови для "Договірна"
+                if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная":
+                    price_text = negotiable_text
                 else:
                     price_text = f"{price_display} {currency}"
             elif float(price) == 0:
-                price_text = "Договірна"
+                price_text = negotiable_text
             else:
                 price_text = f"{price} {currency}"
             category = listing.get('category', '')
@@ -588,9 +602,10 @@ class ModerationManager:
             if subcategory:
                 category_text += f" / {subcategory}"
             
+            # Використовуємо переклади для condition
             condition_map = {
-                'new': '🆕 Новий',
-                'used': '🔧 Б/у'
+                'new': t(user_id_for_lang, 'listing.details.condition_new'),
+                'used': t(user_id_for_lang, 'listing.details.condition_used')
             }
             condition_text = condition_map.get(condition, condition)
             
@@ -613,66 +628,60 @@ class ModerationManager:
             
             # Визначаємо title_prefix та title_style на основі вибраних тарифів
             title_prefix = ''
-            title_style = title
+            # Назва завжди жирна в каналі
+            title_style = f"<b>{title}</b>"
             
             # Якщо є highlighted, додаємо префікс
             if 'highlighted' in tariffs:
                 title_prefix = '⭐ '
-                title_style = f"<b>{title}</b>"
             # Якщо є story, додаємо префікс
             elif 'story' in tariffs:
                 title_prefix = '📸 '
-                title_style = f"<b>{title}</b>"
-            # Якщо є pinned (будь-який), робимо жирним
-            elif any(t.startswith('pinned') for t in tariffs):
-                title_style = f"<b>{title}</b>"
             
             # Отримуємо інформацію про продавця
             seller_first_name = listing.get('firstName', '')
             seller_last_name = listing.get('lastName', '')
             seller_username = listing.get('username', '')
-            seller_telegram_id = listing.get('sellerTelegramId') or listing.get('telegramId')
+            # seller_telegram_id вже отримано вище
             
-            # Формуємо ім'я продавця
+            # Формуємо ім'я продавця (Ім'я Прізвище)
             seller_name_parts = []
-            if seller_last_name:
-                seller_name_parts.append(seller_last_name)
             if seller_first_name:
                 seller_name_parts.append(seller_first_name)
-            seller_full_name = ' '.join(seller_name_parts).strip() if seller_name_parts else 'Продавець'
+            if seller_last_name:
+                seller_name_parts.append(seller_last_name)
+            # Використовуємо переклад для "Продавець" якщо немає імені
+            seller_default_name = t(user_id_for_lang, 'listing.details.seller_channel').replace('<b>', '').replace('</b>', '').replace(':', '').strip()
+            seller_full_name = ' '.join(seller_name_parts).strip() if seller_name_parts else seller_default_name
             
-            # Формуємо посилання на продавця
+            # Формуємо посилання на продавця (без емодзі для каналу)
+            seller_label = t(user_id_for_lang, 'listing.details.seller_channel')
             if seller_username:
                 seller_link = f"@{seller_username}"
-                seller_text = f"👤 <b>Продавець:</b> <a href=\"https://t.me/{seller_username}\">{seller_full_name}</a>"
+                seller_text = f"{seller_label} <a href=\"https://t.me/{seller_username}\">{seller_full_name}</a>"
             elif seller_telegram_id:
                 seller_link = f"tg://user?id={seller_telegram_id}"
-                seller_text = f"👤 <b>Продавець:</b> <a href=\"{seller_link}\">{seller_full_name}</a>"
+                seller_text = f"{seller_label} <a href=\"{seller_link}\">{seller_full_name}</a>"
             else:
-                seller_text = f"👤 <b>Продавець:</b> {seller_full_name}"
+                seller_text = f"{seller_label} {seller_full_name}"
             
             # Отримуємо username бота з .env
             bot_username = os.getenv('BOT_USERNAME', 'TradeGroundBot')
             bot_link = f"https://t.me/{bot_username}"
             
-            # Отримуємо мову користувача для перекладу (використовуємо seller_telegram_id або дефолтну мову)
-            user_id_for_lang = seller_telegram_id if seller_telegram_id else None
-            if user_id_for_lang:
-                bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
-            else:
-                # Якщо немає user_id, використовуємо російську мову (дефолт для каналу)
-                bot_text = f"\n\n💼 <b>Хотите подать своё объявление?</b> <a href=\"{bot_link}\">Нажмите здесь 👉</a>"
+            # Отримуємо мову користувача для перекладу (використовуємо user_id_for_lang, який вже встановлено)
+            bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
             
             text = f"""{title_prefix}{title_style}
 
-📄 {description}
+{description}
 
-💰 <b>Ціна:</b> {price_text}
-📂 <b>Категорія:</b> {category_text}
-📍 <b>Розташування:</b> {location}
+{t(user_id_for_lang, 'listing.details.price_channel')} {price_text}
+{t(user_id_for_lang, 'listing.details.category_channel')} {category_text}
+{t(user_id_for_lang, 'listing.details.location_channel')} {location}
 {seller_text}
 
-#Оголошення #{category.replace(' ', '')}"""
+{t(user_id_for_lang, 'listing.details.hashtag')} #{category.replace(' ', '')}"""
             
             images = listing.get('images', [])
             if isinstance(images, str):
@@ -685,11 +694,7 @@ class ModerationManager:
                 if len(images) == 1:
                     # Для одного фото - додаємо інлайн кнопку
                     # Отримуємо текст кнопки залежно від мови користувача
-                    if seller_telegram_id:
-                        button_text = t(seller_telegram_id, 'listing.submit_ad_button')
-                    else:
-                        # Якщо немає user_id, використовуємо російську мову (дефолт для каналу)
-                        button_text = "💼 Подать своё объявление"
+                    button_text = t(user_id_for_lang, 'listing.submit_ad_button')
                     
                     keyboard = InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(
@@ -819,11 +824,7 @@ class ModerationManager:
                     text_with_bot = text + bot_text
                     
                     # Отримуємо текст кнопки залежно від мови користувача
-                    if seller_telegram_id:
-                        button_text = t(seller_telegram_id, 'listing.submit_ad_button')
-                    else:
-                        # Якщо немає user_id, використовуємо російську мову (дефолт для каналу)
-                        button_text = "💼 Подать своё объявление"
+                    button_text = t(user_id_for_lang, 'listing.submit_ad_button')
                     
                     keyboard = InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(

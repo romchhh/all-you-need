@@ -93,6 +93,24 @@ export async function POST(request: NextRequest) {
         // Якщо оголошення НЕ в статусі active або pending_moderation, відправляємо на модерацію
         // (це означає, що воно було реактивовано і потребує модерації)
         if (currentStatus !== 'active' && currentStatus !== 'pending_moderation') {
+          // Перевіряємо активні реклами для формування комбінованого типу
+          const activePromos = await prisma.$queryRawUnsafe(
+            `SELECT promotionType FROM PromotionPurchase 
+             WHERE listingId = ? 
+               AND status IN ('active', 'paid', 'completed')
+               AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))`,
+            promotion.listingId
+          ) as Array<{ promotionType: string }>;
+          
+          const activeTypes = activePromos.map(p => p.promotionType);
+          let combinedType: string = promotion.promotionType;
+          
+          // Якщо додаємо highlighted або top_category, і вже є інший з цієї пари - дозволяємо обидві
+          if ((promotion.promotionType === 'highlighted' && activeTypes.includes('top_category')) ||
+              (promotion.promotionType === 'top_category' && activeTypes.includes('highlighted'))) {
+            combinedType = 'highlighted,top_category';
+          }
+          
           // Для відхилених оголошень також очищаємо причину відхилення
           if (isRejected) {
             await prisma.$executeRawUnsafe(
@@ -104,7 +122,7 @@ export async function POST(request: NextRequest) {
                 rejectionReason = NULL,
                 updatedAt = ? 
               WHERE id = ?`,
-              promotion.promotionType,
+              combinedType,
               endsAt.toISOString(),
               nowStr,
               promotion.listingId
@@ -118,7 +136,7 @@ export async function POST(request: NextRequest) {
                 moderationStatus = 'pending',
                 updatedAt = ? 
               WHERE id = ?`,
-              promotion.promotionType,
+              combinedType,
               endsAt.toISOString(),
               nowStr,
               promotion.listingId
@@ -133,11 +151,46 @@ export async function POST(request: NextRequest) {
 
           console.log(`Promotion payment confirmed for listing ${promotion.listingId}: ${promotion.promotionType}, status set to pending_moderation`);
         } else {
-          // Якщо вже active або pending_moderation, просто оновлюємо рекламу
+          // Якщо вже active або pending_moderation, перевіряємо чи можна додати нову рекламу
+          // Для highlighted та top_category - дозволяємо обидві одночасно
+          const activePromos = await prisma.$queryRawUnsafe(
+            `SELECT promotionType FROM PromotionPurchase 
+             WHERE listingId = ? 
+               AND status IN ('active', 'paid', 'completed')
+               AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))`,
+            promotion.listingId
+          ) as Array<{ promotionType: string }>;
+          
+          const activeTypes = activePromos.map(p => p.promotionType);
+          
+          // Якщо додаємо highlighted або top_category, і вже є інший з цієї пари - дозволяємо обидві
+          let newPromotionType = promotion.promotionType;
+          if ((promotion.promotionType === 'highlighted' && activeTypes.includes('top_category')) ||
+              (promotion.promotionType === 'top_category' && activeTypes.includes('highlighted'))) {
+            // Обидві реклами можуть працювати разом
+            newPromotionType = activeTypes.includes('highlighted') && activeTypes.includes('top_category')
+              ? 'highlighted,top_category'
+              : (activeTypes.includes('highlighted') ? 'highlighted' : 'top_category');
+          }
+          
+          // Знаходимо найпізнішу дату закінчення
+          const allEndsAt = await prisma.$queryRawUnsafe(
+            `SELECT endsAt FROM PromotionPurchase 
+             WHERE listingId = ? 
+               AND status IN ('active', 'paid', 'completed')
+               AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))
+             ORDER BY endsAt DESC LIMIT 1`,
+            promotion.listingId
+          ) as Array<{ endsAt: string | null }>;
+          
+          const latestEndsAt = allEndsAt.length > 0 && allEndsAt[0].endsAt
+            ? allEndsAt[0].endsAt
+            : endsAt.toISOString();
+          
           await prisma.$executeRawUnsafe(
             `UPDATE Listing SET promotionType = ?, promotionEnds = ?, updatedAt = ? WHERE id = ?`,
-            promotion.promotionType,
-            endsAt.toISOString(),
+            newPromotionType,
+            latestEndsAt,
             nowStr,
             promotion.listingId
           );

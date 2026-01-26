@@ -25,6 +25,7 @@
     "currency": "Валюта",
     "selectCurrency": "Оберіть валюту",
     "free": "FREE",
+    "negotiable": "Договірна",
     "language": "Мова",
     "languageLabel": "Мова",
     "all": "Всі",
@@ -236,10 +237,11 @@
   "phone": {
     "title": "Номер телефону",
     "copyNumber": "Скопіювати номер",
-    "call": "Зателефонувати",
+    "call": "Подзвонити",
     "numberCopied": "Номер скопійовано!",
     "copyError": "Помилка копіювання номера",
-    "cancel": "Скасувати"
+    "cancel": "Скасувати",
+    "explanation": "У користувача немає username в Telegram, тому напряму написати повідомлення неможливо. Використовуйте номер телефону для зв'язку."
   },
   "emptyState": {
     "noResults": "Нічого не знайдено",
@@ -326,7 +328,32 @@
     "deleteConfirmTitle": "Видалити оголошення?",
     "active": "Активне",
     "openDetails": "Відкрити деталі",
-    "cannotEditOnModeration": "Не можна редагувати оголошення під час модерації"
+    "cannotEditOnModeration": "Не можна редагувати оголошення під час модерації",
+    "cannotMarkSoldRejected": "Не можна позначати як продане відхилене оголошення",
+    "submitAgainDescription": "щоб відправити виправлене оголошення на повторну перевірку",
+    "addPhoto": "Додати",
+    "photosLabel": "Фото *",
+    "titleLabel": "Заголовок *",
+    "titlePlaceholder": "Наприклад: iPhone 13 Pro Max",
+    "descriptionLabel": "Опис *",
+    "descriptionPlaceholder": "Детальний опис товару...",
+    "pricePlaceholder": "Ціна",
+    "categoryLabel": "Розділ *",
+    "subcategoryLabel": "Тип (необов'язково)",
+    "conditionLabel": "Стан (необов'язково)",
+    "selectCondition": "Оберіть стан",
+    "locationLabel": "Локація *",
+    "locationPlaceholder": "Оберіть або введіть місто",
+    "errors": {
+      "titleRequired": "Введіть назву товару",
+      "titleMinLength": "Назва має містити мінімум 3 символи",
+      "descriptionRequired": "Введіть опис товару",
+      "descriptionMinLength": "Опис має містити мінімум 10 символів",
+      "priceRequired": "Введіть ціну",
+      "priceInvalid": "Введіть коректну ціну",
+      "categoryRequired": "Оберіть розділ",
+      "locationRequired": "Введіть локацію"
+    }
   },
   "userProfile": {
     "noListings": "Немає оголошень",
@@ -686,7 +713,8 @@
     "upgradeNow": "Покращити рекламу",
     "maxLevel": "Максимальний рівень досягнуто",
     "maxLevelDesc": "Ваше оголошення вже має найкращу рекламу",
-    "comingSoon": "Функція реклами буде доступна найближчим часом"
+    "comingSoon": "Функція реклами буде доступна найближчим часом",
+    "bothActive": "Обидві реклами вже активні"
   },
   "moderation": {
     "title": "Модерація оголошень",

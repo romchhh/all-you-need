@@ -1,7 +1,7 @@
 import { Eye, Heart, Edit2, Check, Megaphone, Package, DollarSign, Loader2 } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ProfileListingCardProps {
@@ -50,40 +50,62 @@ export const ProfileListingCard = ({
     ? Math.ceil((promotionEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) 
     : null;
   
+  // Отримуємо активні реклами через API
+  const [activePromotions, setActivePromotions] = useState<string[]>([]);
+  
+  useEffect(() => {
+    if (listing.id) {
+      fetch(`/api/listings/promotions?listingId=${listing.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.activePromotions) {
+            setActivePromotions(data.activePromotions);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching active promotions:', err);
+          // Fallback на старий спосіб
+          if (listing.promotionType) {
+            setActivePromotions([listing.promotionType]);
+          }
+        });
+    }
+  }, [listing.id, listing.promotionType]);
+  
   // Функція для отримання значка реклами
   const getPromotionBadge = () => {
-    if (!hasPromotion || !isPromotionActive || !listing.promotionType) return null;
+    const promotionsToShow = activePromotions.length > 0 ? activePromotions : (listing.promotionType ? [listing.promotionType] : []);
     
-    const promotionType = listing.promotionType;
+    if (promotionsToShow.length === 0) return null;
     
-    // Для ВИП - показуємо значок VIP
-    if (promotionType === 'vip') {
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
-          VIP
-        </span>
-      );
-    }
-    
-    // Для ТОП - показуємо значок TOP
-    if (promotionType === 'top_category') {
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
-          TOP
-        </span>
-      );
-    }
-    
-    // Для Выделение цветом - показуємо значок
-    if (promotionType === 'highlighted') {
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
-          {t('promotions.highlighted')}
-        </span>
-      );
-    }
-    
-    return null;
+    return (
+      <>
+        {promotionsToShow.map((promoType) => {
+          if (promoType === 'vip') {
+            return (
+              <span key="vip" className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+                VIP
+              </span>
+            );
+          }
+          if (promoType === 'top_category') {
+            return (
+              <span key="top" className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+                TOP
+              </span>
+            );
+          }
+          if (promoType === 'highlighted') {
+            return (
+              <span key="highlighted" className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+                {t('promotions.highlighted')}
+              </span>
+            );
+          }
+          return null;
+        })}
+      </>
+    );
   };
 
   const imageUrl = useMemo(() => {
@@ -229,23 +251,32 @@ export const ProfileListingCard = ({
           )}
           
           {/* Бейдж реклами - справа знизу на фото */}
-          {hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && !isRejected && listing.promotionType && (
-            <div className="absolute bottom-1 right-1 z-10">
-              {listing.promotionType === 'vip' && (
-                <div className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
-                  VIP
-                </div>
-              )}
-              {listing.promotionType === 'top_category' && (
-                <div className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
-                  TOP
-                </div>
-              )}
-              {listing.promotionType === 'highlighted' && (
-                <div className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
-                  {t('promotions.highlighted')}
-                </div>
-              )}
+          {activePromotions.length > 0 && !isPendingModeration && !isDeactivated && !isRejected && (
+            <div className="absolute bottom-1 right-1 z-10 flex flex-col gap-1 items-end">
+              {activePromotions.map((promoType) => {
+                if (promoType === 'vip') {
+                  return (
+                    <div key="vip" className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
+                      VIP
+                    </div>
+                  );
+                }
+                if (promoType === 'top_category') {
+                  return (
+                    <div key="top" className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
+                      TOP
+                    </div>
+                  );
+                }
+                if (promoType === 'highlighted') {
+                  return (
+                    <div key="highlighted" className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
+                      {t('promotions.highlighted')}
+                    </div>
+                  );
+                }
+                return null;
+              })}
             </div>
           )}
         </div>
@@ -403,7 +434,7 @@ export const ProfileListingCard = ({
           )}
 
           {/* Кнопка відмітити як продане */}
-          {!isSold && !isPendingModeration && (
+          {!isSold && !isPendingModeration && !isRejected && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

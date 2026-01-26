@@ -721,20 +721,30 @@ export const ListingDetail = ({
         {isOwnListing && listing.promotionType && listing.promotionEnds && new Date(listing.promotionEnds) > new Date() && (
           <div className="mb-6 flex items-center gap-2 text-sm">
             <span className="text-white/70">{t('sales.promotion')}:</span>
-            <div className="flex items-center gap-2">
-              {listing.promotionType === 'vip' && (
-                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
-                  VIP
-                </div>
-              )}
-              {listing.promotionType === 'top_category' && (
-                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
-                  TOP
-                </div>
-              )}
-              {listing.promotionType === 'highlighted' && (
-                <span className="text-[#D3F1A7] font-semibold">{t('promotions.highlighted')}</span>
-              )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {listing.promotionType.split(',').map((promoType: string) => {
+                const trimmedType = promoType.trim();
+                if (trimmedType === 'vip') {
+                  return (
+                    <div key="vip" className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                      VIP
+                    </div>
+                  );
+                }
+                if (trimmedType === 'top_category') {
+                  return (
+                    <div key="top" className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                      TOP
+                    </div>
+                  );
+                }
+                if (trimmedType === 'highlighted') {
+                  return (
+                    <span key="highlighted" className="text-[#D3F1A7] font-semibold">{t('promotions.highlighted')}</span>
+                  );
+                }
+                return null;
+              })}
             </div>
           </div>
         )}
@@ -1021,6 +1031,11 @@ export const ListingDetail = ({
             // Перевіряємо статус модерації перед позначенням як продане
             if (listing.status === 'pending_moderation') {
               showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+              setShowMarkSoldConfirm(false);
+              return;
+            }
+            if (listing.status === 'rejected') {
+              showToast(t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення', 'error');
               setShowMarkSoldConfirm(false);
               return;
             }

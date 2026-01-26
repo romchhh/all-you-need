@@ -439,7 +439,29 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     );
   }
 
-  const displayName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || t('common.user');
+  // Формуємо ім'я: якщо є firstName або lastName, об'єднуємо їх, інакше username, інакше fallback
+  const displayName = (() => {
+    const firstName = (profile.firstName || '').trim();
+    const lastName = (profile.lastName || '').trim();
+    
+    // Якщо обидва поля однакові (наприклад, обидва "User"), показуємо тільки один
+    if (firstName && lastName && firstName === lastName) {
+      return firstName;
+    }
+    
+    if (firstName || lastName) {
+      const fullName = `${firstName} ${lastName}`.trim();
+      // Перевіряємо, чи не є це просто дублікат "User User"
+      if (fullName === 'User User' || fullName === 'user user') {
+        return firstName || lastName || profile.username || t('common.user');
+      }
+      return fullName;
+    }
+    if (profile.username) {
+      return profile.username;
+    }
+    return t('common.user');
+  })();
   const displayUsername = profile.username ? `@${profile.username}` : '';
 
   return (
@@ -829,6 +851,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                       onMarkAsSold={() => {
                         if (listing.status === 'pending_moderation') {
                           showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+                          return;
+                        }
+                        if (listing.status === 'rejected') {
+                          showToast(t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення', 'error');
                           return;
                         }
                         setConfirmModal({

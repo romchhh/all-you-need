@@ -106,6 +106,13 @@ export const PhoneModal = ({ isOpen, onClose, phoneNumber, tg }: PhoneModalProps
             </div>
           </div>
 
+          {/* Пояснювальний текст */}
+          <div className="mb-4 px-2">
+            <p className="text-xs text-white/50 leading-relaxed">
+              {t('phone.explanation')}
+            </p>
+          </div>
+
           {/* Кнопки дій */}
           <div className="space-y-3">
             <button

@@ -43,11 +43,46 @@ export default function PromotionModal({
   const { user } = useTelegram();
   const [selectedPromotion, setSelectedPromotion] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activePromotions, setActivePromotions] = useState<string[]>([]);
+  const [activePromotionEnds, setActivePromotionEnds] = useState<string | null>(null);
 
-  // Перевіряємо чи активна реклама
+  // Завантажуємо активні реклами для оголошення
+  useEffect(() => {
+    if (isOpen && listingId) {
+      fetch(`/api/listings/promotions?listingId=${listingId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.activePromotions) {
+            setActivePromotions(data.activePromotions);
+            setActivePromotionEnds(data.promotionEnds);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching active promotions:', err);
+          // Fallback на старий спосіб
+          if (currentPromotion) {
+            setActivePromotions([currentPromotion]);
+            if (promotionEnds) {
+              setActivePromotionEnds(promotionEnds);
+            }
+          }
+        });
+    } else {
+      setActivePromotions([]);
+      setActivePromotionEnds(null);
+    }
+  }, [isOpen, listingId, currentPromotion, promotionEnds]);
+
+  // Перевіряємо чи активна реклама (для сумісності зі старим кодом)
   const isPromotionActive = currentPromotion && promotionEnds 
     ? new Date(promotionEnds) > new Date() 
     : false;
+  
+  // Перевіряємо чи конкретний тип реклами активний
+  const isPromotionTypeActive = (promoType: string): boolean => {
+    return activePromotions.includes(promoType) || 
+           (currentPromotion === promoType && isPromotionActive);
+  };
 
   // Функція для форматування залишкового часу
   const getTimeRemaining = (endsAt: string): string => {
@@ -177,24 +212,33 @@ export default function PromotionModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-4" data-scrollable>
           {/* Інформація про активну рекламу */}
-          {isPromotionActive && currentPromotion && promotionEnds && (
+          {activePromotions.length > 0 && (
             <div className="mb-4 p-4 rounded-xl bg-[#D3F1A7]/10 border-2 border-[#D3F1A7]">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="text-[#D3F1A7] font-semibold">{t('sales.promotion')}:</span>
-                <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
-                  {currentPromotion === 'vip' ? 'VIP' : currentPromotion === 'top_category' ? 'TOP' : t('promotions.highlighted')}
-                </div>
+                {activePromotions.map((promoType) => (
+                  <div key={promoType} className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                    {promoType === 'vip' ? 'VIP' : promoType === 'top_category' ? 'TOP' : t('promotions.highlighted')}
+                  </div>
+                ))}
               </div>
-              <p className="text-sm text-white/70">
-                {t('common.activeUntil') || 'Активна до'}: {getTimeRemaining(promotionEnds)}
-              </p>
+              {activePromotionEnds && (
+                <p className="text-sm text-white/70">
+                  {t('common.activeUntil') || 'Активна до'}: {getTimeRemaining(activePromotionEnds)}
+                </p>
+              )}
             </div>
           )}
 
           {/* Типи реклами */}
           {PROMOTIONS.map((promo) => {
-            const isCurrentPromotion = currentPromotion === promo.type && isPromotionActive;
-            const isDisabled = isCurrentPromotion;
+            const isCurrentPromotion = isPromotionTypeActive(promo.type);
+            // Для highlighted та top_category - якщо обидві вже активні, то обидві кнопки неактивні
+            // Для інших типів - якщо вже активний, то неактивний
+            const hasBothHighlightedAndTop = isPromotionTypeActive('highlighted') && isPromotionTypeActive('top_category');
+            const isDisabled = isCurrentPromotion || 
+              (promo.type === 'highlighted' && hasBothHighlightedAndTop) ||
+              (promo.type === 'top_category' && hasBothHighlightedAndTop);
             
             return (
             <button
@@ -259,13 +303,15 @@ export default function PromotionModal({
                   
                   <div className="flex items-center justify-between">
                     <div>
-                      {isCurrentPromotion ? (
+                      {isDisabled ? (
                         <>
                           <p className="text-sm font-semibold text-[#D3F1A7]">
                             {t('common.active') || 'Активна'}
                           </p>
                           <p className="text-xs text-white/70">
-                            {t('common.cannotBuySame') || 'Не можна купити поки активна'}
+                            {hasBothHighlightedAndTop && (promo.type === 'highlighted' || promo.type === 'top_category')
+                              ? t('promotions.bothActive') || 'Обидві реклами вже активні'
+                              : t('common.cannotBuySame') || 'Не можна купити поки активна'}
                           </p>
                         </>
                       ) : (

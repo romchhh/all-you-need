@@ -121,6 +121,8 @@ export async function GET(request: NextRequest) {
         l.location,
         l.views,
         l.status,
+        l.promotionType,
+        l.promotionEnds,
         l.images,
         l.optimizedImages,
         l.tags,
@@ -138,9 +140,13 @@ export async function GET(request: NextRequest) {
       ORDER BY 
         CASE 
           WHEN l.status = 'active' THEN 1
-          WHEN l.status = 'sold' THEN 2
-          WHEN l.status = 'hidden' THEN 3
-          ELSE 4
+          WHEN l.status = 'pending_moderation' THEN 2
+          WHEN l.status = 'sold' THEN 3
+          WHEN l.status = 'expired' THEN 4
+          WHEN l.status = 'rejected' THEN 5
+          WHEN l.status = 'deactivated' THEN 6
+          WHEN l.status = 'hidden' THEN 7
+          ELSE 8
         END,
         l.createdAt DESC
       LIMIT ? OFFSET ?`;
@@ -215,7 +221,9 @@ export async function GET(request: NextRequest) {
         condition: listing.condition === 'new' ? 'new' : (listing.condition ? 'used' : null),
         tags: tags,
         isFree: listing.isFree === 1 || listing.isFree === true,
-        status: listing.status || 'active',
+        status: listing.status ?? 'active',
+        promotionType: listing.promotionType || null,
+        promotionEnds: listing.promotionEnds || null,
         favoritesCount: typeof listing.favoritesCount === 'bigint' ? Number(listing.favoritesCount) : (listing.favoritesCount || 0),
       };
     });

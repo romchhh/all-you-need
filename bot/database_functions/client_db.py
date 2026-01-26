@@ -223,13 +223,7 @@ def set_user_phone(user_id: str, phone: str):
 
 
 def get_user_language(user_id: int) -> str:
-    cursor.execute('SELECT language FROM users_legacy WHERE user_id = ?', (str(user_id),))
-    result = cursor.fetchone()
-    if result and result[0]:
-        lang = result[0]
-        if lang in ['uk', 'ru']:
-            return lang
-    
+    # Спочатку шукаємо в таблиці User (основна таблиця)
     try:
         cursor.execute('''
             SELECT language FROM User 
@@ -239,10 +233,21 @@ def get_user_language(user_id: int) -> str:
         if user_result and user_result[0]:
             lang = user_result[0]
             if lang in ['uk', 'ru']:
-                set_user_language(user_id, lang)
+                # Синхронізуємо з users_legacy для сумісності (але не викликаємо set_user_language, щоб уникнути рекурсії)
                 return lang
     except Exception as e:
-        pass
+        print(f"Error getting language from User table: {e}")
+    
+    # Якщо не знайдено в User, шукаємо в users_legacy
+    try:
+        cursor.execute('SELECT language FROM users_legacy WHERE user_id = ?', (str(user_id),))
+        result = cursor.fetchone()
+        if result and result[0]:
+            lang = result[0]
+            if lang in ['uk', 'ru']:
+                return lang
+    except Exception as e:
+        print(f"Error getting language from users_legacy table: {e}")
     
     return 'uk'
 
@@ -252,6 +257,7 @@ def set_user_language(user_id: int, language: str):
         print(f"Invalid language: {language}")
         return
 
+    # Оновлюємо users_legacy
     cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
     result = cursor.fetchone()
     
@@ -266,6 +272,16 @@ def set_user_language(user_id: int, language: str):
             INSERT INTO users_legacy (user_id, language, join_date, last_activity)
             VALUES (?, ?, ?, ?)
         ''', (str(user_id), language, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+    
+    # Також оновлюємо таблицю User
+    try:
+        cursor.execute('''
+            UPDATE User 
+            SET language = ? 
+            WHERE CAST(telegramId AS INTEGER) = ?
+        ''', (language, user_id))
+    except Exception as e:
+        print(f"Error updating User language: {e}")
     
     conn.commit()
     print(f"Language {language} set for user {user_id}")
