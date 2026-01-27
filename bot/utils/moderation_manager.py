@@ -184,8 +184,10 @@ class ModerationManager:
             payment_status = listing.get('paymentStatus', 'pending')
             
             if publication_tariff:
+                # Отримуємо переклад для "безкоштовно"
+                free_text = t(user_id, 'common.free')
                 tariff_names = {
-                    'standard': '📌 Звичайна публікація — 3€',
+                    'standard': f'📌 Звичайна публікація — {free_text}',
                     'highlighted': '⭐ Виділене оголошення — 4,5€',
                     'pinned_12h': '📌 Закріп на 12 годин — 5,5€',
                     'pinned_24h': '📌 Закріп на 24 години — 7,5€',

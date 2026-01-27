@@ -1,4 +1,5 @@
 import json
+import re
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
@@ -1672,7 +1673,7 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
     
     # Визначаємо ціни тарифів (додаткова вартість для рекламних)
     tariff_prices = {
-        'standard': 3.0,  # Базова публікація
+        'standard': 0.0,  # Базова публікація (безкоштовно)
         'highlighted': 1.5,  # Додаткова вартість
         'pinned_12h': 2.5,  # Додаткова вартість
         'pinned_24h': 4.5,  # Додаткова вартість
@@ -1729,6 +1730,12 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
     additional_price = sum(tariff_prices[t] for t in selected_tariffs if t != 'standard' and t in tariff_prices)
     total_amount = base_price + additional_price
     
+    # Формуємо рядок з загальною сумою
+    if total_amount == 0:
+        total_amount_text = re.sub(r'0\.00€|0€', t(user_id, 'common.free'), t(user_id, 'tariffs.total_amount', amount=total_amount))
+    else:
+        total_amount_text = t(user_id, 'tariffs.total_amount', amount=total_amount)
+    
     # Оновлюємо повідомлення
     tariff_text = f"""{t(user_id, 'tariffs.select_title')}
 
@@ -1752,7 +1759,7 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
 {t(user_id, 'tariffs.default_note')}
 
 {t(user_id, 'tariffs.your_balance', balance=user_balance)}
-{t(user_id, 'tariffs.total_amount', amount=total_amount)}"""
+{total_amount_text}"""
     
     try:
         await callback.message.edit_text(
@@ -1791,7 +1798,7 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
     
     # Визначаємо ціни тарифів (додаткова вартість для рекламних)
     tariff_prices = {
-        'standard': 3.0,  # Базова публікація
+        'standard': 0.0,  # Базова публікація (безкоштовно)
         'highlighted': 1.5,  # Додаткова вартість
         'pinned_12h': 2.5,  # Додаткова вартість
         'pinned_24h': 4.5,  # Додаткова вартість
@@ -1814,6 +1821,35 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
     # Зберігаємо тарифи як JSON у БД
     import json
     tariffs_json = json.dumps(selected_tariffs)
+    
+    # Якщо сума 0 (тільки базова публікація), одразу відправляємо на модерацію
+    if total_amount == 0:
+        update_telegram_listing_publication_tariff(listing_id, tariffs_json, 'paid')
+        await state.clear()
+        
+        # Відправляємо на модерацію
+        moderation_manager = ModerationManager(bot)
+        await moderation_manager.send_listing_to_moderation(
+            listing_id=listing_id,
+            source='telegram'
+        )
+        
+        # Видаляємо клавіатуру з попереднього повідомлення
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except:
+            pass
+        
+        # Відправляємо нове повідомлення з головним меню
+        await callback.message.answer(
+            t(user_id, 'payment.balance_success_message'),
+            parse_mode="HTML",
+            reply_markup=get_main_menu_keyboard(user_id)
+        )
+        await callback.answer()
+        return
+    
+    # Якщо є додаткові тарифи, створюємо платіж
     update_telegram_listing_publication_tariff(listing_id, tariffs_json, 'pending')
     
     # Створюємо платіжне посилання для картки
@@ -1854,10 +1890,17 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
     for tariff_type in selected_tariffs:
         if tariff_type in tariff_prices:
             if tariff_type == 'standard':
-                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.base_label')}")
+                free_text = t(user_id, 'common.free')
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {free_text} {t(user_id, 'tariffs.base_label')}")
             else:
                 selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.additional_label')}")
     selected_tariffs_text = "\n".join(selected_tariffs_text)
+    
+    # Формуємо текст загальної суми - якщо 0, показуємо "Безкоштовно"
+    if total_amount == 0:
+        total_amount_text = f"💰 <b>{t(user_id, 'payment.total_amount', amount=0).split(':')[0]}:</b> {t(user_id, 'common.free')}"
+    else:
+        total_amount_text = t(user_id, 'payment.total_amount', amount=total_amount)
     
     payment_method_text = f"""{t(user_id, 'payment.select_method_title')}
 
@@ -1866,7 +1909,7 @@ async def confirm_tariff_selection(callback: types.CallbackQuery, state: FSMCont
 
 {t(user_id, 'payment.how_to_pay')}
 
-{t(user_id, 'payment.total_amount', amount=total_amount)}
+{total_amount_text}
 {t(user_id, 'payment.your_balance', balance=user_balance)}"""
     
     try:
@@ -1910,7 +1953,7 @@ async def back_to_tariffs_selection(callback: types.CallbackQuery, state: FSMCon
     
     # Визначаємо ціни тарифів
     tariff_prices = {
-        'standard': 3.0,  # Базова публікація
+        'standard': 0.0,  # Базова публікація (безкоштовно)
         'highlighted': 1.5,  # Додаткова вартість
         'pinned_12h': 2.5,  # Додаткова вартість
         'pinned_24h': 4.5,  # Додаткова вартість
@@ -1921,6 +1964,12 @@ async def back_to_tariffs_selection(callback: types.CallbackQuery, state: FSMCon
     base_price = tariff_prices['standard']
     additional_price = sum(tariff_prices[t] for t in selected_tariffs if t != 'standard' and t in tariff_prices)
     total_amount = base_price + additional_price
+    
+    # Формуємо рядок з загальною сумою
+    if total_amount == 0:
+        total_amount_text = re.sub(r'0\.00€|0€', t(user_id, 'common.free'), t(user_id, 'tariffs.total_amount', amount=total_amount))
+    else:
+        total_amount_text = t(user_id, 'tariffs.total_amount', amount=total_amount)
     
     # Формуємо текст для вибору тарифів
     tariff_text = f"""{t(user_id, 'tariffs.select_title')}
@@ -1945,7 +1994,7 @@ async def back_to_tariffs_selection(callback: types.CallbackQuery, state: FSMCon
 {t(user_id, 'tariffs.default_note')}
 
 {t(user_id, 'tariffs.your_balance', balance=user_balance)}
-{t(user_id, 'tariffs.total_amount', amount=total_amount)}"""
+{total_amount_text}"""
     
     try:
         await callback.message.edit_text(
@@ -1977,17 +2026,19 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
         await state.clear()
         return
     
-    # Перевіряємо баланс
-    current_balance = get_user_balance(user_id)
-    if current_balance < amount:
-        await callback.answer(t(user_id, 'payment.insufficient_balance', required=amount, current=current_balance), show_alert=True)
-        return
-    
-    # Списуємо з балансу
-    success = deduct_user_balance(user_id, amount)
-    if not success:
-        await callback.answer(t(user_id, 'payment.balance_deduction_error'), show_alert=True)
-        return
+    # Якщо сума 0, не списуємо кошти
+    if amount > 0:
+        # Перевіряємо баланс
+        current_balance = get_user_balance(user_id)
+        if current_balance < amount:
+            await callback.answer(t(user_id, 'payment.insufficient_balance', required=amount, current=current_balance), show_alert=True)
+            return
+        
+        # Списуємо з балансу
+        success = deduct_user_balance(user_id, amount)
+        if not success:
+            await callback.answer(t(user_id, 'payment.balance_deduction_error'), show_alert=True)
+            return
     
     # Оновлюємо тарифи в БД як оплачені (зберігаємо як JSON)
     import json
@@ -2006,7 +2057,7 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
     }
     
     tariff_prices = {
-        'standard': 3.0,  # Базова публікація
+        'standard': 0.0,  # Базова публікація (безкоштовно)
         'highlighted': 1.5,  # Додаткова вартість
         'pinned_12h': 2.5,  # Додаткова вартість
         'pinned_24h': 4.5,  # Додаткова вартість
@@ -2018,7 +2069,8 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
     for tariff_type in selected_tariffs:
         if tariff_type in tariff_names_display:
             if tariff_type == 'standard':
-                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.base_label')}")
+                free_text = t(user_id, 'common.free')
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {free_text} {t(user_id, 'tariffs.base_label')}")
             else:
                 selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.additional_label')}")
     selected_tariffs_text = "\n".join(selected_tariffs_text)
@@ -2032,7 +2084,16 @@ async def process_payment_balance(callback: types.CallbackQuery, state: FSMConte
         )
         
         new_balance = get_user_balance(user_id)
-        success_text = f"""{t(user_id, 'payment.balance_success_title')}
+        # Якщо сума 0, не показуємо інформацію про списання коштів
+        if amount == 0:
+            success_text = f"""{t(user_id, 'payment.balance_success_title')}
+
+{t(user_id, 'payment.balance_success_tariffs')}
+{selected_tariffs_text}
+
+{t(user_id, 'payment.balance_success_message')}"""
+        else:
+            success_text = f"""{t(user_id, 'payment.balance_success_title')}
 
 {t(user_id, 'payment.balance_success_tariffs')}
 {selected_tariffs_text}
@@ -2121,7 +2182,7 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
     }
     
     tariff_prices = {
-        'standard': 3.0,  # Базова публікація
+        'standard': 0.0,  # Базова публікація (безкоштовно)
         'highlighted': 1.5,  # Додаткова вартість
         'pinned_12h': 2.5,  # Додаткова вартість
         'pinned_24h': 4.5,  # Додаткова вартість
@@ -2132,7 +2193,8 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
     for tariff_type in selected_tariffs:
         if tariff_type in tariff_names_display:
             if tariff_type == 'standard':
-                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.base_label')}")
+                free_text = t(user_id, 'common.free')
+                selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {free_text} {t(user_id, 'tariffs.base_label')}")
             else:
                 selected_tariffs_text.append(f"• {tariff_names_display.get(tariff_type, tariff_type)} — {tariff_prices.get(tariff_type, 0)}€ {t(user_id, 'tariffs.additional_label')}")
     selected_tariffs_text = "\n".join(selected_tariffs_text)

@@ -390,8 +390,10 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
         
         # Базова публікація завжди вибрана і не може бути знята
         if info['base']:
-            checkbox = '✅'
-            button_text = f"{checkbox} {info['icon']} {info['name']} — {info['price']}€ {t(user_id, 'tariffs.base_label')}"
+            checkbox = '✔️'
+            # Додаємо "Безкоштовно" без закреслення
+            free_text = t(user_id, 'common.free')
+            button_text = f"{checkbox} {info['icon']} {info['name']} — {free_text} {t(user_id, 'tariffs.base_label')}"
             # Не додаємо callback для базової публікації - вона не може бути знята
             keyboard.append([
                 InlineKeyboardButton(
@@ -400,7 +402,7 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
                 )
             ])
         else:
-            checkbox = '✅' if is_selected else '☐'
+            checkbox = '✔️' if is_selected else '☐'
             button_text = f"{checkbox} {info['icon']} {info['name']} — {info['price']}€"
             
             keyboard.append([
@@ -411,13 +413,20 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
             ])
     
     # Завжди показуємо кнопку "Готово" (базова публікація завжди вибрана)
-    base_price = tariff_info['standard']['price']
+    # Базова публікація тепер безкоштовна (0€)
+    base_price = 0.0
     additional_price = sum(tariff_info[tariff]['price'] for tariff in selected_tariffs if tariff != 'standard' and tariff in tariff_info)
     total_price = base_price + additional_price
     
+    # Формуємо текст кнопки "Готово" - якщо сума 0, показуємо "Безкоштовно"
+    if total_price == 0:
+        done_text = f"✅ {t(user_id, 'common.continue')} ({t(user_id, 'common.free')})"
+    else:
+        done_text = t(user_id, 'tariffs.done_button', total=total_price)
+    
     keyboard.append([
         InlineKeyboardButton(
-            text=t(user_id, 'tariffs.done_button', total=total_price),
+            text=done_text,
             callback_data="tariff_confirm"
         )
     ])
