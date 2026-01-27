@@ -24,7 +24,7 @@
     "user": "Пользователь",
     "currency": "Валюта",
     "selectCurrency": "Выберите валюту",
-    "free": "Бесплатно",
+    "free": "Free",
     "negotiable": "Договорная",
     "language": "Язык",
     "languageLabel": "Язык",
@@ -67,7 +67,7 @@
     "title": "Название",
     "description": "Описание",
     "price": "Цена",
-    "free": "Бесплатно",
+    "free": "Free",
     "location": "Место",
     "condition": {
       "label": "Состояние",
@@ -296,7 +296,7 @@
     },
     "fields": {
       "selectCondition": "Выберите состояние",
-      "free": "Бесплатно"
+      "free": "Free"
     }
   },
   "editListing": {

@@ -372,7 +372,7 @@ export default function PromotionModal({
                 className="px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap inline-block"
                 style={{ transform: 'rotate(-8deg)' }}
               >
-                {t('common.free') || 'Бесплатно'}
+                {t('common.free') || 'Free'}
               </span>
             </button>
           )}
