@@ -657,11 +657,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         <PromotionModal
           isOpen={true}
           onClose={() => {
-            // Якщо закриває без вибору - створюємо без промо
-            const telegramId = getTelegramId();
-            if (pendingListingData && telegramId) {
-              createListingWithData(pendingListingData, telegramId, null);
-            }
+            // Якщо закриває через X - закриваємо весь флоу створення оголошення
+            console.log('[CreateListingFlow] PromotionModal closed via X - closing entire create listing flow');
+            setPendingListingData(null);
+            setSelectedPromotionType(null);
+            setStep('create_listing');
+            onClose();
           }}
           onSelectPromotion={handlePromotionSelect}
           listingId={null}

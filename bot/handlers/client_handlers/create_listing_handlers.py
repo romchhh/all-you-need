@@ -948,9 +948,10 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
 {t(user_id, 'tariffs.story_title')}
 {t(user_id, 'tariffs.story_desc')}
 
-{t(user_id, 'tariffs.your_balance', balance=user_balance)}
+{t(user_id, 'tariffs.default_note')}
 
-{t(user_id, 'tariffs.default_note')}"""
+{t(user_id, 'tariffs.your_balance', balance=user_balance)}
+"""
         
         await callback.message.answer(
             tariff_text,
@@ -1748,10 +1749,10 @@ async def toggle_tariff_selection(callback: types.CallbackQuery, state: FSMConte
 {t(user_id, 'tariffs.story_title')}
 {t(user_id, 'tariffs.story_desc')}
 
-{t(user_id, 'tariffs.your_balance', balance=user_balance)}
-{t(user_id, 'tariffs.total_amount', amount=total_amount)}
+{t(user_id, 'tariffs.default_note')}
 
-{t(user_id, 'tariffs.default_note')}"""
+{t(user_id, 'tariffs.your_balance', balance=user_balance)}
+{t(user_id, 'tariffs.total_amount', amount=total_amount)}"""
     
     try:
         await callback.message.edit_text(
@@ -1941,10 +1942,10 @@ async def back_to_tariffs_selection(callback: types.CallbackQuery, state: FSMCon
 {t(user_id, 'tariffs.story_title')}
 {t(user_id, 'tariffs.story_desc')}
 
-{t(user_id, 'tariffs.your_balance', balance=user_balance)}
-{t(user_id, 'tariffs.total_amount', amount=total_amount)}
+{t(user_id, 'tariffs.default_note')}
 
-{t(user_id, 'tariffs.default_note')}"""
+{t(user_id, 'tariffs.your_balance', balance=user_balance)}
+{t(user_id, 'tariffs.total_amount', amount=total_amount)}"""
     
     try:
         await callback.message.edit_text(

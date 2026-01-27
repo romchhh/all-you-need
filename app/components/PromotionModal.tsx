@@ -365,9 +365,15 @@ export default function PromotionModal({
             <button
               onClick={handleSkip}
               disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold text-white bg-transparent border border-white/20 hover:bg-white/10 transition-all"
+              className="w-full py-3 rounded-xl font-semibold text-white bg-transparent border border-white/20 hover:bg-white/10 transition-all flex items-center justify-center gap-2"
             >
-              {t('promotions.noPromotion')}
+              <span>{t('promotions.noPromotion')}</span>
+              <span 
+                className="px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap inline-block"
+                style={{ transform: 'rotate(-8deg)' }}
+              >
+                {t('common.free') || 'Бесплатно'}
+              </span>
             </button>
           )}
         </div>

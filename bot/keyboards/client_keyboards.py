@@ -422,6 +422,14 @@ def get_publication_tariff_keyboard(user_id: int, selected_tariffs: list = None)
         )
     ])
     
+    # Кнопка "Скасувати" для повернення в головне меню
+    keyboard.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'create_listing.cancel_button'),
+            callback_data="cancel_listing"
+        )
+    ])
+    
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
@@ -460,6 +468,14 @@ def get_payment_method_keyboard(user_id: int, balance: float, amount: float, pay
         InlineKeyboardButton(
             text=t(user_id, 'create_listing.back'),
             callback_data="back_to_tariffs"
+        )
+    ])
+    
+    # Кнопка "Скасувати" для повернення в головне меню
+    keyboard.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'create_listing.cancel_button'),
+            callback_data="cancel_listing"
         )
     ])
     
