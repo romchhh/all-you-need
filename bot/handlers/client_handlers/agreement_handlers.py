@@ -9,6 +9,7 @@ from database_functions.client_db import check_user, add_user, get_user_agreemen
 from database_functions.create_dbs import create_dbs
 from database_functions.links_db import increment_link_count
 from database_functions.prisma_db import PrismaDB
+from database_functions.referral_db import add_referral, create_referral_table
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, set_language as set_user_language, get_user_lang, get_welcome_message
 from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard, get_language_selection_keyboard
@@ -32,11 +33,18 @@ async def start_command(message: types.Message):
     args = message.text.split()
 
     ref_link = None
-    if len(args) > 1 and args[1].startswith('linktowatch_'):
-        try:
-            ref_link = int(args[1].split('_')[1])
-        except (ValueError, IndexError) as e:
-            pass
+    referral_id = None
+    if len(args) > 1:
+        if args[1].startswith('linktowatch_'):
+            try:
+                ref_link = int(args[1].split('_')[1])
+            except (ValueError, IndexError) as e:
+                pass
+        elif args[1].startswith('ref_'):
+            try:
+                referral_id = int(args[1].split('_')[1])
+            except (ValueError, IndexError) as e:
+                pass
 
     user_exists = check_user(user_id)
     
@@ -53,6 +61,23 @@ async def start_command(message: types.Message):
         # Створюємо користувача в БД
         add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
         user_exists = True
+        
+        # Зберігаємо реферальний зв'язок якщо є
+        if referral_id:
+            create_referral_table()
+            if add_referral(referral_id, user_id):
+                print(f"Referral link saved: {referral_id} -> {user_id}")
+                # Відправляємо повідомлення запрошувачу
+                try:
+                    referrer_lang = get_user_lang(referral_id)
+                    new_user_name = user.first_name or user.username or "користувач"
+                    notification_text = (
+                        f"🎉 {t(referral_id, 'referral.new_user_registered', name=new_user_name)}\n\n"
+                        f"💰 {t(referral_id, 'referral.reward_info')}"
+                    )
+                    await bot.send_message(referral_id, notification_text, parse_mode="HTML")
+                except Exception as e:
+                    print(f"Error sending referral notification: {e}")
     
     update_user_activity(str(user_id))
     

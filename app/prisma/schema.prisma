@@ -324,3 +324,18 @@ model Link {
   @@index([linkName])
 }
 
+// Реферальні зв'язки
+model Referral {
+  id                  Int       @id @default(autoincrement())
+  referrerTelegramId  BigInt    @map("referrer_telegram_id") // Telegram ID запрошувача
+  referredTelegramId  BigInt    @unique @map("referred_telegram_id") // Telegram ID запрошеного користувача
+  rewardPaid          Int       @default(0) @map("reward_paid") // 0 = не виплачено, 1 = виплачено
+  createdAt           DateTime  @default(now()) @map("created_at")
+  rewardPaidAt        DateTime? @map("reward_paid_at")
+
+  @@map("Referral")
+  @@index([referrerTelegramId])
+  @@index([referredTelegramId])
+  @@index([rewardPaid])
+}
+

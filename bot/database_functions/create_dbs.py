@@ -6,6 +6,7 @@ from config import administrators
 from database_functions.migrations import apply_new_categories
 from database_functions.telegram_listing_db import init_categories_if_empty
 from database_functions.payments_db import create_payments_table
+from database_functions.referral_db import create_referral_table
 
 
 def create_dbs():
@@ -17,6 +18,7 @@ def create_dbs():
     init_categories_if_empty()
     apply_new_categories()
     create_payments_table()
+    create_referral_table()
     
     if administrators:
         superadmin_id = administrators[0]

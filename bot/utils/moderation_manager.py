@@ -335,6 +335,29 @@ class ModerationManager:
                     
                     conn.commit()
                     conn.close()
+                    
+                    # Перевіряємо реферальну винагороду після одобрення TelegramListing
+                    if listing:
+                        seller_telegram_id = listing.get('sellerTelegramId') or listing.get('telegramId')
+                        if seller_telegram_id:
+                            try:
+                                webapp_url = os.getenv('WEBAPP_URL') or os.getenv('NEXT_PUBLIC_BASE_URL') or 'http://localhost:3000'
+                                api_url = f"{webapp_url}/api/referral/check"
+                                
+                                async with aiohttp.ClientSession() as session:
+                                    async with session.post(
+                                        api_url,
+                                        json={'telegramId': str(seller_telegram_id)},
+                                        timeout=aiohttp.ClientTimeout(total=10)
+                                    ) as response:
+                                        if response.status == 200:
+                                            result = await response.json()
+                                            if result.get('rewardPaid'):
+                                                print(f"[approve_listing] Referral reward paid for user {seller_telegram_id}")
+                                        else:
+                                            print(f"[approve_listing] Failed to check referral reward: {response.status}")
+                            except Exception as ref_error:
+                                print(f"[approve_listing] Error checking referral reward: {ref_error}")
                 
                 return success
             else:
@@ -359,6 +382,37 @@ class ModerationManager:
                 
                 success = cursor.rowcount > 0
                 conn.commit()
+                
+                # Перевіряємо реферальну винагороду після одобрення Listing (маркетплейс)
+                if success:
+                    try:
+                        # Отримуємо telegramId користувача
+                        cursor.execute("""
+                            SELECT CAST(telegramId AS INTEGER) as telegramId
+                            FROM User
+                            WHERE id = (SELECT userId FROM Listing WHERE id = ?)
+                        """, (listing_id,))
+                        user_result = cursor.fetchone()
+                        if user_result and user_result[0]:
+                            seller_telegram_id = user_result[0]
+                            webapp_url = os.getenv('WEBAPP_URL') or os.getenv('NEXT_PUBLIC_BASE_URL') or 'http://localhost:3000'
+                            api_url = f"{webapp_url}/api/referral/check"
+                            
+                            async with aiohttp.ClientSession() as session:
+                                async with session.post(
+                                    api_url,
+                                    json={'telegramId': str(seller_telegram_id)},
+                                    timeout=aiohttp.ClientTimeout(total=10)
+                                ) as response:
+                                    if response.status == 200:
+                                        result = await response.json()
+                                        if result.get('rewardPaid'):
+                                            print(f"[approve_listing] Referral reward paid for user {seller_telegram_id}")
+                                    else:
+                                        print(f"[approve_listing] Failed to check referral reward: {response.status}")
+                    except Exception as ref_error:
+                        print(f"[approve_listing] Error checking referral reward: {ref_error}")
+                
                 conn.close()
                 return success
                 

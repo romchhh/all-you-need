@@ -13,7 +13,8 @@ from database_functions.prisma_db import PrismaDB
 from database_functions.telegram_listing_db import get_user_telegram_listings, get_telegram_listing_by_id
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, get_user_lang
-from keyboards.client_keyboards import get_catalog_webapp_keyboard, get_language_selection_keyboard, get_support_keyboard, get_main_menu_keyboard
+from keyboards.client_keyboards import get_catalog_webapp_keyboard, get_language_selection_keyboard, get_support_keyboard, get_main_menu_keyboard, get_referral_keyboard
+from database_functions.referral_db import get_referral_stats, create_referral_table
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from utils.monopay_functions import check_pending_payments
 from utils.cron_functions import deactivate_old_telegram_listings
@@ -119,6 +120,52 @@ async def cancel_handler(message: types.Message, state: FSMContext):
         reply_markup=get_main_menu_keyboard(user_id),
         parse_mode="HTML"
     )
+
+
+@router.message(F.text.in_([
+    "🎁 Реферальна програма",  # UK
+    "🎁 Реферальная программа"  # RU
+]))
+async def referral_handler(message: types.Message):
+    """Обробник для кнопки 'Реферальна програма'"""
+    user_id = message.from_user.id
+    create_referral_table()
+    
+    # Отримуємо статистику
+    stats = get_referral_stats(user_id)
+    
+    # Формуємо текст
+    referral_text = (
+        t(user_id, 'referral.title') +
+        t(user_id, 'referral.description') +
+        t(user_id, 'referral.stats_title') +
+        t(user_id, 'referral.total_referrals', count=stats['total_referrals']) + "\n" +
+        t(user_id, 'referral.paid_referrals', count=stats['paid_referrals']) + "\n" +
+        t(user_id, 'referral.total_reward', amount=stats['total_reward'])
+    )
+    
+    # Отримуємо username бота
+    username = bot_username or (await bot.get_me()).username
+    
+    await message.answer(
+        referral_text,
+        reply_markup=get_referral_keyboard(user_id, username),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "back_to_main")
+async def back_to_main_handler(callback: types.CallbackQuery):
+    """Повернення до головного меню"""
+    user_id = callback.from_user.id
+    
+    await callback.message.delete()
+    await callback.message.answer(
+        f"<b>{t(user_id, 'menu.main_menu')}</b>",
+        reply_markup=get_main_menu_keyboard(user_id),
+        parse_mode="HTML"
+    )
+    await callback.answer()
 
 
 async def on_startup(router):

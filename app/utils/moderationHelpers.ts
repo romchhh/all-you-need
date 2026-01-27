@@ -149,6 +149,17 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
   ).catch(err => {
     console.error('[approveListing] Failed to send Telegram notification:', err);
   });
+
+  // Перевіряємо реферальну винагороду (асинхронно, не блокуємо відповідь)
+  if (listing.telegramId) {
+    fetch('/api/referral/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId: listing.telegramId.toString() }),
+    }).catch((error) => {
+      console.error('[approveListing] Error checking referral reward:', error);
+    });
+  }
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle } from 'lucide-react';
+import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle, Gift } from 'lucide-react';
 import { NavIcon } from '../NavIcon';
 import { ImageViewModal } from '../ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
@@ -8,6 +8,7 @@ import { ProfileListingCard } from '../ProfileListingCard';
 import { EditProfileModal } from '../EditProfileModal';
 import { EditListingModal } from '../EditListingModal';
 import { ShareModal } from '../ShareModal';
+import { ReferralModal } from '../ReferralModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { TopUpBalanceModal } from '../TopUpBalanceModal';
 import dynamic from 'next/dynamic';
@@ -60,6 +61,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   }, [editingListing, onEditModalChange]);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState(false);
@@ -526,12 +528,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => {
-                    setShowShareModal(true);
+                    setShowReferralModal(true);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
                   className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+                  title={t('referral.menuButton') || 'Реферальна програма'}
                 >
-                  <Share2 size={18} />
+                  <Gift size={18} />
                 </button>
                 <button
                   onClick={() => {
@@ -1355,6 +1358,16 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             setShowReactivateFlow(false);
             setSelectedListingForReactivation(null);
           }}
+        />
+      )}
+
+      {/* Модальне вікно реферальної програми */}
+      {profile && (
+        <ReferralModal
+          isOpen={showReferralModal}
+          onClose={() => setShowReferralModal(false)}
+          telegramId={profile.telegramId}
+          tg={tg}
         />
       )}
 

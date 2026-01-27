@@ -425,6 +425,15 @@ export async function POST(request: NextRequest) {
         }).catch(err => {
           console.error('Failed to send approval notification:', err);
         });
+
+        // Перевіряємо реферальну винагороду (асинхронно, не блокуємо відповідь)
+        fetch('/api/referral/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId: listing.telegramId.toString() }),
+        }).catch((error) => {
+          console.error('[Telegram Moderation] Error checking referral reward:', error);
+        });
       }
 
       return NextResponse.json({

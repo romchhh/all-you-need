@@ -404,6 +404,7 @@ export async function POST(request: NextRequest) {
       } else {
         await approveListing(listing);
         // Повідомлення користувачу вже надсилається в approveListing
+        // Перевірка рефералів також виконується в approveListing
       }
       return NextResponse.json({
         success: true,

@@ -80,11 +80,15 @@ def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
         text=t(user_id, 'menu.support')
     )
     
+    referral_button = KeyboardButton(
+        text=t(user_id, 'referral.menu_button')
+    )
+    
     return ReplyKeyboardMarkup(
         keyboard=[
             [add_listing_button, my_listings_button],
             [about_us_button, my_profile_button],
-            [support_button]
+            [support_button, referral_button]
         ],
         resize_keyboard=True,
         is_persistent=True
@@ -178,6 +182,23 @@ def get_support_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=t(user_id, 'support.contact_manager'),
                 url=support_manager
+            )
+        ]
+    ])
+
+
+def get_referral_keyboard(user_id: int, bot_username: str) -> InlineKeyboardMarkup:
+    """Створює клавіатуру для реферальної програми"""
+    import urllib.parse
+    referral_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+    share_text = t(user_id, 'referral.share_text')
+    share_url = f"https://t.me/share/url?url={urllib.parse.quote(referral_link)}&text={urllib.parse.quote(share_text)}"
+    
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'referral.share_button'),
+                url=share_url
             )
         ]
     ])
