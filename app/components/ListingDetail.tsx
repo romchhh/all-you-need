@@ -493,19 +493,30 @@ export const ListingDetail = ({
         >
           <ArrowLeft size={20} className="text-gray-900" />
         </button>
-        <button
-          onClick={() => {
-            onToggleFavorite(listing.id);
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
-        >
-          <Heart 
-            size={20} 
-            className={isFavorite ? 'text-red-500' : 'text-gray-900'}
-            fill={isFavorite ? 'currentColor' : 'none'}
-          />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setShowShareModal(true);
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
+          >
+            <Share2 size={20} className="text-gray-900" />
+          </button>
+          <button
+            onClick={() => {
+              onToggleFavorite(listing.id);
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
+          >
+            <Heart 
+              size={20} 
+              className={isFavorite ? 'text-red-500' : 'text-gray-900'}
+              fill={isFavorite ? 'currentColor' : 'none'}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Лого Trade Ground - частина сторінки */}
@@ -662,12 +673,37 @@ export const ListingDetail = ({
             {/* Ціна */}
             <div className="mb-4">
               <div className="flex items-center gap-2">
-                <div className={`text-3xl font-bold mb-1`} style={{ color: listing.isFree ? '#D3F1A7' : '#D3F1A7' }}>
-                  {listing.isFree ? t('common.free') : listing.price}
-                </div>
-                {!listing.isFree && listing.currency && (
-                  <span className="text-3xl font-bold" style={{ color: '#D3F1A7' }}>{getCurrencySymbol(listing.currency)}</span>
-                )}
+                {(() => {
+                  const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
+                  const isFree = listing.isFree;
+                  
+                  if (isFree) {
+                    return (
+                      <div className="text-3xl font-bold mb-1" style={{ color: '#D3F1A7' }}>
+                        {t('common.free')}
+                      </div>
+                    );
+                  }
+                  
+                  if (isNegotiable) {
+                    return (
+                      <div className="text-xl font-bold mb-1" style={{ color: '#D3F1A7' }}>
+                        {listing.price}
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <>
+                      <div className="text-3xl font-bold mb-1" style={{ color: '#D3F1A7' }}>
+                        {listing.price}
+                      </div>
+                      {listing.currency && (
+                        <span className="text-3xl font-bold" style={{ color: '#D3F1A7' }}>{getCurrencySymbol(listing.currency)}</span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
@@ -961,7 +997,15 @@ export const ListingDetail = ({
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         shareLink={getListingShareLink(listing.id)}
-        shareText={`📦 ${listing.title} - ${listing.price} в Trade Ground Marketplace`}
+        shareText={(() => {
+          const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
+          const priceText = listing.isFree 
+            ? t('common.free') 
+            : (isNegotiable 
+              ? listing.price 
+              : `${listing.price}${listing.currency ? getCurrencySymbol(listing.currency) : '€'}`);
+          return `📦 ${listing.title} - ${priceText} в Trade Ground Marketplace`;
+        })()}
         tg={tg}
       />
 

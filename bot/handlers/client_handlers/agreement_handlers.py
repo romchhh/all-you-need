@@ -191,19 +191,39 @@ async def start_command(message: types.Message):
         return
     
     # Якщо є shared_item, показуємо інформацію про нього
-    welcome_text = t(user_id, 'welcome.greeting')
-    
     if shared_item and shared_data:
         webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
         
         if shared_item['type'] == 'listing':
             listing = shared_data
             import json
+            
+            # Обробка ціни
             is_free = listing.get('isFree') or (isinstance(listing.get('isFree'), int) and listing.get('isFree') == 1)
-            price_text = t(user_id, 'common.free') if is_free else f"{listing.get('price', 'N/A')} €"
+            price_value = listing.get('price', 'N/A')
+            negotiable_text = t(user_id, 'moderation.negotiable')
+            
+            # Перевіряємо, чи це "Договірна" ціна
+            is_negotiable = (
+                price_value == negotiable_text or 
+                price_value == 'Договірна' or 
+                price_value == 'Договорная'
+            )
+            
+            if is_free:
+                price_text = t(user_id, 'common.free')
+            elif is_negotiable:
+                price_text = price_value  # Не додаємо валюту для "Договірна"
+            else:
+                # Додаємо валюту тільки якщо це не "Договірна"
+                currency = listing.get('currency', 'EUR')
+                currency_symbol = '€' if currency == 'EUR' else ('₴' if currency == 'UAH' else '$')
+                price_text = f"{price_value} {currency_symbol}"
+            
             seller_name = f"{listing.get('firstName', '')} {listing.get('lastName', '')}".strip() or listing.get('username', t(user_id, 'common.user'))
             
-            welcome_text += (
+            # Для поділеного оголошення не додаємо привітання
+            welcome_text = (
                 f"{t(user_id, 'shared.listing.title', title=listing.get('title', 'Оголошення'))}\n\n"
                 f"{t(user_id, 'shared.listing.price', price=price_text)}\n"
                 f"{t(user_id, 'shared.listing.location', location=listing.get('location', 'N/A'))}\n"
@@ -213,6 +233,59 @@ async def start_command(message: types.Message):
             
             webapp_url_with_params = f"{webapp_url}?listing={shared_item['id']}&telegramId={user_id}"
             button_text = t(user_id, 'shared.listing.button')
+            
+            # Створюємо клавіатуру для оголошення
+            listing_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text=button_text,
+                    web_app=WebAppInfo(url=webapp_url_with_params)
+                )]
+            ])
+            
+            # Спробуємо відправити зображення товару, якщо воно є
+            try:
+                images = listing.get('images')
+                if images:
+                    if isinstance(images, str):
+                        images = json.loads(images)
+                    if isinstance(images, list) and len(images) > 0:
+                        first_image = images[0]
+                        # Якщо це file_id або URL, спробуємо відправити фото
+                        if first_image and (first_image.startswith('http') or len(first_image) < 100):
+                            # Якщо це URL, використовуємо InputFile з URL
+                            if first_image.startswith('http'):
+                                async with aiohttp.ClientSession() as session:
+                                    async with session.get(first_image) as resp:
+                                        if resp.status == 200:
+                                            photo_data = await resp.read()
+                                            from aiogram.types import BufferedInputFile
+                                            photo_file = BufferedInputFile(photo_data, filename='listing.jpg')
+                                            await message.answer_photo(
+                                                photo_file,
+                                                caption=welcome_text,
+                                                reply_markup=listing_keyboard,
+                                                parse_mode="HTML"
+                                            )
+                                            return
+                            # Якщо це file_id, спробуємо використати його напряму
+                            else:
+                                try:
+                                    await message.answer_photo(
+                                        first_image,
+                                        caption=welcome_text,
+                                        reply_markup=listing_keyboard,
+                                        parse_mode="HTML"
+                                    )
+                                    return
+                                except:
+                                    pass
+            except Exception as e:
+                print(f"Error sending listing image: {e}")
+                # Продовжуємо без зображення
+            
+            # Якщо не вдалося відправити з фото, відправляємо текст
+            await message.answer(welcome_text, reply_markup=listing_keyboard, parse_mode="HTML")
+            return
             
         elif shared_item['type'] == 'user':
             user = shared_data
@@ -230,14 +303,25 @@ async def start_command(message: types.Message):
             
             webapp_url_with_params = f"{webapp_url}?user={shared_item['id']}&telegramId={user_id}"
             button_text = t(user_id, 'shared.user.button')
+            
+            # Створюємо клавіатуру для профілю
+            user_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text=button_text,
+                    web_app=WebAppInfo(url=webapp_url_with_params)
+                )]
+            ])
+            await message.answer(welcome_text, reply_markup=user_keyboard, parse_mode="HTML")
+            await message.answer(
+                f"<b>{t(user_id, 'menu.main_menu')}</b>",
+                reply_markup=get_main_menu_keyboard(user_id),
+                parse_mode="HTML"
+            )
+            return
         
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(
-                text=button_text,
-                web_app=WebAppInfo(url=webapp_url_with_params)
-            )]
-        ])
-        await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
+        # Якщо не вдалося відправити з фото (для listing), відправляємо текст
+        if shared_item['type'] == 'listing':
+            await message.answer(welcome_text, reply_markup=listing_keyboard, parse_mode="HTML")
         await message.answer(
             f"<b>{t(user_id, 'menu.main_menu')}</b>",
             reply_markup=get_main_menu_keyboard(user_id),

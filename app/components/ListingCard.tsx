@@ -285,9 +285,20 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl rounded-b-2xl -mt-5 pt-3 px-4 pb-1.5 flex flex-col flex-1 z-30" style={{ minHeight: '110px', position: 'relative', zIndex: 30 }}>
         {/* Ціна та тег стану */}
         <div className="flex items-start justify-between mb-1">
-          <span className={`font-bold text-white ${listing.isFree ? 'text-2xl' : 'text-2xl'}`}>
-            {listing.isFree ? t('common.free') : `${listing.price}${getCurrencySymbol(listing.currency)}`}
-          </span>
+          {(() => {
+            const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
+            const isFree = listing.isFree;
+            
+            if (isFree) {
+              return <span className="font-bold text-white text-2xl">{t('common.free')}</span>;
+            }
+            
+            if (isNegotiable) {
+              return <span className="font-bold text-white text-base">{listing.price}</span>;
+            }
+            
+            return <span className="font-bold text-white text-2xl">{`${listing.price}${getCurrencySymbol(listing.currency)}`}</span>;
+          })()}
           {listing.condition && (
             <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-[11px] font-semibold rounded">
               {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}

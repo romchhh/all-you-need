@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
       return {
         id: listing.id,
         title: listing.title,
-        price: listing.isFree ? 'Безкоштовно' : listing.price,
+        price: listing.isFree ? 'Free' : listing.price,
         currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
         image: images[0] || '',
         images: images,

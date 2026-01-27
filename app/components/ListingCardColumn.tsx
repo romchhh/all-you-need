@@ -165,9 +165,20 @@ const ListingCardColumnComponent = ({
               {listing.title}
             </div>
             <div className="flex items-center gap-2 mb-2">
-              <span className={`text-white font-bold ${listing.isFree ? 'text-lg' : 'text-lg'}`}>
-                {listing.isFree ? t('common.free') : `${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}
-              </span>
+              {(() => {
+                const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
+                const isFree = listing.isFree;
+                
+                if (isFree) {
+                  return <span className="text-white font-bold text-lg">{t('common.free')}</span>;
+                }
+                
+                if (isNegotiable) {
+                  return <span className="text-white font-bold text-sm">{listing.price}</span>;
+                }
+                
+                return <span className="text-white font-bold text-lg">{`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}</span>;
+              })()}
               {listing.condition && (
                 <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-[11px] font-semibold rounded">
                   {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}

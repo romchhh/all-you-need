@@ -242,7 +242,7 @@ export default function AdminListingDetailPage() {
                 </dt>
                 <dd className="text-base sm:text-lg font-semibold text-gray-900 mt-1">
                   {listing.isFree
-                    ? 'Безкоштовно'
+                    ? 'Free'
                     : `${listing.price} ${listing.currency || ''}`}
                 </dd>
               </div>

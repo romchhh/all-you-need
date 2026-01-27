@@ -304,7 +304,7 @@ export const ProfileListingCard = ({
             >
               {listing.title}
             </div>
-            <div className={`font-bold text-base mt-1 ${
+            <div className={`font-bold mt-1 ${
               isSold
                 ? 'text-gray-500 line-through'
                 : isPendingModeration 
@@ -312,8 +312,26 @@ export const ProfileListingCard = ({
                 : isDeactivated
                 ? 'text-gray-500 line-through'
                 : 'text-white'
+            } ${
+              (() => {
+                const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
+                return isNegotiable ? 'text-sm' : 'text-base';
+              })()
             }`}>
-              {listing.isFree ? t('common.free') : `${listing.price} ${listing.currency || '$'}`}
+              {(() => {
+                const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
+                const isFree = listing.isFree;
+                
+                if (isFree) {
+                  return t('common.free');
+                }
+                
+                if (isNegotiable) {
+                  return listing.price;
+                }
+                
+                return `${listing.price} ${listing.currency || '$'}`;
+              })()}
             </div>
 
             {/* Статус модерації, деактивації або продажу */}
