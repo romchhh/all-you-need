@@ -198,6 +198,9 @@ async def start_command(message: types.Message):
             listing = shared_data
             import json
             
+            # Отримуємо мову користувача для правильного URL
+            user_lang = get_user_lang(user_id)
+            
             # Обробка ціни
             is_free = listing.get('isFree') or (isinstance(listing.get('isFree'), int) and listing.get('isFree') == 1)
             price_value = listing.get('price', 'N/A')
@@ -231,7 +234,8 @@ async def start_command(message: types.Message):
                 f"{t(user_id, 'shared.listing.instruction')}"
             )
             
-            webapp_url_with_params = f"{webapp_url}?listing={shared_item['id']}&telegramId={user_id}"
+            # Формуємо правильний URL на сторінку товару в мінідодатку
+            webapp_url_with_params = f"{webapp_url}/{user_lang}/bazaar?listing={shared_item['id']}&telegramId={user_id}"
             button_text = t(user_id, 'shared.listing.button')
             
             # Створюємо клавіатуру для оголошення
@@ -289,19 +293,24 @@ async def start_command(message: types.Message):
             
         elif shared_item['type'] == 'user':
             user = shared_data
+            # Отримуємо мову користувача для правильного URL
+            user_lang = get_user_lang(user_id)
+            
             user_name = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip() or user.get('username', t(user_id, 'common.user'))
             username_text = f"@{user.get('username')}" if user.get('username') else ""
             total_listings = user.get('totalListings', 0) or 0
             active_listings = user.get('activeListings', 0) or 0
             
-            welcome_text += (
+            # Для поділеного профілю не додаємо привітання
+            welcome_text = (
                 f"{t(user_id, 'shared.user.title', name=user_name, username=username_text)}\n\n"
                 f"{t(user_id, 'shared.user.listings', total=total_listings)}\n"
                 f"{t(user_id, 'shared.user.active', active=active_listings)}\n\n"
                 f"{t(user_id, 'shared.user.instruction')}"
             )
             
-            webapp_url_with_params = f"{webapp_url}?user={shared_item['id']}&telegramId={user_id}"
+            # Формуємо правильний URL на сторінку профілю в мінідодатку
+            webapp_url_with_params = f"{webapp_url}/{user_lang}/bazaar?user={shared_item['id']}&telegramId={user_id}"
             button_text = t(user_id, 'shared.user.button')
             
             # Створюємо клавіатуру для профілю
