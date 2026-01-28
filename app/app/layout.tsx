@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PerformanceScript } from "@/components/PerformanceScript";
 import { MobileOptimizationScript } from "@/components/MobileOptimizationScript";
+import { TelegramAccessGuard } from "@/components/TelegramAccessGuard";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,7 +50,9 @@ export default function RootLayout({
           <LanguageProvider>
             <PerformanceScript />
             <MobileOptimizationScript />
-            {children}
+            <TelegramAccessGuard>
+              {children}
+            </TelegramAccessGuard>
           </LanguageProvider>
         </ErrorBoundary>
       </body>
