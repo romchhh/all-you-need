@@ -225,6 +225,44 @@ def get_user_telegram_listings(telegram_id: int) -> List[Dict[str, Any]]:
     return result
 
 
+def update_telegram_listing(
+    listing_id: int,
+    title: str,
+    description: str,
+    price: float,
+    currency: str,
+    category: str,
+    subcategory: Optional[str],
+    condition: str,
+    location: str,
+    images: List[str],
+    price_display: Optional[str] = None
+) -> bool:
+    """Оновлює оголошення (для повторної модерації після відхилення)"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    images_json = json.dumps(images)
+    if price_display is None:
+        price_display = str(price) if price > 0 else None
+    cursor.execute("PRAGMA table_info(TelegramListing)")
+    columns = [row[1] for row in cursor.fetchall()]
+    has_price_display = 'priceDisplay' in columns
+    set_clause = """
+        title = ?, description = ?, price = ?, currency = ?, category = ?, subcategory = ?,
+        condition = ?, location = ?, images = ?, status = 'pending_moderation',
+        moderationStatus = 'pending', rejectionReason = NULL, updatedAt = ?
+    """
+    params = [title, description, price, currency, category, subcategory, condition, location, images_json, datetime.now()]
+    if has_price_display:
+        set_clause = set_clause.replace("updatedAt = ?", "priceDisplay = ?, updatedAt = ?")
+        params.insert(-1, price_display)
+    cursor.execute(f"UPDATE TelegramListing SET {set_clause} WHERE id = ?", params + [listing_id])
+    success = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return success
+
+
 def update_telegram_listing_moderation_status(
     listing_id: int,
     status: str,

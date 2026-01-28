@@ -1009,14 +1009,14 @@ export const ListingDetail = ({
         tg={tg}
       />
 
-      {/* Модальне вікно реклами/апгрейду */}
+      {/* Модальне вікно реклами/апгрейду — передаємо поточну рекламу тільки якщо вона ще активна, щоб можна було купити знову після закінчення */}
       {showPromotionModal && (
         <PromotionModal
           isOpen={showPromotionModal}
           onClose={() => setShowPromotionModal(false)}
           listingId={listing.id}
-          currentPromotion={listing.promotionType}
-          promotionEnds={listing.promotionEnds}
+          currentPromotion={listing.promotionEnds && new Date(listing.promotionEnds) > new Date() ? listing.promotionType : null}
+          promotionEnds={listing.promotionEnds && new Date(listing.promotionEnds) > new Date() ? listing.promotionEnds : null}
           telegramId={String(currentUser?.id || profile?.telegramId || '')}
           // Тут користувач явно натискає «Рекламувати» — кнопка «Опублікувати без реклами» не потрібна
           showSkipButton={false}

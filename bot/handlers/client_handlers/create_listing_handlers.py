@@ -23,6 +23,7 @@ from database_functions.telegram_listing_db import (
     get_categories,
     get_user_telegram_listings,
     get_telegram_listing_by_id,
+    update_telegram_listing,
     update_telegram_listing_publication_tariff
 )
 from database_functions.client_db import check_user, get_user_balance, deduct_user_balance
@@ -32,6 +33,7 @@ from main import bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, FSInputFile
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 
 router = Router()
@@ -899,22 +901,42 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         else:
             price_value = float(price_value) if price_value else 0
         
-        listing_id = create_telegram_listing(
-            user_id=db_user_id,
-            title=title,
-            description=description,
-            price=price_value,
-            currency='EUR',
-            category=data['category_name'],
-            subcategory=None,
-            condition='service',  # Для послуг завжди 'service'
-            location=data.get('location', t(user_id, 'moderation.not_specified')),
-            images=photos,
-            price_display=price_display  # Передаємо оригінальне значення
-        )
-        
-        # Зберігаємо listing_id в стані для подальшого використання
-        await state.update_data(listing_id=listing_id)
+        editing_listing_id = data.get('editing_listing_id')
+        if editing_listing_id:
+            success = update_telegram_listing(
+                listing_id=editing_listing_id,
+                title=title,
+                description=description,
+                price=price_value,
+                currency='EUR',
+                category=data['category_name'],
+                subcategory=None,
+                condition='service',
+                location=data.get('location', t(user_id, 'moderation.not_specified')),
+                images=photos,
+                price_display=price_display
+            )
+            if not success:
+                await callback.answer("❌ Помилка оновлення оголошення", show_alert=True)
+                return
+            listing_id = editing_listing_id
+            await state.update_data(listing_id=listing_id)
+            await state.update_data(editing_listing_id=None)
+        else:
+            listing_id = create_telegram_listing(
+                user_id=db_user_id,
+                title=title,
+                description=description,
+                price=price_value,
+                currency='EUR',
+                category=data['category_name'],
+                subcategory=None,
+                condition='service',  # Для послуг завжди 'service'
+                location=data.get('location', t(user_id, 'moderation.not_specified')),
+                images=photos,
+                price_display=price_display  # Передаємо оригінальне значення
+            )
+            await state.update_data(listing_id=listing_id)
         
         # Переходимо до вибору тарифу публікації
         await state.set_state(CreateListing.waiting_for_publication_tariff)
@@ -1360,42 +1382,38 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         message_text += f"\n"
         message_text += f"{t(user_id, 'listing.details.location')} {location}\n"
         message_text += f"{t(user_id, 'listing.details.status')} {status_text}\n"
+        if status == 'rejected':
+            rejection_reason = listing.get('rejectionReason') or listing.get('rejection_reason') or ''
+            if rejection_reason:
+                message_text += f"\n{t(user_id, 'my_listings.rejection_reason')}\n{rejection_reason}\n"
         if created_at:
-            # Форматуємо дату в нормальний формат
-            from datetime import datetime
             try:
                 dt = None
                 if isinstance(created_at, str):
-                    # Спробуємо різні формати
                     try:
-                        # ISO формат з Z
                         dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
                     except:
                         try:
-                            # ISO формат без Z
                             dt = datetime.fromisoformat(created_at)
                         except:
-                            try:
-                                # Формат з пробілом: "2026-01-12 20:30:12.360820"
-                                if ' ' in created_at:
-                                    parts = created_at.split(' ')
-                                    date_part = parts[0]
-                                    time_part = parts[1].split('.')[0]  # Прибираємо мікросекунди
-                                    dt = datetime.strptime(f"{date_part} {time_part}", "%Y-%m-%d %H:%M:%S")
-                            except:
-                                pass
+                            if ' ' in created_at:
+                                parts = created_at.split(' ')
+                                date_part = parts[0]
+                                time_part = parts[1].split('.')[0]
+                                dt = datetime.strptime(f"{date_part} {time_part}", "%Y-%m-%d %H:%M:%S")
+                                dt = dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('Europe/Berlin'))
                 elif hasattr(created_at, 'strftime'):
-                    # Якщо це вже datetime об'єкт
                     dt = created_at
-                
                 if dt:
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('Europe/Berlin'))
+                    else:
+                        dt = dt.astimezone(ZoneInfo('Europe/Berlin'))
                     formatted_date = dt.strftime("%d.%m.%Y %H:%M")
                     message_text += f"{t(user_id, 'listing.details.created')} {formatted_date}\n"
                 else:
-                    # Якщо не вдалося розпарсити, виводимо як є
                     message_text += f"{t(user_id, 'listing.details.created')} {created_at}\n"
-            except Exception as e:
-                # Якщо не вдалося розпарсити, виводимо як є
+            except Exception:
                 message_text += f"{t(user_id, 'listing.details.created')} {created_at}\n"
         
         keyboard_buttons = []
@@ -1488,6 +1506,18 @@ async def view_telegram_listing(callback: types.CallbackQuery):
                     callback_data=f"confirm_delete_{listing_id}"
                 )
             ])
+        # Для відхилених — редагувати та відправити на повторну модерацію (з оплатою) або видалити
+        if status == 'rejected':
+            keyboard_buttons.append([
+                InlineKeyboardButton(
+                    text=t(user_id, 'my_listings.edit_button'),
+                    callback_data=f"edit_rejected_listing_{listing_id}"
+                ),
+                InlineKeyboardButton(
+                    text=t(user_id, 'my_listings.delete_button'),
+                    callback_data=f"confirm_delete_{listing_id}"
+                )
+            ])
         
         keyboard_buttons.append([
             InlineKeyboardButton(
@@ -1501,13 +1531,32 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         images = listing.get('images', [])
         if images and len(images) > 0:
             try:
-                await bot.send_photo(
-                    chat_id=user_id,
-                    photo=images[0],
-                    caption=message_text,
-                    reply_markup=keyboard,
-                    parse_mode="HTML"
-                )
+                if len(images) > 1:
+                    media = []
+                    for i, photo_id in enumerate(images):
+                        if i == 0:
+                            media.append(InputMediaPhoto(
+                                media=photo_id,
+                                caption=message_text,
+                                parse_mode="HTML"
+                            ))
+                        else:
+                            media.append(InputMediaPhoto(media=photo_id))
+                    await bot.send_media_group(chat_id=user_id, media=media)
+                    await bot.send_message(
+                        chat_id=user_id,
+                        text=t(user_id, 'my_listings.choose_action'),
+                        reply_markup=keyboard,
+                        parse_mode="HTML"
+                    )
+                else:
+                    await bot.send_photo(
+                        chat_id=user_id,
+                        photo=images[0],
+                        caption=message_text,
+                        reply_markup=keyboard,
+                        parse_mode="HTML"
+                    )
             except Exception as e:
                 print(f"Error sending photo: {e}")
                 await callback.message.answer(
@@ -1527,6 +1576,38 @@ async def view_telegram_listing(callback: types.CallbackQuery):
     except Exception as e:
         print(f"Error viewing listing: {e}")
         await callback.answer("❌ Помилка при перегляді оголошення", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("edit_rejected_listing_"))
+async def edit_rejected_listing(callback: types.CallbackQuery, state: FSMContext):
+    """Почати редагування відхиленого оголошення та відправку на повторну модерацію (з оплатою)"""
+    user_id = callback.from_user.id
+    try:
+        listing_id = int(callback.data.split("_")[-1])
+        listing = get_telegram_listing_by_id(listing_id)
+        if not listing or listing.get('sellerTelegramId') != user_id:
+            await callback.answer(t(user_id, 'my_listings.listing_not_found'), show_alert=True)
+            return
+        if listing.get('status') != 'rejected':
+            await callback.answer(t(user_id, 'my_listings.not_rejected'), show_alert=True)
+            return
+        price_val = listing.get('priceDisplay') or listing.get('price')
+        if price_val is None:
+            price_val = listing.get('price', 0)
+        await state.update_data(
+            title=listing.get('title', ''),
+            description=listing.get('description', ''),
+            photos=listing.get('images', []),
+            category_name=listing.get('category', ''),
+            price=price_val,
+            location=listing.get('location', ''),
+            editing_listing_id=listing_id
+        )
+        await state.set_state(CreateListing.waiting_for_confirmation)
+        await show_preview(user_id, state, callback=callback)
+    except Exception as e:
+        print(f"Error starting edit rejected listing: {e}")
+        await callback.answer("❌ Помилка", show_alert=True)
 
 
 @router.callback_query(F.data == "refresh_not_available")

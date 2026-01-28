@@ -1316,8 +1316,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             setPromotionOpenSource(null);
           }}
           listingId={selectedListingForPromotion.id}
-          currentPromotion={selectedListingForPromotion.promotionType}
-          promotionEnds={selectedListingForPromotion.promotionEnds}
+          currentPromotion={selectedListingForPromotion.promotionEnds && new Date(selectedListingForPromotion.promotionEnds) > new Date() ? selectedListingForPromotion.promotionType : null}
+          promotionEnds={selectedListingForPromotion.promotionEnds && new Date(selectedListingForPromotion.promotionEnds) > new Date() ? selectedListingForPromotion.promotionEnds : null}
           telegramId={profile?.telegramId}
           // Кнопка «Опублікувати без реклами» повинна бути скрізь,
           // ОКРІМ випадку, коли користувач сам натиснув «Рекламувати»

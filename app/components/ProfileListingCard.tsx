@@ -64,23 +64,27 @@ export const ProfileListingCard = ({
         })
         .catch(err => {
           console.error('Error fetching active promotions:', err);
-          // Fallback на старий спосіб
-          if (listing.promotionType) {
-            setActivePromotions([listing.promotionType]);
+          // Fallback тільки якщо реклама ще активна (promotionEnds > now)
+          const endsAt = listing.promotionEnds ? new Date(listing.promotionEnds) : null;
+          if (listing.promotionType && endsAt && endsAt.getTime() > now.getTime()) {
+            setActivePromotions(listing.promotionType.split(',').map((t: string) => t.trim()));
           }
         });
     }
-  }, [listing.id, listing.promotionType]);
+  }, [listing.id, listing.promotionType, listing.promotionEnds]);
+  
+  // Показуємо рекламу тільки якщо вона ще активна (promotionEnds > now)
+  const promotionsToShow = isPromotionActive
+    ? (activePromotions.length > 0 ? activePromotions : (listing.promotionType ? listing.promotionType.split(',').map(t => t.trim()) : []))
+    : [];
   
   // Функція для отримання значка реклами
   const getPromotionBadge = () => {
-    const promotionsToShow = activePromotions.length > 0 ? activePromotions : (listing.promotionType ? [listing.promotionType] : []);
-    
     if (promotionsToShow.length === 0) return null;
     
     return (
       <>
-        {promotionsToShow.map((promoType) => {
+        {promotionsToShow.map((promoType: string) => {
           if (promoType === 'vip') {
             return (
               <span key="vip" className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
@@ -250,10 +254,10 @@ export const ProfileListingCard = ({
             </div>
           )}
           
-          {/* Бейдж реклами - справа знизу на фото */}
-          {activePromotions.length > 0 && !isPendingModeration && !isDeactivated && !isRejected && (
+          {/* Бейдж реклами - справа знизу на фото (тільки якщо реклама ще активна) */}
+          {promotionsToShow.length > 0 && !isPendingModeration && !isDeactivated && !isRejected && (
             <div className="absolute bottom-1 right-1 z-10 flex flex-col gap-1 items-end">
-              {activePromotions.map((promoType) => {
+              {promotionsToShow.map((promoType: string) => {
                 if (promoType === 'vip') {
                   return (
                     <div key="vip" className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
@@ -363,16 +367,20 @@ export const ProfileListingCard = ({
               </div>
             )}
             {expiresAt && !isExpired && (
-              <div className={`flex items-center gap-1 ${
+              <div className={`flex flex-wrap items-center gap-x-1 gap-y-0.5 ${
                 isSold || isPendingModeration || isDeactivated
                   ? 'text-gray-500' 
                   : isExpiringSoon 
                   ? 'text-orange-400 font-semibold' 
                   : ''
               }`}>
-                {isPendingModeration && <Loader2 size={10} className="animate-spin text-gray-500" />}
-                <span>{t('sales.expires')}: {formatDate(expiresAt)}</span>
-                {isExpiringSoon && !isPendingModeration && !isSold && !isDeactivated && !isRejected && ` (${daysUntilExpiry} ${daysUntilExpiry === 1 ? t('profile.day') : t('profile.days')})`}
+                {isPendingModeration && <Loader2 size={10} className="animate-spin text-gray-500 flex-shrink-0" />}
+                <span className="min-w-0">{t('sales.expires')}: {formatDate(expiresAt)}</span>
+                {isExpiringSoon && !isPendingModeration && !isSold && !isDeactivated && !isRejected && daysUntilExpiry != null && (
+                  <span className="whitespace-nowrap">
+                    ({daysUntilExpiry} {daysUntilExpiry === 1 ? t('profile.day') : daysUntilExpiry <= 4 ? t('profile.days') : t('profile.daysMany')})
+                  </span>
+                )}
               </div>
             )}
             {isExpired && expiresAt && (
