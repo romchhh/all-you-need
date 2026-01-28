@@ -23,13 +23,12 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const viewerId = searchParams.get('viewerId'); // Telegram ID користувача, який переглядає
 
-    // Перевіряємо колонку currency (з кешуванням)
-    const { ensureCurrencyColumn } = await import('@/lib/prisma');
+    // Перевіряємо колонку currency та таблицю Favorite (з кешуванням)
+    const { ensureCurrencyColumn, ensureFavoriteTable } = await import('@/lib/prisma');
     const currencyColumnExists = await ensureCurrencyColumn();
+    await ensureFavoriteTable();
 
-    // Використовуємо raw SQL для уникнення проблем з форматом дати
-    const listings = await prisma.$queryRawUnsafe(
-      `SELECT 
+    const queryWithFavorites = `SELECT 
         l.id,
         l.userId,
         l.title,
@@ -54,12 +53,15 @@ export async function GET(
         u.firstName,
         u.lastName,
         u.avatar,
-        u.phone
+        u.phone,
+        COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount
       FROM Listing l
       JOIN User u ON l.userId = u.id
-      WHERE l.id = ?`,
-      listingId
-    ) as Array<{
+      WHERE l.id = ?`;
+
+    let listings: Array<any>;
+    try {
+      listings = await prisma.$queryRawUnsafe(queryWithFavorites, listingId) as Array<{
       id: number;
       userId: number;
       title: string;
@@ -84,7 +86,19 @@ export async function GET(
       lastName: string | null;
       avatar: string | null;
       phone: string | null;
+      favoritesCount?: number | bigint | string;
     }>;
+    } catch (error: any) {
+      if (error.message?.includes('no such table: Favorite') || error.message?.includes('Favorite')) {
+        listings = await prisma.$queryRawUnsafe(
+          queryWithFavorites.replace(', COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount', ''),
+          listingId
+        ) as Array<any>;
+        if (listings[0]) (listings[0] as any).favoritesCount = 0;
+      } else {
+        throw error;
+      }
+    }
 
     if (!listings || listings.length === 0) {
       return NextResponse.json(
@@ -178,6 +192,7 @@ export async function GET(
         status: listing.status || 'active',
         promotionType: listing.promotionType || null,
         promotionEnds: listing.promotionEnds || null,
+        favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
       };
 
     return NextResponse.json(formattedListing);
@@ -188,6 +203,15 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+// SQLite може повертати COUNT як number, bigint або string
+function normalizeFavoritesCount(value: number | bigint | string | undefined): number {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'string') return parseInt(value, 10) || 0;
+  return 0;
 }
 
 function formatPostedTime(date: Date): string {

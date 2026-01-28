@@ -174,7 +174,7 @@ const ListingCardColumnComponent = ({
                 }
                 
                 if (isNegotiable) {
-                  return <span className="text-white font-bold text-sm">{listing.price}</span>;
+                  return <span className="text-white font-bold text-sm truncate min-w-0 inline-block max-w-full">{t('common.negotiable')}</span>;
                 }
                 
                 return <span className="text-white font-bold text-lg">{`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}</span>;

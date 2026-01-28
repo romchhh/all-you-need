@@ -327,7 +327,7 @@ export const ProfileListingCard = ({
                 }
                 
                 if (isNegotiable) {
-                  return listing.price;
+                  return t('common.negotiable');
                 }
                 
                 return `${listing.price} ${listing.currency || '$'}`;

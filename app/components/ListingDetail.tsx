@@ -688,7 +688,7 @@ export const ListingDetail = ({
                   if (isNegotiable) {
                     return (
                       <div className="text-xl font-bold mb-1" style={{ color: '#D3F1A7' }}>
-                        {listing.price}
+                        {t('common.negotiable')}
                       </div>
                     );
                   }
@@ -1002,7 +1002,7 @@ export const ListingDetail = ({
           const priceText = listing.isFree 
             ? t('common.free') 
             : (isNegotiable 
-              ? listing.price 
+              ? t('common.negotiable') 
               : `${listing.price}${listing.currency ? getCurrencySymbol(listing.currency) : '€'}`);
           return `📦 ${listing.title} - ${priceText} в Trade Ground Marketplace`;
         })()}

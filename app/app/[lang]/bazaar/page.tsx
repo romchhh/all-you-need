@@ -417,15 +417,17 @@ const BazaarPage = () => {
       return newFavorites;
     });
 
-    // Оновлюємо лічильник лайків на картці товару
+    // Оновлюємо лічильник лайків на картці товару та в деталях (включно з власними оголошеннями)
+    const delta = isFavorite ? -1 : 1;
     setListings(prev => prev.map(listing => 
       listing.id === id 
         ? { 
             ...listing, 
-            favoritesCount: Math.max(0, (listing.favoritesCount || 0) + (isFavorite ? -1 : 1))
+            favoritesCount: Math.max(0, (listing.favoritesCount || 0) + delta)
           }
         : listing
     ));
+    setSelectedListing(prev => prev && prev.id === id ? { ...prev, favoritesCount: Math.max(0, (prev.favoritesCount ?? 0) + delta) } : prev);
 
     tg?.HapticFeedback.notificationOccurred('success');
     

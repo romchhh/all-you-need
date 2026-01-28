@@ -21,6 +21,7 @@ import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getBotBaseUrl, getBotStartLink } from '@/utils/botLinks';
 import { getProfileShareLink } from '@/utils/botLinks';
+import { getFavoritesFromStorage } from '@/utils/favorites';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { LanguageSwitcher } from '../LanguageSwitcher';
@@ -42,15 +43,26 @@ interface ProfileTabProps {
   onSelectListing?: (listing: Listing) => void;
   onCreateListing?: () => void;
   onEditModalChange?: (isOpen: boolean) => void;
+  /** Обране з батьківської сторінки (localStorage + API) — для коректного відображення isFavorite та лайків */
+  favorites?: Set<number>;
+  onToggleFavorite?: (id: number) => void;
 }
 
-export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalChange }: ProfileTabProps) => {
+export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalChange, favorites: favoritesProp, onToggleFavorite }: ProfileTabProps) => {
   const { t, language } = useLanguage();
   const categories = getCategories(t);
   const router = useRouter();
   const { profile, loading, refetch } = useUser();
   const [userListings, setUserListings] = useState<Listing[]>([]);
-  const [favorites, setFavorites] = useState<Set<number>>(new Set());
+  const [favoritesLocal, setFavoritesLocal] = useState<Set<number>>(new Set());
+  const favorites = favoritesProp ?? favoritesLocal;
+  const setFavorites = favoritesProp !== undefined ? (() => {}) : setFavoritesLocal;
+  // Якщо батьківський компонент не передав favorites — завантажуємо з localStorage
+  useEffect(() => {
+    if (favoritesProp === undefined && typeof window !== 'undefined') {
+      setFavoritesLocal(getFavoritesFromStorage());
+    }
+  }, [favoritesProp]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [isSavingListing, setIsSavingListing] = useState(false);

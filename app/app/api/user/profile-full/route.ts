@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureCurrencyColumn } from '@/lib/prisma';
 
+// SQLite може повертати COUNT як number, bigint або string
+function normalizeFavoritesCount(value: number | bigint | string | undefined): number {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'string') return parseInt(value, 10) || 0;
+  return 0;
+}
+
 /**
  * Комплексний endpoint для отримання всіх даних профілю користувача за один запит
  * Повертає: profile, stats, listings
@@ -224,7 +233,7 @@ export async function GET(request: NextRequest) {
         status: listing.status ?? 'active',
         promotionType: listing.promotionType || null,
         promotionEnds: listing.promotionEnds || null,
-        favoritesCount: typeof listing.favoritesCount === 'bigint' ? Number(listing.favoritesCount) : (listing.favoritesCount || 0),
+        favoritesCount: normalizeFavoritesCount(listing.favoritesCount),
       };
     });
 

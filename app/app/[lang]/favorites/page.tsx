@@ -379,6 +379,10 @@ const FavoritesPage = () => {
       return newFavorites;
     });
 
+    // Оновлюємо лічильник у деталях відкритого оголошення (включно з власними)
+    const delta = isFavorite ? -1 : 1;
+    setSelectedListing(prev => prev && prev.id === id ? { ...prev, favoritesCount: Math.max(0, (prev.favoritesCount ?? 0) + delta) } : prev);
+
     tg?.HapticFeedback.notificationOccurred('success');
     
     // Виконуємо операцію (localStorage + БД для статистики)
@@ -412,7 +416,7 @@ const FavoritesPage = () => {
           listing.id === id 
             ? { 
                 ...listing, 
-                favoritesCount: Math.max(0, (listing.favoritesCount || 0) + 1)
+                favoritesCount: Math.max(0, (listing.favoritesCount || 0) + delta)
               }
             : listing
         ));

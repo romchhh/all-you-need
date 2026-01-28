@@ -1093,10 +1093,17 @@ export const EditListingModal = ({
               <>
                 <div className="flex gap-2 mb-2">
                   <input
-                    type="text"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step={0.01}
                     value={price}
                     onChange={(e) => {
-                      setPrice(e.target.value);
+                      const raw = e.target.value.replace(',', '.');
+                      let numeric = raw.replace(/[^0-9.]/g, '');
+                      const parts = numeric.split('.');
+                      if (parts.length > 2) numeric = parts[0] + '.' + parts.slice(1).join('');
+                      setPrice(numeric);
                       if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                     }}
                     placeholder={t('editListing.pricePlaceholder')}

@@ -14,6 +14,15 @@ function normalizeCondition(condition: string | null): 'new' | 'used' | null {
   return 'used';
 }
 
+// SQLite може повертати COUNT як number, bigint або string
+function normalizeFavoritesCount(value: number | bigint | string | undefined): number {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'string') return parseInt(value, 10) || 0;
+  return 0;
+}
+
 // Глобальна змінна для відстеження ініціалізації таблиці Favorite
 let favoriteTableInitPromise: Promise<void> | null = null;
 
@@ -310,7 +319,7 @@ export async function GET(request: NextRequest) {
           promotionType: listing.promotionType || null,
           promotionEnds: listing.promotionEnds || null,
           expiresAt: listing.expiresAt || null,
-          favoritesCount: typeof listing.favoritesCount === 'bigint' ? Number(listing.favoritesCount) : (typeof listing.favoritesCount === 'number' ? listing.favoritesCount : (typeof (listing as any).favoritesCount === 'bigint' ? Number((listing as any).favoritesCount) : (typeof (listing as any).favoritesCount === 'number' ? (listing as any).favoritesCount : 0))),
+          favoritesCount: normalizeFavoritesCount(listing.favoritesCount),
         };
       });
       total = Number(totalCount[0]?.count || 0);
@@ -574,7 +583,7 @@ export async function GET(request: NextRequest) {
                promotionType: listing.promotionType || null,
                promotionEnds: listing.promotionEnds || null,
                expiresAt: listing.expiresAt || null,
-               favoritesCount: typeof (listing as any).favoritesCount === 'bigint' ? Number((listing as any).favoritesCount) : ((listing as any).favoritesCount || 0),
+               favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
              };
     });
 

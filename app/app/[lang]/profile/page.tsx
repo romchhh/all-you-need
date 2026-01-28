@@ -64,6 +64,7 @@ const ProfilePage = () => {
   const lastViewedListingIdKey = 'profileLastViewedListingId';
   const isReturningFromListing = useRef(false);
   const hasScrolledOnThisMount = useRef(false);
+  const didToggleFavoriteOnCurrentListing = useRef(false);
   
   // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {
@@ -119,7 +120,7 @@ const ProfilePage = () => {
   const toggleFavorite = async (id: number) => {
     const isFavorite = favorites.has(id);
     
-    // Оптимістичне оновлення UI
+    // Оптимістичне оновлення UI (обране + лічильник лайків на поточному оголошенні)
     setFavorites(prev => {
       const newFavorites = new Set(prev);
       if (isFavorite) {
@@ -129,10 +130,16 @@ const ProfilePage = () => {
       }
       return newFavorites;
     });
+    setSelectedListing(prev => {
+      if (!prev || prev.id !== id) return prev;
+      didToggleFavoriteOnCurrentListing.current = true;
+      const delta = isFavorite ? -1 : 1;
+      return { ...prev, favoritesCount: Math.max(0, (prev.favoritesCount ?? 0) + delta) };
+    });
 
     tg?.HapticFeedback.notificationOccurred('success');
     
-    // Виконуємо операцію (localStorage + БД для статистики)
+    // Виконуємо операцію (localStorage + БД для статистики, включно з власними оголошеннями)
     if (isFavorite) {
       await removeFavoriteFromStorage(id, profile?.telegramId);
       showToast(t('listing.removeFromFavorites'), 'success');
@@ -349,6 +356,10 @@ const ProfilePage = () => {
           listing={selectedListing}
           isFavorite={favorites.has(selectedListing.id)}
           onClose={() => {
+            if (didToggleFavoriteOnCurrentListing.current) {
+              setRefreshKey(prev => prev + 1);
+              didToggleFavoriteOnCurrentListing.current = false;
+            }
             // Встановлюємо прапорець, що користувач повертається з товару
             isReturningFromListing.current = true;
             hasScrolledOnThisMount.current = false;
@@ -364,6 +375,10 @@ const ProfilePage = () => {
             setSelectedListing(null);
           }}
           onBack={() => {
+            if (didToggleFavoriteOnCurrentListing.current) {
+              setRefreshKey(prev => prev + 1);
+              didToggleFavoriteOnCurrentListing.current = false;
+            }
             // Встановлюємо прапорець, що користувач повертається з товару
             isReturningFromListing.current = true;
             hasScrolledOnThisMount.current = false;
@@ -410,7 +425,9 @@ const ProfilePage = () => {
           setSelectedListing(listing);
         }} 
         onCreateListing={() => setIsCreateListingModalOpen(true)} 
-        onEditModalChange={setIsEditModalOpen} 
+        onEditModalChange={setIsEditModalOpen}
+        favorites={favorites}
+        onToggleFavorite={toggleFavorite}
       />
     );
   };
