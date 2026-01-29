@@ -15,6 +15,7 @@ from database_functions.telegram_listing_db import (
     update_telegram_listing_moderation_status,
     get_connection as get_db_connection
 )
+from keyboards.client_keyboards import get_category_translation
 from utils.translations import t
 
 load_dotenv()
@@ -659,10 +660,12 @@ class ModerationManager:
             subcategory = listing.get('subcategory')
             condition = listing.get('condition', '')
             location = listing.get('location', '')
-            
-            category_text = category
+
+            # Назва категорії та хештег — однією мовою (мова продавця)
+            category_text = get_category_translation(user_id_for_lang, category)
             if subcategory:
                 category_text += f" / {subcategory}"
+            hashtag_category = get_category_translation(user_id_for_lang, category)
             
             # Використовуємо переклади для condition
             condition_map = {
@@ -743,7 +746,7 @@ class ModerationManager:
 {t(user_id_for_lang, 'listing.details.location_channel')} {location}
 {seller_text}
 
-{t(user_id_for_lang, 'listing.details.hashtag')} #{category.replace(' ', '')}"""
+{t(user_id_for_lang, 'listing.details.hashtag')} #{hashtag_category.replace(' ', '').replace('/', '_')}"""
             
             images = listing.get('images', [])
             if isinstance(images, str):

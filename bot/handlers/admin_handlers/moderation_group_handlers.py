@@ -1,4 +1,7 @@
+import json
 import os
+from datetime import datetime, timedelta
+
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -7,7 +10,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from main import bot
 from utils.filters import IsAdmin
 from utils.moderation_manager import ModerationManager
-from utils.translations import t
+from utils.translations import t, get_user_lang
 from database_functions.telegram_listing_db import get_telegram_listing_by_id
 from database_functions.prisma_db import PrismaDB
 
@@ -191,17 +194,16 @@ async def send_approval_notification(
     source: str,
     listing_id: int
 ):
-    """Надсилає повідомлення користувачу про схвалення оголошення"""
+    """Надсилає повідомлення користувачу про схвалення оголошення (мова — з БД користувача)."""
     try:
-        title = listing_data.get('title', 'Оголошення')
+        title = listing_data.get('title', '')
+        if not title:
+            title = t(telegram_id, 'my_listings.listing_default_title')
         webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
         channel_id = os.getenv('TRADE_CHANNEL_ID')
-        
+        user_lang = get_user_lang(telegram_id)
+
         if source == 'telegram':
-            # Отримуємо channel_message_id та дату публікації з БД
-            from database_functions.telegram_listing_db import get_telegram_listing_by_id
-            from datetime import datetime, timedelta
-            import json
             listing = get_telegram_listing_by_id(listing_id)
             channel_message_id_raw = listing.get('channelMessageId') if listing else None
             if channel_message_id_raw and isinstance(channel_message_id_raw, str) and channel_message_id_raw.strip().startswith('['):
@@ -213,8 +215,7 @@ async def send_approval_notification(
             else:
                 channel_message_id = channel_message_id_raw
             published_at = listing.get('publishedAt') if listing else None
-            
-            # Форматуємо дату закінчення (опубліковано до)
+
             expires_date_text = ""
             if published_at:
                 try:
@@ -222,65 +223,53 @@ async def send_approval_notification(
                         published_date = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
                     else:
                         published_date = published_at
-                    # Оголошення активне 30 днів
                     expires_date = published_date + timedelta(days=30)
-                    expires_date_text = f"\n📅 Опубліковано до: {expires_date.strftime('%d.%m.%Y')}"
-                except:
+                    expires_date_text = t(telegram_id, 'my_listings.approval_expires_telegram', date=expires_date.strftime('%d.%m.%Y'))
+                except Exception:
                     pass
-            
-            message_text = f"""✅ <b>Оголошення схвалено!</b>
 
-Ваше оголошення "<b>{title}</b>" пройшло модерацію та опубліковане в каналі.{expires_date_text}
+            msg_title = t(telegram_id, 'my_listings.approval_title')
+            msg_body = t(telegram_id, 'my_listings.approval_body_telegram', title=title)
+            msg_thanks = t(telegram_id, 'my_listings.approval_thanks')
+            message_text = f"{msg_title}\n\n{msg_body}{expires_date_text}\n\n{msg_thanks}"
 
-Дякуємо за використання нашого сервісу!"""
-            
-            # Створюємо inline кнопку з посиланням на оголошення в каналі
             keyboard_buttons = []
             if channel_id and channel_message_id:
-                # Формуємо посилання на повідомлення в каналі
                 channel_username = os.getenv('TRADE_CHANNEL_USERNAME', '')
                 if channel_username:
-                    # Якщо є username каналу
                     channel_link = f"https://t.me/{channel_username}/{channel_message_id}"
                 else:
-                    # Якщо немає username, використовуємо ID
                     channel_link = f"https://t.me/c/{str(channel_id)[4:]}/{channel_message_id}"
-                
                 keyboard_buttons.append([InlineKeyboardButton(
-                    text="🔗 Переглянути оголошення",
+                    text=t(telegram_id, 'my_listings.view_listing_button'),
                     url=channel_link
                 )])
             else:
-                # Якщо немає посилання на канал, даємо посилання на профіль
-                webapp_url_with_params = f"{webapp_url}/uk/profile?telegramId={telegram_id}"
+                webapp_url_with_params = f"{webapp_url}/{user_lang}/profile?telegramId={telegram_id}"
                 keyboard_buttons.append([InlineKeyboardButton(
-                    text="🔗 Переглянути профіль",
+                    text=t(telegram_id, 'my_listings.view_profile_button'),
                     web_app=WebAppInfo(url=webapp_url_with_params)
                 )])
-            
+
             keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
         else:
-            from datetime import datetime, timedelta
             expires_at = datetime.now() + timedelta(days=30)
-            expires_date = expires_at.strftime("%d.%m.%Y")
-            
-            message_text = f"""✅ <b>Оголошення схвалено!</b>
+            expires_date_str = expires_at.strftime("%d.%m.%Y")
 
-Ваше оголошення "<b>{title}</b>" пройшло модерацію та опубліковано.
+            msg_title = t(telegram_id, 'my_listings.approval_title')
+            msg_body = t(telegram_id, 'my_listings.approval_body_marketplace', title=title)
+            msg_expires = t(telegram_id, 'my_listings.approval_expires_marketplace', date=expires_date_str)
+            msg_active = t(telegram_id, 'my_listings.approval_active_days')
+            message_text = f"{msg_title}\n\n{msg_body}{msg_expires}\n\n{msg_active}"
 
-📅 Термін дії: до {expires_date}
-
-Ваше оголошення буде активним протягом 30 днів."""
-            
-            # Для маркетплейсу посилання на оголошення
-            webapp_url_with_params = f"{webapp_url}/uk/bazaar?listing={listing_id}&telegramId={telegram_id}"
+            webapp_url_with_params = f"{webapp_url}/{user_lang}/bazaar?listing={listing_id}&telegramId={telegram_id}"
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
-                    text="🔗 Переглянути оголошення",
+                    text=t(telegram_id, 'my_listings.view_listing_button'),
                     web_app=WebAppInfo(url=webapp_url_with_params)
                 )]
             ])
-        
+
         await bot.send_message(
             chat_id=telegram_id,
             text=message_text,
