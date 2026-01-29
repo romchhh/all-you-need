@@ -289,39 +289,53 @@ async def send_rejection_notification(
     source: str,
     refund_info: dict = None
 ):
-    """Надсилає повідомлення користувачу про відхилення оголошення"""
+    """Надсилає повідомлення користувачу про відхилення оголошення (мова — з БД користувача)."""
     try:
         title = listing_data.get('title', 'Оголошення')
-        
-        # Формуємо інформацію про повернення коштів
+        title_placeholder = title  # для перекладу "Оголошення" можна додати ключ, поки використовуємо як є
+
+        # Формуємо інформацію про повернення коштів (переклади за мовою користувача)
         refund_parts = []
         if refund_info:
             if refund_info.get('refundedPackage'):
-                refund_parts.append('• Повернено 1 пакет оголошення')
+                refund_parts.append(t(telegram_id, 'my_listings.rejection_notification_refund_package'))
             if refund_info.get('refundedPromotions') and refund_info.get('promotionRefundAmount'):
                 amount = refund_info.get('promotionRefundAmount', 0)
                 if amount > 0:
-                    refund_parts.append(f"• Повернено кошти за рекламу: <b>{amount:.2f} EUR</b> на баланс")
-        
-        refund_text = ""
-        if refund_parts:
-            refund_text = f"\n\n💰 <b>Повернення коштів:</b>\n" + "\n".join(refund_parts)
-        elif not refund_info or (not refund_info.get('refundedPackage') and not refund_info.get('refundedPromotions')):
-            refund_text = "\n\n💰 <b>Повернення коштів:</b>\n• Не було списано коштів (перше безкоштовне оголошення)"
-        
-        message_text = f"""❌ <b>Оголошення відхилено</b>
+                    refund_parts.append(t(telegram_id, 'my_listings.rejection_notification_refund_promotion', amount=amount))
+        if not refund_parts:
+            refund_parts.append(t(telegram_id, 'my_listings.rejection_notification_refund_none'))
 
-Ваше оголошення "<b>{title}</b>" не пройшло модерацію.
+        refund_title = t(telegram_id, 'my_listings.rejection_notification_refund_title')
+        refund_text = f"\n\n{refund_title}\n" + "\n".join(refund_parts)
 
-📝 <b>Причина відхилення:</b>
+        msg_title = t(telegram_id, 'my_listings.rejection_notification_title')
+        msg_body = t(telegram_id, 'my_listings.rejection_notification_body', title=title_placeholder)
+        reason_label = t(telegram_id, 'my_listings.rejection_reason')
+        edit_hint = t(telegram_id, 'my_listings.rejection_notification_edit_hint')
+
+        message_text = f"""{msg_title}
+
+{msg_body}
+
+{reason_label}
 {reason}{refund_text}
 
-✏️ Ви можете <b>відредагувати</b> це оголошення з урахуванням зауважень модератора та подати його на модерацію знову."""
-        
+{edit_hint}"""
+
+        listing_id = listing_data.get('id')
+        keyboard = None
+        if listing_id is not None:
+            edit_btn_text = t(telegram_id, 'my_listings.edit_button')
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=edit_btn_text, callback_data=f"edit_rejected_listing_{listing_id}")]
+            ])
+
         await bot.send_message(
             chat_id=telegram_id,
             text=message_text,
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=keyboard
         )
     except Exception as e:
         print(f"Помилка надсилання повідомлення про відхилення: {e}")

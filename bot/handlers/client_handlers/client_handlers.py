@@ -17,7 +17,7 @@ from keyboards.client_keyboards import get_catalog_webapp_keyboard, get_language
 from database_functions.referral_db import get_referral_stats, create_referral_table
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from utils.monopay_functions import check_pending_payments
-from utils.cron_functions import deactivate_old_telegram_listings
+from utils.cron_functions import run_scheduled_tasks
 from main import scheduler
 
 load_dotenv()
@@ -57,23 +57,23 @@ async def scheduler_jobs():
         import traceback
         traceback.print_exc()
     
-    # Додаємо job для деактивації старих оголошень (щодня о 00:00)
+    # Job для деактивації старих оголошень (канал + маркетплейс) та повідомлень користувачам
     try:
-        deactivate_job_id = 'deactivate_old_telegram_listings'
+        deactivate_job_id = 'deactivate_old_listings_and_notify'
         existing_deactivate_job = scheduler.get_job(deactivate_job_id)
         
         if existing_deactivate_job:
             scheduler.remove_job(deactivate_job_id)
         
         scheduler.add_job(
-            deactivate_old_telegram_listings,
+            run_scheduled_tasks,
             'cron',
-            hour=0,
-            minute=0,
+            hour=14,
+            minute=51,
             id=deactivate_job_id,
             replace_existing=True
         )
-        print(f"✅ Scheduler job '{deactivate_job_id}' додано (щодня о 00:00)")
+        print(f"✅ Scheduler job '{deactivate_job_id}' додано (деактивація канал + маркетплейс, повідомлення в бот)")
     except Exception as e:
         print(f"❌ Помилка додавання job '{deactivate_job_id}': {e}")
         import traceback

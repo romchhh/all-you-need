@@ -41,6 +41,160 @@ router = Router()
 MAX_PHOTOS = 10
 MAX_TITLE_LENGTH = 100
 MAX_DESCRIPTION_LENGTH = 600
+LISTINGS_PER_PAGE = 8
+
+
+def _format_listing_date(listing: dict) -> str:
+    """Повертає коротку дату/час для кнопки: dd.mm.yy HH:mm з publishedAt або createdAt."""
+    dt = None
+    published_at = listing.get('publishedAt') or listing.get('published_at')
+    created_at = listing.get('createdAt') or listing.get('created_at')
+    value = published_at if published_at else created_at
+    if not value:
+        return ""
+    try:
+        if isinstance(value, str):
+            try:
+                dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except ValueError:
+                try:
+                    dt = datetime.fromisoformat(value)
+                except ValueError:
+                    if ' ' in value:
+                        parts = value.split(' ')
+                        date_part = parts[0]
+                        time_part = parts[1].split('.')[0]
+                        dt = datetime.strptime(f"{date_part} {time_part}", "%Y-%m-%d %H:%M:%S")
+        elif hasattr(value, 'strftime'):
+            dt = value
+        if dt:
+            if dt.tzinfo:
+                dt = dt.astimezone(ZoneInfo('Europe/Berlin'))
+            else:
+                dt = dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('Europe/Berlin'))
+            return dt.strftime("%d.%m.%y %H:%M")
+    except Exception:
+        pass
+    return ""
+
+
+def _format_created_display(value) -> str:
+    """Повертає дату для відображення «Создано»: dd.mm.yyyy HH:mm. Приймає str або datetime."""
+    if not value:
+        return ""
+    dt = None
+    try:
+        if hasattr(value, 'strftime'):
+            dt = value
+        elif isinstance(value, str):
+            s = value.strip()
+            try:
+                dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                try:
+                    dt = datetime.strptime(s.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    if ' ' in s:
+                        parts = s.split(' ', 1)
+                        time_part = parts[1].split('.')[0][:8]
+                        dt = datetime.strptime(f"{parts[0]} {time_part}", "%Y-%m-%d %H:%M:%S")
+        if dt:
+            if getattr(dt, 'tzinfo', None):
+                dt = dt.astimezone(ZoneInfo('Europe/Berlin'))
+            else:
+                dt = dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('Europe/Berlin'))
+            return dt.strftime("%d.%m.%Y %H:%M")
+    except Exception:
+        pass
+    return ""
+
+
+def _count_listing_stats(listings: list) -> dict:
+    """Підраховує кількість по статусах: active, sold, moderation, inactive."""
+    active = sold = moderation = inactive = 0
+    for listing in listings:
+        status = (listing.get('status') or '').lower()
+        if status in ('published', 'approved'):
+            active += 1
+        elif status == 'sold':
+            sold += 1
+        elif status == 'pending_moderation':
+            moderation += 1
+        elif status in ('rejected', 'expired'):
+            inactive += 1
+        else:
+            inactive += 1
+    return {"active": active, "sold": sold, "moderation": moderation, "inactive": inactive}
+
+
+def _build_my_listings_page(user_id: int, listings: list, page: int):
+    """Повертає (текст повідомлення, клавіатура) для сторінки списку оголошень."""
+    total = len(listings)
+    total_pages = max(1, (total + LISTINGS_PER_PAGE - 1) // LISTINGS_PER_PAGE)
+    page = max(0, min(page, total_pages - 1))
+    start = page * LISTINGS_PER_PAGE
+    end = min(start + LISTINGS_PER_PAGE, total)
+    page_listings = listings[start:end]
+
+    stats = _count_listing_stats(listings)
+
+    keyboard_buttons = []
+    for listing in page_listings:
+        title = listing.get('title', t(user_id, 'moderation.no_title'))
+        status = listing.get('status', 'pending')
+        status_emoji = {
+            'pending_moderation': '⏳',
+            'approved': '✅',
+            'rejected': '❌',
+            'published': '📢',
+            'expired': '🕐',
+            'sold': '💰'
+        }.get(status, '📦')
+        date_str = _format_listing_date(listing)
+        if date_str:
+            suffix = f"  •  {date_str}"
+            max_title_len = 18
+            title_part = (title[:max_title_len] + '...') if len(title) > max_title_len else title
+            button_text = f"{status_emoji} {title_part}{suffix}"
+        else:
+            button_text = f"{status_emoji} {title[:30]}{'...' if len(title) > 30 else ''}"
+        keyboard_buttons.append([
+            InlineKeyboardButton(
+                text=button_text,
+                callback_data=f"view_telegram_listing_{listing['id']}_{page}"
+            )
+        ])
+
+    if total_pages > 1:
+        nav_row = []
+        if page > 0:
+            nav_row.append(InlineKeyboardButton(
+                text=t(user_id, 'my_listings.prev_page'),
+                callback_data=f"my_listings_page_{page - 1}"
+            ))
+        nav_row.append(InlineKeyboardButton(
+            text=f"{page + 1} / {total_pages}",
+            callback_data="my_listings_noop"
+        ))
+        if page < total_pages - 1:
+            nav_row.append(InlineKeyboardButton(
+                text=t(user_id, 'my_listings.next_page'),
+                callback_data=f"my_listings_page_{page + 1}"
+            ))
+        keyboard_buttons.append(nav_row)
+
+    if total_pages > 1:
+        header = t(user_id, 'my_listings.title_page', count=total, page=page + 1, total_pages=total_pages)
+    else:
+        header = t(user_id, 'my_listings.title', count=total)
+    stats_line = t(
+        user_id, 'my_listings.stats_line',
+        active=stats['active'], sold=stats['sold'],
+        moderation=stats['moderation'], inactive=stats['inactive']
+    )
+    text = f"{header}\n\n{stats_line}"
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    return text, keyboard
 
 
 @router.message(F.text.in_([
@@ -1300,50 +1454,33 @@ async def cancel_listing(message: types.Message, state: FSMContext):
 ]))
 async def show_my_listings(message: types.Message):
     user_id = message.from_user.id
-    
+
     listings = get_user_telegram_listings(user_id)
-    
+
     if not listings:
         await message.answer(
             t(user_id, 'my_listings.empty'),
             parse_mode="HTML"
         )
         return
-    
-    keyboard_buttons = []
-    for listing in listings:
-        title = listing.get('title', t(user_id, 'moderation.no_title'))
-        status = listing.get('status', 'pending')
-        status_emoji = {
-            'pending_moderation': '⏳',
-            'approved': '✅',
-            'rejected': '❌',
-            'published': '📢'
-        }.get(status, '📦')
-        
-        button_text = f"{status_emoji} {title[:30]}{'...' if len(title) > 30 else ''}"
-        keyboard_buttons.append([
-            InlineKeyboardButton(
-                text=button_text,
-                callback_data=f"view_telegram_listing_{listing['id']}"
-            )
-        ])
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-    
-    await message.answer(
-        t(user_id, 'my_listings.title', count=len(listings)),
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
+
+    text, keyboard = _build_my_listings_page(user_id, listings, 0)
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "my_listings_noop")
+async def my_listings_noop(callback: types.CallbackQuery):
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("view_telegram_listing_"))
 async def view_telegram_listing(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    
+    parts = callback.data.split("_")
+    listing_id = int(parts[3])
+    current_page = int(parts[4]) if len(parts) > 4 else 0
+
     try:
-        listing_id = int(callback.data.split("_")[-1])
         listing = get_telegram_listing_by_id(listing_id)
         
         if not listing:
@@ -1369,7 +1506,8 @@ async def view_telegram_listing(callback: types.CallbackQuery):
             'pending_moderation': t(user_id, 'listing.status.pending_moderation'),
             'approved': t(user_id, 'listing.status.approved'),
             'rejected': t(user_id, 'listing.status.rejected'),
-            'published': t(user_id, 'listing.status.published')
+            'published': t(user_id, 'listing.status.published'),
+            'expired': t(user_id, 'listing.status.expired')
         }
         status_text = status_translations.get(status, status)
         
@@ -1386,40 +1524,14 @@ async def view_telegram_listing(callback: types.CallbackQuery):
             rejection_reason = listing.get('rejectionReason') or listing.get('rejection_reason') or ''
             if rejection_reason:
                 message_text += f"\n{t(user_id, 'my_listings.rejection_reason')}\n{rejection_reason}\n"
-        if created_at:
-            try:
-                dt = None
-                if isinstance(created_at, str):
-                    try:
-                        dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                    except:
-                        try:
-                            dt = datetime.fromisoformat(created_at)
-                        except:
-                            if ' ' in created_at:
-                                parts = created_at.split(' ')
-                                date_part = parts[0]
-                                time_part = parts[1].split('.')[0]
-                                dt = datetime.strptime(f"{date_part} {time_part}", "%Y-%m-%d %H:%M:%S")
-                                dt = dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('Europe/Berlin'))
-                elif hasattr(created_at, 'strftime'):
-                    dt = created_at
-                if dt:
-                    if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('Europe/Berlin'))
-                    else:
-                        dt = dt.astimezone(ZoneInfo('Europe/Berlin'))
-                    formatted_date = dt.strftime("%d.%m.%Y %H:%M")
-                    message_text += f"{t(user_id, 'listing.details.created')} {formatted_date}\n"
-                else:
-                    message_text += f"{t(user_id, 'listing.details.created')} {created_at}\n"
-            except Exception:
-                message_text += f"{t(user_id, 'listing.details.created')} {created_at}\n"
+        formatted_created = _format_created_display(created_at)
+        if formatted_created:
+            message_text += f"{t(user_id, 'listing.details.created')} {formatted_created}\n"
         
         keyboard_buttons = []
         
         channel_message_id = listing.get('channelMessageId') or listing.get('channel_message_id')
-        if channel_message_id and channel_message_id != 'None' and str(channel_message_id).strip():
+        if channel_message_id and channel_message_id != 'None' and str(channel_message_id).strip() and status != 'expired':
             channel_id = os.getenv('TRADE_CHANNEL_ID', '')
             channel_username = os.getenv('TRADE_CHANNEL_USERNAME', '')
             
@@ -1518,11 +1630,23 @@ async def view_telegram_listing(callback: types.CallbackQuery):
                     callback_data=f"confirm_delete_{listing_id}"
                 )
             ])
+        # Для закінчених за терміном (деактивованих) — редагувати та подати знову або видалити
+        if status == 'expired':
+            keyboard_buttons.append([
+                InlineKeyboardButton(
+                    text=t(user_id, 'my_listings.edit_button'),
+                    callback_data=f"edit_rejected_listing_{listing_id}"
+                ),
+                InlineKeyboardButton(
+                    text=t(user_id, 'my_listings.delete_button'),
+                    callback_data=f"confirm_delete_{listing_id}"
+                )
+            ])
         
         keyboard_buttons.append([
             InlineKeyboardButton(
                 text=t(user_id, 'my_listings.back_to_list'),
-                callback_data="back_to_my_listings"
+                callback_data=f"back_to_my_listings_{current_page}"
             )
         ])
         
@@ -1588,7 +1712,7 @@ async def edit_rejected_listing(callback: types.CallbackQuery, state: FSMContext
         if not listing or listing.get('sellerTelegramId') != user_id:
             await callback.answer(t(user_id, 'my_listings.listing_not_found'), show_alert=True)
             return
-        if listing.get('status') != 'rejected':
+        if listing.get('status') not in ('rejected', 'expired'):
             await callback.answer(t(user_id, 'my_listings.not_rejected'), show_alert=True)
             return
         price_val = listing.get('priceDisplay') or listing.get('price')
@@ -2316,54 +2440,92 @@ async def process_payment_card(callback: types.CallbackQuery, state: FSMContext)
     await callback.answer()
 
 
-@router.callback_query(F.data == "back_to_my_listings")
+def _parse_my_listings_page(callback_data: str) -> int:
+    """Парсить номер сторінки з callback_data: back_to_my_listings або back_to_my_listings_1."""
+    if callback_data == "back_to_my_listings":
+        return 0
+    if callback_data.startswith("back_to_my_listings_"):
+        try:
+            return int(callback_data.split("_")[-1])
+        except (ValueError, IndexError):
+            return 0
+    return 0
+
+
+@router.callback_query(F.data.startswith("back_to_my_listings"))
 async def back_to_my_listings(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    
+    page = _parse_my_listings_page(callback.data)
+
     listings = get_user_telegram_listings(user_id)
-    
+
     if not listings:
-        await callback.message.edit_text(
-            t(user_id, 'my_listings.empty'),
-            parse_mode="HTML"
-        )
+        try:
+            await callback.message.edit_text(
+                t(user_id, 'my_listings.empty'),
+                parse_mode="HTML"
+            )
+        except Exception:
+            await callback.message.answer(
+                t(user_id, 'my_listings.empty'),
+                parse_mode="HTML"
+            )
         await callback.answer()
         return
 
-    keyboard_buttons = []
-    for listing in listings:
-        title = listing.get('title', t(user_id, 'moderation.no_title'))
-        status = listing.get('status', 'pending')
-        status_emoji = {
-            'pending_moderation': '⏳',
-            'approved': '✅',
-            'rejected': '❌',
-            'published': '📢'
-        }.get(status, '📦')
-        
-        button_text = f"{status_emoji} {title[:30]}{'...' if len(title) > 30 else ''}"
-        keyboard_buttons.append([
-            InlineKeyboardButton(
-                text=button_text,
-                callback_data=f"view_telegram_listing_{listing['id']}"
-            )
-        ])
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-    
+    text, keyboard = _build_my_listings_page(user_id, listings, page)
     try:
         await callback.message.edit_text(
-            t(user_id, 'my_listings.title', count=len(listings)),
+            text,
             reply_markup=keyboard,
             parse_mode="HTML"
         )
-    except:
+    except Exception:
         await callback.message.answer(
-            t(user_id, 'my_listings.title', count=len(listings)),
+            text,
             reply_markup=keyboard,
             parse_mode="HTML"
         )
-    
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("my_listings_page_"))
+async def my_listings_page(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    try:
+        page = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        page = 0
+
+    listings = get_user_telegram_listings(user_id)
+    if not listings:
+        try:
+            await callback.message.edit_text(
+                t(user_id, 'my_listings.empty'),
+                parse_mode="HTML"
+            )
+        except Exception:
+            await callback.message.answer(
+                t(user_id, 'my_listings.empty'),
+                parse_mode="HTML"
+            )
+        await callback.answer()
+        return
+
+    text, keyboard = _build_my_listings_page(user_id, listings, page)
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+    except Exception:
+        await callback.message.answer(
+            text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
     await callback.answer()
 
 

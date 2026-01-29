@@ -43,20 +43,14 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
   const [translations, setTranslations] = useState<Record<string, any>>({});
   const [isLoadingLanguage, setIsLoadingLanguage] = useState(false);
 
-  // Завантажуємо мову з БД при ініціалізації якщо є telegramId
+  // Завжди беремо мову з БД (джерело правди — бот/профіль користувача)
   useEffect(() => {
     const loadLanguageFromDB = async () => {
       if (typeof window === 'undefined') return;
-      
-      // Перевіряємо глобальну змінну для telegramId
       const telegramId = userTelegramId || (window as any).__userTelegramId;
-      
-      // Також перевіряємо URL параметри
       const urlParams = new URLSearchParams(window.location.search);
       const telegramIdFromUrl = urlParams.get('telegramId');
-      
       const finalTelegramId = telegramId || telegramIdFromUrl;
-      
       if (finalTelegramId) {
         setIsLoadingLanguage(true);
         try {
@@ -76,12 +70,11 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
       }
     };
 
-    // Затримка для того, щоб профіль встиг завантажитися
-    const timer = setTimeout(() => {
-      loadLanguageFromDB();
-    }, 1000);
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const hasTelegramIdInUrl = urlParams?.get('telegramId');
+    const delay = hasTelegramIdInUrl ? 100 : 1000;
+    const timer = setTimeout(loadLanguageFromDB, delay);
 
-    // Також слухаємо зміни глобальної змінної
     const checkInterval = setInterval(() => {
       if ((window as any).__userTelegramId && !userTelegramId) {
         loadLanguageFromDB();

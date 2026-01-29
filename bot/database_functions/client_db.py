@@ -155,6 +155,25 @@ def get_username_by_user_id(user_id: str):
     return result[0] if result else None
 
 
+def update_user_username(user_id: str, username: str | None):
+    """Оновлює username користувача в User та users_legacy (при зміні нікнейму в Telegram)."""
+    current_date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    username_val = username if username else None
+    try:
+        cursor.execute(
+            "UPDATE User SET username = ?, updatedAt = ? WHERE telegramId = ?",
+            (username_val, current_date_str, int(user_id))
+        )
+        conn.commit()
+        cursor.execute(
+            "UPDATE users_legacy SET user_name = ? WHERE user_id = ?",
+            (username_val or '', str(user_id))
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Error updating username for user {user_id}: {e}")
+
+
 def get_user_avatar(user_id: str):
     cursor.execute("SELECT avatar FROM User WHERE telegramId = ?", (int(user_id),))
     result = cursor.fetchone()

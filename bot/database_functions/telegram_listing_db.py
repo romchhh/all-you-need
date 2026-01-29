@@ -241,6 +241,10 @@ def update_telegram_listing(
     """Оновлює оголошення (для повторної модерації після відхилення)"""
     conn = get_connection()
     cursor = conn.cursor()
+    try:
+        price = float(price) if price is not None else 0.0
+    except (TypeError, ValueError):
+        price = 0.0
     images_json = json.dumps(images)
     if price_display is None:
         price_display = str(price) if price > 0 else None

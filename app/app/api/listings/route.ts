@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { trackUserActivity } from '@/utils/trackActivity';
+import { executeInClause } from '@/utils/dbHelpers';
 
 // Відключаємо кешування для API route
 export const dynamic = 'force-dynamic';
@@ -154,15 +155,15 @@ export async function GET(request: NextRequest) {
       const queryParams: any[] = [parseInt(userId)];
       
       if (!isOwnProfile) {
-        whereClause += " AND l.status != 'sold' AND l.status != 'hidden' AND l.status != 'deactivated' AND l.status != 'rejected'";
+        whereClause += " AND l.status != 'sold' AND l.status != 'hidden' AND l.status != 'deactivated' AND l.status != 'rejected' AND l.status != 'expired'";
       }
       // Додаємо фільтр за статусом, якщо він вказаний
       if (status && status !== 'all') {
-        // Підтримка обох варіантів для сумісності
+        // Підтримка обох варіантів для сумісності; деактивовані = вручну деактивовані + закінчені за терміном (expired)
         if (status === 'deactivated') {
-          whereClause += " AND (l.status = 'deactivated' OR l.status = 'hidden')";
+          whereClause += " AND (l.status = 'deactivated' OR l.status = 'hidden' OR l.status = 'expired')";
         } else if (status === 'hidden') {
-          whereClause += " AND (l.status = 'deactivated' OR l.status = 'hidden')";
+          whereClause += " AND (l.status = 'deactivated' OR l.status = 'hidden' OR l.status = 'expired')";
         } else {
           whereClause += " AND l.status = ?";
           queryParams.push(status);
@@ -281,12 +282,40 @@ export async function GET(request: NextRequest) {
         ...countParams
       ) as Array<{ count: bigint }>;
 
+      // Оголошення з минулим expiresAt — оновлюємо статус в БД на expired і повертаємо як expired
+      const now = Date.now();
+      const expiredIds: number[] = [];
+      for (const listing of userListings) {
+        const s = listing.status ?? 'active';
+        if (s !== 'active' || !listing.expiresAt) continue;
+        try {
+          const expTime = new Date(listing.expiresAt).getTime();
+          if (!Number.isNaN(expTime) && expTime <= now) expiredIds.push(listing.id);
+        } catch (_) {}
+      }
+      if (expiredIds.length > 0) {
+        try {
+          await executeInClause(
+            `UPDATE Listing SET status = 'expired', updatedAt = datetime('now') WHERE id IN (?)`,
+            expiredIds
+          );
+        } catch (e) {
+          console.error('[Listings API] Error updating expired listings:', e);
+        }
+      }
+
       // Форматуємо дані для профілю користувача
       listings = userListings.map((listing: any) => {
         const images = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
         const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
         const createdAt = listing.createdAt instanceof Date ? listing.createdAt : new Date(listing.createdAt);
-        
+        let status = listing.status ?? 'active';
+        if (status === 'active' && listing.expiresAt) {
+          try {
+            const expTime = new Date(listing.expiresAt).getTime();
+            if (!Number.isNaN(expTime) && expTime <= now) status = 'expired';
+          } catch (_) {}
+        }
         return {
           id: listing.id,
           title: listing.title,
@@ -313,7 +342,7 @@ export async function GET(request: NextRequest) {
           condition: normalizeCondition(listing.condition),
           tags: tags,
           isFree: listing.isFree === 1 || listing.isFree === true,
-          status: listing.status ?? 'active',
+          status,
           moderationStatus: listing.moderationStatus || null,
           rejectionReason: listing.rejectionReason || null,
           promotionType: listing.promotionType || null,

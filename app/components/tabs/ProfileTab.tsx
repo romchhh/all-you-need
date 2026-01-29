@@ -832,7 +832,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                         listing={{ ...listing, favoritesCount: listing.favoritesCount || 0 }}
                         isFavorite={favorites.has(listing.id)}
                         isSold={isSold}
-                        isDeactivated={isDeactivated}
+                        isDeactivated={isDeactivated || isExpired}
                         onSelect={(selectedListing) => {
                           if (onSelectListing) {
                             // Завантажуємо повну інформацію про товар

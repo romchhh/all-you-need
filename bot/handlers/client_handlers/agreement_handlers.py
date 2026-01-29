@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from main import bot
 from config import bot_username
-from database_functions.client_db import check_user, add_user, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar, update_user_activity
+from database_functions.client_db import check_user, add_user, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar, update_user_activity, get_username_by_user_id, update_user_username
 from database_functions.create_dbs import create_dbs
 from database_functions.links_db import increment_link_count
 from database_functions.prisma_db import PrismaDB
@@ -81,6 +81,13 @@ async def start_command(message: types.Message):
     
     update_user_activity(str(user_id))
     
+    # Синхронізація username: якщо користувач змінив нікнейм в Telegram — оновлюємо в БД
+    if user_exists:
+        db_username = get_username_by_user_id(user_id)
+        current_username = username if username else None
+        if (db_username or None) != (current_username or None):
+            update_user_username(user_id, username)
+    
     # Перевіряємо чи користувач вже погодився з офертою
     has_agreed = get_user_agreement_status(user_id)
     
@@ -149,6 +156,10 @@ async def start_command(message: types.Message):
     add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
     
     update_user_activity(str(user_id))
+    
+    # Якщо у користувача немає username — нагадуємо налаштувати для прийому повідомлень від покупців
+    if not username or (isinstance(username, str) and not username.strip()):
+        await message.answer(t(user_id, 'phone.no_username_hint'), parse_mode="HTML")
     
     if ref_link and not user_exists:
         increment_link_count(ref_link)

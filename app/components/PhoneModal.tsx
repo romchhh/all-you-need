@@ -75,9 +75,11 @@ export const PhoneModal = ({ isOpen, onClose, phoneNumber, tg }: PhoneModalProps
     }
   };
 
-  const handleCall = () => {
-    window.location.href = `tel:${phoneNumber.trim()}`;
-    tg?.HapticFeedback.impactOccurred('medium');
+  // tel: краще працює в Telegram WebView через реальне посилання <a>, ніж через window.location
+  const normalized = phoneNumber.trim().replace(/\s/g, '');
+  const telUrl = normalized.startsWith('+') ? `tel:${normalized}` : `tel:+${normalized}`;
+  const handleCallClick = () => {
+    tg?.HapticFeedback?.impactOccurred('medium');
     onClose();
   };
 
@@ -113,15 +115,16 @@ export const PhoneModal = ({ isOpen, onClose, phoneNumber, tg }: PhoneModalProps
             </p>
           </div>
 
-          {/* Кнопки дій */}
+          {/* Кнопки дій: <a href="tel:"> для коректного виклику дзвінка в Telegram WebView */}
           <div className="space-y-3">
-            <button
-              onClick={handleCall}
-              className="w-full px-6 py-4 bg-[#D3F1A7] text-black rounded-2xl font-semibold hover:bg-[#D3F1A7]/90 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+            <a
+              href={telUrl}
+              onClick={handleCallClick}
+              className="w-full px-6 py-4 bg-[#D3F1A7] text-black rounded-2xl font-semibold hover:bg-[#D3F1A7]/90 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 no-underline"
             >
               <Phone size={24} />
               <span className="text-lg">{t('phone.call')}</span>
-            </button>
+            </a>
 
             <button
               onClick={handleCopyNumber}

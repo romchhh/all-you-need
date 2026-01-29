@@ -29,7 +29,6 @@ scheduler = AsyncIOScheduler(
     job_defaults=job_defaults,
     timezone='Europe/Kiev'
 )
-
 scheduler.start()
 
 async def main():
