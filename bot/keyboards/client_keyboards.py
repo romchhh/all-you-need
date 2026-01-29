@@ -96,9 +96,9 @@ def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
 
 
 def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    telegram_url = os.getenv('TELEGRAM_URL', 'https://t.me/your_channel')
-    instagram_url = os.getenv('INSTAGRAM_URL', 'https://instagram.com/your_account')
-    tiktok_url = os.getenv('TIKTOK_URL', 'https://tiktok.com/@your_account')
+    telegram_url = os.getenv('TELEGRAM_URL', 'https://t.me/TradeGroundHamburg')
+    instagram_url = os.getenv('INSTAGRAM_URL', 'https://www.instagram.com/tradeground?igsh=MWs3dnEybWpscXY4dQ==')
+    tiktok_url = os.getenv('TIKTOK_URL', 'https://www.tiktok.com/@tradeground')
     support_url = os.getenv('SUPPORT_URL', telegram_url)  # Якщо немає окремого URL, використовуємо telegram
     lang = get_user_lang(user_id)
     offer_url = get_offer_url(lang)
