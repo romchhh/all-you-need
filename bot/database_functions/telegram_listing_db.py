@@ -2,7 +2,7 @@ import sqlite3
 import os
 import json
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
 
@@ -41,13 +41,13 @@ def create_telegram_listing(
     subcategory: Optional[str],
     condition: str,
     location: str,
-    images: List[str],
+    images: Union[List[str], List[Dict[str, Any]]],
     price_display: Optional[str] = None
 ) -> int:
-    """Створює нове оголошення для Telegram каналу"""
+    """Створює нове оголошення для Telegram каналу. images — список file_id (str) або [{"type":"photo"|"video","file_id":str}]."""
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     images_json = json.dumps(images)
     
     # Перевіряємо чи є колонки в таблиці
@@ -235,10 +235,10 @@ def update_telegram_listing(
     subcategory: Optional[str],
     condition: str,
     location: str,
-    images: List[str],
+    images: Union[List[str], List[Dict[str, Any]]],
     price_display: Optional[str] = None
 ) -> bool:
-    """Оновлює оголошення (для повторної модерації після відхилення)"""
+    """Оновлює оголошення (для повторної модерації після відхилення). images — список file_id або [{"type":"photo"|"video","file_id":str}]."""
     conn = get_connection()
     cursor = conn.cursor()
     try:

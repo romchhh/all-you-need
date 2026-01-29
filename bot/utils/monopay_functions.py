@@ -172,22 +172,13 @@ async def check_pending_payments():
                                             if channel_message_id:
                                                 conn = get_connection()
                                                 cursor = conn.cursor()
-                                                
-                                                cursor.execute("PRAGMA table_info(TelegramListing)")
-                                                columns = [row[1] for row in cursor.fetchall()]
-                                                has_channel_message_id = 'channelMessageId' in columns
-                                                
-                                                if not has_channel_message_id:
-                                                    cursor.execute("ALTER TABLE TelegramListing ADD COLUMN channelMessageId INTEGER")
-                                                
-                                                # Оновлюємо publishedAt на поточну дату
+                                                # channelMessageId вже збережено в _publish_to_channel (JSON з усіма message_id) — не перезаписуємо
                                                 cursor.execute("""
                                                     UPDATE TelegramListing
-                                                    SET channelMessageId = ?,
-                                                        publishedAt = ?,
+                                                    SET publishedAt = ?,
                                                         updatedAt = ?
                                                     WHERE id = ?
-                                                """, (channel_message_id, datetime.now(), datetime.now(), listing_id))
+                                                """, (datetime.now(), datetime.now(), listing_id))
                                                 conn.commit()
                                                 conn.close()
                                                 

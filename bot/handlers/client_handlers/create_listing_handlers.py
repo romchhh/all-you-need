@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from aiogram import Router, types, F
@@ -30,7 +31,7 @@ from database_functions.client_db import check_user, get_user_balance, deduct_us
 from utils.moderation_manager import ModerationManager
 from utils.monopay_functions import create_publication_payment_link
 from main import bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, FSInputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, FSInputFile
 import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -39,9 +40,13 @@ from zoneinfo import ZoneInfo
 router = Router()
 
 MAX_PHOTOS = 10
+MAX_MEDIA = 10
 MAX_TITLE_LENGTH = 100
 MAX_DESCRIPTION_LENGTH = 600
 LISTINGS_PER_PAGE = 8
+
+# Lock для серіалізації обробки медіа-групи (1 відео + 2 фото приходять окремими повідомленнями і мають оброблятися по черзі)
+_media_group_lock = asyncio.Lock()
 
 
 def _format_listing_date(listing: dict) -> str:
@@ -107,6 +112,43 @@ def _format_created_display(value) -> str:
     except Exception:
         pass
     return ""
+
+
+def _normalize_media_list(data: dict) -> list:
+    """Повертає список медіа: [{"type": "photo"|"video", "file_id": str}, ...]. Підтримує старий формат photos (list of str)."""
+    media = data.get('media', [])
+    if not media and data.get('photos'):
+        photos = data.get('photos', [])
+        return [{"type": "photo", "file_id": (p if isinstance(p, str) else p.get("file_id"))} for p in photos]
+    result = []
+    for m in media:
+        if isinstance(m, dict) and m.get("type") in ("photo", "video") and m.get("file_id"):
+            result.append({"type": m["type"], "file_id": m["file_id"]})
+        elif isinstance(m, str):
+            result.append({"type": "photo", "file_id": m})
+    return result
+
+
+def _media_to_image_file_ids(media: list) -> list:
+    """Повертає лише file_id фото для збереження в БД (канал підтримує тільки фото)."""
+    return [m["file_id"] for m in media if m.get("type") == "photo"]
+
+
+def _first_channel_message_id(channel_message_id) -> str:
+    """Повертає перший message_id для посилання в канал (якщо збережено JSON масив — бере перший)."""
+    if not channel_message_id or channel_message_id == 'None':
+        return ''
+    s = str(channel_message_id).strip()
+    if not s:
+        return ''
+    if s.startswith('['):
+        try:
+            arr = json.loads(s)
+            if isinstance(arr, list) and len(arr) > 0:
+                return str(arr[0])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return s
 
 
 def _count_listing_stats(listings: list) -> dict:
@@ -335,7 +377,7 @@ async def process_description(message: types.Message, state: FSMContext):
     
     # Якщо створюємо нове, переходимо до наступного кроку
     await state.set_state(CreateListing.waiting_for_photos)
-    await state.update_data(photos=[], media_group_limit_notified=[])
+    await state.update_data(media=[], photos=[], media_group_limit_notified=[])
     
     # Видаляємо попереднє повідомлення про опис (промпт) та повідомлення користувача
     last_message_id = data.get('last_message_id')
@@ -359,197 +401,179 @@ async def process_description(message: types.Message, state: FSMContext):
     await state.update_data(last_message_id=sent_message.message_id)
 
 
-@router.message(CreateListing.waiting_for_photos, F.photo, F.media_group_id)
+@router.message(CreateListing.waiting_for_photos, F.media_group_id, F.photo)
 async def process_media_group_photo(message: types.Message, state: FSMContext):
-    """Обробляє фото з медіа групи - відповідає тільки один раз на всю групу"""
+    """Обробляє фото з медіа групи."""
+    await _process_media_group_item(message, state, "photo", message.photo[-1].file_id)
+
+
+@router.message(CreateListing.waiting_for_photos, F.media_group_id, F.video)
+async def process_media_group_video(message: types.Message, state: FSMContext):
+    """Обробляє відео з медіа групи."""
+    await _process_media_group_item(message, state, "video", message.video.file_id)
+
+
+async def _process_media_group_item(message: types.Message, state: FSMContext, media_type: str, file_id: str):
+    """Додає один елемент (фото або відео) з медіа-групи. Lock усуває race: усі повідомлення групи обробляються по черзі."""
     user_id = message.from_user.id
-    data = await state.get_data()
-    photos = data.get('photos', [])
     media_group_id = message.media_group_id
-    media_group_responses = data.get('media_group_responses', {})
-    media_group_limit_notified = set(data.get('media_group_limit_notified', []))
-    
-    # Перевіряємо ліміт ПЕРЕД додаванням фото
-    if len(photos) >= MAX_PHOTOS:
-        # Видаляємо фото від користувача
-        try:
-            await message.delete()
-        except:
-            pass
-        # Відправляємо повідомлення про досягнення ліміту тільки один раз для медіа-групи
-        if media_group_id not in media_group_limit_notified:
-            media_group_limit_notified.add(media_group_id)
-            await state.update_data(media_group_limit_notified=list(media_group_limit_notified))
-            # Видаляємо старе повідомлення про фото якщо є
-            last_photo_message_id = data.get('last_photo_message_id')
-            if last_photo_message_id:
-                try:
-                    await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
-                except:
-                    pass
-            sent_message = await message.answer(
-                t(user_id, 'create_listing.photo_limit_reached'),
-                reply_markup=get_continue_photos_keyboard(user_id)
-            )
-            await state.update_data(last_photo_message_id=sent_message.message_id)
-        return
-    
-    file_id = message.photo[-1].file_id
-    photos.append(file_id)
-    
-    # Перевіряємо чи це перше фото з групи
-    if media_group_id not in media_group_responses:
-        # Перше фото з групи - зберігаємо інформацію та запускаємо таймер
-        media_group_responses[media_group_id] = True
-        
-        # Видаляємо промпт про фото при першому додаванні
-        last_message_id = data.get('last_message_id')
-        if last_message_id and len(photos) == 1:
+
+    async with _media_group_lock:
+        data = await state.get_data()
+        media = _normalize_media_list(data)
+        media_group_responses = data.get('media_group_responses', {})
+        media_group_limit_notified = set(data.get('media_group_limit_notified', []))
+
+        if len(media) >= MAX_MEDIA:
             try:
-                await bot.delete_message(chat_id=user_id, message_id=last_message_id)
-                await state.update_data(last_message_id=None)  # Очищаємо ID промпта
-            except:
+                await message.delete()
+            except Exception:
                 pass
-        
-        await state.update_data(
-            photos=photos,
-            media_group_responses=media_group_responses
-        )
-        
-        # Видаляємо фото від користувача
-        try:
-            await message.delete()
-        except:
-            pass
-        
-        # Запускаємо відкладений відповідь
-        import asyncio
-        asyncio.create_task(delayed_media_group_response(user_id, media_group_id, state))
-    else:
-        # Наступні фото з тієї ж групи - просто додаємо без відповіді
-        await state.update_data(photos=photos)
-        # Видаляємо фото від користувача
-        try:
-            await message.delete()
-        except:
-            pass
+            if media_group_id not in media_group_limit_notified:
+                media_group_limit_notified.add(media_group_id)
+                await state.update_data(media_group_limit_notified=list(media_group_limit_notified))
+                last_photo_message_id = data.get('last_photo_message_id')
+                if last_photo_message_id:
+                    try:
+                        await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
+                    except Exception:
+                        pass
+                sent_message = await message.answer(
+                    t(user_id, 'create_listing.media_limit_reached'),
+                    reply_markup=get_continue_photos_keyboard(user_id)
+                )
+                await state.update_data(last_photo_message_id=sent_message.message_id)
+            return
+
+        media.append({"type": media_type, "file_id": file_id})
+
+        if media_group_id not in media_group_responses:
+            media_group_responses[media_group_id] = True
+            last_message_id = data.get('last_message_id')
+            if last_message_id and len(media) == 1:
+                try:
+                    await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+                    await state.update_data(last_message_id=None)
+                except Exception:
+                    pass
+            await state.update_data(media=media, media_group_responses=media_group_responses)
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            asyncio.create_task(delayed_media_group_response(user_id, media_group_id, state))
+        else:
+            await state.update_data(media=media)
+            try:
+                await message.delete()
+            except Exception:
+                pass
 
 
 async def delayed_media_group_response(user_id: int, media_group_id: str, state: FSMContext):
     """Відповідає на медіа групу після затримки - тільки один раз"""
     import asyncio
-    # Чекаємо 2 секунди, щоб зібрати всі фото з групи
     await asyncio.sleep(2)
-    
-    # Перевіряємо чи група ще не оброблена
+
     data = await state.get_data()
     media_group_responses = data.get('media_group_responses', {})
-    
+
     if media_group_id in media_group_responses:
-        # Видаляємо інформацію про групу
         del media_group_responses[media_group_id]
         await state.update_data(media_group_responses=media_group_responses)
-        
-        # Видаляємо попереднє повідомлення "Фото додано!" якщо є
         last_photo_message_id = data.get('last_photo_message_id')
         if last_photo_message_id:
             try:
                 await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
-            except:
+            except Exception:
                 pass
-        
         current_data = await state.get_data()
-        current_photos_count = len(current_data.get('photos', []))
-        
+        media = _normalize_media_list(current_data)
         sent_message = await bot.send_message(
             chat_id=user_id,
-            text=t(user_id, 'create_listing.photo_added').format(
-                current=current_photos_count,
-                max=MAX_PHOTOS
+            text=t(user_id, 'create_listing.media_added').format(
+                current=len(media),
+                max=MAX_MEDIA
             ),
             reply_markup=get_continue_photos_keyboard(user_id)
         )
-        
         await state.update_data(last_photo_message_id=sent_message.message_id)
 
 
 @router.message(CreateListing.waiting_for_photos, F.photo)
 async def process_photo(message: types.Message, state: FSMContext):
-    """Обробляє окремі фото (не медіа групи)"""
+    """Обробляє окремі фото (не медіа групи)."""
+    await _process_single_media(message, state, "photo", message.photo[-1].file_id)
+
+
+@router.message(CreateListing.waiting_for_photos, F.video)
+async def process_video(message: types.Message, state: FSMContext):
+    """Обробляє окреме відео."""
+    await _process_single_media(message, state, "video", message.video.file_id)
+
+
+async def _process_single_media(message: types.Message, state: FSMContext, media_type: str, file_id: str):
+    """Додає одне фото або відео (не з групи)."""
     user_id = message.from_user.id
     data = await state.get_data()
-    photos = data.get('photos', [])
+    media = _normalize_media_list(data)
     last_photo_message_id = data.get('last_photo_message_id')
-    last_message_id = data.get('last_message_id')  # Промпт про фото
-    
-    # Перевіряємо ліміт ПЕРЕД додаванням фото
-    if len(photos) >= MAX_PHOTOS:
-        # Видаляємо фото від користувача
+    last_message_id = data.get('last_message_id')
+
+    if len(media) >= MAX_MEDIA:
         try:
             await message.delete()
-        except:
+        except Exception:
             pass
-        # Видаляємо старе повідомлення про ліміт якщо є
         if last_photo_message_id:
             try:
                 await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
-            except:
+            except Exception:
                 pass
-        # Відправляємо повідомлення про досягнення ліміту
         sent_message = await message.answer(
-            t(user_id, 'create_listing.photo_limit_reached'),
+            t(user_id, 'create_listing.media_limit_reached'),
             reply_markup=get_continue_photos_keyboard(user_id)
         )
         await state.update_data(last_photo_message_id=sent_message.message_id)
         return
-    
-    file_id = message.photo[-1].file_id
-    photos.append(file_id)
-    
-    # Видаляємо фото від користувача
+
+    media.append({"type": media_type, "file_id": file_id})
+
     try:
         await message.delete()
-    except:
+    except Exception:
         pass
-    
-    # Видаляємо промпт про фото при першому додаванні
-    if last_message_id and len(photos) == 1:
+
+    if last_message_id and len(media) == 1:
         try:
             await bot.delete_message(chat_id=user_id, message_id=last_message_id)
-            await state.update_data(last_message_id=None)  # Очищаємо ID промпта
-        except:
+            await state.update_data(last_message_id=None)
+        except Exception:
             pass
-    
-    # Видаляємо старе повідомлення "Фото додано!" якщо є
+
     if last_photo_message_id:
         try:
             await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
-        except:
+        except Exception:
             pass
-    
-    # Відправляємо повідомлення про додавання фото з кнопкою "Продовжити"
+
     sent_message = await message.answer(
-        t(user_id, 'create_listing.photo_added').format(
-            current=len(photos),
-            max=MAX_PHOTOS
+        t(user_id, 'create_listing.media_added').format(
+            current=len(media),
+            max=MAX_MEDIA
         ),
         reply_markup=get_continue_photos_keyboard(user_id)
     )
-
-    await state.update_data(
-        photos=photos,
-        last_photo_message_id=sent_message.message_id
-    )
+    await state.update_data(media=media, last_photo_message_id=sent_message.message_id)
 
 
 @router.callback_query(F.data == "continue_after_photos", CreateListing.waiting_for_photos)
 async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     data = await state.get_data()
-    photos = data.get('photos', [])
-    
-    # Якщо фото немає, позначаємо що використовується дефолтне зображення
-    if not photos or len(photos) == 0:
+    media = _normalize_media_list(data)
+
+    if not media or len(media) == 0:
         default_photo_path = get_default_photo_path()
         if default_photo_path:
             await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
@@ -612,7 +636,10 @@ async def handle_text_in_photos_state(message: types.Message, state: FSMContext)
         )
         return
     
-    await message.answer("📸 <b>Будь ласка, надішліть фото!</b>\n\nВи можете надіслати до 10 фото. Після додавання фото натисніть Продовжити для продовження.", parse_mode="HTML")
+    await message.answer(
+        t(user_id, 'create_listing.send_media_hint'),
+        parse_mode="HTML"
+    )
 
 
 async def process_category_selection(message: types.Message, state: FSMContext, user_id: int):
@@ -1008,17 +1035,22 @@ def build_preview(user_id: int, data: dict) -> str:
 async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     data = await state.get_data()
-    
-    photos = data.get('photos', [])
-    # Якщо фото немає, перевіряємо чи є дефолтне зображення
-    if not photos or len(photos) == 0:
+    media = _normalize_media_list(data)
+    image_ids = _media_to_image_file_ids(media)
+
+    if not media or len(media) == 0:
         default_photo_path = get_default_photo_path()
         if not default_photo_path:
             await callback.answer("❌ Помилка: не вдалося знайти дефолтне зображення!", show_alert=True)
             return
-        # Позначаємо що використовується дефолтне фото (шлях буде використаний при публікації)
         await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
-    
+    elif not image_ids:
+        default_photo_path = get_default_photo_path()
+        if default_photo_path:
+            await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
+
+    images_for_db = media
+
     db_user_id = get_user_id_by_telegram_id(user_id)
     if not db_user_id:
         await callback.answer("❌ Помилка: користувач не знайдений", show_alert=True)
@@ -1067,7 +1099,7 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
                 subcategory=None,
                 condition='service',
                 location=data.get('location', t(user_id, 'moderation.not_specified')),
-                images=photos,
+                images=images_for_db,
                 price_display=price_display
             )
             if not success:
@@ -1087,7 +1119,7 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
                 subcategory=None,
                 condition='service',  # Для послуг завжди 'service'
                 location=data.get('location', t(user_id, 'moderation.not_specified')),
-                images=photos,
+                images=images_for_db,
                 price_display=price_display  # Передаємо оригінальне значення
             )
             await state.update_data(listing_id=listing_id)
@@ -1159,64 +1191,76 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
 
 
 async def show_preview(user_id: int, state: FSMContext, message: types.Message = None, callback: types.CallbackQuery = None):
-    """Показує preview оголошення з кнопками підтвердження"""
+    """Показує preview оголошення з кнопками підтвердження."""
     data = await state.get_data()
     preview_text = build_preview(user_id, data)
-    photos = data.get('photos', [])
-    
+    media = _normalize_media_list(data)
+
     await state.set_state(CreateListing.waiting_for_confirmation)
-    
-    # Якщо фото немає, використовуємо дефолтне зображення
+
     use_default_photo = False
-    if not photos or len(photos) == 0:
+    if not media or len(media) == 0:
         default_photo_path = get_default_photo_path()
         if default_photo_path:
             use_default_photo = True
-            # Зберігаємо маркер, що використовується дефолтне фото
             await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
-    
+
     target_message = callback.message if callback else message
-    
-    if photos and len(photos) > 0:
-        if len(photos) == 1:
-            # Для одного фото
-            if callback:
-                try:
-                    await callback.message.delete()
-                except:
-                    pass
-                await callback.message.answer_photo(
-                    photo=photos[0],
-                    caption=preview_text,
-                    parse_mode="HTML"
-                )
-            else:
-                await message.answer_photo(
-                    photo=photos[0],
-                    caption=preview_text,
-                    parse_mode="HTML"
-                )
-        else:
-            # Для кількох фото - медіа-група
-            media = []
-            for i, photo_id in enumerate(photos):
-                if i == 0:
-                    media.append(InputMediaPhoto(
-                        media=photo_id,
+
+    if media and len(media) > 0:
+        if len(media) == 1:
+            m = media[0]
+            if m.get("type") == "video":
+                if callback:
+                    try:
+                        await callback.message.delete()
+                    except Exception:
+                        pass
+                    await callback.message.answer_video(
+                        video=m["file_id"],
                         caption=preview_text,
                         parse_mode="HTML"
-                    ))
-                else:       
-                    media.append(InputMediaPhoto(media=photo_id))
-            
+                    )
+                else:
+                    await message.answer_video(
+                        video=m["file_id"],
+                        caption=preview_text,
+                        parse_mode="HTML"
+                    )
+            else:
+                if callback:
+                    try:
+                        await callback.message.delete()
+                    except Exception:
+                        pass
+                    await callback.message.answer_photo(
+                        photo=m["file_id"],
+                        caption=preview_text,
+                        parse_mode="HTML"
+                    )
+                else:
+                    await message.answer_photo(
+                        photo=m["file_id"],
+                        caption=preview_text,
+                        parse_mode="HTML"
+                    )
+        else:
+            input_media = []
+            for i, m in enumerate(media):
+                caption = (preview_text if i == 0 else None)
+                parse = "HTML" if i == 0 else None
+                if m.get("type") == "video":
+                    input_media.append(InputMediaVideo(media=m["file_id"], caption=caption, parse_mode=parse))
+                else:
+                    input_media.append(InputMediaPhoto(media=m["file_id"], caption=caption, parse_mode=parse))
             if callback:
                 try:
                     await callback.message.delete()
-                except:
+                except Exception:
                     pass
-                await callback.message.answer_media_group(media=media)
+                await callback.message.answer_media_group(media=input_media)
             else:
-                await message.answer_media_group(media=media)
+                await message.answer_media_group(media=input_media)
     elif use_default_photo:
         # Використовуємо дефолтне фото безпосередньо з FSInputFile
         default_photo_path = get_default_photo_path()
@@ -1325,7 +1369,7 @@ async def edit_field_photos(callback: types.CallbackQuery, state: FSMContext):
     """Починає редагування фото"""
     user_id = callback.from_user.id
     await state.set_state(CreateListing.waiting_for_photos)
-    await state.update_data(photos=[], media_group_limit_notified=[])
+    await state.update_data(media=[], photos=[], media_group_limit_notified=[])
     
     try:
         await callback.message.edit_text(
@@ -1530,7 +1574,8 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         
         keyboard_buttons = []
         
-        channel_message_id = listing.get('channelMessageId') or listing.get('channel_message_id')
+        channel_message_id_raw = listing.get('channelMessageId') or listing.get('channel_message_id')
+        channel_message_id = _first_channel_message_id(channel_message_id_raw)
         if channel_message_id and channel_message_id != 'None' and str(channel_message_id).strip() and status != 'expired':
             channel_id = os.getenv('TRADE_CHANNEL_ID', '')
             channel_username = os.getenv('TRADE_CHANNEL_USERNAME', '')
@@ -1655,18 +1700,25 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         images = listing.get('images', [])
         if images and len(images) > 0:
             try:
+                def _item_file_id_and_type(item):
+                    if isinstance(item, dict):
+                        return (item.get('file_id') or '', (item.get('type') or 'photo').lower())
+                    return (str(item), 'photo')
+
                 if len(images) > 1:
                     media = []
-                    for i, photo_id in enumerate(images):
-                        if i == 0:
-                            media.append(InputMediaPhoto(
-                                media=photo_id,
-                                caption=message_text,
-                                parse_mode="HTML"
-                            ))
+                    for i, item in enumerate(images):
+                        file_id, mtype = _item_file_id_and_type(item)
+                        if not file_id:
+                            continue
+                        cap = message_text if i == 0 else None
+                        parse = "HTML" if i == 0 else None
+                        if mtype == 'video':
+                            media.append(InputMediaVideo(media=file_id, caption=cap, parse_mode=parse))
                         else:
-                            media.append(InputMediaPhoto(media=photo_id))
-                    await bot.send_media_group(chat_id=user_id, media=media)
+                            media.append(InputMediaPhoto(media=file_id, caption=cap, parse_mode=parse))
+                    if media:
+                        await bot.send_media_group(chat_id=user_id, media=media)
                     await bot.send_message(
                         chat_id=user_id,
                         text=t(user_id, 'my_listings.choose_action'),
@@ -1674,13 +1726,23 @@ async def view_telegram_listing(callback: types.CallbackQuery):
                         parse_mode="HTML"
                     )
                 else:
-                    await bot.send_photo(
-                        chat_id=user_id,
-                        photo=images[0],
-                        caption=message_text,
-                        reply_markup=keyboard,
-                        parse_mode="HTML"
-                    )
+                    file_id, mtype = _item_file_id_and_type(images[0])
+                    if mtype == 'video':
+                        await bot.send_video(
+                            chat_id=user_id,
+                            video=file_id,
+                            caption=message_text,
+                            reply_markup=keyboard,
+                            parse_mode="HTML"
+                        )
+                    else:
+                        await bot.send_photo(
+                            chat_id=user_id,
+                            photo=file_id,
+                            caption=message_text,
+                            reply_markup=keyboard,
+                            parse_mode="HTML"
+                        )
             except Exception as e:
                 print(f"Error sending photo: {e}")
                 await callback.message.answer(
@@ -1718,10 +1780,18 @@ async def edit_rejected_listing(callback: types.CallbackQuery, state: FSMContext
         price_val = listing.get('priceDisplay') or listing.get('price')
         if price_val is None:
             price_val = listing.get('price', 0)
+        images = listing.get('images', []) or []
+        media = []
+        for f in images:
+            if isinstance(f, str) and f:
+                media.append({"type": "photo", "file_id": f})
+            elif isinstance(f, dict) and f.get("file_id"):
+                media.append({"type": (f.get("type") or "photo").lower(), "file_id": f.get("file_id")})
         await state.update_data(
             title=listing.get('title', ''),
             description=listing.get('description', ''),
-            photos=listing.get('images', []),
+            photos=images,
+            media=media,
             category_name=listing.get('category', ''),
             price=price_val,
             location=listing.get('location', ''),

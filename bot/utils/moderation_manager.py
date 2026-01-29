@@ -3,7 +3,7 @@ import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from aiogram import Bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, FSInputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, FSInputFile
 from dotenv import load_dotenv
 import aiohttp
 
@@ -57,13 +57,22 @@ class ModerationManager:
             keyboard = self._create_moderation_keyboard(listing_id, source)
             
             if images:
-                is_url = source == 'marketplace' and (images[0].startswith('http') or images[0].startswith('/'))
-                
+                first_id, first_type = self._media_item_file_id_and_type(images[0])
+                is_url = source == 'marketplace' and isinstance(first_id, str) and (first_id.startswith('http') or first_id.startswith('/'))
+
                 if len(images) == 1:
                     if is_url:
                         message = await self.bot.send_photo(
                             chat_id=self.group_id,
-                            photo=images[0],
+                            photo=first_id,
+                            caption=text,
+                            parse_mode="HTML",
+                            reply_markup=keyboard
+                        )
+                    elif first_type == 'video':
+                        message = await self.bot.send_video(
+                            chat_id=self.group_id,
+                            video=first_id,
                             caption=text,
                             parse_mode="HTML",
                             reply_markup=keyboard
@@ -71,7 +80,7 @@ class ModerationManager:
                     else:
                         message = await self.bot.send_photo(
                             chat_id=self.group_id,
-                            photo=images[0],
+                            photo=first_id,
                             caption=text,
                             parse_mode="HTML",
                             reply_markup=keyboard
@@ -79,18 +88,17 @@ class ModerationManager:
                     return message.message_id
                 else:
                     media_group = []
-                    for i, image in enumerate(images):
-                        if i == 0:
-                            media_group.append(
-                                InputMediaPhoto(
-                                    media=image,
-                                    caption=text,
-                                    parse_mode="HTML"
-                                )
-                            )
+                    for i, item in enumerate(images):
+                        file_id, mtype = self._media_item_file_id_and_type(item)
+                        if not file_id:
+                            continue
+                        caption = text if i == 0 else None
+                        parse = "HTML" if i == 0 else None
+                        if mtype == 'video':
+                            media_group.append(InputMediaVideo(media=file_id, caption=caption, parse_mode=parse))
                         else:
-                            media_group.append(InputMediaPhoto(media=image))
-                    
+                            media_group.append(InputMediaPhoto(media=file_id, caption=caption, parse_mode=parse))
+
                     messages = await self.bot.send_media_group(
                         chat_id=self.group_id,
                         media=media_group
@@ -236,19 +244,27 @@ class ModerationManager:
         
         return text
     
-    def _get_listing_images(self, listing: Dict[str, Any]) -> List[str]:
+    def _get_listing_images(self, listing: Dict[str, Any]) -> List[Any]:
+        """Повертає список медіа: або [file_id str], або [{"type":"photo"|"video","file_id":str}]. До 10 елементів."""
         images = listing.get('images', [])
-        
+
         if isinstance(images, str):
             try:
                 images = json.loads(images)
-            except:
+            except Exception:
                 images = []
-        
+
         if not isinstance(images, list):
             images = []
-        
+
         return images[:10]
+
+    @staticmethod
+    def _media_item_file_id_and_type(item: Any) -> tuple:
+        """Повертає (file_id, type) для елемента: str -> (str, "photo"), dict -> (file_id, type)."""
+        if isinstance(item, dict):
+            return (item.get('file_id') or '', (item.get('type') or 'photo').lower())
+        return (str(item), 'photo')
     
     def _create_moderation_keyboard(self, listing_id: int, source: str) -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup(inline_keyboard=[
@@ -316,24 +332,14 @@ class ModerationManager:
                     
                     if not has_channel_message_id:
                         cursor.execute("ALTER TABLE TelegramListing ADD COLUMN channelMessageId INTEGER")
-                    
-                    if channel_message_id:
-                        cursor.execute("""
-                            UPDATE TelegramListing
-                            SET status = 'approved',
-                                publishedAt = ?,
-                                updatedAt = ?,
-                                channelMessageId = ?
-                            WHERE id = ?
-                        """, (datetime.now(), datetime.now(), channel_message_id, listing_id))
-                    else:
-                        cursor.execute("""
-                            UPDATE TelegramListing
-                            SET status = 'approved',
-                                publishedAt = ?,
-                                updatedAt = ?
-                            WHERE id = ?
-                        """, (datetime.now(), datetime.now(), listing_id))
+                    # channelMessageId вже збережено в _publish_to_channel (JSON з усіма message_id медіа-групи) — не перезаписуємо
+                    cursor.execute("""
+                        UPDATE TelegramListing
+                        SET status = 'approved',
+                            publishedAt = ?,
+                            updatedAt = ?
+                        WHERE id = ?
+                    """, (datetime.now(), datetime.now(), listing_id))
                     
                     conn.commit()
                     conn.close()
@@ -747,37 +753,37 @@ class ModerationManager:
                     images = []
             
             if images and len(images) > 0:
+                first_id, first_type = self._media_item_file_id_and_type(images[0])
+                button_text = t(user_id_for_lang, 'listing.submit_ad_button')
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text=button_text, url=bot_link)]
+                ])
+                text_with_bot = text + bot_text
+
                 if len(images) == 1:
-                    # Для одного фото - додаємо інлайн кнопку
-                    # Отримуємо текст кнопки залежно від мови користувача
-                    button_text = t(user_id_for_lang, 'listing.submit_ad_button')
-                    
-                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(
-                            text=button_text,
-                            url=bot_link
-                        )]
-                    ])
-                    
-                    message = await self.bot.send_photo(
-                        chat_id=channel_id,
-                        photo=images[0],
-                        caption=text,
-                        parse_mode="HTML",
-                        reply_markup=keyboard
-                    )
+                    if first_type == 'video':
+                        message = await self.bot.send_video(
+                            chat_id=channel_id,
+                            video=first_id,
+                            caption=text_with_bot,
+                            parse_mode="HTML",
+                            reply_markup=keyboard
+                        )
+                    else:
+                        message = await self.bot.send_photo(
+                            chat_id=channel_id,
+                            photo=first_id,
+                            caption=text_with_bot,
+                            parse_mode="HTML",
+                            reply_markup=keyboard
+                        )
                     message_id = message.message_id
-                    
-                    # Зберігаємо message_id як JSON масив (для уніфікації з медіа-групою)
-                    import json
+
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     cursor.execute("PRAGMA table_info(TelegramListing)")
                     columns = [row[1] for row in cursor.fetchall()]
-                    has_channel_message_id = 'channelMessageId' in columns
-                    
-                    if has_channel_message_id:
-                        # Зберігаємо як JSON масив навіть для одного фото
+                    if 'channelMessageId' in columns:
                         cursor.execute("""
                             UPDATE TelegramListing
                             SET channelMessageId = ?
@@ -785,44 +791,34 @@ class ModerationManager:
                         """, (json.dumps([message_id]), listing_id))
                         conn.commit()
                     conn.close()
-                    
-                    # Застосовуємо всі вибрані тарифи
-                    # Закріплення (pinned_12h або pinned_24h)
+
                     if message_id and any(t.startswith('pinned') for t in tariffs):
                         try:
-                            await self.bot.pin_chat_message(
-                                chat_id=channel_id,
-                                message_id=message_id
-                            )
+                            await self.bot.pin_chat_message(chat_id=channel_id, message_id=message_id)
                         except Exception as e:
                             print(f"Error pinning message: {e}")
-                    
-                    # Для виділеного оголошення відправляємо додаткове повідомлення
                     if 'highlighted' in tariffs and message_id:
                         try:
-                            await self.bot.send_message(
-                                chat_id=channel_id,
-                                text="🔝🔝🔝"
-                            )
+                            await self.bot.send_message(chat_id=channel_id, text="🔝🔝🔝")
                         except Exception as e:
                             print(f"Error sending highlighted message: {e}")
-                    
+
                     return message_id
                 else:
-                    # Для медіа-групи - додаємо текст з посиланням в кінець caption
-                    text_with_bot = text + bot_text
-                    
                     media = []
-                    for i, img in enumerate(images):
-                        if i == 0:
-                            media.append(InputMediaPhoto(
-                                media=img,
-                                caption=text_with_bot,
-                                parse_mode="HTML"
-                            ))
+                    for i, item in enumerate(images):
+                        file_id, mtype = self._media_item_file_id_and_type(item)
+                        if not file_id:
+                            continue
+                        caption = text_with_bot if i == 0 else None
+                        parse = "HTML" if i == 0 else None
+                        if mtype == 'video':
+                            media.append(InputMediaVideo(media=file_id, caption=caption, parse_mode=parse))
                         else:
-                            media.append(InputMediaPhoto(media=img))
-                    
+                            media.append(InputMediaPhoto(media=file_id, caption=caption, parse_mode=parse))
+
+                    if not media:
+                        return None
                     messages = await self.bot.send_media_group(
                         chat_id=channel_id,
                         media=media
@@ -924,7 +920,19 @@ class ModerationManager:
                         parse_mode="HTML"
                     )
                     message_id = message.message_id
-                
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("PRAGMA table_info(TelegramListing)")
+                    columns = [row[1] for row in cursor.fetchall()]
+                    if 'channelMessageId' in columns:
+                        cursor.execute("""
+                            UPDATE TelegramListing
+                            SET channelMessageId = ?
+                            WHERE id = ?
+                        """, (json.dumps([message_id]), listing_id))
+                        conn.commit()
+                    conn.close()
+
                 # Застосовуємо всі вибрані тарифи
                 # Закріплення (pinned_12h або pinned_24h)
                 if message_id and any(t.startswith('pinned') for t in tariffs):

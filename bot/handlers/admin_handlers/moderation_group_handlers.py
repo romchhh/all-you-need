@@ -201,8 +201,17 @@ async def send_approval_notification(
             # Отримуємо channel_message_id та дату публікації з БД
             from database_functions.telegram_listing_db import get_telegram_listing_by_id
             from datetime import datetime, timedelta
+            import json
             listing = get_telegram_listing_by_id(listing_id)
-            channel_message_id = listing.get('channelMessageId') if listing else None
+            channel_message_id_raw = listing.get('channelMessageId') if listing else None
+            if channel_message_id_raw and isinstance(channel_message_id_raw, str) and channel_message_id_raw.strip().startswith('['):
+                try:
+                    arr = json.loads(channel_message_id_raw)
+                    channel_message_id = str(arr[0]) if isinstance(arr, list) and arr else channel_message_id_raw
+                except (json.JSONDecodeError, TypeError):
+                    channel_message_id = channel_message_id_raw
+            else:
+                channel_message_id = channel_message_id_raw
             published_at = listing.get('publishedAt') if listing else None
             
             # Форматуємо дату закінчення (опубліковано до)
