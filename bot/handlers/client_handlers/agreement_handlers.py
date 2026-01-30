@@ -1,5 +1,6 @@
 import os
 from aiogram import Router, types, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from dotenv import load_dotenv
 
@@ -400,7 +401,7 @@ async def decline_agreement(callback: types.CallbackQuery):
     await callback.answer()
 
 
-def _send_agreement_message(chat_id: int, user_id: int):
+async def _send_agreement_message(chat_id: int, user_id: int):
     """Надсилає повідомлення з офертою (для використання з callback)."""
     offer_text = (
         f"{t(user_id, 'agreement.title')}\n\n"
@@ -408,7 +409,7 @@ def _send_agreement_message(chat_id: int, user_id: int):
         f"{t(user_id, 'agreement.description')}\n\n"
         f"{t(user_id, 'agreement.instructions')}"
     )
-    return bot.send_message(
+    await bot.send_message(
         chat_id,
         offer_text,
         reply_markup=get_agreement_keyboard(user_id),
@@ -445,13 +446,16 @@ async def username_check(callback: types.CallbackQuery):
             return
         current_username = (callback.from_user.username or "").strip()
         # Тестовий нік telebotsnowayrm не вважаємо «доданим»
-        if current_username and current_username.lower() != TEST_USERNAME_AS_MISSING:
+        if current_username and current_username.lower() != "TEST_USERNAME_AS_MISSING":
             update_user_username(user_id, current_username)
-            await callback.message.edit_text(
-                t(user_id, 'registration.username_verified'),
-                parse_mode="HTML"
-            )
-            await callback.message.edit_reply_markup(reply_markup=None)
+            try:
+                await callback.message.edit_text(
+                    t(user_id, 'registration.username_verified'),
+                    parse_mode="HTML"
+                )
+                await callback.message.edit_reply_markup(reply_markup=None)
+            except TelegramBadRequest:
+                pass
             await _send_agreement_message(callback.message.chat.id, user_id)
             await callback.answer()
         else:
