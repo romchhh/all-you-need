@@ -149,6 +149,37 @@ export async function updateListingPackagesBalance(
 }
 
 /**
+ * Отримує мову користувача (uk | ru) за telegramId
+ */
+export async function getUserLanguage(telegramId: string | number): Promise<'uk' | 'ru'> {
+  const id = typeof telegramId === 'string' ? parseInt(telegramId, 10) : telegramId;
+  if (isNaN(id)) return 'uk';
+  try {
+    const legacy = await prisma.$queryRawUnsafe(
+      `SELECT language FROM users_legacy WHERE user_id = ?`,
+      telegramId.toString()
+    ) as Array<{ language: string | null }>;
+    if (legacy.length > 0 && (legacy[0].language === 'uk' || legacy[0].language === 'ru')) {
+      return legacy[0].language as 'uk' | 'ru';
+    }
+  } catch {
+    // legacy table may not exist
+  }
+  try {
+    const users = await prisma.$queryRawUnsafe(
+      `SELECT language FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+      id
+    ) as Array<{ language: string | null }>;
+    if (users.length > 0 && (users[0].language === 'uk' || users[0].language === 'ru')) {
+      return users[0].language as 'uk' | 'ru';
+    }
+  } catch {
+    // language column may not exist
+  }
+  return 'uk';
+}
+
+/**
  * Парсить telegramId з різних форматів
  */
 export function parseTelegramId(telegramId: string | number): number {

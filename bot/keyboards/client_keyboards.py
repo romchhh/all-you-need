@@ -19,11 +19,26 @@ def get_offer_url(language: str = 'uk') -> str:
 def get_agreement_keyboard(user_id: int) -> InlineKeyboardMarkup:
     lang = get_user_lang(user_id)
     offer_url = get_offer_url(lang)
+    offer_webapp_url = f"{offer_url}?telegramId={user_id}" if "?" not in offer_url else f"{offer_url}&telegramId={user_id}"
     
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=t(user_id, 'agreement.read_button'), url=offer_url)],
+        [InlineKeyboardButton(text=t(user_id, 'agreement.read_button'), web_app=WebAppInfo(url=offer_webapp_url))],
         [InlineKeyboardButton(text=t(user_id, 'agreement.agree_button'), callback_data=f"agree_{user_id}")],
         [InlineKeyboardButton(text=t(user_id, 'agreement.decline_button'), callback_data="decline_agreement")]
+    ])
+
+
+def get_username_prompt_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Клавіатура для кроку «немає юзернейму» на початку реєстрації."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t(user_id, 'registration.continue_without_username'),
+            callback_data=f"username_skip_{user_id}"
+        )],
+        [InlineKeyboardButton(
+            text=t(user_id, 'registration.added_username'),
+            callback_data=f"username_check_{user_id}"
+        )]
     ])
 
 
@@ -157,12 +172,13 @@ def get_about_us_back_keyboard(user_id: int) -> InlineKeyboardMarkup:
 def get_about_us_rules_keyboard(user_id: int) -> InlineKeyboardMarkup:
     lang = get_user_lang(user_id)
     offer_url = get_offer_url(lang)
+    offer_webapp_url = f"{offer_url}?telegramId={user_id}" if "?" not in offer_url else f"{offer_url}&telegramId={user_id}"
     
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
                 text=t(user_id, 'about_us.open_full_version'),
-                url=offer_url
+                web_app=WebAppInfo(url=offer_webapp_url)
             )
         ],
         [

@@ -81,8 +81,11 @@ export async function sendListingApprovedNotification(
   expiresAt: Date
 ): Promise<boolean> {
   const webappUrl = process.env.WEBAPP_URL || 'http://localhost:3000';
-  const listingUrl = `${webappUrl}/uk/bazaar?listing=${listingId}`;
-  const expiresDate = expiresAt.toLocaleDateString('uk-UA', {
+  const { getUserLanguage } = await import('@/utils/userHelpers');
+  const lang = await getUserLanguage(telegramId);
+  const listingUrl = `${webappUrl}/${lang}/bazaar?listing=${listingId}&telegramId=${telegramId}`;
+  const locale = lang === 'ru' ? 'ru-RU' : 'uk-UA';
+  const expiresDate = expiresAt.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

@@ -12,7 +12,7 @@ from database_functions.prisma_db import PrismaDB
 from database_functions.referral_db import add_referral, create_referral_table
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, set_language as set_user_language, get_user_lang, get_welcome_message
-from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard, get_language_selection_keyboard
+from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard, get_language_selection_keyboard, get_username_prompt_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, FSInputFile
 import aiohttp
 
@@ -23,6 +23,9 @@ router = Router()
 
 # Шлях до фото привітання
 HELLO_PHOTO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content', 'hello.jpg')
+
+# Для тесту: цей нік вважати відсутнім (показувати крок «немає юзернейму»)
+TEST_USERNAME_AS_MISSING = "telebotsnowayrm"
 
 
 @router.message(CommandStart())
@@ -397,6 +400,70 @@ async def decline_agreement(callback: types.CallbackQuery):
     await callback.answer()
 
 
+def _send_agreement_message(chat_id: int, user_id: int):
+    """Надсилає повідомлення з офертою (для використання з callback)."""
+    offer_text = (
+        f"{t(user_id, 'agreement.title')}\n\n"
+        f"{t(user_id, 'agreement.welcome')}\n\n"
+        f"{t(user_id, 'agreement.description')}\n\n"
+        f"{t(user_id, 'agreement.instructions')}"
+    )
+    return bot.send_message(
+        chat_id,
+        offer_text,
+        reply_markup=get_agreement_keyboard(user_id),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("username_skip_"))
+async def username_skip(callback: types.CallbackQuery):
+    """Користувач обрав «Продовжити без юзернейму» — показуємо оферту."""
+    try:
+        user_id = int(callback.data.split("_")[-1])
+        if callback.from_user.id != user_id:
+            await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
+            return
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await _send_agreement_message(callback.message.chat.id, user_id)
+        await callback.answer()
+    except (ValueError, IndexError) as e:
+        print(f"username_skip error: {e}")
+        await callback.answer("Помилка", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("username_check_"))
+async def username_check(callback: types.CallbackQuery):
+    """Перевірка: чи користувач додав юзернейм (данні приходять актуальні з Telegram)."""
+    try:
+        user_id = int(callback.data.split("_")[-1])
+        if callback.from_user.id != user_id:
+            await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
+            return
+        current_username = (callback.from_user.username or "").strip()
+        # Тестовий нік telebotsnowayrm не вважаємо «доданим»
+        if current_username and current_username.lower() != TEST_USERNAME_AS_MISSING:
+            update_user_username(user_id, current_username)
+            await callback.message.edit_text(
+                t(user_id, 'registration.username_verified'),
+                parse_mode="HTML"
+            )
+            await callback.message.edit_reply_markup(reply_markup=None)
+            await _send_agreement_message(callback.message.chat.id, user_id)
+            await callback.answer()
+        else:
+            await callback.answer(
+                t(user_id, 'registration.username_still_missing'),
+                show_alert=True
+            )
+    except (ValueError, IndexError) as e:
+        print(f"username_check error: {e}")
+        await callback.answer("Помилка", show_alert=True)
+
+
 @router.callback_query(F.data.startswith("set_lang_"))
 async def handle_language_selection(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -422,16 +489,24 @@ async def handle_language_selection(callback: types.CallbackQuery):
             parse_mode="HTML"
         )
         
-        # Після вибору мови показуємо оферту (якщо не погоджено)
         has_agreed = get_user_agreement_status(user_id)
         if not has_agreed:
+            # Якщо немає юзернейму (або тестовий нік) — спочатку показуємо попередження та кнопки
+            current_username = (callback.from_user.username or "").strip()
+            if not current_username or current_username.lower() == TEST_USERNAME_AS_MISSING:
+                await callback.message.answer(
+                    t(user_id, 'registration.username_no_nickname'),
+                    reply_markup=get_username_prompt_keyboard(user_id),
+                    parse_mode="HTML"
+                )
+                return
+            # Є юзернейм — одразу оферта
             offer_text = (
                 f"{t(user_id, 'agreement.title')}\n\n"
                 f"{t(user_id, 'agreement.welcome')}\n\n"
                 f"{t(user_id, 'agreement.description')}\n\n"
                 f"{t(user_id, 'agreement.instructions')}"
             )
-            
             await callback.message.answer(
                 offer_text,
                 reply_markup=get_agreement_keyboard(user_id),

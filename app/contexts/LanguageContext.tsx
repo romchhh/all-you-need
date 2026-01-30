@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 
 type Language = 'uk' | 'ru';
 
@@ -27,6 +28,9 @@ interface LanguageProviderProps {
 }
 
 export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: LanguageProviderProps) => {
+  const router = useRouter();
+  const pathname = usePathname();
+
   // Визначаємо мову з URL або localStorage
   const getInitialLanguage = (): Language => {
     if (typeof window !== 'undefined') {
@@ -43,7 +47,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
   const [translations, setTranslations] = useState<Record<string, any>>({});
   const [isLoadingLanguage, setIsLoadingLanguage] = useState(false);
 
-  // Завжди беремо мову з БД (джерело правди — бот/профіль користувача)
+  // Завжди беремо мову з БД і синхронізуємо URL (щоб при заході/виході не скидалась на uk)
   useEffect(() => {
     const loadLanguageFromDB = async () => {
       if (typeof window === 'undefined') return;
@@ -58,8 +62,18 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
           if (response.ok) {
             const data = await response.json();
             if (data.language && (data.language === 'uk' || data.language === 'ru')) {
-              setLanguageState(data.language);
-              localStorage.setItem('language', data.language);
+              const dbLang = data.language as Language;
+              setLanguageState(dbLang);
+              localStorage.setItem('language', dbLang);
+              // Якщо URL з префіксом іншої мови — перенаправляємо на ту саму сторінку з правильною мовою
+              const path = pathname ?? window.location.pathname;
+              const currentPrefix = path.startsWith('/ru') ? 'ru' : path.startsWith('/uk') ? 'uk' : null;
+              if (currentPrefix && currentPrefix !== dbLang) {
+                const pathWithoutLang = path.replace(/^\/(uk|ru)/, '') || '/';
+                const newPath = `/${dbLang}${pathWithoutLang.startsWith('/') ? pathWithoutLang : '/' + pathWithoutLang}`;
+                const search = window.location.search || '';
+                router.replace(newPath + search);
+              }
             }
           }
         } catch (error) {
@@ -86,7 +100,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
       clearTimeout(timer);
       clearInterval(checkInterval);
     };
-  }, [userTelegramId]);
+  }, [userTelegramId, pathname, router]);
 
   useEffect(() => {
     // Завантажуємо переклади

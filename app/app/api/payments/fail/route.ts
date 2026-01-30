@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getUserLanguage } from '@/utils/userHelpers';
 
 /**
  * Редирект після невдалої оплати
@@ -7,11 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const telegramId = searchParams.get('telegramId');
-  
-  // Редиректимо на профіль користувача
-  const lang = 'uk'; // Можна додати визначення мови
+  const lang = telegramId ? await getUserLanguage(telegramId) : 'uk';
   const WEBAPP_URL = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const redirectUrl = telegramId 
+  const redirectUrl = telegramId
     ? `${WEBAPP_URL}/${lang}/profile?telegramId=${telegramId}&payment=failed`
     : `${WEBAPP_URL}/${lang}/profile?payment=failed`;
   

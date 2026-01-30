@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getUserLanguage } from '@/utils/userHelpers';
 
 const MONOBANK_API_URL = process.env.MONOBANK_API_URL || 'https://api.monobank.ua';
 const MONOBANK_TOKEN = process.env.MONOBANK_TOKEN;
@@ -57,6 +58,7 @@ export async function createMonobankInvoice(params: CreateInvoiceParams): Promis
   }
 
   const userId = users[0].id;
+  const userLang = await getUserLanguage(telegramIdStr);
   console.log('[Monobank] User found:', { userId, telegramId: telegramIdStr, type });
 
   // Формуємо дані залежно від типу платежу
@@ -108,7 +110,7 @@ export async function createMonobankInvoice(params: CreateInvoiceParams): Promis
         }
       ]
     },
-    redirectUrl: `${WEBAPP_URL}/uk/profile?telegramId=${telegramId}`,
+    redirectUrl: `${WEBAPP_URL}/${userLang}/profile?telegramId=${telegramId}`,
     webHookUrl: `${WEBAPP_URL}/api/payments/webhook`,
     validity: 3600,
     paymentType: 'debit' as const,
