@@ -27,10 +27,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   
-  // Якщо користувач зайшов на головну сторінку без мови, перенаправляємо на /uk
+  // Якщо користувач зайшов на головну сторінку без мови — редірект за cookie (мова з БД/вибору), інакше /uk
   if (pathname === '/') {
     const url = request.nextUrl.clone();
-    url.pathname = '/uk';
+    const langCookie = request.cookies.get('lang')?.value;
+    url.pathname = langCookie === 'ru' ? '/ru' : '/uk';
     return NextResponse.redirect(url);
   }
   

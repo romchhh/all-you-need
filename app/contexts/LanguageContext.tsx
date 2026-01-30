@@ -5,6 +5,41 @@ import { useRouter, usePathname } from 'next/navigation';
 
 type Language = 'uk' | 'ru';
 
+const LANG_COOKIE_NAME = 'lang';
+const LANG_COOKIE_MAX_AGE = 31536000; // 1 year
+
+function getTelegramIdSync(): string | null {
+  if (typeof window === 'undefined') return null;
+  const urlParams = new URLSearchParams(window.location.search);
+  const fromUrl = urlParams.get('telegramId');
+  if (fromUrl) return fromUrl;
+  const fromWindow = (window as any).__userTelegramId;
+  if (fromWindow) return String(fromWindow);
+  const tg = (window as any).Telegram?.WebApp;
+  const fromTg = tg?.initDataUnsafe?.user?.id ?? (tg?.initData ? parseTelegramIdFromInitData(tg.initData) : null);
+  if (fromTg != null) return String(fromTg);
+  return null;
+}
+
+function parseTelegramIdFromInitData(initData: string): number | null {
+  try {
+    const params = new URLSearchParams(initData);
+    const userParam = params.get('user');
+    if (userParam) {
+      const user = JSON.parse(decodeURIComponent(userParam));
+      return user?.id ?? null;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function setLangCookie(lang: Language) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${LANG_COOKIE_NAME}=${lang}; path=/; max-age=${LANG_COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -46,15 +81,21 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
   const [language, setLanguageState] = useState<Language>(getInitialLanguage);
   const [translations, setTranslations] = useState<Record<string, any>>({});
   const [isLoadingLanguage, setIsLoadingLanguage] = useState(false);
+  const [isLanguageResolved, setIsLanguageResolved] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const path = window.location.pathname;
+    const hasLangPath = path.startsWith('/uk') || path.startsWith('/ru');
+    const telegramId = getTelegramIdSync() || userTelegramId;
+    return !hasLangPath || !telegramId;
+  });
 
-  // Завжди беремо мову з БД і синхронізуємо URL (щоб при заході/виході не скидалась на uk)
   useEffect(() => {
     const loadLanguageFromDB = async () => {
       if (typeof window === 'undefined') return;
-      const telegramId = userTelegramId || (window as any).__userTelegramId;
+      const telegramId = userTelegramId || (window as any).__userTelegramId || getTelegramIdSync();
       const urlParams = new URLSearchParams(window.location.search);
       const telegramIdFromUrl = urlParams.get('telegramId');
-      const finalTelegramId = telegramId || telegramIdFromUrl;
+      const finalTelegramId = telegramId?.toString() ?? telegramIdFromUrl ?? null;
       if (finalTelegramId) {
         setIsLoadingLanguage(true);
         try {
@@ -65,7 +106,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
               const dbLang = data.language as Language;
               setLanguageState(dbLang);
               localStorage.setItem('language', dbLang);
-              // Якщо URL з префіксом іншої мови — перенаправляємо на ту саму сторінку з правильною мовою
+              setLangCookie(dbLang);
               const path = pathname ?? window.location.pathname;
               const currentPrefix = path.startsWith('/ru') ? 'ru' : path.startsWith('/uk') ? 'uk' : null;
               if (currentPrefix && currentPrefix !== dbLang) {
@@ -80,13 +121,17 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
           console.error('Failed to load language from database:', error);
         } finally {
           setIsLoadingLanguage(false);
+          setIsLanguageResolved(true);
         }
+      } else {
+        setIsLanguageResolved(true);
       }
     };
 
+    const telegramId = getTelegramIdSync() || userTelegramId;
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const hasTelegramIdInUrl = urlParams?.get('telegramId');
-    const delay = hasTelegramIdInUrl ? 100 : 1000;
+    const hasTelegramId = !!telegramId || !!urlParams?.get('telegramId');
+    const delay = hasTelegramId ? 0 : 300;
     const timer = setTimeout(loadLanguageFromDB, delay);
 
     const checkInterval = setInterval(() => {
@@ -94,7 +139,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
         loadLanguageFromDB();
         clearInterval(checkInterval);
       }
-    }, 500);
+    }, 400);
 
     return () => {
       clearTimeout(timer);
@@ -114,11 +159,9 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
   }, [language]);
 
   useEffect(() => {
-    // Зберігаємо мову в localStorage та БД
     if (typeof window !== 'undefined' && !isLoadingLanguage) {
       localStorage.setItem('language', language);
-      
-      // Зберігаємо мову в БД якщо є telegramId
+      setLangCookie(language);
       if (userTelegramId) {
         fetch('/api/user/language', {
           method: 'POST',
@@ -170,7 +213,20 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>
-      {children}
+      {!isLanguageResolved ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100dvh',
+          fontSize: 18,
+          color: '#666',
+        }}>
+          Завантаження… / Загрузка…
+        </div>
+      ) : (
+        children
+      )}
     </LanguageContext.Provider>
   );
 };
