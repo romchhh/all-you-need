@@ -170,8 +170,12 @@ class ModerationManager:
         negotiable_text = t(user_id, 'moderation.negotiable')
         
         if price_display:
-            # Використовуємо оригінальне значення (діапазон або "Договірна")
-            price_text = price_display if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная" else f"{price_display} {currency}"
+            if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная":
+                price_text = negotiable_text
+            elif '/год' in price_display or '/час' in price_display:
+                price_text = price_display
+            else:
+                price_text = f"{price_display} {currency}"
         else:
             # Якщо price == 0 і немає priceDisplay, можливо це "Договірна"
             if float(price) == 0:
@@ -647,9 +651,10 @@ class ModerationManager:
             
             # Формуємо текст ціни
             if price_display:
-                # Перевіряємо обидві мови для "Договірна"
                 if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная":
                     price_text = negotiable_text
+                elif '/год' in price_display or '/час' in price_display:
+                    price_text = price_display
                 else:
                     price_text = f"{price_display} {currency}"
             elif float(price) == 0:

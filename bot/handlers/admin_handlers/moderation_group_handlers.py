@@ -258,9 +258,10 @@ async def send_approval_notification(
 
             msg_title = t(telegram_id, 'my_listings.approval_title')
             msg_body = t(telegram_id, 'my_listings.approval_body_marketplace', title=title)
+            msg_platform_soon = t(telegram_id, 'my_listings.approval_platform_soon')
             msg_expires = t(telegram_id, 'my_listings.approval_expires_marketplace', date=expires_date_str)
             msg_active = t(telegram_id, 'my_listings.approval_active_days')
-            message_text = f"{msg_title}\n\n{msg_body}{msg_expires}\n\n{msg_active}"
+            message_text = f"{msg_title}\n\n{msg_body}\n\n{msg_platform_soon}{msg_expires}\n\n{msg_active}"
 
             webapp_url_with_params = f"{webapp_url}/{user_lang}/bazaar?listing={listing_id}&telegramId={telegram_id}"
             keyboard = InlineKeyboardMarkup(inline_keyboard=[

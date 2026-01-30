@@ -775,6 +775,47 @@ async def process_price(message: types.Message, state: FSMContext):
     
     text = message.text.replace(',', '.').strip()
     
+    # Перевіряємо чи це почасова оплата (наприклад "50/год", "25 €/год", "50/час", "50/hour")
+    if '/' in text and '-' not in text:
+        parts_h = [p.strip() for p in text.split('/', 1)]
+        if len(parts_h) == 2:
+            right = parts_h[1].lower().replace('.', '').strip()
+            if right in ('год', 'год.', 'г', 'г.', 'hour', 'час', 'час.'):
+                left = parts_h[0].replace('€', '').replace('eur', '').strip()
+                try:
+                    hourly_price = float(left)
+                    if hourly_price < 0:
+                        raise ValueError("Ціна не може бути від'ємною")
+                    per_hour_suffix = t(user_id, 'create_listing.price_per_hour_suffix')
+                    price_display = f"{hourly_price} {per_hour_suffix}"
+                    await state.update_data(price=hourly_price, price_display=price_display)
+                    data = await state.get_data()
+                    is_editing = data.get('location') is not None
+                    if is_editing:
+                        try:
+                            await message.delete()
+                        except Exception:
+                            pass
+                        await show_preview(user_id, state, message=message)
+                        return
+                    await state.set_state(CreateListing.waiting_for_location)
+                    last_message_id = data.get('last_message_id')
+                    if last_message_id:
+                        try:
+                            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+                        except Exception:
+                            pass
+                    sent_message = await message.answer(
+                        t(user_id, 'create_listing.location_prompt'),
+                        parse_mode="HTML",
+                        reply_markup=get_german_cities_keyboard(user_id)
+                    )
+                    await state.update_data(last_message_id=sent_message.message_id)
+                    return
+                except ValueError:
+                    await message.answer(t(user_id, 'create_listing.price_invalid'))
+                    return
+    
     # Перевіряємо чи це діапазон ціни (наприклад "50-100" або "50 - 100")
     if '-' in text:
         try:
@@ -1001,26 +1042,25 @@ def build_preview(user_id: int, data: dict) -> str:
     preview += t(user_id, 'create_listing.preview_category').format(category=category_text)
     
     # Форматуємо ціну для відображення
-    price_display = data.get('price', 0)
+    price_display = data.get('price_display') or data.get('price', 0)
     negotiable_text = t(user_id, 'moderation.negotiable')
     
     if isinstance(price_display, str):
-        # Перевіряємо обидві мови для "Договірна"
         if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная":
             price_display = negotiable_text
         elif '-' in price_display:
-            # Діапазон ціни - вже містить формат "50-100"
             price_display = f"{price_display} EUR"
+        elif '/год' in price_display or '/час' in price_display:
+            pass
         else:
-            # Звичайна ціна як рядок
             price_display = f"{price_display} EUR"
     else:
-        # Числова ціна
         price_display = f"{price_display} EUR"
     
-    # Використовуємо спеціальний формат для "Договірна"
     if price_display == negotiable_text:
         preview += t(user_id, 'create_listing.preview_price_negotiable').format(price=negotiable_text)
+    elif isinstance(price_display, str) and ('/год' in price_display or '/час' in price_display):
+        preview += t(user_id, 'create_listing.preview_price_negotiable').format(price=price_display)
     else:
         preview += t(user_id, 'create_listing.preview_price').format(price=price_display.replace(' EUR', ''))
     # Убрано preview_condition - не показуємо стан для послуг
@@ -1062,28 +1102,29 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         title = capitalize_first_letter(data['title'])
         description = capitalize_first_letter(data['description'])
         
-        # Обробляємо ціну: може бути число, діапазон або "Договірна"
+        # Обробляємо ціну: число, діапазон, почасова (€/год, €/час) або "Договірна"
         price_value = data.get('price', 0)
         is_negotiable = data.get('isNegotiable', False)
-        price_display = None  # Оригінальне значення для відображення
+        price_display = data.get('price_display')
         negotiable_text = t(user_id, 'moderation.negotiable')
         
-        if isinstance(price_value, str):
-            # Перевіряємо обидві мови для "Договірна"
+        if price_display and ('/год' in str(price_display) or '/час' in str(price_display)):
+            price_value = float(price_value) if price_value else 0
+        elif isinstance(price_value, str):
             if price_value == negotiable_text or price_value == "Договірна" or price_value == "Договорная" or is_negotiable:
-                # Для "Договірна" зберігаємо як 0, але зберігаємо оригінальне значення
                 price_display = negotiable_text
                 price_value = 0
             elif '-' in price_value:
-                # Для діапазону беремо мінімальне значення для сортування, але зберігаємо діапазон
                 try:
                     parts = price_value.split('-')
                     price_min = float(parts[0].strip())
                     price_max = float(parts[1].strip())
-                    price_display = f"{price_min}-{price_max}"  # Зберігаємо діапазон для відображення
-                    price_value = price_min  # Зберігаємо мінімальну ціну для сортування
-                except:
+                    price_display = f"{price_min}-{price_max}"
+                    price_value = price_min
+                except Exception:
                     price_value = 0
+            else:
+                price_value = 0
         else:
             price_value = float(price_value) if price_value else 0
         
@@ -1538,7 +1579,18 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         title = listing.get('title', 'Без назви')
         description = listing.get('description', t(user_id, 'moderation.no_description'))
         price = listing.get('price', 0)
+        price_display = listing.get('priceDisplay')
         currency = listing.get('currency', 'EUR')
+        negotiable_text = t(user_id, 'moderation.negotiable')
+        if price_display:
+            if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная":
+                price_text = negotiable_text
+            elif '/год' in str(price_display) or '/час' in str(price_display):
+                price_text = price_display
+            else:
+                price_text = f"{price_display} {currency}"
+        else:
+            price_text = f"{price} {currency}"
         category = listing.get('category', t(user_id, 'moderation.not_specified'))
         subcategory = listing.get('subcategory')
         condition = listing.get('condition', t(user_id, 'moderation.not_specified'))
@@ -1557,7 +1609,7 @@ async def view_telegram_listing(callback: types.CallbackQuery):
         
         message_text = f"""📦 <b>{title}</b>\n\n"""
         message_text += f"{t(user_id, 'listing.details.description')} {description[:500]}{'...' if len(description) > 500 else ''}\n\n"
-        message_text += f"{t(user_id, 'listing.details.price')} {price} {currency}\n"
+        message_text += f"{t(user_id, 'listing.details.price')} {price_text}\n"
         message_text += f"{t(user_id, 'listing.details.category')} {category}"
         if subcategory:
             message_text += f" / {subcategory}"
