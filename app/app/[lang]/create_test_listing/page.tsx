@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 export default function CreateTestListingPage() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [data, setData] = useState<{
-    user?: { id: number; telegramId: string; firstName: string | null; lastName: string | null; avatar: string | null };
+    users?: Array<{ id: number; telegramId: string; firstName: string; lastName: string; username: string; listingsCount: number }>;
     listingsCount?: number;
     listings?: Array<{ id: number; title: string; status: string }>;
   } | null>(null);
@@ -45,19 +45,22 @@ export default function CreateTestListingPage() {
       <h1 className="text-xl font-semibold mb-4">Тестові дані</h1>
 
       {status === 'loading' && (
-        <p className="text-white/70">Створюємо тестового користувача та 10 оголошень…</p>
+        <p className="text-white/70">Створюємо 3 користувачів та 100 оголошень…</p>
       )}
 
       {status === 'ok' && data && (
         <div className="space-y-4 text-left max-w-md w-full">
           <p className="text-[#D3F1A7] font-medium">Готово.</p>
-          <p>
-            Користувач: <strong>{data.user?.firstName} {data.user?.lastName}</strong> (telegramId: {data.user?.telegramId})
-          </p>
-          {data.user?.avatar && (
-            <p className="text-sm text-white/70">Аватар: {data.user.avatar}</p>
+          {data.users && data.users.length > 0 && (
+            <ul className="text-sm space-y-1">
+              {data.users.map((u) => (
+                <li key={u.id}>
+                  <strong>{u.firstName} {u.lastName}</strong> — {u.listingsCount} оголошень
+                </li>
+              ))}
+            </ul>
           )}
-          <p>Оголошень створено: <strong>{data.listingsCount ?? 0}</strong></p>
+          <p>Всього оголошень: <strong>{data.listingsCount ?? 0}</strong></p>
           {data.listings && data.listings.length > 0 && (
             <ul className="text-sm text-white/70 list-disc list-inside space-y-1">
               {data.listings.slice(0, 5).map((l) => (
