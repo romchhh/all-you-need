@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
@@ -39,6 +39,19 @@ async function handleRequest(request: NextRequest) {
         await mkdir(uploadsDir, { recursive: true });
       }
 
+      // Видаляємо всі старі аватари цього користувача (avatar_123.* та avatar_123_*)
+      const prefix = `avatar_${telegramId}`;
+      try {
+        const files = await readdir(uploadsDir);
+        for (const file of files) {
+          if (file.startsWith(`${prefix}.`) || file.startsWith(`${prefix}_`)) {
+            await unlink(join(uploadsDir, file));
+          }
+        }
+      } catch (e) {
+        // ігноруємо помилки читання/видалення
+      }
+
       // Визначаємо розширення файлу
       const originalName = avatarFile.name;
       const extension = originalName.split('.').pop()?.toLowerCase() || 'jpg';
@@ -49,7 +62,7 @@ async function handleRequest(request: NextRequest) {
       const filename = `avatar_${telegramId}.${finalExtension}`;
       const filepath = join(uploadsDir, filename);
       
-      // Просто зберігаємо файл без обробки
+      // Зберігаємо нове фото
       const bytes = await avatarFile.arrayBuffer();
       await writeFile(filepath, Buffer.from(bytes));
       

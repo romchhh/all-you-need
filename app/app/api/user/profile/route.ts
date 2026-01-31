@@ -162,9 +162,12 @@ export async function POST(request: NextRequest) {
 
     let avatarPath: string | null = null;
 
-    // Завантажуємо фото профілю якщо є
-    if (photoUrl) {
+    // Завантажуємо фото з Telegram тільки один раз — якщо у користувача ще немає аватара
+    const hasExistingAvatar = user?.avatar && String(user.avatar).trim().length > 0;
+    if (photoUrl && !hasExistingAvatar) {
       avatarPath = await downloadProfilePhoto(photoUrl, Number(telegramId));
+    } else if (hasExistingAvatar) {
+      avatarPath = user.avatar;
     }
 
     // Якщо фото немає, створюємо аватар з ініціалами
