@@ -154,12 +154,6 @@ const TEST_LISTINGS = [
   },
 ];
 
-function isAllowed(request: NextRequest): boolean {
-  if (process.env.NODE_ENV === 'development') return true;
-  const secret = request.nextUrl.searchParams.get('secret');
-  return secret === process.env.CREATE_TEST_SECRET;
-}
-
 async function downloadAvatar(): Promise<string> {
   const res = await fetch(AVATAR_URL);
   if (!res.ok) throw new Error('Failed to fetch avatar');
@@ -183,11 +177,7 @@ export async function POST(request: NextRequest) {
   return handle(request);
 }
 
-async function handle(request: NextRequest) {
-  if (!isAllowed(request)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
+async function handle(_request: NextRequest) {
   try {
     const avatarPath = await downloadAvatar();
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);

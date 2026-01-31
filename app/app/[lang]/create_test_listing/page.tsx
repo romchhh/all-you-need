@@ -74,7 +74,7 @@ export default function CreateTestListingPage() {
       )}
 
       <p className="mt-8 text-white/50 text-sm">
-        Сторінка тільки для створення тестових даних. У production додай ?secret=... або встанови CREATE_TEST_SECRET.
+        Сторінка для створення тестових даних.
       </p>
     </div>
   );
