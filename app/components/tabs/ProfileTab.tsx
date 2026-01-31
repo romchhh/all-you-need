@@ -245,13 +245,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     }
   };
 
-  // Функція для завантаження оголошень з фільтрами
+  const LISTINGS_PAGE_SIZE = 20;
+
+  // Функція для завантаження оголошень з фільтрами (20 за раз, коректний offset і hasMore)
   const fetchListingsWithFilters = async (offset = 0, reset = false) => {
     if (!profile?.telegramId) return;
-    
-    let url = `/api/listings?userId=${profile.telegramId}&viewerId=${profile.telegramId}&limit=16&offset=${offset}`;
+
+    let url = `/api/listings?userId=${profile.telegramId}&viewerId=${profile.telegramId}&limit=${LISTINGS_PAGE_SIZE}&offset=${offset}`;
     if (selectedStatus !== 'all') {
-      // API підтримує обидва варіанти 'deactivated' та 'hidden'
       url += `&status=${selectedStatus}`;
     }
     if (selectedCategory !== 'all') {
@@ -265,17 +266,21 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         return { listings: [], total: 0 };
       }
       const data = await response.json();
-      
+      const list = data.listings || [];
+      const total = data.total ?? 0;
+
       if (reset) {
-        setUserListings(data.listings || []);
-        setListingsOffset(16);
+        setUserListings(list);
+        setListingsOffset(list.length);
+        setTotalListings(total);
+        setHasMore(list.length < total);
       } else {
-        setUserListings(prev => [...prev, ...(data.listings || [])]);
-        setListingsOffset(prev => prev + 16);
+        setUserListings(prev => [...prev, ...list]);
+        const newOffset = offset + list.length;
+        setListingsOffset(newOffset);
+        setTotalListings(total);
+        setHasMore(newOffset < total);
       }
-      
-      setTotalListings(data.total || 0);
-      setHasMore((data.listings?.length || 0) < (data.total || 0));
       return data;
     } catch (err) {
       console.error('Error fetching user listings:', err);
@@ -407,13 +412,21 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     tg?.HapticFeedback.impactOccurred('light');
   };
 
-  // Оновлюємо оголошення при зміні фільтрів
+  // При зміні фільтрів — перезавантажити оголошення з offset 0 (як у каталозі)
+  const prevFilterKeyRef = useRef<string | null>(null);
   useEffect(() => {
+    const key = `${selectedStatus}|${selectedCategory}`;
+    if (prevFilterKeyRef.current === null) {
+      prevFilterKeyRef.current = key;
+      return;
+    }
+    if (prevFilterKeyRef.current === key) return;
+    prevFilterKeyRef.current = key;
     if (profile?.telegramId) {
       fetchListingsWithFilters(0, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus, selectedCategory, profile?.telegramId]);
+  }, [selectedStatus, selectedCategory]);
 
   if (loading) {
     return (

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId');
     const viewerId = searchParams.get('viewerId'); // ID користувача, який переглядає профіль
     const sortBy = searchParams.get('sortBy') || 'newest';
-    const limit = parseInt(searchParams.get('limit') || '16');
+    const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
 
     // Якщо це запит для профілю користувача (userId), показуємо всі його оголошення
