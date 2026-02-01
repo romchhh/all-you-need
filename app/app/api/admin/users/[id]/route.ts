@@ -225,9 +225,17 @@ export async function DELETE(
       // Таблиця може не існувати
     }
 
-    await executeWithRetry(() =>
-      prisma.user.delete({ where: { id: userId } })
+    // Сирий SQL, щоб уникнути помилки Prisma при парсингу DateTime (в БД дати як "YYYY-MM-DD HH:MM:SS")
+    const result = await executeWithRetry(() =>
+      prisma.$executeRawUnsafe('DELETE FROM User WHERE id = ?', userId)
     );
+
+    if (typeof result === 'number' && result === 0) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -235,12 +243,6 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
-      );
-    }
-    if (error?.code === 'P2025') {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
       );
     }
     console.error('Error deleting user:', error);
