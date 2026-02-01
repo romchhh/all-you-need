@@ -44,6 +44,7 @@ export default function AdminUserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -94,6 +95,29 @@ export default function AdminUserDetailPage() {
       alert('Помилка підключення до сервера');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!user) return;
+    if (!confirm('Видалити користувача з бази? Він зможе пройти реєстрацію заново. Всі оголошення та дані будуть видалені.')) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      const response = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+
+      if (response.ok) {
+        router.push('/admin/users');
+      } else {
+        const data = await response.json().catch(() => ({}));
+        alert(data.error || 'Помилка видалення користувача');
+      }
+    } catch (err) {
+      alert('Помилка підключення до сервера');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -175,17 +199,26 @@ export default function AdminUserDetailPage() {
             </div>
           </div>
         </div>
-        <button
-          onClick={handleToggleStatus}
-          disabled={updating}
-          className={`w-full sm:w-auto px-3 sm:px-4 py-2 rounded-md transition-colors text-sm sm:text-base ${
-            user.isActive
-              ? 'bg-red-600 hover:bg-red-700 text-white'
-              : 'bg-green-600 hover:bg-green-700 text-white'
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
-        >
-          {updating ? 'Обробка...' : user.isActive ? 'Заблокувати' : 'Розблокувати'}
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={handleToggleStatus}
+            disabled={updating || deleting}
+            className={`w-full sm:w-auto px-3 sm:px-4 py-2 rounded-md transition-colors text-sm sm:text-base ${
+              user.isActive
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-green-600 hover:bg-green-700 text-white'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {updating ? 'Обробка...' : user.isActive ? 'Заблокувати' : 'Розблокувати'}
+          </button>
+          <button
+            onClick={handleDeleteUser}
+            disabled={updating || deleting}
+            className="w-full sm:w-auto px-3 sm:px-4 py-2 rounded-md bg-gray-800 hover:bg-gray-900 text-white transition-colors text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deleting ? 'Видалення...' : 'Видалити користувача'}
+          </button>
+        </div>
       </div>
 
       {/* Основна інформація */}

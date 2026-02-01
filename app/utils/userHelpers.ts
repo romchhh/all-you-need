@@ -189,3 +189,20 @@ export function parseTelegramId(telegramId: string | number): number {
   }
   return parsed;
 }
+
+/**
+ * Повертає userId та isActive за telegramId. null якщо користувача немає.
+ * Використовується для перевірки блокування в API.
+ */
+export async function getUserIdAndActive(telegramId: number): Promise<{ userId: number; isActive: boolean } | null> {
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT id, isActive FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+    telegramId
+  ) as Array<{ id: number; isActive: number }>;
+
+  if (rows.length === 0) return null;
+  return {
+    userId: rows[0].id,
+    isActive: rows[0].isActive === 1,
+  };
+}

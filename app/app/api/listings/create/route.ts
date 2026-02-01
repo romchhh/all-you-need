@@ -7,6 +7,7 @@ import {
   createDraftListing,
   submitListingToModeration,
 } from '@/utils/listingHelpers';
+import { getUserIdAndActive } from '@/utils/userHelpers';
 import { prisma } from '@/lib/prisma';
 
 // Збільшуємо максимальний час виконання до 5 хвилин для обробки великих файлів
@@ -88,6 +89,18 @@ export async function POST(request: NextRequest) {
         { error: 'At least one image is required' },
         { status: 400 }
       );
+    }
+
+    const telegramIdNum = parseInt(telegramId, 10);
+    if (isNaN(telegramIdNum)) {
+      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
+    }
+    const u = await getUserIdAndActive(telegramIdNum);
+    if (!u) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (!u.isActive) {
+      return NextResponse.json({ error: 'blocked' }, { status: 403 });
     }
 
     // Валідація розміру файлів (5 МБ на файл)

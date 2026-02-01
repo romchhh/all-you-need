@@ -33,6 +33,7 @@ export const useUser = () => {
   const searchParams = useSearchParams();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [currentTelegramId, setCurrentTelegramId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -114,7 +115,12 @@ export const useUser = () => {
       if (response.ok) {
         const data = await response.json();
         setProfile(data);
+        setIsBlocked(false);
+      } else if (response.status === 403) {
+        setProfile(null);
+        setIsBlocked(true);
       } else if (response.status === 404) {
+        setIsBlocked(false);
         let telegramUser: any = null;
         if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user) {
           telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
@@ -160,6 +166,6 @@ export const useUser = () => {
     }
   };
 
-  return { profile, loading, refetch };
+  return { profile, loading, refetch, isBlocked };
 };
 

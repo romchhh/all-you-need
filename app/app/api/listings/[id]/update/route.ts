@@ -11,6 +11,7 @@ import {
   needsReactivation,
   submitListingToModeration,
 } from '@/utils/listingHelpers';
+import { getUserIdAndActive } from '@/utils/userHelpers';
 
 interface Listing {
   userId: number;
@@ -40,6 +41,18 @@ export async function PUT(
     const condition = formData.get('condition') as string | null;
     const location = formData.get('location') as string;
     const requestedStatus = formData.get('status') as string | null;
+
+    const telegramIdNum = parseInt(telegramId, 10);
+    if (isNaN(telegramIdNum)) {
+      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
+    }
+    const u = await getUserIdAndActive(telegramIdNum);
+    if (!u) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (!u.isActive) {
+      return NextResponse.json({ error: 'blocked' }, { status: 403 });
+    }
 
     // Знаходимо користувача
     const user = await findUserByTelegramIdForListing(telegramId);

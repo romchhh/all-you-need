@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getUserIdAndActive } from '@/utils/userHelpers';
 
 export async function DELETE(
   request: NextRequest,
@@ -18,18 +19,19 @@ export async function DELETE(
       );
     }
 
-    // Перевіряємо чи користувач є власником
-    const user = await prisma.$queryRawUnsafe(
-      `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-      parseInt(telegramId)
-    ) as Array<{ id: number }>;
-
-    if (!user[0]) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    const telegramIdNum = parseInt(telegramId, 10);
+    if (isNaN(telegramIdNum)) {
+      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
     }
+    const u = await getUserIdAndActive(telegramIdNum);
+    if (!u) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (!u.isActive) {
+      return NextResponse.json({ error: 'blocked' }, { status: 403 });
+    }
+
+    const user = [{ id: u.userId }];
 
     const listing = await prisma.$queryRawUnsafe(
       `SELECT userId FROM Listing WHERE id = ?`,

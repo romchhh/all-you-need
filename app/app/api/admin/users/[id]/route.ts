@@ -197,3 +197,56 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    await requireAdminAuth();
+
+    const { id } = await params;
+    const userId = parseInt(id, 10);
+
+    if (isNaN(userId)) {
+      return NextResponse.json(
+        { error: 'Invalid user ID' },
+        { status: 400 }
+      );
+    }
+
+    // Видаляємо сесії (таблиця UserSession не в Prisma, каскад не спрацює)
+    try {
+      await prisma.$executeRawUnsafe(
+        'DELETE FROM UserSession WHERE userId = ?',
+        userId
+      );
+    } catch {
+      // Таблиця може не існувати
+    }
+
+    await executeWithRetry(() =>
+      prisma.user.delete({ where: { id: userId } })
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    if (error?.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+    console.error('Error deleting user:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete user' },
+      { status: 500 }
+    );
+  }
+}

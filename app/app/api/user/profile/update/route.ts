@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getUserIdAndActive } from '@/utils/userHelpers';
 import { writeFile, mkdir, readdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -21,6 +22,14 @@ async function handleRequest(request: NextRequest) {
     }
 
     const telegramIdNum = parseInt(telegramId);
+    const u = await getUserIdAndActive(telegramIdNum);
+    if (!u) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (!u.isActive) {
+      return NextResponse.json({ error: 'blocked' }, { status: 403 });
+    }
+
     let avatarPath: string | null = null;
 
     // Завантажуємо нове фото якщо є - просто замінюємо без обробки

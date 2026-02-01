@@ -158,6 +158,12 @@ export async function POST(request: NextRequest) {
       `
       );
       user = fullUsers[0];
+      if (user && !user.isActive) {
+        return NextResponse.json(
+          { error: 'blocked' },
+          { status: 403 }
+        );
+      }
     }
 
     let avatarPath: string | null = null;
@@ -356,15 +362,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { executeWithRetry, ensureUserSessionTable, updateUserActivity } = await import('@/lib/prisma');
-    
-    // Оновлюємо активність користувача
-    try {
-      await ensureUserSessionTable();
-      await updateUserActivity(telegramIdNum);
-    } catch (err) {
-      // Тиха обробка помилок - не блокуємо відповідь
-    }
-    
+
     const users = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
         `SELECT 
@@ -379,6 +377,7 @@ export async function GET(request: NextRequest) {
           listingPackagesBalance,
           rating,
           reviewsCount,
+          isActive,
           createdAt
         FROM User
         WHERE CAST(telegramId AS INTEGER) = ?`,
@@ -395,10 +394,11 @@ export async function GET(request: NextRequest) {
         listingPackagesBalance: number | bigint;
         rating: number | bigint;
         reviewsCount: number | bigint;
+        isActive: number | boolean;
         createdAt: string;
       }>>
     );
-    
+
     const userData = users[0];
 
     if (!userData) {
@@ -406,6 +406,22 @@ export async function GET(request: NextRequest) {
         { error: 'User not found' },
         { status: 404 }
       );
+    }
+
+    const isActive = userData.isActive === 1 || userData.isActive === true;
+    if (!isActive) {
+      return NextResponse.json(
+        { error: 'blocked' },
+        { status: 403 }
+      );
+    }
+
+    // Оновлюємо активність користувача (тільки для активних)
+    try {
+      await ensureUserSessionTable();
+      await updateUserActivity(telegramIdNum);
+    } catch (err) {
+      // Тиха обробка помилок - не блокуємо відповідь
     }
 
     const telegramIdResponse = typeof userData.telegramId === 'bigint'

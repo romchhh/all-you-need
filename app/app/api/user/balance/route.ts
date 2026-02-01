@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByTelegramId, getUserBalance, parseTelegramId } from '@/utils/userHelpers';
+import { findUserByTelegramId, getUserBalance, getUserIdAndActive, parseTelegramId } from '@/utils/userHelpers';
 import { updateUserBalance } from '@/utils/userHelpers';
 import { createTransaction } from '@/utils/dbHelpers';
 
@@ -17,6 +17,14 @@ export async function GET(request: NextRequest) {
     }
 
     const telegramId = parseTelegramId(telegramIdRaw);
+    const u = await getUserIdAndActive(telegramId);
+    if (!u) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (!u.isActive) {
+      return NextResponse.json({ error: 'blocked' }, { status: 403 });
+    }
+
     const balance = await getUserBalance(telegramId);
 
     if (!balance) {
@@ -50,6 +58,14 @@ export async function POST(request: NextRequest) {
     }
 
     const telegramId = parseTelegramId(telegramIdRaw);
+    const u = await getUserIdAndActive(telegramId);
+    if (!u) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (!u.isActive) {
+      return NextResponse.json({ error: 'blocked' }, { status: 403 });
+    }
+
     const user = await findUserByTelegramId(telegramId);
 
     if (!user) {

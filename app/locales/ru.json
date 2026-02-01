@@ -50,7 +50,8 @@
     "hour": "час",
     "hours": "часов",
     "soon": "скоро",
-    "telebotsBranding": "TeleBots | Разработка сайтов"
+    "telebotsBranding": "TeleBots | Разработка сайтов",
+    "blocked": "Вы заблокированы. Свяжитесь с поддержкой для уточнения."
   },
   "navigation": {
     "bazaar": "Главная",

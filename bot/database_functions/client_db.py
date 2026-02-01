@@ -102,7 +102,16 @@ def check_user(user_id: str):
     user = cursor.fetchone()
     if user:
         return True
-    return False    
+    return False
+
+
+def is_user_active(user_id):
+    """Повертає True якщо користувач існує і не заблокований (isActive=1)."""
+    cursor.execute('SELECT isActive FROM User WHERE telegramId = ?', (int(user_id),))
+    row = cursor.fetchone()
+    if not row:
+        return False
+    return row[0] == 1    
 
 
 def update_user_activity(user_id: str):

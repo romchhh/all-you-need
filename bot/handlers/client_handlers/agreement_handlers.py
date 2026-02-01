@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from main import bot
 from config import bot_username
-from database_functions.client_db import check_user, add_user, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar, update_user_activity, get_username_by_user_id, update_user_username
+from database_functions.client_db import check_user, add_user, is_user_active, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar, update_user_activity, get_username_by_user_id, update_user_username
 from database_functions.create_dbs import create_dbs
 from database_functions.links_db import increment_link_count
 from database_functions.prisma_db import PrismaDB
@@ -51,8 +51,16 @@ async def start_command(message: types.Message):
                 pass
 
     user_exists = check_user(user_id)
-    
-    # Створюємо користува   челя якщо його немає
+
+    # Заблоковані користувачі не мають доступу до бота
+    if user_exists and not is_user_active(user_id):
+        await message.answer(
+            t(user_id, 'common.blocked') or "Ви заблоковані. Зв'яжіться з підтримкою.",
+            parse_mode="HTML"
+        )
+        return
+
+    # Створюємо користувача якщо його немає
     if not user_exists:
         avatar_path = None
         try:
