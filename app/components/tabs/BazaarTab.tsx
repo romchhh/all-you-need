@@ -450,28 +450,16 @@ const BazaarTabComponent = ({
     const hasSearch = Boolean(trimmedQuery);
     const lowerQuery = hasSearch ? trimmedQuery.toLowerCase() : '';
     
-    // Обмеження: при пошуку показуємо максимум 10 результатів для швидкості
-    const MAX_SEARCH_RESULTS = 20;
-
-    // Фільтр по пошуку (найважливіший фільтр - застосовуємо першим для швидшого відсіювання)
+    // Фільтр по пошуку (при серверному пошуку listings вже відфільтровані; тут лише для миттєвого введення до debounce)
     if (hasSearch) {
-      const searchResults: typeof filtered = [];
-      
-      // Обмежуємо пошук для швидкості - зупиняємось після знаходження MAX_SEARCH_RESULTS
-      for (let i = 0; i < filtered.length && searchResults.length < MAX_SEARCH_RESULTS; i++) {
-        const listing = filtered[i];
+      filtered = filtered.filter(listing => {
         const titleLower = listing.title.toLowerCase();
         const descLower = listing.description.toLowerCase();
         const locationLower = listing.location.toLowerCase();
-        
-        if (titleLower.includes(lowerQuery) || 
-            descLower.includes(lowerQuery) || 
-            locationLower.includes(lowerQuery)) {
-          searchResults.push(listing);
-        }
-      }
-      
-      filtered = searchResults;
+        return titleLower.includes(lowerQuery) ||
+          descLower.includes(lowerQuery) ||
+          locationLower.includes(lowerQuery);
+      });
       
       // Якщо є пошук, не застосовуємо категорії (повертаємо всі результати пошуку)
       // Застосовуємо тільки інші фільтри

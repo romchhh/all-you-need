@@ -463,6 +463,7 @@ export async function GET(request: NextRequest) {
       const countQuery = `
         SELECT COUNT(*) as count
         FROM Listing l
+        JOIN User u ON l.userId = u.id
         ${whereClause}
       `;
       

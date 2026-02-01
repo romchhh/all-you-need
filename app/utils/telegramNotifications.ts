@@ -199,3 +199,28 @@ export async function sendListingExpiringWarning(
     disable_notification: true, // Не шумимо
   });
 }
+
+/**
+ * Повідомлення про нарахування коштів на баланс (з адмін-панелі) — українською та російською.
+ */
+export async function sendBalanceCreditedNotification(
+  telegramId: number | string,
+  amount: number,
+  newBalance: number
+): Promise<boolean> {
+  const amountStr = amount.toFixed(2);
+  const balanceStr = newBalance.toFixed(2);
+
+  const message =
+    `💰 <b>На ваш баланс нараховано кошти</b>\n\n` +
+    `Вам нараховано <b>${amountStr} EUR</b>.\n` +
+    `Поточний баланс: <b>${balanceStr} EUR</b>\n\n` +
+    `Кошти можна використовувати для платного просування оголошень.\n\n` +
+    `———\n\n` +
+    `💰 <b>На ваш баланс зачислены средства</b>\n\n` +
+    `Вам начислено <b>${amountStr} EUR</b>.\n` +
+    `Текущий баланс: <b>${balanceStr} EUR</b>\n\n` +
+    `Средства можно использовать для продвижения объявлений.`;
+
+  return await sendTelegramMessage(telegramId, message);
+}

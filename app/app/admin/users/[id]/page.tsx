@@ -45,6 +45,9 @@ export default function AdminUserDetailPage() {
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [creditAmount, setCreditAmount] = useState('');
+  const [crediting, setCrediting] = useState(false);
+  const [creditMessage, setCreditMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -118,6 +121,47 @@ export default function AdminUserDetailPage() {
       alert('Помилка підключення до сервера');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleCreditBalance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    const amount = parseFloat(creditAmount.replace(',', '.'));
+    if (isNaN(amount) || amount <= 0) {
+      setCreditMessage({ type: 'error', text: 'Введіть коректну суму (додатнє число)' });
+      return;
+    }
+
+    setCreditMessage(null);
+    try {
+      setCrediting(true);
+      const response = await fetch(`/api/admin/users/${id}/credit-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data.success) {
+        setCreditMessage({
+          type: 'success',
+          text: `Нараховано ${data.creditedAmount.toFixed(2)} EUR. Новий баланс: ${data.newBalance.toFixed(2)} EUR.`,
+        });
+        setCreditAmount('');
+        fetchUser();
+      } else {
+        setCreditMessage({
+          type: 'error',
+          text: data.error || 'Помилка нарахування балансу',
+        });
+      }
+    } catch (err) {
+      setCreditMessage({ type: 'error', text: 'Помилка підключення до сервера' });
+    } finally {
+      setCrediting(false);
     }
   };
 
@@ -240,6 +284,51 @@ export default function AdminUserDetailPage() {
           title="Остання активність"
           value={user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleDateString('uk-UA') : 'Ніколи'}
         />
+      </div>
+
+      {/* Нарахування на баланс */}
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
+          Нарахувати на баланс
+        </h2>
+        <p className="text-sm text-gray-600 mb-3">
+          Додайте кошти на баланс користувача (наприклад, за співпрацю). Сума вказується в EUR.
+        </p>
+        <form onSubmit={handleCreditBalance} className="flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="credit-amount" className="block text-xs font-medium text-gray-700 mb-1">
+              Сума (EUR)
+            </label>
+            <input
+              id="credit-amount"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
+              className="w-full sm:w-32 px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={crediting}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={crediting || !creditAmount.trim()}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {crediting ? 'Нарахування...' : 'Нарахувати'}
+          </button>
+        </form>
+        {creditMessage && (
+          <div
+            className={`mt-3 px-3 py-2 rounded-md text-sm ${
+              creditMessage.type === 'success'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}
+          >
+            {creditMessage.text}
+          </div>
+        )}
       </div>
 
       {/* Контактна інформація */}

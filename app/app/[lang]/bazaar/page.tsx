@@ -189,8 +189,8 @@ const BazaarPage = () => {
   const [listingsOffset, setListingsOffset] = useState(0);
   const { tg } = useTelegram();
 
-  /** Побудова URL для API оголошень з поточними фільтрами (категорія, підкатегорія, сортування, безкоштовні). */
-  const buildListingsUrl = useCallback((limit: number, offset: number) => {
+  /** Побудова URL для API оголошень з поточними фільтрами та пошуком (щоб пагінація і «Показати більше» працювали коректно). */
+  const buildListingsUrl = useCallback((limit: number, offset: number, searchQueryForApi?: string) => {
     const params = new URLSearchParams();
     params.set('limit', String(limit));
     params.set('offset', String(offset));
@@ -198,8 +198,10 @@ const BazaarPage = () => {
     if (bazaarTabState.selectedCategory) params.set('category', bazaarTabState.selectedCategory);
     if (bazaarTabState.selectedSubcategory) params.set('subcategory', bazaarTabState.selectedSubcategory);
     if (bazaarTabState.showFreeOnly) params.set('isFree', 'true');
+    const searchTrimmed = (searchQueryForApi ?? debouncedSearchQuery ?? '').trim();
+    if (searchTrimmed) params.set('search', searchTrimmed);
     return `/api/listings?${params.toString()}`;
-  }, [bazaarTabState.sortBy, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.showFreeOnly]);
+  }, [bazaarTabState.sortBy, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.showFreeOnly, debouncedSearchQuery]);
   const { toast, showToast, hideToast } = useToast();
   
   // ВИДАЛЕНО: Вся складна логіка з isReturningFromListing, scrollToLastViewedListing, 
@@ -253,14 +255,18 @@ const BazaarPage = () => {
   const hasActiveFilters = Boolean(
     bazaarTabState.selectedCategory || bazaarTabState.selectedSubcategory || bazaarTabState.showFreeOnly
   );
+  const hasSearchQuery = Boolean((debouncedSearchQuery ?? '').trim());
 
-  // Функція завантаження оголошень (з фільтрами: категорія, підкатегорія, сортування, безкоштовні)
-  const fetchListings = useCallback(async (forceRefresh: boolean = false) => {
+  // Функція завантаження оголошень (з фільтрами та пошуком)
+  const fetchListings = useCallback(async (forceRefresh: boolean = false, initialSearch?: string) => {
     try {
       setLoading(true);
 
-      // Кеш тільки без фільтрів і без примусового оновлення
-      if (!forceRefresh && !hasActiveFilters && typeof window !== 'undefined') {
+      const searchForRequest = (initialSearch ?? debouncedSearchQuery ?? '').trim();
+      const useSearch = Boolean(searchForRequest);
+
+      // Кеш тільки без фільтрів, без пошуку і без примусового оновлення
+      if (!forceRefresh && !hasActiveFilters && !useSearch && typeof window !== 'undefined') {
         const cachedState = sessionStorage.getItem('bazaarListingsState');
         if (cachedState) {
           try {
@@ -280,7 +286,7 @@ const BazaarPage = () => {
         }
       }
 
-      const response = await fetch(buildListingsUrl(PAGE_SIZE, 0));
+      const response = await fetch(buildListingsUrl(PAGE_SIZE, 0, searchForRequest || undefined));
       if (response.ok) {
         const data = await response.json();
         const list = data.listings || [];
@@ -291,7 +297,7 @@ const BazaarPage = () => {
         setHasMore(more);
         setListingsOffset(list.length);
 
-        if (!hasActiveFilters && typeof window !== 'undefined') {
+        if (!hasActiveFilters && !useSearch && typeof window !== 'undefined') {
           setCachedData('bazaarListingsState', {
             listings: list,
             total,
@@ -318,37 +324,43 @@ const BazaarPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [showToast, t, buildListingsUrl, hasActiveFilters, PAGE_SIZE]);
+  }, [showToast, t, buildListingsUrl, hasActiveFilters, hasSearchQuery, PAGE_SIZE]);
 
   const hasLoadedListings = useRef(false);
   const previousFilterKey = useRef<string | null>(null);
 
-  // Перше завантаження (без фільтрів — можна з кешу)
+  // Ключ фільтрів (категорія, пошук тощо) — однаковий формат для першого завантаження та рефетчу
+  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(debouncedSearchQuery ?? '').trim()}`;
+
+  // Перше завантаження (без фільтрів і без пошуку — можна з кешу; якщо є пошук — одразу з пошуком)
   useEffect(() => {
     if (listings.length > 0 && hasLoadedListings.current) return;
 
+    const searchTrimmed = (searchQuery || '').trim();
     const cached = getCachedData('bazaarListingsState');
-    if (cached && cached.listings && cached.listings.length > 0 && !hasActiveFilters) {
+    if (cached && cached.listings && cached.listings.length > 0 && !hasActiveFilters && !searchTrimmed) {
       setListings(cached.listings || []);
       setTotalListings(cached.total || 0);
       setHasMore((cached.listings?.length ?? 0) < (cached.total ?? 0));
       setListingsOffset(cached.offset ?? PAGE_SIZE);
       setLoading(false);
       hasLoadedListings.current = true;
-      previousFilterKey.current = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}`;
+      previousFilterKey.current = filterKey;
       return;
     }
 
     if (!hasLoadedListings.current) {
       hasLoadedListings.current = true;
-      previousFilterKey.current = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}`;
-      fetchListings(false);
+      // Ключ з поточним пошуком (щоб після debounce не робити зайвий рефетч)
+      previousFilterKey.current = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${searchTrimmed}`;
+      // Якщо в полі пошуку вже є текст (наприклад з localStorage) — одразу завантажуємо з пошуком
+      fetchListings(false, searchTrimmed || undefined);
     }
-  }, [fetchListings, hasActiveFilters, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly]);
+  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery]);
 
-  // При зміні фільтрів — перезавантажити з offset 0 з тими ж фільтрами
+  // При зміні фільтрів або пошуку — перезавантажити з offset 0
   useEffect(() => {
-    const key = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}`;
+    const key = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(debouncedSearchQuery ?? '').trim()}`;
     if (previousFilterKey.current === null) {
       previousFilterKey.current = key;
       return;
@@ -364,7 +376,7 @@ const BazaarPage = () => {
     setTotalListings(0);
     setHasMore(false);
     fetchListings(true);
-  }, [bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, fetchListings]);
+  }, [bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, fetchListings]);
 
 
   // Функція для оновлення даних (pull-to-refresh)
@@ -412,7 +424,7 @@ const BazaarPage = () => {
         setTotalListings(total);
         setHasMore(newHasMore);
         tg?.HapticFeedback.impactOccurred('light');
-        if (!hasActiveFilters && typeof window !== 'undefined') {
+        if (!hasActiveFilters && !hasSearchQuery && typeof window !== 'undefined') {
           setCachedData('bazaarListingsState', {
             listings: newListings,
             total,
