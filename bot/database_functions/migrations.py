@@ -41,9 +41,14 @@ NEW_CATEGORIES: List[Dict[str, Any]] = [
         "sortOrder": 7,
     },
     {
+        "name": "Краса та здоров'я",
+        "icon": "💆",
+        "sortOrder": 8,
+    },
+    {
         "name": "Інше",
         "icon": "❓",
-        "sortOrder": 8,
+        "sortOrder": 9,
     },
 ]
 
@@ -77,6 +82,47 @@ def apply_new_categories() -> None:
             """,
             (name, icon, sort_order),
         )
+
+    conn.commit()
+    conn.close()
+
+
+def ensure_categories_exist() -> None:
+    """
+    М'яка міграція: додає відсутні категорії та оновлює sortOrder.
+    Не видаляє існуючі категорії. Викликається при запуску бота.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    for cat in NEW_CATEGORIES:
+        name = cat["name"]
+        icon = cat["icon"]
+        sort_order = cat["sortOrder"]
+        
+        # Перевіряємо чи категорія існує
+        cursor.execute(
+            "SELECT id FROM Category WHERE name = ? AND parentId IS NULL",
+            (name,)
+        )
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Оновлюємо sortOrder якщо категорія вже існує
+            cursor.execute(
+                "UPDATE Category SET sortOrder = ?, icon = ? WHERE name = ? AND parentId IS NULL",
+                (sort_order, icon, name)
+            )
+        else:
+            # Додаємо нову категорію
+            cursor.execute(
+                """
+                INSERT INTO Category (name, icon, parentId, sortOrder, isActive, createdAt)
+                VALUES (?, ?, NULL, ?, 1, CURRENT_TIMESTAMP)
+                """,
+                (name, icon, sort_order),
+            )
+            print(f"Додано нову категорію: {name}")
 
     conn.commit()
     conn.close()

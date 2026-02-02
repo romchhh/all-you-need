@@ -41,6 +41,14 @@ async def main():
     from handlers.admin_handlers.links_handlers import router as links_router
     from handlers.admin_handlers.admin_management_handlers import router as admin_management_router
     from handlers.admin_handlers.moderation_group_handlers import router as moderation_group_router
+    from database_functions.migrations import ensure_categories_exist
+    
+    # Виконуємо міграцію категорій при запуску
+    try:
+        ensure_categories_exist()
+    except Exception as e:
+        logging.warning(f"Categories migration warning: {e}")
+    
     dp.include_router(agreement_router)
     dp.include_router(client_router)
     dp.include_router(about_us_router)

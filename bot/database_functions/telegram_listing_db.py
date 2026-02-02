@@ -402,9 +402,15 @@ def init_categories_if_empty():
             'subcategories': []
         },
         {
+            'name': 'Краса та здоров\'я',
+            'icon': '💆',
+            'sortOrder': 8,
+            'subcategories': []
+        },
+        {
             'name': 'Інше',
             'icon': '❓',
-            'sortOrder': 8,
+            'sortOrder': 9,
             'subcategories': []
         },
     ]

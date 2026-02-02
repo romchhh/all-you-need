@@ -489,6 +489,7 @@ TEXTS = {
         "auto_services": "Автоуслуги",
         "business_ad": "Реклама бизнеса",
         "kids_services": "Услуги для детей",
+        "beauty_health": "Красота и здоровье",
         "other": "Другое"
     },
     "payment": {

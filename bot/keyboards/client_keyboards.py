@@ -232,6 +232,7 @@ def get_category_translation(user_id: int, category_name: str) -> str:
         'Автопослуги': 'categories.auto_services',
         'Реклама бізнесу': 'categories.business_ad',
         'Послуги для дітей': 'categories.kids_services',
+        'Краса та здоров\'я': 'categories.beauty_health',
         'Інше': 'categories.other',
         # Російські назви (на випадок якщо в БД будуть російські)
         'Услуги': 'categories.services',
@@ -241,6 +242,7 @@ def get_category_translation(user_id: int, category_name: str) -> str:
         'Автоуслуги': 'categories.auto_services',
         'Реклама бизнеса': 'categories.business_ad',
         'Услуги для детей': 'categories.kids_services',
+        'Красота и здоровье': 'categories.beauty_health',
         'Другое': 'categories.other'
     }
     
