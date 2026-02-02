@@ -32,17 +32,18 @@ def get_username_prompt_keyboard(user_id: int) -> InlineKeyboardMarkup:
     """Клавіатура для кроку «немає юзернейму» на початку реєстрації."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text=t(user_id, 'registration.continue_without_username'),
-            callback_data=f"username_skip_{user_id}"
-        )],
-        [InlineKeyboardButton(
             text=t(user_id, 'registration.added_username'),
             callback_data=f"username_check_{user_id}"
+        )],
+        [InlineKeyboardButton(
+            text=t(user_id, 'registration.use_phone_instead'),
+            callback_data=f"username_use_phone_{user_id}"
         )]
     ])
 
 
 def get_phone_share_keyboard(user_id: int) -> ReplyKeyboardMarkup:
+    """Одна кнопка — поділитися номером (для користувачів без username після оферти)."""
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=t(user_id, 'phone.share_button'), request_contact=True)]],
         resize_keyboard=True,

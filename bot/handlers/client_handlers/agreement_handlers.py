@@ -146,10 +146,14 @@ async def start_command(message: types.Message):
         )
         return
 
+    # Перевіряємо наявність номера телефону
     user_phone = get_user_phone(user_id)
-    if not user_phone:
+    current_username = username if username else None
+    
+    # Просимо номер тільки якщо немає юзернейму
+    if not user_phone and not current_username:
         await message.answer(
-            t(user_id, 'phone.request'),
+            t(user_id, 'phone.request_no_username'),
             reply_markup=get_phone_share_keyboard(user_id),
             parse_mode="HTML"
         )
@@ -385,11 +389,40 @@ async def agree_agreement(callback: types.CallbackQuery):
         
         await callback.message.delete()
         
-        await callback.message.answer(
-            f"{t(user_id, 'agreement.agreed')}\n\n{t(user_id, 'phone.request')}",
-            reply_markup=get_phone_share_keyboard(user_id),
-            parse_mode="HTML"
-        )
+        # Перевіряємо наявність username
+        current_username = (callback.from_user.username or "").strip()
+        
+        # Якщо немає юзернейму — просимо номер (якщо ще не поділилися), інакше головне меню
+        if not current_username or current_username.lower() == TEST_USERNAME_AS_MISSING:
+            if not get_user_phone(user_id):
+                await callback.message.answer(
+                    f"{t(user_id, 'agreement.agreed')}\n\n{t(user_id, 'phone.request_no_username')}",
+                    reply_markup=get_phone_share_keyboard(user_id),
+                    parse_mode="HTML"
+                )
+            else:
+                await callback.message.answer(t(user_id, 'agreement.agreed'), parse_mode="HTML")
+                welcome_text = t(user_id, 'welcome.greeting')
+                try:
+                    photo_file = FSInputFile(HELLO_PHOTO_PATH)
+                    await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                except Exception as e:
+                    print(f"Error sending hello photo: {e}")
+                    await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+        else:
+            # Якщо є юзернейм - просто завершуємо реєстрацію
+            await callback.message.answer(
+                t(user_id, 'agreement.agreed'),
+                parse_mode="HTML"
+            )
+            # Показуємо головне меню
+            welcome_text = t(user_id, 'welcome.greeting')
+            try:
+                photo_file = FSInputFile(HELLO_PHOTO_PATH)
+                await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+            except Exception as e:
+                print(f"Error sending hello photo: {e}")
+                await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
         
         await callback.answer()
     except Exception as e:
@@ -425,9 +458,9 @@ async def _send_agreement_message(chat_id: int, user_id: int):
     )
 
 
-@router.callback_query(F.data.startswith("username_skip_"))
-async def username_skip(callback: types.CallbackQuery):
-    """Користувач обрав «Продовжити без юзернейму» — показуємо оферту."""
+@router.callback_query(F.data.startswith("username_use_phone_"))
+async def username_use_phone(callback: types.CallbackQuery):
+    """Користувач обрав «Використовувати номер замість юзернейму» — просимо поділитися номером."""
     try:
         user_id = int(callback.data.split("_")[-1])
         if callback.from_user.id != user_id:
@@ -437,10 +470,16 @@ async def username_skip(callback: types.CallbackQuery):
             await callback.message.edit_reply_markup(reply_markup=None)
         except Exception:
             pass
-        await _send_agreement_message(callback.message.chat.id, user_id)
+        
+        # Просимо поділитися номером телефону ПЕРЕД офертою
+        await callback.message.answer(
+            t(user_id, 'phone.request_before_agreement'),
+            reply_markup=get_phone_share_keyboard(user_id),
+            parse_mode="HTML"
+        )
         await callback.answer()
     except (ValueError, IndexError) as e:
-        print(f"username_skip error: {e}")
+        print(f"username_use_phone error: {e}")
         await callback.answer("Помилка", show_alert=True)
 
 
@@ -503,7 +542,7 @@ async def handle_language_selection(callback: types.CallbackQuery):
         
         has_agreed = get_user_agreement_status(user_id)
         if not has_agreed:
-            # Якщо немає юзернейму (або тестовий нік) — спочатку показуємо попередження та кнопки
+            # Якщо немає юзернейму — показуємо попередження з вибором
             current_username = (callback.from_user.username or "").strip()
             if not current_username or current_username.lower() == TEST_USERNAME_AS_MISSING:
                 await callback.message.answer(
@@ -557,14 +596,34 @@ async def handle_contact(message: types.Message):
         
         set_user_phone(user_id, phone)
         print(f"Phone {phone} saved for user {user_id}")
-        
-        await message.answer(
-            f"{t(user_id, 'phone.saved')}\n\n{t(user_id, 'phone.instructions')}",
-            reply_markup=get_main_menu_keyboard(user_id),
-            parse_mode="HTML"
-        )
+
+        has_agreed = get_user_agreement_status(user_id)
+        if not has_agreed:
+            await message.answer(t(user_id, 'phone.saved'), parse_mode="HTML")
+            offer_text = (
+                f"{t(user_id, 'agreement.title')}\n\n"
+                f"{t(user_id, 'agreement.welcome')}\n\n"
+                f"{t(user_id, 'agreement.description')}\n\n"
+                f"{t(user_id, 'agreement.instructions')}"
+            )
+            await message.answer(
+                offer_text,
+                reply_markup=get_agreement_keyboard(user_id),
+                parse_mode="HTML"
+            )
+        else:
+            welcome_text = t(user_id, 'welcome.greeting')
+            try:
+                photo_file = FSInputFile(HELLO_PHOTO_PATH)
+                await message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+            except Exception as e:
+                print(f"Error sending hello photo: {e}")
+                await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
     else:
+        user_id = message.from_user.id
         await message.answer(t(user_id, 'phone.invalid'), parse_mode="HTML")
+
+
 
 
 # on_startup та on_shutdown тепер в client_handlers.py
