@@ -283,22 +283,21 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
       
       {/* Темний overlay з інформацією - нижня частина з заокругленими верхніми кутами */}
       <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl rounded-b-2xl -mt-5 pt-3 px-4 pb-1.5 flex flex-col flex-1 z-30" style={{ minHeight: '110px', position: 'relative', zIndex: 30 }}>
-        {/* Ціна та тег стану */}
+        {/* Ціна та тег стану — повний текст, масштабування шрифту по ширині */}
         <div className="flex items-start justify-between gap-2 mb-1 min-h-[1.5rem]">
           <div className="min-w-0 flex-1">
           {(() => {
             const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
             const isFree = listing.isFree;
-            
+            const priceClass = 'font-bold text-white block overflow-visible';
+            const fluidSize = 'text-[clamp(0.6875rem,4vw,1.5rem)]';
             if (isFree) {
-              return <span className="font-bold text-white text-2xl truncate block">{t('common.free')}</span>;
+              return <span className={`${priceClass} ${fluidSize}`}>{t('common.free')}</span>;
             }
-            
             if (isNegotiable) {
-              return <span className="font-bold text-white text-base truncate block" title={t('common.negotiable')}>{t('common.negotiable')}</span>;
+              return <span className={`${priceClass} text-[clamp(0.625rem,3.5vw,1rem)]`} title={t('common.negotiable')}>{t('common.negotiable')}</span>;
             }
-            
-            return <span className="font-bold text-white text-2xl truncate block">{`${listing.price}${getCurrencySymbol(listing.currency)}`}</span>;
+            return <span className={`${priceClass} ${fluidSize}`} style={{ wordBreak: 'break-all' }}>{`${listing.price}${getCurrencySymbol(listing.currency)}`}</span>;
           })()}
           </div>
           {listing.condition && (

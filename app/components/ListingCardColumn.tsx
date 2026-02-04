@@ -164,20 +164,18 @@ const ListingCardColumnComponent = ({
             <div className="font-semibold text-base text-white line-clamp-2 leading-snug mb-1.5">
               {listing.title}
             </div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 min-w-0">
               {(() => {
                 const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
                 const isFree = listing.isFree;
-                
+                const fluidSize = 'text-[clamp(0.6875rem,4vw,1.125rem)]';
                 if (isFree) {
-                  return <span className="text-white font-bold text-lg">{t('common.free')}</span>;
+                  return <span className={`text-white font-bold ${fluidSize}`}>{t('common.free')}</span>;
                 }
-                
                 if (isNegotiable) {
-                  return <span className="text-white font-bold text-sm truncate min-w-0 inline-block max-w-full">{t('common.negotiable')}</span>;
+                  return <span className="text-white font-bold text-[clamp(0.625rem,3.5vw,0.875rem)] min-w-0">{t('common.negotiable')}</span>;
                 }
-                
-                return <span className="text-white font-bold text-lg">{`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}</span>;
+                return <span className={`text-white font-bold ${fluidSize} break-all`}>{`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}</span>;
               })()}
               {listing.condition && (
                 <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-[11px] font-semibold rounded">

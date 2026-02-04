@@ -377,8 +377,8 @@ async def process_description(message: types.Message, state: FSMContext):
     
     # Якщо створюємо нове, переходимо до наступного кроку
     await state.set_state(CreateListing.waiting_for_photos)
-    await state.update_data(media=[], photos=[], media_group_limit_notified=[])
-    
+    await state.update_data(media=[], photos=[], media_group_limit_notified=[], media_group_buffer={})
+
     # Видаляємо попереднє повідомлення про опис (промпт) та повідомлення користувача
     last_message_id = data.get('last_message_id')
     if last_message_id:
@@ -414,17 +414,24 @@ async def process_media_group_video(message: types.Message, state: FSMContext):
 
 
 async def _process_media_group_item(message: types.Message, state: FSMContext, media_type: str, file_id: str):
-    """Додає один елемент (фото або відео) з медіа-групи. Lock усуває race: усі повідомлення групи обробляються по черзі."""
+    """Додає один елемент (фото або відео) з медіа-групи. Lock усуває race. Порядок зберігається через буфер і сортування по message_id."""
     user_id = message.from_user.id
     media_group_id = message.media_group_id
+    message_id = message.message_id
 
     async with _media_group_lock:
         data = await state.get_data()
         media = _normalize_media_list(data)
+        media_group_buffer = dict(data.get('media_group_buffer', {}))
         media_group_responses = data.get('media_group_responses', {})
         media_group_limit_notified = set(data.get('media_group_limit_notified', []))
 
-        if len(media) >= MAX_MEDIA:
+        if media_group_id not in media_group_buffer:
+            media_group_buffer[media_group_id] = []
+        buffer_for_group = media_group_buffer[media_group_id]
+        current_total = len(media) + len(buffer_for_group)
+
+        if len(media) >= MAX_MEDIA and not buffer_for_group:
             try:
                 await message.delete()
             except Exception:
@@ -445,25 +452,26 @@ async def _process_media_group_item(message: types.Message, state: FSMContext, m
                 await state.update_data(last_photo_message_id=sent_message.message_id)
             return
 
-        media.append({"type": media_type, "file_id": file_id})
+        buffer_for_group.append({"message_id": message_id, "type": media_type, "file_id": file_id})
+        media_group_buffer[media_group_id] = buffer_for_group
+        await state.update_data(media_group_buffer=media_group_buffer)
 
         if media_group_id not in media_group_responses:
             media_group_responses[media_group_id] = True
             last_message_id = data.get('last_message_id')
-            if last_message_id and len(media) == 1:
+            if last_message_id and len(media) == 0 and len(buffer_for_group) == 1:
                 try:
                     await bot.delete_message(chat_id=user_id, message_id=last_message_id)
                     await state.update_data(last_message_id=None)
                 except Exception:
                     pass
-            await state.update_data(media=media, media_group_responses=media_group_responses)
+            await state.update_data(media_group_responses=media_group_responses)
             try:
                 await message.delete()
             except Exception:
                 pass
             asyncio.create_task(delayed_media_group_response(user_id, media_group_id, state))
         else:
-            await state.update_data(media=media)
             try:
                 await message.delete()
             except Exception:
@@ -471,33 +479,45 @@ async def _process_media_group_item(message: types.Message, state: FSMContext, m
 
 
 async def delayed_media_group_response(user_id: int, media_group_id: str, state: FSMContext):
-    """Відповідає на медіа групу після затримки - тільки один раз"""
-    import asyncio
+    """Після затримки зливає буфер групи в media у правильному порядку (сортування по message_id) і відповідає один раз."""
     await asyncio.sleep(2)
 
     data = await state.get_data()
     media_group_responses = data.get('media_group_responses', {})
+    media_group_buffer = dict(data.get('media_group_buffer', {}))
 
-    if media_group_id in media_group_responses:
-        del media_group_responses[media_group_id]
-        await state.update_data(media_group_responses=media_group_responses)
-        last_photo_message_id = data.get('last_photo_message_id')
-        if last_photo_message_id:
-            try:
-                await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
-            except Exception:
-                pass
-        current_data = await state.get_data()
-        media = _normalize_media_list(current_data)
-        sent_message = await bot.send_message(
-            chat_id=user_id,
-            text=t(user_id, 'create_listing.media_added').format(
-                current=len(media),
-                max=MAX_MEDIA
-            ),
-            reply_markup=get_continue_photos_keyboard(user_id)
-        )
-        await state.update_data(last_photo_message_id=sent_message.message_id)
+    if media_group_id not in media_group_responses:
+        return
+
+    buffer_list = media_group_buffer.pop(media_group_id, [])
+    del media_group_responses[media_group_id]
+    await state.update_data(media_group_responses=media_group_responses, media_group_buffer=media_group_buffer)
+
+    media = _normalize_media_list(data)
+    room = max(0, MAX_MEDIA - len(media))
+    # Зберігаємо порядок як у користувача: перше фото в альбомі має найменший message_id
+    sorted_buffer = sorted(buffer_list, key=lambda x: x["message_id"])[:room]
+    for item in sorted_buffer:
+        media.append({"type": item["type"], "file_id": item["file_id"]})
+    await state.update_data(media=media)
+
+    last_photo_message_id = data.get('last_photo_message_id')
+    if last_photo_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_photo_message_id)
+        except Exception:
+            pass
+    current_data = await state.get_data()
+    media_final = _normalize_media_list(current_data)
+    sent_message = await bot.send_message(
+        chat_id=user_id,
+        text=t(user_id, 'create_listing.media_added').format(
+            current=len(media_final),
+            max=MAX_MEDIA
+        ),
+        reply_markup=get_continue_photos_keyboard(user_id)
+    )
+    await state.update_data(last_photo_message_id=sent_message.message_id)
 
 
 @router.message(CreateListing.waiting_for_photos, F.photo)
@@ -578,8 +598,8 @@ async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext
         if default_photo_path:
             await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
     
-    # Очищаємо оброблені медіа групи при переході до наступного кроку
-    await state.update_data(processed_media_groups={}, media_group_responses={}, media_group_limit_notified=[])
+    # Очищаємо оброблені медіа групи та буфер при переході до наступного кроку
+    await state.update_data(processed_media_groups={}, media_group_responses={}, media_group_limit_notified=[], media_group_buffer={})
     
     # Видаляємо останнє повідомлення "Фото додано!" при переході до наступного кроку
     data = await state.get_data()
@@ -1410,7 +1430,7 @@ async def edit_field_photos(callback: types.CallbackQuery, state: FSMContext):
     """Починає редагування фото"""
     user_id = callback.from_user.id
     await state.set_state(CreateListing.waiting_for_photos)
-    await state.update_data(media=[], photos=[], media_group_limit_notified=[])
+    await state.update_data(media=[], photos=[], media_group_limit_notified=[], media_group_buffer={})
     
     try:
         await callback.message.edit_text(

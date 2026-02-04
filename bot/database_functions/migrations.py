@@ -50,6 +50,11 @@ NEW_CATEGORIES: List[Dict[str, Any]] = [
         "icon": "❓",
         "sortOrder": 9,
     },
+    {
+        "name": "Подія",
+        "icon": "🎉",
+        "sortOrder": 10,
+    },
 ]
 
 

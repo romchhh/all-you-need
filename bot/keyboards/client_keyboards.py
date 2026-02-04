@@ -234,6 +234,7 @@ def get_category_translation(user_id: int, category_name: str) -> str:
         'Послуги для дітей': 'categories.kids_services',
         'Краса та здоров\'я': 'categories.beauty_health',
         'Інше': 'categories.other',
+        'Подія': 'categories.event',
         # Російські назви (на випадок якщо в БД будуть російські)
         'Услуги': 'categories.services',
         'Вакансия/поиск работы': 'categories.vacancy',
@@ -243,7 +244,8 @@ def get_category_translation(user_id: int, category_name: str) -> str:
         'Реклама бизнеса': 'categories.business_ad',
         'Услуги для детей': 'categories.kids_services',
         'Красота и здоровье': 'categories.beauty_health',
-        'Другое': 'categories.other'
+        'Другое': 'categories.other',
+        'Мероприятие': 'categories.event',
     }
     
     # Отримуємо ключ перекладу для категорії

@@ -308,7 +308,7 @@ export const ProfileListingCard = ({
             >
               {listing.title}
             </div>
-            <div className={`font-bold mt-1 ${
+            <div className={`font-bold mt-1 min-w-0 ${
               isSold
                 ? 'text-gray-500 line-through'
                 : isPendingModeration 
@@ -316,24 +316,16 @@ export const ProfileListingCard = ({
                 : isDeactivated
                 ? 'text-gray-500 line-through'
                 : 'text-white'
-            } ${
-              (() => {
-                const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
-                return isNegotiable ? 'text-sm' : 'text-base';
-              })()
-            }`}>
+            } text-[clamp(0.6875rem,4vw,1rem)]`}>
               {(() => {
                 const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
                 const isFree = listing.isFree;
-                
                 if (isFree) {
                   return t('common.free');
                 }
-                
                 if (isNegotiable) {
                   return t('common.negotiable');
                 }
-                
                 return `${listing.price} ${listing.currency || '$'}`;
               })()}
             </div>
