@@ -14,7 +14,7 @@ from database_functions.referral_db import add_referral, create_referral_table
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, set_language as set_user_language, get_user_lang, get_welcome_message
 from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard, get_language_selection_keyboard, get_username_prompt_keyboard
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, FSInputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, FSInputFile, LinkPreviewOptions
 import aiohttp
 
 
@@ -24,9 +24,6 @@ router = Router()
 
 # Шлях до фото привітання
 HELLO_PHOTO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content', 'hello.jpg')
-
-# Для тесту: цей нік вважати відсутнім (показувати крок «немає юзернейму»)
-TEST_USERNAME_AS_MISSING = "telebotsnowayrm"
 
 
 @router.message(CommandStart())
@@ -211,10 +208,10 @@ async def start_command(message: types.Message):
         welcome_text = t(user_id, 'welcome.greeting')
         try:
             photo_file = FSInputFile(HELLO_PHOTO_PATH)
-            await message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+            await message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
         except Exception as e:
             print(f"Error sending hello photo: {e}")
-            await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+            await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
         return
     
     # Якщо є shared_item, показуємо інформацію про нього
@@ -393,7 +390,7 @@ async def agree_agreement(callback: types.CallbackQuery):
         current_username = (callback.from_user.username or "").strip()
         
         # Якщо немає юзернейму — просимо номер (якщо ще не поділилися), інакше головне меню
-        if not current_username or current_username.lower() == TEST_USERNAME_AS_MISSING:
+        if not current_username:
             if not get_user_phone(user_id):
                 await callback.message.answer(
                     f"{t(user_id, 'agreement.agreed')}\n\n{t(user_id, 'phone.request_no_username')}",
@@ -402,13 +399,13 @@ async def agree_agreement(callback: types.CallbackQuery):
                 )
             else:
                 await callback.message.answer(t(user_id, 'agreement.agreed'), parse_mode="HTML")
-                welcome_text = t(user_id, 'welcome.greeting')
+                welcome_text = t(user_id, 'welcome.registration_success')
                 try:
                     photo_file = FSInputFile(HELLO_PHOTO_PATH)
-                    await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                    await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
                 except Exception as e:
                     print(f"Error sending hello photo: {e}")
-                    await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                    await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
         else:
             # Якщо є юзернейм - просто завершуємо реєстрацію
             await callback.message.answer(
@@ -416,13 +413,13 @@ async def agree_agreement(callback: types.CallbackQuery):
                 parse_mode="HTML"
             )
             # Показуємо головне меню
-            welcome_text = t(user_id, 'welcome.greeting')
+            welcome_text = t(user_id, 'welcome.registration_success')
             try:
                 photo_file = FSInputFile(HELLO_PHOTO_PATH)
-                await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
             except Exception as e:
                 print(f"Error sending hello photo: {e}")
-                await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
         
         await callback.answer()
     except Exception as e:
@@ -493,7 +490,7 @@ async def username_check(callback: types.CallbackQuery):
             return
         current_username = (callback.from_user.username or "").strip()
         # Тестовий нік telebotsnowayrm не вважаємо «доданим»
-        if current_username and current_username.lower() != "TEST_USERNAME_AS_MISSING":
+        if current_username:
             update_user_username(user_id, current_username)
             try:
                 await callback.message.edit_text(
@@ -544,7 +541,7 @@ async def handle_language_selection(callback: types.CallbackQuery):
         if not has_agreed:
             # Якщо немає юзернейму — показуємо попередження з вибором
             current_username = (callback.from_user.username or "").strip()
-            if not current_username or current_username.lower() == TEST_USERNAME_AS_MISSING:
+            if not current_username:
                 await callback.message.answer(
                     t(user_id, 'registration.username_no_nickname'),
                     reply_markup=get_username_prompt_keyboard(user_id),
@@ -565,13 +562,13 @@ async def handle_language_selection(callback: types.CallbackQuery):
             )
         else:
             # Якщо оферта вже погоджена, показуємо головне меню
-            welcome_text = t(user_id, 'welcome.greeting')
+            welcome_text = t(user_id, 'welcome.registration_success')
             try:
                 photo_file = FSInputFile(HELLO_PHOTO_PATH)
-                await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
             except Exception as e:
                 print(f"Error sending hello photo: {e}")
-                await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
     else:
         await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
 
@@ -612,13 +609,13 @@ async def handle_contact(message: types.Message):
                 parse_mode="HTML"
             )
         else:
-            welcome_text = t(user_id, 'welcome.greeting')
+            welcome_text = t(user_id, 'welcome.registration_success')
             try:
                 photo_file = FSInputFile(HELLO_PHOTO_PATH)
-                await message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                await message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
             except Exception as e:
                 print(f"Error sending hello photo: {e}")
-                await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML")
+                await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
     else:
         user_id = message.from_user.id
         await message.answer(t(user_id, 'phone.invalid'), parse_mode="HTML")

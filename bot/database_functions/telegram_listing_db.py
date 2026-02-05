@@ -403,19 +403,19 @@ def init_categories_if_empty():
         },
         {
             'name': 'Краса та здоров\'я',
-            'icon': '💆',
+            'icon': '💅',
             'sortOrder': 8,
-            'subcategories': []
-        },
-        {
-            'name': 'Інше',
-            'icon': '❓',
-            'sortOrder': 9,
             'subcategories': []
         },
         {
             'name': 'Подія',
             'icon': '🎉',
+            'sortOrder': 9,
+            'subcategories': []
+        },
+        {
+            'name': 'Інше',
+            'icon': '❓',
             'sortOrder': 10,
             'subcategories': []
         },

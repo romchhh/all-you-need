@@ -42,17 +42,17 @@ NEW_CATEGORIES: List[Dict[str, Any]] = [
     },
     {
         "name": "Краса та здоров'я",
-        "icon": "💆",
+        "icon": "💅",
         "sortOrder": 8,
-    },
-    {
-        "name": "Інше",
-        "icon": "❓",
-        "sortOrder": 9,
     },
     {
         "name": "Подія",
         "icon": "🎉",
+        "sortOrder": 9,
+    },
+    {
+        "name": "Інше",
+        "icon": "❓",
         "sortOrder": 10,
     },
 ]
