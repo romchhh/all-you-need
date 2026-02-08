@@ -133,6 +133,13 @@ export const EditProfileModal = ({
       };
       
       const preventPullToClose = (e: TouchEvent) => {
+        // Не блокуємо події всередині модального контенту — дозволяємо скрол в обох напрямках
+        const target = e.target as Node;
+        const scrollableModal = document.querySelector('[data-edit-profile-scrollable]');
+        if (scrollableModal && scrollableModal.contains(target)) {
+          return;
+        }
+        
         if (touchStartY === null || touchStartScrollY === null) {
           return;
         }
@@ -258,7 +265,11 @@ export const EditProfileModal = ({
       onTouchEnd={(e) => e.stopPropagation()}
       style={{ touchAction: 'none' }}
     >
-      <div className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl relative z-[100000] my-4 sm:my-0 max-h-[calc(100vh-8rem)] sm:max-h-[90vh] overflow-y-auto">
+      <div 
+        data-edit-profile-scrollable 
+        className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl relative z-[100000] my-4 sm:my-0 max-h-[calc(100vh-8rem)] sm:max-h-[90vh] overflow-y-auto overscroll-contain"
+        style={{ touchAction: 'pan-y' }}
+      >
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white">{t('profile.editProfile')}</h2>

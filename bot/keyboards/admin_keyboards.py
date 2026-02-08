@@ -7,7 +7,7 @@ from database_functions.links_db import get_all_links
 def admin_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         [KeyboardButton(text="Розсилка") ,KeyboardButton(text="Статистика")], 
-        [KeyboardButton(text="Адміністратори")],
+        [KeyboardButton(text="Посилання"), KeyboardButton(text="Адміністратори")],
     ]
 
     keyboard = ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
@@ -95,18 +95,19 @@ def get_links_keyboard() -> InlineKeyboardMarkup:
     links = get_all_links()
     
     for link in links:
+        link_count = link[3] if len(link) > 3 else 0
         keyboard.append([
             InlineKeyboardButton(
-                text=f"{link[1]} ({link[3]} переходів)",
+                text=f"{link[1]} ({link_count} переходів)",
                 callback_data=f"link_stats_{link[0]}"
             )
         ])
     
     keyboard.append([
-        InlineKeyboardButton(
-            text="➕ Додати посилання",
-            callback_data="add_link"
-        )
+        InlineKeyboardButton(text="➕ Додати посилання", callback_data="add_link")
+    ])
+    keyboard.append([
+        InlineKeyboardButton(text="📊 Реферальний трафік", callback_data="ref_traffic_stats")
     ])
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard)

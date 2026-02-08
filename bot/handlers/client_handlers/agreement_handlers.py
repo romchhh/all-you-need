@@ -8,7 +8,7 @@ from main import bot
 from config import bot_username
 from database_functions.client_db import check_user, add_user, is_user_active, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar, update_user_activity, get_username_by_user_id, update_user_username
 from database_functions.create_dbs import create_dbs
-from database_functions.links_db import increment_link_count
+from database_functions.links_db import increment_link_count, record_link_visit
 from database_functions.prisma_db import PrismaDB
 from database_functions.referral_db import add_referral, create_referral_table
 from utils.download_avatar import download_user_avatar
@@ -48,6 +48,13 @@ async def start_command(message: types.Message):
                 pass
 
     user_exists = check_user(user_id)
+
+    # Фіксуємо трафік одразу — кожен /start з linktowatch_ або ref_ рахується
+    if ref_link:
+        increment_link_count(ref_link)
+        record_link_visit('link', ref_link, user_id)
+    if referral_id:
+        record_link_visit('ref', referral_id, user_id)
 
     # Заблоковані користувачі не мають доступу до бота
     if user_exists and not is_user_active(user_id):
@@ -173,9 +180,6 @@ async def start_command(message: types.Message):
     # Якщо у користувача немає username — нагадуємо налаштувати для прийому повідомлень від покупців
     if not username or (isinstance(username, str) and not username.strip()):
         await message.answer(t(user_id, 'phone.no_username_hint'), parse_mode="HTML")
-    
-    if ref_link and not user_exists:
-        increment_link_count(ref_link)
 
     shared_item = None
     shared_data = None

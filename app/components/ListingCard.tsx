@@ -295,7 +295,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
               return <span className={`${priceClass} ${fluidSize}`}>{t('common.free')}</span>;
             }
             if (isNegotiable) {
-              return <span className={`${priceClass} text-[clamp(0.625rem,3.5vw,1rem)]`} title={t('common.negotiable')}>{t('common.negotiable')}</span>;
+              return <span className={`${priceClass} text-[clamp(1.25rem,7vw,2rem)]`} title={t('common.negotiable')}>🤝</span>;
             }
             return <span className={`${priceClass} ${fluidSize}`} style={{ wordBreak: 'break-all' }}>{`${listing.price}${getCurrencySymbol(listing.currency)}`}</span>;
           })()}

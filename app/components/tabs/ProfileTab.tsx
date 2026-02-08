@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/useToast';
 import { Toast } from '../Toast';
 import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
+import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { getBotBaseUrl, getBotStartLink } from '@/utils/botLinks';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { getFavoritesFromStorage } from '@/utils/favorites';
@@ -506,12 +507,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               <>
                 <div className="absolute inset-0 animate-pulse bg-gray-200" />
                 <img 
-                  src={(() => {
-                    if (profile.avatar?.startsWith('http')) return profile.avatar;
-                    const cleanPath = profile.avatar?.split('?')[0] || profile.avatar;
-                    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-                    return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
-                  })()}
+                  src={getResolvedImageUrl(profile.avatar)}
                   alt={displayName}
                   className="w-full h-full object-cover relative z-10"
                   loading="eager"
@@ -1024,10 +1020,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       </div>
 
       {/* Модальне вікно перегляду аватара */}
-      {showAvatarModal && profile?.avatar && (
+      {showAvatarModal && profile?.avatar && getResolvedImageUrl(profile.avatar) && (
         <ImageViewModal
           isOpen={showAvatarModal}
-          images={[profile.avatar]}
+          images={[getResolvedImageUrl(profile.avatar)!]}
           initialIndex={0}
           alt={t('profile.avatar')}
           onClose={() => setShowAvatarModal(false)}

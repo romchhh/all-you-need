@@ -1,9 +1,10 @@
 from aiogram import Router, types, F
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.exceptions import TelegramBadRequest
 from utils.filters import IsAdmin
 from aiogram.fsm.context import FSMContext
 from keyboards.admin_keyboards import get_links_keyboard, cancel_button, admin_keyboard, get_link_stats_keyboard, get_delete_link_confirm_keyboard
-from database_functions.links_db import get_link_by_id, update_link_name, delete_link, add_link, get_link_detailed_stats
+from database_functions.links_db import get_link_by_id, update_link_name, delete_link, add_link, get_link_detailed_stats, get_visits_by_link, get_all_ref_stats
 from main import bot
 from config import bot_username
 from states.admin_states import LinkStates
@@ -35,6 +36,11 @@ async def show_link_stats(callback: types.CallbackQuery):
                 visits_count = stat[2]  # stat[2] - це link_count (переходи)
                 break
         
+        visits_list = get_visits_by_link(link_id)
+        visits_detail = "\n".join([f"  • <a href=\"tg://user?id={v[0]}\">ID {v[0]}</a> — {v[1][:16]}" for v in visits_list[:10]]) if visits_list else "  (немає записів)"
+        if visits_list and len(visits_list) > 10:
+            visits_detail += f"\n  ... та ще {len(visits_list) - 10}"
+
         try:
             await callback.message.edit_text(
                 f"<b>📊 Статистика посилання:</b>\n"
@@ -42,7 +48,8 @@ async def show_link_stats(callback: types.CallbackQuery):
                 f"Посилання: <code>{bot_link}</code>\n\n"
                 f"<b>📈 Метрики:</b>\n"
                 f"• Переходів в бот: {visits_count}\n\n"
-                f"Скопіюйте це посилання для розповсюдження",
+                f"<b>Хто перейшов (останні):</b>\n{visits_detail}\n\n"
+                f"Скопіюйте посилання для розповсюдження",
                 parse_mode="HTML",
                 reply_markup=get_link_stats_keyboard(link_id)
             )
@@ -108,6 +115,41 @@ async def delete_link_process(callback: types.CallbackQuery):
         "Оберіть посилання для перегляду статистики або додайте нове:",
         reply_markup=get_links_keyboard()
     )
+    await callback.answer()
+
+
+@router.callback_query(IsAdmin(), F.data == "ref_traffic_stats")
+async def show_ref_traffic_stats(callback: types.CallbackQuery):
+    ref_stats = get_all_ref_stats()
+    if not ref_stats:
+        text = (
+            "<b>📊 Реферальний трафік</b>\n\n"
+            "Поки немає кліків по реферальних посиланнях.\n"
+            "Користувачі діляться посиланням t.me/bot?start=ref_ID"
+        )
+    else:
+        lines = []
+        for referrer_id, clicks, converted in ref_stats[:20]:
+            lines.append(f"• ID {referrer_id}: {clicks} кліків, {converted} зареєструвались")
+        text = (
+            "<b>📊 Реферальний трафік</b>\n\n"
+            "Кліки та реєстрації по ref-посиланнях:\n\n"
+            + "\n".join(lines)
+        )
+        if len(ref_stats) > 20:
+            text += f"\n\n... та ще {len(ref_stats) - 20} реферерів"
+    try:
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_links")]
+            ])
+        )
+    except TelegramBadRequest:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_links")]
+        ]))
     await callback.answer()
 
 

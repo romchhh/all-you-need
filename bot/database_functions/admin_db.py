@@ -142,8 +142,9 @@ def get_top_links(limit: int = 5):
 
 
 def get_users_with_ref_link():
+    """Кількість користувачів, які перейшли по посиланнях (linktowatch). ref_link зберігається в users_legacy."""
     try:
-        cursor.execute("SELECT COUNT(*) FROM User WHERE ref_link IS NOT NULL")
+        cursor.execute("SELECT COUNT(*) FROM users_legacy WHERE ref_link IS NOT NULL")
         count = cursor.fetchone()[0]
         return count
     except sqlite3.OperationalError:

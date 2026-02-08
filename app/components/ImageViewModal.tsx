@@ -13,6 +13,7 @@ interface ImageViewModalProps {
 
 export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt, onClose }: ImageViewModalProps) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [imageError, setImageError] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -21,8 +22,14 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
   useEffect(() => {
     if (isOpen && initialIndex !== undefined) {
       setCurrentIndex(initialIndex);
+      setImageError(false);
     }
   }, [isOpen, initialIndex]);
+
+  // Скидаємо помилку при зміні зображення
+  useEffect(() => {
+    setImageError(false);
+  }, [imageList[currentIndex]]);
 
   const imageList = images || (imageUrl ? [imageUrl] : []);
   
@@ -177,20 +184,25 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
         style={{ width: '100vw', maxWidth: '100vw' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <img 
-          src={imageList[currentIndex]} 
-          alt={`${alt} - фото ${currentIndex + 1}`}
-          className="transition-opacity duration-300"
-          style={{ 
-            width: '100%', 
-            maxWidth: '100%', 
-            height: 'auto',
-            maxHeight: '90vh',
-            objectFit: 'contain',
-            display: 'block'
-          }}
-          onClick={(e) => e.stopPropagation()}
-        />
+        {imageError ? (
+          <div className="text-white/70 text-center px-4">Зображення не завантажилось</div>
+        ) : (
+          <img 
+            src={imageList[currentIndex]} 
+            alt={`${alt} - фото ${currentIndex + 1}`}
+            className="transition-opacity duration-300"
+            style={{ 
+              width: '100%', 
+              maxWidth: '100%', 
+              height: 'auto',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              display: 'block'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onError={() => setImageError(true)}
+          />
+        )}
       </div>
     </div>
   );

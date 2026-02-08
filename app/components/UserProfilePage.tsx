@@ -7,6 +7,7 @@ import { ShareModal } from './ShareModal';
 import { PhoneModal } from './PhoneModal';
 import { useLongPress } from '@/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
+import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -252,12 +253,7 @@ export const UserProfilePage = ({
               <>
                 <div className="absolute inset-0 animate-pulse bg-gray-200" />
                 <img 
-                  src={(() => {
-                    if (sellerAvatar?.startsWith('http')) return sellerAvatar;
-                    const cleanPath = sellerAvatar?.split('?')[0] || sellerAvatar;
-                    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-                    return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
-                  })()}
+                  src={getResolvedImageUrl(sellerAvatar)}
                   alt={sellerName}
                   className="w-full h-full object-cover relative z-10"
                   loading="eager"
@@ -444,7 +440,7 @@ export const UserProfilePage = ({
       {sellerAvatar && (sellerAvatar.startsWith('/') || sellerAvatar.startsWith('http')) && (
         <ImageViewModal
           isOpen={showAvatarModal}
-          imageUrl={sellerAvatar}
+          imageUrl={getResolvedImageUrl(sellerAvatar)}
           alt={sellerName}
           onClose={() => {
             setShowAvatarModal(false);

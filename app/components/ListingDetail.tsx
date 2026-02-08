@@ -671,7 +671,7 @@ export const ListingDetail = ({
           }}
         >
             {/* Ціна */}
-            <div className="mb-4">
+            <div className="mt-3 mb-4">
               <div className="flex items-center gap-2">
                 {(() => {
                   const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
