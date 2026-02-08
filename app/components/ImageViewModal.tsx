@@ -18,6 +18,8 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
   const touchEndX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   
+  const imageList = images || (imageUrl ? [imageUrl] : []);
+
   // Оновлюємо індекс при зміні initialIndex
   useEffect(() => {
     if (isOpen && initialIndex !== undefined) {
@@ -30,8 +32,6 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
   useEffect(() => {
     setImageError(false);
   }, [imageList[currentIndex]]);
-
-  const imageList = images || (imageUrl ? [imageUrl] : []);
   
   const nextImage = () => {
     if (imageList.length > 1) {
