@@ -166,6 +166,11 @@ export const useUser = () => {
     }
   };
 
-  return { profile, loading, refetch, isBlocked };
+  // Користувач має завершити реєстрацію в боті, якщо немає ні номера ні юзернейма
+  const isRegistrationIncomplete = Boolean(
+    profile && !profile.phone?.trim() && !profile.username?.trim()
+  );
+
+  return { profile, loading, refetch, isBlocked, isRegistrationIncomplete };
 };
 
