@@ -200,11 +200,20 @@ async def send_approval_notification(
         if not title:
             title = t(telegram_id, 'my_listings.listing_default_title')
         webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
-        channel_id = os.getenv('TRADE_CHANNEL_ID')
         user_lang = get_user_lang(telegram_id)
 
         if source == 'telegram':
             listing = get_telegram_listing_by_id(listing_id)
+            
+            # Визначаємо канал на основі регіону
+            region = listing.get('region', 'hamburg') if listing else 'hamburg'
+            if region == 'other_germany':
+                channel_id = os.getenv('TRADE_GERMANY_CHANNEL_ID')
+                channel_username = os.getenv('TRADE_GERMANY_CHANNEL_USERNAME', '')
+            else:
+                channel_id = os.getenv('TRADE_CHANNEL_ID')
+                channel_username = os.getenv('TRADE_CHANNEL_USERNAME', '')
+            
             channel_message_id_raw = listing.get('channelMessageId') if listing else None
             if channel_message_id_raw and isinstance(channel_message_id_raw, str) and channel_message_id_raw.strip().startswith('['):
                 try:
@@ -235,11 +244,12 @@ async def send_approval_notification(
 
             keyboard_buttons = []
             if channel_id and channel_message_id:
-                channel_username = os.getenv('TRADE_CHANNEL_USERNAME', '')
                 if channel_username:
                     channel_link = f"https://t.me/{channel_username}/{channel_message_id}"
                 else:
-                    channel_link = f"https://t.me/c/{str(channel_id)[4:]}/{channel_message_id}"
+                    # Видаляємо префікс -100 з ID каналу
+                    channel_id_clean = str(channel_id).replace('-100', '')
+                    channel_link = f"https://t.me/c/{channel_id_clean}/{channel_message_id}"
                 keyboard_buttons.append([InlineKeyboardButton(
                     text=t(telegram_id, 'my_listings.view_listing_button'),
                     url=channel_link

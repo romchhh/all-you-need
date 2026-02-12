@@ -512,7 +512,33 @@ def get_payment_method_keyboard(user_id: int, balance: float, amount: float, pay
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
+def get_region_selection_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Клавіатура для вибору регіону: Гамбург або інші регіони Німеччини"""
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.region.hamburg'),
+                callback_data="region_hamburg"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.region.other_germany'),
+                callback_data="region_other_germany"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'create_listing.cancel'),
+                callback_data="cancel_listing"
+            )
+        ]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
 def get_german_cities_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Клавіатура для міст Гамбурга та околиць"""
     # Гамбург та найближчі міста
     cities = [
         "Hamburg", "Norderstedt",
@@ -535,6 +561,57 @@ def get_german_cities_keyboard(user_id: int) -> InlineKeyboardMarkup:
                 callback_data=f"city_{cities[i + 1]}"
             ))
         keyboard.append(row)
+    
+    # Додаємо кнопку "Назад"
+    keyboard.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'create_listing.back'),
+            callback_data="back_from_location"
+        )
+    ])
+    
+    # Додаємо кнопку "Скасувати"
+    keyboard.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'create_listing.cancel'),
+            callback_data="cancel_listing"
+        )
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_other_germany_cities_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Клавіатура для інших міст Німеччини"""
+    cities = [
+        "Berlin", "Bremen",
+        "Hannover", "München",
+        "Frankfurt", "Köln",
+        "Düsseldorf", "Stuttgart",
+        "Leipzig", "Dortmund"
+    ]
+    
+    keyboard = []
+    for i in range(0, len(cities), 2):
+        row = []
+        row.append(InlineKeyboardButton(
+            text=cities[i],
+            callback_data=f"city_{cities[i]}"
+        ))
+        if i + 1 < len(cities):
+            row.append(InlineKeyboardButton(
+                text=cities[i + 1],
+                callback_data=f"city_{cities[i + 1]}"
+            ))
+        keyboard.append(row)
+    
+    # Додаємо кнопку "Назад"
+    keyboard.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'create_listing.back'),
+            callback_data="back_from_location"
+        )
+    ])
     
     # Додаємо кнопку "Скасувати"
     keyboard.append([

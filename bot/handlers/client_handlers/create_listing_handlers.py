@@ -14,6 +14,8 @@ from keyboards.client_keyboards import (
     get_publication_tariff_keyboard,
     get_payment_method_keyboard,
     get_german_cities_keyboard,
+    get_other_germany_cities_keyboard,
+    get_region_selection_keyboard,
     get_continue_photos_keyboard,
     get_edit_listing_keyboard,
     get_category_translation
@@ -775,12 +777,12 @@ async def process_price_negotiable(callback: types.CallbackQuery, state: FSMCont
         return
     
     # Якщо створюємо нове, переходимо до наступного кроку
-    await state.set_state(CreateListing.waiting_for_location)
+    await state.set_state(CreateListing.waiting_for_region)
     
     await callback.message.edit_text(
-        t(user_id, 'create_listing.location_prompt'),
+        t(user_id, 'create_listing.region_prompt'),
         parse_mode="HTML",
-        reply_markup=get_german_cities_keyboard(user_id)
+        reply_markup=get_region_selection_keyboard(user_id)
     )
     await callback.answer(t(user_id, 'create_listing.price_negotiable_set'))
 
@@ -818,7 +820,7 @@ async def process_price(message: types.Message, state: FSMContext):
                             pass
                         await show_preview(user_id, state, message=message)
                         return
-                    await state.set_state(CreateListing.waiting_for_location)
+                    await state.set_state(CreateListing.waiting_for_region)
                     last_message_id = data.get('last_message_id')
                     if last_message_id:
                         try:
@@ -826,9 +828,9 @@ async def process_price(message: types.Message, state: FSMContext):
                         except Exception:
                             pass
                     sent_message = await message.answer(
-                        t(user_id, 'create_listing.location_prompt'),
+                        t(user_id, 'create_listing.region_prompt'),
                         parse_mode="HTML",
-                        reply_markup=get_german_cities_keyboard(user_id)
+                        reply_markup=get_region_selection_keyboard(user_id)
                     )
                     await state.update_data(last_message_id=sent_message.message_id)
                     return
@@ -865,7 +867,7 @@ async def process_price(message: types.Message, state: FSMContext):
                     return
                 
                 # Якщо створюємо нове, переходимо до наступного кроку
-                await state.set_state(CreateListing.waiting_for_location)
+                await state.set_state(CreateListing.waiting_for_region)
                 
                 # Видаляємо попереднє повідомлення якщо є
                 last_message_id = data.get('last_message_id')
@@ -876,9 +878,9 @@ async def process_price(message: types.Message, state: FSMContext):
                         pass
                 
                 sent_message = await message.answer(
-                    t(user_id, 'create_listing.location_prompt'),
+                    t(user_id, 'create_listing.region_prompt'),
                     parse_mode="HTML",
-                    reply_markup=get_german_cities_keyboard(user_id)
+                    reply_markup=get_region_selection_keyboard(user_id)
                 )
                 await state.update_data(last_message_id=sent_message.message_id)
                 return
@@ -911,7 +913,7 @@ async def process_price(message: types.Message, state: FSMContext):
         return
     
     # Якщо створюємо нове, переходимо до наступного кроку
-    await state.set_state(CreateListing.waiting_for_location)
+    await state.set_state(CreateListing.waiting_for_region)
     
     # Видаляємо попереднє повідомлення якщо є
     last_message_id = data.get('last_message_id')
@@ -922,9 +924,9 @@ async def process_price(message: types.Message, state: FSMContext):
             pass
     
     sent_message = await message.answer(
-        t(user_id, 'create_listing.location_prompt'),
+        t(user_id, 'create_listing.region_prompt'),
         parse_mode="HTML",
-        reply_markup=get_german_cities_keyboard(user_id)
+        reply_markup=get_region_selection_keyboard(user_id)
     )
     await state.update_data(last_message_id=sent_message.message_id)
 
@@ -954,6 +956,190 @@ async def cancel_listing_from_city_selection(callback: types.CallbackQuery, stat
         reply_markup=get_main_menu_keyboard(user_id),
         parse_mode="HTML"
     )
+
+
+@router.callback_query(F.data == "region_hamburg", CreateListing.waiting_for_region)
+async def process_region_hamburg(callback: types.CallbackQuery, state: FSMContext):
+    """Обробка вибору регіону Гамбург"""
+    user_id = callback.from_user.id
+    
+    # Зберігаємо вибраний регіон
+    await state.update_data(region='hamburg')
+    
+    # Переходимо до вибору міста
+    await state.set_state(CreateListing.waiting_for_location)
+    
+    # Видаляємо попереднє повідомлення якщо є
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.location_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_german_cities_keyboard(user_id)
+        )
+    except:
+        sent_message = await callback.message.answer(
+            t(user_id, 'create_listing.location_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_german_cities_keyboard(user_id)
+        )
+        await state.update_data(last_message_id=sent_message.message_id)
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "region_other_germany", CreateListing.waiting_for_region)
+async def process_region_other_germany(callback: types.CallbackQuery, state: FSMContext):
+    """Обробка вибору інших регіонів Німеччини"""
+    user_id = callback.from_user.id
+    
+    # Зберігаємо вибраний регіон
+    await state.update_data(region='other_germany')
+    
+    # Переходимо до вибору міста
+    await state.set_state(CreateListing.waiting_for_location)
+    
+    # Видаляємо попереднє повідомлення якщо є
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.location_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_other_germany_cities_keyboard(user_id)
+        )
+    except:
+        sent_message = await callback.message.answer(
+            t(user_id, 'create_listing.location_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_other_germany_cities_keyboard(user_id)
+        )
+        await state.update_data(last_message_id=sent_message.message_id)
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_from_region", CreateListing.waiting_for_region)
+async def back_from_region(callback: types.CallbackQuery, state: FSMContext):
+    """Повернення до вибору ціни з етапу вибору регіону"""
+    user_id = callback.from_user.id
+    
+    # Видаляємо збережений регіон та локацію (якщо були вибрані раніше)
+    await state.update_data(region=None, location=None)
+    
+    # Повертаємося до етапу вибору ціни
+    await state.set_state(CreateListing.waiting_for_price)
+    
+    # Видаляємо попереднє повідомлення якщо є
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    # Створюємо клавіатуру з кнопкою "Договірна"
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t(user_id, 'create_listing.price_negotiable_button_alt'),
+            callback_data="price_negotiable"
+        )]
+    ])
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.price_prompt'),
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.update_data(last_message_id=callback.message.message_id)
+    except:
+        sent_message = await callback.message.answer(
+            t(user_id, 'create_listing.price_prompt'),
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await state.update_data(last_message_id=sent_message.message_id)
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cancel_listing", CreateListing.waiting_for_region)
+async def cancel_listing_from_region(callback: types.CallbackQuery, state: FSMContext):
+    """Скасування створення оголошення з етапу вибору регіону"""
+    user_id = callback.from_user.id
+    await state.clear()
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.cancelled'),
+            parse_mode="HTML"
+        )
+    except:
+        await callback.message.answer(
+            t(user_id, 'create_listing.cancelled'),
+            parse_mode="HTML"
+        )
+    
+    await callback.answer()
+    await callback.message.answer(
+        f"<b>{t(user_id, 'menu.main_menu')}</b>",
+        reply_markup=get_main_menu_keyboard(user_id),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "back_from_location", CreateListing.waiting_for_location)
+async def back_from_location(callback: types.CallbackQuery, state: FSMContext):
+    """Повернення до вибору регіону з етапу вибору міста"""
+    user_id = callback.from_user.id
+    
+    # Видаляємо збережену локацію
+    await state.update_data(location=None)
+    
+    # Повертаємося до етапу вибору регіону
+    await state.set_state(CreateListing.waiting_for_region)
+    
+    # Видаляємо попереднє повідомлення якщо є
+    data = await state.get_data()
+    last_message_id = data.get('last_message_id')
+    if last_message_id:
+        try:
+            await bot.delete_message(chat_id=user_id, message_id=last_message_id)
+        except:
+            pass
+    
+    try:
+        await callback.message.edit_text(
+            t(user_id, 'create_listing.region_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_region_selection_keyboard(user_id)
+        )
+        await state.update_data(last_message_id=callback.message.message_id)
+    except:
+        sent_message = await callback.message.answer(
+            t(user_id, 'create_listing.region_prompt'),
+            parse_mode="HTML",
+            reply_markup=get_region_selection_keyboard(user_id)
+        )
+        await state.update_data(last_message_id=sent_message.message_id)
+    
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("city_"), CreateListing.waiting_for_location)
@@ -999,8 +1185,13 @@ async def process_location(message: types.Message, state: FSMContext):
     
     location = message.text.strip()
     
+    # Визначаємо яку клавіатуру показувати на основі регіону
+    data = await state.get_data()
+    region = data.get('region', 'hamburg')  # За замовчуванням Гамбург
+    cities_keyboard = get_german_cities_keyboard(user_id) if region == 'hamburg' else get_other_germany_cities_keyboard(user_id)
+    
     if not location or len(location) < 2:
-        await message.answer("<b>❌ Місто повинно містити мінімум 2 символи.</b>\n\nСпробуйте ще раз:", reply_markup=get_german_cities_keyboard(user_id), parse_mode="HTML")
+        await message.answer("<b>❌ Місто повинно містити мінімум 2 символи.</b>\n\nСпробуйте ще раз:", reply_markup=cities_keyboard, parse_mode="HTML")
         return
     
     # Видаляємо повідомлення користувача з локацією
@@ -1161,7 +1352,8 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
                 condition='service',
                 location=data.get('location', t(user_id, 'moderation.not_specified')),
                 images=images_for_db,
-                price_display=price_display
+                price_display=price_display,
+                region=data.get('region', 'hamburg')  # Зберігаємо регіон
             )
             if not success:
                 await callback.answer("❌ Помилка оновлення оголошення", show_alert=True)
@@ -1181,7 +1373,8 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
                 condition='service',  # Для послуг завжди 'service'
                 location=data.get('location', t(user_id, 'moderation.not_specified')),
                 images=images_for_db,
-                price_display=price_display  # Передаємо оригінальне значення
+                price_display=price_display,  # Передаємо оригінальне значення
+                region=data.get('region', 'hamburg')  # Зберігаємо регіон
             )
             await state.update_data(listing_id=listing_id)
         
@@ -1508,13 +1701,20 @@ async def edit_field_price(callback: types.CallbackQuery, state: FSMContext):
 async def edit_field_location(callback: types.CallbackQuery, state: FSMContext):
     """Починає редагування міста"""
     user_id = callback.from_user.id
+    # При редагуванні переходимо безпосередньо до вибору міста (пропускаємо вибір регіону)
     await state.set_state(CreateListing.waiting_for_location)
+    
+    # Визначаємо яку клавіатуру показати на основі збереженого регіону
+    data = await state.get_data()
+    region = data.get('region', 'hamburg')  # За замовчуванням Гамбург
+    
+    cities_keyboard = get_german_cities_keyboard(user_id) if region == 'hamburg' else get_other_germany_cities_keyboard(user_id)
     
     try:
         await callback.message.edit_text(
             t(user_id, 'create_listing.location_prompt'),
             parse_mode="HTML",
-            reply_markup=get_german_cities_keyboard(user_id)
+            reply_markup=cities_keyboard
         )
     except:
         await callback.message.answer(

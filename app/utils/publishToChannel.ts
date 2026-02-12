@@ -7,6 +7,7 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 
 const TRADE_CHANNEL_ID = process.env.TRADE_CHANNEL_ID;
+const TRADE_GERMANY_CHANNEL_ID = process.env.TRADE_GERMANY_CHANNEL_ID;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 interface ListingData {
@@ -21,6 +22,7 @@ interface ListingData {
   location: string;
   images: string | string[];
   publicationTariff?: string; // 'standard', 'highlighted', 'pinned', 'story'
+  region?: string; // 'hamburg' or 'other_germany'
 }
 
 /**
@@ -30,8 +32,14 @@ export async function publishListingToChannel(
   listingId: number,
   listingData: ListingData
 ): Promise<number | null> {
-  if (!TRADE_CHANNEL_ID || !BOT_TOKEN) {
-    console.warn('TRADE_CHANNEL_ID or TELEGRAM_BOT_TOKEN not set');
+  // Визначаємо канал на основі регіону
+  const region = listingData.region || 'hamburg'; // За замовчуванням Гамбург
+  const channelId = region === 'other_germany' 
+    ? TRADE_GERMANY_CHANNEL_ID 
+    : TRADE_CHANNEL_ID;
+  
+  if (!channelId || !BOT_TOKEN) {
+    console.warn(`${region === 'other_germany' ? 'TRADE_GERMANY_CHANNEL_ID' : 'TRADE_CHANNEL_ID'} or TELEGRAM_BOT_TOKEN not set`);
     return null;
   }
 
@@ -73,6 +81,22 @@ export async function publishListingToChannel(
       titleStyle = title;
     }
 
+    // Формуємо хештег міста (видаляємо пробіли та спецсимволи)
+    const cityHashtag = location
+      .replace(/\s+/g, '')
+      .replace(/ü/g, 'u')
+      .replace(/ö/g, 'o')
+      .replace(/ä/g, 'a')
+      .replace(/ß/g, 'ss')
+      .replace(/[^a-zA-Z0-9_-]/g, '');
+    const cityHashtagText = cityHashtag ? `#${cityHashtag}` : '';
+
+    // Формуємо хештеги: категорія + місто
+    const categoryHashtag = `#${category.replace(/\s+/g, '')}`;
+    const hashtags = cityHashtagText 
+      ? `${categoryHashtag} ${cityHashtagText}` 
+      : categoryHashtag;
+
     const text = `${titlePrefix}${titleStyle}
 
 📄 ${description}
@@ -81,7 +105,7 @@ export async function publishListingToChannel(
 📂 <b>Категорія:</b> ${categoryText}
 📍 <b>Розташування:</b> ${location}
 
-#Оголошення #${category.replace(/\s+/g, '')}`;
+#Оголошення ${hashtags}`;
 
     // Отримуємо зображення
     let images: string[] = [];
@@ -149,7 +173,7 @@ export async function publishListingToChannel(
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  chat_id: TRADE_CHANNEL_ID,
+                  chat_id: channelId,
                   photo: imageUrl,
                   caption: text,
                   parse_mode: 'HTML',
@@ -181,7 +205,7 @@ export async function publishListingToChannel(
             };
 
             appendFile('photo', buffer, 'image.webp', 'image/webp');
-            appendField('chat_id', TRADE_CHANNEL_ID!);
+            appendField('chat_id', channelId!);
             appendField('caption', text);
             appendField('parse_mode', 'HTML');
             formDataParts.push(Buffer.from(`--${boundary}--\r\n`));
@@ -213,7 +237,7 @@ export async function publishListingToChannel(
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        chat_id: TRADE_CHANNEL_ID,
+                        chat_id: channelId,
                         message_id: messageId,
                       }),
                     }
@@ -264,7 +288,7 @@ export async function publishListingToChannel(
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  chat_id: TRADE_CHANNEL_ID,
+                  chat_id: channelId,
                   photo: imageUrl,
                   caption: text,
                   parse_mode: 'HTML',
@@ -295,7 +319,7 @@ export async function publishListingToChannel(
             };
 
             appendFile('photo', buffer, 'image.webp', 'image/webp');
-            appendField('chat_id', TRADE_CHANNEL_ID!);
+            appendField('chat_id', channelId!);
             appendField('caption', text);
             appendField('parse_mode', 'HTML');
             formDataParts.push(Buffer.from(`--${boundary}--\r\n`));
@@ -349,7 +373,7 @@ export async function publishListingToChannel(
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  chat_id: TRADE_CHANNEL_ID,
+                  chat_id: channelId,
                   message_id: messageId,
                 }),
               }

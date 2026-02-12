@@ -90,14 +90,17 @@ export async function POST(
     const nowStr = nowSQLite();
 
     // Оновлюємо статус на pending_moderation, щоб оголошення пройшло через модерацію
+    // Також оновлюємо createdAt, щоб реактивоване оголошення відображалося як нове в топі
     await prisma.$executeRawUnsafe(
       `UPDATE Listing 
        SET status = 'pending_moderation',
            moderationStatus = 'pending',
+           createdAt = ?,
            expiresAt = ?,
            updatedAt = ?,
            rejectionReason = NULL
        WHERE id = ?`,
+      nowStr,
       expiresAtStr,
       nowStr,
       listingId

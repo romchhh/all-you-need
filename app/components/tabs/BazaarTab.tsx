@@ -448,17 +448,23 @@ const BazaarTabComponent = ({
     // Оптимізація: кешуємо запит для пошуку
     const trimmedQuery = queryToUse.trim();
     const hasSearch = Boolean(trimmedQuery);
-    const lowerQuery = hasSearch ? trimmedQuery.toLowerCase() : '';
+    const hasDeferredSearch = deferredSearchQuery !== undefined && deferredSearchQuery.trim().length > 0;
     
     // Фільтр по пошуку (при серверному пошуку listings вже відфільтровані; тут лише для миттєвого введення до debounce)
-    if (hasSearch) {
+    // Якщо є deferredSearchQuery з непустим значенням, це означає що сервер вже відфільтрував результати - не фільтруємо повторно
+    // Фільтруємо тільки якщо це локальний пошук (до debounce), коли deferredSearchQuery ще не оновився або порожній
+    if (hasSearch && !hasDeferredSearch) {
+      // Фільтруємо тільки якщо це локальний пошук (до debounce), а не серверний
       filtered = filtered.filter(listing => {
-        const titleLower = listing.title.toLowerCase();
-        const descLower = listing.description.toLowerCase();
-        const locationLower = listing.location.toLowerCase();
-        return titleLower.includes(lowerQuery) ||
-          descLower.includes(lowerQuery) ||
-          locationLower.includes(lowerQuery);
+        // Використовуємо нормалізацію для коректного порівняння кирилиці
+        const normalize = (text: string) => text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ё/g, 'е').replace(/Ё/g, 'е');
+        const normalizedQuery = normalize(trimmedQuery);
+        const titleNorm = normalize(listing.title || '');
+        const descNorm = normalize(listing.description || '');
+        const locationNorm = normalize(listing.location || '');
+        return titleNorm.includes(normalizedQuery) ||
+          descNorm.includes(normalizedQuery) ||
+          locationNorm.includes(normalizedQuery);
       });
       
       // Якщо є пошук, не застосовуємо категорії (повертаємо всі результати пошуку)

@@ -208,7 +208,9 @@ const BazaarPage = () => {
     if (bazaarTabState.selectedSubcategory) params.set('subcategory', bazaarTabState.selectedSubcategory);
     if (bazaarTabState.showFreeOnly) params.set('isFree', 'true');
     const searchTrimmed = (searchQueryForApi ?? debouncedSearchQuery ?? '').trim();
-    if (searchTrimmed) params.set('search', searchTrimmed);
+    if (searchTrimmed) {
+      params.set('search', searchTrimmed);
+    }
     return `/api/listings?${params.toString()}`;
   }, [bazaarTabState.sortBy, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.showFreeOnly, debouncedSearchQuery]);
   const { toast, showToast, hideToast } = useToast();
@@ -333,7 +335,7 @@ const BazaarPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [showToast, t, buildListingsUrl, hasActiveFilters, hasSearchQuery, PAGE_SIZE]);
+  }, [showToast, t, buildListingsUrl, hasActiveFilters, hasSearchQuery, debouncedSearchQuery, PAGE_SIZE]);
 
   const hasLoadedListings = useRef(false);
   const previousFilterKey = useRef<string | null>(null);

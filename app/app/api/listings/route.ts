@@ -24,6 +24,36 @@ function normalizeFavoritesCount(value: number | bigint | string | undefined): n
   return 0;
 }
 
+// Функція для нормалізації кирилиці до lowercase
+// JavaScript's toLowerCase() правильно працює з кирилицею
+function normalizeCyrillicToLower(text: string): string {
+  return text.toLowerCase();
+}
+
+// Функція для генерації всіх можливих варіантів регістру для пошуку
+// Генерує варіанти: оригінальний, всі малі, перша велика решта малі
+function generateSearchVariants(searchText: string): string[] {
+  const variants = new Set<string>();
+  const normalized = normalizeCyrillicToLower(searchText);
+  
+  // Додаємо оригінальний варіант
+  variants.add(searchText);
+  
+  // Додаємо lowercase варіант
+  variants.add(normalized);
+  
+  // Додаємо варіант з першою великою літерою
+  if (searchText.length > 0) {
+    const firstUpper = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    variants.add(firstUpper);
+  }
+  
+  // Додаємо варіант з усіма великими літерами
+  variants.add(searchText.toUpperCase());
+  
+  return Array.from(variants);
+}
+
 // Глобальна змінна для відстеження ініціалізації таблиці Favorite
 let favoriteTableInitPromise: Promise<void> | null = null;
 
@@ -45,7 +75,8 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const subcategory = searchParams.get('subcategory');
     const isFree = searchParams.get('isFree') === 'true';
-    const search = searchParams.get('search');
+    // searchParams.get() автоматично декодує URL-encoded параметри в Next.js
+    const search = searchParams.get('search')?.trim() || null;
     const userId = searchParams.get('userId');
     const viewerId = searchParams.get('viewerId'); // ID користувача, який переглядає профіль
     const sortBy = searchParams.get('sortBy') || 'newest';
@@ -95,7 +126,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      const searchLower = search.toLowerCase();
+      // Використовуємо нормалізацію кирилиці для пошуку
+      // JavaScript's toLowerCase() правильно працює з кирилицею
+      const searchLower = normalizeCyrillicToLower(search.trim());
       where.OR = [
         { title: { contains: searchLower } },
         { description: { contains: searchLower } },
@@ -372,9 +405,50 @@ export async function GET(request: NextRequest) {
       }
       
       if (search) {
-        whereClause += " AND (l.title LIKE ? OR l.description LIKE ? OR l.location LIKE ?)";
-        const searchPattern = `%${search.toLowerCase()}%`;
-        params.push(searchPattern, searchPattern, searchPattern);
+        const searchTrimmed = search.trim();
+        // Генеруємо всі можливі варіанти регістру для пошуку
+        // Це необхідно, оскільки SQLite не підтримує case-insensitive порівняння для кирилиці
+        const searchVariants = generateSearchVariants(searchTrimmed);
+        
+        // Для коротких пошукових запитів (до 30 символів) використовуємо SQL LIKE
+        // Для довших використовуємо фільтрацію в JavaScript після отримання даних
+        if (searchTrimmed.length <= 30) {
+          // Створюємо умову з усіма варіантами для кожного поля
+          const titleConditions = searchVariants.map(() => 'l.title LIKE ?').join(' OR ');
+          const descConditions = searchVariants.map(() => 'l.description LIKE ?').join(' OR ');
+          const locationConditions = searchVariants.map(() => 'l.location LIKE ?').join(' OR ');
+          
+          whereClause += ` AND (
+            (${titleConditions}) OR
+            (${descConditions}) OR
+            (${locationConditions})
+          )`;
+          
+          // Додаємо параметри для кожного варіанту та кожного поля
+          searchVariants.forEach(variant => {
+            params.push(`%${variant}%`); // title
+          });
+          searchVariants.forEach(variant => {
+            params.push(`%${variant}%`); // description
+          });
+          searchVariants.forEach(variant => {
+            params.push(`%${variant}%`); // location
+          });
+        } else {
+          // Для довших запитів зберігаємо пошуковий запит для фільтрації в JavaScript
+          // Використовуємо тільки lowercase варіант для базового фільтру
+          const searchLower = normalizeCyrillicToLower(searchTrimmed);
+          whereClause += ` AND (
+            (l.title LIKE ? OR l.title LIKE ?) OR
+            (l.description LIKE ? OR l.description LIKE ?) OR
+            (l.location LIKE ? OR l.location LIKE ?)
+          )`;
+          params.push(
+            `%${searchTrimmed}%`, `%${searchLower}%`,
+            `%${searchTrimmed}%`, `%${searchLower}%`,
+            `%${searchTrimmed}%`, `%${searchLower}%`
+          );
+        }
       }
       
       // Додаємо фільтр для активних рекламних оголошень (promotionEnds > NOW)
@@ -384,11 +458,6 @@ export async function GET(request: NextRequest) {
       // Фільтруємо тільки активні оголошення (не закінчені)
       whereClause += " AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))";
       
-      // Логування для діагностики (тільки в development)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Listings API] Where clause:', whereClause);
-        console.log('[Listings API] Params:', params);
-      }
       
       // Правильне сортування з урахуванням реклами
       // VIP - завжди в топі (приоритет 1)
@@ -472,16 +541,18 @@ export async function GET(request: NextRequest) {
       let totalCountData: Array<{ count: bigint }> = [];
       
       try {
+        // Формуємо масив параметрів для основного запиту
+        const listingsParams = [...params, limit, offset];
+        const countParams = [...params];
+        
         const [data, count] = await Promise.all([
           prisma.$queryRawUnsafe(
             listingsQuery,
-            ...params,
-            limit * 2, // Беремо більше для сортування по ціні
-            offset
+            ...listingsParams
           ) as any,
           prisma.$queryRawUnsafe(
             countQuery,
-            ...params
+            ...countParams
           ) as Promise<Array<{ count: bigint }>>
         ]);
         
@@ -495,7 +566,7 @@ export async function GET(request: NextRequest) {
             prisma.$queryRawUnsafe(
               queryWithoutFavorites,
               ...params,
-              limit * 2,
+              limit,
               offset
             ) as any,
             prisma.$queryRawUnsafe(
@@ -514,6 +585,35 @@ export async function GET(request: NextRequest) {
 
       listings = listingsData;
       total = Number(totalCountData[0]?.count || 0);
+      
+      // Для довших пошукових запитів (>30 символів) додатково фільтруємо в JavaScript
+      // оскільки SQLite не підтримує правильну нормалізацію кирилиці
+      if (search && search.trim().length > 30) {
+        const searchTrimmed = search.trim();
+        const searchLower = normalizeCyrillicToLower(searchTrimmed);
+        const searchVariants = generateSearchVariants(searchTrimmed);
+        
+        listings = listings.filter((listing: any) => {
+          const title = listing.title || '';
+          const description = listing.description || '';
+          const location = listing.location || '';
+          
+          const titleLower = normalizeCyrillicToLower(title);
+          const descLower = normalizeCyrillicToLower(description);
+          const locationLower = normalizeCyrillicToLower(location);
+          
+          // Перевіряємо, чи містить хоча б одне поле пошуковий запит
+          return searchVariants.some(variant => {
+            const variantLower = normalizeCyrillicToLower(variant);
+            return titleLower.includes(variantLower) ||
+                   descLower.includes(variantLower) ||
+                   locationLower.includes(variantLower);
+          });
+        });
+        
+        // Оновлюємо загальну кількість після фільтрації
+        total = listings.length;
+      }
     }
 
     // Сортуємо по ціні вручну (якщо потрібно) - тільки для загальних запитів

@@ -312,6 +312,8 @@ export async function POST(request: NextRequest) {
           condition: listing.condition,
           location: listing.location,
           images: listing.images,
+          publicationTariff: listing.publicationTariff || 'standard',
+          region: (listing as any).region || 'hamburg', // Додаємо регіон
         });
 
         // Схвалюємо TelegramListing
@@ -366,8 +368,15 @@ export async function POST(request: NextRequest) {
         // Надсилаємо повідомлення користувачу з посиланням на канал
         if (listing.telegramId) {
           const { sendTelegramMessage } = await import('@/utils/telegramNotifications');
-          const TRADE_CHANNEL_ID = process.env.TRADE_CHANNEL_ID;
-          const TRADE_CHANNEL_USERNAME = process.env.TRADE_CHANNEL_USERNAME || '';
+          
+          // Визначаємо канал на основі регіону
+          const region = (listing as any).region || 'hamburg';
+          const TRADE_CHANNEL_ID = region === 'other_germany' 
+            ? process.env.TRADE_GERMANY_CHANNEL_ID 
+            : process.env.TRADE_CHANNEL_ID;
+          const TRADE_CHANNEL_USERNAME = region === 'other_germany'
+            ? (process.env.TRADE_GERMANY_CHANNEL_USERNAME || '')
+            : (process.env.TRADE_CHANNEL_USERNAME || '');
           
           let channelLink = '';
           if (channelMessageId && TRADE_CHANNEL_ID) {

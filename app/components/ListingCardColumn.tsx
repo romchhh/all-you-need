@@ -173,7 +173,7 @@ const ListingCardColumnComponent = ({
                   return <span className={`text-white font-bold ${fluidSize}`}>{t('common.free')}</span>;
                 }
                 if (isNegotiable) {
-                  return <span className="text-white font-bold text-[clamp(1.25rem,7vw,1.75rem)] min-w-0" title={t('common.negotiable')}>🤝</span>;
+                  return <span className="text-white font-bold text-[clamp(1.25rem,7vw,1.75rem)] min-w-0 -mt-2.5" style={{ display: 'inline-block' }} title={t('common.negotiable')}>🤝</span>;
                 }
                 return <span className={`text-white font-bold ${fluidSize} break-all`}>{`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}</span>;
               })()}

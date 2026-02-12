@@ -42,7 +42,8 @@ def create_telegram_listing(
     condition: str,
     location: str,
     images: Union[List[str], List[Dict[str, Any]]],
-    price_display: Optional[str] = None
+    price_display: Optional[str] = None,
+    region: Optional[str] = None
 ) -> int:
     """Створює нове оголошення для Telegram каналу. images — список file_id (str) або [{"type":"photo"|"video","file_id":str}]."""
     conn = get_connection()
@@ -57,6 +58,7 @@ def create_telegram_listing(
     has_publication_tariff = 'publicationTariff' in columns
     has_payment_status = 'paymentStatus' in columns
     has_price_display = 'priceDisplay' in columns
+    has_region = 'region' in columns
     
     # Додаємо колонки якщо їх немає
     if not has_location:
@@ -67,21 +69,27 @@ def create_telegram_listing(
         cursor.execute("ALTER TABLE TelegramListing ADD COLUMN paymentStatus TEXT DEFAULT 'pending'")
     if not has_price_display:
         cursor.execute("ALTER TABLE TelegramListing ADD COLUMN priceDisplay TEXT")
+    if not has_region:
+        cursor.execute("ALTER TABLE TelegramListing ADD COLUMN region TEXT")
     
     # Якщо price_display не передано, використовуємо звичайну ціну
     if price_display is None:
         price_display = str(price) if price > 0 else None
     
+    # Якщо region не передано, встановлюємо за замовчуванням 'hamburg'
+    if region is None:
+        region = 'hamburg'
+    
     cursor.execute("""
         INSERT INTO TelegramListing (
             userId, title, description, price, currency, category, subcategory,
-            condition, location, images, status, moderationStatus, createdAt, updatedAt, priceDisplay
+            condition, location, images, status, moderationStatus, createdAt, updatedAt, priceDisplay, region
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         user_id, title, description, price, currency, category, subcategory,
         condition, location, images_json, 'pending_moderation', 'pending',
-        datetime.now(), datetime.now(), price_display
+        datetime.now(), datetime.now(), price_display, region
     ))
     
     listing_id = cursor.lastrowid
@@ -236,7 +244,8 @@ def update_telegram_listing(
     condition: str,
     location: str,
     images: Union[List[str], List[Dict[str, Any]]],
-    price_display: Optional[str] = None
+    price_display: Optional[str] = None,
+    region: Optional[str] = None
 ) -> bool:
     """Оновлює оголошення (для повторної модерації після відхилення). images — список file_id або [{"type":"photo"|"video","file_id":str}]."""
     conn = get_connection()
@@ -248,9 +257,18 @@ def update_telegram_listing(
     images_json = json.dumps(images)
     if price_display is None:
         price_display = str(price) if price > 0 else None
+    if region is None:
+        region = 'hamburg'  # За замовчуванням
     cursor.execute("PRAGMA table_info(TelegramListing)")
     columns = [row[1] for row in cursor.fetchall()]
     has_price_display = 'priceDisplay' in columns
+    has_region = 'region' in columns
+    
+    # Додаємо колонку region якщо її немає
+    if not has_region:
+        cursor.execute("ALTER TABLE TelegramListing ADD COLUMN region TEXT")
+        has_region = True
+    
     set_clause = """
         title = ?, description = ?, price = ?, currency = ?, category = ?, subcategory = ?,
         condition = ?, location = ?, images = ?, status = 'pending_moderation',
@@ -260,6 +278,9 @@ def update_telegram_listing(
     if has_price_display:
         set_clause = set_clause.replace("updatedAt = ?", "priceDisplay = ?, updatedAt = ?")
         params.insert(-1, price_display)
+    if has_region:
+        set_clause = set_clause.replace("updatedAt = ?", "region = ?, updatedAt = ?")
+        params.insert(-1, region)
     cursor.execute(f"UPDATE TelegramListing SET {set_clause} WHERE id = ?", params + [listing_id])
     success = cursor.rowcount > 0
     conn.commit()

@@ -351,7 +351,7 @@ export async function PUT(
         `UPDATE Listing SET
           title = ?, description = ?, price = ?, currency = ?, isFree = ?,
           category = ?, subcategory = ?, condition = ?, location = ?,
-          images = ?, expiresAt = ?, updatedAt = ?, rejectionReason = NULL
+          images = ?, createdAt = ?, expiresAt = ?, updatedAt = ?, rejectionReason = NULL
         WHERE id = ?`,
         listingData.title,
         listingData.description,
@@ -363,6 +363,7 @@ export async function PUT(
         listingData.condition || null,
         listingData.location,
         imagesJson,
+        nowStr, // Оновлюємо createdAt, щоб реактивоване оголошення відображалося як нове
         expiresAtStr,
         nowStr,
         listingId

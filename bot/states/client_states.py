@@ -8,6 +8,7 @@ class CreateListing(StatesGroup):
     waiting_for_category = State()
     waiting_for_price = State()
     waiting_for_condition = State()
+    waiting_for_region = State()  # Новий стан для вибору регіону
     waiting_for_location = State()
     waiting_for_confirmation = State()
     waiting_for_publication_tariff = State()
