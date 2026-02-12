@@ -312,7 +312,7 @@ export async function POST(request: NextRequest) {
           condition: listing.condition,
           location: listing.location,
           images: listing.images,
-          publicationTariff: listing.publicationTariff || 'standard',
+          publicationTariff: (listing as any).publicationTariff || 'standard',
           region: (listing as any).region || 'hamburg', // Додаємо регіон
         });
 
