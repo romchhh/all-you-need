@@ -1017,13 +1017,13 @@ async def process_region_other_germany(callback: types.CallbackQuery, state: FSM
     
     try:
         await callback.message.edit_text(
-            t(user_id, 'create_listing.location_prompt'),
+            t(user_id, 'create_listing.location_prompt_other'),
             parse_mode="HTML",
             reply_markup=get_other_germany_cities_keyboard(user_id)
         )
     except:
         sent_message = await callback.message.answer(
-            t(user_id, 'create_listing.location_prompt'),
+            t(user_id, 'create_listing.location_prompt_other'),
             parse_mode="HTML",
             reply_markup=get_other_germany_cities_keyboard(user_id)
         )
@@ -1709,18 +1709,18 @@ async def edit_field_location(callback: types.CallbackQuery, state: FSMContext):
     region = data.get('region', 'hamburg')  # За замовчуванням Гамбург
     
     cities_keyboard = get_german_cities_keyboard(user_id) if region == 'hamburg' else get_other_germany_cities_keyboard(user_id)
-    
+    loc_prompt_key = 'create_listing.location_prompt_other' if region == 'other_germany' else 'create_listing.location_prompt'
     try:
         await callback.message.edit_text(
-            t(user_id, 'create_listing.location_prompt'),
+            t(user_id, loc_prompt_key),
             parse_mode="HTML",
             reply_markup=cities_keyboard
         )
     except:
         await callback.message.answer(
-            t(user_id, 'create_listing.location_prompt'),
+            t(user_id, loc_prompt_key),
             parse_mode="HTML",
-            reply_markup=get_german_cities_keyboard(user_id)
+            reply_markup=cities_keyboard
         )
     await callback.answer()
 
