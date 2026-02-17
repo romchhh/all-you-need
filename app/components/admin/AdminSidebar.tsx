@@ -16,6 +16,7 @@ const menuItems: MenuItem[] = [
   { href: '/admin', label: 'Статистика', icon: '📊' },
   { href: '/admin/listings?source=marketplace', label: 'Оголошення маркетплейсу', icon: '🌐' },
   { href: '/admin/listings/moderation', label: 'На модерації', icon: '⏳', badge: undefined },
+  { href: '/admin/listings/import', label: 'Імпорт оголошень', icon: '📥' },
   { href: '/admin/users', label: 'Користувачі', icon: '👥' },
   { href: '/admin/finances', label: 'Фінанси', icon: '💰' },
   { href: '/admin/settings', label: 'Налаштування', icon: '⚙️' },
