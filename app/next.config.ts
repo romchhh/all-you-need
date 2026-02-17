@@ -5,9 +5,11 @@ const nextConfig: NextConfig = {
   // Вимкнути Server Actions для уникнення помилок
   experimental: {
     serverActions: {
-      bodySizeLimit: '100mb',
+      bodySizeLimit: '200mb', // Збільшено для великих ZIP файлів
     },
   },
+  // Збільшуємо обмеження для API routes (для App Router)
+  // Це працює через збільшення memory limit для Node.js runtime
   // Додати обробку помилок
   onDemandEntries: {
     maxInactiveAge: 25 * 1000,

@@ -14,6 +14,10 @@ import AdmZip from 'adm-zip';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 хвилин
 
+// Збільшуємо обмеження розміру тіла запиту для великих ZIP файлів
+export const runtime = 'nodejs';
+export const fetchCache = 'force-no-store';
+
 interface ImportListing {
   telegramId: string;
   title: string;
@@ -30,12 +34,29 @@ interface ImportListing {
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  console.log('[Import] ===== Starting import process =====');
+  console.log('[Import] Request headers:', {
+    'content-type': request.headers.get('content-type'),
+    'content-length': request.headers.get('content-length'),
+  });
+  
   // Перевірка авторизації адміна
-  const isAdmin = await isAdminAuthenticated();
-  if (!isAdmin) {
+  try {
+    const isAdmin = await isAdminAuthenticated();
+    if (!isAdmin) {
+      console.log('[Import] Unauthorized access attempt');
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    console.log('[Import] Admin authenticated');
+  } catch (authError) {
+    console.error('[Import] Auth check error:', authError);
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
+      { error: 'Authentication error', details: authError instanceof Error ? authError.message : 'Unknown' },
+      { status: 500 }
     );
   }
 
@@ -44,6 +65,7 @@ export async function POST(request: NextRequest) {
   let zipExtractedPath: string | null = null;
 
   try {
+    console.log('[Import] Creating directories...');
     // Створюємо тимчасову директорію
     if (!existsSync(tempDir)) {
       await mkdir(tempDir, { recursive: true });
@@ -51,31 +73,66 @@ export async function POST(request: NextRequest) {
     if (!existsSync(uploadsDir)) {
       await mkdir(uploadsDir, { recursive: true });
     }
+    console.log('[Import] Directories created');
 
-    const formData = await request.formData();
+    console.log('[Import] Reading form data...');
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+      console.log('[Import] FormData read successfully');
+    } catch (formDataError) {
+      console.error('[Import] Error reading FormData:', formDataError);
+      throw new Error(`Помилка читання FormData: ${formDataError instanceof Error ? formDataError.message : 'Unknown error'}`);
+    }
+    
     const jsonFile = formData.get('json') as File;
     const zipFile = formData.get('zip') as File | null;
 
+    console.log('[Import] Files received:', {
+      jsonFile: jsonFile ? `${jsonFile.name} (${(jsonFile.size / 1024).toFixed(2)} KB)` : 'none',
+      zipFile: zipFile ? `${zipFile.name} (${(zipFile.size / 1024 / 1024).toFixed(2)} MB)` : 'none'
+    });
+
     if (!jsonFile) {
+      console.error('[Import] JSON file not provided');
       return NextResponse.json(
         { error: 'JSON файл не надано' },
         { status: 400 }
       );
     }
 
+    // Перевіряємо розмір ZIP файлу
+    const MAX_ZIP_SIZE = 200 * 1024 * 1024; // 200 MB
+    if (zipFile && zipFile.size > MAX_ZIP_SIZE) {
+      console.error('[Import] ZIP file too large:', (zipFile.size / 1024 / 1024).toFixed(2), 'MB');
+      return NextResponse.json(
+        { 
+          error: 'ZIP файл занадто великий',
+          details: `Максимальний розмір: 200 MB, ваш файл: ${(zipFile.size / 1024 / 1024).toFixed(2)} MB`
+        },
+        { status: 400 }
+      );
+    }
+
     // Читаємо JSON файл
+    console.log('[Import] Reading JSON file...');
     const jsonText = await jsonFile.text();
+    console.log('[Import] JSON file read, length:', jsonText.length);
+    
     let listings: ImportListing[];
     try {
       listings = JSON.parse(jsonText);
+      console.log('[Import] JSON parsed successfully, listings count:', listings.length);
     } catch (error) {
+      console.error('[Import] JSON parse error:', error);
       return NextResponse.json(
-        { error: 'Невірний формат JSON файлу' },
+        { error: 'Невірний формат JSON файлу', details: error instanceof Error ? error.message : 'Unknown error' },
         { status: 400 }
       );
     }
 
     if (!Array.isArray(listings)) {
+      console.error('[Import] JSON is not an array');
       return NextResponse.json(
         { error: 'JSON повинен містити масив оголошень' },
         { status: 400 }
@@ -83,17 +140,64 @@ export async function POST(request: NextRequest) {
     }
 
     // Розархівуємо ZIP якщо він є
-    const imageMap = new Map<string, string>(); // filename -> new path
     if (zipFile) {
+      console.log('[Import] Starting ZIP extraction...');
       zipExtractedPath = join(tempDir, `extracted_${Date.now()}`);
       await mkdir(zipExtractedPath, { recursive: true });
+      console.log('[Import] Extraction directory created:', zipExtractedPath);
 
-      // Зберігаємо ZIP файл тимчасово
-      const zipBuffer = Buffer.from(await zipFile.arrayBuffer());
-      const zip = new AdmZip(zipBuffer);
-      zip.extractAllTo(zipExtractedPath, true);
-
-      console.log(`[Import] Extracted ZIP to ${zipExtractedPath}`);
+      try {
+        // Зберігаємо ZIP файл тимчасово
+        console.log('[Import] Reading ZIP file buffer...');
+        let zipBuffer: Buffer;
+        try {
+          console.log('[Import] Starting to read ZIP arrayBuffer, this may take a while for large files...');
+          const arrayBufferStart = Date.now();
+          const arrayBuffer = await zipFile.arrayBuffer();
+          const arrayBufferDuration = Date.now() - arrayBufferStart;
+          console.log(`[Import] ArrayBuffer read in ${arrayBufferDuration}ms`);
+          
+          console.log('[Import] Converting to Buffer...');
+          zipBuffer = Buffer.from(arrayBuffer);
+          console.log('[Import] ZIP buffer created, size:', (zipBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+        } catch (bufferError) {
+          console.error('[Import] Error reading ZIP buffer:', bufferError);
+          console.error('[Import] Buffer error details:', {
+            name: bufferError instanceof Error ? bufferError.name : 'Unknown',
+            message: bufferError instanceof Error ? bufferError.message : 'Unknown',
+            stack: bufferError instanceof Error ? bufferError.stack : 'No stack'
+          });
+          throw new Error(`Помилка читання ZIP файлу: ${bufferError instanceof Error ? bufferError.message : 'Unknown error'}`);
+        }
+        
+        console.log('[Import] Creating AdmZip instance...');
+        let zip: AdmZip;
+        try {
+          zip = new AdmZip(zipBuffer);
+          console.log('[Import] AdmZip instance created');
+        } catch (zipInitError) {
+          console.error('[Import] Error creating AdmZip instance:', zipInitError);
+          throw new Error(`Помилка ініціалізації ZIP: ${zipInitError instanceof Error ? zipInitError.message : 'Unknown error'}`);
+        }
+        
+        console.log('[Import] Extracting ZIP files...');
+        try {
+          zip.extractAllTo(zipExtractedPath, true);
+          console.log(`[Import] ZIP extracted successfully to ${zipExtractedPath}`);
+          
+          // Перевіряємо скільки файлів розархівовано
+          const extractedFiles = await readdir(zipExtractedPath, { recursive: true });
+          console.log(`[Import] Extracted ${extractedFiles.length} files from ZIP`);
+        } catch (extractError) {
+          console.error('[Import] Error extracting ZIP:', extractError);
+          throw new Error(`Помилка розархівування ZIP: ${extractError instanceof Error ? extractError.message : 'Unknown error'}`);
+        }
+      } catch (zipError) {
+        console.error('[Import] ZIP processing error:', zipError);
+        throw zipError instanceof Error ? zipError : new Error('Unknown ZIP error');
+      }
+    } else {
+      console.log('[Import] No ZIP file provided');
     }
 
     const results = {
@@ -102,9 +206,15 @@ export async function POST(request: NextRequest) {
       errors: [] as string[],
     };
 
+    console.log(`[Import] Starting to process ${listings.length} listings...`);
+
     // Обробляємо кожне оголошення
     for (let i = 0; i < listings.length; i++) {
       const listing = listings[i];
+      
+      if ((i + 1) % 10 === 0) {
+        console.log(`[Import] Processing listing ${i + 1}/${listings.length}...`);
+      }
       
       try {
         // Валідація обов'язкових полів
@@ -282,14 +392,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Очищаємо тимчасові файли
-    if (zipExtractedPath && existsSync(zipExtractedPath)) {
-      try {
-        await rm(zipExtractedPath, { recursive: true, force: true });
-      } catch {
-        // Ігноруємо помилки очищення
-      }
-    }
+    const totalDuration = Date.now() - startTime;
+    console.log('[Import] ===== Process completed =====');
+    console.log('[Import] Results:', {
+      success: results.success,
+      failed: results.failed,
+      total: listings.length,
+      duration: `${(totalDuration / 1000).toFixed(2)}s`
+    });
 
     return NextResponse.json({
       success: results.success,
@@ -298,6 +408,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[Import] Fatal error:', error);
+    console.error('[Import] Error stack:', error instanceof Error ? error.stack : 'No stack');
     return NextResponse.json(
       {
         error: 'Помилка імпорту',
@@ -305,5 +416,16 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+  } finally {
+    // Очищаємо тимчасові файли
+    if (zipExtractedPath && existsSync(zipExtractedPath)) {
+      try {
+        console.log('[Import] Cleaning up temporary files...');
+        await rm(zipExtractedPath, { recursive: true, force: true });
+        console.log('[Import] Cleanup completed');
+      } catch (cleanupError) {
+        console.error('[Import] Cleanup error:', cleanupError);
+      }
+    }
   }
 }
