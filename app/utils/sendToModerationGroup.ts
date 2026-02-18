@@ -476,7 +476,8 @@ export async function sendListingToModerationGroup(
                   localPath = join(process.cwd(), 'public', img);
                 } else if (img.includes('listings/')) {
                   // Шлях без початкового слеша (наприклад: listings/file.webp)
-                  localPath = join(process.cwd(), 'public', '/' + img);
+                  const relativePath = img.startsWith('/') ? img.slice(1) : img;
+                  localPath = join(process.cwd(), 'public', relativePath);
                 }
                 
                 // Спробуємо прочитати з диска
