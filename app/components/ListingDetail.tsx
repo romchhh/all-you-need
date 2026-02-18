@@ -21,6 +21,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
+import { descriptionWithLinks } from '@/utils/descriptionLinks';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 
@@ -737,7 +738,9 @@ export const ListingDetail = ({
         {/* Опис */}
         <div className="mb-6 rounded-2xl p-4" style={{ background: '#1C1C1C' }}>
           <h2 className="font-semibold mb-2 text-white">{t('listing.description')}</h2>
-          <p className="whitespace-pre-line leading-relaxed text-white">{listing.description}</p>
+          <p className="whitespace-pre-line leading-relaxed text-white">
+            {descriptionWithLinks(listing.description || '')}
+          </p>
         </div>
 
         {/* Перегляди */}
