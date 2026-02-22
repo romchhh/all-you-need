@@ -191,3 +191,78 @@ export async function GET(
     );
   }
 }
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    await requireAdminAuth();
+
+    const { id } = await params;
+    const listingId = parseInt(id, 10);
+
+    if (isNaN(listingId)) {
+      return NextResponse.json(
+        { error: 'Invalid listing ID' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { category, subcategory } = body;
+
+    if (!category || typeof category !== 'string') {
+      return NextResponse.json(
+        { error: 'Category is required' },
+        { status: 400 }
+      );
+    }
+
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const subValue = subcategory == null || subcategory === '' ? null : String(subcategory);
+
+    // Оновлюємо Listing; якщо запис не знайдено (0 змін), оновлюємо TelegramListing
+    const listingResult = await executeWithRetry(() =>
+      prisma.$executeRawUnsafe(
+        `UPDATE Listing SET category = ?, subcategory = ?, updatedAt = ? WHERE id = ?`,
+        category,
+        subValue,
+        nowStr,
+        listingId
+      )
+    );
+
+    if (Number(listingResult) === 0) {
+      const telegramResult = await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `UPDATE TelegramListing SET category = ?, subcategory = ?, updatedAt = ? WHERE id = ?`,
+          category,
+          subValue,
+          nowStr,
+          listingId
+        )
+      );
+      if (Number(telegramResult) === 0) {
+        return NextResponse.json(
+          { error: 'Listing not found' },
+          { status: 404 }
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true, category, subcategory: subValue });
+  } catch (error: any) {
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    console.error('Error updating listing category:', error);
+    return NextResponse.json(
+      { error: 'Failed to update listing category' },
+      { status: 500 }
+    );
+  }
+}

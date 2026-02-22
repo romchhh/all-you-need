@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { categories } from '@/constants/categories';
 
 interface Listing {
   id: number;
@@ -44,6 +45,9 @@ export default function AdminListingDetailPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editSubcategory, setEditSubcategory] = useState<string | null>(null);
+  const [savingCategory, setSavingCategory] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -58,6 +62,8 @@ export default function AdminListingDetailPage() {
       if (response.ok) {
         const data = await response.json();
         setListing(data);
+        setEditCategory(data.category || '');
+        setEditSubcategory(data.subcategory ?? null);
       } else {
         setError('Помилка завантаження оголошення');
       }
@@ -112,6 +118,39 @@ export default function AdminListingDetailPage() {
       }
     } catch (err) {
       alert('Помилка підключення до сервера');
+    }
+  };
+
+  const subcategoriesForCategory = useMemo(() => {
+    const cat = categories.find((c) => c.id === editCategory);
+    return cat && 'subcategories' in cat && cat.subcategories ? cat.subcategories : [];
+  }, [editCategory]);
+
+  const handleCategoryChange = async () => {
+    if (!id) return;
+    setSavingCategory(true);
+    try {
+      const response = await fetch(`/api/admin/listings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: editCategory,
+          subcategory: editSubcategory || null,
+        }),
+      });
+      if (response.ok) {
+        if (listing) {
+          setListing({ ...listing, category: editCategory, subcategory: editSubcategory });
+        }
+        await fetchListing();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Помилка зміни категорії');
+      }
+    } catch (err) {
+      alert('Помилка підключення до сервера');
+    } finally {
+      setSavingCategory(false);
     }
   };
 
@@ -247,12 +286,46 @@ export default function AdminListingDetailPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-xs sm:text-sm font-medium text-gray-900">
+                <dt className="text-xs sm:text-sm font-medium text-gray-900 mb-1">
                   Категорія
                 </dt>
-                <dd className="text-sm sm:text-base text-gray-900 mt-1">
-                  {listing.category}
-                  {listing.subcategory && ` • ${listing.subcategory}`}
+                <dd className="space-y-2">
+                  <select
+                    value={editCategory}
+                    onChange={(e) => {
+                      setEditCategory(e.target.value);
+                      setEditSubcategory(null);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  {subcategoriesForCategory.length > 0 && (
+                    <select
+                      value={editSubcategory ?? ''}
+                      onChange={(e) => setEditSubcategory(e.target.value || null)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
+                    >
+                      <option value="">— Підкатегорія —</option>
+                      {subcategoriesForCategory.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleCategoryChange}
+                    disabled={savingCategory || (editCategory === listing.category && editSubcategory === (listing.subcategory ?? null))}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors"
+                  >
+                    {savingCategory ? 'Збереження…' : 'Зберегти категорію'}
+                  </button>
                 </dd>
               </div>
               {listing.condition && (
