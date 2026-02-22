@@ -157,6 +157,12 @@ def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
                 text=t(user_id, 'about_us.rules'),
                 callback_data="about_rules"
             )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.partners'),
+                callback_data="about_partners"
+            )
         ]
     ])
 
@@ -167,6 +173,36 @@ def get_about_us_back_keyboard(user_id: int) -> InlineKeyboardMarkup:
             text=t(user_id, 'about_us.back'),
             callback_data="about_us_main"
         )]
+    ])
+
+
+# Партнери: id для callback_data та ключ назви кнопки в локалі
+PARTNERS_LIST = [
+    {"id": "sho_events", "name_key": "about_us.partner_name_sho_events"},
+]
+
+
+def get_partners_list_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    buttons = [
+        [InlineKeyboardButton(
+            text=t(user_id, p["name_key"]),
+            callback_data=f"partner_{p['id']}"
+        )]
+        for p in PARTNERS_LIST
+    ]
+    buttons.append([
+        InlineKeyboardButton(
+            text=t(user_id, 'about_us.back'),
+            callback_data="about_us_main"
+        )
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_partner_detail_keyboard(user_id: int, partner_url: str, link_label_key: str = "about_us.partner_link_instagram") -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(user_id, link_label_key), url=partner_url)],
+        [InlineKeyboardButton(text=t(user_id, 'about_us.back'), callback_data="partners_back")]
     ])
 
 

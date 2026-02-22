@@ -166,6 +166,17 @@ TEXTS = {
         "faq": "❓ Часті питання",
         "instructions": "📖 Інструкції",
         "rules": "📋 Правила",
+        "partners": "🤝 Наші партнери",
+        "partners_title": "🤝 <b>Наші партнери</b>\n\nОберіть партнера, щоб переглянути інформацію та перейти на сторінку.",
+        "partner_name_sho_events": "🎉 SHO EVENTS | Hamburg",
+        "partner_caption_sho_events": (
+            "<b>SHO EVENTS | Hamburg</b>\n"
+            "@sho_events_\n\n"
+            "International events from Ukrainian people 🇺🇦🌍\n\n"
+            "📌 <b>LOVE PARTY – 14.02</b> ♥️🤭\n"
+            "Indra music club | Große Freiheit 64, 22767"
+        ),
+        "partner_link_instagram": "📷 Відкрити Instagram",
         "support": "💬 Підтримка",
         "open_full_version": "🌐 Відкрити повну версію",
         "back": "⬅️ Назад",
