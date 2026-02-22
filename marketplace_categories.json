@@ -1,4 +1,6 @@
 {
+  "title": "Гайд по оголошеннях маркетплейсу",
+  "_note": "Відповідає поточному коду: app/constants/categories.ts, app/constants/german-cities.ts, app/app/api/listings/create, Prisma Listing.",
   "categories": [
     {
       "id": "fashion",
@@ -146,20 +148,107 @@
       "subcategories": []
     }
   ],
-  "fields": {
-    "telegramId": "string (обов'язкове) - Telegram ID користувача",
-    "title": "string (обов'язкове) - Назва оголошення",
-    "description": "string (обов'язкове) - Опис товару/послуги",
-    "price": "string (обов'язкове) - Ціна ('Free' для безкоштовних, число як рядок для платних)",
-    "currency": "string | null - Валюта: 'UAH', 'EUR', 'USD' або null для безкоштовних",
-    "isFree": "boolean (обов'язкове) - Чи є товар безкоштовним",
-    "category": "string (обов'язкове) - ID категорії зі списку вище",
-    "subcategory": "string | null - ID підкатегорії або null",
-    "location": "string (обов'язкове) - Місто або локація",
-    "condition": "string | null - Стан товару: 'new', 'used' або null (для послуг завжди null)",
-    "images": "array (обов'язкове) - Масив URL зображень (мінімум 1, максимум 10)",
-    "tags": "array | null - Масив тегів для пошуку"
+
+  "cities": {
+    "description": "Локація оголошення. Рекомендовано використовувати міста з списку (латиницею). Повний список доступний через API /api/german-cities.",
+    "main": [
+      "Berlin",
+      "Hamburg",
+      "München",
+      "Köln",
+      "Frankfurt am Main",
+      "Stuttgart",
+      "Düsseldorf",
+      "Dortmund",
+      "Essen",
+      "Leipzig",
+      "Bremen",
+      "Dresden",
+      "Hannover",
+      "Nürnberg",
+      "Bonn",
+      "Münster",
+      "Karlsruhe",
+      "Mannheim",
+      "Augsburg",
+      "Wiesbaden",
+      "Aachen",
+      "Freiburg im Breisgau",
+      "Lübeck",
+      "Halle (Saale)",
+      "Magdeburg",
+      "Erfurt",
+      "Mainz",
+      "Rostock",
+      "Kiel",
+      "Potsdam",
+      "Heidelberg",
+      "Ulm",
+      "Regensburg",
+      "Würzburg",
+      "Wolfsburg",
+      "Göttingen",
+      "Jena",
+      "Trier",
+      "Cottbus",
+      "Schwerin"
+    ]
   },
+
+  "price": {
+    "description": "Правила заповнення ціни",
+    "options": [
+      {
+        "type": "free",
+        "value": "Free",
+        "usage": "Безкоштовно: isFree = true, price = 'Free' або '0'"
+      },
+      {
+        "type": "fixed",
+        "usage": "Фіксована ціна: число як рядок, напр. '50', '99.99'. Можна з пробілами: '50 000'."
+      },
+      {
+        "type": "negotiable",
+        "value": "Договірна",
+        "alternatives": ["Договорная"],
+        "usage": "Договірна ціна: в полі price передати рядок 'Договірна' (UK) або 'Договорная' (RU). У формі можна використовувати прапорець isNegotiable = true, тоді price відправляється як переклад 'Договірна'."
+      },
+      {
+        "type": "range",
+        "example": "50-100",
+        "usage": "Діапазон: рядок у форматі 'мін-макс', напр. '50-100'."
+      },
+      {
+        "type": "hourly",
+        "example": "25/год або 25 €/год",
+        "usage": "Почасова оплата (послуги): напр. '25/год', '25 €/год'."
+      }
+    ]
+  },
+
+  "listingFormat": {
+    "description": "Повна структура одного оголошення для API та відображення",
+    "fields": {
+      "telegramId": "string (обов'язкове) — Telegram ID користувача",
+      "title": "string (обов'язкове) — Назва оголошення",
+      "description": "string (обов'язкове) — Опис товару/послуги",
+      "price": "string (обов'язкове) — Ціна: 'Free' для безкоштовних, число/діапазон/почасова як рядок, або 'Договірна'/'Договорная' для договірної",
+      "currency": "string | null — Валюта: 'UAH', 'EUR', 'USD' або null для безкоштовних/договірної",
+      "isFree": "boolean (обов'язкове) — true для безкоштовних оголошень",
+      "category": "string (обов'язкове) — ID категорії зі списку categories",
+      "subcategory": "string | null — ID підкатегорії або null",
+      "location": "string (обов'язкове) — Місто або локація (рекомендовано з списку cities.main або API german-cities)",
+      "condition": "string | null — Стан товару: 'new', 'used' або null (для послуг та нерухомості — null)",
+      "images": "array (обов'язкове) — Масив URL зображень, мін. 1, макс. 10"
+    },
+    "required": ["telegramId", "title", "description", "location", "category", "images"],
+    "notes": [
+      "Поле price обов'язкове: для безкоштовних — 'Free' + isFree true; для договірної — 'Договірна' або 'Договорная'.",
+      "condition лише для товарів; для категорій services_work та realestate передавати null.",
+      "location використовується для фільтра по містах у каталозі; краще латиниця (Berlin, Hamburg тощо)."
+    ]
+  },
+
   "validation": {
     "required": ["telegramId", "title", "description", "location", "category", "images"],
     "images": {

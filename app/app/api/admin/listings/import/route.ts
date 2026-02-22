@@ -342,9 +342,11 @@ export async function POST(request: NextRequest) {
           throw new Error(`Оголошення ${i + 1}: не знайдено жодного зображення`);
         }
 
-        // Визначаємо isFree та price
-        const isFree = listing.isFree || listing.price === null || listing.price === 'Free' || listing.price.toLowerCase().includes('безкоштовно');
-        const price = isFree ? 'Free' : (listing.price || '0');
+        // Визначаємо isFree та price (якщо price null або порожній — вважаємо договірною)
+        const isFree = listing.isFree || listing.price === 'Free' || (typeof listing.price === 'string' && listing.price.toLowerCase().includes('безкоштовно'));
+        const price = isFree
+          ? 'Free'
+          : (listing.price == null || listing.price === '' ? 'Договірна' : listing.price);
         const currency = isFree ? null : (listing.currency || 'EUR');
 
         // Створюємо оголошення зі статусом "active" (без модерації)
