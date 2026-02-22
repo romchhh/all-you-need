@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 interface ImportResult {
   success: number;
   failed: number;
+  skipped: number;
   errors: string[];
 }
 
@@ -60,6 +61,7 @@ export default function ImportListingsPage() {
       setResult({
         success: data.success || 0,
         failed: data.failed || 0,
+        skipped: data.skipped || 0,
         errors: data.errors || [],
       });
 
@@ -69,6 +71,7 @@ export default function ImportListingsPage() {
       setResult({
         success: 0,
         failed: 0,
+        skipped: 0,
         errors: [error instanceof Error ? error.message : 'Невідома помилка'],
       });
     } finally {
@@ -164,6 +167,11 @@ export default function ImportListingsPage() {
             {result.failed > 0 && (
               <p className="text-red-700 mt-1">
                 Помилок: <strong>{result.failed}</strong>
+              </p>
+            )}
+            {result.skipped > 0 && (
+              <p className="text-gray-700 mt-1">
+                Пропущено дублікатів: <strong>{result.skipped}</strong>
               </p>
             )}
             {result.errors.length > 0 && (

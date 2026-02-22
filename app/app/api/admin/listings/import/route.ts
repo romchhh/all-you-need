@@ -3,9 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId } from '@/utils/userHelpers';
 import { isAdminAuthenticated } from '@/utils/adminAuth';
 import { toSQLiteDate, addDays } from '@/utils/dateHelpers';
-import { mkdir, readdir, unlink, rm } from 'fs/promises';
+import { mkdir, readdir, unlink, rm, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { createHash } from 'crypto';
 import { createReadStream, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 // @ts-ignore - adm-zip не має типів
@@ -203,8 +204,47 @@ export async function POST(request: NextRequest) {
     const results = {
       success: 0,
       failed: 0,
+      skipped: 0,
       errors: [] as string[],
     };
+
+    /** Хеші першого фото по оголошеннях — щоб пропускати дублі по фото в межах одного імпорту */
+    const seenFirstImageHashes = new Set<string>();
+
+    /** Повертає шлях до файлу зображення в ZIP (або null) */
+    async function findImageSourcePath(imageName: string): Promise<string | null> {
+      if (!zipExtractedPath) return null;
+      const possiblePaths = [
+        join(zipExtractedPath, imageName),
+        join(zipExtractedPath, imageName.toLowerCase()),
+        join(zipExtractedPath, imageName.toUpperCase()),
+      ];
+      for (const path of possiblePaths) {
+        if (existsSync(path)) return path;
+      }
+      async function findRecursive(dir: string, targetName: string): Promise<string | null> {
+        try {
+          const entries = await readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = join(dir, entry.name);
+            if (entry.isDirectory()) {
+              const found = await findRecursive(fullPath, targetName);
+              if (found) return found;
+            } else if (
+              entry.name.toLowerCase() === targetName.toLowerCase() ||
+              entry.name.endsWith(targetName) ||
+              entry.name.includes(targetName)
+            ) {
+              return fullPath;
+            }
+          }
+        } catch {
+          // ignore
+        }
+        return null;
+      }
+      return findRecursive(zipExtractedPath, imageName);
+    }
 
     console.log(`[Import] Starting to process ${listings.length} listings...`);
 
@@ -263,57 +303,39 @@ export async function POST(request: NextRequest) {
           };
         }
 
+        // Дубль у БД: той самий користувач + та сама назва
+        const existingByTitle = await prisma.$queryRawUnsafe(
+          `SELECT id FROM Listing WHERE userId = ? AND TRIM(title) = TRIM(?) LIMIT 1`,
+          user.id,
+          listing.title.trim()
+        ) as Array<{ id: number }>;
+        if (existingByTitle.length > 0) {
+          results.skipped++;
+          console.log(`[Import] Skipping duplicate (same user+title) listing ${i + 1}: "${listing.title.substring(0, 40)}..."`);
+          continue;
+        }
+
+        // Дубль по фото: в межах цього імпорту вже було оголошення з таким самим першим фото
+        if (listing.images && listing.images.length > 0 && zipExtractedPath) {
+          const firstImagePath = await findImageSourcePath(listing.images[0]);
+          if (firstImagePath && existsSync(firstImagePath)) {
+            const buf = await readFile(firstImagePath);
+            const hash = createHash('md5').update(buf).digest('hex');
+            if (seenFirstImageHashes.has(hash)) {
+              results.skipped++;
+              console.log(`[Import] Skipping duplicate (same first photo) listing ${i + 1}`);
+              continue;
+            }
+            seenFirstImageHashes.add(hash);
+          }
+        }
+
         // Обробляємо зображення
         const imageUrls: string[] = [];
         if (listing.images && listing.images.length > 0) {
           for (const imageName of listing.images) {
             try {
-              let sourcePath: string | null = null;
-              
-              // Шукаємо файл в розархівованому ZIP
-              if (zipExtractedPath) {
-                const possiblePaths = [
-                  join(zipExtractedPath, imageName),
-                  join(zipExtractedPath, imageName.toLowerCase()),
-                  join(zipExtractedPath, imageName.toUpperCase()),
-                ];
-
-                for (const path of possiblePaths) {
-                  if (existsSync(path)) {
-                    sourcePath = path;
-                    break;
-                  }
-                }
-
-                // Шукаємо в підпапках (рекурсивно)
-                if (!sourcePath) {
-                  async function findFileRecursive(dir: string, targetName: string): Promise<string | null> {
-                    try {
-                      const entries = await readdir(dir, { withFileTypes: true });
-                      for (const entry of entries) {
-                        const fullPath = join(dir, entry.name);
-                        if (entry.isDirectory()) {
-                          const found = await findFileRecursive(fullPath, targetName);
-                          if (found) return found;
-                        } else if (
-                          entry.name.toLowerCase() === targetName.toLowerCase() ||
-                          entry.name.endsWith(targetName) ||
-                          entry.name.includes(targetName)
-                        ) {
-                          return fullPath;
-                        }
-                      }
-                    } catch {
-                      // Ігноруємо помилки
-                    }
-                    return null;
-                  }
-                  const found = await findFileRecursive(zipExtractedPath, imageName);
-                  if (found) {
-                    sourcePath = found;
-                  }
-                }
-              }
+              const sourcePath = zipExtractedPath ? await findImageSourcePath(imageName) : null;
 
               if (!sourcePath || !existsSync(sourcePath)) {
                 console.warn(`[Import] Image not found: ${imageName} for listing ${i + 1}`);
@@ -399,6 +421,7 @@ export async function POST(request: NextRequest) {
     console.log('[Import] Results:', {
       success: results.success,
       failed: results.failed,
+      skipped: results.skipped,
       total: listings.length,
       duration: `${(totalDuration / 1000).toFixed(2)}s`
     });
@@ -406,6 +429,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: results.success,
       failed: results.failed,
+      skipped: results.skipped,
       errors: results.errors.slice(0, 50), // Обмежуємо кількість помилок
     });
   } catch (error) {
