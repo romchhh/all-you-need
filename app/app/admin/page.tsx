@@ -35,16 +35,23 @@ interface DetailedStats {
   topUsers: Array<{ id: number; name: string; username: string | null; avatar: string | null; telegramId: string; listingsCount: number; totalViews: number }>;
 }
 
+interface CityCount {
+  city: string;
+  count: number;
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null);
+  const [listingsByCity, setListingsByCity] = useState<CityCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     fetchStats();
     fetchDetailedStats();
+    fetchListingsByCity();
   }, []);
 
   const fetchStats = async () => {
@@ -72,6 +79,18 @@ export default function AdminDashboardPage() {
       }
     } catch (err) {
       // Ігноруємо помилки детальної статистики
+    }
+  };
+
+  const fetchListingsByCity = async () => {
+    try {
+      const response = await fetch('/api/admin/stats/listings-by-city');
+      if (response.ok) {
+        const data = await response.json();
+        setListingsByCity(data.cities || []);
+      }
+    } catch (err) {
+      // Ігноруємо
     }
   };
 
@@ -241,6 +260,35 @@ export default function AdminDashboardPage() {
             ))}
           </div>
         </div>
+
+        {/* Топ 20 міст за кількістю оголошень */}
+        {listingsByCity.length > 0 && (
+          <div className="mt-4 sm:mt-6">
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
+              Оголошення по містах (топ 20)
+            </h3>
+            <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 overflow-x-auto">
+              <table className="w-full min-w-[280px]">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 px-2 text-xs font-medium text-gray-900 uppercase">#</th>
+                    <th className="text-left py-2 px-2 text-xs font-medium text-gray-900 uppercase">Місто</th>
+                    <th className="text-right py-2 px-2 text-xs font-medium text-gray-900 uppercase">Оголошень</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {listingsByCity.map((row, idx) => (
+                    <tr key={row.city} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 px-2 text-sm text-gray-600">{idx + 1}</td>
+                      <td className="py-2 px-2 text-sm font-medium text-gray-900">{row.city}</td>
+                      <td className="py-2 px-2 text-sm text-gray-900 text-right font-semibold">{row.count.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Швидкі дії */}
