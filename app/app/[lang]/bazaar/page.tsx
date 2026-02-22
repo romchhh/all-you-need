@@ -207,12 +207,15 @@ const BazaarPage = () => {
     if (bazaarTabState.selectedCategory) params.set('category', bazaarTabState.selectedCategory);
     if (bazaarTabState.selectedSubcategory) params.set('subcategory', bazaarTabState.selectedSubcategory);
     if (bazaarTabState.showFreeOnly) params.set('isFree', 'true');
+    if (bazaarTabState.selectedCities?.length > 0) {
+      params.set('cities', bazaarTabState.selectedCities.join(','));
+    }
     const searchTrimmed = (searchQueryForApi ?? debouncedSearchQuery ?? '').trim();
     if (searchTrimmed) {
       params.set('search', searchTrimmed);
     }
     return `/api/listings?${params.toString()}`;
-  }, [bazaarTabState.sortBy, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.showFreeOnly, debouncedSearchQuery]);
+  }, [bazaarTabState.sortBy, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.showFreeOnly, bazaarTabState.selectedCities, debouncedSearchQuery]);
   const { toast, showToast, hideToast } = useToast();
   
   // ВИДАЛЕНО: Вся складна логіка з isReturningFromListing, scrollToLastViewedListing, 
@@ -264,7 +267,7 @@ const BazaarPage = () => {
   }, []);
 
   const hasActiveFilters = Boolean(
-    bazaarTabState.selectedCategory || bazaarTabState.selectedSubcategory || bazaarTabState.showFreeOnly
+    bazaarTabState.selectedCategory || bazaarTabState.selectedSubcategory || bazaarTabState.showFreeOnly || (bazaarTabState.selectedCities?.length ?? 0) > 0
   );
   const hasSearchQuery = Boolean((debouncedSearchQuery ?? '').trim());
 
@@ -340,8 +343,8 @@ const BazaarPage = () => {
   const hasLoadedListings = useRef(false);
   const previousFilterKey = useRef<string | null>(null);
 
-  // Ключ фільтрів (категорія, пошук тощо) — однаковий формат для першого завантаження та рефетчу
-  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(debouncedSearchQuery ?? '').trim()}`;
+  // Ключ фільтрів (категорія, міста, пошук тощо) — однаковий формат для першого завантаження та рефетчу
+  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${(debouncedSearchQuery ?? '').trim()}`;
 
   // Перше завантаження (без фільтрів і без пошуку — можна з кешу; якщо є пошук — одразу з пошуком)
   useEffect(() => {
@@ -369,9 +372,9 @@ const BazaarPage = () => {
     }
   }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery]);
 
-  // При зміні фільтрів або пошуку — перезавантажити з offset 0
+  // При зміні фільтрів (включно з містами) або пошуку — перезавантажити з offset 0
   useEffect(() => {
-    const key = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(debouncedSearchQuery ?? '').trim()}`;
+    const key = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${(debouncedSearchQuery ?? '').trim()}`;
     if (previousFilterKey.current === null) {
       previousFilterKey.current = key;
       return;
@@ -387,7 +390,7 @@ const BazaarPage = () => {
     setTotalListings(0);
     setHasMore(false);
     fetchListings(true);
-  }, [bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, fetchListings]);
+  }, [bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, bazaarTabState.selectedCities, debouncedSearchQuery, fetchListings]);
 
 
   // Функція для оновлення даних (pull-to-refresh)

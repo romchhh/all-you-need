@@ -82,6 +82,11 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'newest';
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
+    // Міста для фільтра локації (каталог): передаються як cities=Berlin,Hamburg
+    const citiesParam = searchParams.get('cities')?.trim() || '';
+    const cities = citiesParam
+      ? citiesParam.split(',').map(c => c.trim()).filter(Boolean)
+      : [];
 
     // Якщо це запит для профілю користувача (userId), показуємо всі його оголошення
     // Інакше показуємо тільки активні оголошення для каталогу
@@ -402,6 +407,13 @@ export async function GET(request: NextRequest) {
       
       if (isFree) {
         whereClause += " AND l.isFree = 1";
+      }
+
+      // Фільтр по містах: location містить хоча б одне з обраних міст (на всіх оголошеннях, до LIMIT)
+      if (cities.length > 0) {
+        const placeholders = cities.map(() => 'l.location LIKE ?').join(' OR ');
+        whereClause += ` AND (${placeholders})`;
+        cities.forEach(city => params.push(`%${city}%`));
       }
       
       if (search) {
