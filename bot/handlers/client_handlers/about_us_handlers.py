@@ -7,6 +7,7 @@ from keyboards.client_keyboards import (
     get_about_us_keyboard,
     get_about_us_back_keyboard,
     get_about_us_rules_keyboard,
+    get_about_us_telegram_channels_keyboard,
     get_partners_list_keyboard,
     get_partner_detail_keyboard,
 )
@@ -113,6 +114,18 @@ async def about_rules_callback(callback: types.CallbackQuery):
     await callback.message.edit_text(
         rules_text,
         reply_markup=get_about_us_rules_keyboard(user_id),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "about_telegram")
+async def about_telegram_callback(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    text = t(user_id, 'about_us.telegram_channels_text')
+    await callback.message.edit_text(
+        text,
+        reply_markup=get_about_us_telegram_channels_keyboard(user_id),
         parse_mode="HTML"
     )
     await callback.answer()

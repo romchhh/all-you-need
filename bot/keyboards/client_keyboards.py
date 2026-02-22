@@ -112,28 +112,26 @@ def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
 
 
 def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    telegram_url = os.getenv('TELEGRAM_URL', 'https://t.me/TradeGroundHamburg')
     instagram_url = os.getenv('INSTAGRAM_URL', 'https://www.instagram.com/tradeground?igsh=MWs3dnEybWpscXY4dQ==')
     tiktok_url = os.getenv('TIKTOK_URL', 'https://www.tiktok.com/@tradeground')
-    support_url = os.getenv('SUPPORT_URL', telegram_url)  # Якщо немає окремого URL, використовуємо telegram
     lang = get_user_lang(user_id)
     offer_url = get_offer_url(lang)
     
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text=t(user_id, 'about_us.telegram'),
-                url=telegram_url
-            ),
-            InlineKeyboardButton(
                 text=t(user_id, 'about_us.instagram'),
                 url=instagram_url
+            ),
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.tiktok'),
+                url=tiktok_url
             )
         ],
         [
             InlineKeyboardButton(
-                text=t(user_id, 'about_us.tiktok'),
-                url=tiktok_url
+                text=t(user_id, 'about_us.telegram'),
+                callback_data="about_telegram"
             )
         ],
         [
@@ -163,12 +161,34 @@ def get_about_us_keyboard(user_id: int) -> InlineKeyboardMarkup:
                 text=t(user_id, 'about_us.partners'),
                 callback_data="about_partners"
             )
-        ]
+        ],
+
     ])
 
 
 def get_about_us_back_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t(user_id, 'about_us.back'),
+            callback_data="about_us_main"
+        )]
+    ])
+
+
+def get_about_us_telegram_channels_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    hamburg_url = os.getenv('TELEGRAM_URL', 'https://t.me/TradeGroundHamburg')
+    germany_url = os.getenv('TELEGRAM_GERMANY_URL', 'https://t.me/TradeGroundGermany')
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.telegram_channel_hamburg'),
+                url=hamburg_url
+            ),
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.telegram_channel_germany'),
+                url=germany_url
+            )
+        ],
         [InlineKeyboardButton(
             text=t(user_id, 'about_us.back'),
             callback_data="about_us_main"

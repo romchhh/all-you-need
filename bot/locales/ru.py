@@ -165,6 +165,17 @@ TEXTS = {
             "Выберите раздел ниже, чтобы узнать больше.⬇️"
         ),
         "telegram": "📱 Телеграм канал",
+        "telegram_channels_text": (
+            "📢 <b>Каналы TradeGround</b>\n\n"
+            "У нас два канала:\n\n"
+            "📍 <b>Гамбург и окрестности</b> — основной городской канал для объявлений об услугах, вакансиях и рекламе.\n"
+            "@TradeGroundHamburg\n\n"
+            "🌍 <b>Вся Германия</b> — общий канал, объявления со всей страны 🇩🇪\n"
+            "@TradeGroundGermany\n\n"
+            "Выберите канал ниже, чтобы перейти:"
+        ),
+        "telegram_channel_hamburg": "📍 Hamburg",
+        "telegram_channel_germany": "🌍 Germany",
         "instagram": "📷 Instagram",
         "tiktok": "🎵 TikTok",
         "tariffs": "💰 Тарифы",
