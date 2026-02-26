@@ -13,6 +13,7 @@ CITY_SYNONYMS = {
     # Кёльн
     "кёльн": "Köln",
     "кельн": "Köln",
+    "koln": "Köln",
     "cologne": "Köln",
     # Дюссельдорф
     "дюссельдорф": "Düsseldorf",

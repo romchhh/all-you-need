@@ -17,6 +17,7 @@ const prisma = new PrismaClient();
 const CITY_REPLACEMENTS: { from: string; to: string }[] = [
   { from: 'Munich', to: 'München' },
   { from: 'Cologne', to: 'Köln' },
+  { from: 'Koln', to: 'Köln' },
   { from: 'Nuremberg', to: 'Nürnberg' },
   { from: 'Dusseldorf', to: 'Düsseldorf' },
   { from: 'Frankfurt', to: 'Frankfurt (Oder)' },

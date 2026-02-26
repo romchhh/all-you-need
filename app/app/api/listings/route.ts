@@ -44,6 +44,7 @@ const CITY_ALIASES: Record<string, string> = {
   // Кёльн
   'кёльн': 'Köln',
   'кельн': 'Köln',
+  'koln': 'Köln',
   'cologne': 'Köln',
   // Дюссельдорф
   'дюссельдорф': 'Düsseldorf',
