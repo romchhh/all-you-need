@@ -30,6 +30,7 @@ from database_functions.telegram_listing_db import (
     update_telegram_listing_publication_tariff
 )
 from database_functions.client_db import check_user, get_user_balance, deduct_user_balance
+from utils.location_normalization import normalize_city_name, contains_cyrillic
 from utils.moderation_manager import ModerationManager
 from utils.monopay_functions import create_publication_payment_link
 from main import bot
@@ -1146,8 +1147,9 @@ async def back_from_location(callback: types.CallbackQuery, state: FSMContext):
 async def process_city_selection(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     
-    # Отримуємо назву міста з callback_data
-    city_name = callback.data.replace("city_", "")
+    # Отримуємо назву міста з callback_data та нормалізуємо
+    raw_city_name = callback.data.replace("city_", "")
+    city_name = normalize_city_name(raw_city_name)
     
     await state.update_data(location=city_name)
     
@@ -1183,7 +1185,21 @@ async def process_location(message: types.Message, state: FSMContext):
     if not message.text:
         return
     
-    location = message.text.strip()
+    raw_location = message.text.strip()
+    
+    # Забороняємо вводити місто кирилицею — тільки латиниця (англ/нім)
+    if contains_cyrillic(raw_location):
+        await message.answer(
+            "<b>❌ Пожалуйста, вводите название города латиницей.</b>\n\n"
+            "Например: <b>Hamburg</b>, <b>München</b>, <b>Köln</b>.\n\n"
+            "Или выберите город из списка ниже.",
+            reply_markup=cities_keyboard,
+            parse_mode="HTML"
+        )
+        return
+    
+    # Нормалізуємо введене місто (Hamburg/Munich → Hamburg/München тощо)
+    location = normalize_city_name(raw_location)
     
     # Визначаємо яку клавіатуру показувати на основі регіону
     data = await state.get_data()

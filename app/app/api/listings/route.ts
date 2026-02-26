@@ -30,6 +30,74 @@ function normalizeCyrillicToLower(text: string): string {
   return text.toLowerCase();
 }
 
+// Маппінг синонімів міст (RU/EN) → канонічна німецька назва
+const CITY_ALIASES: Record<string, string> = {
+  // Гамбург
+  'гамбург': 'Hamburg',
+  'hamburg': 'Hamburg',
+  // Мюнхен
+  'мюнхен': 'München',
+  'munich': 'München',
+  // Берлін
+  'берлин': 'Berlin',
+  'berlin': 'Berlin',
+  // Кёльн
+  'кёльн': 'Köln',
+  'кельн': 'Köln',
+  'cologne': 'Köln',
+  // Дюссельдорф
+  'дюссельдорф': 'Düsseldorf',
+  'dusseldorf': 'Düsseldorf',
+  'düsseldorf': 'Düsseldorf',
+  // Штутгарт
+  'штутгарт': 'Stuttgart',
+  'stuttgart': 'Stuttgart',
+  // Ганновер
+  'ганновер': 'Hannover',
+  'hannover': 'Hannover',
+  'hanover': 'Hannover',
+  // Бремен
+  'бремен': 'Bremen',
+  'bremen': 'Bremen',
+  // Лейпциг
+  'лейпциг': 'Leipzig',
+  'leipzig': 'Leipzig',
+  // Дрезден
+  'дрезден': 'Dresden',
+  'dresden': 'Dresden',
+  // Дортмунд
+  'дортмунд': 'Dortmund',
+  'dortmund': 'Dortmund',
+  // Ессен
+  'эссен': 'Essen',
+  'essen': 'Essen',
+  // Дуйсбург
+  'дуйсбург': 'Duisburg',
+  'duisburg': 'Duisburg',
+  // Бонн
+  'бонн': 'Bonn',
+  'bonn': 'Bonn',
+  // Карлсруэ
+  'карлсруэ': 'Karlsruhe',
+  'karlsruhe': 'Karlsruhe',
+  // Мангейм / Маннхайм
+  'маннгейм': 'Mannheim',
+  'манхайм': 'Mannheim',
+  'mannheim': 'Mannheim',
+  // Нюрнберг
+  'нюрнберг': 'Nürnberg',
+  'nuremberg': 'Nürnberg',
+  'nürnberg': 'Nürnberg',
+  // Франкфурт (приклад з вимог користувача)
+  'франкфурт': 'Frankfurt (Oder)',
+  'frankfurt': 'Frankfurt (Oder)',
+};
+
+function normalizeCityInput(city: string): string {
+  const key = city.trim().toLowerCase();
+  return CITY_ALIASES[key] || city.trim();
+}
+
 // Функція для генерації всіх можливих варіантів регістру для пошуку
 // Генерує варіанти: оригінальний, всі малі, перша велика решта малі
 function generateSearchVariants(searchText: string): string[] {
@@ -52,6 +120,28 @@ function generateSearchVariants(searchText: string): string[] {
   variants.add(searchText.toUpperCase());
   
   return Array.from(variants);
+}
+
+// Розширюємо варіанти пошуку з урахуванням синонімів міст.
+// Якщо запит — одне слово і воно збігається з відомим містом (РУ/EN),
+// додаємо варіанти для канонічної назви (наприклад, "Гамбург"/"Hamburg" → "Hamburg").
+function generateSearchVariantsWithCities(searchText: string): string[] {
+  const baseVariants = generateSearchVariants(searchText);
+  const trimmed = searchText.trim();
+  if (!trimmed) return baseVariants;
+  
+  // Працюємо тільки з одиничними словами, щоб не ламати складні запити
+  if (/\s/.test(trimmed)) {
+    return baseVariants;
+  }
+
+  const normalizedCity = normalizeCityInput(trimmed);
+  if (normalizedCity === trimmed) {
+    return baseVariants;
+  }
+
+  const cityVariants = generateSearchVariants(normalizedCity);
+  return Array.from(new Set([...baseVariants, ...cityVariants]));
 }
 
 // Глобальна змінна для відстеження ініціалізації таблиці Favorite
@@ -84,9 +174,10 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
     // Міста для фільтра локації (каталог): передаються як cities=Berlin,Hamburg
     const citiesParam = searchParams.get('cities')?.trim() || '';
-    const cities = citiesParam
+    const citiesRaw = citiesParam
       ? citiesParam.split(',').map(c => c.trim()).filter(Boolean)
       : [];
+    const cities = citiesRaw.map(c => normalizeCityInput(c));
 
     // Якщо це запит для профілю користувача (userId), показуємо всі його оголошення
     // Інакше показуємо тільки активні оголошення для каталогу
@@ -419,8 +510,9 @@ export async function GET(request: NextRequest) {
       if (search) {
         const searchTrimmed = search.trim();
         // Генеруємо всі можливі варіанти регістру для пошуку
+        // + додаємо варіанти для синонімів міст (Гамбург/Hamburg, Munich/München тощо)
         // Це необхідно, оскільки SQLite не підтримує case-insensitive порівняння для кирилиці
-        const searchVariants = generateSearchVariants(searchTrimmed);
+        const searchVariants = generateSearchVariantsWithCities(searchTrimmed);
         
         // Для коротких пошукових запитів (до 30 символів) використовуємо SQL LIKE
         // Для довших використовуємо фільтрацію в JavaScript після отримання даних
