@@ -9,6 +9,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { isGermanCityValid } from '../constants/german-cities';
 
 const prisma = new PrismaClient();
 
@@ -29,6 +30,16 @@ const CITY_REPLACEMENTS: { from: string; to: string }[] = [
 const DRY_RUN = process.argv.includes('--dry-run');
 
 async function main() {
+  // Перевіряємо, що всі цільові міста існують в довіднику germanCities
+  const invalidTargets = CITY_REPLACEMENTS.filter(({ to }) => !isGermanCityValid(to));
+  if (invalidTargets.length > 0) {
+    console.warn('⚠️ Деякі цільові міста відсутні в базовому списку germanCities:');
+    invalidTargets.forEach(({ to }) => {
+      console.warn(`  - "${to}"`);
+    });
+    console.warn('Перевірте написання цих міст перед запуском міграції.\n');
+  }
+
   console.log(
     `Запуск скрипта заміни міст (${DRY_RUN ? 'DRY RUN — без змін в БД' : 'ON-LINE ОНОВЛЕННЯ'})...\n`
   );
