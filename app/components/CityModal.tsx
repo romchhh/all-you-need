@@ -4,7 +4,7 @@ import { X, MapPin, Search, Check } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useState, useEffect, Fragment, useMemo, useRef } from 'react';
-import { germanCities, fetchGermanCitiesFromAPI } from '@/constants/german-cities';
+import { germanCities, fetchGermanCitiesFromAPI, isGermanCityValid } from '@/constants/german-cities';
 
 interface TouchStart {
   y: number;
@@ -13,17 +13,25 @@ interface TouchStart {
 
 // Список великих міст Німеччини (в порядку як зазначено користувачем)
 const majorGermanCities = [
-  'Hamburg',
-  'Bremen',
-  'Hannover',
   'Berlin',
-  'Dortmund',
+  'Hamburg',
+  'München',
   'Köln',
-  'Leipzig',
-  'Frankfurt am Main',
+  'Frankfurt',
   'Stuttgart',
-  'München'
+  'Düsseldorf',
+  'Leipzig',
+  'Dortmund',
+  'Essen',
+  'Bremen',
+  'Dresden',
+  'Hannover',
+  'Nürnberg',
+  'Duisburg'
 ];
+
+// Перевіряємо, що всі міста зі списку є в базовому списку germanCities
+const validMajorGermanCities = majorGermanCities.filter((city) => isGermanCityValid(city));
 
 // Маппінг популярних індексів до міст (для прикладу)
 // В реальному застосунку можна використовувати API або більший список
@@ -454,7 +462,7 @@ export const CityModal = ({
                 <div>
                   <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.majorCities')}</h4>
                   <div className="space-y-2">
-                    {majorGermanCities.map((city) => {
+                    {validMajorGermanCities.map((city) => {
                       const isSelected = localSelectedCities.includes(city);
                       return (
                         <button
