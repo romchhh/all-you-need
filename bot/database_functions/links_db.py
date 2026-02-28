@@ -123,67 +123,86 @@ def get_link_by_id(link_id: int):
 
 def get_link_payments_total(link_id: int) -> tuple[float, float, float, int, int]:
     """
-    Повертає для користувачів, які перейшли за цим посиланням:
-    (bot_eur, marketplace_eur, total_eur, bot_payers_count, marketplace_payers_count)
+    Повертає оплати тільки від користувачів, чий перший перехід у бот був саме за цим посиланням
+    (first-touch: один користувач атрибутується одному link_id).
+    (bot_eur, marketplace_eur, total_eur, bot_payers_count, marketplace_payers_count).
     """
+    conn_local = get_optimized_connection()
+    cur = conn_local.cursor()
     try:
-        # Telegram ID відвідувачів (у LinkVisit зберігається як текст)
-        cursor.execute('''
-            SELECT DISTINCT visitor_user_id FROM LinkVisit
-            WHERE source_type = 'link' AND source_id = ?
+        # Тільки ті, у кого перший візит по будь-якому посиланню був саме цей link_id
+        cur.execute('''
+            SELECT DISTINCT lv.visitor_user_id
+            FROM LinkVisit lv
+            WHERE lv.source_type = 'link' AND lv.source_id = ?
+            AND lv.created_at = (
+                SELECT MIN(lv2.created_at) FROM LinkVisit lv2
+                WHERE lv2.source_type = 'link' AND lv2.visitor_user_id = lv.visitor_user_id
+            )
         ''', (link_id,))
-        visitor_ids = [row[0] for row in cursor.fetchall()]
+        visitor_ids = [row[0] for row in cur.fetchall()]
         if not visitor_ids:
             return 0.0, 0.0, 0.0, 0, 0
 
-        # Внутрішні User.id для маркетплейсу (Transaction)
-        cursor.execute('''
-            SELECT DISTINCT u.id FROM LinkVisit lv
-            JOIN User u ON CAST(u.telegramId AS TEXT) = lv.visitor_user_id
-            WHERE lv.source_type = 'link' AND lv.source_id = ?
+        # User.id цих же користувачів (перший перехід = цей link_id)
+        cur.execute('''
+            SELECT DISTINCT u.id
+            FROM User u
+            WHERE CAST(u.telegramId AS TEXT) IN (
+                SELECT DISTINCT lv.visitor_user_id
+                FROM LinkVisit lv
+                WHERE lv.source_type = 'link' AND lv.source_id = ?
+                AND lv.created_at = (
+                    SELECT MIN(lv2.created_at) FROM LinkVisit lv2
+                    WHERE lv2.source_type = 'link' AND lv2.visitor_user_id = lv.visitor_user_id
+                )
+            )
         ''', (link_id,))
-        user_ids = [row[0] for row in cursor.fetchall()]
+        user_ids = [row[0] for row in cur.fetchall()]
 
         placeholders_visitors = ','.join('?' * len(visitor_ids))
+        visitor_ints = [int(v) for v in visitor_ids]
 
-        # Оплати в боті — таблиця payments (user_id тут = telegram_id)
+        # Оплати в боті — тільки від користувачів з visitor_ids для цього link_id
         bot_eur = 0.0
         bot_payers = 0
         try:
-            cursor.execute(f'''
+            cur.execute(f'''
                 SELECT COALESCE(SUM(amount), 0) FROM payments
                 WHERE user_id IN ({placeholders_visitors}) AND status = 'success'
-            ''', [int(v) for v in visitor_ids])
-            bot_eur = float(cursor.fetchone()[0] or 0.0)
-            cursor.execute(f'''
+            ''', visitor_ints)
+            row = cur.fetchone()
+            bot_eur = float(row[0] or 0.0)
+            cur.execute(f'''
                 SELECT COUNT(DISTINCT user_id) FROM payments
                 WHERE user_id IN ({placeholders_visitors}) AND status = 'success'
-            ''', [int(v) for v in visitor_ids])
-            bot_payers = cursor.fetchone()[0] or 0
+            ''', visitor_ints)
+            bot_payers = (cur.fetchone()[0] or 0)
         except Exception:
             pass
 
-        # Оплати в маркетплейсі — Transaction (userId = User.id)
         marketplace_eur = 0.0
         marketplace_payers = 0
         if user_ids:
             placeholders_users = ','.join('?' * len(user_ids))
-            cursor.execute(f'''
+            cur.execute(f'''
                 SELECT COALESCE(SUM(amount), 0) FROM [Transaction]
                 WHERE userId IN ({placeholders_users}) AND type = 'payment' AND status = 'completed'
             ''', user_ids)
-            marketplace_eur = float(cursor.fetchone()[0] or 0.0)
-            cursor.execute(f'''
+            marketplace_eur = float(cur.fetchone()[0] or 0.0)
+            cur.execute(f'''
                 SELECT COUNT(DISTINCT userId) FROM [Transaction]
                 WHERE userId IN ({placeholders_users}) AND type = 'payment' AND status = 'completed'
             ''', user_ids)
-            marketplace_payers = cursor.fetchone()[0] or 0
+            marketplace_payers = cur.fetchone()[0] or 0
 
         total_eur = bot_eur + marketplace_eur
         return bot_eur, marketplace_eur, total_eur, bot_payers, marketplace_payers
     except Exception as e:
         print(f"Error get_link_payments_total: {e}")
         return 0.0, 0.0, 0.0, 0, 0
+    finally:
+        conn_local.close()
 
 
 def update_link_name(link_id: int, new_name: str):
