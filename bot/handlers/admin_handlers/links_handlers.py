@@ -4,7 +4,7 @@ from aiogram.exceptions import TelegramBadRequest
 from utils.filters import IsAdmin
 from aiogram.fsm.context import FSMContext
 from keyboards.admin_keyboards import get_links_keyboard, cancel_button, admin_keyboard, get_link_stats_keyboard, get_delete_link_confirm_keyboard
-from database_functions.links_db import get_link_by_id, update_link_name, delete_link, add_link, get_link_detailed_stats, get_visits_by_link, get_all_ref_stats
+from database_functions.links_db import get_link_by_id, update_link_name, delete_link, add_link, get_link_detailed_stats, get_visits_by_link, get_all_ref_stats, get_link_payments_total
 from main import bot
 from config import bot_username
 from states.admin_states import LinkStates
@@ -41,6 +41,8 @@ async def show_link_stats(callback: types.CallbackQuery):
         if visits_list and len(visits_list) > 10:
             visits_detail += f"\n  ... та ще {len(visits_list) - 10}"
 
+        bot_eur, marketplace_eur, total_eur, bot_payers, marketplace_payers = get_link_payments_total(link_id)
+
         try:
             await callback.message.edit_text(
                 f"<b>📊 Статистика посилання:</b>\n"
@@ -48,6 +50,9 @@ async def show_link_stats(callback: types.CallbackQuery):
                 f"Посилання: <code>{bot_link}</code>\n\n"
                 f"<b>📈 Метрики:</b>\n"
                 f"• Переходів в бот: {visits_count}\n\n"
+                f"<b>💳 Оплати в боті:</b> {bot_eur:.2f} € ({bot_payers} користувачів)\n"
+                f"<b>🛒 Оплати в маркетплейсі:</b> {marketplace_eur:.2f} € ({marketplace_payers} користувачів)\n"
+                f"<b>💰 Всі оплати:</b> {total_eur:.2f} €\n\n"
                 f"<b>Хто перейшов (останні):</b>\n{visits_detail}\n\n"
                 f"Скопіюйте посилання для розповсюдження",
                 parse_mode="HTML",
@@ -105,9 +110,9 @@ async def delete_link_confirm(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(IsAdmin(), F.data.startswith("confirm_delete_"))
+@router.callback_query(IsAdmin(), F.data.startswith("linkconfirm_delete_link_"))
 async def delete_link_process(callback: types.CallbackQuery):
-    link_id = int(callback.data.split("_")[2])
+    link_id = int(callback.data.split("_")[3])
     delete_link(link_id)
     
     await callback.message.edit_text(

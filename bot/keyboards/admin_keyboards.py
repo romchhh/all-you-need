@@ -136,7 +136,7 @@ def get_link_stats_keyboard(link_id: int) -> InlineKeyboardMarkup:
 def get_delete_link_confirm_keyboard(link_id: int) -> InlineKeyboardMarkup:
     keyboard = [
         [
-            InlineKeyboardButton(text="✅ Так", callback_data=f"confirm_delete_{link_id}"),
+            InlineKeyboardButton(text="✅ Так", callback_data=f"linkconfirm_delete_link_{link_id}"),
             InlineKeyboardButton(text="❌ Ні", callback_data="back_to_links")
         ]
     ]
