@@ -100,11 +100,16 @@ def get_main_menu_keyboard(user_id: int) -> ReplyKeyboardMarkup:
         text=t(user_id, 'referral.menu_button')
     )
     
+    polezno_button = KeyboardButton(
+        text=t(user_id, 'menu.polezno')
+    )
+    
     return ReplyKeyboardMarkup(
         keyboard=[
             [add_listing_button, my_listings_button],
             [about_us_button, my_profile_button],
-            [support_button, referral_button]
+            [support_button, referral_button],
+            [polezno_button]
         ],
         resize_keyboard=True,
         is_persistent=True
@@ -199,6 +204,7 @@ def get_about_us_telegram_channels_keyboard(user_id: int) -> InlineKeyboardMarku
 # Партнери: id для callback_data та ключ назви кнопки в локалі
 PARTNERS_LIST = [
     {"id": "sho_events", "name_key": "about_us.partner_name_sho_events"},
+    {"id": "polezno", "name_key": "about_us.partner_name_polezno"},
 ]
 
 

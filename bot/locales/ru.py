@@ -151,7 +151,8 @@ TEXTS = {
         "my_profile": "👤 Мой профиль",
         "about_us": "ℹ️ О нас",
         "support": "💬 Поддержка",
-        "main_menu": "📋 Главное меню"
+        "main_menu": "📋 Главное меню",
+        "polezno": "Полезно Германия 🇩🇪"
     },
     "about_us": {
         "title": "ℹ️ <b>О TradeGround</b>\n\n",
@@ -196,6 +197,14 @@ TEXTS = {
             "Indra music club | Große Freiheit 64, 22767"
         ),
         "partner_link_instagram": "📷 Открыть Instagram",
+        "partner_link_channel": "📢 Перейти в канал",
+        "partner_name_polezno": "Полезно Германия 🇩🇪",
+        "partner_caption_polezno": (
+            "<b>Главный инфо-партнёр Германии 🇩🇪</b>\n\n"
+            "POLEZNO | Германия — информационный канал для русскоязычных жителей Германии: новости, изменения в законах, полезные разборы, жизнь в городах и актуальные события.\n\n"
+            "Рекомендуем как надёжный источник информации по Германии.\n\n"
+            "https://t.me/poleznoOK"
+        ),
         "support": "💬 Поддержка",
         "open_full_version": "🌐 Открыть полную версию",
         "back": "⬅️ Назад",

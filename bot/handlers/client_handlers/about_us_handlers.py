@@ -17,14 +17,41 @@ router = Router()
 # Директорія Content відносно кореня бота
 BOT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# Дані партнерів: id, шлях до фото, URL, ключ підпису в локалі
+# Дані партнерів: id, шлях до фото, URL, ключ підпису в локалі, опційно link_label_key для кнопки
 PARTNERS_DATA = {
     "sho_events": {
         "photo": BOT_ROOT / "Content" / "474905083_18135166426381507_7459950685770101771_n.jpg",
         "url": "https://www.instagram.com/sho_events_?igsh=emljYjRkZWNqd2w3",
         "caption_key": "about_us.partner_caption_sho_events",
     },
+    "polezno": {
+        "photo": BOT_ROOT / "Content" / "IMAGE 2026-03-01 12:54:18.jpg",
+        "url": "https://t.me/poleznoOK",
+        "caption_key": "about_us.partner_caption_polezno",
+        "link_label_key": "about_us.partner_link_channel",
+    },
 }
+
+
+# Тексти кнопки "Полезно Германия" для обробника (RU / UK)
+POLEZNO_BUTTON_TEXTS = ["Полезно Германия 🇩🇪", "Корисно Німеччина 🇩🇪"]
+
+
+@router.message(F.text.in_(POLEZNO_BUTTON_TEXTS))
+async def polezno_menu_handler(message: types.Message):
+    """При натисканні кнопки «Полезно Германия» — фото, опис, кнопка посилання на канал."""
+    user_id = message.from_user.id
+    result = _send_partner_content(message.chat.id, user_id, "polezno")
+    if not result:
+        await message.answer("Фото тимчасово недоступне.")
+        return
+    photo_file, caption, keyboard = result
+    await message.answer_photo(
+        photo_file,
+        caption=caption,
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
 
 
 @router.message(F.text.in_([
@@ -143,21 +170,30 @@ async def about_partners_callback(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("partner_"))
-async def partner_detail_callback(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    partner_id = callback.data.replace("partner_", "", 1)
+def _send_partner_content(chat_id: int, user_id: int, partner_id: str):
+    """Надсилає фото, опис і кнопку посилання для партнера (для callback і message handler)."""
     if partner_id not in PARTNERS_DATA:
-        await callback.answer()
         return
     data = PARTNERS_DATA[partner_id]
     photo_path = data["photo"]
     if not photo_path.exists():
-        await callback.answer("Фото тимчасово недоступне.", show_alert=True)
         return
     caption = t(user_id, data["caption_key"])
-    keyboard = get_partner_detail_keyboard(user_id, data["url"])
+    link_label_key = data.get("link_label_key", "about_us.partner_link_instagram")
+    keyboard = get_partner_detail_keyboard(user_id, data["url"], link_label_key=link_label_key)
     photo_file = FSInputFile(str(photo_path))
+    return photo_file, caption, keyboard
+
+
+@router.callback_query(F.data.startswith("partner_"))
+async def partner_detail_callback(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    partner_id = callback.data.replace("partner_", "", 1)
+    result = _send_partner_content(callback.message.chat.id, user_id, partner_id)
+    if not result:
+        await callback.answer("Фото тимчасово недоступне.", show_alert=True)
+        return
+    photo_file, caption, keyboard = result
     await callback.message.answer_photo(
         photo_file,
         caption=caption,
