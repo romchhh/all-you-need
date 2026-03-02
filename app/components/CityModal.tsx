@@ -17,7 +17,7 @@ const majorGermanCities = [
   'Hamburg',
   'München',
   'Köln',
-  'Frankfurt',
+  'Frankfurt am Main',
   'Stuttgart',
   'Düsseldorf',
   'Leipzig',

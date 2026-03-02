@@ -24,6 +24,7 @@ import { formatTimeAgo } from '@/utils/formatTime';
 import { descriptionWithLinks } from '@/utils/descriptionLinks';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
+import { getCategories } from '@/constants/categories';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
 const PromotionModal = dynamic(() => import('./PromotionModal'), {
@@ -105,6 +106,15 @@ export const ListingDetail = ({
   const router = useRouter();
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
+  const categories = useMemo(() => getCategories(t), [t]);
+  const categoryLabel = useMemo(() => {
+    if (!listing.category) return null;
+    const category = categories.find(c => c.id === listing.category);
+    if (!category) return null;
+    if (!listing.subcategory) return category.name;
+    const sub = category.subcategories?.find(s => s.id === listing.subcategory);
+    return sub ? `${category.name} • ${sub.name}` : category.name;
+  }, [categories, listing.category, listing.subcategory]);
   
   // Визначення мобільної версії (безпечно для SSR)
   const [isMobile, setIsMobile] = useState(false);
@@ -709,7 +719,12 @@ export const ListingDetail = ({
             </div>
 
         {/* Заголовок */}
-        <h1 className="text-xl font-semibold mb-4" style={{ color: '#FFFFFF' }}>{listing.title}</h1>
+        <h1 className="text-xl font-semibold mb-1" style={{ color: '#FFFFFF' }}>{listing.title}</h1>
+        {categoryLabel && (
+          <div className="mb-3 text-sm text-white/70">
+            {categoryLabel}
+          </div>
+        )}
 
         {/* Статистика */}
         <div className="flex gap-4 mb-6 text-sm text-white/70">
