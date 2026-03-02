@@ -52,7 +52,7 @@ export default function PlatformPage() {
             </div>
             <div className="relative w-full h-40 sm:h-52 rounded-2xl overflow-hidden border border-emerald-500/30 bg-black/40">
               <Image
-                src="/images/pages/IMAGE 2026-03-02 23:02:23.jpg"
+                src="/images/pages/about-tradeground.jpg"
                 alt="TradeGround · Гамбург"
                 fill
                 priority
@@ -102,7 +102,7 @@ export default function PlatformPage() {
             </div>
             <div className="relative w-full h-40 sm:h-48 rounded-2xl overflow-hidden border border-sky-400/40 bg-black/40">
               <Image
-                src="/images/pages/IMAGE 2026-03-02 23:03:34.jpg"
+                src="/images/pages/platform-channel-vs-marketplace.jpg"
                 alt="Канал и маркетплейс TradeGround"
                 fill
                 className="object-contain"
@@ -151,7 +151,7 @@ export default function PlatformPage() {
             </div>
             <div className="relative w-full h-40 sm:h-48 rounded-2xl overflow-hidden border border-indigo-400/40 bg-black/40">
               <Image
-                src="/images/pages/IMAGE 2026-03-02 23:03:50.jpg"
+                src="/images/pages/platform-how-to-post.jpg"
                 alt="Как подать объявление в TradeGround"
                 fill
                 className="object-contain"
@@ -190,7 +190,7 @@ export default function PlatformPage() {
             </div>
             <div className="relative w-full h-40 sm:h-48 rounded-2xl overflow-hidden border border-purple-400/40 bg-black/40">
               <Image
-                src="/images/pages/IMAGE 2026-03-02 23:04:03.jpg"
+                src="/images/pages/platform-profile.jpg"
                 alt="Профиль пользователя TradeGround"
                 fill
                 className="object-contain"

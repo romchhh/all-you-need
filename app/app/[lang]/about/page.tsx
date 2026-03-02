@@ -77,7 +77,7 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold text-gray-900">{content.subtitle}</h2>
           <div className="relative w-full h-40 sm:h-52 rounded-2xl overflow-hidden border border-gray-200 bg-gray-100">
             <Image
-              src="/images/pages/IMAGE 2026-03-02 23:02:23.jpg"
+              src="/images/pages/about-tradeground.jpg"
               alt="TradeGround Marketplace"
               fill
               className="object-contain"

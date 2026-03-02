@@ -50,7 +50,7 @@ export default function AdsRulesPage() {
             </div>
             <div className="relative w-full h-40 sm:h-48 rounded-2xl overflow-hidden border border-red-400/60 bg-black/40">
               <Image
-                src="/images/pages/IMAGE 2026-03-02 23:04:29.jpg"
+                src="/images/pages/ads-rules-moderation.jpg"
                 alt="Правила размещения объявлений TradeGround"
                 fill
                 className="object-contain"
@@ -83,7 +83,7 @@ export default function AdsRulesPage() {
             </div>
             <div className="relative w-full h-40 sm:h-48 rounded-2xl overflow-hidden border border-yellow-300/60 bg-black/40">
               <Image
-                src="/images/pages/IMAGE 2026-03-02 23:04:45.jpg"
+                src="/images/pages/ads-rules-promotion.jpg"
                 alt="Продвижение и реклама TradeGround"
                 fill
                 className="object-contain"
@@ -121,7 +121,7 @@ export default function AdsRulesPage() {
             </div>
             <div className="relative w-full h-40 sm:h-48 rounded-2xl overflow-hidden border border-sky-400/60 bg-black/40">
               <Image
-                src="/images/pages/IMAGE 2026-03-02 23:04:57.jpg"
+                src="/images/pages/ads-rules-tags.jpg"
                 alt="Поиск объявлений по тегам TradeGround"
                 fill
                 className="object-contain"

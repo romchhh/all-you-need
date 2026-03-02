@@ -1,5 +1,7 @@
 import sqlite3
 import asyncio
+import json
+import os
 from datetime import datetime, timedelta
 from typing import List, Dict
 from database_functions.db_config import DATABASE_PATH
@@ -154,12 +156,172 @@ async def deactivate_old_telegram_listings(bot: Bot = None):
             await bot.session.close()
 
 
+async def unpin_expired_pinned_telegram_listings(bot: Bot = None):
+    """
+    Знімає закріплення з оголошень у каналі після завершення терміну дії тарифів pinned_12h / pinned_24h.
+    Повідомлення в каналі не видаляються, лише відкріплюються.
+    """
+    if not bot:
+        bot = Bot(token=token)
+
+    try:
+        # Отримуємо всі TelegramListing з тарифами, де потенційно є закріплення
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("PRAGMA table_info(TelegramListing)")
+        columns = [row[1] for row in cursor.fetchall()]
+        has_publication_tariff = 'publicationTariff' in columns
+        has_payment_status = 'paymentStatus' in columns
+        has_channel_message_id = 'channelMessageId' in columns
+
+        if not has_publication_tariff or not has_channel_message_id:
+            conn.close()
+            return
+
+        base_query = """
+            SELECT id, publishedAt, publicationTariff, channelMessageId
+            FROM TelegramListing
+            WHERE publishedAt IS NOT NULL
+              AND publicationTariff IS NOT NULL
+        """
+        if has_payment_status:
+            base_query = """
+                SELECT id, publishedAt, publicationTariff, channelMessageId, paymentStatus
+                FROM TelegramListing
+                WHERE publishedAt IS NOT NULL
+                  AND publicationTariff IS NOT NULL
+                  AND paymentStatus = 'paid'
+            """
+
+        cursor.execute(base_query)
+        rows = cursor.fetchall()
+        conn.close()
+
+        if not rows:
+            return
+
+        channel_id_env = os.getenv('TRADE_CHANNEL_ID')
+        if not channel_id_env:
+            print("TRADE_CHANNEL_ID not set, skipping unpinning pinned listings")
+            return
+
+        try:
+            channel_id = int(channel_id_env)
+        except ValueError:
+            print(f"Invalid TRADE_CHANNEL_ID value: {channel_id_env}")
+            return
+
+        now = datetime.now()
+        unpinned_count = 0
+
+        # Обробляємо всі оголошення та визначаємо, чи закінчився час закріплення
+        for row in rows:
+            if has_payment_status:
+                listing_id, published_at_raw, publication_tariff_raw, channel_message_id, _payment_status = row
+            else:
+                listing_id, published_at_raw, publication_tariff_raw, channel_message_id = row
+
+            if not publication_tariff_raw:
+                continue
+
+            tariffs = []
+            try:
+                publication_tariff_str = str(publication_tariff_raw)
+                if publication_tariff_str.startswith('['):
+                    tariffs = json.loads(publication_tariff_str)
+                else:
+                    tariffs = [publication_tariff_str]
+            except Exception:
+                tariffs = [str(publication_tariff_raw)]
+
+            # Нас цікавлять лише тарифи з pinned_*
+            if not any(t.startswith('pinned') for t in tariffs):
+                continue
+
+            # Визначаємо тривалість закріплення
+            duration_hours = 0
+            if 'pinned_12h' in tariffs:
+                duration_hours = max(duration_hours, 12)
+            if 'pinned_24h' in tariffs:
+                duration_hours = max(duration_hours, 24)
+
+            if duration_hours <= 0:
+                continue
+
+            # Парсимо дату публікації
+            if not published_at_raw:
+                continue
+
+            try:
+                published_at = datetime.fromisoformat(str(published_at_raw))
+            except Exception:
+                try:
+                    published_at = datetime.strptime(str(published_at_raw), "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    # Не вдалося розпарсити дату - пропускаємо
+                    continue
+
+            expires_at = published_at + timedelta(hours=duration_hours)
+            if now < expires_at:
+                # Ще не закінчився термін закріплення
+                continue
+
+            # Готуємо message_id для відкріплення
+            if not channel_message_id or str(channel_message_id).strip() in ("", "None"):
+                continue
+
+            message_ids: List[int] = []
+            try:
+                if isinstance(channel_message_id, str) and (channel_message_id.startswith('[') or channel_message_id.startswith('"')):
+                    parsed = json.loads(channel_message_id)
+                    if isinstance(parsed, list):
+                        message_ids = parsed
+                    else:
+                        message_ids = [int(parsed)]
+                else:
+                    message_ids = [int(channel_message_id)]
+            except Exception:
+                try:
+                    message_ids = [int(channel_message_id)]
+                except Exception:
+                    print(f"Не вдалося розпарсити channelMessageId для оголошення {listing_id}: {channel_message_id}")
+                    continue
+
+            if not message_ids:
+                continue
+
+            first_message_id = message_ids[0]
+
+            try:
+                await bot.unpin_chat_message(chat_id=channel_id, message_id=first_message_id)
+                unpinned_count += 1
+                print(
+                    f"Оголошення {listing_id}: повідомлення {first_message_id} "
+                    f"відкріплено (тарифи {tariffs}, опубліковано {published_at}, "
+                    f"тривалість {duration_hours} годин)"
+                )
+            except Exception as e:
+                # Наприклад, якщо повідомлення вже не закріплене або не існує
+                print(f"Помилка відкріплення повідомлення {first_message_id} для оголошення {listing_id}: {e}")
+                continue
+
+        if unpinned_count:
+            print(f"Відкріплено {unpinned_count} оголошень із закінченим терміном pinned-тарифу")
+
+    except Exception as e:
+        print(f"Помилка відкріплення закінчених pinned-оголошень: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 async def run_scheduled_tasks():
     bot = Bot(token=token)
     
     try:
         await deactivate_old_listings(bot)
         await deactivate_old_telegram_listings(bot)
+        await unpin_expired_pinned_telegram_listings(bot)
         
     finally:
         await bot.session.close()

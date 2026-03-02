@@ -49,7 +49,7 @@ export default function ReferralPage() {
             </div>
             <div className="relative w-full h-52 sm:h-60 rounded-2xl overflow-hidden border border-emerald-300/60 bg-black/40">
               <video
-                src="/images/pages/IMG_2420.MP4"
+                src="/images/pages/referral-program.mp4"
                 className="w-full h-full object-cover"
                 controls
                 playsInline
