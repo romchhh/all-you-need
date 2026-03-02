@@ -438,15 +438,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   }
 
   if (!profile) {
-    // Якщо є telegramId в URL, використовуємо його для створення профілю
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const telegramId = urlParams?.get('telegramId');
-    const botLink = telegramId ? getBotStartLink(telegramId) : getBotBaseUrl();
+    // Якщо профіль відсутній — ведемо користувача в бота за фіксованим deep‑link
+    const botLink = 'https://t.me/TradeGroundBot?start=linktowatch_12';
+
     return (
       <div className="pb-24 flex flex-col h-screen overflow-hidden px-4">
         <h2 className="text-2xl font-bold text-white mb-2 pt-2">Профіль</h2>
         <p className="text-sm text-gray-400 mb-8">Ваш особистий профіль</p>
-        
+
         <div className="flex-1 flex items-start justify-center pt-8 pb-20">
           <div className="max-w-sm mx-auto px-4">
             <div className="border-2 border-gray-600 rounded-3xl p-8 text-center">
@@ -458,8 +457,27 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   </svg>
                 </div>
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">{t('profileNotFound.title')}</h3>
-              <p className="text-sm text-gray-400">{t('profileNotFound.description')}</p>
+              <h3 className="text-xl font-bold text-white mb-3">
+                {t('profileNotFound.title')}
+              </h3>
+              <p className="text-sm text-gray-400 mb-5">
+                {t('profileNotFound.description')}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!botLink) return;
+                  if (tg && tg.openTelegramLink) {
+                    tg.openTelegramLink(botLink);
+                    tg.HapticFeedback?.impactOccurred('medium');
+                  } else {
+                    window.location.href = botLink;
+                  }
+                }}
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-2xl bg-white text-black font-semibold text-sm"
+              >
+                Створити профіль у Telegram‑боті
+              </button>
             </div>
           </div>
         </div>

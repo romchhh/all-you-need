@@ -4,6 +4,11 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
+  // Дозволяємо технічні SEO-файли без мовних редіректів
+  if (pathname === '/sitemap.xml' || pathname === '/robots.txt') {
+    return NextResponse.next();
+  }
+  
   // Виключаємо admin роути з мовного редиректу
   if (pathname.startsWith('/admin')) {
     return NextResponse.next();

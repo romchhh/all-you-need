@@ -198,6 +198,23 @@ const BazaarPage = () => {
   const [listingsOffset, setListingsOffset] = useState(0);
   const { tg } = useTelegram();
 
+  // Якщо відкрито з браузера (поза Telegram Mini App) з параметром ?listing=,
+  // одразу перенаправляємо на SEO-сторінку товару /[lang]/listing/[id]
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Усередині Telegram залишаємо поточну поведінку
+    if (tg) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const listingParam = urlParams.get('listing');
+    if (listingParam) {
+      const listingId = parseInt(listingParam, 10);
+      if (!Number.isNaN(listingId)) {
+        router.replace(`/${lang}/listing/${listingId}`);
+      }
+    }
+  }, [tg, lang, router]);
+
   /** Побудова URL для API оголошень з поточними фільтрами та пошуком (щоб пагінація і «Показати більше» працювали коректно). */
   const buildListingsUrl = useCallback((limit: number, offset: number, searchQueryForApi?: string) => {
     const params = new URLSearchParams();

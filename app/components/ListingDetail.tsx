@@ -106,7 +106,9 @@ export const ListingDetail = ({
   const router = useRouter();
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
+  const isSeoListingRoute = Boolean((params as any)?.id);
   const categories = useMemo(() => getCategories(t), [t]);
+  const isTelegramEnv = !!tg;
   const categoryLabel = useMemo(() => {
     if (!listing.category) return null;
     const category = categories.find(c => c.id === listing.category);
@@ -932,82 +934,109 @@ export const ListingDetail = ({
 
 
       {/* Нижня панель з кнопкою */}
-      <div className="fixed bottom-28 left-0 right-0 p-4 z-[50] max-w-2xl mx-auto" style={{ pointerEvents: 'auto' }}>
-        <button 
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            if (isOwnListing) {
-              // Якщо це власне оголошення - відкриваємо модальне вікно реклами
-              setShowPromotionModal(true);
-              tg?.HapticFeedback.impactOccurred('light');
-              return;
-            }
-            
-            const telegramId = listing.seller.telegramId;
-            const username = listing.seller.username;
-            const phone = listing.seller.phone;
-            
-            // Якщо немає username - показуємо телефон
-            if (!username || username.trim() === '') {
-              if (phone && phone.trim() !== '') {
-                // Відкриваємо модальне вікно телефону
-                setShowPhoneModal(true);
-                tg?.HapticFeedback?.impactOccurred('light');
-                return;
-              } else {
-                // Немає ні username, ні телефону
-                if (tg) {
-                  tg.showAlert(t('listingDetail.telegramIdNotFound'));
-                } else {
-                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                }
+      <div className="fixed bottom-28 left-0 right-0 p-4 z-[50] max-w-2xl mx-auto space-y-3" style={{ pointerEvents: 'auto' }}>
+        {(isSeoListingRoute || !isTelegramEnv) && (
+          <div className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-xs text-white/80 text-center">
+            Повний перегляд товару, актуальний статус та зв'язок з продавцем доступні у Telegram‑боті Trade Ground Marketplace.
+          </div>
+        )}
+        {isSeoListingRoute ? (
+          <a
+            href="https://t.me/TradeGroundBot?start=linktowatch_12"
+            className="w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl bg-[#D3F1A7] text-black border-none"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <MessageCircle size={24} />
+            Відкрити товар у Telegram‑боті
+          </a>
+        ) : isTelegramEnv ? (
+          <button 
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              if (isOwnListing) {
+                // Якщо це власне оголошення - відкриваємо модальне вікно реклами
+                setShowPromotionModal(true);
+                tg?.HapticFeedback.impactOccurred('light');
                 return;
               }
-            }
-            
-            // Якщо є username - відкриваємо Telegram
-            const link = `https://t.me/${username.replace('@', '')}`;
-            
-            // Якщо Telegram WebApp доступний, використовуємо його
-            if (tg && tg.openTelegramLink) {
-              tg.openTelegramLink(link);
-              tg.HapticFeedback?.impactOccurred('medium');
-            } else {
-              // Якщо ні, відкриваємо посилання через звичайний браузер
-              window.location.href = link;
-            }
-          }}
-          className="w-full py-4 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl"
-          style={{
-            background: '#D3F1A7',
-            color: '#000000',
-            border: 'none'
-          }}
-        >
-          {isOwnListing ? (
-            <>
-              <TrendingUp size={24} />
-              {t('sales.promote')}
-            </>
-          ) : (
-            <>
-              {listing.seller.username && listing.seller.username.trim() !== '' ? (
-                <>
-                  <MessageCircle size={24} />
-                  {t('common.write')}
-                </>
-              ) : (
-                <>
-                  <Phone size={24} />
-                  {t('common.call')}
-                </>
-              )}
-            </>
-          )}
-        </button>
+              
+              const telegramId = listing.seller.telegramId;
+              const username = listing.seller.username;
+              const phone = listing.seller.phone;
+              
+              // Якщо немає username - показуємо телефон
+              if (!username || username.trim() === '') {
+                if (phone && phone.trim() !== '') {
+                  // Відкриваємо модальне вікно телефону
+                  setShowPhoneModal(true);
+                  tg?.HapticFeedback?.impactOccurred('light');
+                  return;
+                } else {
+                  // Немає ні username, ні телефону
+                  if (tg) {
+                    tg.showAlert(t('listingDetail.telegramIdNotFound'));
+                  } else {
+                    showToast(t('listingDetail.telegramIdNotFound'), 'error');
+                  }
+                  return;
+                }
+              }
+              
+              // Якщо є username - відкриваємо Telegram
+              const link = `https://t.me/${username.replace('@', '')}`;
+              
+              // Якщо Telegram WebApp доступний, використовуємо його
+              if (tg && tg.openTelegramLink) {
+                tg.openTelegramLink(link);
+                tg.HapticFeedback?.impactOccurred('medium');
+              } else {
+                // Якщо ні, відкриваємо посилання через звичайний браузер
+                window.location.href = link;
+              }
+            }}
+            className="w-full py-4 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl"
+            style={{
+              background: '#D3F1A7',
+              color: '#000000',
+              border: 'none'
+            }}
+          >
+            {isOwnListing ? (
+              <>
+                <TrendingUp size={24} />
+                {t('sales.promote')}
+              </>
+            ) : (
+              <>
+                {listing.seller.username && listing.seller.username.trim() !== '' ? (
+                  <>
+                    <MessageCircle size={24} />
+                    {t('common.write')}
+                  </>
+                ) : (
+                  <>
+                    <Phone size={24} />
+                    {t('common.call')}
+                  </>
+                )}
+              </>
+            )}
+          </button>
+        ) : (
+          <a
+            href="https://t.me/TradeGroundBot?start=linktowatch_12"
+            className="w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl bg-[#D3F1A7] text-black border-none"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <MessageCircle size={24} />
+            Відкрити товар у Telegram‑боті
+          </a>
+        )}
       </div>
 
       {/* Модальне вікно поділу */}
