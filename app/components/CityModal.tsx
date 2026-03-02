@@ -407,7 +407,12 @@ export const CityModal = ({
                   }}
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Забороняємо кирилицю у полі пошуку міст (тільки латиниця/цифри)
+                    const cleaned = value.replace(/[\u0400-\u04FF]+/g, '');
+                    setSearchQuery(cleaned);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === 'Search') {
                       e.preventDefault();

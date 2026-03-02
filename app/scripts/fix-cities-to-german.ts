@@ -21,7 +21,7 @@ const CITY_REPLACEMENTS: { from: string; to: string }[] = [
   { from: 'Koln', to: 'Köln' },
   { from: 'Nuremberg', to: 'Nürnberg' },
   { from: 'Dusseldorf', to: 'Düsseldorf' },
-  { from: 'Frankfurt', to: 'Frankfurt (Oder)' },
+  { from: 'Frankfurt (Oder)', to: 'Frankfurt am Main' },
   // приклад з уже існуючим скриптом:
   { from: 'Гамбург', to: 'Hamburg' },
   // ДОДАЙТЕ СЮДИ ІНШІ МІСТА ЗА ПОТРЕБОЮ

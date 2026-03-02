@@ -1187,6 +1187,11 @@ async def process_location(message: types.Message, state: FSMContext):
     
     raw_location = message.text.strip()
     
+    # Визначаємо яку клавіатуру показувати на основі регіону
+    data = await state.get_data()
+    region = data.get('region', 'hamburg')  # За замовчуванням Гамбург
+    cities_keyboard = get_german_cities_keyboard(user_id) if region == 'hamburg' else get_other_germany_cities_keyboard(user_id)
+    
     # Забороняємо вводити місто кирилицею — тільки латиниця (англ/нім)
     if contains_cyrillic(raw_location):
         await message.answer(
@@ -1200,11 +1205,6 @@ async def process_location(message: types.Message, state: FSMContext):
     
     # Нормалізуємо введене місто (Hamburg/Munich → Hamburg/München тощо)
     location = normalize_city_name(raw_location)
-    
-    # Визначаємо яку клавіатуру показувати на основі регіону
-    data = await state.get_data()
-    region = data.get('region', 'hamburg')  # За замовчуванням Гамбург
-    cities_keyboard = get_german_cities_keyboard(user_id) if region == 'hamburg' else get_other_germany_cities_keyboard(user_id)
     
     if not location or len(location) < 2:
         await message.answer("<b>❌ Місто повинно містити мінімум 2 символи.</b>\n\nСпробуйте ще раз:", reply_markup=cities_keyboard, parse_mode="HTML")

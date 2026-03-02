@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
+import { getCategories } from '@/constants/categories';
 
 interface ListingCardProps {
   listing: Listing;
@@ -18,6 +19,15 @@ interface ListingCardProps {
 
 const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false, isDeactivated = false }: ListingCardProps) => {
   const { t } = useLanguage();
+  const categories = useMemo(() => getCategories(t), [t]);
+  const categoryLabel = useMemo(() => {
+    if (!listing.category) return null;
+    const category = categories.find(c => c.id === listing.category);
+    if (!category) return null;
+    if (!listing.subcategory) return category.name;
+    const sub = category.subcategories?.find(s => s.id === listing.subcategory);
+    return sub ? `${category.name} • ${sub.name}` : category.name;
+  }, [categories, listing.category, listing.subcategory]);
   
   // Перевіряємо чи оголошення має активну рекламу
   const hasPromotion = listing.promotionType && listing.promotionEnds 
@@ -311,6 +321,13 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
         <p className="text-sm text-white line-clamp-2 mb-0.5 font-medium leading-snug">
           {listing.title}
         </p>
+        
+        {/* Категорія */}
+        {categoryLabel && (
+          <div className="text-[11px] text-white/70 truncate mt-1">
+            {categoryLabel}
+          </div>
+        )}
         
         {/* Локація та час */}
         <div className="flex flex-col gap-0.5 text-[10px] text-white/60 mt-0.5 mb-0">

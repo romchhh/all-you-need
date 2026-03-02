@@ -26,7 +26,7 @@ PARTNERS_DATA = {
     },
     "polezno": {
         "photo": BOT_ROOT / "Content" / "IMAGE 2026-03-01 12:54:18.jpg",
-        "url": "https://t.me/poleznoOK",
+        "url": "https://t.me/+V6huVx7G1-85OWE6",
         "caption_key": "about_us.partner_caption_polezno",
         "link_label_key": "about_us.partner_link_channel",
     },
