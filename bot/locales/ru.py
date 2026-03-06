@@ -205,6 +205,28 @@ TEXTS = {
             "Рекомендуем как надёжный источник информации по Германии.\n\n"
             "https://t.me/+V6huVx7G1-85OWE6"
         ),
+        "partner_name_mebel_nrw": "🛋 Мебель | NRW",
+        "partner_caption_mebel_nrw": (
+            "<b>Мебель продают | NRW</b>\n"
+            "@tovar_dlya_doma_nrw\n\n"
+            "🛋 Новая мебель для дома 🏠\n"
+            "🚚 Бесплатная доставка по всей земле NRW\n"
+            "♻ Заберём старую мебель при покупке новой у нас\n"
+            "🫰 Оплата при получении\n"
+            "📞 На связи 24/7\n\n"
+            "https://t.me/mebelitexnikaNRW"
+        ),
+        "partner_name_events_pati": "EVENTS PATI | Germany",
+        "partner_caption_events_pati": (
+            "<b>EVENTS PATI | Germany</b>\n"
+            "@events.pati.de\n\n"
+            "СНГ вечеринки в Германии🇩🇪\n\n"
+            "Telegram чат: https://t.me/eventspati_de\n"
+            "Instagram: https://www.instagram.com/events.pati.de?igsh=MWF0eWViNDV2OHgyZA%3D%3D&utm_source=qr\n"
+            "Сайт: https://eventspati.fr\n\n"
+            "📍МЮНХЕН | Woman’s Day | 06.03\n"
+            "Nova Pop Up Club / Sonnenstraße 12, 80331 München"
+        ),
         "support": "💬 Поддержка",
         "open_full_version": "🌐 Открыть полную версию",
         "back": "⬅️ Назад",

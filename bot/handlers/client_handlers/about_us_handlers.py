@@ -30,6 +30,18 @@ PARTNERS_DATA = {
         "caption_key": "about_us.partner_caption_polezno",
         "link_label_key": "about_us.partner_link_channel",
     },
+    "mebel_nrw": {
+        "photo": BOT_ROOT / "Content" / "IMAGE 2026-03-06 14:16:49.jpg",
+        "url": "https://t.me/mebelitexnikaNRW",
+        "caption_key": "about_us.partner_caption_mebel_nrw",
+        "link_label_key": "about_us.partner_link_channel",
+    },
+    "events_pati": {
+        "photo": BOT_ROOT / "Content" / "C6807DF5-A3FC-4129-820B-461A6FB61202.JPG",
+        "url": "https://t.me/eventspati_de",
+        "caption_key": "about_us.partner_caption_events_pati",
+        "link_label_key": "about_us.partner_link_channel",
+    },
 }
 
 

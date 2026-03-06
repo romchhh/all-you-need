@@ -89,9 +89,9 @@ const CITY_ALIASES: Record<string, string> = {
   'нюрнберг': 'Nürnberg',
   'nuremberg': 'Nürnberg',
   'nürnberg': 'Nürnberg',
-  // Франкфурт (приклад з вимог користувача)
-  'франкфурт': 'Frankfurt (Oder)',
-  'frankfurt': 'Frankfurt (Oder)',
+  // Франкфурт (узагальнений ввід користувача)
+  'франкфурт': 'Frankfurt am Main',
+  'frankfurt': 'Frankfurt am Main',
 };
 
 function normalizeCityInput(city: string): string {

@@ -205,6 +205,8 @@ def get_about_us_telegram_channels_keyboard(user_id: int) -> InlineKeyboardMarku
 PARTNERS_LIST = [
     {"id": "sho_events", "name_key": "about_us.partner_name_sho_events"},
     {"id": "polezno", "name_key": "about_us.partner_name_polezno"},
+    {"id": "mebel_nrw", "name_key": "about_us.partner_name_mebel_nrw"},
+    {"id": "events_pati", "name_key": "about_us.partner_name_events_pati"},
 ]
 
 
