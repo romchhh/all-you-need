@@ -46,7 +46,7 @@ PARTNERS_DATA = {
 
 
 # Тексти кнопки "Полезно Германия" для обробника (RU / UK)
-POLEZNO_BUTTON_TEXTS = ["Полезно Германия 🇩🇪", "Корисно Німеччина 🇩🇪"]
+POLEZNO_BUTTON_TEXTS = ["🇩🇪 Polezno | Germany", "🇩🇪 Polezno | Germany"]
 
 
 @router.message(F.text.in_(POLEZNO_BUTTON_TEXTS))

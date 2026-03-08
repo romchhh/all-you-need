@@ -147,7 +147,7 @@ TEXTS = {
         "about_us": "ℹ️ Про нас",
         "support": "💬 Підтримка",
         "main_menu": "📋 Головне меню",
-        "polezno": "Корисно Німеччина 🇩🇪"
+        "polezno": "🇩🇪 Polezno | Germany"
     },
     "about_us": {
         "title": "ℹ️ <b>Про TradeGround</b>\n\n",
@@ -193,7 +193,7 @@ TEXTS = {
         ),
         "partner_link_instagram": "📷 Відкрити Instagram",
         "partner_link_channel": "📢 Перейти в канал",
-        "partner_name_polezno": "Корисно Німеччина 🇩🇪",
+        "partner_name_polezno": "🇩🇪 Polezno | Germany",
         "partner_caption_polezno": (
             "<b>Головний інфо-партнер Німеччини 🇩🇪</b>\n\n"
             "POLEZNO | Германія — інформаційний канал для російськомовних мешканців Німеччини: новини, зміни в законах, корисні розбірки, життя в містах та актуальні події.\n\n"
