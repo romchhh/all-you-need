@@ -26,6 +26,7 @@
     "selectCurrency": "Выберите валюту",
     "free": "Free",
     "negotiable": "Договорная",
+    "negotiableShort": "Договор",
     "language": "Язык",
     "languageLabel": "Язык",
     "all": "Все",

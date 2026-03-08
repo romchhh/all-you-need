@@ -202,7 +202,7 @@ TEXTS = {
         ),
         "partner_name_mebel_nrw": "🛋 Мебель | NRW",
         "partner_caption_mebel_nrw": (
-            "<b>Мебель продают | NRW</b>\n"
+            "<b>🛋 Мебель | NRW</b>\n"
             "@tovar_dlya_doma_nrw\n\n"
             "🛋 Новая мебель для дома 🏠\n"
             "🚚 Бесплатная доставка по всей земле NRW\n"
@@ -211,7 +211,7 @@ TEXTS = {
             "📞 На связи 24/7\n\n"
             "https://t.me/mebelitexnikaNRW"
         ),
-        "partner_name_events_pati": "EVENTS PATI | Germany",
+        "partner_name_events_pati": "✨ EVENTS PATI | Germany",
         "partner_caption_events_pati": (
             "<b>EVENTS PATI | Germany</b>\n"
             "@events.pati.de\n\n"

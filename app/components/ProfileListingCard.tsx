@@ -324,7 +324,7 @@ export const ProfileListingCard = ({
                   return t('common.free');
                 }
                 if (isNegotiable) {
-                  return <span className="text-[clamp(1.375rem,8vw,2rem)]" title={t('common.negotiable')}>🤝</span>;
+                  return <span className="whitespace-nowrap text-[clamp(0.5rem,3.5vw,1rem)]" title={t('common.negotiable')}>{t('common.negotiableShort')}</span>;
                 }
                 return `${listing.price} ${listing.currency || '$'}`;
               })()}

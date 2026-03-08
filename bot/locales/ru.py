@@ -152,7 +152,7 @@ TEXTS = {
         "about_us": "ℹ️ О нас",
         "support": "💬 Поддержка",
         "main_menu": "📋 Главное меню",
-        "polezno": "Полезно Германия 🇩🇪"
+        "polezno": "🇩🇪 Polezno | Germany"
     },
     "about_us": {
         "title": "ℹ️ <b>О TradeGround</b>\n\n",
@@ -198,7 +198,7 @@ TEXTS = {
         ),
         "partner_link_instagram": "📷 Открыть Instagram",
         "partner_link_channel": "📢 Перейти в канал",
-        "partner_name_polezno": "Полезно Германия 🇩🇪",
+        "partner_name_polezno": "🇩🇪 Polezno | Germany",
         "partner_caption_polezno": (
             "<b>Главный инфо-партнёр Германии 🇩🇪</b>\n\n"
             "POLEZNO | Германия — информационный канал для русскоязычных жителей Германии: новости, изменения в законах, полезные разборы, жизнь в городах и актуальные события.\n\n"
@@ -207,7 +207,7 @@ TEXTS = {
         ),
         "partner_name_mebel_nrw": "🛋 Мебель | NRW",
         "partner_caption_mebel_nrw": (
-            "<b>Мебель продают | NRW</b>\n"
+            "<b>🛋 Мебель | NRW</b>\n"
             "@tovar_dlya_doma_nrw\n\n"
             "🛋 Новая мебель для дома 🏠\n"
             "🚚 Бесплатная доставка по всей земле NRW\n"
@@ -216,9 +216,9 @@ TEXTS = {
             "📞 На связи 24/7\n\n"
             "https://t.me/mebelitexnikaNRW"
         ),
-        "partner_name_events_pati": "EVENTS PATI | Germany",
+        "partner_name_events_pati": "✨ EVENTS PATI | Germany",
         "partner_caption_events_pati": (
-            "<b>EVENTS PATI | Germany</b>\n"
+            "<b> EVENTS PATI | Germany</b>\n"
             "@events.pati.de\n\n"
             "СНГ вечеринки в Германии🇩🇪\n\n"
             "Telegram чат: https://t.me/eventspati_de\n"
