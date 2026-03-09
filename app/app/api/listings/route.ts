@@ -7,10 +7,6 @@ import { executeInClause } from '@/utils/dbHelpers';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Telegram ID агрегаторів TradeGround (оголошення з чатів),
-// які в каталозі мають відображатися нижче оголошень звичайних користувачів
-const AGGREGATOR_TELEGRAM_IDS = ['8590825131', '5587484547'];
-
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
   if (!condition) return null;
@@ -574,7 +570,6 @@ export async function GET(request: NextRequest) {
       // Выделение цветом - завжди як звичайне (приоритет 4), тільки візуально відрізняється
       // Перевіряємо, чи є фільтр по категорії для визначення приоритету TOP
       const hasCategoryFilter = !!(category || subcategory);
-      // Формуємо частину ORDER BY з урахуванням реклами
       let orderByClause = `ORDER BY 
         CASE 
           WHEN (l.promotionType = 'vip' OR l.promotionType LIKE '%vip%') AND datetime(l.promotionEnds) > datetime('now') THEN 1
@@ -583,15 +578,6 @@ export async function GET(request: NextRequest) {
             : "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND datetime(l.promotionEnds) > datetime('now') THEN 4"
           }
           ELSE 4
-        END,`;
-      
-      // Додаємо пріоритет для агрегаторів:
-      // оголошення користувачів з AGGREGATOR_TELEGRAM_IDS завжди нижче інших (при однаковій рекламі)
-      const aggregatorIdsSqlList = AGGREGATOR_TELEGRAM_IDS.map(id => `'${id}'`).join(', ');
-      orderByClause += `
-        CASE 
-          WHEN CAST(u.telegramId AS TEXT) IN (${aggregatorIdsSqlList}) THEN 2
-          ELSE 1
         END,`;
       
       switch (sortBy) {
@@ -739,16 +725,6 @@ export async function GET(request: NextRequest) {
     let sortedListings = listings;
     if (!userId && (sortBy === 'price_low' || sortBy === 'price_high')) {
       sortedListings = listings.sort((a: any, b: any) => {
-        const isAggA = AGGREGATOR_TELEGRAM_IDS.includes(
-          (a.sellerTelegramId || a.seller?.telegramId || '').toString()
-        );
-        const isAggB = AGGREGATOR_TELEGRAM_IDS.includes(
-          (b.sellerTelegramId || b.seller?.telegramId || '').toString()
-        );
-        if (isAggA !== isAggB) {
-          // Агрегатори завжди нижче оголошень звичайних користувачів
-          return isAggA ? 1 : -1;
-        }
         // Безкоштовні завжди перші при сортуванні від дешевих
         if (sortBy === 'price_low') {
           if (a.isFree && !b.isFree) return -1;

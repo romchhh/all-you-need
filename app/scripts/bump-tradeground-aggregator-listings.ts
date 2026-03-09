@@ -17,7 +17,8 @@ const prisma = new PrismaClient();
 const AGGREGATOR_TELEGRAM_IDS = ['8590825131', '5587484547'];
 
 async function main() {
-  const now = new Date();
+  // Використовуємо поточний час мінус 8 годин
+  const now = new Date(Date.now() - 8 * 60 * 60 * 1000);
 
   console.log('🔁 Оновлюємо createdAt для останніх 100 оголошень агрегаторів...\n');
 
