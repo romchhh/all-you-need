@@ -14,6 +14,7 @@
 import { PrismaClient } from '@prisma/client';
 import { executeInClause } from '@/utils/dbHelpers';
 
+const prisma = new PrismaClient();
 const AGGREGATOR_TELEGRAM_IDS = ['8590825131', '5587484547'];
 
 async function main() {
@@ -26,9 +27,7 @@ async function main() {
   const nowStr = toSQLiteDate(now);
   const expiresAtStr = toSQLiteDate(expiresAt);
 
-  console.log(
-    '🔁 Оновлюємо дати для всіх оголошень (користувачі — сьогодні, агрегатори — завтра)...\n'
-  );
+  console.log('🔁 Оновлюємо дати для всіх оголошень (користувачі — сьогодні, агрегатори — -12 годин)...\n');
 
   // 1. Знаходимо id користувачів-агрегаторів, яких треба пропустити
   const aggregatorUsers = await prisma.$queryRawUnsafe<Array<{ id: number }>>(
@@ -65,13 +64,18 @@ async function main() {
   const listingIdsToUpdate = listingsToUpdate.map((l) => l.id);
 
   if (listingIdsToUpdate.length > 0) {
-    await executeInClause(
+    const placeholders = listingIdsToUpdate.map(() => '?').join(',');
+
+    await prisma.$executeRawUnsafe(
       `UPDATE Listing
        SET createdAt = ?, 
            publishedAt = ?, 
            expiresAt = ?
-       WHERE id IN (?)`,
-      [nowStr, nowStr, expiresAtStr, ...listingIdsToUpdate]
+       WHERE id IN (${placeholders})`,
+      nowStr,
+      nowStr,
+      expiresAtStr,
+      ...listingIdsToUpdate
     );
 
     console.log(
