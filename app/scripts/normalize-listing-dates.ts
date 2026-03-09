@@ -143,7 +143,7 @@ async function main() {
     `);
   }
 
-  // 3. Для сервісних агрегаторів ставимо час 12:00 (createdAt / publishedAt)
+  // 3. Для сервісних агрегаторів ставимо фіксовану дату публікації: 2026-03-08 12:00 (createdAt / publishedAt)
   if (aggregatorUserIds.length > 0) {
     await prisma.$executeRawUnsafe(
       `
@@ -151,12 +151,12 @@ async function main() {
       SET 
         createdAt = CASE 
           WHEN createdAt IS NOT NULL 
-          THEN datetime(strftime('%Y-%m-%d', createdAt) || ' 12:00:00')
+          THEN '2026-03-08 12:00:00'
           ELSE createdAt
         END,
         publishedAt = CASE 
           WHEN publishedAt IS NOT NULL 
-          THEN datetime(strftime('%Y-%m-%d', publishedAt) || ' 12:00:00')
+          THEN '2026-03-08 12:00:00'
           ELSE publishedAt
         END
       WHERE userId IN (${aggregatorUserIds.map(() => '?').join(', ')})
@@ -165,7 +165,7 @@ async function main() {
     );
   }
 
-  console.log('✅ Час публікації вирівняно: 22:20 для всіх, 12:00 для сервісних агрегаторів.\n');
+  console.log('✅ Час публікації вирівняно: 22:20 для всіх, 2026-03-08 12:00 для сервісних агрегаторів.\n');
 }
 
 main()
