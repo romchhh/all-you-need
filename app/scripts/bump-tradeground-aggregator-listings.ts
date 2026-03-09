@@ -12,8 +12,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { executeInClause } from '@/utils/dbHelpers';
 
 const AGGREGATOR_TELEGRAM_IDS = ['8590825131', '5587484547'];
 
@@ -21,8 +20,11 @@ async function main() {
   // Використовуємо поточний час (без зсуву назад)
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 днів
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const expiresAtTomorrow = new Date(tomorrow.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 днів
+
+  // Форматуємо дати у формат, сумісний з усіма SQL-скриптами (SQLite datetime)
+  const toSQLiteDate = (d: Date) => d.toISOString().replace('T', ' ').substring(0, 19);
+  const nowStr = toSQLiteDate(now);
+  const expiresAtStr = toSQLiteDate(expiresAt);
 
   console.log(
     '🔁 Оновлюємо дати для всіх оголошень (користувачі — сьогодні, агрегатори — завтра)...\n'
@@ -60,24 +62,26 @@ async function main() {
   }
 
   // 3. Оновлюємо всі знайдені оголошення звичайних користувачів (сьогодні)
-  const updated = await prisma.listing.updateMany({
-    where: {
-      id: {
-        in: listingsToUpdate.map((l) => l.id),
-      },
-    },
-    data: {
-      createdAt: now,
-      publishedAt: now,
-      expiresAt,
-    },
-  });
+  const listingIdsToUpdate = listingsToUpdate.map((l) => l.id);
 
-  console.log(
-    `✅ Оновлено createdAt/publishedAt/expiresAt (сьогодні) для ${updated.count} оголошень (усі користувачі, крім агрегаторів).\n`
-  );
+  if (listingIdsToUpdate.length > 0) {
+    await executeInClause(
+      `UPDATE Listing
+       SET createdAt = ?, 
+           publishedAt = ?, 
+           expiresAt = ?
+       WHERE id IN (?)`,
+      [nowStr, nowStr, expiresAtStr, ...listingIdsToUpdate]
+    );
 
-  // 4. Окремо обробляємо оголошення агрегаторів — ставимо їм дату "завтра"
+    console.log(
+      `✅ Оновлено createdAt/publishedAt/expiresAt (сьогодні) для ${listingIdsToUpdate.length} оголошень (усі користувачі, крім агрегаторів).\n`
+    );
+  } else {
+    console.log('ℹ️ Немає оголошень звичайних користувачів для оновлення.\n');
+  }
+
+  // 4. Окремо обробляємо оголошення агрегаторів — робимо їм -12 годин від поточної createdAt/publishedAt
   if (aggregatorUserIds.length) {
     const aggregatorListings = await prisma.listing.findMany({
       where: {
@@ -97,20 +101,24 @@ async function main() {
       console.log(` - [AGG] listingId=${l.id}, userId=${l.userId}, title="${l.title}"`);
     }
 
-    const updatedAggregators = await prisma.listing.updateMany({
-      where: {
-        id: { in: aggregatorListings.map((l) => l.id) },
-      },
-      data: {
-        createdAt: tomorrow,
-        publishedAt: tomorrow,
-        expiresAt: expiresAtTomorrow,
-      },
-    });
+    const aggregatorListingIds = aggregatorListings.map((l) => l.id);
 
-    console.log(
-      `✅ Оновлено createdAt/publishedAt/expiresAt (завтра) для ${updatedAggregators.count} оголошень агрегаторів.\n`
-    );
+    if (aggregatorListingIds.length > 0) {
+      // Зменшуємо createdAt та publishedAt на 12 годин від поточного значення в БД
+      await executeInClause(
+        `UPDATE Listing
+         SET createdAt = datetime(createdAt, '-12 hours'),
+             publishedAt = datetime(publishedAt, '-12 hours')
+         WHERE id IN (?)`,
+        aggregatorListingIds
+      );
+
+      console.log(
+        `✅ Для агрегаторів зменшено createdAt/publishedAt на 12 годин для ${aggregatorListingIds.length} оголошень.\n`
+      );
+    } else {
+      console.log('ℹ️ У агрегаторів немає оголошень для оновлення.\n');
+    }
   }
 }
 
