@@ -21,9 +21,11 @@ async function main() {
   // Використовуємо поточний час (без зсуву назад)
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 днів
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const expiresAtTomorrow = new Date(tomorrow.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 днів
 
   console.log(
-    '🔁 Оновлюємо publishedAt та expiresAt для всіх оголошень, окрім двох агрегаторів...\n'
+    '🔁 Оновлюємо дати для всіх оголошень (користувачі — сьогодні, агрегатори — завтра)...\n'
   );
 
   // 1. Знаходимо id користувачів-агрегаторів, яких треба пропустити
@@ -57,7 +59,7 @@ async function main() {
     console.log(` - listingId=${l.id}, userId=${l.userId}, title="${l.title}"`);
   }
 
-  // 3. Оновлюємо всі знайдені оголошення
+  // 3. Оновлюємо всі знайдені оголошення звичайних користувачів (сьогодні)
   const updated = await prisma.listing.updateMany({
     where: {
       id: {
@@ -72,8 +74,44 @@ async function main() {
   });
 
   console.log(
-    `✅ Оновлено publishedAt та expiresAt для ${updated.count} оголошень (усі користувачі, крім агрегаторів).\n`
+    `✅ Оновлено createdAt/publishedAt/expiresAt (сьогодні) для ${updated.count} оголошень (усі користувачі, крім агрегаторів).\n`
   );
+
+  // 4. Окремо обробляємо оголошення агрегаторів — ставимо їм дату "завтра"
+  if (aggregatorUserIds.length) {
+    const aggregatorListings = await prisma.listing.findMany({
+      where: {
+        userId: { in: aggregatorUserIds },
+      },
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+      },
+    });
+
+    console.log(
+      `Для агрегаторів буде оновлено ${aggregatorListings.length} оголошень (дата — завтра). Перелік id:`
+    );
+    for (const l of aggregatorListings) {
+      console.log(` - [AGG] listingId=${l.id}, userId=${l.userId}, title="${l.title}"`);
+    }
+
+    const updatedAggregators = await prisma.listing.updateMany({
+      where: {
+        id: { in: aggregatorListings.map((l) => l.id) },
+      },
+      data: {
+        createdAt: tomorrow,
+        publishedAt: tomorrow,
+        expiresAt: expiresAtTomorrow,
+      },
+    });
+
+    console.log(
+      `✅ Оновлено createdAt/publishedAt/expiresAt (завтра) для ${updatedAggregators.count} оголошень агрегаторів.\n`
+    );
+  }
 }
 
 main()
