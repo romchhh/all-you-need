@@ -18,8 +18,8 @@ const prisma = new PrismaClient();
 const AGGREGATOR_TELEGRAM_IDS = ['8590825131', '5587484547'];
 
 async function main() {
-  // Використовуємо поточний час мінус 8 годин
-  const now = new Date(Date.now() - 8 * 60 * 60 * 1000);
+  // Використовуємо поточний час (без зсуву назад)
+  const now = new Date();
   const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 днів
 
   console.log(
