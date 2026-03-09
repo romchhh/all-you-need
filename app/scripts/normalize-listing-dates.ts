@@ -19,6 +19,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Сервісні агрегатори (оголошення з чатів)
+const AGGREGATOR_TELEGRAM_IDS = ['8590825131', '5587484547'];
+
 async function main() {
   console.log('🔍 Перевіряємо формати дат у таблиці Listing...\n');
 
@@ -83,11 +86,86 @@ async function main() {
   );
 
   console.log(
-    `\n✅ Після нормалізації:\n` +
+    `\n✅ Після нормалізації форматів (ms → datetime):\n` +
       `  createdAt:  ${createdBadAfter?.count ?? 0} проблемних\n` +
       `  publishedAt: ${publishedBadAfter?.count ?? 0} проблемних\n` +
       `  expiresAt:   ${expiresBadAfter?.count ?? 0} проблемних\n`
   );
+
+  console.log('\n🔧 Додатково вирівнюємо час публікації...\n');
+
+  // 1. Знаходимо id сервісних агрегаторів
+  const aggregatorUsers = await prisma.$queryRawUnsafe<Array<{ id: number }>>(
+    `SELECT id FROM "User" WHERE CAST("telegramId" AS TEXT) IN (${AGGREGATOR_TELEGRAM_IDS.map(() => '?').join(', ')})`,
+    ...AGGREGATOR_TELEGRAM_IDS
+  );
+  const aggregatorUserIds = aggregatorUsers.map((u) => u.id);
+
+  console.log(
+    `Знайдено ${aggregatorUserIds.length} сервісних агрегаторів. Для них час буде 12:00, для всіх інших — 22:20.\n`
+  );
+
+  // 2. Для всіх НЕ сервісних користувачів ставимо час 22:20 (createdAt / publishedAt)
+  if (aggregatorUserIds.length > 0) {
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE Listing
+      SET 
+        createdAt = CASE 
+          WHEN createdAt IS NOT NULL 
+          THEN datetime(strftime('%Y-%m-%d', createdAt) || ' 22:20:00')
+          ELSE createdAt
+        END,
+        publishedAt = CASE 
+          WHEN publishedAt IS NOT NULL 
+          THEN datetime(strftime('%Y-%m-%d', publishedAt) || ' 22:20:00')
+          ELSE publishedAt
+        END
+      WHERE userId NOT IN (${aggregatorUserIds.map(() => '?').join(', ')})
+    `,
+      ...aggregatorUserIds
+    );
+  } else {
+    // Якщо агрегаторів не знайдено — застосовуємо 22:20 до всіх, крім NULL
+    await prisma.$executeRawUnsafe(`
+      UPDATE Listing
+      SET 
+        createdAt = CASE 
+          WHEN createdAt IS NOT NULL 
+          THEN datetime(strftime('%Y-%m-%d', createdAt) || ' 22:20:00')
+          ELSE createdAt
+        END,
+        publishedAt = CASE 
+          WHEN publishedAt IS NOT NULL 
+          THEN datetime(strftime('%Y-%m-%d', publishedAt) || ' 22:20:00')
+          ELSE publishedAt
+        END
+    `);
+  }
+
+  // 3. Для сервісних агрегаторів ставимо час 12:00 (createdAt / publishedAt)
+  if (aggregatorUserIds.length > 0) {
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE Listing
+      SET 
+        createdAt = CASE 
+          WHEN createdAt IS NOT NULL 
+          THEN datetime(strftime('%Y-%m-%d', createdAt) || ' 12:00:00')
+          ELSE createdAt
+        END,
+        publishedAt = CASE 
+          WHEN publishedAt IS NOT NULL 
+          THEN datetime(strftime('%Y-%m-%d', publishedAt) || ' 12:00:00')
+          ELSE publishedAt
+        END
+      WHERE userId IN (${aggregatorUserIds.map(() => '?').join(', ')})
+    `,
+      ...aggregatorUserIds
+    );
+  }
+
+  console.log('✅ Час публікації вирівняно: 22:20 для всіх, 12:00 для сервісних агрегаторів.\n');
 }
 
 main()
