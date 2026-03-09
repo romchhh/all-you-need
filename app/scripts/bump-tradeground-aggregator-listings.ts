@@ -38,14 +38,34 @@ async function main() {
     `Знайдено ${aggregatorUserIds.length} користувач(ів)-агрегаторів, їх оголошення будуть пропущені.`
   );
 
-  // 2. Оновлюємо всі оголошення, де userId НЕ входить у список агрегаторів
-  const updated = await prisma.listing.updateMany({
+  // 2. Знаходимо всі оголошення, де userId НЕ входить у список агрегаторів
+  const listingsToUpdate = await prisma.listing.findMany({
     where: {
       userId: {
         notIn: aggregatorUserIds.length ? aggregatorUserIds : [-1], // якщо не знайдено жодного, оновити всі
       },
     },
+    select: {
+      id: true,
+      userId: true,
+      title: true,
+    },
+  });
+
+  console.log(`Буде оновлено ${listingsToUpdate.length} оголошень. Перелік id:`);
+  for (const l of listingsToUpdate) {
+    console.log(` - listingId=${l.id}, userId=${l.userId}, title="${l.title}"`);
+  }
+
+  // 3. Оновлюємо всі знайдені оголошення
+  const updated = await prisma.listing.updateMany({
+    where: {
+      id: {
+        in: listingsToUpdate.map((l) => l.id),
+      },
+    },
     data: {
+      createdAt: now,
       publishedAt: now,
       expiresAt,
     },
