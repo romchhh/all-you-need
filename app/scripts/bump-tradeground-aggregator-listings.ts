@@ -1,8 +1,9 @@
 /**
- * Скрипт для оновлення дати додавання (createdAt)
- * для останніх 100 оголошень кожного з агрегаторів TradeGround.
+ * Скрипт оновлює дату публікації (publishedAt)
+ * та дату завершення (expiresAt) для ВСІХ оголошень,
+ * окрім оголошень двох агрегаторів TradeGround.
  *
- * Користувачі-агрегатори (оголошення з чатів):
+ * Користувачі-агрегатори (оголошення з чатів), яких потрібно пропустити:
  * - @tradeground_seller  (telegramId: 8590825131)
  * - @tradeground_seller2 (telegramId: 5587484547)
  *
@@ -21,55 +22,38 @@ async function main() {
   const now = new Date(Date.now() - 8 * 60 * 60 * 1000);
   const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 днів
 
-  console.log('🔁 Оновлюємо createdAt для останніх 100 оголошень агрегаторів...\n');
+  console.log(
+    '🔁 Оновлюємо publishedAt та expiresAt для всіх оголошень, окрім двох агрегаторів...\n'
+  );
 
-  for (const telegramId of AGGREGATOR_TELEGRAM_IDS) {
-    console.log(`Обробка користувача з telegramId = ${telegramId}...`);
+  // 1. Знаходимо id користувачів-агрегаторів, яких треба пропустити
+  const aggregatorUsers = await prisma.$queryRawUnsafe<Array<{ id: number }>>(
+    `SELECT id FROM "User" WHERE CAST("telegramId" AS TEXT) IN (${AGGREGATOR_TELEGRAM_IDS.map(() => '?').join(', ')})`,
+    ...AGGREGATOR_TELEGRAM_IDS
+  );
 
-    // Використовуємо сирий SQL, щоб уникнути проблем з конверсією BigInt/INT
-    const users = await prisma.$queryRawUnsafe<Array<{ id: number }>>(
-      `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ? LIMIT 1`,
-      telegramId
-    );
+  const aggregatorUserIds = aggregatorUsers.map((u) => u.id);
 
-    const user = users[0];
+  console.log(
+    `Знайдено ${aggregatorUserIds.length} користувач(ів)-агрегаторів, їх оголошення будуть пропущені.`
+  );
 
-    if (!user) {
-      console.warn(`  ⚠️ Користувача з telegramId=${telegramId} не знайдено. Пропускаємо.\n`);
-      continue;
-    }
-
-    const listings = await prisma.listing.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: { id: true },
-    });
-
-    if (listings.length === 0) {
-      console.log('  Немає оголошень для оновлення.\n');
-      continue;
-    }
-
-    const ids = listings.map(l => l.id);
-
-    const updated = await prisma.listing.updateMany({
-      where: { id: { in: ids } },
-      data: {
-        createdAt: now,
-        status: 'active',
-        moderationStatus: 'approved',
-        publishedAt: now,
-        expiresAt,
+  // 2. Оновлюємо всі оголошення, де userId НЕ входить у список агрегаторів
+  const updated = await prisma.listing.updateMany({
+    where: {
+      userId: {
+        notIn: aggregatorUserIds.length ? aggregatorUserIds : [-1], // якщо не знайдено жодного, оновити всі
       },
-    });
+    },
+    data: {
+      publishedAt: now,
+      expiresAt,
+    },
+  });
 
-    console.log(
-      `  Користувач id=${user.id}: оновлено createdAt для ${updated.count} оголошень (запитано: ${ids.length}).\n`
-    );
-  }
-
-  console.log('✅ Готово.\n');
+  console.log(
+    `✅ Оновлено publishedAt та expiresAt для ${updated.count} оголошень (усі користувачі, крім агрегаторів).\n`
+  );
 }
 
 main()
