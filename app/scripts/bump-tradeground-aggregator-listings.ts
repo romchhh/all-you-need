@@ -19,6 +19,7 @@ const AGGREGATOR_TELEGRAM_IDS = ['8590825131', '5587484547'];
 async function main() {
   // Використовуємо поточний час мінус 8 годин
   const now = new Date(Date.now() - 8 * 60 * 60 * 1000);
+  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 днів
 
   console.log('🔁 Оновлюємо createdAt для останніх 100 оголошень агрегаторів...\n');
 
@@ -54,7 +55,13 @@ async function main() {
 
     const updated = await prisma.listing.updateMany({
       where: { id: { in: ids } },
-      data: { createdAt: now },
+      data: {
+        createdAt: now,
+        status: 'active',
+        moderationStatus: 'approved',
+        publishedAt: now,
+        expiresAt,
+      },
     });
 
     console.log(
