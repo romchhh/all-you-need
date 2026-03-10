@@ -166,6 +166,27 @@ async function main() {
   }
 
   console.log('✅ Час публікації вирівняно: 22:20 для всіх, 2026-03-08 12:00 для сервісних агрегаторів.\n');
+
+  console.log('🎲 Додаємо випадковий зсув часу (±0–2 години) для розсіювання оголошень...\n');
+
+  // 4. Додаємо випадковий зсув часу до createdAt / publishedAt у діапазоні приблизно [-120; +120] хвилин
+  // Використовуємо SQLite random(): abs(random()) % 241 дає 0..240, мінус 120 → -120..120 хв
+  await prisma.$executeRawUnsafe(`
+    UPDATE Listing
+    SET 
+      createdAt = CASE 
+        WHEN createdAt IS NOT NULL 
+        THEN datetime(createdAt, printf('%+d minutes', (abs(random()) % 241) - 120))
+        ELSE createdAt
+      END,
+      publishedAt = CASE 
+        WHEN publishedAt IS NOT NULL 
+        THEN datetime(publishedAt, printf('%+d minutes', (abs(random()) % 241) - 120))
+        ELSE publishedAt
+      END
+  `);
+
+  console.log('✅ Час публікації/створення розподілено випадковим чином в межах ±2 годин для всіх оголошень.\n');
 }
 
 main()
