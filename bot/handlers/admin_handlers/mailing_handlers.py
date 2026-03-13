@@ -17,10 +17,50 @@ router = Router()
 
 user_data = {}
 
+# Тимчасове сховище медіагруп під час збирання: { (user_id, media_group_id): [file_id, ...] }
+_media_group_buffer: dict[tuple, list[str]] = {}
+# Задачі таймерів для медіагруп: { (user_id, media_group_id): Task }
+_media_group_tasks: dict[tuple, asyncio.Task] = {}
+
 
 def initialize_user_data(user_id: str):
     if user_id not in user_data:
         user_data[user_id] = {}
+
+
+async def send_preview(chat_id: int, user_id: int, url_buttons: list = None):
+    """Відправляє превʼю поста адміну: альбом якщо > 1 фото, інакше одне фото/відео/документ або текст."""
+    media_info = user_data[user_id].get('media')
+    media_type = user_data[user_id].get('media_type')
+    content_info = user_data[user_id].get('content', '') or ''
+    kb = create_post(user_data, user_id, url_buttons)
+
+    if media_type == 'photo':
+        photos = media_info if isinstance(media_info, list) else [media_info]
+        if len(photos) == 1:
+            await bot.send_photo(chat_id, photos[0], caption=content_info or None, parse_mode='HTML', reply_markup=kb)
+        else:
+            media_group = [
+                types.InputMediaPhoto(
+                    media=pid,
+                    caption=content_info if i == 0 else None,
+                    parse_mode='HTML' if i == 0 else None
+                )
+                for i, pid in enumerate(photos)
+            ]
+            await bot.send_media_group(chat_id=chat_id, media=media_group)
+            # Кнопки керування постом окремим повідомленням (без дублювання тексту)
+            await bot.send_message(
+                chat_id,
+                f"📸 Фото у розсилці: {len(photos)}",
+                reply_markup=kb
+            )
+    elif media_type == 'video':
+        await bot.send_video(chat_id, media_info, caption=content_info or None, parse_mode='HTML', reply_markup=kb)
+    elif media_type == 'document':
+        await bot.send_document(chat_id, media_info, caption=content_info or None, parse_mode='HTML', reply_markup=kb)
+    else:
+        await bot.send_message(chat_id, content_info, parse_mode='HTML', reply_markup=kb)
 
 
       
@@ -49,49 +89,79 @@ async def process_channel_selection(callback_query: CallbackQuery, state: FSMCon
         reply_markup=reply_markup
     )
     
+async def _flush_media_group(user_id: int, mg_id: str, state: FSMContext, context: str):
+    """Викликається після затримки: збирає всі фото з буфера і відповідає адміну один раз."""
+    await asyncio.sleep(0.7)
+    key = (user_id, mg_id)
+    photos = _media_group_buffer.pop(key, [])
+    _media_group_tasks.pop(key, None)
+    if not photos:
+        return
+
+    user_data[user_id]['media'] = photos
+    user_data[user_id]['media_type'] = 'photo'
+    content_info = user_data[user_id].get('content', '')
+    url_buttons = user_data[user_id].get('url_buttons')
+
+    await send_preview(user_id, user_id, url_buttons)
+
+    if context == 'content':
+        await state.clear()
+
+
 @router.message(Mailing.content)
 async def handle_content(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-
     content_type = message.content_type
-    content_info = ""
-    media_info = None
-    media_type = None
-    html_content = None 
+    html_content = None
 
     if content_type == 'text':
         content_info = message.text
-        entities = message.entities 
-
-        if entities:
-            html_content = format_entities(content_info, entities)
-        else:
-            html_content = content_info 
-
-        await message.answer(html_content, parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-        media_type = None
-    elif content_type == 'photo':
-        media_info = message.photo[-1].file_id
-        await message.answer_photo(media_info, reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-        media_type = 'photo'
-    elif content_type == 'video':
-        media_info = message.video.file_id
-        await message.answer_video(media_info, reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-        media_type = 'video'
-    elif content_type == 'document':
-        media_info = message.document.file_id
-        await message.answer_document(media_info, reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-        media_type = 'document'
-    else:
-        await message.answer("Невідомий формат.")
-    if html_content:
+        entities = message.entities
+        html_content = format_entities(content_info, entities) if entities else content_info
         user_data[user_id]['content'] = html_content
         await state.update_data(content=html_content)
+        await message.answer(html_content, parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
+        user_data[user_id]['media'] = None
+        user_data[user_id]['media_type'] = None
+        await state.clear()
 
-    user_data[user_id]['media'] = media_info
-    user_data[user_id]['media_type'] = media_type
+    elif content_type == 'photo':
+        photo_id = message.photo[-1].file_id
+        mg_id = message.media_group_id
 
-    await state.clear()
+        if mg_id:
+            key = (user_id, mg_id)
+            if key not in _media_group_buffer:
+                _media_group_buffer[key] = []
+            _media_group_buffer[key].append(photo_id)
+            if key in _media_group_tasks:
+                _media_group_tasks[key].cancel()
+            _media_group_tasks[key] = asyncio.create_task(
+                _flush_media_group(user_id, mg_id, state, 'content')
+            )
+        else:
+            user_data[user_id]['media'] = [photo_id]
+            user_data[user_id]['media_type'] = 'photo'
+            await send_preview(message.chat.id, user_id, user_data[user_id].get('url_buttons'))
+            await state.clear()
+
+    elif content_type == 'video':
+        media_info = message.video.file_id
+        user_data[user_id]['media'] = media_info
+        user_data[user_id]['media_type'] = 'video'
+        await send_preview(message.chat.id, user_id, user_data[user_id].get('url_buttons'))
+        await state.clear()
+
+    elif content_type == 'document':
+        media_info = message.document.file_id
+        user_data[user_id]['media'] = media_info
+        user_data[user_id]['media_type'] = 'document'
+        await send_preview(message.chat.id, user_id, user_data[user_id].get('url_buttons'))
+        await state.clear()
+
+    else:
+        await message.answer("Невідомий формат.")
 
     
 @router.callback_query(F.data.startswith('media_'))
@@ -105,34 +175,46 @@ async def handle_media(callback_query: types.CallbackQuery, state: FSMContext):
 async def handle_media_content(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
 
-    media_info = None
-    media_type = None
     if message.content_type == 'photo':
-        media_info = message.photo[-1].file_id
-        media_type = 'photo'
+        photo_id = message.photo[-1].file_id
+        mg_id = message.media_group_id
+
+        if mg_id:
+            # Фото з медіагрупи — накопичуємо у буфер
+            key = (user_id, mg_id)
+            if key not in _media_group_buffer:
+                _media_group_buffer[key] = []
+            _media_group_buffer[key].append(photo_id)
+
+            # Скасовуємо попередній таймер і запускаємо новий
+            if key in _media_group_tasks:
+                _media_group_tasks[key].cancel()
+            _media_group_tasks[key] = asyncio.create_task(
+                _flush_media_group(user_id, mg_id, state, 'media')
+            )
+            # Не відповідаємо зараз — _flush_media_group відповість один раз
+            return
+
+        # Одне фото без медіагрупи — просто додаємо до списку
+        existing = user_data[user_id].get('media')
+        if isinstance(existing, list):
+            existing.append(photo_id)
+        elif existing:
+            user_data[user_id]['media'] = [existing, photo_id]
+        else:
+            user_data[user_id]['media'] = [photo_id]
+        user_data[user_id]['media_type'] = 'photo'
+        await send_preview(message.chat.id, user_id, user_data[user_id].get('url_buttons'))
+
     elif message.content_type == 'video':
-        media_info = message.video.file_id
-        media_type = 'video'
+        user_data[user_id]['media'] = message.video.file_id
+        user_data[user_id]['media_type'] = 'video'
+        await send_preview(message.chat.id, user_id, user_data[user_id].get('url_buttons'))
+
     elif message.content_type == 'document':
-        media_info = message.document.file_id
-        media_type = 'document'
-
-    user_data[user_id]['media'] = media_info
-    user_data[user_id]['media_type'] = media_type
-
-    content_info = user_data[user_id].get('content')
-
-    if media_info:
-        if media_type == 'photo':
-            await message.answer_photo(media_info, caption=f"{content_info}", parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-        elif media_type == 'video':
-            await message.answer_video(media_info, caption=f"{content_info}", parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-        elif media_type == 'document':
-            await message.answer_document(media_info, caption=f"{content_info}", parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-    else:
-        await message.answer(f"{content_info}", parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-
-    await state.clear()
+        user_data[user_id]['media'] = message.document.file_id
+        user_data[user_id]['media_type'] = 'document'
+        await send_preview(message.chat.id, user_id, user_data[user_id].get('url_buttons'))
 
 
 @router.callback_query(F.data.startswith('description_'))
@@ -146,29 +228,24 @@ async def handle_description(callback_query: types.CallbackQuery, state: FSMCont
 @router.message(Mailing.description)
 async def handle_description_content(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    media_info = user_data[user_id].get('media')
-    media_type = user_data[user_id].get('media_type')
     
     content_info = message.text
-    entities = message.entities or [] 
-    print(message.entities)
+    entities = message.entities or []
     
     formatted_content = format_entities(content_info, entities)
-    
     user_data[user_id]['content'] = formatted_content
-    print(user_data)
 
-    if media_info:
-        if media_type == 'photo':
-            await message.answer_photo(media_info, caption=formatted_content, parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-        elif media_type == 'video':
-            await message.answer_video(media_info, caption=formatted_content, parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-        elif media_type == 'document':
-            await message.answer_document(media_info, caption=formatted_content, parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-    else:
-        await message.answer(formatted_content, parse_mode='HTML', reply_markup=create_post(user_data, user_id, user_data[user_id].get('url_buttons')))
-
+    await send_preview(message.chat.id, user_id, user_data[user_id].get('url_buttons'))
     await state.clear()
+
+
+@router.callback_query(F.data == 'url_buttons_disabled_')
+async def handle_url_buttons_disabled(callback_query: types.CallbackQuery):
+    await callback_query.answer(
+        "⛔ URL-кнопки недоступні при кількох фото.\n"
+        "Telegram не підтримує inline-кнопки з альбомом.",
+        show_alert=True
+    )
 
 
 @router.callback_query(F.data.startswith('url_buttons_'))
@@ -189,25 +266,13 @@ async def handle_url_buttons(callback_query: types.CallbackQuery, state: FSMCont
 @router.message(Mailing.url_buttons)
 async def handle_url_buttons_content(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    media_info = user_data[user_id].get('media')
-    media_type = user_data[user_id].get('media_type')
-    content_info = user_data[user_id].get('content')
 
     url_buttons_text = message.text
     url_buttons = parse_url_buttons(url_buttons_text)
 
     user_data[user_id]['url_buttons'] = url_buttons
 
-    if media_info:
-        if media_type == 'photo':
-            await message.answer_photo(media_info, caption=f"{content_info}", parse_mode='HTML', reply_markup=create_post(user_data, user_id, url_buttons))
-        elif media_type == 'video':
-            await message.answer_video(media_info, caption=f"{content_info}", parse_mode='HTML', reply_markup=create_post(user_data, user_id, url_buttons))
-        elif media_type == 'document':
-            await message.answer_document(media_info, caption=f"{content_info}", parse_mode='HTML', reply_markup=create_post(user_data, user_id, url_buttons))
-    else:
-        await message.answer(f"{content_info}", parse_mode='HTML', reply_markup=create_post(user_data, user_id, url_buttons))
-
+    await send_preview(message.chat.id, user_id, url_buttons)
     await state.clear()
 
 
@@ -253,7 +318,41 @@ async def handle_publish_confirmation(callback_query: types.CallbackQuery, state
         try:
             if media_info:
                 if media_type == 'photo':
-                    await bot.send_photo(recipient_id, media_info, caption=content_info, parse_mode='HTML', reply_markup=post_keyboard(user_data, user_id, url_buttons), disable_notification=disable_notification)
+                    photos = media_info if isinstance(media_info, list) else [media_info]
+                    if len(photos) == 1:
+                        # Одне фото з описом і кнопками
+                        await bot.send_photo(
+                            recipient_id,
+                            photos[0],
+                            caption=content_info,
+                            parse_mode='HTML',
+                            reply_markup=post_keyboard(user_data, user_id, url_buttons),
+                            disable_notification=disable_notification
+                        )
+                    else:
+                        # Кілька фото — альбом з описом на першому фото
+                        media_group = [
+                            types.InputMediaPhoto(
+                                media=photo_id,
+                                caption=content_info if idx == 0 else None,
+                                parse_mode='HTML' if idx == 0 else None
+                            )
+                            for idx, photo_id in enumerate(photos)
+                        ]
+                        await bot.send_media_group(
+                            chat_id=recipient_id,
+                            media=media_group,
+                            disable_notification=disable_notification
+                        )
+                        # Якщо є URL-кнопки — окреме повідомлення тільки з кнопками (без тексту)
+                        kb = post_keyboard(user_data, user_id, url_buttons)
+                        if kb.inline_keyboard:
+                            await bot.send_message(
+                                recipient_id,
+                                '​',  # невидимий символ (zero-width space)
+                                reply_markup=kb,
+                                disable_notification=disable_notification
+                            )
                 elif media_type == 'video':
                     await bot.send_video(recipient_id, media_info, caption=content_info, parse_mode='HTML', reply_markup=post_keyboard(user_data, user_id, url_buttons), disable_notification=disable_notification)
                 elif media_type == 'document':

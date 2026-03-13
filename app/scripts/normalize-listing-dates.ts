@@ -167,26 +167,27 @@ async function main() {
 
   console.log('✅ Час публікації вирівняно: 22:20 для всіх, 2026-03-08 12:00 для сервісних агрегаторів.\n');
 
-  console.log('🎲 Додаємо випадковий зсув часу (±0–2 години) для розсіювання оголошень...\n');
+  console.log('🎲 Додаємо випадковий зсув часу (0–2 години назад) для розсіювання оголошень без переходу на інший день...\n');
 
-  // 4. Додаємо випадковий зсув часу до createdAt / publishedAt у діапазоні приблизно [-120; +120] хвилин
-  // Використовуємо SQLite random(): abs(random()) % 241 дає 0..240, мінус 120 → -120..120 хв
+  // 4. Додаємо випадковий зсув часу до createdAt / publishedAt у діапазоні [-120; 0] хвилин (тільки назад),
+  // щоб не переходити на наступний день (базовий час далеко від опівночі).
+  // abs(random()) % 121 дає 0..120, множимо на -1 → 0..-120 хв.
   await prisma.$executeRawUnsafe(`
     UPDATE Listing
     SET 
       createdAt = CASE 
         WHEN createdAt IS NOT NULL 
-        THEN datetime(createdAt, printf('%+d minutes', (abs(random()) % 241) - 120))
+        THEN datetime(createdAt, printf('%+d minutes', (abs(random()) % 121) * -1))
         ELSE createdAt
       END,
       publishedAt = CASE 
         WHEN publishedAt IS NOT NULL 
-        THEN datetime(publishedAt, printf('%+d minutes', (abs(random()) % 241) - 120))
+        THEN datetime(publishedAt, printf('%+d minutes', (abs(random()) % 121) * -1))
         ELSE publishedAt
       END
   `);
 
-  console.log('✅ Час публікації/створення розподілено випадковим чином в межах ±2 годин для всіх оголошень.\n');
+  console.log('✅ Час публікації/створення розподілено випадковим чином в межах 0–2 годин назад для всіх оголошень (без зміни дати).\n');
 }
 
 main()

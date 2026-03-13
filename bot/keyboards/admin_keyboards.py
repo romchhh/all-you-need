@@ -43,12 +43,19 @@ def create_post(user_data: dict, user_id: str, url_buttons: list = None) -> Inli
         InlineKeyboardButton(text="Додати опис", callback_data=f"description_")
     ])
 
+    # Перевіряємо кількість фото: якщо > 1 — URL-кнопки недоступні (Telegram не дозволяє)
+    media = user_data.get(user_id, {}).get('media')
+    has_multiple_photos = isinstance(media, list) and len(media) > 1
+
+    if has_multiple_photos:
+        url_btn = InlineKeyboardButton(text="⛔ URL-кнопки", callback_data="url_buttons_disabled_")
+    else:
+        url_btn = InlineKeyboardButton(text="URL-кнопки", callback_data="url_buttons_")
+
     inline_kb_list.append([
         InlineKeyboardButton(text="🔔" if user_data.get(user_id, {}).get('bell', 0) == 1 else "🔕", callback_data=f"bell_"),
-        InlineKeyboardButton(text="URL-кнопки", callback_data=f"url_buttons_")
+        url_btn
     ])
-
-    
 
     inline_kb_list.append([
         InlineKeyboardButton(text="← Відміна", callback_data=f"back_to"),
