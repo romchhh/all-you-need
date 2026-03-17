@@ -22,8 +22,62 @@ load_dotenv()
 
 router = Router()
 
+BASE_CONTENT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content')
+
 # Шлях до фото привітання
-HELLO_PHOTO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content', 'hello.jpg')
+HELLO_PHOTO_PATH = os.path.join(BASE_CONTENT_PATH, 'hello.jpg')
+
+# Шляхи до відео-інструкцій після підтвердження оферти
+OFFER_INSTRUCTION_VIDEO_1_PATH = os.path.join(BASE_CONTENT_PATH, 'IMG_2974.mp4')
+OFFER_INSTRUCTION_VIDEO_2_PATH = os.path.join(BASE_CONTENT_PATH, 'IMG_2975.mp4')
+
+
+async def _send_offer_instruction_videos(chat_id: int, user_id: int):
+    """Надсилає відео-інструкції з додавання оголошень після підтвердження оферти (з урахуванням мови)."""
+    user_lang = get_user_lang(user_id) or 'uk'
+
+    if user_lang == 'ru':
+        caption_1 = (
+            "🎥 Инструкция: как подать объявление в канал.\n\n"
+            "Пошагово показываем, как правильно оформить и отправить объявление, "
+            "чтобы его увидело как можно больше людей."
+        )
+        caption_2 = (
+            "🎥 Инструкция: как подать объявление в маркетплейсе.\n\n"
+            "Объясняем, как добавить товар в маркетплейс, заполнить все важные поля "
+            "и сделать объявление максимально привлекательным для покупателей."
+        )
+    else:
+        caption_1 = (
+            "🎥 Інструкція: як додавати оголошення в канал.\n\n"
+            "Крок за кроком показуємо, як правильно оформити та відправити оголошення, "
+            "щоб його побачило якомога більше людей."
+        )
+        caption_2 = (
+            "🎥 Інструкція: як подати оголошення в маркетплейсі.\n\n"
+            "Пояснюємо, як додати товар у маркетплейс, заповнити всі важливі поля "
+            "та зробити оголошення максимально привабливим для покупців."
+        )
+
+    try:
+        video_1 = FSInputFile(OFFER_INSTRUCTION_VIDEO_1_PATH)
+        await bot.send_video(
+            chat_id,
+            video_1,
+            caption=caption_1
+        )
+    except Exception as e:
+        print(f"Error sending offer instruction video 1: {e}")
+
+    try:
+        video_2 = FSInputFile(OFFER_INSTRUCTION_VIDEO_2_PATH)
+        await bot.send_video(
+            chat_id,
+            video_2,
+            caption=caption_2
+        )
+    except Exception as e:
+        print(f"Error sending offer instruction video 2: {e}")
 
 
 @router.message(CommandStart())
@@ -410,6 +464,9 @@ async def agree_agreement(callback: types.CallbackQuery):
                 except Exception as e:
                     print(f"Error sending hello photo: {e}")
                     await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
+
+                # Після повного доступу до бота надсилаємо відео-інструкції
+                await _send_offer_instruction_videos(callback.message.chat.id, user_id)
         else:
             # Якщо є юзернейм - просто завершуємо реєстрацію
             await callback.message.answer(
@@ -424,6 +481,9 @@ async def agree_agreement(callback: types.CallbackQuery):
             except Exception as e:
                 print(f"Error sending hello photo: {e}")
                 await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
+
+            # Після повного доступу до бота надсилаємо відео-інструкції
+            await _send_offer_instruction_videos(callback.message.chat.id, user_id)
         
         await callback.answer()
     except Exception as e:
