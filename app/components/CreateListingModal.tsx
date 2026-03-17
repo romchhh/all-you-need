@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { getCategories } from '@/constants/categories';
 import { germanCities, fetchGermanCitiesFromAPI } from '@/constants/german-cities';
+import { majorGermanCities } from '@/constants/major-german-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
@@ -111,19 +112,9 @@ export const CreateListingModal = ({
     }
   }, [isFree]);
 
-  // Список міст для вибору при створенні оголошення
-  const defaultCities = [
-    'Hamburg',
-    'Norderstedt',
-    'Pinneberg',
-    'Wedel',
-    'Ahrensburg',
-    'Reinbek',
-    'Barsbüttel',
-    'Elmshorn',
-    'Stade',
-    'Buxtehude'
-  ];
+  // Список міст для вибору при створенні оголошення —
+  // використовуємо той же топ крупних міст, що й у фільтрі каталогу.
+  const defaultCities = majorGermanCities;
 
   // Фільтруємо міста за запитом (по ключових літерах, як на головній сторінці)
   const [filteredCities, setFilteredCities] = useState<string[]>(defaultCities);
@@ -1423,12 +1414,12 @@ export const CreateListingModal = ({
                 className={`w-full py-3 pr-10 bg-[#1C1C1C] rounded-xl border text-left ${
                   errors.location ? 'border-red-500' : 'border-white/20'
                 } focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 hover:bg-[#1C1C1C]/80 transition-colors`}
-                style={{ paddingLeft: '56px' }}
+                style={{ paddingLeft: '52px' }}
               >
               <MapPin 
                 size={18} 
-                className="absolute top-1/2 -translate-y-1/2 text-[#D3F1A7]"
-                style={{ left: '20px' }}
+                className="absolute top-1/2 -translate-y-1/2 text-[#D3F1A7] pointer-events-none"
+                style={{ left: '16px' }}
               />
                 <span className={location ? 'text-white font-medium' : 'text-white/50'}>
                   {location || t('createListing.locationPlaceholder')}

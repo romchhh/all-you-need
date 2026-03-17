@@ -9,6 +9,7 @@ import {
 } from '@/utils/listingHelpers';
 import { getUserIdAndActive } from '@/utils/userHelpers';
 import { prisma } from '@/lib/prisma';
+import { normalizeCityInput } from '@/utils/cityNormalization';
 
 // Збільшуємо максимальний час виконання до 5 хвилин для обробки великих файлів
 export const maxDuration = 300; // 5 хвилин
@@ -57,11 +58,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedLocation = normalizeCityInput(location);
+
     console.log('[Create Listing] Request data:', {
       telegramId,
       title,
       description: description?.substring(0, 50),
-      location,
+      location: normalizedLocation,
       category,
       imagesCount: images.length,
       originalImagesCount: allImages.length,
@@ -172,7 +175,7 @@ export async function POST(request: NextRequest) {
     try {
       listingId = await createDraftListing(
         user.id,
-        { title, description, price, currency, isFree, category, subcategory, condition, location },
+        { title, description, price, currency, isFree, category, subcategory, condition, location: normalizedLocation },
         savedImageUrls
       );
       console.log('[Create Listing API] Listing created with ID:', listingId);

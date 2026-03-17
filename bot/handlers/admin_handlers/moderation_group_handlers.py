@@ -208,21 +208,12 @@ async def send_approval_notification(
             # Визначаємо канал на основі регіону
             region = listing.get('region', 'hamburg') if listing else 'hamburg'
             if region == 'other_germany':
-                channel_id = os.getenv('TRADE_GERMANY_CHANNEL_ID')
-                channel_username = os.getenv('TRADE_GERMANY_CHANNEL_USERNAME', '')
+                # Загальний канал по Німеччині
+                channel_username = os.getenv('TRADE_GERMANY_CHANNEL_USERNAME', 'TradeGroundGermany')
             else:
-                channel_id = os.getenv('TRADE_CHANNEL_ID')
-                channel_username = os.getenv('TRADE_CHANNEL_USERNAME', '')
-            
-            channel_message_id_raw = listing.get('channelMessageId') if listing else None
-            if channel_message_id_raw and isinstance(channel_message_id_raw, str) and channel_message_id_raw.strip().startswith('['):
-                try:
-                    arr = json.loads(channel_message_id_raw)
-                    channel_message_id = str(arr[0]) if isinstance(arr, list) and arr else channel_message_id_raw
-                except (json.JSONDecodeError, TypeError):
-                    channel_message_id = channel_message_id_raw
-            else:
-                channel_message_id = channel_message_id_raw
+                # Міський канал (Гамбург)
+                channel_username = os.getenv('TRADE_CHANNEL_USERNAME', 'TradeGroundHamburg')
+
             published_at = listing.get('publishedAt') if listing else None
 
             expires_date_text = ""
@@ -243,13 +234,9 @@ async def send_approval_notification(
             message_text = f"{msg_title}\n\n{msg_body}{expires_date_text}\n\n{msg_thanks}"
 
             keyboard_buttons = []
-            if channel_id and channel_message_id:
-                if channel_username:
-                    channel_link = f"https://t.me/{channel_username}/{channel_message_id}"
-                else:
-                    # Видаляємо префікс -100 з ID каналу
-                    channel_id_clean = str(channel_id).replace('-100', '')
-                    channel_link = f"https://t.me/c/{channel_id_clean}/{channel_message_id}"
+            # Після схвалення надсилаємо посилання саме на канал, а не на конкретний пост
+            if channel_username:
+                channel_link = f"https://t.me/{channel_username}"
                 keyboard_buttons.append([InlineKeyboardButton(
                     text=t(telegram_id, 'my_listings.view_listing_button'),
                     url=channel_link

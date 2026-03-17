@@ -371,23 +371,11 @@ export async function POST(request: NextRequest) {
           
           // Визначаємо канал на основі регіону
           const region = (listing as any).region || 'hamburg';
-          const TRADE_CHANNEL_ID = region === 'other_germany' 
-            ? process.env.TRADE_GERMANY_CHANNEL_ID 
-            : process.env.TRADE_CHANNEL_ID;
-          const TRADE_CHANNEL_USERNAME = region === 'other_germany'
-            ? (process.env.TRADE_GERMANY_CHANNEL_USERNAME || '')
-            : (process.env.TRADE_CHANNEL_USERNAME || '');
-          
-          let channelLink = '';
-          if (channelMessageId && TRADE_CHANNEL_ID) {
-            if (TRADE_CHANNEL_USERNAME) {
-              channelLink = `https://t.me/${TRADE_CHANNEL_USERNAME}/${channelMessageId}`;
-            } else {
-              // Використовуємо ID каналу (без -100)
-              const channelId = TRADE_CHANNEL_ID.replace(/^-100/, '');
-              channelLink = `https://t.me/c/${channelId}/${channelMessageId}`;
-            }
-          }
+          // @TradeGroundGermany - загальний, @TradeGroundHamburg - Гамбург
+          const channelUsername = region === 'other_germany'
+            ? 'TradeGroundGermany'
+            : 'TradeGroundHamburg';
+          const channelLink = `https://t.me/${channelUsername}`;
           
           const message = `✅ <b>Оголошення схвалено!</b>
 
@@ -398,7 +386,7 @@ export async function POST(request: NextRequest) {
           const replyMarkup = channelLink ? {
             inline_keyboard: [[
               {
-                text: '🔗 Переглянути оголошення',
+                text: '🔗 Перейти в канал',
                 url: channelLink,
               }
             ]]

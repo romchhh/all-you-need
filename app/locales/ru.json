@@ -284,6 +284,7 @@
     "conditionLabel": "Состояние",
     "locationLabel": "Место *",
     "locationPlaceholder": "Введите город...",
+    "searchCity": "Попробуйте ввести индекс (5 цифр) или название города",
     "errors": {
       "titleRequired": "Введите название товара",
       "titleMinLength": "Название должно содержать минимум 3 символа",

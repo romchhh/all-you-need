@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizeCityInput } from '@/utils/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
 
@@ -28,75 +29,6 @@ function normalizeFavoritesCount(value: number | bigint | string | undefined): n
 // JavaScript's toLowerCase() правильно працює з кирилицею
 function normalizeCyrillicToLower(text: string): string {
   return text.toLowerCase();
-}
-
-// Маппінг синонімів міст (RU/EN) → канонічна німецька назва
-const CITY_ALIASES: Record<string, string> = {
-  // Гамбург
-  'гамбург': 'Hamburg',
-  'hamburg': 'Hamburg',
-  // Мюнхен
-  'мюнхен': 'München',
-  'munich': 'München',
-  // Берлін
-  'берлин': 'Berlin',
-  'berlin': 'Berlin',
-  // Кёльн
-  'кёльн': 'Köln',
-  'кельн': 'Köln',
-  'koln': 'Köln',
-  'cologne': 'Köln',
-  // Дюссельдорф
-  'дюссельдорф': 'Düsseldorf',
-  'dusseldorf': 'Düsseldorf',
-  'düsseldorf': 'Düsseldorf',
-  // Штутгарт
-  'штутгарт': 'Stuttgart',
-  'stuttgart': 'Stuttgart',
-  // Ганновер
-  'ганновер': 'Hannover',
-  'hannover': 'Hannover',
-  'hanover': 'Hannover',
-  // Бремен
-  'бремен': 'Bremen',
-  'bremen': 'Bremen',
-  // Лейпциг
-  'лейпциг': 'Leipzig',
-  'leipzig': 'Leipzig',
-  // Дрезден
-  'дрезден': 'Dresden',
-  'dresden': 'Dresden',
-  // Дортмунд
-  'дортмунд': 'Dortmund',
-  'dortmund': 'Dortmund',
-  // Ессен
-  'эссен': 'Essen',
-  'essen': 'Essen',
-  // Дуйсбург
-  'дуйсбург': 'Duisburg',
-  'duisburg': 'Duisburg',
-  // Бонн
-  'бонн': 'Bonn',
-  'bonn': 'Bonn',
-  // Карлсруэ
-  'карлсруэ': 'Karlsruhe',
-  'karlsruhe': 'Karlsruhe',
-  // Мангейм / Маннхайм
-  'маннгейм': 'Mannheim',
-  'манхайм': 'Mannheim',
-  'mannheim': 'Mannheim',
-  // Нюрнберг
-  'нюрнберг': 'Nürnberg',
-  'nuremberg': 'Nürnberg',
-  'nürnberg': 'Nürnberg',
-  // Франкфурт (узагальнений ввід користувача)
-  'франкфурт': 'Frankfurt am Main',
-  'frankfurt': 'Frankfurt am Main',
-};
-
-function normalizeCityInput(city: string): string {
-  const key = city.trim().toLowerCase();
-  return CITY_ALIASES[key] || city.trim();
 }
 
 // Функція для генерації всіх можливих варіантів регістру для пошуку

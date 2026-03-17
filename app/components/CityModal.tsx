@@ -5,30 +5,12 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useState, useEffect, Fragment, useMemo, useRef } from 'react';
 import { germanCities, fetchGermanCitiesFromAPI, isGermanCityValid } from '@/constants/german-cities';
+import { majorGermanCities } from '@/constants/major-german-cities';
 
 interface TouchStart {
   y: number;
   scrollTop: number;
 }
-
-// Список великих міст Німеччини (в порядку як зазначено користувачем)
-const majorGermanCities = [
-  'Berlin',
-  'Hamburg',
-  'München',
-  'Köln',
-  'Frankfurt am Main',
-  'Stuttgart',
-  'Düsseldorf',
-  'Leipzig',
-  'Dortmund',
-  'Essen',
-  'Bremen',
-  'Dresden',
-  'Hannover',
-  'Nürnberg',
-  'Duisburg'
-];
 
 // Перевіряємо, що всі міста зі списку є в базовому списку germanCities
 const validMajorGermanCities = majorGermanCities.filter((city) => isGermanCityValid(city));

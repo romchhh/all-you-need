@@ -19,9 +19,12 @@ CITY_SYNONYMS = {
     "дюссельдорф": "Düsseldorf",
     "dusseldorf": "Düsseldorf",
     "düsseldorf": "Düsseldorf",
+    "dusseldrof": "Düsseldorf",
+    "duseldorf": "Düsseldorf",
     # Штутгарт
     "штутгарт": "Stuttgart",
     "stuttgart": "Stuttgart",
+    "stutgart": "Stuttgart",
     # Ганновер
     "ганновер": "Hannover",
     "hannover": "Hannover",
