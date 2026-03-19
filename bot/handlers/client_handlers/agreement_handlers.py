@@ -14,7 +14,7 @@ from database_functions.referral_db import add_referral, create_referral_table
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, set_language as set_user_language, get_user_lang, get_welcome_message
 from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard, get_language_selection_keyboard, get_username_prompt_keyboard
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, FSInputFile, LinkPreviewOptions
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, FSInputFile, LinkPreviewOptions, InputMediaPhoto, InputMediaVideo
 import aiohttp
 
 
@@ -36,48 +36,25 @@ async def _send_offer_instruction_videos(chat_id: int, user_id: int):
     """Надсилає відео-інструкції з додавання оголошень після підтвердження оферти (з урахуванням мови)."""
     user_lang = get_user_lang(user_id) or 'uk'
 
-    if user_lang == 'ru':
-        caption_1 = (
-            "🎥 Инструкция: как подать объявление в канал.\n\n"
-            "Пошагово показываем, как правильно оформить и отправить объявление, "
-            "чтобы его увидело как можно больше людей."
-        )
-        caption_2 = (
-            "🎥 Инструкция: как подать объявление в маркетплейсе.\n\n"
-            "Объясняем, как добавить товар в маркетплейс, заполнить все важные поля "
-            "и сделать объявление максимально привлекательным для покупателей."
-        )
-    else:
-        caption_1 = (
-            "🎥 Інструкція: як додавати оголошення в канал.\n\n"
-            "Крок за кроком показуємо, як правильно оформити та відправити оголошення, "
-            "щоб його побачило якомога більше людей."
-        )
-        caption_2 = (
-            "🎥 Інструкція: як подати оголошення в маркетплейсі.\n\n"
-            "Пояснюємо, як додати товар у маркетплейс, заповнити всі важливі поля "
-            "та зробити оголошення максимально привабливим для покупців."
-        )
 
     try:
+        photo = FSInputFile(HELLO_PHOTO_PATH)
         video_1 = FSInputFile(OFFER_INSTRUCTION_VIDEO_1_PATH)
-        await bot.send_video(
-            chat_id,
-            video_1,
-            caption=caption_1
-        )
-    except Exception as e:
-        print(f"Error sending offer instruction video 1: {e}")
-
-    try:
         video_2 = FSInputFile(OFFER_INSTRUCTION_VIDEO_2_PATH)
-        await bot.send_video(
-            chat_id,
-            video_2,
-            caption=caption_2
-        )
+
+        # Текст, який раніше відправлявся разом із фото hello.jpg
+        welcome_text = t(user_id, 'welcome.registration_success')
+
+        media = [
+            InputMediaPhoto(media=photo, caption=welcome_text, parse_mode="HTML"),
+            InputMediaVideo(media=video_1),
+            InputMediaVideo(media=video_2),
+        ]
+
+        await bot.send_media_group(chat_id=chat_id, media=media)
+
     except Exception as e:
-        print(f"Error sending offer instruction video 2: {e}")
+        print(f"Error sending media group with offer instruction videos: {e}")
 
 
 @router.message(CommandStart())
@@ -457,33 +434,28 @@ async def agree_agreement(callback: types.CallbackQuery):
                 )
             else:
                 await callback.message.answer(t(user_id, 'agreement.agreed'), parse_mode="HTML")
-                welcome_text = t(user_id, 'welcome.registration_success')
-                try:
-                    photo_file = FSInputFile(HELLO_PHOTO_PATH)
-                    await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
-                except Exception as e:
-                    print(f"Error sending hello photo: {e}")
-                    await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
-
-                # Після повного доступу до бота надсилаємо відео-інструкції
+                # Після повного доступу до бота надсилаємо медіагрупу з вітальним фото та відео-інструкціями
                 await _send_offer_instruction_videos(callback.message.chat.id, user_id)
+                # Окремо показуємо головне меню без дублювання вітального тексту
+                await callback.message.answer(
+                    f"<b>{t(user_id, 'menu.main_menu')}</b>",
+                    reply_markup=get_main_menu_keyboard(user_id),
+                    parse_mode="HTML"
+                )
         else:
             # Якщо є юзернейм - просто завершуємо реєстрацію
             await callback.message.answer(
                 t(user_id, 'agreement.agreed'),
                 parse_mode="HTML"
             )
-            # Показуємо головне меню
-            welcome_text = t(user_id, 'welcome.registration_success')
-            try:
-                photo_file = FSInputFile(HELLO_PHOTO_PATH)
-                await callback.message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
-            except Exception as e:
-                print(f"Error sending hello photo: {e}")
-                await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
-
-            # Після повного доступу до бота надсилаємо відео-інструкції
+            # Після повного доступу до бота надсилаємо медіагрупу з вітальним фото та відео-інструкціями
             await _send_offer_instruction_videos(callback.message.chat.id, user_id)
+            # Окремо показуємо головне меню без дублювання вітального тексту
+            await callback.message.answer(
+                f"<b>{t(user_id, 'menu.main_menu')}</b>",
+                reply_markup=get_main_menu_keyboard(user_id),
+                parse_mode="HTML"
+            )
         
         await callback.answer()
     except Exception as e:
