@@ -168,7 +168,7 @@
         "selectedCities": "Вибрані міста",
         "majorCities": "Великі міста",
         "searchResults": "Результати пошуку",
-        "tryPostalCode": "Спробуйте ввести індекс (5 цифр) або назву міста",
+        "tryPostalCode": "Спробуйте ввести назву міста",
         "allCategories": "Всі категорії",
         "clearFilters": "Очистити фільтри",
         "sort": {
@@ -269,7 +269,7 @@
     "addMorePhotos": "Додати ще фото",
     "errorCreating": "Помилка при створенні оголошення",
     "selectCity": "Оберіть місто",
-    "searchCity": "Спробуйте ввести індекс (5 цифр) або назву міста",
+    "searchCity": "Спробуйте ввести назву міста",
     "noCitiesFound": "Міста не знайдено",
     "tryAnotherSearch": "Спробуйте інший запит",
     "enterTitle": "Введіть назву",

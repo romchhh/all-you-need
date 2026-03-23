@@ -168,7 +168,7 @@
         "selectedCities": "Выбранные города",
         "majorCities": "Крупные города",
         "searchResults": "Результаты поиска",
-        "tryPostalCode": "Попробуйте ввести индекс (5 цифр) или название города",
+        "tryPostalCode": "Попробуйте ввести название города",
         "allCategories": "Все категории",
         "clearFilters": "Очистить фильтры",
         "sort": {
@@ -284,7 +284,7 @@
     "conditionLabel": "Состояние",
     "locationLabel": "Место *",
     "locationPlaceholder": "Введите город...",
-    "searchCity": "Попробуйте ввести индекс (5 цифр) или название города",
+    "searchCity": "Попробуйте ввести название города",
     "errors": {
       "titleRequired": "Введите название товара",
       "titleMinLength": "Название должно содержать минимум 3 символа",
