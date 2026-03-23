@@ -188,10 +188,18 @@ def get_about_us_telegram_channels_keyboard(user_id: int) -> InlineKeyboardMarku
             InlineKeyboardButton(
                 text=t(user_id, 'about_us.telegram_channel_hamburg'),
                 url=hamburg_url
-            ),
+            )
+        ],
+        [
             InlineKeyboardButton(
                 text=t(user_id, 'about_us.telegram_channel_germany'),
                 url=germany_url
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=t(user_id, 'about_us.telegram_channel_polezno'),
+                callback_data="partner_polezno"
             )
         ],
         [InlineKeyboardButton(

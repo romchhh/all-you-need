@@ -45,13 +45,31 @@ PARTNERS_DATA = {
 }
 
 
-# Тексти кнопки "Полезно Германия" для обробника (RU / UK)
-POLEZNO_BUTTON_TEXTS = ["🇩🇪 Polezno | Germany", "🇩🇪 Polezno | Germany"]
+# Кнопка в головному меню (RU / UK): текст розділу + inline-кнопки каналів.
+TRADE_CHANNELS_MENU_BUTTON_TEXTS = [
+    "📢 Каналы TradeGround",
+    "📢 Канали TradeGround",
+]
+
+# Стара reply-кнопка для сумісності — одразу екран Polezno.
+POLEZNO_LEGACY_REPLY_BUTTON_TEXTS = ["🇩🇪 Polezno | Germany"]
 
 
-@router.message(F.text.in_(POLEZNO_BUTTON_TEXTS))
+@router.message(F.text.in_(TRADE_CHANNELS_MENU_BUTTON_TEXTS))
+async def trade_channels_menu_handler(message: types.Message):
+    """Текст «Каналы TradeGround» + Hamburg/Germany (url) + Polezno (callback з інфо)."""
+    user_id = message.from_user.id
+    text = t(user_id, "about_us.telegram_channels_text")
+    await message.answer(
+        text,
+        reply_markup=get_about_us_telegram_channels_keyboard(user_id),
+        parse_mode="HTML",
+    )
+
+
+@router.message(F.text.in_(POLEZNO_LEGACY_REPLY_BUTTON_TEXTS))
 async def polezno_menu_handler(message: types.Message):
-    """При натисканні кнопки «Полезно Германия» — фото, опис, кнопка посилання на канал."""
+    """Стара кнопка «Polezno» — фото, опис, кнопка посилання на канал."""
     user_id = message.from_user.id
     result = _send_partner_content(message.chat.id, user_id, "polezno")
     if not result:
@@ -62,7 +80,7 @@ async def polezno_menu_handler(message: types.Message):
         photo_file,
         caption=caption,
         reply_markup=keyboard,
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
 
 
