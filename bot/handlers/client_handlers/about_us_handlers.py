@@ -10,6 +10,7 @@ from keyboards.client_keyboards import (
     get_about_us_telegram_channels_keyboard,
     get_partners_list_keyboard,
     get_partner_detail_keyboard,
+    get_trade_ground_channel_urls,
 )
 
 router = Router()
@@ -59,11 +60,18 @@ POLEZNO_LEGACY_REPLY_BUTTON_TEXTS = ["🇩🇪 Polezno | Germany"]
 async def trade_channels_menu_handler(message: types.Message):
     """Текст «Каналы TradeGround» + Hamburg/Germany (url) + Polezno (callback з інфо)."""
     user_id = message.from_user.id
-    text = t(user_id, "about_us.telegram_channels_text")
+    hamburg_url, germany_url = get_trade_ground_channel_urls()
+    text = t(
+        user_id,
+        "about_us.telegram_channels_text",
+        hamburg_url=hamburg_url,
+        germany_url=germany_url,
+    )
     await message.answer(
         text,
         reply_markup=get_about_us_telegram_channels_keyboard(user_id),
         parse_mode="HTML",
+        disable_web_page_preview=True,
     )
 
 
@@ -179,11 +187,18 @@ async def about_rules_callback(callback: types.CallbackQuery):
 @router.callback_query(F.data == "about_telegram")
 async def about_telegram_callback(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    text = t(user_id, 'about_us.telegram_channels_text')
+    hamburg_url, germany_url = get_trade_ground_channel_urls()
+    text = t(
+        user_id,
+        "about_us.telegram_channels_text",
+        hamburg_url=hamburg_url,
+        germany_url=germany_url,
+    )
     await callback.message.edit_text(
         text,
         reply_markup=get_about_us_telegram_channels_keyboard(user_id),
-        parse_mode="HTML"
+        parse_mode="HTML",
+        disable_web_page_preview=True,
     )
     await callback.answer()
 

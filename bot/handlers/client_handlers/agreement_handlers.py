@@ -47,8 +47,8 @@ async def _send_offer_instruction_videos(chat_id: int, user_id: int):
 
         media = [
             InputMediaPhoto(media=photo, caption=welcome_text, parse_mode="HTML"),
-            InputMediaVideo(media=video_1),
             InputMediaVideo(media=video_2),
+            InputMediaVideo(media=video_1),
         ]
 
         await bot.send_media_group(chat_id=chat_id, media=media)

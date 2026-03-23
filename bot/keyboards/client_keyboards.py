@@ -180,9 +180,15 @@ def get_about_us_back_keyboard(user_id: int) -> InlineKeyboardMarkup:
     ])
 
 
+def get_trade_ground_channel_urls() -> tuple[str, str]:
+    """URL каналів TradeGround Hamburg та Germany (env як у inline-кнопках)."""
+    hamburg = os.getenv("TELEGRAM_URL", "https://t.me/TradeGroundHamburg")
+    germany = os.getenv("TELEGRAM_GERMANY_URL", "https://t.me/TradeGroundGermany")
+    return hamburg, germany
+
+
 def get_about_us_telegram_channels_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    hamburg_url = os.getenv('TELEGRAM_URL', 'https://t.me/TradeGroundHamburg')
-    germany_url = os.getenv('TELEGRAM_GERMANY_URL', 'https://t.me/TradeGroundGermany')
+    hamburg_url, germany_url = get_trade_ground_channel_urls()
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
