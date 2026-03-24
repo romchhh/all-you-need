@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Одноразовий / адмінський скрипт: нарахувати VIP (7 днів) на останнє оголошення
-маркетплейсу (таблиця Listing) для заданих Telegram username і надіслати
-користувачу повідомлення в бот.
+Адмінський скрипт: нарахувати TOP-рекламу (top_category, 7 днів) на останнє оголошення
+маркетплейсу (Listing) для заданих Telegram username або numeric Telegram ID.
+
+Як у app/utils/paymentConstants.ts: top_category — duration 7 днів.
 
 Запуск з каталогу bot/:
-  python scripts/grant_vip_latest_listings.py
-  python scripts/grant_vip_latest_listings.py --dry-run
+  python3 scripts/grant_top_latest_listings.py user1 123456789
+  python3 scripts/grant_top_latest_listings.py --dry-run
 
-Потрібні змінні в .env (як у бота): TOKEN.
-Залежності: лише стандартна бібліотека; .env читається через python-dotenv або простий парсер.
+Потрібно в .env: TOKEN.
 """
 from __future__ import annotations
 
@@ -45,42 +45,63 @@ except ImportError:
 from database_functions.client_db import get_user_language  # noqa: E402
 from database_functions.db_config import DATABASE_PATH  # noqa: E402
 
-# Тривалість VIP як у app/utils/paymentConstants.ts
-VIP_DURATION_DAYS = 7
+TOP_DURATION_DAYS = 7
 
-DEFAULT_USERNAMES = [
-    "laslobl",
+# Username без @ або лише цифри (Telegram ID). Або передайте аргументами.
+DEFAULT_TARGETS: list[str] = [
+    "7119952932",
+    "491000004",
+    "6999973578",
+    "koshka_ya",
+    "SvVost",
+    "Alona_hrybovych",
+    "a_rezunenko",
 ]
 
 
 def _normalize_username(raw: str) -> str:
-    s = raw.strip().lstrip("@").lower()
-    return s
+    return raw.strip().lstrip("@").lower()
 
 
 def _fmt_ends_for_user(lang: str, ends_at: datetime) -> str:
-    if lang == "ru":
-        return ends_at.strftime("%d.%m.%Y %H:%M UTC")
+    _ = lang
     return ends_at.strftime("%d.%m.%Y %H:%M UTC")
+
+
+def _merge_top_promotion_type(existing: str | None) -> str:
+    """
+    Узгоджено з app/utils/paymentHelpers.ts: highlighted + top_category → 'highlighted,top_category'.
+    Якщо вже є vip — додаємо top_category: 'vip,top_category'.
+    """
+    if not existing or not str(existing).strip():
+        return "top_category"
+    parts = [p.strip() for p in str(existing).split(",") if p.strip()]
+    if "top_category" in parts:
+        return ",".join(parts)
+    parts.append("top_category")
+    if "highlighted" in parts and "top_category" in parts:
+        others = [p for p in parts if p not in ("highlighted", "top_category")]
+        return "highlighted,top_category" + ("," + ",".join(others) if others else "")
+    return ",".join(parts)
 
 
 def _build_message(lang: str, title: str, listing_id: int, ends_at: datetime) -> str:
     safe_title = html.escape(title)
-    ends_str = _fmt_ends_for_user(lang, ends_at)
+    ends_str = html.escape(_fmt_ends_for_user(lang, ends_at))
     if lang == "ru":
         return (
-            "⭐ <b>Активировано VIP-размещение</b>\n\n"
+            "📌 <b>Активировано TOP-размещение</b>\n\n"
             f"Вашему объявлению «<b>{safe_title}</b>» (№{listing_id}) "
-            f"начислено <b>VIP на {VIP_DURATION_DAYS} дней</b> "
-            f"до <b>{html.escape(ends_str)}</b>.\n\n"
-            "Объявление будет показываться в приоритете в каталоге TradeGround."
+            f"начислено <b>TOP в категории на {TOP_DURATION_DAYS} дней</b> "
+            f"до <b>{ends_str}</b>.\n\n"
+            "Объявление будет выше в своей категории в каталоге TradeGround."
         )
     return (
-        "⭐ <b>Активовано VIP-розміщення</b>\n\n"
+        "📌 <b>Активовано TOP-розміщення</b>\n\n"
         f"Вашому оголошенню «<b>{safe_title}</b>» (№{listing_id}) "
-        f"нараховано <b>VIP на {VIP_DURATION_DAYS} днів</b> "
-        f"до <b>{html.escape(ends_str)}</b>.\n\n"
-        "Оголошення відображатиметься в пріоритеті в каталозі TradeGround."
+        f"нараховано <b>TOP у категорії на {TOP_DURATION_DAYS} днів</b> "
+        f"до <b>{ends_str}</b>.\n\n"
+        "Оголошення буде вище у своїй категорії в каталозі TradeGround."
     )
 
 
@@ -102,13 +123,44 @@ def _find_user(conn: sqlite3.Connection, username: str) -> dict | None:
     return {"id": row[0], "telegramId": int(row[1]), "username": row[2]}
 
 
+def _find_user_by_telegram_id(conn: sqlite3.Connection, telegram_id: int) -> dict | None:
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, telegramId, username
+        FROM User
+        WHERE telegramId = ?
+        LIMIT 1
+        """,
+        (telegram_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {"id": row[0], "telegramId": int(row[1]), "username": row[2]}
+
+
+def _resolve_user(conn: sqlite3.Connection, raw: str) -> tuple[dict | None, str]:
+    """
+    Повертає (user | None, label для логу).
+    Якщо рядок — лише цифри, шукаємо за telegramId, інакше за username.
+    """
+    s = raw.strip()
+    if s.isdigit():
+        tid = int(s)
+        u = _find_user_by_telegram_id(conn, tid)
+        return u, f"telegramId={tid}"
+    uname = _normalize_username(s)
+    u = _find_user(conn, uname)
+    return u, f"@{uname}"
+
+
 def _listing_has_column(conn: sqlite3.Connection, column: str) -> bool:
     cur = conn.execute("PRAGMA table_info(Listing)")
     return any(row[1] == column for row in cur.fetchall())
 
 
 def _find_latest_listing(conn: sqlite3.Connection, user_id: int) -> dict | None:
-    """Спочатку активне оголошення маркетплейсу, інакше просто останнє за createdAt."""
     cur = conn.cursor()
     has_expires = _listing_has_column(conn, "expiresAt")
     active_extra = ""
@@ -117,7 +169,7 @@ def _find_latest_listing(conn: sqlite3.Connection, user_id: int) -> dict | None:
 
     cur.execute(
         f"""
-        SELECT id, title, status
+        SELECT id, title, status, promotionType
         FROM Listing
         WHERE userId = ?
           AND status = 'active'
@@ -129,10 +181,15 @@ def _find_latest_listing(conn: sqlite3.Connection, user_id: int) -> dict | None:
     )
     row = cur.fetchone()
     if row:
-        return {"id": row[0], "title": row[1], "status": row[2]}
+        return {
+            "id": row[0],
+            "title": row[1],
+            "status": row[2],
+            "promotionType": row[3],
+        }
     cur.execute(
         """
-        SELECT id, title, status
+        SELECT id, title, status, promotionType
         FROM Listing
         WHERE userId = ?
         ORDER BY datetime(createdAt) DESC, id DESC
@@ -143,19 +200,24 @@ def _find_latest_listing(conn: sqlite3.Connection, user_id: int) -> dict | None:
     row = cur.fetchone()
     if not row:
         return None
-    return {"id": row[0], "title": row[1], "status": row[2]}
+    return {
+        "id": row[0],
+        "title": row[1],
+        "status": row[2],
+        "promotionType": row[3],
+    }
 
 
-def _apply_vip(
+def _apply_top(
     conn: sqlite3.Connection,
     user_id: int,
     listing_id: int,
+    merged_type: str,
     starts_at: datetime,
     ends_at: datetime,
     dry_run: bool,
 ) -> None:
     now_str = starts_at.strftime("%Y-%m-%d %H:%M:%S")
-    # ISO для полів, які читає Prisma / Next
     starts_iso = starts_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     ends_iso = ends_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     cur = conn.cursor()
@@ -164,12 +226,12 @@ def _apply_vip(
     cur.execute(
         """
         UPDATE Listing
-        SET promotionType = 'vip',
+        SET promotionType = ?,
             promotionEnds = ?,
             updatedAt = ?
         WHERE id = ?
         """,
-        (ends_iso, now_str, listing_id),
+        (merged_type, ends_iso, now_str, listing_id),
     )
     cur.execute(
         """
@@ -177,9 +239,9 @@ def _apply_vip(
             userId, listingId, promotionType, price, duration,
             paymentMethod, status, startsAt, endsAt, createdAt
         )
-        VALUES (?, ?, 'vip', 0, ?, 'admin_grant', 'active', ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, 'top_category', 0, ?, 'admin_grant', 'active', ?, ?, CURRENT_TIMESTAMP)
         """,
-        (user_id, listing_id, VIP_DURATION_DAYS, starts_iso, ends_iso),
+        (user_id, listing_id, TOP_DURATION_DAYS, starts_iso, ends_iso),
     )
     conn.commit()
 
@@ -206,7 +268,7 @@ def _send_telegram_message(token: str, chat_id: int, text: str) -> None:
         raise RuntimeError(body)
 
 
-def _run(usernames: list[str], dry_run: bool) -> None:
+def _run(targets: list[str], dry_run: bool) -> None:
     _load_dotenv(BOT_ROOT / ".env")
     token = os.getenv("TOKEN")
     if not token:
@@ -217,14 +279,13 @@ def _run(usernames: list[str], dry_run: bool) -> None:
     conn.row_factory = sqlite3.Row
     try:
         starts_at = datetime.now(timezone.utc)
-        ends_at = starts_at + timedelta(days=VIP_DURATION_DAYS)
+        ends_at = starts_at + timedelta(days=TOP_DURATION_DAYS)
 
-        for raw in usernames:
-            uname = _normalize_username(raw)
-            print(f"\n=== @{uname} ===")
-            user = _find_user(conn, uname)
+        for raw in targets:
+            user, label = _resolve_user(conn, raw)
+            print(f"\n=== {label} ===")
             if not user:
-                print("  Користувача з таким username не знайдено в User.")
+                print("  Користувача не знайдено в User.")
                 continue
 
             listing = _find_latest_listing(conn, user["id"])
@@ -232,29 +293,32 @@ def _run(usernames: list[str], dry_run: bool) -> None:
                 print("  Немає оголошень у таблиці Listing.")
                 continue
 
+            merged = _merge_top_promotion_type(listing.get("promotionType"))
             print(
                 f"  userId={user['id']} telegramId={user['telegramId']} "
-                f"listing id={listing['id']} status={listing['status']!r}"
+                f"listing id={listing['id']} status={listing['status']!r} "
+                f"promotionType: {listing.get('promotionType')!r} → {merged!r}"
             )
             if listing["status"] != "active":
                 print(
-                    "  Увага: оголошення не в статусі active — VIP у БД буде, "
-                    "але в каталозі може не відображатися."
+                    "  Увага: оголошення не в статусі active — зміни в БД можуть "
+                    "не відображатися в каталозі."
                 )
 
             if dry_run:
                 print("  [dry-run] без змін у БД і без повідомлення.")
                 continue
 
-            _apply_vip(
+            _apply_top(
                 conn,
                 user_id=user["id"],
                 listing_id=listing["id"],
+                merged_type=merged,
                 starts_at=starts_at,
                 ends_at=ends_at,
                 dry_run=False,
             )
-            print("  VIP застосовано в БД.")
+            print("  TOP застосовано в БД.")
 
             lang = get_user_language(user["telegramId"]) or "uk"
             if lang not in ("uk", "ru"):
@@ -274,20 +338,27 @@ def _run(usernames: list[str], dry_run: bool) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Нарахувати VIP на останнє Listing для заданих username."
+        description="Нарахувати TOP (top_category) на останнє Listing: username або Telegram ID."
     )
     parser.add_argument(
-        "usernames",
+        "targets",
         nargs="*",
-        help="Username без @ (за замовчуванням — фіксований список у скрипті)",
+        help="Username без @ або numeric Telegram ID",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Лише показати, кого знайдено; без UPDATE/INSERT і без повідомлень",
+        help="Лише перевірка; без UPDATE/INSERT і без повідомлень",
     )
     args = parser.parse_args()
-    names = args.usernames if args.usernames else DEFAULT_USERNAMES
+    names = list(args.targets) if args.targets else list(DEFAULT_TARGETS)
+    if not names:
+        print(
+            "Вкажіть хоча б один username або Telegram ID, "
+            "або заповніть DEFAULT_TARGETS у скрипті.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     _run(names, dry_run=args.dry_run)
 
 
