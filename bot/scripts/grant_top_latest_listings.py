@@ -51,7 +51,7 @@ from database_functions.client_db import get_user_language  # noqa: E402
 from database_functions.db_config import DATABASE_PATH  # noqa: E402
 
 TOP_DURATION_DAYS = 7
-DEFAULT_HOURS = 8
+DEFAULT_HOURS = 20
 
 # Опційно: обмежити користувачів (username без @ або Telegram ID). Порожній список = усі.
 DEFAULT_TARGETS: list[str] = []
