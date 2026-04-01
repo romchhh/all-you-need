@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureCurrencyColumn } from '@/lib/prisma';
+import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
 
 // SQLite може повертати COUNT як number, bigint або string
 function normalizeFavoritesCount(value: number | bigint | string | undefined): number {
@@ -136,6 +137,7 @@ export async function GET(request: NextRequest) {
         l.optimizedImages,
         l.tags,
         l.createdAt,
+        l.publishedAt,
         u.username as sellerUsername,
         u.firstName as sellerFirstName,
         u.lastName as sellerLastName,
@@ -202,8 +204,8 @@ export async function GET(request: NextRequest) {
       // Використовуємо оптимізовані версії якщо є, інакше оригінали
       const images = optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
       const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
-      const createdAt = listing.createdAt instanceof Date ? listing.createdAt : new Date(listing.createdAt);
-      
+      const timeFields = listingTimeFieldsForApi(listing);
+
       return {
         id: listing.id,
         title: listing.title,
@@ -225,8 +227,9 @@ export async function GET(request: NextRequest) {
         description: listing.description,
         location: listing.location,
         views: listing.views || 0,
-        posted: new Date(createdAt).toLocaleDateString('uk-UA'),
-        createdAt: listing.createdAt instanceof Date ? listing.createdAt.toISOString() : listing.createdAt,
+        posted: timeFields.posted,
+        publishedAt: timeFields.publishedAt,
+        createdAt: timeFields.createdAt,
         condition: listing.condition === 'new' ? 'new' : (listing.condition ? 'used' : null),
         tags: tags,
         isFree: listing.isFree === 1 || listing.isFree === true,

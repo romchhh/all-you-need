@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/utils/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
+import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
 
 // Відключаємо кешування для API route
 export const dynamic = 'force-dynamic';
@@ -260,6 +261,7 @@ export async function GET(request: NextRequest) {
           l.optimizedImages,
           l.tags,
           l.createdAt,
+          l.publishedAt,
           u.username as sellerUsername,
           u.firstName as sellerFirstName,
           u.lastName as sellerLastName,
@@ -370,7 +372,7 @@ export async function GET(request: NextRequest) {
       listings = userListings.map((listing: any) => {
         const images = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
         const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
-        const createdAt = listing.createdAt instanceof Date ? listing.createdAt : new Date(listing.createdAt);
+        const timeFields = listingTimeFieldsForApi(listing);
         let status = listing.status ?? 'active';
         if (status === 'active' && listing.expiresAt) {
           try {
@@ -399,8 +401,9 @@ export async function GET(request: NextRequest) {
           description: listing.description,
           location: listing.location,
           views: listing.views || 0,
-          posted: formatPostedTime(createdAt),
-          createdAt: listing.createdAt instanceof Date ? listing.createdAt.toISOString() : listing.createdAt,
+          posted: timeFields.posted,
+          publishedAt: timeFields.publishedAt,
+          createdAt: timeFields.createdAt,
           condition: normalizeCondition(listing.condition),
           tags: tags,
           isFree: listing.isFree === 1 || listing.isFree === true,
@@ -552,6 +555,7 @@ export async function GET(request: NextRequest) {
                l.images,
                l.tags,
                l.createdAt,
+               l.publishedAt,
                u.username as sellerUsername,
                u.firstName as sellerFirstName,
                u.lastName as sellerLastName,
@@ -689,8 +693,8 @@ export async function GET(request: NextRequest) {
       // Використовуємо оптимізовані версії якщо є, інакше оригінали
       const images = optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
       const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
-      const createdAt = listing.createdAt instanceof Date ? listing.createdAt : new Date(listing.createdAt);
-      
+      const timeFields = listingTimeFieldsForApi(listing);
+
       // Отримуємо дані користувача
       let sellerName = 'Користувач';
       let sellerAvatar = '👤';
@@ -739,8 +743,9 @@ export async function GET(request: NextRequest) {
                description: listing.description,
                location: listing.location,
                views: listing.views || 0,
-               posted: formatPostedTime(createdAt),
-               createdAt: listing.createdAt instanceof Date ? listing.createdAt.toISOString() : listing.createdAt,
+               posted: timeFields.posted,
+               publishedAt: timeFields.publishedAt,
+               createdAt: timeFields.createdAt,
                condition: normalizeCondition(listing.condition),
                tags: tags,
                isFree: listing.isFree === 1 || listing.isFree === true,
@@ -783,19 +788,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-function formatPostedTime(date: Date): string {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (minutes < 1) return 'щойно';
-  if (minutes < 60) return `${minutes} хв тому`;
-  if (hours < 24) return `${hours} год тому`;
-  if (days === 1) return '1 день тому';
-  if (days < 7) return `${days} днів тому`;
-  return `${Math.floor(days / 7)} тижнів тому`;
-}
-

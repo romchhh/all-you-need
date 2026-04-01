@@ -20,6 +20,8 @@ export interface Listing {
   location: string;
   views: number;
   posted: string;
+  /** Коли оголошення схвалено й опубліковано на маркетплейсі (UTC). Для «щойно» важливіше за createdAt. */
+  publishedAt?: string | null;
   createdAt?: string;
   condition?: 'new' | 'used';
   tags?: string[];

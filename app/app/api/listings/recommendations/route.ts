@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getListingDisplayDate } from '@/utils/parseDbDate';
+import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,6 +61,7 @@ export async function GET(request: NextRequest) {
           l.images,
           l.tags,
           l.createdAt,
+          l.publishedAt,
           u.username as sellerUsername,
           u.firstName as sellerFirstName,
           u.lastName as sellerLastName,
@@ -80,23 +83,8 @@ export async function GET(request: NextRequest) {
         const sellerName = listing.sellerFirstName 
           ? `${listing.sellerFirstName} ${listing.sellerLastName || ''}`.trim()
           : listing.sellerUsername || 'Користувач';
-        const createdAt = new Date(listing.createdAt);
-        const now = new Date();
-        const diffTime = now.getTime() - createdAt.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-        const diffMinutes = Math.floor(diffTime / (1000 * 60));
-        
-        let posted = '';
-        if (diffMinutes < 60) {
-          posted = diffMinutes < 1 ? 'щойно' : `${diffMinutes} хв тому`;
-        } else if (diffHours < 24) {
-          posted = `${diffHours} год тому`;
-        } else if (diffDays < 7) {
-          posted = `${diffDays} дн тому`;
-        } else {
-          posted = createdAt.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' });
-        }
+        const display = getListingDisplayDate(listing);
+        const posted = display ? formatPostedTimeUk(display) : '';
 
         return {
           id: listing.id,
@@ -165,6 +153,7 @@ export async function GET(request: NextRequest) {
         l.images,
         l.tags,
         l.createdAt,
+        l.publishedAt,
         u.username as sellerUsername,
         u.firstName as sellerFirstName,
         u.lastName as sellerLastName,
@@ -191,23 +180,8 @@ export async function GET(request: NextRequest) {
       const sellerName = listing.sellerFirstName 
         ? `${listing.sellerFirstName} ${listing.sellerLastName || ''}`.trim()
         : listing.sellerUsername || 'Користувач';
-      const createdAt = new Date(listing.createdAt);
-      const now = new Date();
-      const diffTime = now.getTime() - createdAt.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-      const diffMinutes = Math.floor(diffTime / (1000 * 60));
-      
-      let posted = '';
-      if (diffMinutes < 60) {
-        posted = diffMinutes < 1 ? 'щойно' : `${diffMinutes} хв тому`;
-      } else if (diffHours < 24) {
-        posted = `${diffHours} год тому`;
-      } else if (diffDays < 7) {
-        posted = `${diffDays} дн тому`;
-      } else {
-        posted = createdAt.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' });
-      }
+      const display = getListingDisplayDate(listing);
+      const posted = display ? formatPostedTimeUk(display) : '';
 
       return {
         id: listing.id,

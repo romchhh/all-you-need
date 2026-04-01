@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { trackUserActivity } from '@/utils/trackActivity';
+import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
+import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
@@ -47,6 +49,7 @@ export async function GET(
         l.images,
         l.tags,
         l.createdAt,
+        l.publishedAt,
         u.id as userId,
         CAST(u.telegramId AS INTEGER) as telegramId,
         u.username,
@@ -161,9 +164,12 @@ export async function GET(
     });
     const currentViews = updatedListing?.views || listing.views;
 
-    // Форматуємо дані
-    const createdAt = new Date(listing.createdAt);
-      const formattedListing = {
+    // Форматуємо дані (час публікації для «щойно» — publishedAt після модерації)
+    const display = getListingDisplayDate({
+      publishedAt: listing.publishedAt,
+      createdAt: listing.createdAt,
+    });
+    const formattedListing = {
         id: listing.id,
         title: listing.title,
         price: listing.price,
@@ -184,8 +190,13 @@ export async function GET(
         description: listing.description,
         location: listing.location,
         views: currentViews, // Використовуємо актуальне значення
-        posted: formatPostedTime(createdAt),
-        createdAt: listing.createdAt,
+        posted: display ? formatPostedTimeUk(display) : '',
+        publishedAt:
+          listing.publishedAt != null && String(listing.publishedAt).trim() !== ''
+            ? parseDbDate(listing.publishedAt)?.toISOString() ?? listing.publishedAt
+            : null,
+        createdAt:
+          parseDbDate(listing.createdAt)?.toISOString() ?? listing.createdAt,
         condition: normalizeCondition(listing.condition),
         tags: listing.tags ? JSON.parse(listing.tags) : [],
         isFree: listing.isFree === 1,
@@ -213,19 +224,3 @@ function normalizeFavoritesCount(value: number | bigint | string | undefined): n
   if (typeof value === 'string') return parseInt(value, 10) || 0;
   return 0;
 }
-
-function formatPostedTime(date: Date): string {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (minutes < 1) return 'щойно';
-  if (minutes < 60) return `${minutes} хв тому`;
-  if (hours < 24) return `${hours} год тому`;
-  if (days === 1) return '1 день тому';
-  if (days < 7) return `${days} днів тому`;
-  return `${Math.floor(days / 7)} тижнів тому`;
-}
-

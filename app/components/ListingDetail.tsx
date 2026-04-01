@@ -21,6 +21,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
+import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { descriptionWithLinks } from '@/utils/descriptionLinks';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
@@ -35,9 +36,14 @@ const PaymentSummaryModal = dynamic(() => import('./PaymentSummaryModal').then(m
 });
 
 // Функція для форматування дати публікації
-const formatPublicationDate = (dateString: string, lang: 'uk' | 'ru'): string => {
-  const date = new Date(dateString);
-  
+const formatPublicationDate = (dateInput: string | Date, lang: 'uk' | 'ru'): string => {
+  if (dateInput === '' || dateInput == null) return '';
+  const date =
+    dateInput instanceof Date
+      ? dateInput
+      : parseDbDate(dateInput) ?? new Date(dateInput);
+  if (Number.isNaN(date.getTime())) return '';
+
   const monthsUk = [
     'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
     'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'
@@ -129,11 +135,10 @@ export const ListingDetail = ({
   
   // Форматуємо час на клієнті з перекладами
   const formattedTime = useMemo(() => {
-    if (listing.createdAt) {
-      return formatTimeAgo(listing.createdAt, t);
-    }
+    const d = getListingDisplayDate(listing);
+    if (d) return formatTimeAgo(d, t);
     return listing.posted || '';
-  }, [listing.createdAt, listing.posted, t]);
+  }, [listing.createdAt, listing.publishedAt, listing.posted, t]);
   
   // Перевіряємо, чи це власне оголошення
   const isOwnListing = useMemo(() => {
@@ -767,9 +772,15 @@ export const ListingDetail = ({
         </div>
 
         {/* Дата публікації */}
-        {listing.createdAt && (
+        {(listing.publishedAt || listing.createdAt) && (
           <div className="mb-6 text-sm text-white/70">
-            <span>{t('listing.publishedDate')}: {formatPublicationDate(listing.createdAt, language)}</span>
+            <span>
+              {t('listing.publishedDate')}:{' '}
+              {formatPublicationDate(
+                getListingDisplayDate(listing) ?? listing.createdAt ?? '',
+                language
+              )}
+            </span>
           </div>
         )}
 

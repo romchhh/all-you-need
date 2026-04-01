@@ -4,6 +4,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
+import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCurrencySymbol } from '@/utils/currency';
 
 interface ListingCardColumnProps {
@@ -100,11 +101,10 @@ const ListingCardColumnComponent = ({
   }, [listing.image, listing.images]);
 
   const formattedTime = useMemo(() => {
-    if (listing.createdAt) {
-      return formatTimeAgo(listing.createdAt, t);
-    }
+    const d = getListingDisplayDate(listing);
+    if (d) return formatTimeAgo(d, t);
     return listing.posted || '';
-  }, [listing.createdAt, listing.posted, t]);
+  }, [listing.createdAt, listing.publishedAt, listing.posted, t]);
 
   return (
     <div 

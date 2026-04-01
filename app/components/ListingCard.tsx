@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
+import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCategories } from '@/constants/categories';
 
 interface ListingCardProps {
@@ -112,11 +113,10 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   
   // Форматуємо час на клієнті з перекладами
   const formattedTime = useMemo(() => {
-    if (listing.createdAt) {
-      return formatTimeAgo(listing.createdAt, t);
-    }
+    const d = getListingDisplayDate(listing);
+    if (d) return formatTimeAgo(d, t);
     return listing.posted || '';
-  }, [listing.createdAt, listing.posted, t]);
+  }, [listing.createdAt, listing.publishedAt, listing.posted, t]);
   const imageLoadedRef = useRef<Set<string>>(new Set());
   
   // Перевіряємо, чи зображення вже завантажене при ініціалізації

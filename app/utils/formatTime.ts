@@ -1,3 +1,5 @@
+import { parseDbDate } from './parseDbDate';
+
 /**
  * Форматує час відносно поточного моменту з перекладами
  */
@@ -5,20 +7,21 @@ export function formatTimeAgo(date: Date | string | null | undefined, t: (key: s
   if (!date) {
     return '';
   }
-  
+
   const now = new Date();
-  const pastDate = typeof date === 'string' ? new Date(date) : date;
-  
+  const pastDate =
+    date instanceof Date ? date : parseDbDate(date) ?? new Date(NaN);
+
   // Перевірка на валідність дати
   if (isNaN(pastDate.getTime())) {
     return '';
   }
-  
+
   const diff = now.getTime() - pastDate.getTime();
-  
-  // Якщо дата в майбутньому, повертаємо порожній рядок
+
+  // Невелике від’ємне значення (різниця годинників) — показуємо «щойно»
   if (diff < 0) {
-    return '';
+    return t('common.timeAgo.justNow');
   }
   
   const minutes = Math.floor(diff / 60000);
