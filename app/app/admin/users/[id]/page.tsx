@@ -33,8 +33,16 @@ interface User {
     status: string;
     views: number;
     createdAt: string;
+    promotionType: string | null;
+    promotionEnds: string | null;
   }>;
 }
+
+const PROMO_OPTIONS: { value: string; label: string }[] = [
+  { value: 'highlighted', label: 'Виділення' },
+  { value: 'top_category', label: 'ТОП категорії' },
+  { value: 'vip', label: 'VIP' },
+];
 
 export default function AdminUserDetailPage() {
   const params = useParams();
@@ -48,6 +56,25 @@ export default function AdminUserDetailPage() {
   const [creditAmount, setCreditAmount] = useState('');
   const [crediting, setCrediting] = useState(false);
   const [creditMessage, setCreditMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [grantForm, setGrantForm] = useState<Record<number, { type: string; days: number }>>({});
+  const [grantingId, setGrantingId] = useState<number | null>(null);
+  const [grantFlash, setGrantFlash] = useState<{
+    listingId: number;
+    kind: 'ok' | 'err';
+    text: string;
+  } | null>(null);
+
+  const grantDraft = (listingId: number) =>
+    grantForm[listingId] ?? { type: 'highlighted', days: 7 };
+
+  const formatListingPromo = (listing: User['recentListings'][number]) => {
+    if (!listing.promotionType) return '—';
+    const ends = listing.promotionEnds ? new Date(listing.promotionEnds) : null;
+    const active = ends ? ends.getTime() > Date.now() : false;
+    const typeLabel = listing.promotionType.split(',').map((t) => t.trim()).join(', ');
+    if (!ends) return typeLabel;
+    return `${typeLabel} · ${active ? `до ${ends.toLocaleString('uk-UA')}` : 'закінчилась'}`;
+  };
 
   useEffect(() => {
     if (id) {
@@ -162,6 +189,41 @@ export default function AdminUserDetailPage() {
       setCreditMessage({ type: 'error', text: 'Помилка підключення до сервера' });
     } finally {
       setCrediting(false);
+    }
+  };
+
+  const handleGrantPromotion = async (listingId: number) => {
+    const d = grantDraft(listingId);
+    setGrantingId(listingId);
+    setGrantFlash(null);
+    try {
+      const response = await fetch(`/api/admin/listings/${listingId}/grant-promotion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          promotionType: d.type,
+          durationDays: d.days,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setGrantFlash({
+          listingId,
+          kind: 'err',
+          text: typeof data.error === 'string' ? data.error : 'Помилка нарахування',
+        });
+        return;
+      }
+      setGrantFlash({
+        listingId,
+        kind: 'ok',
+        text: `Нараховано до ${new Date(data.promotionEnds).toLocaleString('uk-UA')}`,
+      });
+      fetchUser();
+    } catch {
+      setGrantFlash({ listingId, kind: 'err', text: 'Помилка підключення' });
+    } finally {
+      setGrantingId(null);
     }
   };
 
@@ -397,75 +459,150 @@ export default function AdminUserDetailPage() {
         </div>
       </div>
 
-      {/* Останні оголошення */}
-      {user.recentListings && user.recentListings.length > 0 && (
-        <div>
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
-            Останні оголошення
-          </h2>
+      {/* Оголошення користувача та нарахування реклами */}
+      <div>
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">
+          Оголошення користувача
+        </h2>
+        <p className="text-sm text-gray-600 mb-3">
+          До 100 оголошень. Реклама нараховується без списання з балансу (запис у PromotionPurchase, метод admin).
+        </p>
+        {!user.recentListings?.length ? (
+          <div className="bg-white rounded-lg shadow-md p-6 text-gray-600 text-sm">
+            Немає оголошень
+          </div>
+        ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <table className="w-full min-w-[700px]">
+              <table className="w-full min-w-[1100px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap sticky left-0 bg-gray-50 z-10 min-w-[200px]">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap sticky left-0 bg-gray-50 z-10 min-w-[180px]">
                       Назва
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[100px]">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[90px]">
                       Статус
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[100px]">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[200px]">
+                      Реклама зараз
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[220px]">
+                      Нарахувати
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[80px]">
                       Перегляди
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[120px]">
-                      Дата створення
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[120px] sticky right-0 bg-gray-50 z-10">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase whitespace-nowrap min-w-[100px] sticky right-0 bg-gray-50 z-10">
                       Дії
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {user.recentListings.map((listing) => (
-                    <tr key={listing.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 text-sm text-gray-900 sticky left-0 bg-white z-10 min-w-[200px]">
-                        <div className="max-w-[200px] truncate" title={listing.title}>{listing.title}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap min-w-[100px]">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                            listing.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : listing.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {listing.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-900 whitespace-nowrap min-w-[100px]">
-                        {listing.views}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-900 whitespace-nowrap min-w-[120px]">
-                        {new Date(listing.createdAt).toLocaleDateString('uk-UA')}
-                      </td>
-                      <td className="px-4 py-4 text-sm font-medium min-w-[120px] sticky right-0 bg-white z-10">
-                        <button
-                          onClick={() => router.push(`/admin/listings/${listing.id}`)}
-                          className="text-indigo-600 hover:text-indigo-900 transition-colors whitespace-nowrap"
-                        >
-                          Переглянути
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {user.recentListings.map((listing) => {
+                    const d = grantDraft(listing.id);
+                    return (
+                      <tr key={listing.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-3 text-sm text-gray-900 sticky left-0 bg-white z-10 min-w-[180px]">
+                          <div className="max-w-[200px] truncate" title={listing.title}>
+                            {listing.title}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5">#{listing.id}</div>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap min-w-[90px]">
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                              listing.status === 'active'
+                                ? 'bg-green-100 text-green-800'
+                                : listing.status === 'pending' || listing.status === 'pending_moderation'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {listing.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-xs text-gray-800 min-w-[200px] max-w-[280px]">
+                          {formatListingPromo(listing)}
+                        </td>
+                        <td className="px-3 py-3 min-w-[220px]">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <select
+                              value={d.type}
+                              onChange={(e) =>
+                                setGrantForm((prev) => ({
+                                  ...prev,
+                                  [listing.id]: { ...d, type: e.target.value },
+                                }))
+                              }
+                              className="text-xs border border-gray-300 rounded px-2 py-1.5 text-gray-900 bg-white max-w-[140px]"
+                              disabled={grantingId === listing.id}
+                            >
+                              {PROMO_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              min={1}
+                              max={90}
+                              value={d.days}
+                              onChange={(e) =>
+                                setGrantForm((prev) => ({
+                                  ...prev,
+                                  [listing.id]: {
+                                    ...d,
+                                    days: Math.min(90, Math.max(1, parseInt(e.target.value, 10) || 7)),
+                                  },
+                                }))
+                              }
+                              className="w-14 text-xs border border-gray-300 rounded px-2 py-1.5 text-gray-900"
+                              disabled={grantingId === listing.id}
+                              title="Днів"
+                            />
+                            <span className="text-xs text-gray-500">дн.</span>
+                            <button
+                              type="button"
+                              onClick={() => handleGrantPromotion(listing.id)}
+                              disabled={grantingId === listing.id}
+                              className="text-xs px-2 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {grantingId === listing.id ? '…' : 'OK'}
+                            </button>
+                          </div>
+                          {grantFlash?.listingId === listing.id && (
+                            <p
+                              className={`mt-1 text-xs ${
+                                grantFlash.kind === 'ok' ? 'text-green-700' : 'text-red-600'
+                              }`}
+                            >
+                              {grantFlash.text}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-900 whitespace-nowrap">{listing.views}</td>
+                        <td className="px-3 py-3 text-sm font-medium min-w-[100px] sticky right-0 bg-white z-10">
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/admin/listings/${listing.id}`)}
+                            className="text-indigo-600 hover:text-indigo-900 transition-colors whitespace-nowrap text-xs"
+                          >
+                            В адмінці
+                          </button>
+                          <div className="text-[10px] text-gray-500 mt-1">
+                            {new Date(listing.createdAt).toLocaleDateString('uk-UA')}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Перегляд всіх оголошень користувача */}
       <div>

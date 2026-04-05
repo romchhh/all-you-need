@@ -89,10 +89,11 @@ export async function GET(
       );
     }
 
-    // Отримуємо останні оголошення користувача
+    // Оголошення користувача (для адмінки: реклама, перегляд)
     const listings = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
-        `SELECT id, title, status, views, createdAt FROM Listing WHERE userId = ? ORDER BY createdAt DESC LIMIT 10`,
+        `SELECT id, title, status, views, promotionType, promotionEnds, createdAt 
+         FROM Listing WHERE userId = ? ORDER BY createdAt DESC LIMIT 100`,
         userId
       ) as Promise<Array<any>>
     ).catch(() => []);
@@ -128,6 +129,8 @@ export async function GET(
         title: l.title,
         status: l.status,
         views: l.views || 0,
+        promotionType: l.promotionType || null,
+        promotionEnds: l.promotionEnds || null,
         createdAt: l.createdAt,
       })),
     });

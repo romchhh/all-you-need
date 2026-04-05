@@ -36,6 +36,18 @@ export default function AdminUsersPage() {
   const [dateToFilter, setDateToFilter] = useState('');
   const [activeFromFilter, setActiveFromFilter] = useState('');
   const [activeToFilter, setActiveToFilter] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    const delay = trimmed === '' ? 0 : 450;
+    const id = setTimeout(() => {
+      setDebouncedSearch(trimmed);
+      setPage(1);
+    }, delay);
+    return () => clearTimeout(id);
+  }, [searchInput]);
 
   const fetchUsers = async () => {
     try {
@@ -45,6 +57,7 @@ export default function AdminUsersPage() {
       if (dateToFilter) params.set('dateTo', dateToFilter);
       if (activeFromFilter) params.set('activeFrom', activeFromFilter);
       if (activeToFilter) params.set('activeTo', activeToFilter);
+      if (debouncedSearch) params.set('q', debouncedSearch);
       params.set('limit', limit.toString());
       params.set('offset', ((page - 1) * limit).toString());
 
@@ -65,7 +78,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, [page, dateFromFilter, dateToFilter, activeFromFilter, activeToFilter]);
+  }, [page, dateFromFilter, dateToFilter, activeFromFilter, activeToFilter, debouncedSearch]);
 
   const handleApplyFilters = () => {
     setPage(1);
@@ -77,6 +90,8 @@ export default function AdminUsersPage() {
     setDateToFilter('');
     setActiveFromFilter('');
     setActiveToFilter('');
+    setSearchInput('');
+    setDebouncedSearch('');
     setPage(1);
   };
 
@@ -104,6 +119,18 @@ export default function AdminUsersPage() {
         <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
           Фільтри
         </h2>
+        <div className="mb-4 sm:mb-5">
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+            Пошук (username або телефон / цифри Telegram ID)
+          </label>
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="@username, +380…, або фрагмент номера"
+            className="w-full max-w-xl px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm sm:text-base"
+          />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">

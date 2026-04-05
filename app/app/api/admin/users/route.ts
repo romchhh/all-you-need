@@ -12,11 +12,38 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get('dateTo');
     const activeFrom = searchParams.get('activeFrom'); // Фільтр по даті останньої активності
     const activeTo = searchParams.get('activeTo');
+    const qRaw = searchParams.get('q')?.trim() || '';
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
+
+    // Пошук за @username, телефоном (цифри) або фрагментом Telegram ID
+    if (qRaw.length > 0) {
+      const usernamePart = qRaw.replace(/^@/, '').trim();
+      const digitPart = qRaw.replace(/\D/g, '');
+      const ors: string[] = [];
+
+      if (usernamePart.length >= 1) {
+        ors.push('LOWER(u.username) LIKE LOWER(?)');
+        params.push(`%${usernamePart}%`);
+      }
+      if (digitPart.length >= 2) {
+        ors.push(
+          "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(u.phone, ''), ' ', ''), '-', ''), '+', ''), '(', ''), ')', '') LIKE ?"
+        );
+        params.push(`%${digitPart}%`);
+        ors.push('CAST(u.telegramId AS TEXT) LIKE ?');
+        params.push(`%${digitPart}%`);
+      }
+
+      if (ors.length > 0) {
+        whereClause += ` AND (${ors.join(' OR ')})`;
+      } else {
+        whereClause += ' AND 1=0';
+      }
+    }
 
     // Фільтр по даті реєстрації
     if (dateFrom) {

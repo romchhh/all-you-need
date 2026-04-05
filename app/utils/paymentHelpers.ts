@@ -73,6 +73,160 @@ export async function processPackagePurchaseFromBalance(
 }
 
 /**
+ * Оновлює Listing після запису рядка в PromotionPurchase (оплата або адмін-нарахування).
+ */
+export async function applyPromotionPurchaseToListing(
+  listingId: number,
+  promotionType: PromotionType,
+  endsAt: Date,
+  nowStr: string
+): Promise<void> {
+  const listing = await prisma.$queryRawUnsafe(
+    `SELECT status FROM Listing WHERE id = ?`,
+    listingId
+  ) as Array<{ status: string }>;
+
+  const currentStatus = listing[0]?.status;
+
+  if (currentStatus !== 'active' && currentStatus !== 'pending_moderation') {
+    const activePromos = await prisma.$queryRawUnsafe(
+      `SELECT promotionType FROM PromotionPurchase 
+       WHERE listingId = ? 
+         AND status IN ('active', 'paid', 'completed')
+         AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))`,
+      listingId
+    ) as Array<{ promotionType: string }>;
+
+    const activeTypes = activePromos.map(p => p.promotionType);
+    let combinedType: string = promotionType;
+
+    if ((promotionType === 'highlighted' && activeTypes.includes('top_category')) ||
+        (promotionType === 'top_category' && activeTypes.includes('highlighted'))) {
+      combinedType = 'highlighted,top_category';
+    }
+
+    if (currentStatus === 'rejected') {
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing SET 
+          promotionType = ?, 
+          promotionEnds = ?, 
+          status = 'pending_moderation',
+          moderationStatus = 'pending',
+          rejectionReason = NULL,
+          updatedAt = ? 
+        WHERE id = ?`,
+        combinedType,
+        endsAt.toISOString(),
+        nowStr,
+        listingId
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing SET 
+          promotionType = ?, 
+          promotionEnds = ?, 
+          status = 'pending_moderation',
+          moderationStatus = 'pending',
+          updatedAt = ? 
+        WHERE id = ?`,
+        combinedType,
+        endsAt.toISOString(),
+        nowStr,
+        listingId
+      );
+    }
+
+    try {
+      const { submitListingToModeration } = await import('./listingHelpers');
+      await submitListingToModeration(listingId, currentStatus === 'rejected');
+    } catch (error) {
+      console.error('[applyPromotionPurchaseToListing] Error sending listing to moderation:', error);
+    }
+  } else {
+    const activePromos = await prisma.$queryRawUnsafe(
+      `SELECT promotionType FROM PromotionPurchase 
+       WHERE listingId = ? 
+         AND status IN ('active', 'paid', 'completed')
+         AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))`,
+      listingId
+    ) as Array<{ promotionType: string }>;
+
+    const activeTypes = activePromos.map(p => p.promotionType);
+
+    if ((promotionType === 'highlighted' && activeTypes.includes('top_category')) ||
+        (promotionType === 'top_category' && activeTypes.includes('highlighted'))) {
+      const combinedType = activeTypes.includes('highlighted') && activeTypes.includes('top_category')
+        ? 'highlighted,top_category'
+        : (activeTypes.includes('highlighted') ? 'highlighted' : 'top_category');
+
+      const allEndsAt = await prisma.$queryRawUnsafe(
+        `SELECT endsAt FROM PromotionPurchase 
+         WHERE listingId = ? 
+           AND status IN ('active', 'paid', 'completed')
+           AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))
+         ORDER BY endsAt DESC LIMIT 1`,
+        listingId
+      ) as Array<{ endsAt: string | null }>;
+
+      const latestEndsAt = allEndsAt.length > 0 && allEndsAt[0].endsAt
+        ? allEndsAt[0].endsAt
+        : endsAt.toISOString();
+
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing SET promotionType = ?, promotionEnds = ?, updatedAt = ? WHERE id = ?`,
+        combinedType,
+        latestEndsAt,
+        nowStr,
+        listingId
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing SET promotionType = ?, promotionEnds = ?, updatedAt = ? WHERE id = ?`,
+        promotionType,
+        endsAt.toISOString(),
+        nowStr,
+        listingId
+      );
+    }
+  }
+}
+
+/**
+ * Безкоштовне нарахування реклами з адмін-панелі (без списання балансу).
+ */
+export async function grantAdminPromotionForListing(
+  listingUserId: number,
+  listingId: number,
+  promotionType: PromotionType,
+  durationDays?: number
+): Promise<{ promotionEnds: Date }> {
+  const promotionInfo = PROMOTION_PRICES[promotionType];
+  const days =
+    durationDays !== undefined
+      ? Math.min(90, Math.max(1, Math.floor(durationDays)))
+      : promotionInfo.duration;
+  const nowStr = nowSQLite();
+  const endsAt = new Date();
+  endsAt.setDate(endsAt.getDate() + days);
+  const startsIso = new Date().toISOString();
+  const endsIso = endsAt.toISOString();
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO PromotionPurchase (userId, listingId, promotionType, price, duration, paymentMethod, status, startsAt, endsAt, createdAt)
+     VALUES (?, ?, ?, 0, ?, 'admin', 'completed', ?, ?, CURRENT_TIMESTAMP)`,
+    listingUserId,
+    listingId,
+    promotionType,
+    days,
+    startsIso,
+    endsIso
+  );
+
+  await applyPromotionPurchaseToListing(listingId, promotionType, endsAt, nowStr);
+  return { promotionEnds: endsAt };
+}
+
+/**
  * Обробляє оплату реклами з балансу
  */
 export async function processPromotionPurchaseFromBalance(
@@ -120,140 +274,8 @@ export async function processPromotionPurchaseFromBalance(
     'completed' // Статус 'completed' для оплати з балансу
   );
 
-  // Якщо є listingId, оновлюємо оголошення (promotionType, promotionEnds, і відправляємо на модерацію)
   if (listingId) {
-    // Перевіряємо поточний статус оголошення
-    const listing = await prisma.$queryRawUnsafe(
-      `SELECT status FROM Listing WHERE id = ?`,
-      listingId
-    ) as Array<{ status: string }>;
-    
-    const currentStatus = listing[0]?.status;
-    
-    // Якщо оголошення НЕ в статусі active або pending_moderation, відправляємо на модерацію
-    // (це означає, що воно було реактивовано і потребує модерації)
-    if (currentStatus !== 'active' && currentStatus !== 'pending_moderation') {
-      // Перевіряємо активні реклами для формування комбінованого типу
-      const activePromos = await prisma.$queryRawUnsafe(
-        `SELECT promotionType FROM PromotionPurchase 
-         WHERE listingId = ? 
-           AND status IN ('active', 'paid', 'completed')
-           AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))`,
-        listingId
-      ) as Array<{ promotionType: string }>;
-      
-      const activeTypes = activePromos.map(p => p.promotionType);
-      let combinedType: string = promotionType;
-      
-      // Якщо додаємо highlighted або top_category, і вже є інший з цієї пари - дозволяємо обидві
-      if ((promotionType === 'highlighted' && activeTypes.includes('top_category')) ||
-          (promotionType === 'top_category' && activeTypes.includes('highlighted'))) {
-        combinedType = 'highlighted,top_category';
-      }
-      
-      // Для відхилених оголошень очищаємо причину відхилення
-      if (currentStatus === 'rejected') {
-        await prisma.$executeRawUnsafe(
-          `UPDATE Listing SET 
-            promotionType = ?, 
-            promotionEnds = ?, 
-            status = 'pending_moderation',
-            moderationStatus = 'pending',
-            rejectionReason = NULL,
-            updatedAt = ? 
-          WHERE id = ?`,
-          combinedType,
-          endsAt.toISOString(),
-          nowStr,
-          listingId
-        );
-      } else {
-        await prisma.$executeRawUnsafe(
-          `UPDATE Listing SET 
-            promotionType = ?, 
-            promotionEnds = ?, 
-            status = 'pending_moderation',
-            moderationStatus = 'pending',
-            updatedAt = ? 
-          WHERE id = ?`,
-          combinedType,
-          endsAt.toISOString(),
-          nowStr,
-          listingId
-        );
-      }
-      
-      // Відправляємо на модерацію в Telegram групу
-      try {
-        const { submitListingToModeration } = await import('./listingHelpers');
-        await submitListingToModeration(listingId, currentStatus === 'rejected');
-        console.log('[processPromotionPurchaseFromBalance] Listing sent to moderation group after promotion purchase');
-      } catch (error) {
-        console.error('[processPromotionPurchaseFromBalance] Error sending listing to moderation:', error);
-        // Продовжуємо виконання навіть якщо відправка не вдалася
-      }
-    } else {
-      // Якщо вже active або pending_moderation, перевіряємо чи можна додати нову рекламу
-      // Для highlighted та top_category - дозволяємо обидві одночасно
-      const currentListing = await prisma.$queryRawUnsafe(
-        `SELECT promotionType FROM Listing WHERE id = ?`,
-        listingId
-      ) as Array<{ promotionType: string | null }>;
-      
-      const currentPromoType = currentListing[0]?.promotionType;
-      
-      // Перевіряємо активні реклами через PromotionPurchase
-      const activePromos = await prisma.$queryRawUnsafe(
-        `SELECT promotionType FROM PromotionPurchase 
-         WHERE listingId = ? 
-           AND status IN ('active', 'paid', 'completed')
-           AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))`,
-        listingId
-      ) as Array<{ promotionType: string }>;
-      
-      const activeTypes = activePromos.map(p => p.promotionType);
-      
-      // Якщо додаємо highlighted або top_category, і вже є інший з цієї пари - дозволяємо обидві
-      if ((promotionType === 'highlighted' && activeTypes.includes('top_category')) ||
-          (promotionType === 'top_category' && activeTypes.includes('highlighted'))) {
-        // Обидві реклами можуть працювати разом - не оновлюємо promotionType, воно залишається як є
-        // Або встановлюємо комбінований тип
-        const combinedType = activeTypes.includes('highlighted') && activeTypes.includes('top_category')
-          ? 'highlighted,top_category'
-          : (activeTypes.includes('highlighted') ? 'highlighted' : 'top_category');
-        
-        // Знаходимо найпізнішу дату закінчення
-        const allEndsAt = await prisma.$queryRawUnsafe(
-          `SELECT endsAt FROM PromotionPurchase 
-           WHERE listingId = ? 
-             AND status IN ('active', 'paid', 'completed')
-             AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))
-           ORDER BY endsAt DESC LIMIT 1`,
-          listingId
-        ) as Array<{ endsAt: string | null }>;
-        
-        const latestEndsAt = allEndsAt.length > 0 && allEndsAt[0].endsAt
-          ? allEndsAt[0].endsAt
-          : endsAt.toISOString();
-        
-        await prisma.$executeRawUnsafe(
-          `UPDATE Listing SET promotionType = ?, promotionEnds = ?, updatedAt = ? WHERE id = ?`,
-          combinedType,
-          latestEndsAt,
-          nowStr,
-          listingId
-        );
-      } else {
-        // Якщо це не комбінація highlighted+top_category, оновлюємо як зазвичай
-        await prisma.$executeRawUnsafe(
-          `UPDATE Listing SET promotionType = ?, promotionEnds = ?, updatedAt = ? WHERE id = ?`,
-          promotionType,
-          endsAt.toISOString(),
-          nowStr,
-          listingId
-        );
-      }
-    }
+    await applyPromotionPurchaseToListing(listingId, promotionType, endsAt, nowStr);
   }
 
   return { newBalance, promotionEnds: endsAt };
