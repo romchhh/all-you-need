@@ -26,6 +26,7 @@ import { descriptionWithLinks } from '@/utils/descriptionLinks';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { getCategories } from '@/constants/categories';
+import { buildListingImageUrl } from '@/utils/listingImageUrl';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
 const PromotionModal = dynamic(() => import('./PromotionModal'), {
@@ -1116,12 +1117,7 @@ export const ListingDetail = ({
       {selectedImageIndex !== null && images[selectedImageIndex] && (
         <ImageViewModal
           isOpen={selectedImageIndex !== null}
-          images={images.map(img => {
-            if (img?.startsWith('http')) return img;
-            const cleanPath = img?.split('?')[0] || img;
-            const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-            return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
-          })}
+          images={images.map((img) => buildListingImageUrl(img))}
           initialIndex={selectedImageIndex}
           alt={`${listing.title}`}
           onClose={() => setSelectedImageIndex(null)}

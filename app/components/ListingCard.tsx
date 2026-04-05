@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCategories } from '@/constants/categories';
+import { buildListingImageUrl } from '@/utils/listingImageUrl';
 
 interface ListingCardProps {
   listing: Listing;
@@ -136,13 +137,8 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
 
   // Мемоізуємо URL зображення, щоб уникнути зайвих запитів
   const imageUrl = useMemo(() => {
-    // Спочатку перевіряємо listing.image, потім listing.images[0]
     const image = listing.image || (listing.images && listing.images.length > 0 ? listing.images[0] : '');
-    if (!image) return '';
-    if (image?.startsWith('http')) return image;
-    const cleanPath = image?.split('?')[0] || image;
-    const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-    return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+    return buildListingImageUrl(image);
   }, [listing.image, listing.images]);
 
   // Ініціалізуємо стан завантаження на основі того, чи зображення вже завантажене

@@ -360,7 +360,7 @@ export async function GET(request: NextRequest) {
         rating: number | bigint;
         reviewsCount: number | bigint;
         isActive: number | boolean;
-        agreementAccepted: number | boolean;
+        agreementAccepted: number | boolean | string | bigint;
         createdAt: string;
       }>>
     );
@@ -401,7 +401,7 @@ export async function GET(request: NextRequest) {
       rawAgreed === 1 ||
       rawAgreed === true ||
       rawAgreed === '1' ||
-      (typeof rawAgreed === 'bigint' && rawAgreed === 1n);
+      (typeof rawAgreed === 'bigint' && rawAgreed === BigInt(1));
 
     const response = {
       id: userData.id,

@@ -3,6 +3,7 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { buildListingImageUrl } from '@/utils/listingImageUrl';
 
 interface ProfileListingCardProps {
   listing: Listing;
@@ -113,18 +114,8 @@ export const ProfileListingCard = ({
   };
 
   const imageUrl = useMemo(() => {
-    if (listing.image) {
-      return listing.image.startsWith('http') 
-        ? listing.image 
-        : `/api/images/${listing.image.startsWith('/') ? listing.image.slice(1) : listing.image}`;
-    }
-    if (listing.images && listing.images.length > 0) {
-      const firstImage = listing.images[0];
-      return firstImage.startsWith('http')
-        ? firstImage
-        : `/api/images/${firstImage.startsWith('/') ? firstImage.slice(1) : firstImage}`;
-    }
-    return '';
+    const raw = listing.image || (listing.images && listing.images.length > 0 ? listing.images[0] : '');
+    return buildListingImageUrl(raw);
   }, [listing.image, listing.images]);
 
   // Розраховуємо дати

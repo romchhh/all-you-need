@@ -29,7 +29,6 @@ async def scheduler_jobs():
     existing_job = scheduler.get_job(job_id)
     
     if existing_job:
-        # Якщо job вже існує, видаляємо його
         scheduler.remove_job(job_id)
         print(f"🔄 Видалено існуючий job '{job_id}'")
     
@@ -45,7 +44,6 @@ async def scheduler_jobs():
         )
         print(f"✅ Scheduler job '{job_id}' додано (перевірка кожні 10 секунд)")
         
-        # Перевіряємо чи job дійсно додано
         added_job = scheduler.get_job(job_id)
         if added_job:
             print(f"✅ Job '{job_id}' успішно зареєстровано в scheduler")
@@ -78,6 +76,30 @@ async def scheduler_jobs():
         print(f"❌ Помилка додавання job '{deactivate_job_id}': {e}")
         import traceback
         traceback.print_exc()
+
+    # Job для парсера оголошень з Telegram-каналів
+    import os as _os
+    if _os.getenv("PARSER_API_ID"):
+        try:
+            from parser.scheduler import run_parser_cycle, PARSER_INTERVAL_MIN
+            parser_job_id = 'telegram_parser'
+            existing_parser_job = scheduler.get_job(parser_job_id)
+            if existing_parser_job:
+                scheduler.remove_job(parser_job_id)
+            scheduler.add_job(
+                run_parser_cycle,
+                'interval',
+                minutes=PARSER_INTERVAL_MIN,
+                id=parser_job_id,
+                replace_existing=True,
+                max_instances=1,
+                misfire_grace_time=max(1, int(PARSER_INTERVAL_MIN * 60)),
+            )
+            print(f"✅ Scheduler job '{parser_job_id}' додано (парсинг каналів кожні {PARSER_INTERVAL_MIN} хв)")
+        except Exception as e:
+            print(f"❌ Помилка реєстрації parser job: {e}")
+            import traceback
+            traceback.print_exc()
 
 router = Router()
 

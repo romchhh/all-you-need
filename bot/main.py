@@ -42,12 +42,20 @@ async def main():
     from handlers.admin_handlers.admin_management_handlers import router as admin_management_router
     from handlers.admin_handlers.moderation_group_handlers import router as moderation_group_router
     from database_functions.migrations import ensure_categories_exist
+    from parser.confirm_handler import router as parser_confirm_router
+    from parser.db import ensure_parsed_items_table
     
     # Виконуємо міграцію категорій при запуску
     try:
         ensure_categories_exist()
     except Exception as e:
         logging.warning(f"Categories migration warning: {e}")
+
+    # Ініціалізуємо таблицю parsed_items
+    try:
+        ensure_parsed_items_table()
+    except Exception as e:
+        logging.warning(f"parsed_items table init warning: {e}")
     
     dp.include_router(agreement_router)
     dp.include_router(client_router)
@@ -58,7 +66,9 @@ async def main():
     dp.include_router(links_router)
     dp.include_router(admin_management_router)
     dp.include_router(moderation_group_router)
-    
+    # Парсер: хендлер підтвердження/відхилення оголошень
+    dp.include_router(parser_confirm_router)
+
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
     

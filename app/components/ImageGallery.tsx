@@ -1,5 +1,6 @@
 import { Image as ImageIcon } from 'lucide-react';
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { buildListingImageUrl } from '@/utils/listingImageUrl';
 
 interface ImageGalleryProps {
   images: string[];
@@ -13,17 +14,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
 
   // Мемоізуємо URL зображень, щоб уникнути зайвих запитів
   const imageUrls = useMemo(() => {
-    return images.map((imagePath) => {
-      if (imagePath?.startsWith('http')) {
-        return imagePath;
-      }
-      // Видаляємо query параметри якщо є
-      const cleanPath = imagePath?.split('?')[0] || imagePath;
-      // Видаляємо початковий слеш якщо є
-      const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-      // Використовуємо API route для обслуговування зображень без timestamp
-      return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
-    });
+    return images.map((imagePath) => buildListingImageUrl(imagePath));
   }, [images]);
 
   // Скидаємо activeIndex до 0 при зміні images (новий товар)
