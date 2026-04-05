@@ -183,6 +183,10 @@ async function updateProfileFromTelegram(telegramUser: any) {
       }),
     });
 
+    if (response.status === 404) {
+      // Користувача ще немає в БД — реєстрація тільки через бота, не створюємо запис з міні-апу
+      return;
+    }
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Failed to update profile:', response.status, errorText);

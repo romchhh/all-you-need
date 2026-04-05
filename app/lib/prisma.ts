@@ -300,6 +300,111 @@ export async function ensureOptimizedImagesColumn(): Promise<boolean> {
   }
 }
 
+/**
+ * Колонки для raw SQL у /api/listings (старі SQLite без міграцій Prisma).
+ */
+export async function ensureListingApiRawColumns(): Promise<void> {
+  try {
+    const tableInfo = (await prisma.$queryRawUnsafe(
+      `PRAGMA table_info(Listing)`
+    )) as Array<{ name: string }>;
+    const names = new Set(tableInfo.map((c) => c.name));
+
+    const addColumn = async (col: string, ddl: string) => {
+      if (names.has(col)) return;
+      try {
+        await prisma.$executeRawUnsafe(ddl);
+        names.add(col);
+      } catch (error: any) {
+        if (
+          error.message?.includes('duplicate column name') ||
+          error.message?.includes('duplicate column') ||
+          error.message?.includes('already exists')
+        ) {
+          names.add(col);
+        } else if (process.env.NODE_ENV === 'development') {
+          console.log(`Note: Could not add Listing.${col}:`, error.message);
+        }
+      }
+    };
+
+    await addColumn('expiresAt', 'ALTER TABLE Listing ADD COLUMN expiresAt DATETIME');
+    await addColumn(
+      'moderationStatus',
+      `ALTER TABLE Listing ADD COLUMN moderationStatus TEXT DEFAULT 'approved'`
+    );
+    await addColumn('rejectionReason', 'ALTER TABLE Listing ADD COLUMN rejectionReason TEXT');
+    await addColumn('optimizedImages', 'ALTER TABLE Listing ADD COLUMN optimizedImages TEXT');
+
+    if (names.has('optimizedImages')) {
+      optimizedImagesColumnExists = true;
+      optimizedImagesColumnChecked = true;
+    }
+  } catch (error: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('ensureListingApiRawColumns:', error.message);
+    }
+  }
+}
+
+let userApiRawColumnsReady = false;
+
+/**
+ * Колонки User для raw SQL (старі SQLite без повної міграції Prisma).
+ */
+export async function ensureUserApiRawColumns(): Promise<void> {
+  if (userApiRawColumnsReady) return;
+  try {
+    const tableInfo = (await prisma.$queryRawUnsafe(
+      `PRAGMA table_info(User)`
+    )) as Array<{ name: string }>;
+    const names = new Set(tableInfo.map((c) => c.name));
+
+    const addColumn = async (col: string, ddl: string) => {
+      if (names.has(col)) return;
+      try {
+        await prisma.$executeRawUnsafe(ddl);
+        names.add(col);
+      } catch (error: any) {
+        if (
+          error.message?.includes('duplicate column name') ||
+          error.message?.includes('duplicate column') ||
+          error.message?.includes('already exists')
+        ) {
+          names.add(col);
+        } else if (process.env.NODE_ENV === 'development') {
+          console.log(`Note: Could not add User.${col}:`, error.message);
+        }
+      }
+    };
+
+    await addColumn(
+      'listingPackagesBalance',
+      'ALTER TABLE User ADD COLUMN listingPackagesBalance INTEGER DEFAULT 1'
+    );
+    await addColumn(
+      'hasUsedFreeAd',
+      'ALTER TABLE User ADD COLUMN hasUsedFreeAd INTEGER DEFAULT 0'
+    );
+    await addColumn(
+      'agreementAccepted',
+      'ALTER TABLE User ADD COLUMN agreementAccepted INTEGER DEFAULT 0'
+    );
+
+    if (
+      names.has('listingPackagesBalance') &&
+      names.has('hasUsedFreeAd') &&
+      names.has('agreementAccepted')
+    ) {
+      userApiRawColumnsReady = true;
+    }
+  } catch (error: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('ensureUserApiRawColumns:', error.message);
+    }
+  }
+}
+
 // Кешуємо створення таблиці ViewHistory
 export async function ensureViewHistoryTable(): Promise<void> {
   if (viewHistoryTableChecked) {

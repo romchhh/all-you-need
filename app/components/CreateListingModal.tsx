@@ -893,7 +893,7 @@ export const CreateListingModal = ({
       <div className="w-full h-full flex flex-col">
         <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}>
           {/* Лого Trade Ground */}
-          <div className="w-full pt-4 pb-3 flex items-center justify-center">
+          <div className="w-full pb-3 flex items-center justify-center pt-[calc(1rem+1mm)]">
             <Image 
               src="/images/Group 1000007086.svg" 
               alt="Trade Ground" 

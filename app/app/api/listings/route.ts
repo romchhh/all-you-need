@@ -87,8 +87,9 @@ export async function GET(request: NextRequest) {
     await trackUserActivity(request);
     
     // Перевіряємо колонку currency (з кешуванням)
-    const { ensureCurrencyColumn, ensureFavoriteTable } = await import('@/lib/prisma');
+    const { ensureCurrencyColumn, ensureFavoriteTable, ensureListingApiRawColumns } = await import('@/lib/prisma');
     const currencyColumnExists = await ensureCurrencyColumn();
+    await ensureListingApiRawColumns();
     // Перевіряємо та створюємо таблицю Favorite тільки один раз
     if (!favoriteTableInitPromise) {
       favoriteTableInitPromise = ensureFavoriteTable();

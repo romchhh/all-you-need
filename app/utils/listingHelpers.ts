@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { executeWithRetry } from '@/lib/prisma';
+import { executeWithRetry, ensureUserApiRawColumns } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
@@ -29,6 +29,7 @@ interface ListingFormData {
  * Знаходить користувача за Telegram ID
  */
 export async function findUserByTelegramIdForListing(telegramId: string): Promise<User | null> {
+  await ensureUserApiRawColumns();
   const users = await prisma.$queryRawUnsafe(
     `SELECT id, listingPackagesBalance, hasUsedFreeAd FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
     parseInt(telegramId)

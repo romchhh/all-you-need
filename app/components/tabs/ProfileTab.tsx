@@ -24,7 +24,7 @@ import { getBotBaseUrl, getBotStartLink } from '@/utils/botLinks';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { getFavoritesFromStorage } from '@/utils/favorites';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { CategoryIcon } from '../CategoryIcon';
 
@@ -53,6 +53,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const { t, language } = useLanguage();
   const categories = getCategories(t);
   const router = useRouter();
+  const params = useParams();
+  const lang = (params?.lang as string) || 'uk';
   const { profile, loading, refetch } = useUser();
   const [userListings, setUserListings] = useState<Listing[]>([]);
   const [favoritesLocal, setFavoritesLocal] = useState<Set<number>>(new Set());
@@ -438,17 +440,16 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   }
 
   if (!profile) {
-    // Якщо профіль відсутній — ведемо користувача в бота за фіксованим deep‑link
-    const botLink = 'https://t.me/TradeGroundBot?start=linktowatch_12';
+    const botLink = getBotBaseUrl();
 
     return (
       <div className="pb-24 flex flex-col h-screen overflow-hidden px-4">
-        <h2 className="text-2xl font-bold text-white mb-2 pt-2">Профіль</h2>
-        <p className="text-sm text-gray-400 mb-8">Ваш особистий профіль</p>
+        <h2 className="text-2xl font-bold text-white mb-2 pt-2">{t('navigation.profile')}</h2>
+        <p className="text-sm text-gray-400 mb-8">{t('profileNotFound.subtitle')}</p>
 
         <div className="flex-1 flex items-start justify-center pt-8 pb-20">
-          <div className="max-w-sm mx-auto px-4">
-            <div className="border-2 border-gray-600 rounded-3xl p-8 text-center">
+          <div className="max-w-sm mx-auto px-4 w-full">
+            <div className="rounded-3xl border border-white/15 bg-white/[0.06] p-8 text-center backdrop-blur-sm">
               <div className="flex items-center justify-center mx-auto mb-6">
                 <div className="text-white" style={{ width: '64px', height: '64px' }}>
                   <svg width="64" height="64" viewBox="0 0 39 39" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -460,24 +461,35 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               <h3 className="text-xl font-bold text-white mb-3">
                 {t('profileNotFound.title')}
               </h3>
-              <p className="text-sm text-gray-400 mb-5">
+              <p className="text-sm text-gray-400 mb-5 leading-relaxed">
                 {t('profileNotFound.description')}
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!botLink) return;
-                  if (tg && tg.openTelegramLink) {
-                    tg.openTelegramLink(botLink);
-                    tg.HapticFeedback?.impactOccurred('medium');
-                  } else {
-                    window.location.href = botLink;
-                  }
-                }}
-                className="inline-flex items-center justify-center px-4 py-2.5 rounded-2xl bg-white text-black font-semibold text-sm"
-              >
-                Створити профіль у Telegram‑боті
-              </button>
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tg && tg.openTelegramLink) {
+                      tg.openTelegramLink(botLink);
+                      tg.HapticFeedback?.impactOccurred('medium');
+                    } else {
+                      window.location.href = botLink;
+                    }
+                  }}
+                  className="inline-flex w-full items-center justify-center rounded-2xl bg-[#D3F1A7] px-4 py-3 text-sm font-semibold text-black hover:bg-[#c5e895]"
+                >
+                  {t('profileNotFound.createButton')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    router.push(`/${lang}/complete-registration`);
+                    tg?.HapticFeedback?.impactOccurred('light');
+                  }}
+                  className="inline-flex w-full items-center justify-center rounded-2xl border border-white/20 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/[0.1]"
+                >
+                  {t('profileNotFound.stepsInApp')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

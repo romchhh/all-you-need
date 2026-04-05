@@ -17,14 +17,15 @@ export const AppHeader: React.FC = () => {
   };
 
   return (
-    <div 
-      className="w-full cursor-pointer" 
-      onClick={handleClick}
-      style={{ 
-        height: '52.5px'
-      }}
-    >
-      <div className="w-full h-full mx-auto px-4 flex items-center justify-center">
+    <div className="w-full" style={{ paddingTop: '1mm' }}>
+      <div
+        className="w-full cursor-pointer"
+        onClick={handleClick}
+        style={{
+          height: '52.5px',
+        }}
+      >
+        <div className="flex h-full w-full items-center justify-center px-4 mx-auto">
         <Image 
           src="/images/Group 1000007086.svg" 
           alt="Trade Ground" 
@@ -34,6 +35,7 @@ export const AppHeader: React.FC = () => {
           style={{ height: '52.5px', width: 'auto' }}
           priority
         />
+        </div>
       </div>
     </div>
   );

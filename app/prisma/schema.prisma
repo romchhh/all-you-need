@@ -25,6 +25,7 @@ model User {
   isActive                Boolean  @default(true)
   listingPackagesBalance  Int      @default(1) // Перше оголошення безкоштовне
   hasUsedFreeAd           Boolean  @default(false) // Чи використав перше безкоштовне оголошення
+  agreementAccepted       Boolean  @default(false) // Згода з офертою (синхронно з ботом)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 

@@ -111,7 +111,8 @@ export async function POST(request: NextRequest) {
     const telegramIdNum = parseInt(telegramId);
 
     // Додаємо retry logic для уникнення проблем з блокуванням БД
-    const { executeWithRetry } = await import('@/lib/prisma');
+    const { executeWithRetry, ensureUserApiRawColumns } = await import('@/lib/prisma');
+    await ensureUserApiRawColumns();
 
     // Перевіряємо чи користувач існує через raw query (з retry)
     const existingUsers = await executeWithRetry(() =>
@@ -121,12 +122,21 @@ export async function POST(request: NextRequest) {
     );
     
     const existingUser = existingUsers[0];
+
+    if (!existingUser) {
+      return NextResponse.json(
+        {
+          error: 'not_registered',
+          message: 'Complete registration in the bot first (language, agreement, contact).',
+        },
+        { status: 404 }
+      );
+    }
+
     let user: any = null;
-    
-    if (existingUser) {
-      // Отримуємо повні дані користувача (з retry)
-      const fullUsers = await executeWithRetry(() =>
-        prisma.$queryRaw<Array<{
+
+    const fullUsers = await executeWithRetry(() =>
+      prisma.$queryRaw<Array<{
         id: number;
         telegramId: number;
         username: string | null;
@@ -137,6 +147,7 @@ export async function POST(request: NextRequest) {
         rating: number;
         reviewsCount: number;
         isActive: boolean;
+        agreementAccepted: number | boolean;
         createdAt: string;
         updatedAt: string;
       }>>`
@@ -151,19 +162,19 @@ export async function POST(request: NextRequest) {
           rating,
           reviewsCount,
           isActive,
+          COALESCE(agreementAccepted, 0) as agreementAccepted,
           createdAt,
           updatedAt
         FROM User
         WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
       `
+    );
+    user = fullUsers[0];
+    if (user && !user.isActive) {
+      return NextResponse.json(
+        { error: 'blocked' },
+        { status: 403 }
       );
-      user = fullUsers[0];
-      if (user && !user.isActive) {
-        return NextResponse.json(
-          { error: 'blocked' },
-          { status: 403 }
-        );
-      }
     }
 
     let avatarPath: string | null = null;
@@ -240,6 +251,7 @@ export async function POST(request: NextRequest) {
           balance,
           rating,
           reviewsCount,
+          COALESCE(agreementAccepted, 0) as agreementAccepted,
           createdAt
         FROM User
         WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
@@ -247,63 +259,6 @@ export async function POST(request: NextRequest) {
       );
       
       user = updatedUsers[0];
-    } else {
-      // Створюємо нового користувача через raw query (з retry)
-      const createTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      
-      await executeWithRetry(() =>
-        prisma.$executeRaw`
-          INSERT INTO User (
-            telegramId, username, firstName, lastName, avatar, 
-            balance, rating, reviewsCount, isActive, createdAt, updatedAt
-          )
-          VALUES (
-            ${telegramIdNum},
-            ${username || null},
-            ${firstName || null},
-            ${lastName || null},
-            ${avatarPath || null},
-            0.0,
-            5.0,
-            0,
-            1,
-            ${createTime},
-            ${createTime}
-          )
-        `
-      );
-      
-      // Отримуємо створені дані (з retry)
-      const createdUsers = await executeWithRetry(() =>
-        prisma.$queryRaw<Array<{
-        id: number;
-        telegramId: number;
-        username: string | null;
-        firstName: string | null;
-        lastName: string | null;
-        avatar: string | null;
-        balance: number;
-        rating: number;
-        reviewsCount: number;
-        createdAt: string;
-      }>>`
-        SELECT 
-          id,
-          CAST(telegramId AS INTEGER) as telegramId,
-          username,
-          firstName,
-          lastName,
-          avatar,
-          balance,
-          rating,
-          reviewsCount,
-          createdAt
-        FROM User
-        WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-      `
-      );
-      
-      user = createdUsers[0];
     }
 
     // Оновлюємо активність користувача
@@ -313,6 +268,11 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       // Тиха обробка помилок - не блокуємо відповідь
     }
+
+    const agreementAccepted =
+      user.agreementAccepted === 1 ||
+      user.agreementAccepted === true ||
+      user.agreementAccepted === '1';
 
     const response = {
       id: user.id,
@@ -324,6 +284,7 @@ export async function POST(request: NextRequest) {
       balance: user.balance,
       rating: user.rating,
       reviewsCount: user.reviewsCount,
+      agreementAccepted: Boolean(agreementAccepted),
       createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
     };
     
@@ -361,7 +322,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { executeWithRetry, ensureUserSessionTable, updateUserActivity } = await import('@/lib/prisma');
+    const { executeWithRetry, ensureUserSessionTable, updateUserActivity, ensureUserApiRawColumns } =
+      await import('@/lib/prisma');
+
+    await ensureUserApiRawColumns();
 
     const users = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
@@ -374,10 +338,11 @@ export async function GET(request: NextRequest) {
           phone,
           avatar,
           balance,
-          listingPackagesBalance,
+          COALESCE(listingPackagesBalance, 1) as listingPackagesBalance,
           rating,
           reviewsCount,
           isActive,
+          COALESCE(agreementAccepted, 0) as agreementAccepted,
           createdAt
         FROM User
         WHERE CAST(telegramId AS INTEGER) = ?`,
@@ -395,6 +360,7 @@ export async function GET(request: NextRequest) {
         rating: number | bigint;
         reviewsCount: number | bigint;
         isActive: number | boolean;
+        agreementAccepted: number | boolean;
         createdAt: string;
       }>>
     );
@@ -430,6 +396,13 @@ export async function GET(request: NextRequest) {
         ? userData.telegramId.toString() 
         : String(userData.telegramId);
     
+    const rawAgreed = userData.agreementAccepted;
+    const agreementAccepted =
+      rawAgreed === 1 ||
+      rawAgreed === true ||
+      rawAgreed === '1' ||
+      (typeof rawAgreed === 'bigint' && rawAgreed === 1n);
+
     const response = {
       id: userData.id,
       telegramId: telegramIdResponse,
@@ -442,6 +415,7 @@ export async function GET(request: NextRequest) {
       listingPackagesBalance: typeof userData.listingPackagesBalance === 'bigint' ? Number(userData.listingPackagesBalance) : userData.listingPackagesBalance,
       rating: typeof userData.rating === 'bigint' ? Number(userData.rating) : userData.rating,
       reviewsCount: typeof userData.reviewsCount === 'bigint' ? Number(userData.reviewsCount) : userData.reviewsCount,
+      agreementAccepted: Boolean(agreementAccepted),
       createdAt: userData.createdAt,
     };
     

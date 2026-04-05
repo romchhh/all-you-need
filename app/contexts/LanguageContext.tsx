@@ -81,13 +81,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
   const [language, setLanguageState] = useState<Language>(getInitialLanguage);
   const [translations, setTranslations] = useState<Record<string, any>>({});
   const [isLoadingLanguage, setIsLoadingLanguage] = useState(false);
-  const [isLanguageResolved, setIsLanguageResolved] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const path = window.location.pathname;
-    const hasLangPath = path.startsWith('/uk') || path.startsWith('/ru');
-    const telegramId = getTelegramIdSync() || userTelegramId;
-    return !hasLangPath || !telegramId;
-  });
+  // Не блокуємо рендер «через мову з БД»: на сервері window немає — початковий стан інакший би ламав гідратацію.
 
   useEffect(() => {
     const loadLanguageFromDB = async () => {
@@ -121,10 +115,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
           console.error('Failed to load language from database:', error);
         } finally {
           setIsLoadingLanguage(false);
-          setIsLanguageResolved(true);
         }
-      } else {
-        setIsLanguageResolved(true);
       }
     };
 
@@ -213,20 +204,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>
-      {!isLanguageResolved ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100dvh',
-          fontSize: 18,
-          color: '#666',
-        }}>
-          Завантаження… / Загрузка…
-        </div>
-      ) : (
-        children
-      )}
+      {children}
     </LanguageContext.Provider>
   );
 };

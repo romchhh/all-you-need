@@ -95,36 +95,22 @@ async def start_command(message: types.Message):
         )
         return
 
-    # Створюємо користувача якщо його немає
-    if not user_exists:
-        avatar_path = None
-        try:
-            avatar_path = await download_user_avatar(user_id, username)
-            if avatar_path:
-                print(f"Avatar downloaded for new user {user_id}: {avatar_path}")
-        except Exception as e:
-            print(f"Error downloading avatar for user {user_id}: {e}")
-        
-        # Створюємо користувача в БД
-        add_user(user_id, username, user.first_name, user.last_name, user.language_code, ref_link, avatar_path)
-        user_exists = True
-        
-        # Зберігаємо реферальний зв'язок якщо є
-        if referral_id:
-            create_referral_table()
-            if add_referral(referral_id, user_id):
-                print(f"Referral link saved: {referral_id} -> {user_id}")
-                # Відправляємо повідомлення запрошувачу
-                try:
-                    referrer_lang = get_user_lang(referral_id)
-                    new_user_name = user.first_name or user.username or "користувач"
-                    notification_text = (
-                        f"🎉 {t(referral_id, 'referral.new_user_registered', name=new_user_name)}\n\n"
-                        f"💰 {t(referral_id, 'referral.reward_info')}"
-                    )
-                    await bot.send_message(referral_id, notification_text, parse_mode="HTML")
-                except Exception as e:
-                    print(f"Error sending referral notification: {e}")
+    # Не створюємо рядок User до згоди з офертою (або до кроку з телефоном у боті) —
+    # інакше міні-ап бачить профіль і не показує «завершіть реєстрацію».
+    if not user_exists and referral_id:
+        create_referral_table()
+        if add_referral(referral_id, user_id):
+            print(f"Referral link saved: {referral_id} -> {user_id}")
+            try:
+                referrer_lang = get_user_lang(referral_id)
+                new_user_name = user.first_name or user.username or "користувач"
+                notification_text = (
+                    f"🎉 {t(referral_id, 'referral.new_user_registered', name=new_user_name)}\n\n"
+                    f"💰 {t(referral_id, 'referral.reward_info')}"
+                )
+                await bot.send_message(referral_id, notification_text, parse_mode="HTML")
+            except Exception as e:
+                print(f"Error sending referral notification: {e}")
     
     update_user_activity(str(user_id))
     

@@ -35,21 +35,12 @@ const BazaarPage = () => {
   
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
-  const { profile, isBlocked, isRegistrationIncomplete, loading: profileLoading } = useUser();
+  const { profile, isBlocked } = useUser();
 
   if (isBlocked && !profile) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4 text-center">
         <p className="text-white text-lg font-medium mb-2">⛔ {t('common.blocked')}</p>
-        <p className="text-white/70 text-sm">{t('menu.support') || 'Підтримка'}</p>
-      </div>
-    );
-  }
-
-  if (!profileLoading && isRegistrationIncomplete) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4 text-center">
-        <p className="text-white text-lg font-medium mb-2">📋 {t('common.registrationRequired')}</p>
         <p className="text-white/70 text-sm">{t('menu.support') || 'Підтримка'}</p>
       </div>
     );
@@ -193,6 +184,7 @@ const BazaarPage = () => {
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listingsLoadError, setListingsLoadError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalListings, setTotalListings] = useState(0);
   const [listingsOffset, setListingsOffset] = useState(0);
@@ -319,6 +311,7 @@ const BazaarPage = () => {
 
       const response = await fetch(buildListingsUrl(PAGE_SIZE, 0, searchForRequest || undefined));
       if (response.ok) {
+        setListingsLoadError(false);
         const data = await response.json();
         const list = data.listings || [];
         const total = data.total ?? 0;
@@ -338,20 +331,24 @@ const BazaarPage = () => {
           });
         }
       } else {
-        console.error('Failed to fetch listings:', response.status);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to fetch listings:', response.status);
+        }
         setListings([]);
         setTotalListings(0);
         setHasMore(false);
         setListingsOffset(0);
-        showToast(t('common.loadingError'), 'error');
+        setListingsLoadError(true);
       }
     } catch (error) {
-      console.error('Error fetching listings:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching listings:', error);
+      }
       setListings([]);
       setTotalListings(0);
       setHasMore(false);
       setListingsOffset(0);
-      showToast(t('common.loadingError'), 'error');
+      setListingsLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -750,6 +747,26 @@ const BazaarPage = () => {
 
     if (loading) {
       return <ListingGridSkeleton count={6} showLoadingText={true} loadingText={t('common.loading')} />;
+    }
+
+    if (listingsLoadError && listings.length === 0) {
+      return (
+        <div className="min-h-[55vh] flex flex-col items-center justify-center px-6 py-12 text-center">
+          <p className="text-white/90 text-base font-medium leading-relaxed max-w-sm">
+            {t('common.listingsLoadFailed')}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setListingsLoadError(false);
+              fetchListings(true);
+            }}
+            className="mt-6 rounded-xl bg-white/12 hover:bg-white/18 active:bg-white/10 text-white text-sm font-semibold py-3.5 px-8 transition-colors"
+          >
+            {t('common.tryAgain')}
+          </button>
+        </div>
+      );
     }
 
     return (

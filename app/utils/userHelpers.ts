@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { executeWithRetry } from '@/lib/prisma';
+import { executeWithRetry, ensureUserApiRawColumns } from '@/lib/prisma';
 
 export interface UserBalance {
   balance: number;
@@ -25,6 +25,7 @@ export interface UserData {
  * Знаходить користувача за telegramId
  */
 export async function findUserByTelegramId(telegramId: number): Promise<UserData | null> {
+  await ensureUserApiRawColumns();
   const users = await prisma.$queryRawUnsafe(
     `SELECT 
       id,
@@ -58,6 +59,7 @@ export async function findUserByTelegramId(telegramId: number): Promise<UserData
  * Отримує баланс користувача
  */
 export async function getUserBalance(telegramId: number): Promise<UserBalance | null> {
+  await ensureUserApiRawColumns();
   const users = await prisma.$queryRawUnsafe(
     `SELECT balance, listingPackagesBalance, hasUsedFreeAd 
      FROM User 
@@ -71,7 +73,7 @@ export async function getUserBalance(telegramId: number): Promise<UserBalance | 
 
   return {
     balance: users[0].balance,
-    listingPackagesBalance: users[0].listingPackagesBalance,
+    listingPackagesBalance: users[0].listingPackagesBalance ?? 1,
     hasUsedFreeAd: Boolean(users[0].hasUsedFreeAd),
   };
 }

@@ -28,21 +28,12 @@ const CategoriesPage = () => {
   const router = useRouter();
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
-  const { profile, isBlocked, isRegistrationIncomplete, loading: profileLoading } = useUser();
+  const { profile, isBlocked } = useUser();
 
   if (isBlocked && !profile) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4 text-center">
         <p className="text-white text-lg font-medium mb-2">⛔ {t('common.blocked')}</p>
-        <p className="text-white/70 text-sm">{t('menu.support') || 'Підтримка'}</p>
-      </div>
-    );
-  }
-
-  if (!profileLoading && isRegistrationIncomplete) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4 text-center">
-        <p className="text-white text-lg font-medium mb-2">📋 {t('common.registrationRequired')}</p>
         <p className="text-white/70 text-sm">{t('menu.support') || 'Підтримка'}</p>
       </div>
     );

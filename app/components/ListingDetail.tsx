@@ -504,7 +504,11 @@ export const ListingDetail = ({
       >
         <button
           onClick={() => {
-            onBack?.();
+            if (onBack) {
+              onBack();
+            } else {
+              onClose();
+            }
             tg?.HapticFeedback.impactOccurred('light');
           }}
           className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
@@ -539,7 +543,7 @@ export const ListingDetail = ({
 
       {/* Лого Trade Ground - частина сторінки */}
       <div 
-        className="w-full px-4 pt-4 pb-3 flex items-center justify-center cursor-pointer"
+        className="w-full px-4 pb-3 flex items-center justify-center cursor-pointer pt-[calc(1rem+1mm)]"
         style={{
           transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
           transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',

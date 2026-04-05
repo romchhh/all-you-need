@@ -66,10 +66,43 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
             elif language.startswith('uk'):
                 user_language = 'uk'
         
-        cursor.execute('''
-            INSERT INTO users_legacy (user_id, user_name, user_first_name, user_last_name, language, join_date, last_activity, ref_link)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (user_id, user_name, user_first_name, user_last_name, user_language, current_date.strftime('%Y-%m-%d %H:%M:%S'), current_date.strftime('%Y-%m-%d %H:%M:%S'), ref_link))
+        cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
+        legacy_row = cursor.fetchone()
+        if legacy_row:
+            cursor.execute(
+                '''
+                UPDATE users_legacy
+                SET user_name = ?, user_first_name = ?, user_last_name = ?,
+                    last_activity = ?,
+                    ref_link = COALESCE(?, ref_link)
+                WHERE user_id = ?
+                ''',
+                (
+                    user_name or '',
+                    user_first_name or '',
+                    user_last_name or '',
+                    current_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    ref_link,
+                    str(user_id),
+                ),
+            )
+        else:
+            cursor.execute(
+                '''
+                INSERT INTO users_legacy (user_id, user_name, user_first_name, user_last_name, language, join_date, last_activity, ref_link)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    str(user_id),
+                    user_name,
+                    user_first_name,
+                    user_last_name,
+                    user_language,
+                    current_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    current_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    ref_link,
+                ),
+            )
         conn.commit()
     else:
         update_query = '''

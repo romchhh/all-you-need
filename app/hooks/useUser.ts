@@ -14,6 +14,7 @@ interface UserProfile {
   listingPackagesBalance: number;
   rating: number;
   reviewsCount: number;
+  agreementAccepted?: boolean;
   createdAt: string;
 }
 
@@ -121,35 +122,7 @@ export const useUser = () => {
         setIsBlocked(true);
       } else if (response.status === 404) {
         setIsBlocked(false);
-        let telegramUser: any = null;
-        if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user) {
-          telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
-        } else {
-          telegramUser = {
-            id: telegramId,
-            first_name: 'User',
-            last_name: '',
-            username: null,
-            photo_url: null
-          };
-        }
-        
-        const createResponse = await fetch('/api/user/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            telegramId: telegramUser.id || telegramId,
-            username: telegramUser.username || null,
-            firstName: telegramUser.first_name || 'User',
-            lastName: telegramUser.last_name || '',
-            photoUrl: telegramUser.photo_url || null,
-          }),
-        });
-        
-        if (createResponse.ok) {
-          const newProfile = await createResponse.json();
-          setProfile(newProfile);
-        }
+        setProfile(null);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -166,9 +139,17 @@ export const useUser = () => {
     }
   };
 
-  // Користувач має завершити реєстрацію в боті, якщо немає ні номера ні юзернейма
+  // Є контекст Telegram у міні-апі (після першого циклу effect — currentTelegramId виставлений)
+  const hasTelegramIdentity = currentTelegramId != null;
+
+  const agreed = profile?.agreementAccepted === true;
+  const hasContact = Boolean(profile?.phone?.trim() || profile?.username?.trim());
+
+  // Реєстрація не завершена: немає запису профілю в БД або немає оферти / контакту (хоча б один: телефон або username)
   const isRegistrationIncomplete = Boolean(
-    profile && !profile.phone?.trim() && !profile.username?.trim()
+    !loading &&
+      hasTelegramIdentity &&
+      (profile === null || !agreed || !hasContact)
   );
 
   return { profile, loading, refetch, isBlocked, isRegistrationIncomplete };
