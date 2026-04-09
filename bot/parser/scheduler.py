@@ -12,6 +12,7 @@
   PARSER_INTERVAL_MIN — інтервал перевірки в хвилинах (за замовч. 30)
   PARSER_BOT_TELEGRAM_ID — telegram_id системного користувача-бота
   BOT_TOKEN           — токен основного aiogram-бота (для надсилання в групу)
+  PARSER_EXTRA_CHANNELS — додаткові канали: userOrLink:Місто,... (див. parser.py)
 """
 
 import asyncio

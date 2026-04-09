@@ -26,6 +26,7 @@ import { descriptionWithLinks } from '@/utils/descriptionLinks';
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { getCategories } from '@/constants/categories';
+import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
@@ -116,14 +117,10 @@ export const ListingDetail = ({
   const isSeoListingRoute = Boolean((params as any)?.id);
   const categories = useMemo(() => getCategories(t), [t]);
   const isTelegramEnv = !!tg;
-  const categoryLabel = useMemo(() => {
-    if (!listing.category) return null;
-    const category = categories.find(c => c.id === listing.category);
-    if (!category) return null;
-    if (!listing.subcategory) return category.name;
-    const sub = category.subcategories?.find(s => s.id === listing.subcategory);
-    return sub ? `${category.name} • ${sub.name}` : category.name;
-  }, [categories, listing.category, listing.subcategory]);
+  const categoryLabel = useMemo(
+    () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
+    [categories, listing.category, listing.subcategory, t]
+  );
   
   // Визначення мобільної версії (безпечно для SSR)
   const [isMobile, setIsMobile] = useState(false);
@@ -556,14 +553,14 @@ export const ListingDetail = ({
           }
         }}
       >
-        <Image 
-          src="/images/Group 1000007086.svg" 
-          alt="Trade Ground" 
-          width={204} 
-          height={64.5}
-          className="w-auto object-contain"
-          style={{ height: '52.5px', width: 'auto' }}
+        <Image
+          src="/images/Group 1000007086.svg"
+          alt="Trade Ground"
+          width={204}
+          height={65}
+          className="h-[52.5px] w-auto max-w-full object-contain object-center"
           priority
+          unoptimized
         />
       </div>
       

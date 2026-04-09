@@ -7,6 +7,8 @@ import json
 import logging
 import shutil
 import uuid
+import re
+import hashlib
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
@@ -50,6 +52,7 @@ def ensure_parsed_items_table():
             location        TEXT NOT NULL,
             images_json     TEXT,
             raw_text        TEXT,
+            content_hash    TEXT,
             status          TEXT DEFAULT 'pending',
             admin_message_id INTEGER,
             marketplace_listing_id INTEGER,
@@ -59,6 +62,14 @@ def ensure_parsed_items_table():
             UNIQUE(source_channel, message_id)
         )
     """)
+    cursor.execute("PRAGMA table_info(parsed_items)")
+    col_names = {row[1] for row in cursor.fetchall()}
+    if "content_hash" not in col_names:
+        cursor.execute("ALTER TABLE parsed_items ADD COLUMN content_hash TEXT")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_parsed_items_content_hash "
+        "ON parsed_items(content_hash) WHERE content_hash IS NOT NULL"
+    )
     conn.commit()
     conn.close()
 
@@ -70,6 +81,34 @@ def parsed_item_exists(source_channel: str, message_id: int) -> bool:
     cursor.execute(
         "SELECT 1 FROM parsed_items WHERE source_channel = ? AND message_id = ?",
         (source_channel, message_id),
+    )
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
+
+def fingerprint_parsed_text(raw_text: str) -> str:
+    """
+    Нормалізований відбиток тексту оголошення для дедуплікації між каналами
+    (одне й те саме репостять у кілька груп).
+    """
+    t = (raw_text or "").lower()
+    t = re.sub(r"https?://t\.me/\S+", " ", t, flags=re.IGNORECASE)
+    t = re.sub(r"https?://(?:www\.)?instagram\.com/\S+", " ", t, flags=re.IGNORECASE)
+    t = re.sub(r"https?://\S+", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return hashlib.sha256(t.encode("utf-8")).hexdigest()
+
+
+def parsed_item_content_hash_exists(content_hash: str) -> bool:
+    """Чи вже зберегли оголошення з таким самим текстом (будь-який канал)."""
+    if not content_hash:
+        return False
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT 1 FROM parsed_items WHERE content_hash = ? LIMIT 1",
+        (content_hash,),
     )
     exists = cursor.fetchone() is not None
     conn.close()
@@ -94,6 +133,7 @@ def insert_parsed_item(
     location: str,
     images: list[str],
     raw_text: str,
+    content_hash: Optional[str] = None,
 ) -> int:
     """Вставляє нове оголошення в parsed_items. Повертає id запису."""
     conn = get_connection()
@@ -104,14 +144,14 @@ def insert_parsed_item(
             author_username, author_id,
             title, description, price, currency, is_free,
             category, subcategory, condition, location,
-            images_json, raw_text, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            images_json, raw_text, content_hash, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     """, (
         source_channel, source_city, message_id, media_group_id,
         author_username, author_id,
         title, description, price, currency, int(is_free),
         category, subcategory, condition, location,
-        json.dumps(images, ensure_ascii=False), raw_text,
+        json.dumps(images, ensure_ascii=False), raw_text, content_hash,
     ))
     conn.commit()
     item_id = cursor.lastrowid

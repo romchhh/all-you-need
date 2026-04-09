@@ -290,7 +290,9 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
             : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
-        <div className={`transition-transform ${currentActiveTab === 'bazaar' ? 'scale-110' : ''}`}>
+        <div
+          className={`shrink-0 transition-transform ${currentActiveTab === 'bazaar' ? 'scale-110' : ''}`}
+        >
           <NavIcon icon="home" />
         </div>
         <span className="text-[clamp(9px,2.5vw,12px)] font-medium font-montserrat mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.bazaar')}</span>
@@ -306,7 +308,7 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
         }}
         className="flex flex-col items-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all text-white hover:text-[#D3F1A7] group"
       >
-        <div className="transition-transform">
+        <div className="shrink-0 transition-transform">
           <NavIcon icon="add" />
         </div>
         <span className="text-[clamp(9px,2.5vw,12px)] font-medium font-montserrat mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('common.add')}</span>
@@ -321,7 +323,9 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
             : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
-        <div className={`transition-transform ${currentActiveTab === 'favorites' ? 'scale-110' : ''}`}>
+        <div
+          className={`shrink-0 transition-transform ${currentActiveTab === 'favorites' ? 'scale-110' : ''}`}
+        >
           <NavIcon icon="favorites" />
         </div>
         <span className="text-[clamp(9px,2.5vw,12px)] font-medium font-montserrat mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.favorites')}</span>
@@ -336,7 +340,9 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
             : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
-        <div className={`transition-transform ${currentActiveTab === 'profile' ? 'scale-110' : ''}`}>
+        <div
+          className={`shrink-0 transition-transform ${currentActiveTab === 'profile' ? 'scale-110' : ''}`}
+        >
           <NavIcon icon="profile" />
         </div>
         <span className="text-[clamp(9px,2.5vw,12px)] font-medium font-montserrat mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.profile')}</span>

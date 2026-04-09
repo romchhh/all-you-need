@@ -2,6 +2,40 @@
  * Утиліта для відправки повідомлень через Telegram Bot API
  */
 
+import type { PromotionType } from '@/utils/paymentConstants';
+
+function escapeHtmlTelegram(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatPromotionEndsUtc(endsAt: Date): string {
+  const d = endsAt.getUTCDate().toString().padStart(2, '0');
+  const m = (endsAt.getUTCMonth() + 1).toString().padStart(2, '0');
+  const y = endsAt.getUTCFullYear();
+  const h = endsAt.getUTCHours().toString().padStart(2, '0');
+  const min = endsAt.getUTCMinutes().toString().padStart(2, '0');
+  return `${d}.${m}.${y} ${h}:${min} UTC`;
+}
+
+function daysWordUk(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n} день`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} дні`;
+  return `${n} днів`;
+}
+
+function daysWordRu(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n} день`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} дня`;
+  return `${n} дней`;
+}
+
 interface InlineKeyboardButton {
   text: string;
   url?: string;
@@ -197,6 +231,94 @@ export async function sendListingExpiringWarning(
 
   return await sendTelegramMessage(telegramId, message, {
     disable_notification: true, // Не шумимо
+  });
+}
+
+/**
+ * Повідомлення про безкоштовне нарахування реклами з адмін-панелі (аналогічно bot/scripts/grant_top_latest_listings.py).
+ */
+export async function sendAdminPromotionGrantedNotification(
+  telegramId: number | string,
+  listingId: number,
+  listingTitle: string,
+  promotionType: PromotionType,
+  durationDays: number,
+  promotionEnds: Date
+): Promise<boolean> {
+  const { getUserLanguage } = await import('@/utils/userHelpers');
+  const lang = await getUserLanguage(telegramId);
+  const endsStr = escapeHtmlTelegram(formatPromotionEndsUtc(promotionEnds));
+  const safeTitle = escapeHtmlTelegram(listingTitle || '—');
+  const line = `• «<b>${safeTitle}</b>» (№${listingId})`;
+  const dwUk = daysWordUk(durationDays);
+  const dwRu = daysWordRu(durationDays);
+
+  let message: string;
+  if (lang === 'ru') {
+    if (promotionType === 'top_category') {
+      message =
+        '📌 <b>Активировано TOP-размещение</b>\n\n' +
+        `Начислено <b>TOP в категории на ${dwRu}</b> ` +
+        `до <b>${endsStr}</b> для объявления:\n\n` +
+        `${line}\n\n` +
+        'Оно будет выше в своей категории в каталоге TradeGround.';
+    } else if (promotionType === 'highlighted') {
+      message =
+        '📌 <b>Активировано выделение объявления</b>\n\n' +
+        `Начислено <b>выделение на ${dwRu}</b> ` +
+        `до <b>${endsStr}</b> для объявления:\n\n` +
+        `${line}\n\n` +
+        'Оно будет заметнее в каталоге TradeGround.';
+    } else {
+      message =
+        '📌 <b>Активировано VIP-размещение</b>\n\n' +
+        `Начислено <b>VIP на ${dwRu}</b> ` +
+        `до <b>${endsStr}</b> для объявления:\n\n` +
+        `${line}\n\n` +
+        'Объявление получит максимальную видимость в каталоге TradeGround.';
+    }
+  } else {
+    if (promotionType === 'top_category') {
+      message =
+        '📌 <b>Активовано TOP-розміщення</b>\n\n' +
+        `Нараховано <b>TOP у категорії на ${dwUk}</b> ` +
+        `до <b>${endsStr}</b> для оголошення:\n\n` +
+        `${line}\n\n` +
+        'Воно буде вище у своїй категорії в каталозі TradeGround.';
+    } else if (promotionType === 'highlighted') {
+      message =
+        '📌 <b>Активовано виділення оголошення</b>\n\n' +
+        `Нараховано <b>виділення на ${dwUk}</b> ` +
+        `до <b>${endsStr}</b> для оголошення:\n\n` +
+        `${line}\n\n` +
+        'Воно буде помітніше в каталозі TradeGround.';
+    } else {
+      message =
+        '📌 <b>Активовано VIP-розміщення</b>\n\n' +
+        `Нараховано <b>VIP на ${dwUk}</b> ` +
+        `до <b>${endsStr}</b> для оголошення:\n\n` +
+        `${line}\n\n` +
+        'Воно отримає максимальну видимість у каталозі TradeGround.';
+    }
+  }
+
+  const webappUrl = process.env.WEBAPP_URL || 'http://localhost:3000';
+  const tid =
+    typeof telegramId === 'string' ? telegramId : String(telegramId);
+  const listingUrl = `${webappUrl}/${lang}/bazaar?listing=${listingId}&telegramId=${tid}`;
+
+  return await sendTelegramMessage(telegramId, message, {
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: lang === 'ru' ? '🔗 Открыть в приложении' : '🔗 Відкрити в застосунку',
+            web_app: { url: listingUrl },
+          },
+        ],
+      ],
+    },
   });
 }
 

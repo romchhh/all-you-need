@@ -1,12 +1,12 @@
 """
 Основний модуль парсера оголошень з Telegram-каналів через Pyrogram.
 
-Канали та їх міста:
-  - https://t.me/baraholkaberlin  → Berlin
-  - https://t.me/kaufberli        → Berlin
-  - https://t.me/beauty_berlin_ua → Berlin
-  - https://t.me/Leipzig_Flohmarkt → Leipzig
-  - https://t.me/secondhand_hh    → Hamburg
+Публічні канали задаються у CHANNELS (username → місто/регіон).
+Додаткові пари можна передати в .env: PARSER_EXTRA_CHANNELS=user:City,user2:City2
+
+Приватні групи з посиланнями t.me/+...: акаунт парсера має бути учасником; далі можна
+вказати у PARSER_EXTRA_CHANNELS публічний @username супергрупи, якщо з’явиться, або
+numeric chat id (експериментально) після першого join.
 """
 
 import asyncio
@@ -27,12 +27,61 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────
 
 CHANNELS: dict[str, str] = {
-    "baraholkaberlin":   "Berlin",
-    "kaufberli":         "Berlin",
-    "beauty_berlin_ua":  "Berlin",
+    # Berlin
+    "baraholkaberlin": "Berlin",
+    "kaufberli": "Berlin",
+    "beauty_berlin_ua": "Berlin",
+    # Leipzig
     "Leipzig_Flohmarkt": "Leipzig",
-    "secondhand_hh":     "Hamburg",
+    # Hamburg
+    "secondhand_hh": "Hamburg",
+    "HamburgBeauty": "Hamburg",
+    # Munich / Bayern
+    "Flohmark11": "Munich",
+    # Düsseldorf, Essen, NRW
+    "komissionkaDusseldorf": "Düsseldorf",
+    "komissionkaEssen": "Essen",
+    "BeautyNRW": "NRW",
+    "BeautyDusseldorf": "Düsseldorf",
+    # Stuttgart
+    "BaraholkaStuttgart": "Stuttgart",
+    "UaStuttgart": "Stuttgart",
+    # Cologne
+    "keln3": "Cologne",
+    # Misc / multi-city UA communities
+    "ukraineingermany": "Germany",
+    # Приватні запрошення: акаунт парсера має бути в групі; peer — повне посилання t.me/+...
+    "https://t.me/+u9VcbxuhKik1M2My": "Dülmen",
+    "https://t.me/+Yeu9vchwu6llZmYy": "NRW",
 }
+
+
+def _channels_from_env() -> dict[str, str]:
+    raw = (os.getenv("PARSER_EXTRA_CHANNELS") or "").strip()
+    if not raw:
+        return {}
+    extra: dict[str, str] = {}
+    for part in raw.split(","):
+        part = part.strip()
+        if ":" not in part:
+            continue
+        u, city = part.rsplit(":", 1)
+        u = u.strip().lstrip("@")
+        city = city.strip()
+        if u and city:
+            extra[u] = city
+    return extra
+
+
+CHANNELS = {**CHANNELS, **_channels_from_env()}
+
+# Канали з переважно послугами (краса): більше емодзі та інколи без фото — м’якші правила
+BEAUTY_SERVICE_CHANNELS: frozenset[str] = frozenset({
+    "beauty_berlin_ua",
+    "BeautyNRW",
+    "BeautyDusseldorf",
+    "HamburgBeauty",
+})
 
 # Скільки останніх повідомлень перевіряти за один прохід
 FETCH_LIMIT: int = int(os.getenv("PARSER_FETCH_LIMIT", "100"))
@@ -90,6 +139,15 @@ _ONE_EMOJI = (
 )
 TOO_MANY_EMOJI_RE = re.compile(f"({_ONE_EMOJI}){{5,}}")
 ONE_EMOJI_RE = re.compile(_ONE_EMOJI)
+
+SERVICE_AD_HINT_RE = re.compile(
+    r"косметолог|перукар|перукарн|манікюр|маникюр|педикюр"
+    r"|ін['\u2019]?єкц|инъекц|ботулін|ботулин|біоревітал|биоревитал"
+    r"|контурн\w*\s+пластик|мезотерап|пілінг|пилинг|філер|филлер|прайс|запис\s+на"
+    r"|послуг[иі]\b|услуг[иі]\b|виконую\s+такі\s+процедур|выполняю\s+такие\s+процедур"
+    r"|процедур[иы]|прийом\s|прием\s|beauty\s|lash|brow\s|візаж|визаж",
+    re.IGNORECASE,
+)
 
 
 # ──────────────────────────────────────────────
@@ -223,12 +281,25 @@ def get_sender_id(msg) -> Optional[int]:
     return None
 
 
-def is_quality(text: str, has_photo: bool) -> tuple[bool, str]:
+def is_likely_service_ad(text: str) -> bool:
+    return bool(SERVICE_AD_HINT_RE.search(text or ""))
+
+
+def is_quality(text: str, has_photo: bool, relaxed: bool = False) -> tuple[bool, str]:
+    t = text.strip()
+    if relaxed:
+        if len(t) < 25:
+            return False, "замало тексту"
+        if not has_photo and len(t) < 80:
+            return False, "немає фото"
+        if SPAM_RE.search(t):
+            return False, "спам"
+        return True, ""
     if not has_photo:
         return False, "немає фото"
-    if len(text.strip()) < 20:
+    if len(t) < 20:
         return False, "замало тексту"
-    if SPAM_RE.search(text):
+    if SPAM_RE.search(t):
         return False, "спам"
     return True, ""
 
@@ -281,7 +352,11 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
     Повертає статистику: {"added": int, "skipped": int, "reasons": dict}.
     """
     from parser.db import (
-        parsed_item_exists, insert_parsed_item, ensure_parsed_items_table,
+        parsed_item_exists,
+        insert_parsed_item,
+        ensure_parsed_items_table,
+        fingerprint_parsed_text,
+        parsed_item_content_hash_exists,
     )
     from parser.category_keywords import detect_category
 
@@ -320,8 +395,21 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             stats["reasons"]["дублікат (бд)"] = stats["reasons"].get("дублікат (бд)", 0) + 1
             continue
 
+        content_hash = fingerprint_parsed_text(text)
+        if parsed_item_content_hash_exists(content_hash):
+            stats["skipped"] += 1
+            stats["reasons"]["дублікат (текст)"] = stats["reasons"].get("дублікат (текст)", 0) + 1
+            continue
+
+        pre_category, _ = detect_category(text, skip_free=False)
+        relaxed_quality = (
+            channel in BEAUTY_SERVICE_CHANNELS
+            or pre_category == "services_work"
+            or is_likely_service_ad(text)
+        )
+
         # ── Якість ──
-        ok, reason = is_quality(text, len(photos) > 0)
+        ok, reason = is_quality(text, len(photos) > 0, relaxed=relaxed_quality)
         if not ok:
             stats["skipped"] += 1
             stats["reasons"][reason] = stats["reasons"].get(reason, 0) + 1
@@ -337,7 +425,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             stats["reasons"]["не оголошення"] = stats["reasons"].get("не оголошення", 0) + 1
             continue
 
-        if has_too_many_emojis(description):
+        if not relaxed_quality and has_too_many_emojis(description):
             stats["skipped"] += 1
             stats["reasons"]["багато емоджі"] = stats["reasons"].get("багато емоджі", 0) + 1
             continue
@@ -375,6 +463,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             location=city,
             images=images,
             raw_text=text[:4000],
+            content_hash=content_hash,
         )
 
         if item_id:

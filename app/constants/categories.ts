@@ -13,7 +13,19 @@ export const getCategories = (t: (key: string) => string): Category[] => [
       { id: 'men_shoes', name: t('categories.subcategories.men_shoes') },
       { id: 'accessories', name: t('categories.subcategories.accessories') },
       { id: 'hats', name: t('categories.subcategories.hats') },
-      { id: 'beauty_health', name: t('categories.subcategories.beauty_health') },
+      { id: 'other', name: t('categories.subcategories.other') }
+    ]
+  },
+  {
+    id: 'beauty_wellness',
+    name: t('categories.beauty_wellness'),
+    icon: '💄',
+    subcategories: [
+      { id: 'cosmetics', name: t('categories.subcategories.cosmetics') },
+      { id: 'perfumery', name: t('categories.subcategories.perfumery') },
+      { id: 'personal_care', name: t('categories.subcategories.personal_care') },
+      { id: 'health_products', name: t('categories.subcategories.health_products') },
+      { id: 'hygiene', name: t('categories.subcategories.hygiene') },
       { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
@@ -101,6 +113,7 @@ export const getCategories = (t: (key: string) => string): Category[] => [
       { id: 'music_instruments', name: t('categories.subcategories.music_instruments') },
       { id: 'tourism', name: t('categories.subcategories.tourism') },
       { id: 'collections_hobby', name: t('categories.subcategories.collections_hobby') },
+      { id: 'books_learning', name: t('categories.subcategories.books_learning') },
       { id: 'other', name: t('categories.subcategories.other') }
     ]
   },
@@ -154,6 +167,7 @@ export const categories: Category[] = getCategories((key: string) => {
   // Fallback на українську мову
   const ukTranslations: Record<string, string> = {
     'categories.fashion': 'Мода та стиль',
+    'categories.beauty_wellness': 'Краса та здоров\'я',
     'categories.furniture': 'Меблі',
     'categories.electronics': 'Електроніка',
     'categories.appliances': 'Побутова техніка',

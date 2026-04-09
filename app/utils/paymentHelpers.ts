@@ -199,7 +199,7 @@ export async function grantAdminPromotionForListing(
   listingId: number,
   promotionType: PromotionType,
   durationDays?: number
-): Promise<{ promotionEnds: Date }> {
+): Promise<{ promotionEnds: Date; durationDays: number }> {
   const promotionInfo = PROMOTION_PRICES[promotionType];
   const days =
     durationDays !== undefined
@@ -223,7 +223,7 @@ export async function grantAdminPromotionForListing(
   );
 
   await applyPromotionPurchaseToListing(listingId, promotionType, endsAt, nowStr);
-  return { promotionEnds: endsAt };
+  return { promotionEnds: endsAt, durationDays: days };
 }
 
 /**

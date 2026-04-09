@@ -9,6 +9,7 @@ interface CategoryIconProps {
 
 const iconMap: Record<string, string> = {
   'fashion': '/images/categories_icons/fashion.svg',
+  'beauty_wellness': '/images/categories_icons/fashion.svg',
   'furniture': '/images/categories_icons/furniture.svg',
   'electronics': '/images/categories_icons/electronics.svg',
   'appliances': '/images/categories_icons/home.svg',

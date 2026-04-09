@@ -20,6 +20,7 @@ ENV/
 *.sqlite
 *.sqlite3
 database_export.xlsx
+database/parsed_photos/
 
 # Node.js
 node_modules/

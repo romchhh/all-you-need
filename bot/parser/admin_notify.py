@@ -61,6 +61,19 @@ CITY_FLAG = {
     "Berlin": "🇩🇪 Berlin",
     "Leipzig": "🇩🇪 Leipzig",
     "Hamburg": "🇩🇪 Hamburg",
+    "Munich": "🇩🇪 Munich",
+    "München": "🇩🇪 Munich",
+    "Düsseldorf": "🇩🇪 Düsseldorf",
+    "Duesseldorf": "🇩🇪 Düsseldorf",
+    "Essen": "🇩🇪 Essen",
+    "Dülmen": "🇩🇪 Dülmen",
+    "Dulmen": "🇩🇪 Dülmen",
+    "Stuttgart": "🇩🇪 Stuttgart",
+    "Cologne": "🇩🇪 Cologne",
+    "Köln": "🇩🇪 Cologne",
+    "Koln": "🇩🇪 Cologne",
+    "NRW": "🇩🇪 NRW",
+    "Germany": "🇩🇪 Germany",
 }
 
 

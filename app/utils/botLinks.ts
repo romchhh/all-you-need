@@ -24,6 +24,21 @@ export const getBotBaseUrl = (): string => {
 };
 
 /**
+ * Посилання для Telegram WebApp.openTelegramLink — лише t.me / telegram.me.
+ */
+export const getBotTelegramOpenUrl = (): string => {
+  const raw = getBotBaseUrl().trim();
+  if (/^https:\/\/(t\.me|telegram\.me)\//i.test(raw)) {
+    return raw;
+  }
+  const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME;
+  if (botUsername) {
+    return `https://t.me/${botUsername.replace(/^@/, '')}`;
+  }
+  return raw.startsWith('http') ? raw : `https://t.me/${raw.replace(/^@/, '')}`;
+};
+
+/**
  * Генерує посилання на бота з параметром start
  */
 export const getBotStartLink = (startParam: string): string => {

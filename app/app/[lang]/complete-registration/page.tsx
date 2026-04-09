@@ -17,7 +17,7 @@ import {
 import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTelegram } from '@/hooks/useTelegram';
-import { getBotBaseUrl } from '@/utils/botLinks';
+import { getBotTelegramOpenUrl } from '@/utils/botLinks';
 
 function StepCard({
   done,
@@ -86,13 +86,29 @@ export default function CompleteRegistrationPage() {
   const hasContact = Boolean(profile?.phone?.trim() || profile?.username?.trim());
 
   const openBot = () => {
-    const url = getBotBaseUrl();
-    if (tg?.openTelegramLink) {
-      tg.openTelegramLink(url);
-      tg.HapticFeedback?.impactOccurred('medium');
-    } else {
-      window.location.href = url;
+    const url = getBotTelegramOpenUrl();
+    const w = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
+    w?.HapticFeedback?.impactOccurred('medium');
+
+    const closeMiniApp = () => {
+      try {
+        w?.close?.();
+      } catch {
+        /* ignore */
+      }
+    };
+
+    if (w?.openTelegramLink) {
+      w.openTelegramLink(url);
+      window.setTimeout(closeMiniApp, 400);
+      return;
     }
+    if (w?.openLink) {
+      w.openLink(url);
+      window.setTimeout(closeMiniApp, 400);
+      return;
+    }
+    window.location.href = url;
   };
 
   return (
@@ -110,8 +126,9 @@ export default function CompleteRegistrationPage() {
             alt="Trade Ground"
             width={204}
             height={65}
-            className="h-[52px] w-auto object-contain opacity-[0.98]"
+            className="h-[52px] w-auto max-w-full object-contain object-center opacity-[0.98]"
             priority
+            unoptimized
           />
         </div>
 

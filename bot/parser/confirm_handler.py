@@ -183,21 +183,9 @@ def _build_marketplace_description(item: dict) -> str:
     else:
         contact_line = ""
 
-    if lang == "uk":
-        channel_display = f"@{source_channel}" if source_channel else "відкритих джерел"
-        source_line = (
-            f"📢 Оголошення знайдено з {channel_display} і додано на Trade Ground."
-        )
-    else:
-        channel_display = f"@{source_channel}" if source_channel else "открытых источников"
-        source_line = (
-            f"📢 Объявление найдено с {channel_display} и добавлено на Trade Ground."
-        )
-
     parts = [base]
     if contact_line:
         parts.append(contact_line)
-    parts.append(source_line)
 
     return "\n\n".join(parts)
 

@@ -26,14 +26,14 @@ export const AppHeader: React.FC = () => {
         }}
       >
         <div className="flex h-full w-full items-center justify-center px-4 mx-auto">
-        <Image 
-          src="/images/Group 1000007086.svg" 
-          alt="Trade Ground" 
-          width={204} 
-          height={64.5}
-          className="w-auto object-contain"
-          style={{ height: '52.5px', width: 'auto' }}
+        <Image
+          src="/images/Group 1000007086.svg"
+          alt="Trade Ground"
+          width={204}
+          height={65}
+          className="h-[52.5px] w-auto max-w-full object-contain object-center"
           priority
+          unoptimized
         />
         </div>
       </div>

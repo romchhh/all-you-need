@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCategories } from '@/constants/categories';
+import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 
 interface ListingCardProps {
@@ -22,14 +23,10 @@ interface ListingCardProps {
 const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false, isDeactivated = false }: ListingCardProps) => {
   const { t } = useLanguage();
   const categories = useMemo(() => getCategories(t), [t]);
-  const categoryLabel = useMemo(() => {
-    if (!listing.category) return null;
-    const category = categories.find(c => c.id === listing.category);
-    if (!category) return null;
-    if (!listing.subcategory) return category.name;
-    const sub = category.subcategories?.find(s => s.id === listing.subcategory);
-    return sub ? `${category.name} • ${sub.name}` : category.name;
-  }, [categories, listing.category, listing.subcategory]);
+  const categoryLabel = useMemo(
+    () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
+    [categories, listing.category, listing.subcategory, t]
+  );
   
   // Перевіряємо чи оголошення має активну рекламу
   const hasPromotion = listing.promotionType && listing.promotionEnds 

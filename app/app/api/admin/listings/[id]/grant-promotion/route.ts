@@ -6,6 +6,7 @@ import {
   isValidPromotionType,
 } from '@/utils/paymentHelpers';
 import type { PromotionType } from '@/utils/paymentConstants';
+import { sendAdminPromotionGrantedNotification } from '@/utils/telegramNotifications';
 
 export async function POST(
   request: NextRequest,
@@ -41,23 +42,44 @@ export async function POST(
 
     const rows = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
-        `SELECT userId FROM Listing WHERE id = ?`,
+        `SELECT l.userId, l.title, CAST(u.telegramId AS INTEGER) AS telegramId
+         FROM Listing l
+         JOIN User u ON u.id = l.userId
+         WHERE l.id = ?`,
         listingId
-      ) as Promise<Array<{ userId: number }>>
+      ) as Promise<
+        Array<{ userId: number; title: string | null; telegramId: number | bigint }>
+      >
     );
 
     if (!rows[0]) {
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
 
-    const listingUserId = rows[0].userId;
+    const { userId: listingUserId, title, telegramId } = rows[0];
+    const tg =
+      typeof telegramId === 'bigint' ? Number(telegramId) : Number(telegramId);
 
-    const { promotionEnds } = await grantAdminPromotionForListing(
+    const { promotionEnds, durationDays: grantedDays } =
+      await grantAdminPromotionForListing(
       listingUserId,
       listingId,
       promotionType as PromotionType,
       days
     );
+
+    if (tg && !Number.isNaN(tg)) {
+      void sendAdminPromotionGrantedNotification(
+        tg,
+        listingId,
+        title?.trim() || '—',
+        promotionType as PromotionType,
+        grantedDays,
+        promotionEnds
+      ).catch((err) =>
+        console.error('[admin grant-promotion] Telegram notify failed:', err)
+      );
+    }
 
     return NextResponse.json({
       success: true,
