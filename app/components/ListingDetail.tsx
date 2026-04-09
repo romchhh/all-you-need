@@ -23,8 +23,8 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { descriptionWithLinks } from '@/utils/descriptionLinks';
-import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
+import { TradeGroundLogo } from '@/components/TradeGroundLogo';
 import { getCategories } from '@/constants/categories';
 import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
@@ -540,29 +540,19 @@ export const ListingDetail = ({
       </div>
 
       {/* Лого Trade Ground - частина сторінки */}
-      <div 
-        className="w-full px-4 pb-3 flex items-center justify-center cursor-pointer pt-[calc(1rem+1mm)]"
-        style={{
-          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
-          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
-          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1
-        }}
+      <TradeGroundLogo
         onClick={() => {
           if (typeof window !== 'undefined') {
             window.location.href = `/${lang}/bazaar`;
           }
         }}
-      >
-        <Image
-          src="/images/Group 1000007086.svg"
-          alt="Trade Ground"
-          width={140}
-          height={45}
-          className="h-9 w-auto max-w-[min(100%,11rem)] object-contain object-center"
-          priority
-          unoptimized
-        />
-      </div>
+        className="pb-3 pt-[calc(1rem+1mm)]"
+        style={{
+          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
+          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
+          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
+        }}
+      />
       
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (

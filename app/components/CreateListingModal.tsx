@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { CategoryIcon } from './CategoryIcon';
-import Image from 'next/image';
+import { TradeGroundLogo } from '@/components/TradeGroundLogo';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -893,16 +893,10 @@ export const CreateListingModal = ({
       <div className="w-full h-full flex flex-col">
         <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}>
           {/* Лого Trade Ground */}
-          <div className="w-full pb-3 flex items-center justify-center pt-[calc(1rem+1mm)]">
-            <Image 
-              src="/images/Group 1000007086.svg" 
-              alt="Trade Ground" 
-              width={140} 
-              height={45}
-              className="h-9 w-auto max-w-[min(100%,11rem)] object-contain"
-              priority
-            />
-          </div>
+          <TradeGroundLogo
+            className="pb-3 pt-[calc(1rem+1mm)]"
+            paddingX={false}
+          />
           
           {/* Заголовок */}
           <div className="flex items-center justify-center px-4 pb-4">

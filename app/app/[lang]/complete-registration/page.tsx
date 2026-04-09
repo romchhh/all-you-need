@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { TradeGroundLogo } from '@/components/TradeGroundLogo';
 import { useParams, useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -121,15 +121,7 @@ export default function CompleteRegistrationPage() {
     >
       <div className="mx-auto flex max-w-lg flex-col px-4 pt-[calc(1.5rem+1mm)]">
         <div className="mb-6 flex justify-center">
-          <Image
-            src="/images/Group 1000007086.svg"
-            alt="Trade Ground"
-            width={140}
-            height={45}
-            className="h-9 w-auto max-w-[min(100%,11rem)] object-contain object-center opacity-[0.98]"
-            priority
-            unoptimized
-          />
+          <TradeGroundLogo imageOpacity={0.98} />
         </div>
 
         <div className="mb-5 flex justify-center">
