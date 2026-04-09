@@ -32,8 +32,8 @@ export const NavIcon: React.FC<NavIconProps> = ({ icon, className = '' }) => {
   };
 
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-visible">
-      <span className="[&_svg]:block [&_svg]:h-9 [&_svg]:w-auto [&_svg]:max-h-9 [&_svg]:max-w-[2.375rem]">
+    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-visible">
+      <span className="[&_svg]:block [&_svg]:h-6 [&_svg]:w-auto [&_svg]:max-h-6 [&_svg]:max-w-[1.5rem]">
         {icons[icon]}
       </span>
     </div>

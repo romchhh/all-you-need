@@ -156,11 +156,11 @@ export const EditProfileModal = ({
         }
         
         // Дозволяємо згортання тільки якщо користувач тягне за саму верхню частину (білу смужку/header)
-        // AppHeader має висоту ~52.5px, додаємо невеликий запас - 60px
-        const headerHeight = 60;
+        // AppHeader ~36px (лого), запас під відступи — ~48px
+        const headerHeight = 48;
         const isPullingFromHeader = touchStartY < headerHeight;
         
-        // Якщо користувач тягне за header (верхні 60px) і на початку скролу - дозволяємо згортання
+        // Якщо користувач тягне за header (верхня зона) і на початку скролу - дозволяємо згортання
         if (touchStartScrollY <= 10 && isPullingFromHeader && deltaY > 0 && deltaY > 5) {
           // Дозволяємо згортання - не запобігаємо
           return;

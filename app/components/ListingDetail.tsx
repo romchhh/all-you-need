@@ -556,9 +556,9 @@ export const ListingDetail = ({
         <Image
           src="/images/Group 1000007086.svg"
           alt="Trade Ground"
-          width={204}
-          height={65}
-          className="h-[52.5px] w-auto max-w-full object-contain object-center"
+          width={140}
+          height={45}
+          className="h-9 w-auto max-w-[min(100%,11rem)] object-contain object-center"
           priority
           unoptimized
         />

@@ -259,7 +259,7 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
   <>
     <div 
       ref={navRef}
-      className="fixed bottom-0 left-0 right-0 bg-[#000000] safe-area-bottom z-50 pb-4 transition-transform duration-200 ease-in-out"
+      className="fixed bottom-0 left-0 right-0 bg-[#000000] safe-area-bottom z-50 pb-2 transition-transform duration-200 ease-in-out"
       style={{
         position: 'fixed',
         bottom: 0,
@@ -280,22 +280,22 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
         pointerEvents: isInputFocused ? 'none' : 'auto'
       }}
     >
-      <div className="max-w-2xl mx-auto flex justify-around items-center px-2 py-2 border-t-2 border-white rounded-t-3xl bg-[#000000]">
+      <div className="max-w-2xl mx-auto flex justify-around items-center px-2 py-1 border-t-2 border-white rounded-t-3xl bg-[#000000]">
       {/* Головна */}
       <button
         onClick={() => handleTabChange('bazaar')}
-        className={`flex flex-col items-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all group ${
+        className={`flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all group ${
           currentActiveTab === 'bazaar' 
             ? 'text-[#D3F1A7]' 
             : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
         <div
-          className={`shrink-0 transition-transform ${currentActiveTab === 'bazaar' ? 'scale-110' : ''}`}
+          className={`shrink-0 transition-transform ${currentActiveTab === 'bazaar' ? 'scale-105' : ''}`}
         >
           <NavIcon icon="home" />
         </div>
-        <span className="text-[clamp(9px,2.5vw,12px)] font-medium font-montserrat mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.bazaar')}</span>
+        <span className="text-[clamp(8px,2.2vw,11px)] font-medium font-montserrat mt-1 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.bazaar')}</span>
       </button>
 
       {/* Додати оголошення */}
@@ -306,46 +306,46 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
             tg?.HapticFeedback.impactOccurred('medium');
           }
         }}
-        className="flex flex-col items-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all text-white hover:text-[#D3F1A7] group"
+        className="flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all text-white hover:text-[#D3F1A7] group"
       >
         <div className="shrink-0 transition-transform">
           <NavIcon icon="add" />
         </div>
-        <span className="text-[clamp(9px,2.5vw,12px)] font-medium font-montserrat mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('common.add')}</span>
+        <span className="text-[clamp(8px,2.2vw,11px)] font-medium font-montserrat mt-1 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('common.add')}</span>
       </button>
 
       {/* Обране */}
       <button
         onClick={() => handleTabChange('favorites')}
-        className={`flex flex-col items-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all relative group ${
+        className={`flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all relative group ${
           currentActiveTab === 'favorites' 
             ? 'text-[#D3F1A7]' 
             : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
         <div
-          className={`shrink-0 transition-transform ${currentActiveTab === 'favorites' ? 'scale-110' : ''}`}
+          className={`shrink-0 transition-transform ${currentActiveTab === 'favorites' ? 'scale-105' : ''}`}
         >
           <NavIcon icon="favorites" />
         </div>
-        <span className="text-[clamp(9px,2.5vw,12px)] font-medium font-montserrat mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.favorites')}</span>
+        <span className="text-[clamp(8px,2.2vw,11px)] font-medium font-montserrat mt-1 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.favorites')}</span>
       </button>
 
       {/* Профіль */}
       <button
         onClick={() => handleTabChange('profile')}
-        className={`flex flex-col items-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all group ${
+        className={`flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all group ${
           currentActiveTab === 'profile' 
             ? 'text-[#D3F1A7]' 
             : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
         <div
-          className={`shrink-0 transition-transform ${currentActiveTab === 'profile' ? 'scale-110' : ''}`}
+          className={`shrink-0 transition-transform ${currentActiveTab === 'profile' ? 'scale-105' : ''}`}
         >
           <NavIcon icon="profile" />
         </div>
-        <span className="text-[clamp(9px,2.5vw,12px)] font-medium font-montserrat mt-2.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.profile')}</span>
+        <span className="text-[clamp(8px,2.2vw,11px)] font-medium font-montserrat mt-1 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">{t('navigation.profile')}</span>
       </button>
     </div>
   </div>

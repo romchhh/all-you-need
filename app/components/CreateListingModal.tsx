@@ -897,10 +897,9 @@ export const CreateListingModal = ({
             <Image 
               src="/images/Group 1000007086.svg" 
               alt="Trade Ground" 
-              width={204} 
-              height={64.5}
-              className="w-auto object-contain"
-              style={{ height: '52.5px', width: 'auto' }}
+              width={140} 
+              height={45}
+              className="h-9 w-auto max-w-[min(100%,11rem)] object-contain"
               priority
             />
           </div>
