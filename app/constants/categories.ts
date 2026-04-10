@@ -17,19 +17,6 @@ export const getCategories = (t: (key: string) => string): Category[] => [
     ]
   },
   {
-    id: 'beauty_wellness',
-    name: t('categories.beauty_wellness'),
-    icon: '💄',
-    subcategories: [
-      { id: 'cosmetics', name: t('categories.subcategories.cosmetics') },
-      { id: 'perfumery', name: t('categories.subcategories.perfumery') },
-      { id: 'personal_care', name: t('categories.subcategories.personal_care') },
-      { id: 'health_products', name: t('categories.subcategories.health_products') },
-      { id: 'hygiene', name: t('categories.subcategories.hygiene') },
-      { id: 'other', name: t('categories.subcategories.other') }
-    ]
-  },
-  {
     id: 'furniture',
     name: t('categories.furniture'),
     icon: '🛋️',
@@ -87,6 +74,19 @@ export const getCategories = (t: (key: string) => string): Category[] => [
       { id: 'lighting', name: t('categories.subcategories.lighting') },
       { id: 'decor', name: t('categories.subcategories.decor') },
       { id: 'tools', name: t('categories.subcategories.tools') },
+      { id: 'other', name: t('categories.subcategories.other') }
+    ]
+  },
+  {
+    id: 'beauty_wellness',
+    name: t('categories.beauty_wellness'),
+    icon: '💄',
+    subcategories: [
+      { id: 'cosmetics', name: t('categories.subcategories.cosmetics') },
+      { id: 'perfumery', name: t('categories.subcategories.perfumery') },
+      { id: 'personal_care', name: t('categories.subcategories.personal_care') },
+      { id: 'health_products', name: t('categories.subcategories.health_products') },
+      { id: 'hygiene', name: t('categories.subcategories.hygiene') },
       { id: 'other', name: t('categories.subcategories.other') }
     ]
   },

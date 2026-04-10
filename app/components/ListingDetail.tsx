@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, Eye, MapPin, Clock, X, TrendingUp, Phone } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -92,7 +92,6 @@ export const ListingDetail = ({
   const [sellerListings, setSellerListings] = useState<Listing[]>([]);
   const [categoryListings, setCategoryListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [views, setViews] = useState(listing.views);
   const [sellerHasMore, setSellerHasMore] = useState(false);
   const [categoryHasMore, setCategoryHasMore] = useState(false);
   const [sellerOffset, setSellerOffset] = useState(0);
@@ -232,8 +231,7 @@ export const ListingDetail = ({
           method: 'GET',
         });
         if (response.ok) {
-          const updatedListing = await response.json();
-          setViews(updatedListing.views);
+          await response.json();
         }
       } catch (error) {
         console.error('Error recording view:', error);
@@ -425,8 +423,7 @@ export const ListingDetail = ({
         method: 'GET',
       });
       if (response.ok) {
-        const updatedListing = await response.json();
-        setViews(updatedListing.views);
+        await response.json();
       }
 
       // Оновлюємо пов'язані оголошення (тільки активні)
@@ -755,12 +752,6 @@ export const ListingDetail = ({
           <p className="whitespace-pre-line leading-relaxed text-white">
             {descriptionWithLinks(listing.description || '')}
           </p>
-        </div>
-
-        {/* Перегляди */}
-        <div className="flex items-center gap-1 mb-3 text-sm text-white/70">
-          <Eye size={16} className="text-white/70" />
-          <span>{views} {t('listing.views')}</span>
         </div>
 
         {/* Дата публікації */}
