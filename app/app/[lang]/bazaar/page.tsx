@@ -815,6 +815,8 @@ const BazaarPage = () => {
         savedState={bazaarTabState}
         onStateChange={setBazaarTabState}
         tg={tg}
+        profileTelegramId={profile?.telegramId != null ? String(profile.telegramId) : null}
+        onToast={(message, type) => showToast(message, type ?? 'info')}
       />
     );
   };

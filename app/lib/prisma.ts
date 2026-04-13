@@ -589,6 +589,72 @@ export async function ensureFavoriteTable(): Promise<void> {
   }
 }
 
+let citySubscriptionTableChecked = false;
+
+export async function ensureCitySubscriptionTable(): Promise<void> {
+  if (citySubscriptionTableChecked) {
+    return;
+  }
+
+  try {
+    const tableInfo = await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(`
+        SELECT name FROM sqlite_master WHERE type='table' AND name='CitySubscription'
+      `) as Promise<Array<{ name: string }>>
+    );
+
+    if (tableInfo.length === 0) {
+      try {
+        await executeWithRetry(() =>
+          prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS CitySubscription (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              userId INTEGER NOT NULL,
+              cityKey TEXT NOT NULL,
+              createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
+              UNIQUE(userId, cityKey)
+            )
+          `)
+        );
+      } catch (error: any) {
+        if (!error.message?.includes('Execute returned results') &&
+            !error.message?.includes('already exists')) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Note: Could not create CitySubscription table:', error.message);
+          }
+        }
+      }
+    }
+
+    const createIndexSafely = async (indexName: string, sql: string) => {
+      try {
+        await executeWithRetry(() => prisma.$executeRawUnsafe(sql));
+      } catch (error: any) {
+        if (!error.message?.includes('Execute returned results')) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Note: Could not create ${indexName}:`, error.message);
+          }
+        }
+      }
+    };
+
+    await createIndexSafely('idx_citysubscription_userId', `
+      CREATE INDEX IF NOT EXISTS idx_citysubscription_userId ON CitySubscription(userId)
+    `);
+    await createIndexSafely('idx_citysubscription_cityKey', `
+      CREATE INDEX IF NOT EXISTS idx_citysubscription_cityKey ON CitySubscription(cityKey)
+    `);
+
+    citySubscriptionTableChecked = true;
+  } catch (error: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Note: Could not ensure CitySubscription table:', error.message);
+    }
+    citySubscriptionTableChecked = true;
+  }
+}
+
 // Кешуємо створення таблиці UserSession
 let userSessionTableChecked = false;
 

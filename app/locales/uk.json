@@ -200,7 +200,12 @@
         "apply": "Застосувати",
         "categories": "Категорії",
         "condition": "Стан",
-        "reset": "Скинути"
+        "reset": "Скинути",
+        "citySubscribeBell": "Сповіщення про нові оголошення в місті",
+        "citySubscribeNeedLogin": "Увійдіть через Telegram, щоб керувати підпискою",
+        "citySubscribeSuccess": "Ви підписані на нові оголошення в цьому місті",
+        "citySubscribeRemoved": "Підписку на місто скасовано",
+        "citySubscribePickOneCity": "Оберіть одне місто у фільтрі, щоб підписатися"
   },
   "favorites": {
     "title": "Обране",

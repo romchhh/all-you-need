@@ -1,9 +1,10 @@
 'use client';
 
-import { X, MapPin, Search, Check } from 'lucide-react';
+import { X, MapPin, Search, Check, Bell } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useState, useEffect, Fragment, useMemo, useRef } from 'react';
+import { useState, useEffect, Fragment, useRef, useCallback, type MouseEvent } from 'react';
+import { normalizeCityInput } from '@/utils/cityNormalization';
 import { germanCities, fetchGermanCitiesFromAPI, isGermanCityValid } from '@/constants/german-cities';
 import { majorGermanCities } from '@/constants/major-german-cities';
 
@@ -82,6 +83,8 @@ interface CityModalProps {
   onClose: () => void;
   onSelect: (cities: string[]) => void;
   tg: TelegramWebApp | null;
+  profileTelegramId?: string | null;
+  onToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export const CityModal = ({ 
@@ -89,13 +92,17 @@ export const CityModal = ({
   selectedCities,
   onClose, 
   onSelect,
-  tg 
+  tg,
+  profileTelegramId,
+  onToast
 }: CityModalProps) => {
   const { t } = useLanguage();
   const [localSelectedCities, setLocalSelectedCities] = useState<string[]>(selectedCities);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [loadingCities, setLoadingCities] = useState(false);
+  const [citySubCities, setCitySubCities] = useState<string[]>([]);
+  const [citySubBusyKey, setCitySubBusyKey] = useState<string | null>(null);
   
   // Зберігаємо функції в ref для гарантії актуальності
   const onCloseRef = useRef(onClose);
@@ -247,6 +254,109 @@ export const CityModal = ({
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!profileTelegramId) {
+      setCitySubCities([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/city-subscriptions?telegramId=${encodeURIComponent(profileTelegramId)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        if (!cancelled) setCitySubCities(Array.isArray(d.cities) ? d.cities : []);
+      })
+      .catch(() => {
+        if (!cancelled) setCitySubCities([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, profileTelegramId]);
+
+  const toggleSubscription = useCallback(
+    async (e: MouseEvent, city: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const cityKey = normalizeCityInput(city.trim());
+      if (!cityKey) return;
+      if (!profileTelegramId) {
+        onToast?.(t('bazaar.citySubscribeNeedLogin'), 'info');
+        return;
+      }
+      if (citySubBusyKey !== null) return;
+      setCitySubBusyKey(cityKey);
+      try {
+        const subscribed = citySubCities.includes(cityKey);
+        if (subscribed) {
+          const r = await fetch(
+            `/api/city-subscriptions?telegramId=${encodeURIComponent(profileTelegramId)}&city=${encodeURIComponent(cityKey)}`,
+            { method: 'DELETE' }
+          );
+          if (r.ok) {
+            setCitySubCities((c) => c.filter((x) => x !== cityKey));
+            onToast?.(t('bazaar.citySubscribeRemoved'), 'success');
+          } else {
+            onToast?.(t('common.error'), 'error');
+          }
+        } else {
+          const r = await fetch('/api/city-subscriptions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: profileTelegramId, city: cityKey }),
+          });
+          if (r.ok) {
+            setCitySubCities((c) => [...new Set([...c, cityKey])].sort());
+            onToast?.(t('bazaar.citySubscribeSuccess'), 'success');
+          } else {
+            onToast?.(t('common.error'), 'error');
+          }
+        }
+        tg?.HapticFeedback?.impactOccurred?.('light');
+      } finally {
+        setCitySubBusyKey(null);
+      }
+    },
+    [profileTelegramId, citySubBusyKey, citySubCities, onToast, t, tg]
+  );
+
+  const renderCityBell = (city: string, onLightBg: boolean) => {
+    const cityKey = normalizeCityInput(city);
+    const sub = citySubCities.includes(cityKey);
+    const busyAll = citySubBusyKey !== null;
+    const wrap = onLightBg
+      ? sub
+        ? 'border-gray-900/35 bg-black/10'
+        : 'border-black/25 hover:bg-black/8'
+      : sub
+        ? 'border-[#D3F1A7] bg-[#D3F1A7]/15'
+        : 'border-white/40 hover:bg-white/10';
+    const icon = onLightBg
+      ? sub
+        ? 'text-gray-900'
+        : 'text-gray-800'
+      : sub
+        ? 'text-[#D3F1A7]'
+        : 'text-white/80';
+    return (
+      <button
+        type="button"
+        onClick={(e) => void toggleSubscription(e, city)}
+        disabled={busyAll}
+        title={t('bazaar.citySubscribeBell')}
+        aria-label={t('bazaar.citySubscribeBell')}
+        className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-colors border disabled:opacity-45 ${wrap}`}
+      >
+        <Bell
+          size={17}
+          className={icon}
+          fill={sub ? 'currentColor' : 'none'}
+          strokeWidth={2}
+        />
+      </button>
+    );
+  };
 
   // Обробка вибору/зняття вибору міста
   const toggleCity = (city: string) => {
@@ -431,14 +541,21 @@ export const CityModal = ({
                   </h4>
                   <div className="flex flex-wrap gap-2 mb-3">
                     {localSelectedCities.map((city) => (
-                      <button
+                      <div
                         key={city}
-                        onClick={() => toggleCity(city)}
-                        className="px-3 py-1.5 bg-[#D3F1A7] text-black rounded-lg text-sm font-medium hover:bg-[#D3F1A7]/80 transition-colors flex items-center gap-1"
+                        className="inline-flex items-center gap-1 pl-2 py-1 pr-1 bg-[#D3F1A7] text-black rounded-lg text-sm font-medium"
                       >
-                        <span>{city}</span>
-                        <X size={14} />
-                      </button>
+                        <span className="truncate max-w-[min(140px,40vw)]">{city}</span>
+                        {renderCityBell(city, true)}
+                        <button
+                          type="button"
+                          onClick={() => toggleCity(city)}
+                          className="p-1.5 rounded-lg hover:bg-black/10 transition-colors shrink-0"
+                          aria-label={t('common.close')}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -452,27 +569,32 @@ export const CityModal = ({
                     {validMajorGermanCities.map((city) => {
                       const isSelected = localSelectedCities.includes(city);
                       return (
-                        <button
-                          key={city}
-                          onClick={() => toggleCity(city)}
-                          className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
-                            isSelected
-                              ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-                              : 'border-white text-white bg-transparent hover:bg-white/10'
-                          }`}
-                        >
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                            isSelected 
-                              ? 'border-[#D3F1A7] bg-[#D3F1A7]' 
-                              : 'border-white'
-                          }`}>
-                            {isSelected && (
-                              <Check size={12} className="text-black" strokeWidth={3} />
-                            )}
-                          </div>
-                          <MapPin size={16} className={`flex-shrink-0 ${isSelected ? 'text-[#D3F1A7]' : 'text-white'}`} />
-                          <span>{city}</span>
-                        </button>
+                        <div key={city} className="flex gap-2 items-stretch">
+                          <button
+                            type="button"
+                            onClick={() => toggleCity(city)}
+                            className={`flex-1 min-w-0 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
+                              isSelected
+                                ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                                : 'border-white text-white bg-transparent hover:bg-white/10'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                isSelected
+                                  ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                                  : 'border-white'
+                              }`}
+                            >
+                              {isSelected && (
+                                <Check size={12} className="text-black" strokeWidth={3} />
+                              )}
+                            </div>
+                            <MapPin size={16} className={`flex-shrink-0 ${isSelected ? 'text-[#D3F1A7]' : 'text-white'}`} />
+                            <span className="truncate">{city}</span>
+                          </button>
+                          {renderCityBell(city, false)}
+                        </div>
                       );
                     })}
                   </div>
@@ -494,27 +616,32 @@ export const CityModal = ({
                         {searchResults.map((city) => {
                           const isSelected = localSelectedCities.includes(city);
                           return (
-                            <button
-                              key={city}
-                              onClick={() => toggleCity(city)}
-                              className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
-                                isSelected
-                                  ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-                                  : 'border-white text-white bg-transparent hover:bg-white/10'
-                              }`}
-                            >
-                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                                isSelected 
-                                  ? 'border-[#D3F1A7] bg-[#D3F1A7]' 
-                                  : 'border-white'
-                              }`}>
-                                {isSelected && (
-                                  <Check size={12} className="text-black" strokeWidth={3} />
-                                )}
-                              </div>
-                              <MapPin size={16} className={`flex-shrink-0 ${isSelected ? 'text-[#D3F1A7]' : 'text-white'}`} />
-                              <span>{city}</span>
-                            </button>
+                            <div key={city} className="flex gap-2 items-stretch">
+                              <button
+                                type="button"
+                                onClick={() => toggleCity(city)}
+                                className={`flex-1 min-w-0 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
+                                  isSelected
+                                    ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                                    : 'border-white text-white bg-transparent hover:bg-white/10'
+                                }`}
+                              >
+                                <div
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                    isSelected
+                                      ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                                      : 'border-white'
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <Check size={12} className="text-black" strokeWidth={3} />
+                                  )}
+                                </div>
+                                <MapPin size={16} className={`flex-shrink-0 ${isSelected ? 'text-[#D3F1A7]' : 'text-white'}`} />
+                                <span className="truncate">{city}</span>
+                              </button>
+                              {renderCityBell(city, false)}
+                            </div>
                           );
                         })}
                       </div>

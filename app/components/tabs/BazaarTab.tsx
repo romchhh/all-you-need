@@ -55,6 +55,9 @@ interface BazaarTabProps {
     viewMode?: 'grid' | 'list';
   }) => void;
   tg: TelegramWebApp | null;
+  /** Telegram ID залогіненого користувача (міні-ап) — для підписок на місто */
+  profileTelegramId?: string | null;
+  onToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 type SortOption = 'newest' | 'price_low' | 'price_high' | 'popular';
@@ -76,7 +79,9 @@ const BazaarTabComponent = ({
   initialSelectedCategory,
   savedState,
   onStateChange,
-  tg
+  tg,
+  profileTelegramId,
+  onToast
 }: BazaarTabProps) => {
   const { t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
@@ -942,6 +947,8 @@ const BazaarTabComponent = ({
         onClose={() => setIsCityModalOpen(false)}
         onSelect={(cities) => setSelectedCities(cities)}
         tg={tg}
+        profileTelegramId={profileTelegramId}
+        onToast={onToast}
       />
     </div>
   );
@@ -964,7 +971,9 @@ export const BazaarTab = memo(BazaarTabComponent, (prevProps, nextProps) => {
     prevProps.savedState?.selectedCurrency === nextProps.savedState?.selectedCurrency &&
     prevProps.savedState?.sortBy === nextProps.savedState?.sortBy &&
     prevProps.savedState?.showFreeOnly === nextProps.savedState?.showFreeOnly &&
-    prevProps.initialSelectedCategory === nextProps.initialSelectedCategory
+    prevProps.initialSelectedCategory === nextProps.initialSelectedCategory &&
+    prevProps.profileTelegramId === nextProps.profileTelegramId &&
+    prevProps.onToast === nextProps.onToast
   );
 });
 

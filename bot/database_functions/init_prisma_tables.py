@@ -80,6 +80,17 @@ def init_prisma_tables():
         ''')
         
         cursor.execute('''
+            CREATE TABLE IF NOT EXISTS CitySubscription (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userId INTEGER NOT NULL,
+                cityKey TEXT NOT NULL,
+                createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
+                UNIQUE(userId, cityKey)
+            )
+        ''')
+        
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS [Transaction] (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 userId INTEGER NOT NULL,
@@ -227,6 +238,8 @@ def init_prisma_tables():
         
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_userId ON Favorite(userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_listingId ON Favorite(listingId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_citysubscription_userId ON CitySubscription(userId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_citysubscription_cityKey ON CitySubscription(cityKey)')
         
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_userId ON [Transaction](userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_status ON [Transaction](status)')

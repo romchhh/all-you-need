@@ -72,3 +72,11 @@ export function normalizeCityInput(city: string): string {
   return CITY_ALIASES[key] || city.trim();
 }
 
+/** Ключ міста для підписок і фільтрів: перша частина локації (до коми), канонічна назва. */
+export function listingCityKeyFromLocation(location: string): string {
+  const raw = (location || '').trim();
+  if (!raw) return '';
+  const first = raw.includes(',') ? raw.split(',')[0].trim() : raw;
+  return normalizeCityInput(first);
+}
+

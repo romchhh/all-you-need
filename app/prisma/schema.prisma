@@ -32,6 +32,7 @@ model User {
   listings                Listing[]
   telegramListings        TelegramListing[]
   favorites               Favorite[]
+  citySubscriptions       CitySubscription[]
   transactions            Transaction[]
   reviews                 Review[]
   payments                Payment[]
@@ -129,6 +130,19 @@ model TelegramListing {
   @@index([moderationStatus])
   @@index([createdAt])
   @@index([category])
+}
+
+// Підписка на нові оголошення в місті (маркетплейс)
+model CitySubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  cityKey   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cityKey])
+  @@index([cityKey])
 }
 
 // Обране
