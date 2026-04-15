@@ -25,6 +25,11 @@ export async function notifyCitySubscribersOfNewMarketplaceListing(params: {
 
   const cityKey = listingCityKeyFromLocation(params.location);
   if (!cityKey) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        `[CitySubscription] skip listing=${params.listingId}: empty city from location`
+      );
+    }
     return;
   }
 
@@ -36,6 +41,10 @@ export async function notifyCitySubscribersOfNewMarketplaceListing(params: {
     cityKey,
     params.userId
   )) as Array<{ telegramId: number }>;
+
+  console.log(
+    `[CitySubscription] listing=${params.listingId} cityKey=${cityKey} subscribers=${rows.length}`
+  );
 
   if (rows.length === 0) {
     return;
@@ -58,7 +67,7 @@ export async function notifyCitySubscribersOfNewMarketplaceListing(params: {
         : `🔔 <b>Нове оголошення у ${safeCity}</b>\n\n«${safeTitle}»\n\nВідкрийте вітрину, щоб переглянути деталі.`;
 
     try {
-      await sendTelegramMessage(tid, message, {
+      const ok = await sendTelegramMessage(tid, message, {
         disable_web_page_preview: true,
         reply_markup: {
           inline_keyboard: [
@@ -71,6 +80,9 @@ export async function notifyCitySubscribersOfNewMarketplaceListing(params: {
           ],
         },
       });
+      if (!ok) {
+        console.error('[notifyCitySubscribers] sendTelegramMessage returned false for', tid);
+      }
     } catch (e) {
       console.error('[notifyCitySubscribers] send failed for', tid, e);
     }

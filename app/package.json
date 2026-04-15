@@ -14,7 +14,8 @@
     "db:init": "tsx scripts/init-db.ts",
     "db:apply-migration": "tsx scripts/apply-migration.ts",
     "db:fix-location-hamburg": "tsx scripts/fix-location-hamburg.ts",
-    "db:remove-description-footer": "tsx scripts/remove-description-footer.ts"
+    "db:remove-description-footer": "tsx scripts/remove-description-footer.ts",
+    "test:city-notify": "tsx scripts/test-city-subscription-notify.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
