@@ -153,9 +153,16 @@ export async function updateListingPackagesBalance(
 /**
  * Отримує мову користувача (uk | ru) за telegramId
  */
-export async function getUserLanguage(telegramId: string | number): Promise<'uk' | 'ru'> {
-  const id = typeof telegramId === 'string' ? parseInt(telegramId, 10) : telegramId;
-  if (isNaN(id)) return 'uk';
+export async function getUserLanguage(telegramId: string | number | bigint): Promise<'uk' | 'ru'> {
+  let id: number;
+  if (typeof telegramId === 'bigint') {
+    id = Number(telegramId);
+  } else if (typeof telegramId === 'string') {
+    id = parseInt(telegramId, 10);
+  } else {
+    id = Number(telegramId);
+  }
+  if (!Number.isFinite(id)) return 'uk';
   try {
     const legacy = await prisma.$queryRawUnsafe(
       `SELECT language FROM users_legacy WHERE user_id = ?`,
@@ -184,9 +191,16 @@ export async function getUserLanguage(telegramId: string | number): Promise<'uk'
 /**
  * Парсить telegramId з різних форматів
  */
-export function parseTelegramId(telegramId: string | number): number {
-  const parsed = typeof telegramId === 'string' ? parseInt(telegramId, 10) : telegramId;
-  if (isNaN(parsed)) {
+export function parseTelegramId(telegramId: string | number | bigint): number {
+  let parsed: number;
+  if (typeof telegramId === 'bigint') {
+    parsed = Number(telegramId);
+  } else if (typeof telegramId === 'string') {
+    parsed = parseInt(telegramId, 10);
+  } else {
+    parsed = Number(telegramId);
+  }
+  if (!Number.isFinite(parsed)) {
     throw new Error('Invalid telegramId format');
   }
   return parsed;

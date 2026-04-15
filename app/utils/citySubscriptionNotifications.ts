@@ -55,8 +55,14 @@ export async function notifyCitySubscribersOfNewMarketplaceListing(params: {
   const safeCity = escapeHtmlTelegram(cityKey);
 
   for (const row of rows) {
-    const tid = row.telegramId;
-    if (!tid) continue;
+    const rawTid = row.telegramId as number | bigint | string;
+    const tid =
+      typeof rawTid === 'bigint'
+        ? Number(rawTid)
+        : typeof rawTid === 'string'
+          ? parseInt(rawTid, 10)
+          : Number(rawTid);
+    if (!tid || !Number.isFinite(tid)) continue;
 
     const lang = await getUserLanguage(tid);
     const listingUrl = `${webappUrl}/${lang}/bazaar?listing=${params.listingId}&telegramId=${tid}`;
