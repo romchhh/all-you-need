@@ -202,8 +202,9 @@ export async function POST(request: NextRequest) {
     optimizeImages(savedImageUrls).then(async (optimizedUrls) => {
       if (optimizedUrls.length > 0) {
         try {
-          const { prisma } = await import('@/lib/prisma');
-          
+          const { prisma, ensurePromotionPurchaseTable } = await import('@/lib/prisma');
+          await ensurePromotionPurchaseTable();
+
           // Зберігаємо оптимізовані версії в окремому полі
           // Оригінали залишаються в images для fallback
           await prisma.$executeRawUnsafe(

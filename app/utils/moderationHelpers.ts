@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { prisma, ensurePromotionPurchaseTable } from '@/lib/prisma';
 import { sendListingApprovedNotification, sendListingRejectedNotification } from './telegramNotifications';
 import { notifyCitySubscribersOfNewMarketplaceListing } from './citySubscriptionNotifications';
 import { getSystemSetting, createTransaction } from './dbHelpers';
@@ -49,6 +49,7 @@ export async function getListingWithUser(listingId: number): Promise<ListingWith
  * Схвалює оголошення
  */
 export async function approveListing(listing: ListingWithUser): Promise<void> {
+  await ensurePromotionPurchaseTable();
   const expiresAt = addDays(new Date(), 30);
   const expiresAtStr = toSQLiteDate(expiresAt);
   const nowStr = nowSQLite();
@@ -342,6 +343,7 @@ export async function rejectListing(
   reason: string,
   moderatedBy?: number
 ): Promise<{ refundedPackage: boolean; refundedPromotions: boolean; promotionRefundAmount: number }> {
+  await ensurePromotionPurchaseTable();
   const nowStr = nowSQLite();
   
   // Перевіряємо чи платні оголошення увімкнені

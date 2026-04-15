@@ -425,7 +425,48 @@ class ModerationManager:
                                         print(f"[approve_listing] Failed to check referral reward: {response.status}")
                     except Exception as ref_error:
                         print(f"[approve_listing] Error checking referral reward: {ref_error}")
-                
+
+                    # Сповіщення підписників міста (як у Next.js approveListing)
+                    try:
+                        webapp_url = (
+                            os.getenv("WEBAPP_URL")
+                            or os.getenv("NEXT_PUBLIC_BASE_URL")
+                            or "http://localhost:3000"
+                        )
+                        bot_key = (
+                            os.getenv("BOT_API_KEY")
+                            or os.getenv("INTERNAL_API_SECRET")
+                            or os.getenv("TELEGRAM_BOT_API_KEY")
+                        )
+                        if webapp_url and bot_key:
+                            notify_url = (
+                                f"{webapp_url.rstrip('/')}/api/internal/notify-city-subscribers"
+                            )
+                            async with aiohttp.ClientSession() as session:
+                                async with session.post(
+                                    notify_url,
+                                    json={"listingId": listing_id},
+                                    headers={"Authorization": f"Bearer {bot_key}"},
+                                    timeout=aiohttp.ClientTimeout(total=45),
+                                ) as response:
+                                    if response.status != 200:
+                                        text = await response.text()
+                                        print(
+                                            f"[approve_listing] City subscriber notify failed: "
+                                            f"{response.status} {text}"
+                                        )
+                                    else:
+                                        print(
+                                            f"[approve_listing] City subscriber notify OK for listing {listing_id}"
+                                        )
+                        else:
+                            print(
+                                "[approve_listing] Skip city notify: WEBAPP_URL or BOT_API_KEY "
+                                "not set"
+                            )
+                    except Exception as notify_err:
+                        print(f"[approve_listing] City subscriber notify error: {notify_err}")
+
                 conn.close()
                 return success
                 

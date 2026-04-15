@@ -655,6 +655,92 @@ export async function ensureCitySubscriptionTable(): Promise<void> {
   }
 }
 
+let promotionPurchaseTableChecked = false;
+
+/** Таблиця реклами (старі SQLite без prisma migrate). */
+export async function ensurePromotionPurchaseTable(): Promise<void> {
+  if (promotionPurchaseTableChecked) {
+    return;
+  }
+
+  try {
+    const tableInfo = await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(`
+        SELECT name FROM sqlite_master WHERE type='table' AND name='PromotionPurchase'
+      `) as Promise<Array<{ name: string }>>
+    );
+
+    if (tableInfo.length === 0) {
+      try {
+        await executeWithRetry(() =>
+          prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS PromotionPurchase (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              userId INTEGER NOT NULL,
+              listingId INTEGER,
+              promotionType TEXT NOT NULL,
+              price REAL NOT NULL,
+              duration INTEGER NOT NULL DEFAULT 7,
+              paymentMethod TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              invoiceId TEXT,
+              startsAt DATETIME,
+              endsAt DATETIME,
+              createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+            )
+          `)
+        );
+      } catch (error: any) {
+        if (!error.message?.includes('Execute returned results') &&
+            !error.message?.includes('already exists')) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Note: Could not create PromotionPurchase table:', error.message);
+          }
+        }
+      }
+    }
+
+    const createIndexSafely = async (indexName: string, sql: string) => {
+      try {
+        await executeWithRetry(() => prisma.$executeRawUnsafe(sql));
+      } catch (error: any) {
+        if (!error.message?.includes('Execute returned results')) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Note: Could not create ${indexName}:`, error.message);
+          }
+        }
+      }
+    };
+
+    await createIndexSafely('idx_promotion_userId', `
+      CREATE INDEX IF NOT EXISTS idx_promotion_userId ON PromotionPurchase(userId)
+    `);
+    await createIndexSafely('idx_promotion_listingId', `
+      CREATE INDEX IF NOT EXISTS idx_promotion_listingId ON PromotionPurchase(listingId)
+    `);
+    await createIndexSafely('idx_promotion_status', `
+      CREATE INDEX IF NOT EXISTS idx_promotion_status ON PromotionPurchase(status)
+    `);
+    await createIndexSafely('idx_promotion_promotionType', `
+      CREATE INDEX IF NOT EXISTS idx_promotion_promotionType ON PromotionPurchase(promotionType)
+    `);
+    await createIndexSafely('idx_promotion_createdAt', `
+      CREATE INDEX IF NOT EXISTS idx_promotion_createdAt ON PromotionPurchase(createdAt)
+    `);
+    await createIndexSafely('idx_promotion_invoiceId', `
+      CREATE INDEX IF NOT EXISTS idx_promotion_invoiceId ON PromotionPurchase(invoiceId)
+    `);
+
+    promotionPurchaseTableChecked = true;
+  } catch (error: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Note: Could not ensure PromotionPurchase table:', error.message);
+    }
+    promotionPurchaseTableChecked = true;
+  }
+}
+
 // Кешуємо створення таблиці UserSession
 let userSessionTableChecked = false;
 

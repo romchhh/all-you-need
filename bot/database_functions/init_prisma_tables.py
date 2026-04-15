@@ -91,6 +91,24 @@ def init_prisma_tables():
         ''')
         
         cursor.execute('''
+            CREATE TABLE IF NOT EXISTS PromotionPurchase (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userId INTEGER NOT NULL,
+                listingId INTEGER,
+                promotionType TEXT NOT NULL,
+                price REAL NOT NULL,
+                duration INTEGER NOT NULL DEFAULT 7,
+                paymentMethod TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                invoiceId TEXT,
+                startsAt DATETIME,
+                endsAt DATETIME,
+                createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS [Transaction] (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 userId INTEGER NOT NULL,
@@ -240,6 +258,12 @@ def init_prisma_tables():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_listingId ON Favorite(listingId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_citysubscription_userId ON CitySubscription(userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_citysubscription_cityKey ON CitySubscription(cityKey)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_promotion_userId ON PromotionPurchase(userId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_promotion_listingId ON PromotionPurchase(listingId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_promotion_status ON PromotionPurchase(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_promotion_promotionType ON PromotionPurchase(promotionType)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_promotion_createdAt ON PromotionPurchase(createdAt)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_promotion_invoiceId ON PromotionPurchase(invoiceId)')
         
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_userId ON [Transaction](userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transaction_status ON [Transaction](status)')

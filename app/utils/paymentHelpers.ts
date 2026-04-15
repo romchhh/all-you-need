@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { prisma, ensurePromotionPurchaseTable } from '@/lib/prisma';
 import { nowSQLite } from './dateHelpers';
 import { createTransaction } from './dbHelpers';
 import { 
@@ -81,6 +81,7 @@ export async function applyPromotionPurchaseToListing(
   endsAt: Date,
   nowStr: string
 ): Promise<void> {
+  await ensurePromotionPurchaseTable();
   const listing = await prisma.$queryRawUnsafe(
     `SELECT status FROM Listing WHERE id = ?`,
     listingId
@@ -334,6 +335,7 @@ export async function createPromotionPurchaseRecord(
   status: 'pending' | 'completed' = 'pending',
   invoiceId?: string
 ): Promise<void> {
+  await ensurePromotionPurchaseTable();
   const promotionInfo = PROMOTION_PRICES[promotionType];
   const now = new Date();
   const endsAt = new Date();
