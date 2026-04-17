@@ -172,11 +172,19 @@ async def _send_with_retry(coro_fn, *args, **kwargs):
 async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
     """
     Надсилає оголошення в групу модерації парсера.
+    Якщо в item задано notify_chat_id (напр. послуги з parser.py) — надсилання туди.
     Повертає message_id надісланого повідомлення або None.
     """
-    group_id = get_parser_group_id()
+    override = item.get("notify_chat_id")
+    if override is not None:
+        try:
+            group_id = int(override)
+        except (TypeError, ValueError):
+            group_id = get_parser_group_id()
+    else:
+        group_id = get_parser_group_id()
     if not group_id:
-        logger.warning("PARSER_GROUP_ID не встановлено — пропускаємо надсилання адміну")
+        logger.warning("PARSER_GROUP_ID / notify_chat_id не встановлено — пропускаємо надсилання адміну")
         return None
 
     item_id = item["id"]

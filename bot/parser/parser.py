@@ -7,6 +7,10 @@
 Приватні групи з посиланнями t.me/+...: акаунт парсера має бути учасником; далі можна
 вказати у PARSER_EXTRA_CHANNELS публічний @username супергрупи, якщо з’явиться, або
 numeric chat id (експериментально) після першого join.
+
+Оголошення категорії «Послуги» (services_work) надсилаються в окремий канал модерації
+(за замовч. -1003714727651). Інші — у PARSER_GROUP_ID (admin_notify).
+Перевизначення: PARSER_SERVICES_MODERATION_CHANNEL_ID у .env
 """
 
 import asyncio
@@ -85,6 +89,12 @@ BEAUTY_SERVICE_CHANNELS: frozenset[str] = frozenset({
 
 # Скільки останніх повідомлень перевіряти за один прохід
 FETCH_LIMIT: int = int(os.getenv("PARSER_FETCH_LIMIT", "100"))
+
+# Модерація оголошень категорії «Послуги» (services_work) — окремий канал.
+# Інші категорії йдуть у PARSER_GROUP_ID (див. admin_notify).
+SERVICES_MODERATION_CHANNEL_ID: int = int(
+    os.getenv("PARSER_SERVICES_MODERATION_CHANNEL_ID", "-1003714727651")
+)
 
 # ──────────────────────────────────────────────
 # Допоміжні регулярні вирази
@@ -486,6 +496,12 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
                 "images": images,
                 "raw_text": text[:4000],
                 "msg_link": message_link(channel, effective_message_id),
+                # Послуги → окремий канал модерації; інше → None (використається PARSER_GROUP_ID)
+                "notify_chat_id": (
+                    SERVICES_MODERATION_CHANNEL_ID
+                    if category == "services_work"
+                    else None
+                ),
             }
             # Сповіщаємо адміна
             try:
