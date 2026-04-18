@@ -366,7 +366,9 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
         insert_parsed_item,
         ensure_parsed_items_table,
         fingerprint_parsed_text,
-        parsed_item_content_hash_exists,
+        fingerprint_title_desc,
+        parsed_item_is_raw_duplicate,
+        parsed_item_is_semantic_duplicate,
     )
     from parser.category_keywords import detect_category
 
@@ -406,7 +408,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             continue
 
         content_hash = fingerprint_parsed_text(text)
-        if parsed_item_content_hash_exists(content_hash):
+        if parsed_item_is_raw_duplicate(content_hash):
             stats["skipped"] += 1
             stats["reasons"]["дублікат (текст)"] = stats["reasons"].get("дублікат (текст)", 0) + 1
             continue
@@ -438,6 +440,14 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
         if not relaxed_quality and has_too_many_emojis(description):
             stats["skipped"] += 1
             stats["reasons"]["багато емоджі"] = stats["reasons"].get("багато емоджі", 0) + 1
+            continue
+
+        dedup_key = fingerprint_title_desc(title, description)
+        if parsed_item_is_semantic_duplicate(dedup_key):
+            stats["skipped"] += 1
+            stats["reasons"]["дублікат (оголошення)"] = stats["reasons"].get(
+                "дублікат (оголошення)", 0
+            ) + 1
             continue
 
         category, subcategory = detect_category(text, skip_free=(price_str is not None and not is_free))
@@ -474,6 +484,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             images=images,
             raw_text=text[:4000],
             content_hash=content_hash,
+            dedup_key=dedup_key,
         )
 
         if item_id:

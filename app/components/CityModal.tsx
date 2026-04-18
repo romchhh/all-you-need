@@ -1,6 +1,6 @@
 'use client';
 
-import { X, MapPin, Search, Check, Bell } from 'lucide-react';
+import { X, MapPin, Search, Check, Bell, ChevronDown } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useState, useEffect, Fragment, useRef, useCallback, type MouseEvent } from 'react';
@@ -103,6 +103,8 @@ export const CityModal = ({
   const [loadingCities, setLoadingCities] = useState(false);
   const [citySubCities, setCitySubCities] = useState<string[]>([]);
   const [citySubBusyKey, setCitySubBusyKey] = useState<string | null>(null);
+  const [subsDropdownOpen, setSubsDropdownOpen] = useState(false);
+  const subsDropdownRef = useRef<HTMLDivElement>(null);
   
   // Зберігаємо функції в ref для гарантії актуальності
   const onCloseRef = useRef(onClose);
@@ -119,6 +121,7 @@ export const CityModal = ({
     if (isOpen) {
       setLocalSelectedCities([...selectedCities]);
       setSearchQuery('');
+      setSubsDropdownOpen(false);
       // Зберігаємо поточну позицію скролу
       const scrollY = window.scrollY;
       // Блокуємо скрол на body та html
@@ -274,6 +277,18 @@ export const CityModal = ({
       cancelled = true;
     };
   }, [isOpen, profileTelegramId]);
+
+  useEffect(() => {
+    if (!subsDropdownOpen) return;
+    const onDocMouseDown = (ev: globalThis.MouseEvent) => {
+      const el = subsDropdownRef.current;
+      if (el && !el.contains(ev.target as Node)) {
+        setSubsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [subsDropdownOpen]);
 
   const toggleSubscription = useCallback(
     async (e: MouseEvent, city: string) => {
@@ -518,19 +533,75 @@ export const CityModal = ({
                 />
               </div>
 
-              {/* Всі міста (за замовчуванням) */}
-              <div>
+              {/* Всі міста + швидкий вибір міст із підписок */}
+              <div className="flex gap-2 items-stretch">
                 <button
+                  type="button"
                   onClick={() => toggleCity('')}
-                  className={`w-full px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
+                  className={`min-w-0 flex-1 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
                     localSelectedCities.length === 0
                       ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
                       : 'border-white text-white bg-transparent hover:bg-white/10'
                   }`}
                 >
                   <MapPin size={16} className={`flex-shrink-0 mr-2 ${localSelectedCities.length === 0 ? 'text-[#D3F1A7]' : 'text-white'}`} />
-                  <span className="font-medium">{t('bazaar.allCities') || 'Всі міста'}</span>
+                  <span className="font-medium truncate">{t('bazaar.allCities') || 'Всі міста'}</span>
                 </button>
+                {profileTelegramId && citySubCities.length > 0 && (
+                  <div className="relative shrink-0 self-stretch" ref={subsDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setSubsDropdownOpen((o) => !o)}
+                      className={`h-full min-h-[48px] px-3 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                        subsDropdownOpen
+                          ? 'border-[#D3F1A7] text-[#D3F1A7] bg-white/5'
+                          : 'border-white text-white hover:bg-white/10'
+                      }`}
+                      title={t('bazaar.subscribedCitiesMenu')}
+                      aria-expanded={subsDropdownOpen}
+                      aria-haspopup="listbox"
+                    >
+                      <Bell size={16} className={subsDropdownOpen ? 'text-[#D3F1A7]' : 'text-white'} />
+                      <ChevronDown
+                        size={14}
+                        className={`opacity-90 transition-transform ${subsDropdownOpen ? 'rotate-180 text-[#D3F1A7]' : ''}`}
+                      />
+                    </button>
+                    {subsDropdownOpen && (
+                      <div
+                        className="absolute z-[60] right-0 mt-1 min-w-[min(100vw-2rem,16rem)] max-w-[min(100vw-2rem,20rem)] max-h-52 overflow-y-auto rounded-xl border border-white/25 bg-[#1a1a1a] shadow-xl py-1"
+                        role="listbox"
+                      >
+                        {citySubCities.map((city) => {
+                          const selected = localSelectedCities.includes(city);
+                          return (
+                            <button
+                              key={city}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              className="w-full px-3 py-2.5 text-left text-sm text-white hover:bg-white/10 flex items-center gap-2"
+                              onClick={() => {
+                                toggleCity(city);
+                                setSubsDropdownOpen(false);
+                                tg?.HapticFeedback?.impactOccurred?.('light');
+                              }}
+                            >
+                              <span
+                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                  selected ? 'border-[#D3F1A7] bg-[#D3F1A7]' : 'border-white/50'
+                                }`}
+                              >
+                                {selected ? <Check size={10} className="text-black" strokeWidth={3} /> : null}
+                              </span>
+                              <span className="truncate">{city}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Показуємо вибрані міста */}

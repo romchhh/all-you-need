@@ -9,6 +9,7 @@ import shutil
 import uuid
 import re
 import hashlib
+import unicodedata
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
@@ -70,6 +71,14 @@ def ensure_parsed_items_table():
         "CREATE INDEX IF NOT EXISTS idx_parsed_items_content_hash "
         "ON parsed_items(content_hash) WHERE content_hash IS NOT NULL"
     )
+    cursor.execute("PRAGMA table_info(parsed_items)")
+    col_names2 = {row[1] for row in cursor.fetchall()}
+    if "dedup_key" not in col_names2:
+        cursor.execute("ALTER TABLE parsed_items ADD COLUMN dedup_key TEXT")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_parsed_items_dedup_key "
+        "ON parsed_items(dedup_key) WHERE dedup_key IS NOT NULL"
+    )
     conn.commit()
     conn.close()
 
@@ -89,19 +98,60 @@ def parsed_item_exists(source_channel: str, message_id: int) -> bool:
 
 def fingerprint_parsed_text(raw_text: str) -> str:
     """
-    Нормалізований відбиток тексту оголошення для дедуплікації між каналами
+    Нормалізований відбиток сирого тексту для дедуплікації між каналами
     (одне й те саме репостять у кілька груп).
     """
     t = (raw_text or "").lower()
     t = re.sub(r"https?://t\.me/\S+", " ", t, flags=re.IGNORECASE)
     t = re.sub(r"https?://(?:www\.)?instagram\.com/\S+", " ", t, flags=re.IGNORECASE)
     t = re.sub(r"https?://\S+", " ", t)
+    # Прибираємо емодзі — у різних групах текст часто відрізняється лише емодзі
+    t = re.sub(
+        r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F600-\U0001F64F"
+        r"\U0001F680-\U0001F6FF\U0001F900-\U0001F9FF]+",
+        " ",
+        t,
+    )
     t = re.sub(r"\s+", " ", t).strip()
     return hashlib.sha256(t.encode("utf-8")).hexdigest()
 
 
-def parsed_item_content_hash_exists(content_hash: str) -> bool:
-    """Чи вже зберегли оголошення з таким самим текстом (будь-який канал)."""
+def fingerprint_title_desc(title: str, description: str) -> str:
+    """
+    Відбиток за нормалізованим заголовком + початком опису.
+    Ловить дублікати з різним форматуванням/футерами між каналами.
+    """
+    emoji_re = re.compile(
+        r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F600-\U0001F64F"
+        r"\U0001F680-\U0001F6FF\U0001F900-\U0001F9FF]+",
+        re.UNICODE,
+    )
+
+    def norm(s: str) -> str:
+        s = (s or "").lower()
+        try:
+            s = unicodedata.normalize("NFKD", s)
+            s = "".join(c for c in s if not unicodedata.combining(c))
+        except Exception:
+            pass
+        s = emoji_re.sub(" ", s)
+        s = re.sub(r"https?://\S+", " ", s, flags=re.IGNORECASE)
+        s = re.sub(r"@[\w\d_]{2,}", " ", s)
+        s = re.sub(r"[^\w\s\u0400-\u04FF]", " ", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+
+    t = norm(title)[:220]
+    d = norm(description)[:700]
+    # Занадто короткий зміст — не дедуплікуємо семантично (багато хибних збігів)
+    if len(t) + len(d) < 14:
+        return ""
+    blob = f"{t}|{d}"
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def parsed_item_is_raw_duplicate(content_hash: str) -> bool:
+    """Той самий нормалізований сирий текст — дублікат (будь-який статус у БД)."""
     if not content_hash:
         return False
     conn = get_connection()
@@ -110,9 +160,36 @@ def parsed_item_content_hash_exists(content_hash: str) -> bool:
         "SELECT 1 FROM parsed_items WHERE content_hash = ? LIMIT 1",
         (content_hash,),
     )
-    exists = cursor.fetchone() is not None
+    dup = cursor.fetchone() is not None
     conn.close()
-    return exists
+    return dup
+
+
+def parsed_item_is_semantic_duplicate(dedup_key: Optional[str]) -> bool:
+    """
+    Той самий зміст оголошення (заголовок+опис) у іншому каналі / з іншим форматуванням.
+    Пропускаємо лише якщо вже є pending або approved; відхилене можна надіслати знову.
+    """
+    if not dedup_key:
+        return False
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT 1 FROM parsed_items
+        WHERE dedup_key = ? AND status IN ('pending', 'approved')
+        LIMIT 1
+        """,
+        (dedup_key,),
+    )
+    dup = cursor.fetchone() is not None
+    conn.close()
+    return dup
+
+
+def parsed_item_content_hash_exists(content_hash: str) -> bool:
+    """Сумісність: те саме, що parsed_item_is_raw_duplicate."""
+    return parsed_item_is_raw_duplicate(content_hash)
 
 
 def insert_parsed_item(
@@ -134,6 +211,7 @@ def insert_parsed_item(
     images: list[str],
     raw_text: str,
     content_hash: Optional[str] = None,
+    dedup_key: Optional[str] = None,
 ) -> int:
     """Вставляє нове оголошення в parsed_items. Повертає id запису."""
     conn = get_connection()
@@ -144,14 +222,14 @@ def insert_parsed_item(
             author_username, author_id,
             title, description, price, currency, is_free,
             category, subcategory, condition, location,
-            images_json, raw_text, content_hash, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            images_json, raw_text, content_hash, dedup_key, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     """, (
         source_channel, source_city, message_id, media_group_id,
         author_username, author_id,
         title, description, price, currency, int(is_free),
         category, subcategory, condition, location,
-        json.dumps(images, ensure_ascii=False), raw_text, content_hash,
+        json.dumps(images, ensure_ascii=False), raw_text, content_hash, dedup_key,
     ))
     conn.commit()
     item_id = cursor.lastrowid

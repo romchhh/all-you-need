@@ -205,7 +205,8 @@
         "citySubscribeNeedLogin": "Войдите через Telegram, чтобы управлять подпиской",
         "citySubscribeSuccess": "Вы подписаны на новые объявления в этом городе",
         "citySubscribeRemoved": "Подписка на город отменена",
-        "citySubscribePickOneCity": "Выберите один город в фильтре, чтобы подписаться"
+        "citySubscribePickOneCity": "Выберите один город в фильтре, чтобы подписаться",
+        "subscribedCitiesMenu": "Города из подписок"
   },
   "favorites": {
     "title": "Избранное",

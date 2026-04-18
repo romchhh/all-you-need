@@ -205,7 +205,8 @@
         "citySubscribeNeedLogin": "Увійдіть через Telegram, щоб керувати підпискою",
         "citySubscribeSuccess": "Ви підписані на нові оголошення в цьому місті",
         "citySubscribeRemoved": "Підписку на місто скасовано",
-        "citySubscribePickOneCity": "Оберіть одне місто у фільтрі, щоб підписатися"
+        "citySubscribePickOneCity": "Оберіть одне місто у фільтрі, щоб підписатися",
+        "subscribedCitiesMenu": "Міста з підписок"
   },
   "favorites": {
     "title": "Обране",
