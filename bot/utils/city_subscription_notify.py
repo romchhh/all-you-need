@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import json
 import os
 import sqlite3
 from typing import List
@@ -93,6 +94,52 @@ def _user_language(cursor: sqlite3.Cursor, telegram_id: int) -> str:
     return "uk"
 
 
+def _listing_photo_urls(images_raw: str | None, webapp_url: str) -> List[str]:
+    if not images_raw:
+        return []
+    items: list = []
+    try:
+        parsed = json.loads(images_raw)
+        if isinstance(parsed, list):
+            items = parsed
+        elif isinstance(parsed, str):
+            items = [parsed]
+    except Exception:
+        items = [images_raw]
+
+    urls: List[str] = []
+    for item in items:
+        raw = ""
+        if isinstance(item, dict):
+            raw = str(item.get("file_id") or item.get("url") or "").strip()
+        elif isinstance(item, str):
+            raw = item.strip()
+        if not raw:
+            continue
+        if raw.startswith("http://") or raw.startswith("https://"):
+            urls.append(raw)
+            continue
+        clean = raw.split("?", 1)[0].lstrip("/")
+        if not clean:
+            continue
+        if "parsed_photos/" in clean:
+            suffix = clean.split("parsed_photos/", 1)[1]
+            if suffix:
+                urls.append(f"{webapp_url}/api/parsed-images/{suffix}")
+        else:
+            urls.append(f"{webapp_url}/api/images/{clean}")
+
+    # унікальні зберігаємо порядок
+    seen = set()
+    uniq: List[str] = []
+    for u in urls:
+        if u in seen:
+            continue
+        seen.add(u)
+        uniq.append(u)
+    return uniq
+
+
 async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None:
     """
     Надсилає повідомлення всім підписникам cityKey (окрім автора оголошення).
@@ -105,7 +152,17 @@ async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, userId, title, COALESCE(location, '') FROM Listing WHERE id = ?",
+            """
+            SELECT
+                id,
+                userId,
+                title,
+                COALESCE(description, ''),
+                COALESCE(location, ''),
+                COALESCE(images, '')
+            FROM Listing
+            WHERE id = ?
+            """,
             (listing_id,),
         )
         row = cursor.fetchone()
@@ -113,11 +170,20 @@ async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None
             print(f"[city_subscription_notify] Listing {listing_id} not found")
             return
 
-        _lid, author_user_id, title, location = row[0], row[1], row[2], row[3]
+        _lid, author_user_id, title, description, location, images_raw = (
+            row[0],
+            row[1],
+            row[2],
+            row[3],
+            row[4],
+            row[5],
+        )
         city_key = listing_city_key_from_location(location)
         if not city_key:
             print(f"[city_subscription_notify] Empty city for listing {listing_id}")
             return
+        photo_urls = _listing_photo_urls(images_raw, webapp_url)
+        first_photo_url = photo_urls[0] if photo_urls else ""
 
         cursor.execute(
             """
@@ -141,8 +207,10 @@ async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None
             f"subscribers={len(recipients)}"
         )
 
-        safe_title = html.escape(title or "")
+        safe_title = html.escape((title or "").strip())
         safe_city = html.escape(city_key)
+        safe_description = html.escape(" ".join((description or "").split()).strip()[:300])
+        safe_photo_link = html.escape(first_photo_url, quote=True)
 
         for tid in recipients:
             lang = _user_language(cursor, tid)
@@ -153,14 +221,26 @@ async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None
                 text = (
                     f"🔔 <b>Новое объявление в {safe_city}</b>\n\n"
                     f"«{safe_title}»\n\n"
-                    f"Откройте витрину, чтобы посмотреть детали."
+                    f"{safe_description or 'Без описания.'}\n\n"
+                    + (
+                        f"🖼 <a href=\"{safe_photo_link}\">Фото объявления</a>\n\n"
+                        if safe_photo_link
+                        else ""
+                    )
+                    + "Откройте витрину, чтобы посмотреть детали."
                 )
                 btn = "🔗 Открыть"
             else:
                 text = (
                     f"🔔 <b>Нове оголошення у {safe_city}</b>\n\n"
                     f"«{safe_title}»\n\n"
-                    f"Відкрийте вітрину, щоб переглянути деталі."
+                    f"{safe_description or 'Без опису.'}\n\n"
+                    + (
+                        f"🖼 <a href=\"{safe_photo_link}\">Фото оголошення</a>\n\n"
+                        if safe_photo_link
+                        else ""
+                    )
+                    + "Відкрийте вітрину, щоб переглянути деталі."
                 )
                 btn = "🔗 Відкрити"
 
@@ -175,15 +255,37 @@ async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None
                 ]
             )
             try:
-                await bot.send_message(
-                    chat_id=tid,
-                    text=text,
-                    parse_mode="HTML",
-                    reply_markup=kb,
-                    disable_web_page_preview=True,
-                )
+                if first_photo_url:
+                    await bot.send_photo(
+                        chat_id=tid,
+                        photo=first_photo_url,
+                        caption=text[:1024],  # ліміт Telegram для caption
+                        parse_mode="HTML",
+                        reply_markup=kb,
+                    )
+                else:
+                    await bot.send_message(
+                        chat_id=tid,
+                        text=text,
+                        parse_mode="HTML",
+                        reply_markup=kb,
+                        disable_web_page_preview=True,
+                    )
             except Exception as e:
                 print(f"[city_subscription_notify] send failed for {tid}: {e}")
+                if first_photo_url:
+                    try:
+                        await bot.send_message(
+                            chat_id=tid,
+                            text=text,
+                            parse_mode="HTML",
+                            reply_markup=kb,
+                            disable_web_page_preview=True,
+                        )
+                    except Exception as e2:
+                        print(
+                            f"[city_subscription_notify] text fallback failed for {tid}: {e2}"
+                        )
 
             await asyncio.sleep(0.05)
     finally:

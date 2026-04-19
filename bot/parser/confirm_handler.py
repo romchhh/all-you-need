@@ -38,6 +38,12 @@ router = Router()
 WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://allyouneed.de")
 BOT_USERNAME: str = (os.getenv("BOT_USERNAME") or "").lstrip("@")
 PARSER_BOT_TELEGRAM_ID: int = int(os.getenv("PARSER_BOT_TELEGRAM_ID", "0"))
+PARSER_SERVICES_BOT_TELEGRAM_ID: int = int(
+    os.getenv("PARSER_SERVICES_BOT_TELEGRAM_ID", "5587484547")
+)
+PARSER_SERVICES_BOT_USERNAME: str = (
+    os.getenv("PARSER_SERVICES_BOT_USERNAME") or "tradeground_seller2"
+)
 
 NOTIFY_AUTHOR_TEXT_RU = (
     "Привет! 👋\n\n"
@@ -211,9 +217,19 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
         await callback.answer("ℹ️ Оголошення вже відхилено", show_alert=True)
         return
 
-    # Отримуємо або створюємо системного user для маркетплейсу
-    bot_tg_id = PARSER_BOT_TELEGRAM_ID or 8590825131
-    user_id = get_or_create_bot_user(bot_tg_id, "parser_bot")
+    # Отримуємо або створюємо системного user для маркетплейсу:
+    # services_work -> окремий продавець TradeGround Seller 2,
+    # решта категорій -> стандартний parser_bot.
+    item_category = (item.get("category") or "").strip().lower()
+    if item_category == "services_work":
+        user_id = get_or_create_bot_user(
+            PARSER_SERVICES_BOT_TELEGRAM_ID,
+            PARSER_SERVICES_BOT_USERNAME,
+            "TradeGround Seller 2",
+        )
+    else:
+        bot_tg_id = PARSER_BOT_TELEGRAM_ID or 8590825131
+        user_id = get_or_create_bot_user(bot_tg_id, "parser_bot", "Parser Bot")
 
     # Отримуємо зображення
     images_raw = item.get("images_json") or "[]"

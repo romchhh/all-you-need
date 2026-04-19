@@ -206,7 +206,8 @@
         "citySubscribeSuccess": "Ви підписані на нові оголошення в цьому місті",
         "citySubscribeRemoved": "Підписку на місто скасовано",
         "citySubscribePickOneCity": "Оберіть одне місто у фільтрі, щоб підписатися",
-        "subscribedCitiesMenu": "Міста з підписок"
+        "subscribedCitiesMenu": "Міста з підписок",
+        "subscribedCitiesEmpty": "Немає міст у підписці"
   },
   "favorites": {
     "title": "Обране",

@@ -1,6 +1,6 @@
 import { X, Copy, MessageCircle, Mail, Share2 } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
@@ -10,14 +10,69 @@ interface ShareModalProps {
   onClose: () => void;
   shareLink: string;
   shareText: string;
+  telegramTitle?: string;
+  telegramDescription?: string;
+  telegramImageUrl?: string;
   tg: TelegramWebApp | null;
 }
 
-export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareModalProps) => {
+export const ShareModal = ({
+  isOpen,
+  onClose,
+  shareLink,
+  shareText,
+  telegramTitle,
+  telegramDescription,
+  telegramImageUrl,
+  tg,
+}: ShareModalProps) => {
   const { t } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
   const [showFallback, setShowFallback] = useState(false);
   const [copied, setCopied] = useState(false);
+  const escapeHtml = useMemo(
+    () => (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;'),
+    []
+  );
+  const shortDescription = useMemo(
+    () => (telegramDescription || '').replace(/\s+/g, ' ').trim().slice(0, 180),
+    [telegramDescription]
+  );
+  const telegramShareText = useMemo(
+    () =>
+      [
+        telegramTitle ? `📦 ${telegramTitle}` : shareText,
+        shortDescription || null,
+        telegramImageUrl ? `🖼 ${telegramImageUrl}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+    [shareText, shortDescription, telegramImageUrl, telegramTitle]
+  );
+  const telegramShareTextWithTopGap = useMemo(
+    () => `\n${telegramShareText}`,
+    [telegramShareText]
+  );
+  const telegramShareHtmlText = useMemo(() => {
+    const safeTitle = escapeHtml(telegramTitle || shareText);
+    const safeDescription = shortDescription ? escapeHtml(shortDescription) : '';
+    const safeImageUrl = telegramImageUrl ? escapeHtml(telegramImageUrl) : '';
+    const safeShareLink = escapeHtml(shareLink);
+    return [
+      `📦 <b>${safeTitle}</b>`,
+      safeDescription || null,
+      safeImageUrl ? `🖼 <a href="${safeImageUrl}">Фото оголошення</a>` : null,
+      `🔗 <a href="${safeShareLink}">Відкрити оголошення</a>`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+  }, [escapeHtml, shareLink, shareText, shortDescription, telegramImageUrl, telegramTitle]);
 
   // Блокуємо скрол body та html при відкритому модальному вікні
   useEffect(() => {
@@ -60,8 +115,8 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
     try {
       if (navigator.share) {
         await navigator.share({
-          title: shareText,
-          text: shareText,
+          title: telegramTitle || shareText,
+          text: telegramShareTextWithTopGap,
           url: shareLink,
         });
         tg?.HapticFeedback.notificationOccurred('success');
@@ -84,7 +139,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
   const handleCopyLink = async () => {
     try {
       if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareLink);
+        await navigator.clipboard.writeText(telegramShareHtmlText);
         setCopied(true);
         tg?.HapticFeedback.notificationOccurred('success');
         setTimeout(() => {
@@ -103,7 +158,7 @@ export const ShareModal = ({ isOpen, onClose, shareLink, shareText, tg }: ShareM
   };
 
   const shareViaTelegram = () => {
-    const text = encodeURIComponent(`${shareText}\n${shareLink}`);
+    const text = encodeURIComponent(telegramShareTextWithTopGap);
     const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${text}`;
     
     if (tg?.openTelegramLink) {

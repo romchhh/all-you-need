@@ -37,15 +37,19 @@ export async function generateMetadata(
     },
   });
 
-  if (!listing || listing.status !== 'active' || listing.moderationStatus !== 'approved') {
+  if (!listing) {
     return {
-      title: 'Товар не активний | Trade Ground',
+      title: 'Товар не знайдено | Trade Ground',
       robots: { index: false, follow: false },
     };
   }
 
   const lang = params.lang === 'ru' ? 'ru' : 'uk';
-  const baseUrl = (process.env.WEBAPP_URL || 'https://allyouneed-marketplace.com').replace(/\/$/, '');
+  const baseUrl = (
+    process.env.WEBAPP_URL ||
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    'https://tradegrnd.com'
+  ).replace(/\/$/, '');
   const url = `${baseUrl}/${lang}/listing/${listing.id}`;
 
   let imageUrl: string | undefined;
@@ -67,12 +71,16 @@ export async function generateMetadata(
       ? 'Объявление на Trade Ground Marketplace.'
       : 'Оголошення на Trade Ground Marketplace.');
 
+  const isActiveListing = listing.status === 'active' && listing.moderationStatus === 'approved';
   const titlePrefix = lang === 'ru' ? 'Купить' : 'Купити';
-  const fullTitle = `${titlePrefix} ${listing.title} | Trade Ground Marketplace`;
+  const fullTitle = isActiveListing
+    ? `${titlePrefix} ${listing.title} | Trade Ground Marketplace`
+    : `${listing.title} | Trade Ground`;
 
   return {
     title: fullTitle,
     description,
+    robots: isActiveListing ? undefined : { index: false, follow: false },
     alternates: {
       canonical: url,
     },

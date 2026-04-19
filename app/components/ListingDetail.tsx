@@ -120,6 +120,26 @@ export const ListingDetail = ({
     () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
     [categories, listing.category, listing.subcategory, t]
   );
+  const telegramShareImageUrl = useMemo(() => {
+    const publicBaseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      process.env.NEXT_PUBLIC_WEBAPP_URL ||
+      'https://tradegrnd.com';
+    const candidate = listing.images?.[0] || listing.image;
+    const normalizedCandidate = (candidate || '').split('?')[0].replace(/^\/+/, '');
+    const parsedPhotosMatch = normalizedCandidate.match(
+      /(?:^|\/)parsed_photos\/(.+)$/
+    );
+    const rawUrl = parsedPhotosMatch
+      ? `/api/parsed-images/${parsedPhotosMatch[1]}`
+      : buildListingImageUrl(candidate);
+    if (!rawUrl) return '';
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
+    return new URL(rawUrl, publicBaseUrl).toString();
+  }, [listing.image, listing.images]);
+  const telegramShareDescription = useMemo(() => {
+    return (listing.description || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+  }, [listing.description]);
   
   // Визначення мобільної версії (безпечно для SSR)
   const [isMobile, setIsMobile] = useState(false);
@@ -1047,6 +1067,9 @@ export const ListingDetail = ({
               : `${listing.price}${listing.currency ? getCurrencySymbol(listing.currency) : '€'}`);
           return `📦 ${listing.title} - ${priceText} в Trade Ground Marketplace`;
         })()}
+        telegramTitle={listing.title}
+        telegramDescription={telegramShareDescription}
+        telegramImageUrl={telegramShareImageUrl || undefined}
         tg={tg}
       />
 

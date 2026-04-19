@@ -340,7 +340,11 @@ def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -
     return out
 
 
-def get_or_create_bot_user(telegram_id: int, username: Optional[str] = None) -> int:
+def get_or_create_bot_user(
+    telegram_id: int,
+    username: Optional[str] = None,
+    first_name: Optional[str] = None,
+) -> int:
     """
     Повертає User.id для системного бота/парсера.
     Якщо такого користувача немає — створює його.
@@ -355,8 +359,8 @@ def get_or_create_bot_user(telegram_id: int, username: Optional[str] = None) -> 
 
     cursor.execute("""
         INSERT INTO User (telegramId, username, firstName, isActive, agreementAccepted, createdAt, updatedAt)
-        VALUES (?, ?, 'Parser Bot', 1, 1, datetime('now'), datetime('now'))
-    """, (telegram_id, username or "parser_bot"))
+        VALUES (?, ?, ?, 1, 1, datetime('now'), datetime('now'))
+    """, (telegram_id, username or "parser_bot", first_name or "Parser Bot"))
     conn.commit()
     user_id = cursor.lastrowid
     conn.close()

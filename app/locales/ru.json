@@ -206,7 +206,8 @@
         "citySubscribeSuccess": "Вы подписаны на новые объявления в этом городе",
         "citySubscribeRemoved": "Подписка на город отменена",
         "citySubscribePickOneCity": "Выберите один город в фильтре, чтобы подписаться",
-        "subscribedCitiesMenu": "Города из подписок"
+        "subscribedCitiesMenu": "Города из подписок",
+        "subscribedCitiesEmpty": "В подписках пока нет городов"
   },
   "favorites": {
     "title": "Избранное",
