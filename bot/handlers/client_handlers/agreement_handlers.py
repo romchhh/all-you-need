@@ -32,6 +32,36 @@ OFFER_INSTRUCTION_VIDEO_1_PATH = os.path.join(BASE_CONTENT_PATH, 'IMG_2974.mp4')
 OFFER_INSTRUCTION_VIDEO_2_PATH = os.path.join(BASE_CONTENT_PATH, 'IMG_2975.mp4')
 
 
+def _resolve_shared_listing_image(raw_image: str, webapp_url: str) -> str:
+    """
+    Перетворює зображення оголошення в URL/ідентифікатор, який приймає Telegram:
+    - absolute http(s) -> як є
+    - parsed_photos/* -> /api/parsed-images/*
+    - listings/* та інші відносні шляхи -> /api/images/*
+    - file_id -> як є
+    """
+    value = (raw_image or "").strip()
+    if not value:
+        return ""
+
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+
+    clean = value.split("?", 1)[0].lstrip("/")
+    if not clean:
+        return ""
+
+    # file_id у Telegram зазвичай не містить "/"
+    if "/" not in clean:
+        return clean
+
+    if "parsed_photos/" in clean:
+        suffix = clean.split("parsed_photos/", 1)[1]
+        return f"{webapp_url.rstrip('/')}/api/parsed-images/{suffix}"
+
+    return f"{webapp_url.rstrip('/')}/api/images/{clean}"
+
+
 async def _send_offer_instruction_videos(chat_id: int, user_id: int):
     """Надсилає відео-інструкції з додавання оголошень після підтвердження оферти (з урахуванням мови)."""
     user_lang = get_user_lang(user_id) or 'uk'
@@ -237,7 +267,11 @@ async def start_command(message: types.Message):
     
     # Якщо є shared_item, показуємо інформацію про нього
     if shared_item and shared_data:
-        webapp_url = os.getenv('WEBAPP_URL', 'https://your-domain.com')
+        webapp_url = (
+            os.getenv('WEBAPP_URL')
+            or os.getenv('NEXT_PUBLIC_BASE_URL')
+            or 'https://tradegrnd.com'
+        )
         
         if shared_item['type'] == 'listing':
             listing = shared_data
@@ -298,35 +332,28 @@ async def start_command(message: types.Message):
                     if isinstance(images, str):
                         images = json.loads(images)
                     if isinstance(images, list) and len(images) > 0:
-                        first_image = images[0]
-                        # Якщо це file_id або URL, спробуємо відправити фото
-                        if first_image and (first_image.startswith('http') or len(first_image) < 100):
-                            # Якщо це URL, використовуємо InputFile з URL
-                            if first_image.startswith('http'):
-                                async with aiohttp.ClientSession() as session:
-                                    async with session.get(first_image) as resp:
-                                        if resp.status == 200:
-                                            photo_data = await resp.read()
-                                            from aiogram.types import BufferedInputFile
-                                            photo_file = BufferedInputFile(photo_data, filename='listing.jpg')
-                                            await message.answer_photo(
-                                                photo_file,
-                                                caption=welcome_text,
-                                                reply_markup=listing_keyboard,
-                                                parse_mode="HTML"
-                                            )
-                                            return
-                            # Якщо це file_id, спробуємо використати його напряму
-                            else:
+                        first_image_item = images[0]
+                        if isinstance(first_image_item, dict):
+                            first_image_item = (
+                                first_image_item.get('file_id')
+                                or first_image_item.get('url')
+                                or ''
+                            )
+                        if first_image_item:
+                            resolved_image = _resolve_shared_listing_image(
+                                str(first_image_item),
+                                webapp_url
+                            )
+                            if resolved_image:
                                 try:
                                     await message.answer_photo(
-                                        first_image,
+                                        resolved_image,
                                         caption=welcome_text,
                                         reply_markup=listing_keyboard,
                                         parse_mode="HTML"
                                     )
                                     return
-                                except:
+                                except Exception:
                                     pass
             except Exception as e:
                 print(f"Error sending listing image: {e}")

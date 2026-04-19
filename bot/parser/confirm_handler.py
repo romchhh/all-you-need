@@ -31,6 +31,7 @@ from parser.db import (
     copy_parser_images_to_public,
 )
 from parser.parser import enrich_description, detect_lang
+from utils.city_subscription_notify import notify_city_subscribers_marketplace
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -263,6 +264,14 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
 
     set_marketplace_listing_id(item_id, listing_id)
     update_parsed_item_status(item_id, "approved", moderated_by=moderator_id)
+
+    # Сповіщаємо підписників міста про нове активне оголошення
+    try:
+        await notify_city_subscribers_marketplace(bot, listing_id)
+    except Exception as notify_err:
+        logger.warning(
+            f"Не вдалося надіслати city-subscription сповіщення для Listing {listing_id}: {notify_err}"
+        )
 
     # Сповіщаємо автора через Pyrogram (фоново, щоб не блокувати відповідь)
     asyncio.create_task(_try_notify_author_via_pyrogram(item, listing_id))
