@@ -47,13 +47,14 @@ export const ShareModal = ({
   const telegramShareText = useMemo(
     () =>
       [
+        `🔗 ${shareLink}`,
         telegramTitle ? `📦 ${telegramTitle}` : shareText,
         shortDescription || null,
         telegramImageUrl ? `🖼 ${telegramImageUrl}` : null,
       ]
         .filter(Boolean)
         .join('\n\n'),
-    [shareText, shortDescription, telegramImageUrl, telegramTitle]
+    [shareLink, shareText, shortDescription, telegramImageUrl, telegramTitle]
   );
   const telegramShareTextWithTopGap = useMemo(
     () => `\n${telegramShareText}`,
@@ -159,7 +160,7 @@ export const ShareModal = ({
 
   const shareViaTelegram = () => {
     const text = encodeURIComponent(telegramShareTextWithTopGap);
-    const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${text}`;
+    const telegramUrl = `https://t.me/share/url?text=${text}`;
     
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(telegramUrl);

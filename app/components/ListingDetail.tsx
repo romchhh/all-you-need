@@ -138,7 +138,14 @@ export const ListingDetail = ({
     return new URL(rawUrl, publicBaseUrl).toString();
   }, [listing.image, listing.images]);
   const telegramShareDescription = useMemo(() => {
-    return (listing.description || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+    const raw = listing.description || '';
+    // Прибираємо службовий хвіст парсера (лінк на оригінал + канал-джерело)
+    const cleaned = raw
+      .replace(/🔗\s*Оригінальне оголошення:[\s\S]*$/i, '')
+      .replace(/🔗\s*Оригинальное объявление:[\s\S]*$/i, '')
+      .replace(/📢\s*Оголошення знайдено з\s*@[\w\d_]+[\s\S]*$/i, '')
+      .replace(/📢\s*Объявление найдено из\s*@[\w\d_]+[\s\S]*$/i, '');
+    return cleaned.replace(/\s+/g, ' ').trim().slice(0, 180);
   }, [listing.description]);
   
   // Визначення мобільної версії (безпечно для SSR)
