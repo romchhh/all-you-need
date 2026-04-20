@@ -49,7 +49,7 @@ export const ShareModal = ({
       [
         telegramTitle ? `📦 ${telegramTitle}` : shareText,
         shortDescription || null,
-        telegramImageUrl ? `🖼 ${telegramImageUrl} ${shareLink}` : `🖼 ${shareLink}`,
+        telegramImageUrl ? `🖼 ${telegramImageUrl}` : null,
         `🔗 ${shareLink}`,
       ]
         .filter(Boolean)
