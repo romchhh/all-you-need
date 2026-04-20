@@ -47,18 +47,14 @@ export const ShareModal = ({
   const telegramShareText = useMemo(
     () =>
       [
-        `🔗 ${shareLink}`,
         telegramTitle ? `📦 ${telegramTitle}` : shareText,
         shortDescription || null,
-        telegramImageUrl ? `🖼 ${telegramImageUrl}` : null,
+        telegramImageUrl ? `🖼 ${telegramImageUrl} ${shareLink}` : `🖼 ${shareLink}`,
+        `🔗 ${shareLink}`,
       ]
         .filter(Boolean)
         .join('\n\n'),
     [shareLink, shareText, shortDescription, telegramImageUrl, telegramTitle]
-  );
-  const telegramShareTextWithTopGap = useMemo(
-    () => `\n${telegramShareText}`,
-    [telegramShareText]
   );
   const telegramShareHtmlText = useMemo(() => {
     const safeTitle = escapeHtml(telegramTitle || shareText);
@@ -68,7 +64,9 @@ export const ShareModal = ({
     return [
       `📦 <b>${safeTitle}</b>`,
       safeDescription || null,
-      safeImageUrl ? `🖼 <a href="${safeImageUrl}">Фото оголошення</a>` : null,
+      safeImageUrl
+        ? `🖼 <a href="${safeImageUrl}">Фото оголошення</a> <a href="${safeShareLink}">Відкрити</a>`
+        : `🖼 <a href="${safeShareLink}">Відкрити</a>`,
       `🔗 <a href="${safeShareLink}">Відкрити оголошення</a>`,
     ]
       .filter(Boolean)
@@ -117,7 +115,7 @@ export const ShareModal = ({
       if (navigator.share) {
         await navigator.share({
           title: telegramTitle || shareText,
-          text: telegramShareTextWithTopGap,
+          text: telegramShareText,
           url: shareLink,
         });
         tg?.HapticFeedback.notificationOccurred('success');
@@ -159,7 +157,7 @@ export const ShareModal = ({
   };
 
   const shareViaTelegram = () => {
-    const text = encodeURIComponent(telegramShareTextWithTopGap);
+    const text = encodeURIComponent(telegramShareText);
     const telegramUrl = `https://t.me/share/url?text=${text}`;
     
     if (tg?.openTelegramLink) {
