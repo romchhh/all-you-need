@@ -18,6 +18,7 @@ import json
 import html
 import logging
 from typing import Optional
+from pathlib import Path
 
 from aiogram import Bot, Router, F
 from aiogram.types import CallbackQuery
@@ -45,6 +46,14 @@ PARSER_SERVICES_BOT_TELEGRAM_ID: int = int(
 PARSER_SERVICES_BOT_USERNAME: str = (
     os.getenv("PARSER_SERVICES_BOT_USERNAME") or "tradeground_seller2"
 )
+PARSER_API_ID: int = int(os.getenv("PARSER_API_ID", "0"))
+PARSER_API_HASH: str = os.getenv("PARSER_API_HASH", "")
+PARSER_PHONE: str = os.getenv("PARSER_PHONE", "")
+PARSER_SERVICES_API_ID: int = int(os.getenv("PARSER_SERVICES_API_ID", "0"))
+PARSER_SERVICES_API_HASH: str = os.getenv("PARSER_SERVICES_API_HASH", "")
+PARSER_SERVICES_PHONE: str = os.getenv("PARSER_SERVICES_PHONE", "")
+PARSER_SESSION_PATH = Path(__file__).resolve().parent / "parser_session"
+PARSER_SERVICES_SESSION_PATH = Path(__file__).resolve().parent / "parser_services_session"
 
 NOTIFY_AUTHOR_TEXT_RU = (
     "Привет! 👋\n\n"
@@ -72,7 +81,11 @@ def _listing_miniapp_url(listing_id: int) -> str:
     return _listing_url(listing_id)
 
 
-async def _try_notify_author_via_pyrogram(item: dict, listing_id: int):
+async def _try_notify_author_via_pyrogram(
+    item: dict,
+    listing_id: int,
+    use_services_sender: bool = False,
+):
     """
     Надсилає повідомлення автору через Pyrogram-клієнт (акаунт парсера),
     бо бот не може писати першим незнайомому користувачу.
@@ -86,16 +99,31 @@ async def _try_notify_author_via_pyrogram(item: dict, listing_id: int):
         logger.info(f"Автор оголошення {item['id']} невідомий — пропускаємо сповіщення")
         return
 
-    api_id = os.getenv("PARSER_API_ID")
-    api_hash = os.getenv("PARSER_API_HASH")
-    phone = os.getenv("PARSER_PHONE")
+    api_id = PARSER_API_ID
+    api_hash = PARSER_API_HASH
+    phone = PARSER_PHONE
+    session_path = PARSER_SESSION_PATH
+    sender_label = "main"
+
+    if use_services_sender:
+        if PARSER_SERVICES_API_ID and PARSER_SERVICES_API_HASH and PARSER_SERVICES_PHONE:
+            api_id = PARSER_SERVICES_API_ID
+            api_hash = PARSER_SERVICES_API_HASH
+            phone = PARSER_SERVICES_PHONE
+            session_path = PARSER_SERVICES_SESSION_PATH
+            sender_label = "services"
+        else:
+            logger.warning(
+                "PARSER_SERVICES_API_ID/HASH/PHONE не заповнені, "
+                "використовую основний parser-акаунт для DM автору"
+            )
+
     if not api_id or not api_hash or not phone:
         logger.info("Pyrogram не налаштовано — пропускаємо сповіщення автору")
         return
 
     try:
         from pyrogram import Client
-        from parser.scheduler import SESSION_PATH
     except ImportError:
         logger.warning("Pyrogram не встановлено — пропускаємо сповіщення автору")
         return
@@ -113,7 +141,7 @@ async def _try_notify_author_via_pyrogram(item: dict, listing_id: int):
 
     try:
         app = Client(
-            name=str(SESSION_PATH),
+            name=str(session_path),
             api_id=int(api_id),
             api_hash=api_hash,
             phone_number=phone,
@@ -121,9 +149,13 @@ async def _try_notify_author_via_pyrogram(item: dict, listing_id: int):
         async with app:
             target = author_id or f"@{author_username}"
             await app.send_message(target, plain_text)
-            logger.info(f"Pyrogram: надіслано сповіщення автору {target}")
+            logger.info(
+                f"Pyrogram[{sender_label}]: надіслано сповіщення автору {target}"
+            )
     except Exception as e:
-        logger.warning(f"Pyrogram: не вдалося надіслати автору сповіщення: {e}")
+        logger.warning(
+            f"Pyrogram[{sender_label}]: не вдалося надіслати автору сповіщення: {e}"
+        )
 
 
 async def _edit_group_message(
@@ -274,7 +306,13 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
         )
 
     # Сповіщаємо автора через Pyrogram (фоново, щоб не блокувати відповідь)
-    asyncio.create_task(_try_notify_author_via_pyrogram(item, listing_id))
+    asyncio.create_task(
+        _try_notify_author_via_pyrogram(
+            item,
+            listing_id,
+            use_services_sender=(item_category == "services_work"),
+        )
+    )
 
     # Оновлюємо повідомлення в групі
     group_id = int(os.getenv("PARSER_GROUP_ID", "0"))
