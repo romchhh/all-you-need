@@ -84,16 +84,38 @@ def _listing_miniapp_url(listing_id: int) -> str:
     return _listing_url(listing_id)
 
 
+def _main_pyrogram_configured() -> bool:
+    return bool(PARSER_API_ID and PARSER_API_HASH and PARSER_PHONE)
+
+
+def _services_pyrogram_configured() -> bool:
+    return bool(
+        PARSER_SERVICES_API_ID and PARSER_SERVICES_API_HASH and PARSER_SERVICES_PHONE
+    )
+
+
+def _is_peer_flood_error(err_s: str) -> bool:
+    low = err_s.lower()
+    return (
+        "PEER_FLOOD" in err_s
+        or "FLOOD_WAIT" in err_s
+        or ("flood" in low and "limited" in low)
+        or "currently limited" in low
+    )
+
+
 async def _try_notify_author_via_pyrogram(
     item: dict,
     listing_id: int,
     use_services_sender: bool = False,
     _retried_main_fallback: bool = False,
+    _flood_account_switch_done: bool = False,
 ):
     """
     Надсилає повідомлення автору через Pyrogram (акаунт парсера).
     Для послуг (use_services_sender) — другий акаунт (PARSER_SERVICES_*), інакше основний.
-    Якщо з другого акаунта peer невідомий — одна повторна спроба з основного.
+    PEER_ID_INVALID з services → одна спроба з main.
+    PEER_FLOOD / ліміт на поточному акаунті → одна спроба з іншого (якщо він налаштований).
     """
     author_id = item.get("author_id")
     author_username = item.get("author_username")
@@ -164,7 +186,35 @@ async def _try_notify_author_via_pyrogram(
                 listing_id,
                 use_services_sender=False,
                 _retried_main_fallback=True,
+                _flood_account_switch_done=_flood_account_switch_done,
             )
+            return
+
+        if _is_peer_flood_error(err_s) and not _flood_account_switch_done:
+            if use_services_sender and _main_pyrogram_configured():
+                logger.info(
+                    "PEER_FLOOD/ліміт на акаунті послуг — пробуємо основний parser-акаунт"
+                )
+                await _try_notify_author_via_pyrogram(
+                    item,
+                    listing_id,
+                    use_services_sender=False,
+                    _retried_main_fallback=_retried_main_fallback,
+                    _flood_account_switch_done=True,
+                )
+                return
+            if not use_services_sender and _services_pyrogram_configured():
+                logger.info(
+                    "PEER_FLOOD/ліміт на основному parser — пробуємо акаунт послуг (Pyrogram)"
+                )
+                await _try_notify_author_via_pyrogram(
+                    item,
+                    listing_id,
+                    use_services_sender=True,
+                    _retried_main_fallback=_retried_main_fallback,
+                    _flood_account_switch_done=True,
+                )
+                return
 
 
 async def _edit_group_message(
