@@ -21,6 +21,7 @@ from typing import Optional
 from pathlib import Path
 
 from aiogram import Bot, Router, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
 from parser.db import (
@@ -46,6 +47,8 @@ PARSER_SERVICES_BOT_TELEGRAM_ID: int = int(
 PARSER_SERVICES_BOT_USERNAME: str = (
     os.getenv("PARSER_SERVICES_BOT_USERNAME") or "tradeground_seller2"
 )
+# Telegram user id «другого продавця» у БД маркетплейсу (не другий Bot API — бот один, TOKEN один).
+
 PARSER_API_ID: int = int(os.getenv("PARSER_API_ID", "0"))
 PARSER_API_HASH: str = os.getenv("PARSER_API_HASH", "")
 PARSER_PHONE: str = os.getenv("PARSER_PHONE", "")
@@ -85,11 +88,12 @@ async def _try_notify_author_via_pyrogram(
     item: dict,
     listing_id: int,
     use_services_sender: bool = False,
+    _retried_main_fallback: bool = False,
 ):
     """
-    Надсилає повідомлення автору через Pyrogram-клієнт (акаунт парсера),
-    бо бот не може писати першим незнайомому користувачу.
-    Якщо Pyrogram не налаштований або сесія відсутня — пропускаємо тихо.
+    Надсилає повідомлення автору через Pyrogram (акаунт парсера).
+    Для послуг (use_services_sender) — другий акаунт (PARSER_SERVICES_*), інакше основний.
+    Якщо з другого акаунта peer невідомий — одна повторна спроба з основного.
     """
     author_id = item.get("author_id")
     author_username = item.get("author_username")
@@ -114,8 +118,8 @@ async def _try_notify_author_via_pyrogram(
             sender_label = "services"
         else:
             logger.warning(
-                "PARSER_SERVICES_API_ID/HASH/PHONE не заповнені, "
-                "використовую основний parser-акаунт для DM автору"
+                "PARSER_SERVICES_API_ID/HASH/PHONE не заповнені — "
+                "DM автору через основний parser-акаунт"
             )
 
     if not api_id or not api_hash or not phone:
@@ -128,12 +132,6 @@ async def _try_notify_author_via_pyrogram(
         logger.warning("Pyrogram не встановлено — пропускаємо сповіщення автору")
         return
 
-    text = NOTIFY_AUTHOR_TEXT_RU.format(
-        title=html.escape(title),
-        listing_url=html.escape(_listing_miniapp_url(listing_id)),
-    )
-    # Pyrogram приймає звичайний HTML-текст, але надсилає без розмітки —
-    # тому передаємо чистий текст без html.escape для читабельності
     plain_text = NOTIFY_AUTHOR_TEXT_RU.format(
         title=title,
         listing_url=_listing_miniapp_url(listing_id),
@@ -149,13 +147,24 @@ async def _try_notify_author_via_pyrogram(
         async with app:
             target = author_id or f"@{author_username}"
             await app.send_message(target, plain_text)
-            logger.info(
-                f"Pyrogram[{sender_label}]: надіслано сповіщення автору {target}"
-            )
+            logger.info(f"Pyrogram[{sender_label}]: надіслано сповіщення автору {target}")
     except Exception as e:
+        err_s = str(e)
         logger.warning(
             f"Pyrogram[{sender_label}]: не вдалося надіслати автору сповіщення: {e}"
         )
+        if (
+            use_services_sender
+            and not _retried_main_fallback
+            and ("PEER_ID_INVALID" in err_s or "peer id" in err_s.lower())
+        ):
+            logger.info("Повтор DM автору через основний parser-акаунт (services peer невідомий)")
+            await _try_notify_author_via_pyrogram(
+                item,
+                listing_id,
+                use_services_sender=False,
+                _retried_main_fallback=True,
+            )
 
 
 async def _edit_group_message(
@@ -250,9 +259,7 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
         await callback.answer("ℹ️ Оголошення вже відхилено", show_alert=True)
         return
 
-    # Отримуємо або створюємо системного user для маркетплейсу:
-    # services_work -> окремий продавець TradeGround Seller 2,
-    # решта категорій -> стандартний parser_bot.
+    # Товари → parser_bot; послуги (services_work) → другий продавець у маркетплейсі.
     item_category = (item.get("category") or "").strip().lower()
     if item_category == "services_work":
         user_id = get_or_create_bot_user(
@@ -297,25 +304,8 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
     set_marketplace_listing_id(item_id, listing_id)
     update_parsed_item_status(item_id, "approved", moderated_by=moderator_id)
 
-    # Сповіщаємо підписників міста про нове активне оголошення
-    try:
-        await notify_city_subscribers_marketplace(bot, listing_id)
-    except Exception as notify_err:
-        logger.warning(
-            f"Не вдалося надіслати city-subscription сповіщення для Listing {listing_id}: {notify_err}"
-        )
-
-    # Сповіщаємо автора через Pyrogram (фоново, щоб не блокувати відповідь)
-    asyncio.create_task(
-        _try_notify_author_via_pyrogram(
-            item,
-            listing_id,
-            use_services_sender=(item_category == "services_work"),
-        )
-    )
-
-    # Оновлюємо повідомлення в групі
-    group_id = int(os.getenv("PARSER_GROUP_ID", "0"))
+    # Чат, де натиснули кнопку (звичайна група або канал послуг) — туди ж відповідь-статус
+    group_id = callback.message.chat.id
     msg_id = callback.message.message_id
     mini_url = html.escape(_listing_miniapp_url(listing_id))
     if callback.from_user.username:
@@ -327,15 +317,43 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
         f"📌 Listing #{listing_id}: "
         f"<a href=\"{mini_url}\">відкрити в міні-додатку бота</a>"
     )
-    await _edit_group_message(
-        bot,
-        group_id,
-        msg_id,
-        status_text,
-        parse_mode="HTML",
+
+    # answerCallbackQuery має бути швидко (~до 60 с). Розсилка підписникам і оновлення чату — у фоні.
+    try:
+        await callback.answer("✅ Оголошення додано в маркетплейс!", show_alert=False)
+    except TelegramBadRequest as e:
+        low = str(e).lower()
+        if "query is too old" in low or "query id is invalid" in low:
+            logger.warning("Approve: callback query already expired, skip answer: %s", e)
+        else:
+            raise
+
+    async def _approve_followup():
+        try:
+            await notify_city_subscribers_marketplace(bot, listing_id)
+        except Exception as notify_err:
+            logger.warning(
+                "Не вдалося надіслати city-subscription сповіщення для Listing %s: %s",
+                listing_id,
+                notify_err,
+            )
+        await _edit_group_message(
+            bot,
+            group_id,
+            msg_id,
+            status_text,
+            parse_mode="HTML",
+        )
+
+    asyncio.create_task(_approve_followup())
+    asyncio.create_task(
+        _try_notify_author_via_pyrogram(
+            item,
+            listing_id,
+            use_services_sender=(item_category == "services_work"),
+        )
     )
 
-    await callback.answer("✅ Оголошення додано в маркетплейс!", show_alert=False)
     logger.info(f"parsed_item {item_id} → Listing {listing_id} (підтв. {moderator_id})")
 
 
@@ -355,7 +373,7 @@ async def handle_parser_reject(callback: CallbackQuery, bot: Bot):
 
     update_parsed_item_status(item_id, "rejected", moderated_by=moderator_id)
 
-    group_id = int(os.getenv("PARSER_GROUP_ID", "0"))
+    group_id = callback.message.chat.id
     msg_id = callback.message.message_id
     if callback.from_user.username:
         mod_mention = "@" + html.escape(callback.from_user.username)
