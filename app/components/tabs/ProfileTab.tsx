@@ -613,12 +613,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   <span>{t('profile.balance')}: {profile.balance.toFixed(2)}€</span>
                 </div>
               )}
-              {profile.listingPackagesBalance !== undefined && profile.listingPackagesBalance > 0 && (
-                <div className="flex items-center gap-2 text-sm text-white/70">
-                  <Package size={16} className="text-white/70 flex-shrink-0" />
-                  <span>{profile.listingPackagesBalance} {t('profile.availableListings')}</span>
-                </div>
-              )}
+              {/* Тимчасово прибрано "Доступно объявлений" */}
             </div>
           </div>
         </div>

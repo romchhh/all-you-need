@@ -5,7 +5,7 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 
-from utils.translations import t
+from utils.translations import t, get_user_lang
 from states.client_states import CreateListing
 from keyboards.client_keyboards import (
     get_categories_keyboard,
@@ -34,7 +34,14 @@ from utils.location_normalization import normalize_city_name, contains_cyrillic
 from utils.moderation_manager import ModerationManager
 from utils.monopay_functions import create_publication_payment_link
 from main import bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, FSInputFile
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    WebAppInfo,
+    InputMediaPhoto,
+    InputMediaVideo,
+    FSInputFile,
+)
 import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -252,10 +259,31 @@ async def start_create_listing(message: types.Message, state: FSMContext):
     if not check_user(user_id):
         await message.answer("<b>⚠️ Будь ласка, спочатку зареєструйтесь:</b> /start", parse_mode="HTML")
         return
-    
+
+    lang = get_user_lang(user_id)
+    if lang == "ru":
+        prompt = "<b>Вы добавляете:</b>\n\nВыберите тип объявления:"
+        btn_services = "🧰 Услуги"
+        btn_goods = "🛍 Товары"
+    else:
+        prompt = "<b>Ви додаєте:</b>\n\nОберіть тип оголошення:"
+        btn_services = "🧰 Послуги"
+        btn_goods = "🛍 Товари"
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=btn_services, callback_data="listing_type:services")],
+            [InlineKeyboardButton(text=btn_goods, callback_data="listing_type:goods")],
+        ]
+    )
+    await message.answer(prompt, parse_mode="HTML", reply_markup=kb)
+
+
+async def _start_services_listing_flow(message: types.Message, state: FSMContext) -> None:
+    """Старий flow створення оголошення в канали (послуги)."""
+    user_id = message.from_user.id
     await state.set_state(CreateListing.waiting_for_title)
-    
-    # Відправляємо початкове повідомлення з кнопкою "Скасувати" (не видаляється)
+
     initial_message = await message.answer(
         t(user_id, 'create_listing.start'),
         parse_mode="HTML",
@@ -264,16 +292,63 @@ async def start_create_listing(message: types.Message, state: FSMContext):
             resize_keyboard=True
         )
     )
-    
-    # Зберігаємо ID повідомлення для можливого видалення
+
     sent_message = await message.answer(
         t(user_id, 'create_listing.title_prompt'),
         parse_mode="HTML"
-        )
+    )
     await state.update_data(
         last_message_id=sent_message.message_id,
-        initial_message_id=initial_message.message_id  # Зберігаємо ID початкового повідомлення (не видаляємо)
+        initial_message_id=initial_message.message_id
     )
+
+
+@router.callback_query(F.data == "listing_type:services")
+async def choose_listing_type_services(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    await _start_services_listing_flow(callback.message, state)
+
+
+@router.callback_query(F.data == "listing_type:goods")
+async def choose_listing_type_goods(callback: types.CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    await callback.answer()
+    try:
+        await state.clear()
+    except Exception:
+        pass
+
+    webapp_url = (os.getenv("WEBAPP_URL") or "https://tradegrnd.com").rstrip("/")
+    lang = get_user_lang(user_id)
+    target = f"{webapp_url}/{lang}/bazaar?telegramId={user_id}&create=1"
+
+    if lang == "ru":
+        text = (
+            "🛍 <b>Товары создаются в маркетплейсе.</b>\n\n"
+            "Нажмите кнопку ниже, чтобы открыть форму создания объявления."
+        )
+        btn = "🔗 Открыть"
+    else:
+        text = (
+            "🛍 <b>Товари створюються в маркетплейсі.</b>\n\n"
+            "Натисніть кнопку нижче, щоб відкрити форму створення оголошення."
+        )
+        btn = "🔗 Відкрити"
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=btn, web_app=WebAppInfo(url=target))]
+        ]
+    )
+    await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
 
 
 @router.message(CreateListing.waiting_for_title)

@@ -128,6 +128,24 @@ const BazaarPage = () => {
       localStorage.setItem('bazaarSearchQuery', searchQuery);
     }
   }, [searchQuery]);
+
+  // Deep-link: ?create=1 відкриває форму створення оголошення (товари) одразу
+  const createLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (createLinkHandledRef.current) return;
+    if (!profile) return;
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const create = urlParams.get('create');
+    if (create === '1') {
+      setIsCreateListingModalOpen(true);
+      createLinkHandledRef.current = true;
+      // прибираємо параметр, щоб не відкривалося знову при навігації/рефреші стану
+      urlParams.delete('create');
+      const next = `${window.location.pathname}${urlParams.toString() ? `?${urlParams.toString()}` : ''}`;
+      window.history.replaceState({}, '', next);
+    }
+  }, [profile]);
   
   // Зберігаємо стан для вкладки bazaar
   const [bazaarTabState, setBazaarTabState] = useState<{

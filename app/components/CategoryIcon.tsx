@@ -9,10 +9,10 @@ interface CategoryIconProps {
 
 const iconMap: Record<string, string> = {
   'fashion': '/images/categories_icons/fashion.svg',
-  'beauty_wellness': '/images/categories_icons/fashion.svg',
+  'beauty_wellness': '/images/categories_icons/Group.svg',
   'furniture': '/images/categories_icons/furniture.svg',
   'electronics': '/images/categories_icons/electronics.svg',
-  'appliances': '/images/categories_icons/home.svg',
+  'appliances': '/images/categories_icons/Group 2.svg',
   'kids': '/images/categories_icons/kids.svg',
   'home': '/images/categories_icons/home.svg',
   'auto': '/images/categories_icons/auto.svg',
@@ -37,7 +37,7 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({ categoryId, classNam
         alt={categoryId}
         width={size}
         height={size}
-        className="object-contain"
+        className="w-full h-full object-contain"
         style={{
           filter: isActive ? 'brightness(0) saturate(100%) invert(85%) sepia(20%) saturate(500%) hue-rotate(60deg) brightness(110%)' : 'none',
         }}

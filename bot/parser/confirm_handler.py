@@ -33,7 +33,7 @@ from parser.db import (
     copy_parser_images_to_public,
 )
 from parser.parser import enrich_description, detect_lang
-from utils.city_subscription_notify import notify_city_subscribers_marketplace
+from utils.city_digest_notify import enqueue_city_digest_listing
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -380,10 +380,10 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
 
     async def _approve_followup():
         try:
-            await notify_city_subscribers_marketplace(bot, listing_id)
+            enqueue_city_digest_listing(listing_id)
         except Exception as notify_err:
             logger.warning(
-                "Не вдалося надіслати city-subscription сповіщення для Listing %s: %s",
+                "Не вдалося поставити Listing %s в city-digest чергу: %s",
                 listing_id,
                 notify_err,
             )

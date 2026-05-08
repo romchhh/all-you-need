@@ -59,6 +59,48 @@ CHANNELS: dict[str, str] = {
     "https://t.me/+Yeu9vchwu6llZmYy": "NRW",
 }
 
+def normalize_channel_key(raw: str) -> str:
+    """
+    Нормалізує ключ каналу/групи для дедуплікації.
+    - username: прибирає @, робить lowercase
+    - t.me/+invite або t.me/<...>: прибирає протокол/домен, прибирає зайві /
+    """
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    # URL → t.me/... без протоколу
+    s = re.sub(r"^https?://(?:www\.)?t\.me/", "t.me/", s, flags=re.IGNORECASE).rstrip("/")
+    # @username → username
+    if s.startswith("@"):
+        s = s[1:]
+    # usernames у Telegram case-insensitive
+    if s.lower().startswith("t.me/"):
+        return s  # для invite/link лишаємо як є (вже нормалізовано домен)
+    return s.lower()
+
+
+def dedupe_channels(channels: dict[str, str]) -> dict[str, str]:
+    """
+    Прибирає дублікати каналів (після normalize_channel_key).
+    Якщо той самий канал зустрічається кілька разів — лишаємо останнє значення (env може перекрити базу).
+    """
+    out: dict[str, str] = {}
+    seen_original: dict[str, str] = {}
+    for k, city in channels.items():
+        nk = normalize_channel_key(k)
+        if not nk:
+            continue
+        if nk in out and seen_original.get(nk) != k:
+            logger.warning(
+                "Duplicate parser channel key: %r and %r → using %r",
+                seen_original.get(nk),
+                k,
+                city,
+            )
+        out[nk] = city
+        seen_original[nk] = k
+    return out
+
 
 def _channels_from_env() -> dict[str, str]:
     raw = (os.getenv("PARSER_EXTRA_CHANNELS") or "").strip()
@@ -70,21 +112,21 @@ def _channels_from_env() -> dict[str, str]:
         if ":" not in part:
             continue
         u, city = part.rsplit(":", 1)
-        u = u.strip().lstrip("@")
+        u = normalize_channel_key(u.strip())
         city = city.strip()
         if u and city:
             extra[u] = city
     return extra
 
 
-CHANNELS = {**CHANNELS, **_channels_from_env()}
+CHANNELS = dedupe_channels({**CHANNELS, **_channels_from_env()})
 
 # Канали з переважно послугами (краса): більше емодзі та інколи без фото — м’якші правила
 BEAUTY_SERVICE_CHANNELS: frozenset[str] = frozenset({
     "beauty_berlin_ua",
-    "BeautyNRW",
-    "BeautyDusseldorf",
-    "HamburgBeauty",
+    "beautynrw",
+    "beautydusseldorf",
+    "hamburgbeauty",
 })
 
 # Скільки останніх повідомлень перевіряти за один прохід
@@ -178,7 +220,10 @@ def detect_lang(text: str) -> str:
 
 
 def message_link(channel: str, message_id: int) -> str:
-    clean = re.sub(r"^https?://(?:www\.)?t\.me/", "", channel.strip().rstrip("/"))
+    clean = normalize_channel_key(channel)
+    # t.me/<username>/... -> username
+    if clean.lower().startswith("t.me/"):
+        clean = clean.split("/", 1)[1]
     clean = clean.lstrip("@").split("/")[0]
     return f"https://t.me/{clean}/{message_id}"
 

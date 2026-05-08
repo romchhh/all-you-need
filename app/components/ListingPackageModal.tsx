@@ -118,7 +118,6 @@ export default function ListingPackageModal({
                 <p className="text-2xl font-bold text-[#D3F1A7]">{balance.toFixed(2)}€</p>
               </div>
               <div>
-                <p className="text-sm text-white/70">{t('listingPackages.availableListings')}</p>
                 <p className="text-2xl font-bold text-[#D3F1A7]">{packagesBalance}</p>
               </div>
             </div>

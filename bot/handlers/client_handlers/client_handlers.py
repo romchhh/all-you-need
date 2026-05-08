@@ -101,6 +101,37 @@ async def scheduler_jobs():
             import traceback
             traceback.print_exc()
 
+    # Job для пакетних (digest) сповіщень по підписці на міста
+    try:
+        digest_job_id = "city_digest_notifications"
+        existing_digest_job = scheduler.get_job(digest_job_id)
+        if existing_digest_job:
+            scheduler.remove_job(digest_job_id)
+
+        digest_hours = (_os.getenv("CITY_DIGEST_HOURS") or "9,14,20").strip()
+        digest_minute = int((_os.getenv("CITY_DIGEST_MINUTE") or "0").strip() or "0")
+
+        from utils.city_digest_notify import send_city_digest_notifications
+
+        # APScheduler викликає async job з аргументами; передаємо bot як параметр
+        scheduler.add_job(
+            send_city_digest_notifications,
+            "cron",
+            hour=digest_hours,
+            minute=digest_minute,
+            id=digest_job_id,
+            replace_existing=True,
+            max_instances=1,
+            args=[bot],
+        )
+        print(
+            f"✅ Scheduler job '{digest_job_id}' додано (дайджест міст: {digest_hours}:{digest_minute:02d})"
+        )
+    except Exception as e:
+        print(f"❌ Помилка реєстрації city-digest job: {e}")
+        import traceback
+        traceback.print_exc()
+
 router = Router()
 
   
