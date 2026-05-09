@@ -1,6 +1,6 @@
 import { prisma, ensurePromotionPurchaseTable } from '@/lib/prisma';
 import { sendListingApprovedNotification, sendListingRejectedNotification } from './telegramNotifications';
-import { notifyCitySubscribersOfNewMarketplaceListing } from './citySubscriptionNotifications';
+import { enqueueCityDigestListing } from './cityDigestQueue';
 import { getSystemSetting, createTransaction } from './dbHelpers';
 import { toSQLiteDate, addDays, nowSQLite } from './dateHelpers';
 import { unlink } from 'fs/promises';
@@ -152,14 +152,8 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
     console.error('[approveListing] Failed to send Telegram notification:', err);
   });
 
-  const loc = typeof listing.location === 'string' ? listing.location : '';
-  void notifyCitySubscribersOfNewMarketplaceListing({
-    listingId: listing.id,
-    userId: listing.userId,
-    title: listing.title,
-    location: loc,
-  }).catch((err) => {
-    console.error('[approveListing] City subscription notifications:', err);
+  void enqueueCityDigestListing(listing.id).catch((err) => {
+    console.error('[approveListing] City digest enqueue:', err);
   });
 
   // Перевіряємо реферальну винагороду (асинхронно, не блокуємо відповідь)

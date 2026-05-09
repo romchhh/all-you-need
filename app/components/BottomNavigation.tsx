@@ -3,6 +3,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useParams, usePathname } from 'next/navigation';
 import { NavIcon } from './NavIcon';
 import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface BottomNavigationProps {
   activeTab?: string;
@@ -15,6 +16,7 @@ interface BottomNavigationProps {
 
 export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCreateListing, favoritesCount = 0, tg }: BottomNavigationProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
@@ -259,7 +261,11 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
   <>
     <div 
       ref={navRef}
-      className="fixed bottom-0 left-0 right-0 bg-[#000000] safe-area-bottom z-50 pb-2 transition-transform duration-200 ease-in-out"
+      className={`fixed bottom-0 left-0 right-0 z-50 safe-area-bottom pb-2 transition-transform duration-200 ease-in-out ${
+        isLight
+          ? 'border-t border-gray-200/80 bg-white/95 shadow-[0_-6px_32px_-8px_rgba(0,0,0,0.08)] backdrop-blur-md'
+          : 'border-t border-white/10 bg-[#000000] shadow-[0_-8px_40px_-6px_rgba(0,0,0,0.45)]'
+      }`}
       style={{
         position: 'fixed',
         bottom: 0,
@@ -280,14 +286,18 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
         pointerEvents: isInputFocused ? 'none' : 'auto'
       }}
     >
-      <div className="max-w-2xl mx-auto flex justify-around items-center px-2 py-1 border-t-2 border-white rounded-t-3xl bg-[#000000]">
+      <div className="mx-auto flex max-w-2xl items-center justify-around px-2 py-1.5 sm:px-4 lg:max-w-6xl lg:px-8">
       {/* Головна */}
       <button
         onClick={() => handleTabChange('bazaar')}
-        className={`flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all group ${
-          currentActiveTab === 'bazaar' 
-            ? 'text-[#D3F1A7]' 
-            : 'text-white hover:text-[#D3F1A7]'
+        className={`group flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-1 transition-all ${
+          currentActiveTab === 'bazaar'
+            ? isLight
+              ? 'font-semibold text-[#3F5331]'
+              : 'text-[#D3F1A7]'
+            : isLight
+              ? 'text-gray-600 hover:text-[#3F5331]'
+              : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
         <div
@@ -306,7 +316,9 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
             tg?.HapticFeedback.impactOccurred('medium');
           }
         }}
-        className="flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all text-white hover:text-[#D3F1A7] group"
+        className={`flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all group ${
+          isLight ? 'text-gray-600 hover:text-[#3F5331]' : 'text-white hover:text-[#D3F1A7]'
+        }`}
       >
         <div className="shrink-0 transition-transform">
           <NavIcon icon="add" />
@@ -317,10 +329,14 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
       {/* Обране */}
       <button
         onClick={() => handleTabChange('favorites')}
-        className={`flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all relative group ${
-          currentActiveTab === 'favorites' 
-            ? 'text-[#D3F1A7]' 
-            : 'text-white hover:text-[#D3F1A7]'
+        className={`group relative flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-1 transition-all ${
+          currentActiveTab === 'favorites'
+            ? isLight
+              ? 'font-semibold text-[#3F5331]'
+              : 'text-[#D3F1A7]'
+            : isLight
+              ? 'text-gray-600 hover:text-[#3F5331]'
+              : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
         <div
@@ -334,10 +350,14 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
       {/* Профіль */}
       <button
         onClick={() => handleTabChange('profile')}
-        className={`flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all group ${
-          currentActiveTab === 'profile' 
-            ? 'text-[#D3F1A7]' 
-            : 'text-white hover:text-[#D3F1A7]'
+        className={`group flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-1 transition-all ${
+          currentActiveTab === 'profile'
+            ? isLight
+              ? 'font-semibold text-[#3F5331]'
+              : 'text-[#D3F1A7]'
+            : isLight
+              ? 'text-gray-600 hover:text-[#3F5331]'
+              : 'text-white hover:text-[#D3F1A7]'
         }`}
       >
         <div

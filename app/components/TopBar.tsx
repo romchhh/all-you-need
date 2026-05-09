@@ -1,7 +1,10 @@
+'use client';
+
 import { ArrowLeft, Search, SlidersHorizontal, Share2, X, Heart } from 'lucide-react';
 import React from 'react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface TopBarProps {
   variant: 'main' | 'detail' | 'profile';
@@ -41,13 +44,27 @@ export const TopBar = ({
   searchSuggestions
 }: TopBarProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
 
   if (variant === 'main') {
+    const inputClass = isLight
+      ? 'w-full rounded-2xl border border-gray-200/90 bg-white py-3 pr-10 text-gray-900 shadow-sm ring-1 ring-black/[0.03] transition-all placeholder:text-gray-500 focus:border-[#3F5331]/30 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/20'
+      : 'w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 transition-all text-white placeholder:text-white/60';
+    const searchIconClass = isLight
+      ? 'absolute top-1/2 -translate-y-1/2 text-gray-500'
+      : 'absolute top-1/2 -translate-y-1/2 text-white/80';
+    const clearBtnClass = isLight
+      ? 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors'
+      : 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors';
+    const filterBtnClass = isLight
+      ? 'relative flex h-12 w-12 items-center justify-center rounded-2xl border border-gray-200/90 bg-white shadow-sm ring-1 ring-black/[0.03] transition-colors hover:border-gray-300 hover:bg-gray-50/80'
+      : 'relative w-12 h-12 rounded-xl bg-transparent border border-white flex items-center justify-center hover:bg-white/10 transition-colors';
+
     return (
       <div className="flex gap-1 items-center flex-1">
         <div className="relative flex-1">
           <Search 
-            className="absolute top-1/2 -translate-y-1/2 text-white/80" 
+            className={searchIconClass}
             size={18} 
             style={{ left: '16px' }}
           />
@@ -69,7 +86,7 @@ export const TopBar = ({
             onFocus={() => {
               // Можна додати логіку для показу підказок
             }}
-            className="w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 transition-all text-white placeholder:text-white/60"
+            className={inputClass}
             style={{ 
               paddingLeft: '44px',
               fontSize: '16px' // Запобігаємо зуму на iOS при фокусі
@@ -81,9 +98,9 @@ export const TopBar = ({
                 onSearchClear();
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+              className={clearBtnClass}
             >
-              <X size={14} className="text-white" />
+              <X size={14} className={isLight ? 'text-gray-700' : 'text-white'} />
             </button>
           )}
           
@@ -95,9 +112,9 @@ export const TopBar = ({
             onFilterClick?.();
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="relative w-12 h-12 rounded-xl bg-transparent border border-white flex items-center justify-center hover:bg-white/10 transition-colors"
+          className={filterBtnClass}
         >
-          <SlidersHorizontal size={18} className="text-white" />
+          <SlidersHorizontal size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
           {hasActiveFilters && (
             <span className="absolute top-1 right-1 w-2 h-2 bg-[#D3F1A7] rounded-full"></span>
           )}

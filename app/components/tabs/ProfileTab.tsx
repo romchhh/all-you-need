@@ -24,6 +24,8 @@ import { getBotBaseUrl, getBotStartLink } from '@/utils/botLinks';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { getFavoritesFromStorage } from '@/utils/favorites';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useRouter, useParams } from 'next/navigation';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { CategoryIcon } from '../CategoryIcon';
@@ -51,6 +53,8 @@ interface ProfileTabProps {
 
 export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalChange, favorites: favoritesProp, onToggleFavorite }: ProfileTabProps) => {
   const { t, language } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
   const categories = getCategories(t);
   const router = useRouter();
   const params = useParams();
@@ -444,21 +448,27 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
     return (
       <div className="pb-24 flex flex-col h-screen overflow-hidden px-4">
-        <h2 className="text-2xl font-bold text-white mb-2 pt-2">{t('navigation.profile')}</h2>
+        <h2 className={`text-2xl font-bold mb-2 pt-2 ${ac.pageHeading}`}>{t('navigation.profile')}</h2>
         <p className="text-sm text-gray-400 mb-8">{t('profileNotFound.subtitle')}</p>
 
         <div className="flex-1 flex items-start justify-center pt-8 pb-20">
           <div className="max-w-sm mx-auto px-4 w-full">
-            <div className="rounded-3xl border border-white/15 bg-white/[0.06] p-8 text-center backdrop-blur-sm">
+            <div
+              className={`rounded-3xl border p-8 text-center ${
+                isLight
+                  ? 'border-gray-200 bg-white shadow-sm'
+                  : 'border-white/15 bg-white/[0.06] backdrop-blur-sm'
+              }`}
+            >
               <div className="flex items-center justify-center mx-auto mb-6">
-                <div className="text-white" style={{ width: '64px', height: '64px' }}>
+                <div className={isLight ? 'text-gray-700' : 'text-white'} style={{ width: '64px', height: '64px' }}>
                   <svg width="64" height="64" viewBox="0 0 39 39" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M37 19.4959C37.0055 22.9702 35.9722 26.3667 34.0328 29.2493C32.4333 31.6351 30.2705 33.5901 27.7358 34.9412C25.201 36.2924 22.3724 36.9981 19.5 36.9959C16.6276 36.9981 13.7989 36.2924 11.2642 34.9412C8.72943 33.5901 6.56668 31.6351 4.96722 29.2493C3.4442 26.979 2.47425 24.3834 2.13515 21.6707C1.79605 18.958 2.09721 16.2035 3.01451 13.6282C3.9318 11.0528 5.43971 8.72817 7.41735 6.84063C9.39499 4.95309 11.7873 3.55513 14.4026 2.75882C17.0179 1.96252 19.7834 1.79002 22.4774 2.25515C25.1714 2.72028 27.7189 3.8101 29.9158 5.43725C32.1127 7.06441 33.8978 9.18363 35.128 11.625C36.3582 14.0664 36.9993 16.7621 37 19.4959Z" stroke="currentColor" strokeWidth="4"/>
                     <path d="M21.4445 13.6626C21.4445 14.1783 21.2397 14.6729 20.875 15.0375C20.5104 15.4022 20.0158 15.6071 19.5001 15.6071V19.4959C21.0472 19.4959 22.5309 18.8814 23.6249 17.7874C24.7188 16.6934 25.3334 15.2097 25.3334 13.6626H21.4445ZM19.5001 15.6071C18.9844 15.6071 18.4898 15.4022 18.1252 15.0375C17.7605 14.6729 17.5556 14.1783 17.5556 13.6626H13.6668C13.6668 15.2097 14.2813 16.6934 15.3753 17.7874C16.4693 18.8814 17.953 19.4959 19.5001 19.4959V15.6071ZM17.5556 13.6626C17.5556 13.1469 17.7605 12.6523 18.1252 12.2877C18.4898 11.923 18.9844 11.7182 19.5001 11.7182V7.82928C17.953 7.82928 16.4693 8.44387 15.3753 9.53783C14.2813 10.6318 13.6668 12.1155 13.6668 13.6626H17.5556ZM19.5001 11.7182C20.0158 11.7182 20.5104 11.923 20.875 12.2877C21.2397 12.6523 21.4445 13.1469 21.4445 13.6626H25.3334C25.3334 12.1155 24.7188 10.6318 23.6249 9.53783C22.5309 8.44387 21.0472 7.82928 19.5001 7.82928V11.7182ZM6.21176 30.8826L4.34704 30.3284L4.04565 31.3454L4.73593 32.1484L6.21176 30.8826ZM32.7884 30.8826L34.2662 32.1484L34.9545 31.3454L34.6531 30.3284L32.7884 30.8826ZM13.6668 27.2737H25.3334V23.3848H13.6668V27.2737ZM13.6668 23.3848C11.5727 23.3842 9.5344 24.0597 7.85516 25.3108C6.17593 26.5619 4.94552 28.3217 4.34704 30.3284L8.07454 31.4368C8.43421 30.2333 9.17274 29.178 10.1803 28.4279C11.1879 27.6778 12.4107 27.273 13.6668 27.2737V23.3848ZM19.5001 35.0515C17.2552 35.054 15.0365 34.5694 12.9971 33.6311C10.9577 32.6928 9.14621 31.3232 7.6876 29.6168L4.73593 32.1484C6.5596 34.2805 8.8239 35.9918 11.3728 37.1644C13.9216 38.3369 16.6944 38.9429 19.5001 38.9404V35.0515ZM25.3334 27.2737C27.972 27.2737 30.2062 29.0276 30.9256 31.4387L34.6531 30.3284C34.0547 28.322 32.8227 26.5624 31.1438 25.3113C29.465 24.0603 27.4271 23.3846 25.3334 23.3848V27.2737ZM31.3126 29.6168C29.854 31.3232 28.0425 32.6928 26.0031 33.6311C23.9637 34.5694 21.745 35.054 19.5001 35.0515V38.9404C22.3057 38.9429 25.0785 38.3369 27.6274 37.1644C30.1763 35.9918 32.4425 34.2805 34.2662 32.1484L31.3126 29.6168Z" fill="currentColor"/>
                   </svg>
                 </div>
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">
+              <h3 className={`text-xl font-bold mb-3 ${ac.pageHeading}`}>
                 {t('profileNotFound.title')}
               </h3>
               <p className="text-sm text-gray-400 mb-5 leading-relaxed">
@@ -485,7 +495,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     router.push(`/${lang}/complete-registration`);
                     tg?.HapticFeedback?.impactOccurred('light');
                   }}
-                  className="inline-flex w-full items-center justify-center rounded-2xl border border-white/20 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/[0.1]"
+                  className={
+                    isLight
+                      ? 'inline-flex w-full items-center justify-center rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-gray-100'
+                      : 'inline-flex w-full items-center justify-center rounded-2xl border border-white/20 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/[0.1]'
+                  }
                 >
                   {t('profileNotFound.stepsInApp')}
                 </button>
@@ -530,7 +544,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         <div className="flex items-start gap-4">
           {/* Фото профілю */}
           <div 
-            className="w-16 h-16 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 border-white"
+            className={`w-16 h-16 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 ${
+              isLight ? 'border-gray-200' : 'border-white'
+            }`}
             {...avatarLongPress}
           >
             {profile.avatar ? (
@@ -569,9 +585,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-white mb-1 truncate">{displayName}</h2>
+                <h2 className={`text-lg font-bold mb-1 truncate ${ac.pageHeading}`}>{displayName}</h2>
                 {displayUsername && (
-                  <p className="text-sm text-white/70 truncate">{displayUsername}</p>
+                  <p className={`text-sm truncate ${ac.mutedText}`}>{displayUsername}</p>
                 )}
               </div>
               
@@ -582,7 +598,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setShowReferralModal(true);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                    isLight
+                      ? 'border-gray-300 text-gray-800 hover:bg-gray-100'
+                      : 'border-white text-white hover:bg-white/10'
+                  }`}
                   title={t('referral.menuButton') || 'Реферальна програма'}
                 >
                   <Gift size={18} />
@@ -592,7 +612,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setIsEditModalOpen(true);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                    isLight
+                      ? 'border-gray-300 text-gray-800 hover:bg-gray-100'
+                      : 'border-white text-white hover:bg-white/10'
+                  }`}
                 >
                   <Edit2 size={18} />
                 </button>
@@ -602,14 +626,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             {/* Статистика */}
             <div className="space-y-1.5 mt-3">
               {stats && (
-                <div className="flex items-center gap-2 text-sm text-white/70">
-                  <Megaphone size={16} className="text-white/70 flex-shrink-0" />
+                <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
+                  <Megaphone size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
                   <span>{stats.activeListings} {t('sales.active')}</span>
                 </div>
               )}
               {profile.balance !== undefined && (
-                <div className="flex items-center gap-2 text-sm text-white/70">
-                  <Wallet size={16} className="text-white/70 flex-shrink-0" />
+                <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
+                  <Wallet size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
                   <span>{t('profile.balance')}: {profile.balance.toFixed(2)}€</span>
                 </div>
               )}
@@ -635,7 +659,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
         {/* Кнопка створення оголошення */}
         <button 
-          className="w-full bg-transparent hover:bg-white/10 border-2 border-white text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+          className={`w-full bg-transparent font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors border-2 ${
+            isLight
+              ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+              : 'border-white text-white hover:bg-white/10'
+          }`}
           onClick={() => {
             if (onCreateListing) {
               onCreateListing();
@@ -650,12 +678,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
       {/* Розділювач */}
       <div className="px-4 pb-4">
-        <div className="border-t border-white/20"></div>
+        <div className={`border-t ${isLight ? 'border-gray-200' : 'border-white/20'}`}></div>
       </div>
 
       {/* Оголошення користувача */}
       <div className="px-4">
-        <h3 className="text-lg font-semibold text-white mb-3">{t('sales.title')}</h3>
+        <h3 className={`text-lg font-semibold mb-3 ${ac.pageHeading}`}>{t('sales.title')}</h3>
         
         {/* Фільтри */}
         <div className="flex gap-2 mb-4">
@@ -670,9 +698,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 setIsCategoryFilterOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="flex-1 px-3 py-2.5 bg-[#000000] rounded-xl border border-white/20 flex items-center justify-between text-sm hover:border-white/40 transition-colors"
+              className={ac.profileCard}
             >
-              <span className="text-white">
+              <span className={ac.profileCardText}>
                 {selectedStatus === 'all' ? t('sales.allStatuses') : 
                  selectedStatus === 'active' ? t('listing.active') :
                  selectedStatus === 'pending_moderation' ? t('profile.onModeration') :
@@ -680,7 +708,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                  selectedStatus === 'deactivated' ? t('sales.deactivated') :
                  selectedStatus === 'sold' ? t('listing.sold') : selectedStatus}
               </span>
-              <ChevronDown size={16} className={`text-white/70 transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={16} className={`${ac.profileCardChevron} transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Фільтр за категорією */}
@@ -694,16 +722,16 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 setIsStatusFilterOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="flex-1 px-3 py-2.5 bg-[#000000] rounded-xl border border-white/20 flex items-center justify-between text-sm hover:border-white/40 transition-colors"
+              className={ac.profileCard}
             >
-              <span className="text-white truncate">
+              <span className={`${ac.profileCardText} truncate`}>
                 {selectedCategory === 'all' ? (
                   t('sales.allCategories')
                 ) : (
                   categories.find(c => c.id === selectedCategory)?.name || selectedCategory
                 )}
               </span>
-              <ChevronDown size={16} className={`text-white/70 flex-shrink-0 transition-transform ${isCategoryFilterOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={16} className={`${ac.profileCardChevron} flex-shrink-0 transition-transform ${isCategoryFilterOpen ? 'rotate-180' : ''}`} />
             </button>
           </div>
 
@@ -729,7 +757,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           {isStatusFilterOpen && (
             <div 
               id="status-filter-menu"
-              className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] max-h-[50vh] overflow-y-auto overscroll-contain"
+              className={`fixed rounded-xl border shadow-2xl z-[10000] max-h-[50vh] overflow-y-auto overscroll-contain ${
+                isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white/20'
+              }`}
               style={{
                 top: `${statusMenuPosition.top + 8}px`,
                 left: `${statusMenuPosition.left}px`,
@@ -756,8 +786,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setIsStatusFilterOpen(false);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className={`w-full px-3 py-2.5 text-left text-sm hover:bg-white/10 transition-colors border-b border-white/10 last:border-b-0 ${
-                    selectedStatus === status ? 'bg-[#D3F1A7]/20 text-[#D3F1A7]' : 'text-white'
+                  className={`w-full px-3 py-2.5 text-left text-sm transition-colors border-b last:border-b-0 ${
+                    isLight
+                      ? 'border-gray-100 hover:bg-gray-50 ' +
+                        (selectedStatus === status ? 'bg-[#D3F1A7]/20 text-[#3F5331]' : 'text-gray-900')
+                      : 'border-white/10 hover:bg-white/10 ' +
+                        (selectedStatus === status ? 'bg-[#D3F1A7]/20 text-[#D3F1A7]' : 'text-white')
                   }`}
                 >
                   {status === 'all' ? t('sales.allStatuses') : 
@@ -794,7 +828,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           {isCategoryFilterOpen && (
             <div 
               id="category-filter-menu"
-              className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] max-h-[70vh] overflow-y-auto overscroll-contain"
+              className={`fixed rounded-xl border shadow-2xl z-[10000] max-h-[70vh] overflow-y-auto overscroll-contain ${
+                isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white/20'
+              }`}
               style={{
                 top: `${categoryMenuPosition.top + 8}px`,
                 left: `${categoryMenuPosition.left}px`,
@@ -819,10 +855,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   setIsCategoryFilterOpen(false);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b border-white/10 ${
+                className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b ${
+                  isLight ? 'border-gray-100' : 'border-white/10'
+                } ${
                   selectedCategory === 'all'
                     ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
-                    : 'text-white hover:bg-white/10'
+                    : isLight
+                      ? 'text-gray-900 hover:bg-gray-50'
+                      : 'text-white hover:bg-white/10'
                 }`}
               >
                 <span className="flex-1">{t('sales.allCategories')}</span>
@@ -839,10 +879,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setIsCategoryFilterOpen(false);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
-                  className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b border-white/10 ${
+                  className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-between border-b ${
+                    isLight ? 'border-gray-100' : 'border-white/10'
+                  } ${
                     selectedCategory === cat.id
                       ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
-                      : 'text-white hover:bg-white/10'
+                      : isLight
+                        ? 'text-gray-900 hover:bg-gray-50'
+                        : 'text-white hover:bg-white/10'
                   }`}
                 >
                   <span className="flex-1">{cat.name}</span>
@@ -984,7 +1028,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 <div className="py-6">
                   <button
                     onClick={loadMoreListings}
-                    className="w-full bg-gray-800/50 hover:bg-gray-700/50 text-white font-semibold py-4 rounded-2xl transition-colors"
+                    className={ac.salesFilterBar}
                   >
                     {t('sales.showMore')}
                   </button>
@@ -993,8 +1037,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             </>
           ) : (
             <div className="py-16 text-center">
-              <p className="text-white mb-2 font-medium">{t('sales.noListings')}</p>
-              <p className="text-sm text-white/70">{t('sales.createFirst')}</p>
+              <p className={`mb-2 font-medium ${ac.pageHeading}`}>{t('sales.noListings')}</p>
+              <p className={`text-sm ${ac.salesEmptyHint}`}>{t('sales.createFirst')}</p>
             </div>
           )}
         </div>
@@ -1015,10 +1059,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             }
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border border-white/20 hover:bg-white/10 transition-colors"
+          className={`w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border transition-colors ${
+            isLight ? 'border-gray-200 hover:bg-gray-100' : 'border-white/20 hover:bg-white/10'
+          }`}
         >
-          <span className="text-white font-medium">{t('menu.support') || 'Підтримка'}</span>
-          <ChevronRight size={20} className="text-white/70" />
+          <span className={`font-medium ${ac.pageHeading}`}>{t('menu.support') || 'Підтримка'}</span>
+          <ChevronRight size={20} className={ac.mutedText} />
         </button>
         
         <button
@@ -1026,10 +1072,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             router.push(`/${language}/faq`);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border border-white/20 hover:bg-white/10 transition-colors"
+          className={`w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border transition-colors ${
+            isLight ? 'border-gray-200 hover:bg-gray-100' : 'border-white/20 hover:bg-white/10'
+          }`}
         >
-          <span className="text-white font-medium">{t('navigation.faq')}</span>
-          <ChevronRight size={20} className="text-white/70" />
+          <span className={`font-medium ${ac.pageHeading}`}>{t('navigation.faq')}</span>
+          <ChevronRight size={20} className={ac.mutedText} />
         </button>
 
         <button
@@ -1037,10 +1085,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             router.push(`/${language}/privacy`);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border border-white/20 hover:bg-white/10 transition-colors"
+          className={`w-full flex items-center justify-between px-4 py-3 bg-transparent rounded-xl border transition-colors ${
+            isLight ? 'border-gray-200 hover:bg-gray-100' : 'border-white/20 hover:bg-white/10'
+          }`}
         >
-          <span className="text-white font-medium">{t('privacy.title')}</span>
-          <ChevronRight size={20} className="text-white/70" />
+          <span className={`font-medium ${ac.pageHeading}`}>{t('privacy.title')}</span>
+          <ChevronRight size={20} className={ac.mutedText} />
         </button>
       </div>
 

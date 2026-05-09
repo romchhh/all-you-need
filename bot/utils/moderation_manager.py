@@ -426,15 +426,13 @@ class ModerationManager:
                     except Exception as ref_error:
                         print(f"[approve_listing] Error checking referral reward: {ref_error}")
 
-                    # Сповіщення підписників міста — тільки через Telegram-бот (Python)
+                    # Сповіщення підписників міста — пакетами (дайджест), як при approve парсера
                     try:
-                        from utils.city_subscription_notify import (
-                            notify_city_subscribers_marketplace,
-                        )
+                        from utils.city_digest_notify import enqueue_city_digest_listing
 
-                        await notify_city_subscribers_marketplace(self.bot, listing_id)
+                        enqueue_city_digest_listing(listing_id)
                     except Exception as notify_err:
-                        print(f"[approve_listing] City subscriber notify error: {notify_err}")
+                        print(f"[approve_listing] City digest enqueue error: {notify_err}")
 
                 conn.close()
                 return success

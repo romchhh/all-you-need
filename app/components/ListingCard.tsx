@@ -9,6 +9,7 @@ import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCategories } from '@/constants/categories';
 import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface ListingCardProps {
   listing: Listing;
@@ -18,10 +19,23 @@ interface ListingCardProps {
   tg: TelegramWebApp | null;
   isSold?: boolean;
   isDeactivated?: boolean;
+  /** `stacked` — завжди вертикальна картка як на мобільному (для горизонтальних каруселей на десктопі). */
+  layout?: 'responsive' | 'stacked';
 }
 
-const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite, tg, isSold = false, isDeactivated = false }: ListingCardProps) => {
+const ListingCardComponent = ({
+  listing,
+  isFavorite,
+  onSelect,
+  onToggleFavorite,
+  tg,
+  isSold = false,
+  isDeactivated = false,
+  layout = 'responsive',
+}: ListingCardProps) => {
+  const isStacked = layout === 'stacked';
   const { t } = useLanguage();
+  const { isLight } = useTheme();
   const categories = useMemo(() => getCategories(t), [t]);
   const categoryLabel = useMemo(
     () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
@@ -61,25 +75,24 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   // - Выделение цветом (highlighted) - рамка без бейджа
   // - ВИП (vip) - рамка + бейдж VIP
   // - ТОП + Выделение - рамка + бейдж TOP
+  const defaultPromoBorder = isLight ? 'border border-gray-200' : 'border border-white/20';
+
   const getPromotionStyles = () => {
-    if (promotionTypes.length === 0) return 'border border-white/20';
-    
-    // Якщо є VIP - показуємо VIP стиль
+    if (promotionTypes.length === 0) return defaultPromoBorder;
+
     if (promotionTypes.includes('vip')) {
       return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
     }
-    
-    // Якщо є highlighted - показуємо рамку
+
     if (promotionTypes.includes('highlighted')) {
       return 'border-2 border-[#D3F1A7]';
     }
-    
-    // Якщо тільки top_category - без рамки
+
     if (promotionTypes.includes('top_category')) {
-      return 'border border-white/20';
+      return defaultPromoBorder;
     }
-    
-    return 'border border-white/20';
+
+    return defaultPromoBorder;
   };
   
   const getPromotionBadge = () => {
@@ -106,7 +119,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   };
   
   const getCardBackgroundStyles = () => {
-    return 'bg-[#000000]';
+    return isLight ? 'bg-white shadow-sm ring-1 ring-black/[0.06]' : 'bg-[#000000]';
   };
   
   // Форматуємо час на клієнті з перекладами
@@ -200,10 +213,11 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
   return (
     <div 
       data-listing-id={listing.id}
-      className={`${getCardBackgroundStyles()} rounded-2xl transition-all cursor-pointer relative select-none flex flex-col ${
-        isSold || isDeactivated ? 'opacity-60' : ''
-      } ${getPromotionStyles()}`}
-      style={{ height: '100%', minHeight: '350px', overflow: 'visible' }}
+      className={`${getCardBackgroundStyles()} rounded-2xl transition-all cursor-pointer relative select-none flex h-full min-h-0 ${
+        isStacked
+          ? 'flex-col overflow-hidden'
+          : 'flex-col lg:flex-row lg:items-stretch lg:overflow-hidden'
+      } ${isSold || isDeactivated ? 'opacity-60' : ''} ${getPromotionStyles()}`}
       onClick={() => {
         if (!isSold && !isDeactivated) {
           onSelect(listing);
@@ -211,8 +225,14 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
         }
       }}
     >
-      {/* Зображення товару - займає більшу частину картки */}
-      <div className="relative w-full flex-shrink-0 rounded-t-2xl overflow-hidden" style={{ height: '240px', minHeight: '240px', maxHeight: '240px', zIndex: 1 }}>
+      {/* Зображення: зверху на мобільному, зліва на десктопі */}
+      <div
+        className={
+          isStacked
+            ? 'relative z-[1] h-[220px] w-full shrink-0 overflow-hidden rounded-t-2xl sm:h-[240px]'
+            : 'relative z-[1] h-[220px] w-full shrink-0 overflow-hidden rounded-t-2xl sm:h-[240px] lg:h-full lg:min-h-[220px] lg:w-52 lg:self-stretch lg:rounded-l-2xl lg:rounded-t-none lg:rounded-tr-none xl:w-56'
+        }
+      >
         {/* Бейдж реклами (VIP/TOP) - лівий верхній кут */}
         <div className="absolute top-3 left-3 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           {getPromotionBadge()}
@@ -220,9 +240,9 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
         
         {/* Placeholder або зображення */}
         {imageError || (!listing.image && (!listing.images || listing.images.length === 0)) ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#1A1A1A] w-full h-full">
+          <div className={`absolute inset-0 flex items-center justify-center w-full h-full ${isLight ? 'bg-gray-100' : 'bg-[#1A1A1A]'}`}>
             <div className="text-center">
-              <ImageIcon size={48} className="text-white/10 mx-auto" />
+              <ImageIcon size={48} className={`mx-auto ${isLight ? 'text-gray-300' : 'text-white/10'}`} />
             </div>
           </div>
         ) : (
@@ -235,7 +255,7 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
             style={{ width: '100%', height: '100%' }}
             loading="lazy"
             decoding="async"
-            sizes="(max-width: 768px) 50vw, 33vw"
+            sizes={isStacked ? '(max-width: 1023px) 50vw, 240px' : '(max-width: 1023px) 50vw, 25vw'}
             key={`${listing.image}-${listing.id}`}
             onLoad={() => {
               imageLoadedRef.current.add(imageUrl);
@@ -273,67 +293,124 @@ const ListingCardComponent = ({ listing, isFavorite, onSelect, onToggleFavorite,
             onToggleFavorite(listing.id);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-full border border-white/30 hover:bg-black/60 transition-all z-10"
+          className={`absolute top-2 right-2 w-8 h-8 flex items-center justify-center backdrop-blur-sm rounded-full transition-all z-10 ${
+            isLight
+              ? 'bg-white/80 border border-gray-300/80 hover:bg-white'
+              : 'bg-black/40 border border-white/30 hover:bg-black/60'
+          }`}
         >
           <Heart 
             size={16} 
-            className={isFavorite ? 'text-white fill-white' : 'text-white'}
+            className={
+              isFavorite
+                ? isLight
+                  ? 'text-red-500 fill-red-500'
+                  : 'text-white fill-white'
+                : isLight
+                  ? 'text-gray-600'
+                  : 'text-white'
+            }
             fill={isFavorite ? 'currentColor' : 'none'}
             strokeWidth={isFavorite ? 0 : 2}
           />
         </button>
       </div>
       
-      {/* Темний overlay з інформацією - нижня частина з заокругленими верхніми кутами */}
-      <div className="relative bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95 rounded-t-3xl rounded-b-2xl -mt-5 pt-3 px-4 pb-1.5 flex flex-col flex-1 z-30" style={{ minHeight: '110px', position: 'relative', zIndex: 30 }}>
-        {/* Ціна та тег стану — повний текст, масштабування шрифту по ширині */}
-        <div className="flex items-start justify-between gap-2 mb-1 min-h-[1.5rem]">
-          <div className="min-w-0 flex-1">
+      {/* Інфо-блок: знизу на мобільному, справа на десктопі */}
+      <div
+        className={`relative z-30 flex min-h-0 flex-1 flex-col px-4 pb-2 pt-3 -mt-5 rounded-t-3xl rounded-b-2xl ${
+          isStacked
+            ? ''
+            : 'lg:mt-0 lg:rounded-none lg:rounded-r-2xl lg:rounded-bl-2xl lg:justify-center lg:py-4 lg:pl-5'
+        } ${
+          isLight
+            ? 'bg-gradient-to-b from-white to-gray-50'
+            : 'bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95'
+        }`}
+      >
+        {/* Ціна + стан: в ряд на мобільних; з lg (горизонтальна картка) — колонка, щоб бейдж не стискав ціну */}
+        <div
+          className={`mb-1 flex min-w-0 flex-row items-start justify-between gap-2 ${
+            isStacked ? '' : 'lg:flex-col lg:items-stretch lg:gap-1.5'
+          }`}
+        >
+          <div className={`min-w-0 flex-1 ${isStacked ? '' : 'lg:w-full lg:flex-none'}`}>
           {(() => {
             const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
             const isFree = listing.isFree;
-            const priceClass = 'font-bold text-white block overflow-visible';
-            const fluidSize = 'text-[clamp(0.6875rem,4vw,1.5rem)]';
+            const priceClass = `block font-bold text-balance break-words [overflow-wrap:anywhere] ${isLight ? 'text-[#3F5331]' : 'text-white'}`;
+            const fluidSize = isStacked
+              ? 'text-[clamp(0.6875rem,4vw,1.5rem)] sm:max-w-full'
+              : 'text-[clamp(0.6875rem,4vw,1.5rem)] sm:max-w-full lg:text-xl xl:text-2xl';
             if (isFree) {
               return <span className={`${priceClass} ${fluidSize}`}>{t('common.free')}</span>;
             }
             if (isNegotiable) {
-              return <span className={`${priceClass} whitespace-nowrap text-[clamp(0.5rem,3.5vw,1.5rem)]`} title={t('common.negotiable')}>{t('common.negotiableShort')}</span>;
+              return (
+                <span
+                  className={`block min-w-0 truncate font-bold leading-none tracking-tight whitespace-nowrap text-[clamp(0.5rem,2.6vw,0.8125rem)] sm:text-[clamp(0.5625rem,2.2vw,0.875rem)] ${
+                    isStacked ? '' : 'lg:text-[clamp(0.625rem,1.1vw,0.8125rem)]'
+                  } ${isLight ? 'text-[#3F5331]' : 'text-white'}`}
+                  title={t('common.negotiable')}
+                >
+                  {t('common.negotiableShort')}
+                </span>
+              );
             }
-            return <span className={`${priceClass} ${fluidSize}`} style={{ wordBreak: 'break-all' }}>{`${listing.price}${getCurrencySymbol(listing.currency)}`}</span>;
+            return (
+              <span className={`${priceClass} ${fluidSize}`}>
+                {`${listing.price}${getCurrencySymbol(listing.currency)}`}
+              </span>
+            );
           })()}
           </div>
           {listing.condition && (
-            <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-[11px] font-semibold rounded flex-shrink-0">
+            <span
+              className={`inline-flex max-w-full flex-shrink-0 self-start rounded px-2.5 py-1 text-[11px] font-semibold leading-tight lg:self-start ${
+                isLight ? 'bg-gray-200 text-gray-800' : 'bg-[#2A2A2A] text-white'
+              }`}
+            >
               {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
             </span>
           )}
         </div>
         
         {/* Назва товару */}
-        <p className="text-sm text-white line-clamp-2 mb-0.5 font-medium leading-snug">
+        <p
+          className={`text-sm line-clamp-2 mb-0.5 font-medium leading-snug ${
+            isStacked ? '' : 'lg:text-[15px]'
+          } ${isLight ? 'text-gray-900' : 'text-white'}`}
+        >
           {listing.title}
         </p>
-        
-        {/* Категорія */}
+
         {categoryLabel && (
-          <div className="text-[11px] text-white/70 truncate mt-1">
+          <div className={`text-[11px] truncate mt-1 ${isLight ? 'text-gray-600' : 'text-white/70'}`}>
             {categoryLabel}
           </div>
         )}
-        
-        {/* Локація та час */}
-        <div className="flex flex-col gap-0.5 text-[10px] text-white/60 mt-0.5 mb-0">
+
+        <div
+          className={`flex flex-col gap-0.5 text-[10px] mt-0.5 mb-0 ${
+            isLight ? 'text-gray-500' : 'text-white/60'
+          }`}
+        >
           <div className="flex items-center gap-1">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60 flex-shrink-0">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`flex-shrink-0 ${isLight ? 'text-gray-500' : 'text-white/60'}`}
+            >
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
             </svg>
             <span className="truncate">{listing.location?.split(',')[0] || ''}</span>
           </div>
-          <div className="text-white/60 truncate">
-            {formattedTime}
-          </div>
+          <div className="truncate">{formattedTime}</div>
         </div>
       </div>
     </div>
@@ -352,6 +429,7 @@ export const ListingCard = memo(ListingCardComponent, (prevProps, nextProps) => 
     prevProps.listing.promotionEnds === nextProps.listing.promotionEnds &&
     prevProps.isFavorite === nextProps.isFavorite &&
     prevProps.isSold === nextProps.isSold &&
-    prevProps.isDeactivated === nextProps.isDeactivated
+    prevProps.isDeactivated === nextProps.isDeactivated &&
+    prevProps.layout === nextProps.layout
   );
 });

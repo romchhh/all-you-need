@@ -7,6 +7,7 @@ import { PerformanceScript } from "@/components/PerformanceScript";
 import { MobileOptimizationScript } from "@/components/MobileOptimizationScript";
 import { TelegramAccessGuard } from "@/components/TelegramAccessGuard";
 import { RegistrationGate } from "@/components/RegistrationGate";
+import { AppProviders } from "@/components/AppProviders";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,15 +48,22 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} antialiased`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var k='appAppearanceTheme',t=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',t==='light'||t==='dark'?t:'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+          }}
+        />
         <ErrorBoundary>
           <LanguageProvider>
-            <PerformanceScript />
-            <MobileOptimizationScript />
-            <TelegramAccessGuard>
-              <RegistrationGate>
-                {children}
-              </RegistrationGate>
-            </TelegramAccessGuard>
+            <AppProviders>
+              <PerformanceScript />
+              <MobileOptimizationScript />
+              <TelegramAccessGuard>
+                <RegistrationGate>
+                  {children}
+                </RegistrationGate>
+              </TelegramAccessGuard>
+            </AppProviders>
           </LanguageProvider>
         </ErrorBoundary>
       </body>

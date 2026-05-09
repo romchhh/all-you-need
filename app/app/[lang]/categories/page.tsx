@@ -841,7 +841,7 @@ const CategoriesPage = () => {
           </div>
         </div>
       )}
-      <div className="max-w-2xl mx-auto w-full overflow-x-hidden">
+      <div className="mx-auto w-full max-w-2xl overflow-x-hidden lg:max-w-5xl xl:max-w-6xl">
         {renderContent()}
       </div>
 

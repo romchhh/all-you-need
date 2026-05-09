@@ -1,6 +1,10 @@
+'use client';
+
 import { Subcategory } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 
 interface SubcategoryListProps {
   subcategories: Subcategory[];
@@ -12,6 +16,9 @@ interface SubcategoryListProps {
 
 export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, tg, categoryId }: SubcategoryListProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
+  const subIdle = ac.subcategoryIdle;
   if (!subcategories || subcategories.length === 0) return null;
 
   // Для категорії "Послуги та робота" розділяємо підкатегорії на дві групи
@@ -35,10 +42,10 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
         onSelect(subcategory.id);
         tg?.HapticFeedback.impactOccurred('light');
       }}
-      className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all border ${
+      className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
         selectedSubcategory === subcategory.id
-          ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-          : 'border-white text-white bg-transparent hover:bg-white/10'
+          ? 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+          : subIdle
       }`}
     >
       {subcategory.name}
@@ -72,10 +79,10 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
                 onSelect(null);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all border ${
+              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                 selectedSubcategory === null
-                  ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-                  : 'border-white text-white bg-transparent hover:bg-white/10'
+                  ? 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                  : subIdle
               }`}
             >
               {t('common.all')}
@@ -111,10 +118,10 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
               onSelect(null);
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all border ${
+            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
               selectedSubcategory === null
-                ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-                : 'border-white text-white bg-transparent hover:bg-white/10'
+                ? 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                : subIdle
             }`}
           >
             {t('common.all')}

@@ -1,4 +1,4 @@
-import { Search, X, Gift, Clock, MapPin, SlidersHorizontal, Grid3x3, List } from 'lucide-react';
+import { Search, X, Gift, Clock, MapPin, SlidersHorizontal, Grid3x3, List, Sun, Moon } from 'lucide-react';
 import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '../CategoryChip';
@@ -12,6 +12,8 @@ import { TopBar } from '../TopBar';
 import { ListingGridSkeleton } from '../SkeletonLoader';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { Currency } from '@/utils/currency';
 
@@ -84,6 +86,8 @@ const BazaarTabComponent = ({
   onToast
 }: BazaarTabProps) => {
   const { t } = useLanguage();
+  const { isLight, toggleTheme } = useTheme();
+  const ac = getAppearanceClasses(isLight);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
     if (savedState?.selectedCategory !== undefined) {
       return savedState.selectedCategory;
@@ -567,12 +571,71 @@ const BazaarTabComponent = ({
 
   const hasActiveFilters = !!(sortBy !== 'newest' || showFreeOnly || minPrice !== null || maxPrice !== null || selectedCategory || selectedSubcategory || selectedCities.length > 0 || selectedCondition !== null || selectedCurrency !== null);
 
+  const renderCatalogToolbar = (showGridSwitch: boolean) => (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <div className={`flex items-center rounded-xl p-1 ${ac.toggleGroup}`}>
+        <button
+          type="button"
+          onClick={() => {
+            toggleTheme();
+            tg?.HapticFeedback?.impactOccurred?.('light');
+          }}
+          className={`p-2 rounded-lg transition-colors ${ac.toggleInactive}`}
+          aria-label={isLight ? 'Темна тема' : 'Світла тема'}
+          title={isLight ? 'Темна тема' : 'Світла тема'}
+        >
+          {isLight ? <Moon size={18} /> : <Sun size={18} />}
+        </button>
+      </div>
+      {showGridSwitch && filteredAndSortedListings.length > 0 && (
+        <div className={`flex items-center gap-1 rounded-xl p-1 ${ac.toggleGroup}`}>
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('grid');
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className={`p-2 rounded-lg transition-colors ${
+              viewMode === 'grid'
+                ? 'bg-[#D3F1A7] text-gray-900 shadow-sm'
+                : ac.toggleInactive
+            }`}
+            aria-pressed={viewMode === 'grid'}
+          >
+            <Grid3x3 size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('list');
+              tg?.HapticFeedback.impactOccurred('light');
+            }}
+            className={`p-2 rounded-lg transition-colors ${
+              viewMode === 'list'
+                ? 'bg-[#D3F1A7] text-gray-900 shadow-sm'
+                : ac.toggleInactive
+            }`}
+            aria-pressed={viewMode === 'list'}
+          >
+            <List size={18} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="pb-24">
-      {/* Пошук з TopBar */}
+      {/* Пошук з TopBar — на десктопі вужчий і по центру */}
       <div className="relative">
-        <div className="p-4 sticky top-0 z-20">
-          <div className="relative" ref={suggestionsRef}>
+        <div
+          className={`sticky top-0 z-20 p-4 lg:flex lg:justify-center lg:py-4 ${
+            isLight
+              ? 'border-b border-gray-200/70 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/70'
+              : 'border-b border-white/10 bg-black/40 backdrop-blur-md'
+          }`}
+        >
+          <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl" ref={suggestionsRef}>
             <div className="flex gap-1 items-center">
               <TopBar
                 variant="main"
@@ -603,7 +666,7 @@ const BazaarTabComponent = ({
                 tg={tg}
                 searchSuggestions={
                   showSuggestions && searchSuggestions.length > 0 ? (
-                    <div className="absolute left-0 right-0 top-full mt-2 bg-gray-900 rounded-xl border border-gray-700 shadow-lg z-50 max-h-60 overflow-y-auto">
+                    <div className={`absolute left-0 right-0 top-full mt-2 z-50 max-h-60 overflow-y-auto ${ac.suggestionDropdown}`}>
                       {searchSuggestions.map((suggestion, index) => (
                         <button
                           key={index}
@@ -617,12 +680,12 @@ const BazaarTabComponent = ({
                             searchInputRef.current?.blur();
                             tg?.HapticFeedback.impactOccurred('light');
                           }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-800 transition-colors flex items-center gap-2 text-white border-b border-gray-700 last:border-b-0"
+                          className={ac.suggestionRow}
                         >
                           {!searchQuery.trim() ? (
-                            <Clock size={16} className="text-gray-400" />
+                            <Clock size={16} className={ac.suggestionIcon} />
                           ) : (
-                            <Search size={16} className="text-gray-400" />
+                            <Search size={16} className={ac.suggestionIcon} />
                           )}
                           <span>{suggestion}</span>
                         </button>
@@ -638,10 +701,21 @@ const BazaarTabComponent = ({
                 className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors relative border ${
                   selectedCities.length > 0
                     ? 'border-[#D3F1A7] bg-transparent'
-                    : 'border-white bg-transparent hover:bg-white/10'
+                    : isLight
+                      ? 'border-gray-300 bg-transparent hover:bg-gray-100'
+                      : 'border-white bg-transparent hover:bg-white/10'
                 }`}
               >
-                <MapPin size={18} className={selectedCities.length > 0 ? 'text-[#D3F1A7]' : 'text-white'} />
+                <MapPin
+                  size={18}
+                  className={
+                    selectedCities.length > 0
+                      ? 'text-[#D3F1A7]'
+                      : isLight
+                        ? 'text-gray-700'
+                        : 'text-white'
+                  }
+                />
                 {selectedCities.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-[#D3F1A7] text-black text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {selectedCities.length > 9 ? '9+' : selectedCities.length}
@@ -657,51 +731,20 @@ const BazaarTabComponent = ({
 
       {/* Розділи - показуємо тільки якщо не вибрана категорія та немає пошуку */}
       {categories.length > 0 && !selectedCategory && !searchQuery.trim() && (
-        <div className="pt-2 pb-3">
-          <div className="flex items-center justify-between mb-3 px-4">
-            <h2 className="text-lg font-semibold text-white">{t('navigation.categories')}</h2>
-            {/* Перемикач виду */}
-            {filteredAndSortedListings.length > 0 && (
-              <div className="flex items-center gap-1 bg-gray-800/50 rounded-xl p-1">
-                <button
-                  onClick={() => {
-                    setViewMode('grid');
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-[#D3F1A7] text-gray-900 shadow-sm'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Grid3x3 size={18} />
-                </button>
-                <button
-                  onClick={() => {
-                    setViewMode('list');
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-[#D3F1A7] text-gray-900 shadow-sm'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <List size={18} />
-                </button>
-              </div>
-            )}
+        <div className="mx-auto w-full max-w-full pb-3 pt-2 lg:max-w-5xl xl:max-w-6xl">
+          <div className="mb-3 flex items-center justify-between px-4 lg:px-6">
+            <h2 className={`text-lg font-semibold ${ac.pageHeading}`}>{t('navigation.categories')}</h2>
+            {renderCatalogToolbar(true)}
           </div>
-          <div 
-            className="overflow-x-auto scrollbar-hide" 
-            style={{ 
-              width: '100vw',
+          <div
+            className="scrollbar-hide w-full max-w-full overflow-x-auto lg:px-6"
+            style={{
               WebkitOverflowScrolling: 'touch',
               scrollbarWidth: 'none',
-              msOverflowStyle: 'none'
+              msOverflowStyle: 'none',
             }}
           >
-            <div className="flex gap-2 pb-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
+            <div className="mx-auto flex w-max gap-2 px-4 pb-2 lg:px-0" style={{ minWidth: 'max-content' }}>
               {/* Кнопка "Всі категорії" */}
               <div 
                 className="flex flex-col items-center min-w-[80px] max-w-[90px] cursor-pointer flex-shrink-0"
@@ -719,15 +762,21 @@ const BazaarTabComponent = ({
                   }
                 }}
               >
-                <div 
-                  className="w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden border border-white"
+                <div
+                  className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden border ${
+                    isLight ? 'border-transparent' : 'border-white'
+                  }`}
                   style={{
-                    background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+                    background: isLight
+                      ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.22) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), #ffffff'
+                      : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000',
                   }}
                 >
                   <CategoryIcon categoryId="all_categories" isActive={false} size={32} />
                 </div>
-                <span className="text-xs font-medium text-center whitespace-normal leading-tight px-0.5 text-white">
+                <span
+                  className={`text-xs font-medium text-center whitespace-normal leading-tight px-0.5 ${ac.categoryRowLabel}`}
+                >
                   {t('bazaar.allCategories')}
                 </span>
               </div>
@@ -755,40 +804,10 @@ const BazaarTabComponent = ({
       {(selectedCategory || selectedSubcategory) && (
         <div className="px-4 pt-2">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className={`text-lg font-semibold ${ac.pageHeading}`}>
               {selectedCategoryData?.name || t('navigation.categories')}
             </h2>
-            {/* Перемикач виду при виборі категорії */}
-            {filteredAndSortedListings.length > 0 && (
-              <div className="flex items-center gap-1 bg-gray-800/50 rounded-xl p-1">
-                <button
-                  onClick={() => {
-                    setViewMode('grid');
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-[#D3F1A7] text-gray-900 shadow-sm'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Grid3x3 size={18} />
-                </button>
-                <button
-                  onClick={() => {
-                    setViewMode('list');
-                    tg?.HapticFeedback.impactOccurred('light');
-                  }}
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-[#D3F1A7] text-gray-900 shadow-sm'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <List size={18} />
-                </button>
-              </div>
-            )}
+            {renderCatalogToolbar(true)}
           </div>
           
           {/* Кнопка очищення для категорії "Безкоштовно" */}
@@ -801,7 +820,7 @@ const BazaarTabComponent = ({
                   setShowFreeOnly(false);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+                className={ac.outlineButton}
               >
                 {t('common.clear')}
               </button>
@@ -811,7 +830,7 @@ const BazaarTabComponent = ({
           {/* Заголовок підкатегорії та кнопка очищення */}
           {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
             <div className="flex items-center justify-between mt-3 mb-3">
-              <h3 className="text-base font-semibold text-white">Підкатегорії</h3>
+              <h3 className={`text-base font-semibold ${ac.pageHeading}`}>Підкатегорії</h3>
               <button
                 onClick={() => {
                   setSelectedCategory(null);
@@ -819,7 +838,7 @@ const BazaarTabComponent = ({
                   setShowFreeOnly(false);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+                className={ac.outlineButton}
               >
                 {t('common.clear')}
               </button>
@@ -848,7 +867,8 @@ const BazaarTabComponent = ({
       {filteredAndSortedListings.length > 0 ? (
         <>
           {viewMode === 'grid' ? (
-            <div className="px-4 grid grid-cols-2 gap-3 pb-4">
+            <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 [grid-auto-rows:1fr]">
               {filteredAndSortedListings.map(listing => (
                 <ListingCard 
                   key={listing.id} 
@@ -859,6 +879,7 @@ const BazaarTabComponent = ({
                   tg={tg}
                 />
               ))}
+              </div>
             </div>
           ) : (
             <div className="px-4 space-y-3 pb-4">
@@ -883,7 +904,7 @@ const BazaarTabComponent = ({
                   onLoadMore();
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+                className={ac.outlineButton}
               >
                 {t('common.showMore')}
               </button>
@@ -892,7 +913,7 @@ const BazaarTabComponent = ({
         </>
       ) : (
         <div className="px-4 py-16 text-center">
-          <p className="text-gray-400">{t('common.nothingFound')}</p>
+          <p className={ac.nothingFound}>{t('common.nothingFound')}</p>
           {(searchQuery || selectedCategory || selectedSubcategory || showFreeOnly) && (
             <button
               onClick={() => {
@@ -901,7 +922,7 @@ const BazaarTabComponent = ({
                 setSelectedSubcategory(null);
                 setShowFreeOnly(false);
               }}
-              className="mt-4 px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+              className={`mt-4 ${ac.outlineButton}`}
             >
               {t('bazaar.clearFilters')}
             </button>

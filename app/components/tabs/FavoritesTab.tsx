@@ -4,6 +4,8 @@ import { TelegramWebApp } from '@/types/telegram';
 import { ListingCard } from '../ListingCard';
 import { useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 
 interface FavoritesTabProps {
   listings: Listing[];
@@ -29,6 +31,8 @@ export const FavoritesTab = ({
   tg
 }: FavoritesTabProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
   const favoritedListings = listings.filter(l => favorites.has(l.id));
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -87,16 +91,25 @@ export const FavoritesTab = ({
         onTouchEnd={handleTouchEnd}
         style={{ touchAction: 'pan-y' }}
       >
-        <h2 className="text-2xl font-bold text-white mb-2 pt-2">Обране</h2>
-        <p className="text-sm text-gray-400 mb-8">Тут товари, які вам сподобалися</p>
+        <h2 className={`text-2xl font-bold mb-2 pt-2 ${ac.pageHeading}`}>Обране</h2>
+        <p className={`text-sm mb-8 ${ac.nothingFound}`}>Тут товари, які вам сподобалися</p>
         
         <div className="flex-1 flex items-start justify-center pt-8 pb-20">
           <div className="max-w-sm mx-auto px-4">
-            <div className="border-2 border-gray-600 rounded-3xl p-8 text-center">
+            <div
+              className={`border-2 rounded-3xl p-8 text-center ${
+                isLight ? 'border-gray-200 bg-white shadow-sm' : 'border-gray-600'
+              }`}
+            >
               <div className="flex items-center justify-center mx-auto mb-6">
-                <Heart size={64} className="text-white" fill="none" strokeWidth={2} />
+                <Heart
+                  size={64}
+                  className={isLight ? 'text-gray-400' : 'text-white'}
+                  fill="none"
+                  strokeWidth={2}
+                />
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">У вас ще немає обраних</h3>
+              <h3 className={`text-xl font-bold mb-3 ${ac.pageHeading}`}>У вас ще немає обраних</h3>
               <p className="text-sm text-gray-400">Додайте товари до списку обраного, щоб швидко знаходити улюблене</p>
             </div>
           </div>
@@ -114,8 +127,8 @@ export const FavoritesTab = ({
       style={{ touchAction: 'pan-y' }}
     >
       <div className="p-4 pt-2">
-        <h2 className="text-2xl font-bold text-white mb-2">Обране</h2>
-        <p className="text-sm text-gray-400 mb-4">Тут товари, які вам сподобалися</p>
+        <h2 className={`text-2xl font-bold mb-2 ${ac.pageHeading}`}>Обране</h2>
+        <p className={`text-sm mb-4 ${ac.nothingFound}`}>Тут товари, які вам сподобалися</p>
         
         <div className="grid grid-cols-2 gap-4">
           {favoritedListings.map(listing => (
@@ -140,7 +153,7 @@ export const FavoritesTab = ({
                   onLoadMore();
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className="px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors"
+                className={ac.outlineButton}
               >
                 {t('common.showMore')}
               </button>

@@ -3,6 +3,8 @@
 import { X, MapPin, Search, Check, Bell, BellOff, ChevronDown } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useState, useEffect, Fragment, useRef, useCallback, useMemo, type MouseEvent } from 'react';
 import { normalizeCityInput } from '@/utils/cityNormalization';
 import { germanCities, fetchGermanCitiesFromAPI, isGermanCityValid } from '@/constants/german-cities';
@@ -97,6 +99,15 @@ export const CityModal = ({
   onToast
 }: CityModalProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
+  const chipActive = 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent';
+  const chipIdle = isLight
+    ? 'border border-gray-300 text-gray-800 bg-transparent hover:bg-gray-100'
+    : 'border border-white text-white bg-transparent hover:bg-white/10';
+  const sheetBackground = isLight
+    ? 'radial-gradient(ellipse 85% 100% at 18% 0%, rgba(63, 83, 49, 0.14) 0%, transparent 45%), linear-gradient(180deg, #ffffff 0%, #f6f8f4 100%)'
+    : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000';
   const [localSelectedCities, setLocalSelectedCities] = useState<string[]>(selectedCities);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[]>([]);
@@ -453,15 +464,21 @@ export const CityModal = ({
         }}
       >
         <div 
-          className="w-full rounded-t-3xl border-t-2 border-white flex flex-col max-h-[85vh] overflow-hidden"
+          className={`w-full rounded-t-3xl border-t-2 flex flex-col max-h-[85vh] overflow-hidden ${
+            isLight ? 'border-gray-200' : 'border-white'
+          }`}
           onClick={(e) => e.stopPropagation()}
           style={{
-            background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+            background: sheetBackground
           }}
         >
           {/* Закріплена шапка */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-700/50 flex-shrink-0">
-            <h3 className="text-xl font-bold text-white">{t('bazaar.selectCity')}</h3>
+          <div
+            className={`flex items-center justify-between p-6 border-b flex-shrink-0 ${
+              isLight ? 'border-gray-200' : 'border-gray-700/50'
+            }`}
+          >
+            <h3 className={`text-xl font-bold ${ac.pageHeading}`}>{t('bazaar.selectCity')}</h3>
             <button
               onClick={() => {
                 // При закритті через X - застосовуємо вибір міста (якщо є зміни)
@@ -473,9 +490,11 @@ export const CityModal = ({
                 }
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="w-8 h-8 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                isLight ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-800/50 hover:bg-gray-700/50'
+              }`}
             >
-              <X size={18} className="text-white" />
+              <X size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
             </button>
           </div>
 
@@ -515,7 +534,7 @@ export const CityModal = ({
               {/* Пошук */}
               <div className="relative">
                 <Search 
-                  className="absolute top-1/2 -translate-y-1/2 text-white/80" 
+                  className={`absolute top-1/2 -translate-y-1/2 ${isLight ? 'text-gray-500' : 'text-white/80'}`}
                   size={18} 
                   style={{ left: '12px' }}
                 />
@@ -542,7 +561,11 @@ export const CityModal = ({
                     }
                   }}
                   placeholder={t('bazaar.searchCity') || 'Пошук по назві або індексу (наприклад: 22880 або Wedel)'}
-                  className="w-full pr-4 py-3 pl-10 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder:text-white/60"
+                  className={
+                    isLight
+                      ? 'w-full pr-4 py-3 pl-10 bg-white rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/25 text-gray-900 placeholder:text-gray-500'
+                      : 'w-full pr-4 py-3 pl-10 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder:text-white/60'
+                  }
                 />
               </div>
 
@@ -551,14 +574,17 @@ export const CityModal = ({
                 <button
                   type="button"
                   onClick={() => toggleCity('')}
-                  className={`min-w-0 flex-1 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
-                    localSelectedCities.length === 0
-                      ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-                      : 'border-white text-white bg-transparent hover:bg-white/10'
+                  className={`min-w-0 flex-1 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 ${
+                    localSelectedCities.length === 0 ? chipActive : chipIdle
                   }`}
                 >
-                  <MapPin size={16} className={`flex-shrink-0 mr-2 ${localSelectedCities.length === 0 ? 'text-[#D3F1A7]' : 'text-white'}`} />
-                  <span className="font-medium truncate">{t('bazaar.allCities') || 'Всі міста'}</span>
+                  <MapPin
+                    size={16}
+                    className={`flex-shrink-0 mr-2 ${
+                      localSelectedCities.length === 0 ? 'text-[#D3F1A7]' : isLight ? 'text-gray-700' : 'text-white'
+                    }`}
+                  />
+                  <span className={`font-medium truncate ${ac.pageHeading}`}>{t('bazaar.allCities') || 'Всі міста'}</span>
                 </button>
                 {profileTelegramId && (
                   <div className="shrink-0 self-stretch">
@@ -567,17 +593,30 @@ export const CityModal = ({
                       onClick={() => setSubsDropdownOpen((o) => !o)}
                       className={`h-full min-h-[48px] min-w-[50px] px-3 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-colors ${
                         subsDropdownOpen
-                          ? 'border-[#D3F1A7] text-[#D3F1A7] bg-white/5'
-                          : 'border-white text-white hover:bg-white/10'
+                          ? 'border-[#D3F1A7] text-[#D3F1A7] ' + (isLight ? 'bg-gray-100' : 'bg-white/5')
+                          : isLight
+                            ? 'border-gray-300 text-gray-800 hover:bg-gray-100'
+                            : 'border-white text-white hover:bg-white/10'
                       }`}
                       title={t('bazaar.subscribedCitiesMenu')}
                       aria-expanded={subsDropdownOpen}
                       aria-controls="subscribed-cities-inline-list"
                     >
-                      <Bell size={16} className={subsDropdownOpen ? 'text-[#D3F1A7]' : 'text-white'} />
+                      <Bell
+                        size={16}
+                        className={
+                          subsDropdownOpen ? 'text-[#D3F1A7]' : isLight ? 'text-gray-700' : 'text-white'
+                        }
+                      />
                       <ChevronDown
                         size={14}
-                        className={`opacity-90 transition-transform ${subsDropdownOpen ? 'rotate-180 text-[#D3F1A7]' : ''}`}
+                        className={`opacity-90 transition-transform ${
+                          subsDropdownOpen
+                            ? 'rotate-180 text-[#D3F1A7]'
+                            : isLight
+                              ? 'text-gray-600'
+                              : ''
+                        }`}
                       />
                     </button>
                   </div>
@@ -586,17 +625,19 @@ export const CityModal = ({
               {profileTelegramId && subsDropdownOpen && (
                 <div
                   id="subscribed-cities-inline-list"
-                  className="rounded-xl border border-white/25 bg-[#1a1a1a] py-1"
+                  className={`rounded-xl border py-1 ${
+                    isLight ? 'border-gray-200 bg-white shadow-sm' : 'border-white/25 bg-[#1a1a1a]'
+                  }`}
                   role="listbox"
                 >
-                  <div className="px-3 pt-2 pb-1 text-xs uppercase tracking-wide text-white/60">
+                  <div className={`px-3 pt-2 pb-1 text-xs uppercase tracking-wide ${ac.mutedText}`}>
                     {t('bazaar.subscribedCitiesMenu')}
                   </div>
                   {subsLoading && (
-                    <div className="px-3 py-2.5 text-sm text-white/70">{t('common.loading')}</div>
+                    <div className={`px-3 py-2.5 text-sm ${ac.mutedText}`}>{t('common.loading')}</div>
                   )}
                   {!subsLoading && subscribedCityOptions.length === 0 && (
-                    <div className="px-3 py-2.5 text-sm text-white/70">
+                    <div className={`px-3 py-2.5 text-sm ${ac.mutedText}`}>
                       {t('bazaar.subscribedCitiesEmpty')}
                     </div>
                   )}
@@ -608,7 +649,11 @@ export const CityModal = ({
                           type="button"
                           role="option"
                           aria-selected={selected}
-                          className="min-w-0 flex-1 px-2 py-2 text-left text-sm text-white hover:bg-white/10 rounded-lg flex items-center gap-2"
+                          className={`min-w-0 flex-1 px-2 py-2 text-left text-sm rounded-lg flex items-center gap-2 ${
+                            isLight
+                              ? 'text-gray-900 hover:bg-gray-100'
+                              : 'text-white hover:bg-white/10'
+                          }`}
                           onClick={() => {
                             toggleCity(label);
                             tg?.HapticFeedback?.impactOccurred?.('light');
@@ -616,7 +661,7 @@ export const CityModal = ({
                         >
                           <span
                             className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                              selected ? 'border-[#D3F1A7] bg-[#D3F1A7]' : 'border-white/50'
+                              selected ? 'border-[#D3F1A7] bg-[#D3F1A7]' : isLight ? 'border-gray-400' : 'border-white/50'
                             }`}
                           >
                             {selected ? <Check size={10} className="text-black" strokeWidth={3} /> : null}
@@ -629,7 +674,11 @@ export const CityModal = ({
                           disabled={citySubBusyKey !== null}
                           title={t('bazaar.citySubscribeRemoved')}
                           aria-label={t('bazaar.citySubscribeRemoved')}
-                          className="w-9 h-9 shrink-0 rounded-lg border border-white/35 text-white/80 hover:bg-white/10 disabled:opacity-45 flex items-center justify-center"
+                          className={`w-9 h-9 shrink-0 rounded-lg border disabled:opacity-45 flex items-center justify-center ${
+                            isLight
+                              ? 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                              : 'border-white/35 text-white/80 hover:bg-white/10'
+                          }`}
                         >
                           <BellOff size={15} />
                         </button>
@@ -642,7 +691,7 @@ export const CityModal = ({
               {/* Показуємо вибрані міста */}
               {localSelectedCities.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold text-white mb-3">
+                  <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>
                     {t('bazaar.selectedCities')} ({localSelectedCities.length})
                   </h4>
                   <div className="flex flex-wrap gap-2 mb-3">
@@ -670,7 +719,7 @@ export const CityModal = ({
               {/* Великі міста */}
               {!searchQuery && (
                 <div>
-                  <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.majorCities')}</h4>
+                  <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('bazaar.majorCities')}</h4>
                   <div className="space-y-2">
                     {validMajorGermanCities.map((city) => {
                       const isSelected = localSelectedCities.includes(city);
@@ -679,27 +728,32 @@ export const CityModal = ({
                           <button
                             type="button"
                             onClick={() => toggleCity(city)}
-                            className={`flex-1 min-w-0 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
-                              isSelected
-                                ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-                                : 'border-white text-white bg-transparent hover:bg-white/10'
+                            className={`flex-1 min-w-0 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 ${
+                              isSelected ? chipActive : chipIdle
                             }`}
                           >
                             <div
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                                 isSelected
                                   ? 'border-[#D3F1A7] bg-[#D3F1A7]'
-                                  : 'border-white'
+                                  : isLight
+                                    ? 'border-gray-400'
+                                    : 'border-white'
                               }`}
                             >
                               {isSelected && (
                                 <Check size={12} className="text-black" strokeWidth={3} />
                               )}
                             </div>
-                            <MapPin size={16} className={`flex-shrink-0 ${isSelected ? 'text-[#D3F1A7]' : 'text-white'}`} />
-                            <span className="truncate">{city}</span>
+                            <MapPin
+                              size={16}
+                              className={`flex-shrink-0 ${
+                                isSelected ? 'text-[#D3F1A7]' : isLight ? 'text-gray-700' : 'text-white'
+                              }`}
+                            />
+                            <span className={`truncate ${ac.pageHeading}`}>{city}</span>
                           </button>
-                          {renderCityBell(city, false)}
+                          {renderCityBell(city, isLight)}
                         </div>
                       );
                     })}
@@ -713,11 +767,11 @@ export const CityModal = ({
                   {loadingCities ? (
                     <div className="flex flex-col items-center justify-center py-8">
                       <div className="w-6 h-6 border-2 border-[#D3F1A7] border-t-transparent rounded-full animate-spin mb-2"></div>
-                      <p className="text-white/70 text-sm">{t('common.loading')}</p>
+                      <p className={`text-sm ${ac.mutedText}`}>{t('common.loading')}</p>
                     </div>
                   ) : searchResults.length > 0 ? (
                     <>
-                      <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.searchResults')}</h4>
+                      <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('bazaar.searchResults')}</h4>
                       <div className="space-y-2">
                         {searchResults.map((city) => {
                           const isSelected = localSelectedCities.includes(city);
@@ -726,34 +780,39 @@ export const CityModal = ({
                               <button
                                 type="button"
                                 onClick={() => toggleCity(city)}
-                                className={`flex-1 min-w-0 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 border ${
-                                  isSelected
-                                    ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
-                                    : 'border-white text-white bg-transparent hover:bg-white/10'
+                                className={`flex-1 min-w-0 px-4 py-3 text-left rounded-xl transition-colors flex items-center gap-2 ${
+                                  isSelected ? chipActive : chipIdle
                                 }`}
                               >
                                 <div
                                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                                     isSelected
                                       ? 'border-[#D3F1A7] bg-[#D3F1A7]'
-                                      : 'border-white'
+                                      : isLight
+                                        ? 'border-gray-400'
+                                        : 'border-white'
                                   }`}
                                 >
                                   {isSelected && (
                                     <Check size={12} className="text-black" strokeWidth={3} />
                                   )}
                                 </div>
-                                <MapPin size={16} className={`flex-shrink-0 ${isSelected ? 'text-[#D3F1A7]' : 'text-white'}`} />
-                                <span className="truncate">{city}</span>
+                                <MapPin
+                                  size={16}
+                                  className={`flex-shrink-0 ${
+                                    isSelected ? 'text-[#D3F1A7]' : isLight ? 'text-gray-700' : 'text-white'
+                                  }`}
+                                />
+                                <span className={`truncate ${ac.pageHeading}`}>{city}</span>
                               </button>
-                              {renderCityBell(city, false)}
+                              {renderCityBell(city, isLight)}
                             </div>
                           );
                         })}
                       </div>
                     </>
                   ) : (
-                    <div className="text-center py-8 text-white/60">
+                    <div className={`text-center py-8 ${ac.mutedText}`}>
                       <p>{t('common.nothingFound')}</p>
                       <p className="text-sm mt-2">{t('bazaar.tryPostalCode')}</p>
                     </div>
@@ -766,7 +825,11 @@ export const CityModal = ({
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="flex-1 px-4 py-3 bg-transparent border border-white text-white rounded-xl font-semibold hover:bg-white/10 transition-colors active:bg-white/20"
+                  className={`flex-1 px-4 py-3 bg-transparent rounded-xl font-semibold border transition-colors active:opacity-90 ${
+                    isLight
+                      ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                      : 'border-white text-white hover:bg-white/10'
+                  }`}
                 >
                   {t('common.reset')}
                 </button>

@@ -1,4 +1,5 @@
 import os
+import json
 from aiogram import Router, types, F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
@@ -13,6 +14,7 @@ from database_functions.prisma_db import PrismaDB
 from database_functions.referral_db import add_referral, create_referral_table
 from utils.download_avatar import download_user_avatar
 from utils.translations import t, set_language as set_user_language, get_user_lang, get_welcome_message
+from utils.pending_start_link import remember_pending_start_param, take_pending_start_param
 from keyboards.client_keyboards import get_agreement_keyboard, get_phone_share_keyboard, get_catalog_webapp_keyboard, get_main_menu_keyboard, get_language_selection_keyboard, get_username_prompt_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, FSInputFile, LinkPreviewOptions, InputMediaPhoto, InputMediaVideo
 import aiohttp
@@ -62,6 +64,201 @@ def _resolve_shared_listing_image(raw_image: str, webapp_url: str) -> str:
     return f"{webapp_url.rstrip('/')}/api/images/{clean}"
 
 
+async def send_shared_start_link_content(chat_id: int, user_id: int, param: str) -> bool:
+    """
+    Показує картку поділеного listing / user за payload з /start (listing_ / user_).
+    Повертає True, якщо param розпізнано і відправлено (або відправлено текстом без фото).
+    """
+    p = (param or "").strip()
+    if not (p.startswith("listing_") or p.startswith("user_")):
+        return False
+
+    db = PrismaDB()
+    shared_item = None
+    shared_data = None
+
+    if p.startswith("listing_"):
+        try:
+            listing_id = int(p.split("_")[1])
+            listing_data = db.get_listing_by_id(listing_id)
+            if listing_data:
+                shared_item = {"type": "listing", "id": listing_id}
+                shared_data = listing_data
+        except (ValueError, IndexError):
+            return False
+    elif p.startswith("user_"):
+        try:
+            user_telegram_id = int(p.split("_")[1])
+            user_data = db.get_user_by_telegram_id_with_profile(user_telegram_id)
+            if user_data:
+                shared_item = {"type": "user", "id": str(user_telegram_id)}
+                shared_data = user_data
+        except (ValueError, IndexError):
+            return False
+
+    if not (shared_item and shared_data):
+        return False
+
+    webapp_url = (
+        os.getenv("WEBAPP_URL")
+        or os.getenv("NEXT_PUBLIC_BASE_URL")
+        or "https://tradegrnd.com"
+    )
+
+    if shared_item["type"] == "listing":
+        listing = shared_data
+        user_lang = get_user_lang(user_id)
+
+        is_free = listing.get("isFree") or (
+            isinstance(listing.get("isFree"), int) and listing.get("isFree") == 1
+        )
+        price_value = listing.get("price", "N/A")
+        negotiable_text = t(user_id, "moderation.negotiable")
+
+        is_negotiable = (
+            price_value == negotiable_text
+            or price_value == "Договірна"
+            or price_value == "Договорная"
+        )
+
+        if is_free:
+            price_text = t(user_id, "common.free")
+        elif is_negotiable:
+            price_text = price_value
+        else:
+            currency = listing.get("currency", "EUR")
+            currency_symbol = "€" if currency == "EUR" else ("₴" if currency == "UAH" else "$")
+            price_text = f"{price_value} {currency_symbol}"
+
+        seller_name = (
+            f"{listing.get('firstName', '')} {listing.get('lastName', '')}".strip()
+            or listing.get("username", t(user_id, "common.user"))
+        )
+
+        welcome_text = (
+            f"{t(user_id, 'shared.listing.title', title=listing.get('title', 'Оголошення'))}\n\n"
+            f"{t(user_id, 'shared.listing.price', price=price_text)}\n"
+            f"{t(user_id, 'shared.listing.location', location=listing.get('location', 'N/A'))}\n"
+            f"{t(user_id, 'shared.listing.seller', seller=seller_name)}\n\n"
+            f"{t(user_id, 'shared.listing.instruction')}"
+        )
+
+        webapp_url_with_params = (
+            f"{webapp_url}/{user_lang}/bazaar?listing={shared_item['id']}&telegramId={user_id}"
+        )
+        button_text = t(user_id, "shared.listing.button")
+        listing_keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=button_text,
+                        web_app=WebAppInfo(url=webapp_url_with_params),
+                    )
+                ]
+            ]
+        )
+
+        try:
+            images = listing.get("images")
+            if images:
+                if isinstance(images, str):
+                    images = json.loads(images)
+                if isinstance(images, list) and len(images) > 0:
+                    first_image_item = images[0]
+                    if isinstance(first_image_item, dict):
+                        first_image_item = (
+                            first_image_item.get("file_id")
+                            or first_image_item.get("url")
+                            or ""
+                        )
+                    if first_image_item:
+                        resolved_image = _resolve_shared_listing_image(
+                            str(first_image_item),
+                            webapp_url,
+                        )
+                        if resolved_image:
+                            try:
+                                await bot.send_photo(
+                                    chat_id,
+                                    resolved_image,
+                                    caption=welcome_text,
+                                    reply_markup=listing_keyboard,
+                                    parse_mode="HTML",
+                                )
+                                return True
+                            except Exception:
+                                pass
+        except Exception as e:
+            print(f"Error sending listing image: {e}")
+
+        await bot.send_message(
+            chat_id,
+            welcome_text,
+            reply_markup=listing_keyboard,
+            parse_mode="HTML",
+        )
+        return True
+
+    if shared_item["type"] == "user":
+        u = shared_data
+        user_lang = get_user_lang(user_id)
+
+        user_name = (
+            f"{u.get('firstName', '')} {u.get('lastName', '')}".strip()
+            or u.get("username", t(user_id, "common.user"))
+        )
+        username_text = f"@{u.get('username')}" if u.get("username") else ""
+        total_listings = u.get("totalListings", 0) or 0
+        active_listings = u.get("activeListings", 0) or 0
+
+        welcome_text = (
+            f"{t(user_id, 'shared.user.title', name=user_name, username=username_text)}\n\n"
+            f"{t(user_id, 'shared.user.listings', total=total_listings)}\n"
+            f"{t(user_id, 'shared.user.active', active=active_listings)}\n\n"
+            f"{t(user_id, 'shared.user.instruction')}"
+        )
+
+        webapp_url_with_params = (
+            f"{webapp_url}/{user_lang}/bazaar?user={shared_item['id']}&telegramId={user_id}"
+        )
+        button_text = t(user_id, "shared.user.button")
+        user_keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=button_text,
+                        web_app=WebAppInfo(url=webapp_url_with_params),
+                    )
+                ]
+            ]
+        )
+        await bot.send_message(
+            chat_id,
+            welcome_text,
+            reply_markup=user_keyboard,
+            parse_mode="HTML",
+        )
+        await bot.send_message(
+            chat_id,
+            f"<b>{t(user_id, 'menu.main_menu')}</b>",
+            reply_markup=get_main_menu_keyboard(user_id),
+            parse_mode="HTML",
+        )
+        return True
+
+    return False
+
+
+async def flush_pending_shared_link(chat_id: int, user_id: int) -> None:
+    param = take_pending_start_param(user_id)
+    if not param:
+        return
+    try:
+        await send_shared_start_link_content(chat_id, user_id, param)
+    except Exception as e:
+        print(f"flush_pending_shared_link error: {e}")
+
+
 async def _send_offer_instruction_videos(chat_id: int, user_id: int):
     """Надсилає відео-інструкції з додавання оголошень після підтвердження оферти (з урахуванням мови)."""
     user_lang = get_user_lang(user_id) or 'uk'
@@ -87,7 +284,7 @@ async def _send_offer_instruction_videos(chat_id: int, user_id: int):
         print(f"Error sending media group with offer instruction videos: {e}")
 
 
-@router.message(CommandStart())
+@router.message(CommandStart(ignore_case=True))
 async def start_command(message: types.Message):
     user = message.from_user
     user_id = user.id
@@ -160,6 +357,10 @@ async def start_command(message: types.Message):
     
     # Крок 2: Вибір мови (якщо оферта не погоджена - значить користувач новий)
     if not has_agreed:
+        if len(args) > 1:
+            p = args[1].strip()
+            if p.startswith("listing_") or p.startswith("user_"):
+                remember_pending_start_param(user_id, p)
         # Для нових користувачів показуємо привітання з HTML форматуванням та фото
         welcome_text = get_welcome_message(telegram_lang)
         try:
@@ -228,186 +429,20 @@ async def start_command(message: types.Message):
     if not username or (isinstance(username, str) and not username.strip()):
         await message.answer(t(user_id, 'phone.no_username_hint'), parse_mode="HTML")
 
-    shared_item = None
-    shared_data = None
-    db = PrismaDB()
-    
     if len(args) > 1:
-        param = args[1]
-        if param.startswith('listing_'):
-            try:
-                listing_id = int(param.split('_')[1])
-                listing_data = db.get_listing_by_id(listing_id)
-                if listing_data:
-                    shared_item = {'type': 'listing', 'id': listing_id}
-                    shared_data = listing_data
-            except (ValueError, IndexError):
-                pass
-        elif param.startswith('user_'):
-            try:
-                user_telegram_id = int(param.split('_')[1])
-                user_data = db.get_user_by_telegram_id_with_profile(user_telegram_id)
-                if user_data:
-                    shared_item = {'type': 'user', 'id': str(user_telegram_id)}
-                    shared_data = user_data
-            except (ValueError, IndexError):
-                pass
+        p = args[1].strip()
+        if p.startswith("listing_") or p.startswith("user_"):
+            if await send_shared_start_link_content(message.chat.id, user_id, p):
+                return
 
-    # Для існуючих користувачів показуємо привітання тільки якщо немає shared_item
-    if not (shared_item and shared_data):
-        # greeting вже містить весь текст з HTML тегами
-        welcome_text = t(user_id, 'welcome.greeting')
-        try:
-            photo_file = FSInputFile(HELLO_PHOTO_PATH)
-            await message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
-        except Exception as e:
-            print(f"Error sending hello photo: {e}")
-            await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
-        return
-    
-    # Якщо є shared_item, показуємо інформацію про нього
-    if shared_item and shared_data:
-        webapp_url = (
-            os.getenv('WEBAPP_URL')
-            or os.getenv('NEXT_PUBLIC_BASE_URL')
-            or 'https://tradegrnd.com'
-        )
-        
-        if shared_item['type'] == 'listing':
-            listing = shared_data
-            import json
-            
-            # Отримуємо мову користувача для правильного URL
-            user_lang = get_user_lang(user_id)
-            
-            # Обробка ціни
-            is_free = listing.get('isFree') or (isinstance(listing.get('isFree'), int) and listing.get('isFree') == 1)
-            price_value = listing.get('price', 'N/A')
-            negotiable_text = t(user_id, 'moderation.negotiable')
-            
-            # Перевіряємо, чи це "Договірна" ціна
-            is_negotiable = (
-                price_value == negotiable_text or 
-                price_value == 'Договірна' or 
-                price_value == 'Договорная'
-            )
-            
-            if is_free:
-                price_text = t(user_id, 'common.free')
-            elif is_negotiable:
-                price_text = price_value  # Не додаємо валюту для "Договірна"
-            else:
-                # Додаємо валюту тільки якщо це не "Договірна"
-                currency = listing.get('currency', 'EUR')
-                currency_symbol = '€' if currency == 'EUR' else ('₴' if currency == 'UAH' else '$')
-                price_text = f"{price_value} {currency_symbol}"
-            
-            seller_name = f"{listing.get('firstName', '')} {listing.get('lastName', '')}".strip() or listing.get('username', t(user_id, 'common.user'))
-            
-            # Для поділеного оголошення не додаємо привітання
-            welcome_text = (
-                f"{t(user_id, 'shared.listing.title', title=listing.get('title', 'Оголошення'))}\n\n"
-                f"{t(user_id, 'shared.listing.price', price=price_text)}\n"
-                f"{t(user_id, 'shared.listing.location', location=listing.get('location', 'N/A'))}\n"
-                f"{t(user_id, 'shared.listing.seller', seller=seller_name)}\n\n"
-                f"{t(user_id, 'shared.listing.instruction')}"
-            )
-            
-            # Формуємо правильний URL на сторінку товару в мінідодатку
-            webapp_url_with_params = f"{webapp_url}/{user_lang}/bazaar?listing={shared_item['id']}&telegramId={user_id}"
-            button_text = t(user_id, 'shared.listing.button')
-            
-            # Створюємо клавіатуру для оголошення
-            listing_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text=button_text,
-                    web_app=WebAppInfo(url=webapp_url_with_params)
-                )]
-            ])
-            
-            # Спробуємо відправити зображення товару, якщо воно є
-            try:
-                images = listing.get('images')
-                if images:
-                    if isinstance(images, str):
-                        images = json.loads(images)
-                    if isinstance(images, list) and len(images) > 0:
-                        first_image_item = images[0]
-                        if isinstance(first_image_item, dict):
-                            first_image_item = (
-                                first_image_item.get('file_id')
-                                or first_image_item.get('url')
-                                or ''
-                            )
-                        if first_image_item:
-                            resolved_image = _resolve_shared_listing_image(
-                                str(first_image_item),
-                                webapp_url
-                            )
-                            if resolved_image:
-                                try:
-                                    await message.answer_photo(
-                                        resolved_image,
-                                        caption=welcome_text,
-                                        reply_markup=listing_keyboard,
-                                        parse_mode="HTML"
-                                    )
-                                    return
-                                except Exception:
-                                    pass
-            except Exception as e:
-                print(f"Error sending listing image: {e}")
-                # Продовжуємо без зображення
-            
-            # Якщо не вдалося відправити з фото, відправляємо текст
-            await message.answer(welcome_text, reply_markup=listing_keyboard, parse_mode="HTML")
-            return
-            
-        elif shared_item['type'] == 'user':
-            user = shared_data
-            # Отримуємо мову користувача для правильного URL
-            user_lang = get_user_lang(user_id)
-            
-            user_name = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip() or user.get('username', t(user_id, 'common.user'))
-            username_text = f"@{user.get('username')}" if user.get('username') else ""
-            total_listings = user.get('totalListings', 0) or 0
-            active_listings = user.get('activeListings', 0) or 0
-            
-            # Для поділеного профілю не додаємо привітання
-            welcome_text = (
-                f"{t(user_id, 'shared.user.title', name=user_name, username=username_text)}\n\n"
-                f"{t(user_id, 'shared.user.listings', total=total_listings)}\n"
-                f"{t(user_id, 'shared.user.active', active=active_listings)}\n\n"
-                f"{t(user_id, 'shared.user.instruction')}"
-            )
-            
-            # Формуємо правильний URL на сторінку профілю в мінідодатку
-            webapp_url_with_params = f"{webapp_url}/{user_lang}/bazaar?user={shared_item['id']}&telegramId={user_id}"
-            button_text = t(user_id, 'shared.user.button')
-            
-            # Створюємо клавіатуру для профілю
-            user_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text=button_text,
-                    web_app=WebAppInfo(url=webapp_url_with_params)
-                )]
-            ])
-            await message.answer(welcome_text, reply_markup=user_keyboard, parse_mode="HTML")
-            await message.answer(
-                f"<b>{t(user_id, 'menu.main_menu')}</b>",
-                reply_markup=get_main_menu_keyboard(user_id),
-                parse_mode="HTML"
-            )
-            return
-        
-        # Якщо не вдалося відправити з фото (для listing), відправляємо текст
-        if shared_item['type'] == 'listing':
-            await message.answer(welcome_text, reply_markup=listing_keyboard, parse_mode="HTML")
-        await message.answer(
-            f"<b>{t(user_id, 'menu.main_menu')}</b>",
-            reply_markup=get_main_menu_keyboard(user_id),
-            parse_mode="HTML"
-        )
+    # Для існуючих користувачів — звичайне привітання, якщо не було deep link
+    welcome_text = t(user_id, 'welcome.greeting')
+    try:
+        photo_file = FSInputFile(HELLO_PHOTO_PATH)
+        await message.answer_photo(photo_file, caption=welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
+    except Exception as e:
+        print(f"Error sending hello photo: {e}")
+        await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
 
 
 @router.callback_query(F.data.startswith("agree_"))
@@ -455,6 +490,7 @@ async def agree_agreement(callback: types.CallbackQuery):
                     reply_markup=get_main_menu_keyboard(user_id),
                     parse_mode="HTML"
                 )
+                await flush_pending_shared_link(callback.message.chat.id, user_id)
         else:
             # Якщо є юзернейм - просто завершуємо реєстрацію
             await callback.message.answer(
@@ -469,6 +505,7 @@ async def agree_agreement(callback: types.CallbackQuery):
                 reply_markup=get_main_menu_keyboard(user_id),
                 parse_mode="HTML"
             )
+            await flush_pending_shared_link(callback.message.chat.id, user_id)
         
         await callback.answer()
     except Exception as e:
@@ -618,6 +655,7 @@ async def handle_language_selection(callback: types.CallbackQuery):
             except Exception as e:
                 print(f"Error sending hello photo: {e}")
                 await callback.message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
+            await flush_pending_shared_link(callback.message.chat.id, user_id)
     else:
         await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
 
@@ -665,6 +703,7 @@ async def handle_contact(message: types.Message):
             except Exception as e:
                 print(f"Error sending hello photo: {e}")
                 await message.answer(welcome_text, reply_markup=get_main_menu_keyboard(user_id), parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True))
+            await flush_pending_shared_link(message.chat.id, user_id)
     else:
         user_id = message.from_user.id
         await message.answer(t(user_id, 'phone.invalid'), parse_mode="HTML")

@@ -4,9 +4,11 @@ import { X, ChevronRight } from 'lucide-react';
 import { Category } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { getCategories } from '@/constants/categories';
 import { CategoryIcon } from './CategoryIcon';
-import { useEffect } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 
 interface CategoriesModalProps {
   isOpen: boolean;
@@ -22,7 +24,16 @@ export const CategoriesModal = ({
   tg
 }: CategoriesModalProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
   const categories = getCategories(t);
+  const sheetBackground = isLight
+    ? 'radial-gradient(ellipse 85% 100% at 18% 0%, rgba(63, 83, 49, 0.14) 0%, transparent 45%), linear-gradient(180deg, #ffffff 0%, #f6f8f4 100%)'
+    : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000';
+  const darkIconTileStyle: CSSProperties = {
+    background:
+      'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000',
+  };
 
   // Блокуємо скрол body при відкритому модальному вікні
   useEffect(() => {
@@ -62,25 +73,38 @@ export const CategoriesModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end overflow-hidden" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/50 backdrop-blur-sm md:items-center md:p-6"
+      onClick={onClose}
+    >
       <div 
-        className="w-full rounded-t-3xl border-t-2 border-white max-h-[90vh] flex flex-col animate-slide-up" 
+        className={`flex max-h-[90vh] w-full max-w-full flex-col animate-slide-up rounded-t-3xl border-t-2 md:max-h-[85vh] md:max-w-md md:rounded-2xl md:border-2 ${
+          isLight ? 'border-gray-200 md:border-gray-200' : 'border-white md:border-white/25'
+        }`}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+          background: sheetBackground,
         }}
       >
         {/* Хедер */}
-        <div className="border-b border-gray-700/50 px-4 py-4 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-xl font-bold text-white">{t('categories.title') || 'Категорії'}</h2>
+        <div
+          className={`relative flex flex-shrink-0 items-center justify-center border-b px-4 py-4 md:px-5 ${
+            isLight ? 'border-gray-200' : 'border-gray-700/50'
+          }`}
+        >
+          <h2 className={`text-center text-xl font-bold md:pr-10 ${ac.pageHeading}`}>
+            {t('categories.title') || 'Категорії'}
+          </h2>
           <button
             onClick={() => {
               onClose();
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-10 h-10 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
+            className={`absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full transition-colors ${
+              isLight ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-800/50 hover:bg-gray-700/50'
+            }`}
           >
-            <X size={20} className="text-white" />
+            <X size={20} className={isLight ? 'text-gray-800' : 'text-white'} />
           </button>
         </div>
 
@@ -102,21 +126,28 @@ export const CategoriesModal = ({
               onClose();
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-full flex items-center gap-4 px-4 py-4 border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors"
+            className={`w-full flex items-center gap-4 px-4 py-4 border-b transition-colors ${
+              isLight ? 'border-gray-200 hover:bg-gray-100' : 'border-gray-700/50 hover:bg-gray-800/30'
+            }`}
           >
-            <div 
-              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border border-white relative overflow-hidden"
-              style={{
-                background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
-              }}
+            <div
+              className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 relative overflow-hidden ${
+                isLight ? '' : 'border border-white'
+              }`}
+              style={isLight ? undefined : darkIconTileStyle}
             >
               <CategoryIcon categoryId="all_categories" size={24} />
             </div>
             <div className="flex-1 text-left min-w-0">
-              <div className="font-semibold text-white text-base">{t('bazaar.allCategories')}</div>
-              <div className="text-sm text-gray-400 mt-0.5">{t('categories.allCategoriesDescription') || 'Переглянути всі оголошення'}</div>
+              <div className={`font-semibold text-base ${ac.pageHeading}`}>{t('bazaar.allCategories')}</div>
+              <div className={`text-sm mt-0.5 ${ac.mutedText}`}>
+                {t('categories.allCategoriesDescription') || 'Переглянути всі оголошення'}
+              </div>
             </div>
-            <ChevronRight size={20} className="text-gray-400 flex-shrink-0" />
+            <ChevronRight
+              size={20}
+              className={`flex-shrink-0 ${isLight ? 'text-gray-500' : 'text-gray-400'}`}
+            />
           </button>
 
           {/* Список категорій */}
@@ -124,23 +155,28 @@ export const CategoriesModal = ({
             <button
               key={category.id}
               onClick={() => handleCategoryClick(category.id)}
-              className="w-full flex items-center gap-4 px-4 py-4 border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors"
+              className={`w-full flex items-center gap-4 px-4 py-4 border-b transition-colors ${
+                isLight ? 'border-gray-200 hover:bg-gray-100' : 'border-gray-700/50 hover:bg-gray-800/30'
+              }`}
             >
-              <div 
-                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border border-white relative overflow-hidden"
-                style={{
-                  background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
-                }}
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 relative overflow-hidden ${
+                  isLight ? '' : 'border border-white'
+                }`}
+                style={isLight ? undefined : darkIconTileStyle}
               >
                 <CategoryIcon categoryId={category.id} size={24} />
               </div>
               <div className="flex-1 text-left min-w-0">
-                <div className="font-semibold text-white text-base">{category.name}</div>
-                <div className="text-sm text-gray-400 mt-0.5">
+                <div className={`font-semibold text-base ${ac.pageHeading}`}>{category.name}</div>
+                <div className={`text-sm mt-0.5 ${ac.mutedText}`}>
                   {t(`categories.description.${category.id}`) || ''}
                 </div>
               </div>
-              <ChevronRight size={20} className="text-gray-400 flex-shrink-0" />
+              <ChevronRight
+                size={20}
+                className={`flex-shrink-0 ${isLight ? 'text-gray-500' : 'text-gray-400'}`}
+              />
             </button>
           ))}
           {/* Додатковий padding знизу для комфортного скролу */}

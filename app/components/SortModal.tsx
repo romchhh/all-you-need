@@ -3,6 +3,8 @@
 import { X } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { CategoryIcon } from './CategoryIcon';
 import { useState, useEffect, Fragment, useMemo, useCallback, useRef } from 'react';
 import { Category } from '@/types';
@@ -75,6 +77,19 @@ export const SortModal = ({
   tg 
 }: SortModalProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
+  const chipActive = 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium';
+  const chipIdle = isLight
+    ? 'border border-gray-300 text-gray-800 bg-transparent hover:bg-gray-100'
+    : 'border border-white text-white bg-transparent hover:bg-white/10';
+  const sheetBackground = isLight
+    ? 'radial-gradient(ellipse 85% 100% at 18% 0%, rgba(63, 83, 49, 0.14) 0%, transparent 45%), linear-gradient(180deg, #ffffff 0%, #f6f8f4 100%)'
+    : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000';
+  const rangeTrackMuted = isLight ? '#d1d5db' : '#4a5568';
+  const numberFieldClass = isLight
+    ? 'w-full px-3 py-2 bg-white rounded-xl border border-gray-300 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/25'
+    : 'w-full px-3 py-2 bg-transparent rounded-xl border border-white text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-white/50';
   const categories = getCategories(t);
   
   // Функція для визначення максимальної ціни залежно від категорії
@@ -286,31 +301,43 @@ export const SortModal = ({
         }}
       >
         <div 
-          className="w-full rounded-t-3xl border-t-2 border-white flex flex-col max-h-[85vh] overflow-hidden"
+          className={`w-full rounded-t-3xl border-t-2 flex flex-col max-h-[85vh] overflow-hidden ${
+            isLight ? 'border-gray-200' : 'border-white'
+          }`}
           onClick={(e) => e.stopPropagation()}
           style={{
-            background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
+            background: sheetBackground
           }}
         >
           {/* Закріплена шапка */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-700/50 flex-shrink-0">
-            <h3 className="text-xl font-bold text-white">{t('common.filter')}</h3>
+          <div
+            className={`flex items-center justify-between p-6 border-b flex-shrink-0 ${
+              isLight ? 'border-gray-200' : 'border-gray-700/50'
+            }`}
+          >
+            <h3 className={`text-xl font-bold ${ac.pageHeading}`}>{t('common.filter')}</h3>
             <div className="flex items-center gap-2">
               {hasActiveFilters && (
                 <button
                   onClick={() => {
                     handleReset();
                   }}
-                  className="px-3 py-1.5 text-sm font-medium text-white border border-white rounded-lg hover:bg-white/10 transition-colors"
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                    isLight
+                      ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                      : 'border-white text-white hover:bg-white/10'
+                  }`}
                 >
                   {t('common.clear')}
                 </button>
               )}
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-full bg-gray-800/50 flex items-center justify-center hover:bg-gray-700/50 transition-colors"
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                  isLight ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-800/50 hover:bg-gray-700/50'
+                }`}
               >
-                <X size={18} className="text-white" />
+                <X size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
               </button>
             </div>
           </div>
@@ -320,7 +347,7 @@ export const SortModal = ({
             <div className="p-6 space-y-6 pb-32">
               {/* Сортування - горизонтальний скрол */}
               <div>
-                <h4 className="text-sm font-semibold text-white mb-3">{t('common.sort')}</h4>
+                <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('common.sort')}</h4>
                 <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
                   <div className="flex gap-2" style={{ minWidth: 'max-content', width: 'max-content' }}>
                     {sortOptions.map((option) => (
@@ -330,10 +357,8 @@ export const SortModal = ({
                           onSelect(option.value);
                           onClose();
                         }}
-                        className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 border ${
-                          currentSort === option.value
-                            ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                            : 'border-white text-white bg-transparent hover:bg-white/10'
+                        className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 ${
+                          currentSort === option.value ? chipActive : chipIdle
                         }`}
                       >
                         {t(option.labelKey)}
@@ -345,7 +370,7 @@ export const SortModal = ({
 
               {/* Категорії */}
               <div>
-                <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.categories')}</h4>
+                <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('bazaar.categories')}</h4>
                 <div 
                   ref={categoriesContainerRef}
                   className="overflow-x-auto scrollbar-hide" 
@@ -357,10 +382,8 @@ export const SortModal = ({
                         key={category.id}
                         ref={selectedCategory === category.id ? selectedCategoryButtonRef : null}
                         onClick={() => handleCategorySelect(category.id)}
-                        className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 flex items-center gap-2 border ${
-                          localSelectedCategory === category.id
-                            ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                            : 'border-white text-white bg-transparent hover:bg-white/10'
+                        className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 flex items-center gap-2 ${
+                          localSelectedCategory === category.id ? chipActive : chipIdle
                         }`}
                       >
                         <CategoryIcon categoryId={category.id} isActive={localSelectedCategory === category.id} size={20} />
@@ -395,10 +418,8 @@ export const SortModal = ({
                                   <button
                                     key={subcategory.id}
                                     onClick={() => handleSubcategorySelect(subcategory.id)}
-                                    className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 border ${
-                                      localSelectedSubcategory === subcategory.id
-                                        ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                                        : 'border-white text-white bg-transparent hover:bg-white/10'
+                                    className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 ${
+                                      localSelectedSubcategory === subcategory.id ? chipActive : chipIdle
                                     }`}
                                   >
                                     {subcategory.name}
@@ -412,10 +433,8 @@ export const SortModal = ({
                                   <button
                                     key={subcategory.id}
                                     onClick={() => handleSubcategorySelect(subcategory.id)}
-                                    className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 border ${
-                                      localSelectedSubcategory === subcategory.id
-                                        ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                                        : 'border-white text-white bg-transparent hover:bg-white/10'
+                                    className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 ${
+                                      localSelectedSubcategory === subcategory.id ? chipActive : chipIdle
                                     }`}
                                   >
                                     {subcategory.name}
@@ -435,10 +454,8 @@ export const SortModal = ({
                               <button
                                 key={subcategory.id}
                                 onClick={() => handleSubcategorySelect(subcategory.id)}
-                                className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 border ${
-                                  localSelectedSubcategory === subcategory.id
-                                    ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                                    : 'border-white text-white bg-transparent hover:bg-white/10'
+                                className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 ${
+                                  localSelectedSubcategory === subcategory.id ? chipActive : chipIdle
                                 }`}
                               >
                                 {subcategory.name}
@@ -454,24 +471,20 @@ export const SortModal = ({
 
               {/* Стан товару - Новое/БУ */}
               <div>
-                <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.condition')}</h4>
+                <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('bazaar.condition')}</h4>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleConditionSelect(localCondition === 'new' ? null : 'new')}
-                    className={`flex-1 px-4 py-3 rounded-xl transition-all border ${
-                      localCondition === 'new'
-                        ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                        : 'border-white text-white bg-transparent hover:bg-white/10'
+                    className={`flex-1 px-4 py-3 rounded-xl transition-all ${
+                      localCondition === 'new' ? chipActive : chipIdle
                     }`}
                   >
                     {t('listing.new')}
                   </button>
                   <button
                     onClick={() => handleConditionSelect(localCondition === 'used' ? null : 'used')}
-                    className={`flex-1 px-4 py-3 rounded-xl transition-all border ${
-                      localCondition === 'used'
-                        ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                        : 'border-white text-white bg-transparent hover:bg-white/10'
+                    className={`flex-1 px-4 py-3 rounded-xl transition-all ${
+                      localCondition === 'used' ? chipActive : chipIdle
                     }`}
                   >
                     {t('listing.used')}
@@ -481,16 +494,14 @@ export const SortModal = ({
 
               {/* Вибір валюти */}
               <div>
-                <h4 className="text-sm font-semibold text-white mb-3">{t('common.currency')}</h4>
+                <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('common.currency')}</h4>
                 <div className="flex gap-2">
                   {currencyOptions.map((currency) => (
                     <button
                       key={currency}
                       onClick={() => handleCurrencySelect(currency)}
-                      className={`flex-1 px-4 py-3 rounded-xl transition-all border ${
-                        localCurrency === currency
-                          ? 'border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium'
-                          : 'border-white text-white bg-transparent hover:bg-white/10'
+                      className={`flex-1 px-4 py-3 rounded-xl transition-all ${
+                        localCurrency === currency ? chipActive : chipIdle
                       }`}
                     >
                       {getCurrencySymbol(currency)}
@@ -501,7 +512,7 @@ export const SortModal = ({
 
               {/* Діапазон цін */}
               <div>
-                <h4 className="text-sm font-semibold text-white mb-3">{t('bazaar.priceRange')}</h4>
+                <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('bazaar.priceRange')}</h4>
                 
                 {/* Повзунки */}
                 {(() => {
@@ -510,7 +521,7 @@ export const SortModal = ({
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs text-white/80">{t('bazaar.minPrice')}</label>
+                      <label className={`text-xs ${ac.mutedText}`}>{t('bazaar.minPrice')}</label>
                     </div>
                     <input
                       type="range"
@@ -525,9 +536,11 @@ export const SortModal = ({
                           setLocalMaxPrice(value);
                         }
                       }}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider mb-2"
+                      className={`w-full h-2 rounded-lg appearance-none cursor-pointer slider mb-2 ${
+                        isLight ? 'bg-gray-200' : 'bg-gray-700'
+                      }`}
                       style={{
-                            background: `linear-gradient(to right, #D3F1A7 0%, #D3F1A7 ${(localMinPrice / currentMaxPrice) * 100}%, #4a5568 ${(localMinPrice / currentMaxPrice) * 100}%, #4a5568 100%)`
+                            background: `linear-gradient(to right, #D3F1A7 0%, #D3F1A7 ${(localMinPrice / currentMaxPrice) * 100}%, ${rangeTrackMuted} ${(localMinPrice / currentMaxPrice) * 100}%, ${rangeTrackMuted} 100%)`
                       }}
                     />
                     <input
@@ -543,14 +556,14 @@ export const SortModal = ({
                           setLocalMaxPrice(clampedValue);
                         }
                       }}
-                      className="w-full px-3 py-2 bg-transparent rounded-xl border border-white text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      className={numberFieldClass}
                       placeholder={t('bazaar.minPrice')}
                     />
                   </div>
                   
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs text-white/80">{t('bazaar.maxPrice')}</label>
+                      <label className={`text-xs ${ac.mutedText}`}>{t('bazaar.maxPrice')}</label>
                     </div>
                     <input
                       type="range"
@@ -565,9 +578,11 @@ export const SortModal = ({
                           setLocalMinPrice(value);
                         }
                       }}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider mb-2"
+                      className={`w-full h-2 rounded-lg appearance-none cursor-pointer slider mb-2 ${
+                        isLight ? 'bg-gray-200' : 'bg-gray-700'
+                      }`}
                       style={{
-                            background: `linear-gradient(to right, #4a5568 0%, #4a5568 ${(localMaxPrice / currentMaxPrice) * 100}%, #D3F1A7 ${(localMaxPrice / currentMaxPrice) * 100}%, #D3F1A7 100%)`
+                            background: `linear-gradient(to right, ${rangeTrackMuted} 0%, ${rangeTrackMuted} ${(localMaxPrice / currentMaxPrice) * 100}%, #D3F1A7 ${(localMaxPrice / currentMaxPrice) * 100}%, #D3F1A7 100%)`
                       }}
                     />
                     <input
@@ -583,7 +598,7 @@ export const SortModal = ({
                           setLocalMinPrice(clampedValue);
                         }
                       }}
-                      className="w-full px-3 py-2 bg-transparent rounded-xl border border-white text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      className={numberFieldClass}
                       placeholder={t('bazaar.maxPrice')}
                     />
                   </div>
@@ -594,7 +609,13 @@ export const SortModal = ({
 
               {/* Безкоштовні */}
               <div>
-                <label className="flex items-center gap-3 p-4 bg-transparent border border-white rounded-xl cursor-pointer hover:bg-white/10 transition-colors">
+                <label
+                  className={`flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-colors border ${
+                    isLight
+                      ? 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      : 'bg-transparent border-white hover:bg-white/10'
+                  }`}
+                >
                   <input
                     type="checkbox"
                     checked={showFreeOnly}
@@ -602,10 +623,12 @@ export const SortModal = ({
                       onToggleFreeOnly(e.target.checked);
                       onClose();
                     }}
-                    className="w-5 h-5 rounded border-white text-[#D3F1A7] focus:ring-[#D3F1A7] bg-transparent"
+                    className={`w-5 h-5 rounded text-[#D3F1A7] focus:ring-[#D3F1A7] bg-transparent ${
+                      isLight ? 'border-gray-400' : 'border-white'
+                    }`}
                     style={{ accentColor: '#D3F1A7' }}
                   />
-                  <span className="text-white font-medium">{t('bazaar.freeOnly')}</span>
+                  <span className={`font-medium ${ac.pageHeading}`}>{t('bazaar.freeOnly')}</span>
                 </label>
               </div>
 
@@ -651,7 +674,11 @@ export const SortModal = ({
           </div>
 
           {/* Закріплені кнопки дій */}
-          <div className="p-6 border-t border-gray-700/50 flex-shrink-0 relative z-10">
+          <div
+            className={`p-6 border-t flex-shrink-0 relative z-10 ${
+              isLight ? 'border-gray-200' : 'border-gray-700/50'
+            }`}
+          >
             <button
               type="button"
               onClick={() => {
@@ -660,8 +687,12 @@ export const SortModal = ({
               }}
               className={`w-full px-4 py-3 rounded-xl font-semibold transition-colors ${
                 hasActiveFilters
-                  ? 'bg-transparent border border-white text-white hover:bg-white/10 active:bg-white/20'
-                  : 'bg-gray-800/50 border border-gray-700 text-gray-500 cursor-not-allowed'
+                  ? isLight
+                    ? 'bg-transparent border border-gray-300 text-gray-900 hover:bg-gray-100 active:bg-gray-200'
+                    : 'bg-transparent border border-white text-white hover:bg-white/10 active:bg-white/20'
+                  : isLight
+                    ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-800/50 border border-gray-700 text-gray-500 cursor-not-allowed'
               }`}
               disabled={!hasActiveFilters}
             >

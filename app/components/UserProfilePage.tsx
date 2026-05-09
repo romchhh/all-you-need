@@ -15,6 +15,8 @@ import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 
 interface UserProfilePageProps {
   sellerTelegramId: string;
@@ -62,6 +64,8 @@ export const UserProfilePage = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const { user: currentUser } = useTelegram();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
 
   const avatarLongPress = useLongPress({
     onLongPress: () => {
@@ -223,13 +227,17 @@ export const UserProfilePage = ({
               }
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+            className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+              isLight
+                ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                : 'border-white text-white hover:bg-white/10'
+            }`}
           >
             <ArrowLeft size={20} />
           </button>
 
           {/* Текст "Профіль продавця" */}
-          <h2 className="text-lg font-semibold text-white">{t('profile.sellerProfile')}</h2>
+          <h2 className={`text-lg font-semibold ${ac.pageHeading}`}>{t('profile.sellerProfile')}</h2>
 
           {/* Кнопка поділу */}
           <button
@@ -237,7 +245,11 @@ export const UserProfilePage = ({
               setShowShareModal(true);
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-10 h-10 rounded-full border border-white flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+            className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+              isLight
+                ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                : 'border-white text-white hover:bg-white/10'
+            }`}
           >
             <Share2 size={18} />
           </button>
@@ -246,7 +258,9 @@ export const UserProfilePage = ({
         {/* Фото профілю по центру */}
         <div className="flex justify-center mb-4">
           <div 
-            className="w-24 h-24 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 border-white"
+            className={`w-24 h-24 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 ${
+              isLight ? 'border-gray-200' : 'border-white'
+            }`}
             {...avatarLongPress}
           >
             {sellerAvatar && (sellerAvatar.startsWith('/') || sellerAvatar.startsWith('http')) ? (
@@ -284,40 +298,52 @@ export const UserProfilePage = ({
 
         {/* Ім'я продавця */}
         <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-white">{sellerName}</h2>
+          <h2 className={`text-xl font-bold ${ac.pageHeading}`}>{sellerName}</h2>
         </div>
 
         {/* Блоки зі статистикою */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {/* Блок 1: Оголошень */}
-          <div className="rounded-2xl p-3 sm:p-4 border border-white text-center">
-            <div className="text-xl sm:text-2xl font-bold text-white mb-1">
+          <div
+            className={`rounded-2xl p-3 sm:p-4 border text-center ${
+              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white'
+            }`}
+          >
+            <div className={`text-xl sm:text-2xl font-bold mb-1 ${ac.pageHeading}`}>
               {stats ? (currentUser?.id && parseInt(currentUser.id.toString()) === parseInt(sellerTelegramId) ? stats.totalListings : stats.activeListings) : 0}
             </div>
-            <div className="text-xs sm:text-sm text-white/70 leading-tight">{t('profile.listings')}</div>
+            <div className={`text-xs sm:text-sm leading-tight ${ac.mutedText}`}>{t('profile.listings')}</div>
           </div>
 
           {/* Блок 2: Продано */}
-          <div className="rounded-2xl p-3 sm:p-4 border border-white text-center">
-            <div className="text-xl sm:text-2xl font-bold text-white mb-1">
+          <div
+            className={`rounded-2xl p-3 sm:p-4 border text-center ${
+              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white'
+            }`}
+          >
+            <div className={`text-xl sm:text-2xl font-bold mb-1 ${ac.pageHeading}`}>
               {stats?.soldListings || 0}
             </div>
-            <div className="text-xs sm:text-sm text-white/70 leading-tight">{t('profile.sold')}</div>
+            <div className={`text-xs sm:text-sm leading-tight ${ac.mutedText}`}>{t('profile.sold')}</div>
           </div>
 
           {/* Блок 3: На сервісі */}
-          <div className="rounded-2xl p-3 sm:p-4 border border-white text-center">
-            <div className="text-xl sm:text-2xl font-bold text-white mb-1">
+          <div
+            className={`rounded-2xl p-3 sm:p-4 border text-center ${
+              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white'
+            }`}
+          >
+            <div className={`text-xl sm:text-2xl font-bold mb-1 ${ac.pageHeading}`}>
               {getServiceTime || '0 ' + t('profile.days')}
             </div>
-            <div className="text-xs sm:text-sm text-white/70 leading-tight">{t('profile.onService')}</div>
+            <div className={`text-xs sm:text-sm leading-tight ${ac.mutedText}`}>{t('profile.onService')}</div>
           </div>
         </div>
       </div>
 
       {/* Розділювач */}
       <div className="px-4 pb-4">
-        <div className="border-t border-white/20"></div>
+        <div className={`border-t ${isLight ? 'border-gray-200' : 'border-white/20'}`}></div>
       </div>
 
       {/* Кнопка дії */}
@@ -378,14 +404,14 @@ export const UserProfilePage = ({
 
       {/* Розділювач */}
       <div className="px-4 pb-4">
-        <div className="border-t border-white/20"></div>
+        <div className={`border-t ${isLight ? 'border-gray-200' : 'border-white/20'}`}></div>
       </div>
 
       {/* Оголошення */}
       <div className="px-4">
-        <h3 className="text-lg font-semibold text-white mb-3">{t('listing.sellerListings')}</h3>
+        <h3 className={`text-lg font-semibold mb-3 ${ac.pageHeading}`}>{t('listing.sellerListings')}</h3>
         {loading ? (
-          <div className="text-center py-8 text-white/70">{t('common.loading')}</div>
+          <div className={`text-center py-8 ${ac.mutedText}`}>{t('common.loading')}</div>
         ) : listings.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-3">
@@ -424,7 +450,11 @@ export const UserProfilePage = ({
               <div className="py-6">
                 <button
                   onClick={loadMoreListings}
-                  className="w-full bg-transparent hover:bg-white/10 border-2 border-white text-white font-semibold py-4 rounded-2xl transition-colors"
+                  className={`w-full bg-transparent font-semibold py-4 rounded-2xl border-2 transition-colors ${
+                    isLight
+                      ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                      : 'border-white text-white hover:bg-white/10'
+                  }`}
                 >
                   {t('common.showMore')}
                 </button>
@@ -432,7 +462,7 @@ export const UserProfilePage = ({
             )}
           </>
         ) : (
-          <div className="text-center py-8 text-white/70">{t('userProfile.noListings')}</div>
+          <div className={`text-center py-8 ${ac.mutedText}`}>{t('userProfile.noListings')}</div>
         )}
       </div>
 

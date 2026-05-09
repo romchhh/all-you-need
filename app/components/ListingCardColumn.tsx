@@ -7,6 +7,7 @@ import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCurrencySymbol } from '@/utils/currency';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface ListingCardColumnProps {
   listing: Listing;
@@ -24,6 +25,7 @@ const ListingCardColumnComponent = ({
   tg
 }: ListingCardColumnProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
 
   // Перевіряємо чи оголошення має активну рекламу
   const hasPromotion = listing.promotionType && listing.promotionEnds 
@@ -39,29 +41,28 @@ const ListingCardColumnComponent = ({
   
   // Визначаємо стилі в залежності від типу реклами
   // Лаймова рамка тільки для VIP, не для TOP
+  const defaultPromoBorder = isLight ? 'border border-gray-200' : 'border border-white/20';
+
   const getPromotionStyles = () => {
-    if (promotionTypes.length === 0) return 'border border-white/20';
-    
-    // Якщо є VIP - показуємо VIP стиль
+    if (promotionTypes.length === 0) return defaultPromoBorder;
+
     if (promotionTypes.includes('vip')) {
       return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
     }
-    
-    // Якщо є highlighted - показуємо рамку
+
     if (promotionTypes.includes('highlighted')) {
       return 'border-2 border-[#D3F1A7]';
     }
-    
-    // Якщо тільки top_category - без рамки
+
     if (promotionTypes.includes('top_category')) {
-      return 'border border-white/20';
+      return defaultPromoBorder;
     }
-    
-    return 'border border-white/20';
+
+    return defaultPromoBorder;
   };
-  
+
   const getCardBackgroundStyles = () => {
-    return 'bg-[#000000]';
+    return isLight ? 'bg-white shadow-sm ring-1 ring-black/[0.06]' : 'bg-[#000000]';
   };
   
   const getPromotionBadge = () => {
@@ -108,8 +109,10 @@ const ListingCardColumnComponent = ({
     >
       <div className="flex gap-3 p-3.5 pb-4">
         {/* Фото */}
-        <div 
-          className="relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden bg-[#1A1A1A]"
+        <div
+          className={`relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden ${
+            isLight ? 'bg-gray-100' : 'bg-[#1A1A1A]'
+          }`}
         >
           {/* Бейдж реклами */}
           <div className="absolute top-3 left-3 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
@@ -125,7 +128,11 @@ const ListingCardColumnComponent = ({
               loading="lazy"
             />
           ) : (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-white/10 bg-[#1A1A1A]">
+            <div
+              className={`absolute inset-0 w-full h-full flex items-center justify-center ${
+                isLight ? 'text-gray-300 bg-gray-100' : 'text-white/10 bg-[#1A1A1A]'
+              }`}
+            >
               <Package size={32} />
             </div>
           )}
@@ -142,9 +149,15 @@ const ListingCardColumnComponent = ({
             }}
             className="absolute top-0 right-0 w-8 h-8 flex items-center justify-center hover:scale-110 transition-transform active:scale-95 z-10"
           >
-            <Heart 
-              size={18} 
-              className={isFavorite ? 'text-black fill-black' : 'text-white'}
+            <Heart
+              size={18}
+              className={
+                isFavorite
+                  ? 'text-red-500 fill-red-500'
+                  : isLight
+                    ? 'text-gray-500'
+                    : 'text-white'
+              }
               fill={isFavorite ? 'currentColor' : 'none'}
               strokeWidth={isFavorite ? 0 : 2}
             />
@@ -152,24 +165,55 @@ const ListingCardColumnComponent = ({
 
           {/* Верхня частина: назва + ціна */}
           <div className="flex-1 pr-10 min-w-0">
-            <div className="font-semibold text-base text-white line-clamp-2 leading-snug mb-1.5">
+            <div
+              className={`font-semibold text-base line-clamp-2 leading-snug mb-1.5 ${
+                isLight ? 'text-gray-900' : 'text-white'
+              }`}
+            >
               {listing.title}
             </div>
-            <div className="flex items-center gap-2 mb-2 min-w-0">
+            <div className="mb-2 flex min-w-0 flex-col gap-1.5">
               {(() => {
                 const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
                 const isFree = listing.isFree;
                 const fluidSize = 'text-[clamp(0.6875rem,4vw,1.125rem)]';
                 if (isFree) {
-                  return <span className={`text-white font-bold ${fluidSize}`}>{t('common.free')}</span>;
+                  return (
+                    <span
+                      className={`min-w-0 font-bold ${fluidSize} ${isLight ? 'text-[#3F5331]' : 'text-white'}`}
+                    >
+                      {t('common.free')}
+                    </span>
+                  );
                 }
                 if (isNegotiable) {
-                  return <span className="text-white font-bold whitespace-nowrap text-[clamp(0.5rem,3.5vw,1.125rem)]" title={t('common.negotiable')}>{t('common.negotiableShort')}</span>;
+                  return (
+                    <span
+                      className={`min-w-0 max-w-full truncate font-bold leading-none tracking-tight whitespace-nowrap text-[clamp(0.5rem,2.8vw,0.8125rem)] sm:text-[clamp(0.5625rem,2.2vw,0.875rem)] ${
+                        isLight ? 'text-[#3F5331]' : 'text-white'
+                      }`}
+                      title={t('common.negotiable')}
+                    >
+                      {t('common.negotiableShort')}
+                    </span>
+                  );
                 }
-                return <span className={`text-white font-bold ${fluidSize} break-all`}>{`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}</span>;
+                return (
+                  <span
+                    className={`min-w-0 max-w-full font-bold break-words text-balance [overflow-wrap:anywhere] ${fluidSize} ${
+                      isLight ? 'text-[#3F5331]' : 'text-white'
+                    }`}
+                  >
+                    {`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}
+                  </span>
+                );
               })()}
               {listing.condition && (
-                <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-[11px] font-semibold rounded">
+                <span
+                  className={`inline-flex max-w-full flex-shrink-0 self-start rounded px-2.5 py-1 text-[11px] font-semibold leading-tight ${
+                    isLight ? 'bg-gray-200 text-gray-800' : 'bg-[#2A2A2A] text-white'
+                  }`}
+                >
                   {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
                 </span>
               )}
@@ -179,13 +223,20 @@ const ListingCardColumnComponent = ({
           {/* Нижня частина: розташування та час */}
           <div className="flex flex-col gap-1 text-[10px] min-w-0 mb-1">
             {listing.location && (
-              <div className="flex items-center gap-1.5 text-white/80">
-                <MapPin size={10} className="text-white/80 flex-shrink-0" />
+              <div
+                className={`flex items-center gap-1.5 ${isLight ? 'text-gray-600' : 'text-white/80'}`}
+              >
+                <MapPin
+                  size={10}
+                  className={`flex-shrink-0 ${isLight ? 'text-gray-600' : 'text-white/80'}`}
+                />
                 <span className="line-clamp-1 truncate">{listing.location.split(',')[0]}</span>
               </div>
             )}
             {formattedTime && (
-              <span className="text-white/60 truncate">{formattedTime}</span>
+              <span className={`truncate ${isLight ? 'text-gray-500' : 'text-white/60'}`}>
+                {formattedTime}
+              </span>
             )}
           </div>
         </div>

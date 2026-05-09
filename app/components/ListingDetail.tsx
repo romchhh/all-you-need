@@ -28,6 +28,8 @@ import { TradeGroundLogo } from '@/components/TradeGroundLogo';
 import { getCategories } from '@/constants/categories';
 import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
 const PromotionModal = dynamic(() => import('./PromotionModal'), {
@@ -116,6 +118,9 @@ export const ListingDetail = ({
   const isSeoListingRoute = Boolean((params as any)?.id);
   const categories = useMemo(() => getCategories(t), [t]);
   const isTelegramEnv = !!tg;
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
+
   const categoryLabel = useMemo(
     () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
     [categories, listing.category, listing.subcategory, t]
@@ -488,9 +493,13 @@ export const ListingDetail = ({
     tg
   });
 
+  const pageBackground = isLight
+    ? 'radial-gradient(ellipse 90% 120% at 14% -8%, rgba(63, 83, 49, 0.1) 0%, transparent 52%), linear-gradient(180deg, #ffffff 0%, #f5f6f3 100%)'
+    : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000';
+
   return (
     <div 
-      className="min-h-screen pb-20 font-montserrat" 
+      className="min-h-screen pb-20 font-montserrat lg:px-6 xl:px-8" 
       style={{ 
         position: 'relative', 
         overflowX: 'hidden',
@@ -498,7 +507,7 @@ export const ListingDetail = ({
         opacity: 1,
         display: 'block',
         visibility: 'visible',
-        background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000',
+        background: pageBackground,
         zIndex: 1
       }}
     >
@@ -516,14 +525,14 @@ export const ListingDetail = ({
       
       {/* Кнопки управління - фіксовані */}
       <div 
-        className="fixed top-4 left-0 right-0 px-4 flex items-center justify-between pointer-events-none"
+        className="pointer-events-none fixed left-0 right-0 top-4 z-[100] flex justify-center px-4 lg:px-8"
         style={{
           transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
           transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
           opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
-          zIndex: 100
         }}
       >
+        <div className="flex w-full max-w-5xl items-center justify-between xl:max-w-6xl">
         <button
           onClick={() => {
             if (onBack) {
@@ -533,7 +542,11 @@ export const ListingDetail = ({
             }
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
+          className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+            isLight
+              ? 'bg-white text-gray-900 shadow-md ring-1 ring-gray-900/[0.06] hover:bg-gray-50'
+              : 'bg-white text-gray-900 hover:bg-gray-100'
+          }`}
         >
           <ArrowLeft size={20} className="text-gray-900" />
         </button>
@@ -543,7 +556,11 @@ export const ListingDetail = ({
               setShowShareModal(true);
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
+            className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+              isLight
+                ? 'bg-white text-gray-900 shadow-md ring-1 ring-gray-900/[0.06] hover:bg-gray-50'
+                : 'bg-white text-gray-900 hover:bg-gray-100'
+            }`}
           >
             <Share2 size={20} className="text-gray-900" />
           </button>
@@ -552,7 +569,11 @@ export const ListingDetail = ({
               onToggleFavorite(listing.id);
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors pointer-events-auto bg-white"
+            className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+              isLight
+                ? 'bg-white text-gray-900 shadow-md ring-1 ring-gray-900/[0.06] hover:bg-gray-50'
+                : 'bg-white text-gray-900 hover:bg-gray-100'
+            }`}
           >
             <Heart 
               size={20} 
@@ -561,10 +582,13 @@ export const ListingDetail = ({
             />
           </button>
         </div>
+        </div>
       </div>
 
       {/* Лого Trade Ground - частина сторінки */}
+      <div className="w-full px-4 lg:px-6 xl:px-8">
       <TradeGroundLogo
+        paddingX={false}
         onClick={() => {
           if (typeof window !== 'undefined') {
             window.location.href = `/${lang}/bazaar`;
@@ -577,6 +601,7 @@ export const ListingDetail = ({
           opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
         }}
       />
+      </div>
       
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
@@ -672,9 +697,13 @@ export const ListingDetail = ({
         </div>
       )}
 
-      {/* Блок з рамкою зверху - містить фото та контент */}
+      {/* Блок з рамкою зверху — на десктопі: галерея зліва, текст справа */}
       <div 
-        className="mx-4 mt-4 rounded-t-3xl border-t-2 border-white bg-[#000000]"
+        className={`mx-4 mt-4 overflow-hidden rounded-3xl lg:mx-auto lg:mt-8 lg:max-w-5xl xl:max-w-6xl ${
+          isLight
+            ? 'bg-white shadow-md shadow-gray-900/[0.07] ring-1 ring-gray-900/[0.04]'
+            : 'bg-[#000000] shadow-lg shadow-black/30'
+        }`}
         style={{
           transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
           transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
@@ -682,27 +711,28 @@ export const ListingDetail = ({
           overflow: 'visible'
         }}
       >
+        <div className="w-full min-w-0 lg:flex lg:flex-row lg:items-stretch lg:gap-8 xl:gap-10">
         {/* Галерея фото */}
         <div 
-          className="px-0 pt-4 pb-0 w-full min-h-[400px] md:min-h-[500px] max-h-[500px] md:max-h-[600px]"
+          className={`w-full min-h-[360px] max-h-[620px] px-0 pb-0 pt-4 sm:max-h-[640px] lg:flex lg:h-auto lg:min-h-[min(420px,70vh)] lg:max-h-[min(640px,85vh)] lg:w-[42%] lg:max-w-xl lg:min-w-[300px] lg:shrink-0 lg:items-center lg:justify-center lg:self-stretch lg:pl-8 lg:pr-2 lg:pt-0 lg:pb-6 xl:pl-10 ${
+            isMobile ? 'h-[60svh]' : 'h-[85svh] max-lg:h-[85svh]'
+          }`}
           style={{ 
-            height: isMobile ? '60svh' : '85svh',
             ...(tg ? { paddingBottom: '0px' } : {})
           }}
         >
+          <div className="h-full w-full min-h-0 lg:max-h-full">
           <ImageGallery 
             images={images} 
             title={listing.title}
             onImageClick={(index) => setSelectedImageIndex(index)}
           />
+          </div>
         </div>
 
         {/* Контент */}
         <div 
-          className="px-4 pb-4"
-          style={{
-            ...(tg ? { paddingTop: '0.25rem' } : { paddingTop: '0.5rem' })
-          }}
+          className={`min-w-0 flex-1 px-4 pb-6 lg:pl-4 lg:pr-10 lg:pb-10 lg:pt-8 xl:pr-12 ${tg ? 'max-lg:pt-1' : 'max-lg:pt-2'}`}
         >
             {/* Ціна */}
             <div className="mt-3 mb-4">
@@ -742,21 +772,23 @@ export const ListingDetail = ({
             </div>
 
         {/* Заголовок */}
-        <h1 className="text-xl font-semibold mb-1" style={{ color: '#FFFFFF' }}>{listing.title}</h1>
+        <h1 className={`mb-1 text-xl font-semibold tracking-tight lg:text-2xl ${isLight ? 'text-gray-900' : 'text-white'}`}>
+          {listing.title}
+        </h1>
         {categoryLabel && (
-          <div className="mb-3 text-sm text-white/70">
+          <div className={`mb-3 text-sm ${ac.mutedText}`}>
             {categoryLabel}
           </div>
         )}
 
         {/* Статистика */}
-        <div className="flex gap-4 mb-6 text-sm text-white/70">
+        <div className={`flex gap-4 mb-6 text-sm ${ac.mutedText}`}>
           <div className="flex items-center gap-2">
-            <MapPin size={16} className="text-white/70 flex-shrink-0" />
+            <MapPin size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
             <span>{listing.location}</span>
           </div>
           <div className="flex items-center gap-1">
-            <Clock size={16} className="text-white/70" />
+            <Clock size={16} className={ac.mutedText} />
             <span>{t('listing.created')}: {formattedTime}</span>
           </div>
         </div>
@@ -765,8 +797,12 @@ export const ListingDetail = ({
         {listing.condition && (
           <div className="mb-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white/70">{t('listing.condition.label')}:</span>
-              <span className="px-2.5 py-1 bg-[#2A2A2A] text-white text-xs font-semibold rounded">
+              <span className={`text-sm font-medium ${ac.mutedText}`}>{t('listing.condition.label')}:</span>
+              <span
+                className={`px-2.5 py-1 text-xs font-semibold rounded ${
+                  isLight ? 'bg-gray-200 text-gray-800' : 'bg-[#2A2A2A] text-white'
+                }`}
+              >
                 {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
               </span>
             </div>
@@ -774,16 +810,27 @@ export const ListingDetail = ({
         )}
 
         {/* Опис */}
-        <div className="mb-6 rounded-2xl p-4" style={{ background: '#1C1C1C' }}>
-          <h2 className="font-semibold mb-2 text-white">{t('listing.description')}</h2>
-          <p className="whitespace-pre-line leading-relaxed text-white">
+        <div
+          className={`mb-6 min-w-0 rounded-2xl p-4 sm:p-5 ${
+            isLight ? 'bg-gray-50' : ''
+          }`}
+          style={{ background: isLight ? undefined : '#1C1C1C' }}
+        >
+          <h2 className={`font-semibold mb-3 text-base sm:text-lg ${isLight ? 'text-gray-900' : 'text-white'}`}>
+            {t('listing.description')}
+          </h2>
+          <div
+            className={`max-w-prose whitespace-pre-line text-[15px] leading-[1.65] sm:text-base sm:leading-relaxed [overflow-wrap:anywhere] [word-break:break-word] ${
+              isLight ? 'text-gray-800' : 'text-white/95'
+            }`}
+          >
             {descriptionWithLinks(listing.description || '')}
-          </p>
+          </div>
         </div>
 
         {/* Дата публікації */}
         {(listing.publishedAt || listing.createdAt) && (
-          <div className="mb-6 text-sm text-white/70">
+          <div className={`mb-6 text-sm ${ac.mutedText}`}>
             <span>
               {t('listing.publishedDate')}:{' '}
               {formatPublicationDate(
@@ -797,7 +844,7 @@ export const ListingDetail = ({
         {/* Інформація про рекламу для своїх оголошень */}
         {isOwnListing && listing.promotionType && listing.promotionEnds && new Date(listing.promotionEnds) > new Date() && (
           <div className="mb-6 flex items-center gap-2 text-sm">
-            <span className="text-white/70">{t('sales.promotion')}:</span>
+            <span className={ac.mutedText}>{t('sales.promotion')}:</span>
             <div className="flex items-center gap-2 flex-wrap">
               {listing.promotionType.split(',').map((promoType: string) => {
                 const trimmedType = promoType.trim();
@@ -827,8 +874,12 @@ export const ListingDetail = ({
         )}
 
         {/* Продавець */}
-        <div className="rounded-2xl p-4 mb-6 border border-white">
-          <h2 className="font-semibold mb-4 text-white">{t('listing.seller')}</h2>
+        <div
+          className={`mb-6 rounded-2xl p-4 ${
+            isLight ? 'bg-gray-50/90' : 'bg-[#141414]'
+          }`}
+        >
+          <h2 className={`font-semibold mb-4 ${isLight ? 'text-gray-900' : 'text-white'}`}>{t('listing.seller')}</h2>
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 relative bg-white">
               {listing.seller.avatar && (listing.seller.avatar.startsWith('/') || listing.seller.avatar.startsWith('http')) ? (
@@ -868,9 +919,9 @@ export const ListingDetail = ({
               )}
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-lg mb-1 text-white">{listing.seller.name}</p>
+              <p className={`font-semibold text-lg mb-1 ${isLight ? 'text-gray-900' : 'text-white'}`}>{listing.seller.name}</p>
               {listing.seller.username && (
-                <p className="text-sm mb-1 text-white/70">@{listing.seller.username}</p>
+                <p className={`text-sm mb-1 ${ac.mutedText}`}>@{listing.seller.username}</p>
               )}
             </div>
           </div>
@@ -886,7 +937,11 @@ export const ListingDetail = ({
                 );
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="w-full px-4 py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 border border-white text-white bg-transparent hover:bg-white/10"
+              className={`w-full rounded-xl px-4 py-3 font-medium transition-colors flex items-center justify-center gap-2 ${
+                isLight
+                  ? 'bg-gray-100 text-gray-900 hover:bg-gray-200/80'
+                  : 'bg-white/10 text-white hover:bg-white/15'
+              }`}
             >
               <User size={18} />
               {t('listing.viewSellerProfile')}
@@ -895,30 +950,39 @@ export const ListingDetail = ({
         </div>
 
         </div>
+        </div>
 
-        {/* Інші оголошення продавця */}
+        {/* Інші оголошення продавця — під блоком галерея+контент (не в одному flex-ряду) */}
         {sellerListings.length > 0 && (
-          <div className="mb-6" style={{ overflow: 'visible' }}>
-            <h2 className="text-lg font-semibold mb-3 px-4" style={{ color: '#FFFFFF' }}>{t('listing.otherSellerListings')}</h2>
-            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', width: '100vw', overflowY: 'visible', paddingTop: '0.5rem', marginTop: '-0.5rem' }}>
-              <div className="flex gap-3 pl-4 pb-2" style={{ minWidth: 'max-content' }}>
-              {sellerListings.map(sellerListing => (
-                  <div key={sellerListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ overflow: 'visible' }}>
-                <ListingCard 
-                  listing={sellerListing}
-                  isFavorite={favorites.has(sellerListing.id)}
-                  onSelect={(l) => {
-                    if (onSelectListing) {
-                      onSelectListing(l);
-                    }
-                  }}
-                  onToggleFavorite={onToggleFavorite}
-                  tg={tg}
-                />
-            </div>
+          <div
+            className="w-full min-w-0 px-4 pb-4 pt-10 lg:px-6 lg:pb-6 lg:pt-12"
+            style={{ overflow: 'visible' }}
+          >
+            <h2 className={`mb-4 text-lg font-semibold lg:text-xl ${isLight ? 'text-gray-900' : 'text-white'}`}>
+              {t('listing.otherSellerListings')}
+            </h2>
+            <div
+              className="scrollbar-hide w-full max-w-full overflow-x-auto pb-2"
+              style={{ WebkitOverflowScrolling: 'touch', overflowY: 'visible' }}
+            >
+              <div className="flex gap-3 pr-1" style={{ minWidth: 'max-content' }}>
+                {sellerListings.map((sellerListing) => (
+                  <div key={sellerListing.id} className="w-[48vw] max-w-[240px] flex-shrink-0 lg:w-56 lg:max-w-[240px]" style={{ overflow: 'visible' }}>
+                    <ListingCard
+                      listing={sellerListing}
+                      layout="stacked"
+                      isFavorite={favorites.has(sellerListing.id)}
+                      onSelect={(l) => {
+                        if (onSelectListing) {
+                          onSelectListing(l);
+                        }
+                      }}
+                      onToggleFavorite={onToggleFavorite}
+                      tg={tg}
+                    />
+                  </div>
                 ))}
-                {/* Невеликий відступ справа для останнього елемента */}
-                <div className="flex-shrink-0 w-2" style={{ minWidth: '0.5rem' }}></div>
+                <div className="w-2 min-w-[0.5rem] flex-shrink-0 shrink-0" aria-hidden />
               </div>
             </div>
           </div>
@@ -926,27 +990,35 @@ export const ListingDetail = ({
 
         {/* Оголошення з категорії */}
         {categoryListings.length > 0 && (
-          <div className="mb-6" style={{ overflow: 'visible' }}>
-            <h2 className="text-lg font-semibold mb-3 px-4" style={{ color: '#FFFFFF' }}>{t('listing.similarListings')}</h2>
-            <div className="overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', width: '100vw', overflowY: 'visible', paddingTop: '0.5rem', marginTop: '-0.5rem' }}>
-              <div className="flex gap-3 pl-4 pb-2" style={{ minWidth: 'max-content' }}>
-              {categoryListings.map(categoryListing => (
-                  <div key={categoryListing.id} className="flex-shrink-0 w-[48vw] max-w-[240px]" style={{ overflow: 'visible' }}>
-                <ListingCard 
-                  listing={categoryListing}
-                  isFavorite={favorites.has(categoryListing.id)}
-                  onSelect={(l) => {
-                    if (onSelectListing) {
-                      onSelectListing(l);
-                    }
-                  }}
-                  onToggleFavorite={onToggleFavorite}
-                  tg={tg}
-                />
-            </div>
+          <div
+            className="w-full min-w-0 px-4 pb-8 pt-10 lg:px-6 lg:pb-10 lg:pt-12"
+            style={{ overflow: 'visible' }}
+          >
+            <h2 className={`mb-4 text-lg font-semibold lg:text-xl ${isLight ? 'text-gray-900' : 'text-white'}`}>
+              {t('listing.similarListings')}
+            </h2>
+            <div
+              className="scrollbar-hide w-full max-w-full overflow-x-auto pb-2"
+              style={{ WebkitOverflowScrolling: 'touch', overflowY: 'visible' }}
+            >
+              <div className="flex gap-3 pr-1" style={{ minWidth: 'max-content' }}>
+                {categoryListings.map((categoryListing) => (
+                  <div key={categoryListing.id} className="w-[48vw] max-w-[240px] flex-shrink-0 lg:w-56 lg:max-w-[240px]" style={{ overflow: 'visible' }}>
+                    <ListingCard
+                      listing={categoryListing}
+                      layout="stacked"
+                      isFavorite={favorites.has(categoryListing.id)}
+                      onSelect={(l) => {
+                        if (onSelectListing) {
+                          onSelectListing(l);
+                        }
+                      }}
+                      onToggleFavorite={onToggleFavorite}
+                      tg={tg}
+                    />
+                  </div>
                 ))}
-                {/* Невеликий відступ справа для останнього елемента */}
-                <div className="flex-shrink-0 w-2" style={{ minWidth: '0.5rem' }}></div>
+                <div className="w-2 min-w-[0.5rem] flex-shrink-0 shrink-0" aria-hidden />
               </div>
             </div>
           </div>
@@ -955,9 +1027,18 @@ export const ListingDetail = ({
 
 
       {/* Нижня панель з кнопкою */}
-      <div className="fixed bottom-28 left-0 right-0 p-4 z-[50] max-w-2xl mx-auto space-y-3" style={{ pointerEvents: 'auto' }}>
+      <div
+        className="fixed bottom-28 left-0 right-0 z-[50] mx-auto max-w-2xl space-y-3 px-4 py-4 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8"
+        style={{ pointerEvents: 'auto' }}
+      >
         {(isSeoListingRoute || !isTelegramEnv) && (
-          <div className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-xs text-white/80 text-center">
+          <div
+            className={`rounded-xl px-3 py-2 text-center text-xs shadow-sm ${
+              isLight
+                ? 'bg-gray-50 text-gray-700 ring-1 ring-gray-900/[0.05]'
+                : 'bg-white/10 text-white/80'
+            }`}
+          >
             Повний перегляд товару, актуальний статус та зв'язок з продавцем доступні у Telegram‑боті Trade Ground Marketplace.
           </div>
         )}
