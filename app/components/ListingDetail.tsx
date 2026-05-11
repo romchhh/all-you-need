@@ -123,6 +123,10 @@ export const ListingDetail = ({
   const isTelegramEnv = !!tg;
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
+  /** Нижня CTA на сторінці товару: у темній темі — неоновий лайм як основний акцент */
+  const listingPrimaryCtaClass = isLight
+    ? 'bg-[#3F5331] text-white hover:bg-[#344728] [&_svg]:text-white'
+    : 'border-none bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_22px_rgba(200,230,160,0.48)] hover:bg-[#dff5c0] hover:shadow-[0_0_28px_rgba(200,230,160,0.58)] [&_svg]:text-[#0f1408]';
 
   const categoryLabel = useMemo(
     () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
@@ -1120,7 +1124,7 @@ export const ListingDetail = ({
         {isSeoListingRoute ? (
           <a
             href="https://t.me/TradeGroundBot?start=linktowatch_12"
-            className="w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl bg-[#3F5331] text-white border-none"
+            className={`w-full rounded-2xl border-none py-4 font-montserrat text-xl font-semibold flex cursor-pointer items-center justify-center gap-2 transition-colors ${listingPrimaryCtaClass}`}
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -1175,12 +1179,7 @@ export const ListingDetail = ({
                 window.location.href = link;
               }
             }}
-            className="w-full py-4 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl text-white [&_svg]:text-white"
-            style={{
-              background: '#3F5331',
-              color: '#ffffff',
-              border: 'none'
-            }}
+            className={`w-full rounded-2xl py-4 font-montserrat text-xl font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 ${listingPrimaryCtaClass}`}
           >
             {isOwnListing ? (
               <>
@@ -1206,7 +1205,7 @@ export const ListingDetail = ({
         ) : (
           <a
             href="https://t.me/TradeGroundBot?start=linktowatch_12"
-            className="w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl bg-[#3F5331] text-white border-none"
+            className={`w-full rounded-2xl border-none py-4 font-montserrat text-xl font-semibold flex cursor-pointer items-center justify-center gap-2 transition-colors ${listingPrimaryCtaClass}`}
             target="_blank"
             rel="noopener noreferrer"
           >

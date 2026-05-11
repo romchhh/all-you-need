@@ -714,9 +714,17 @@ const BazaarTabComponent = ({
                   }
                 />
                 {selectedCities.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#3F5331] text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                    {selectedCities.length > 9 ? '9+' : selectedCities.length}
-                  </span>
+                  <>
+                    <span
+                      className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full bg-[#3F5331] ring-2 ${
+                        isLight ? 'ring-gray-100' : 'ring-black'
+                      }`}
+                      aria-hidden
+                    />
+                    <span className="absolute bottom-0.5 right-0.5 z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3F5331] px-1 text-xs font-bold text-white">
+                      {selectedCities.length > 9 ? '9+' : selectedCities.length}
+                    </span>
+                  </>
                 )}
               </button>
             </div>

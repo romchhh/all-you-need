@@ -100,6 +100,11 @@ export const CreateListingModal = ({
   const rowHover = isLight ? 'hover:bg-gray-50' : 'hover:bg-white/10';
   const checkBorderIdle = isLight ? 'border-gray-400 bg-transparent' : 'border-white/40 bg-transparent';
 
+  /** Нижня кнопка «Створити оголошення»: у темній темі — світло-зелений акцент */
+  const createPrimaryCtaClass = isLight
+    ? 'bg-[#3F5331] text-white hover:bg-[#344728]'
+    : 'bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_22px_rgba(200,230,160,0.48)] hover:bg-[#dff5c0] hover:shadow-[0_0_28px_rgba(200,230,160,0.58)]';
+
   // Ліміти для Telegram (caption до фото має ліміт 1024 символи)
   // Базовий текст (~120 символів): emoji, HTML теги, структура, ціна, категорія, локація, хештеги
   const TITLE_MAX_LENGTH = 100;
@@ -1549,7 +1554,7 @@ export const CreateListingModal = ({
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-1.5 bg-[#3F5331] text-white rounded-xl text-base font-semibold hover:bg-[#344728] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-montserrat"
+            className={`flex-1 rounded-xl px-4 py-1.5 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 font-montserrat ${createPrimaryCtaClass}`}
           >
             {loading ? t('createListing.creating') : t('createListing.title')}
           </button>

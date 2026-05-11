@@ -302,6 +302,36 @@ html.smooth-scroll {
   margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Темна тема: суцільні CTA (bg #3F5331 + text-white) — неоново-зелені; не чіпаємо bg-[#3F5331]/20 тощо */
+html[data-theme="dark"] button[class*='bg-[#3F5331]'][class*='text-white'],
+html[data-theme="dark"] a[class*='bg-[#3F5331]'][class*='text-white'] {
+  background-color: #c8e6a0 !important;
+  color: #0f1408 !important;
+  font-weight: 600;
+  box-shadow:
+    0 0 22px rgba(200, 230, 160, 0.48),
+    inset 0 0 0 1px rgba(212, 232, 176, 0.55);
+}
+html[data-theme="dark"] button[class*='bg-[#3F5331]'][class*='text-white'] svg,
+html[data-theme="dark"] a[class*='bg-[#3F5331]'][class*='text-white'] svg {
+  color: #0f1408 !important;
+  stroke: #0f1408 !important;
+}
+html[data-theme="dark"] button[class*='bg-[#3F5331]'][class*='text-white']:hover,
+html[data-theme="dark"] a[class*='bg-[#3F5331]'][class*='text-white']:hover {
+  background-color: #dff5c0 !important;
+  color: #0f1408 !important;
+  box-shadow:
+    0 0 30px rgba(200, 230, 160, 0.62),
+    inset 0 0 0 1px rgba(230, 248, 200, 0.65);
+}
+html[data-theme="dark"] button[class*='bg-[#3F5331]'][class*='text-white']:disabled,
+html[data-theme="dark"] a[class*='bg-[#3F5331]'][class*='text-white']:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 /* Запобігаємо підтягуванню BottomNavigation при відкритті клавіатури */
 [class*="BottomNavigation"] > div[class*="fixed"][class*="bottom-0"],
 div[class*="fixed"][class*="bottom-0"]:has([class*="BottomNavigation"]) {
