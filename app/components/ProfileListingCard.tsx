@@ -3,6 +3,7 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 
 interface ProfileListingCardProps {
@@ -38,6 +39,7 @@ export const ProfileListingCard = ({
   tg
 }: ProfileListingCardProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
   const [autoRenewSaving, setAutoRenewSaving] = useState(false);
 
   // Перевіряємо статус модерації
@@ -144,40 +146,48 @@ export const ProfileListingCard = ({
   // - ТОП + Выделение - рамка (як для Выделение)
   const getCardStyles = () => {
     if (isSold) {
-      return 'bg-[#000000] border-2 border-gray-600 opacity-75';
+      return isLight
+        ? 'bg-gray-100 border-2 border-gray-300/90 opacity-95'
+        : 'bg-[#000000] border-2 border-gray-600 opacity-75';
     }
     if (isRejected) {
-      return 'bg-[#000000] border-2 border-red-600 opacity-75';
+      return isLight
+        ? 'bg-red-50/90 border-2 border-red-400/75'
+        : 'bg-[#000000] border-2 border-red-600 opacity-75';
     }
     if (isPendingModeration) {
-      return 'bg-[#000000] border-2 border-yellow-600 opacity-75';
+      return isLight
+        ? 'bg-amber-50/95 border-2 border-amber-400/80'
+        : 'bg-[#000000] border-2 border-yellow-600 opacity-75';
     }
     if (isDeactivated) {
-      return 'bg-[#000000] border-2 border-orange-600 opacity-75';
+      return isLight
+        ? 'bg-orange-50/95 border-2 border-orange-400/75'
+        : 'bg-[#000000] border-2 border-orange-600 opacity-75';
     }
-    
-    // Стилі для реклами (тільки якщо активна)
+
     if (hasPromotion && isPromotionActive && !isPendingModeration && !isDeactivated && !isRejected && listing.promotionType) {
       const promotionType = listing.promotionType;
-      
+
       if (promotionType === 'vip') {
-        // ВИП - рамка з тінню
-        return 'bg-[#000000] border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.4)]';
-      } else if (promotionType === 'highlighted') {
-        // Выделение цветом - рамка без тіні
-        return 'bg-[#000000] border-2 border-[#3F5331]';
-      } else if (promotionType === 'top_category') {
-        // ТОП - без рамки (стандартна рамка)
-        return 'bg-[#000000] border-2 border-white/20';
+        return isLight
+          ? 'bg-white border-2 border-[#3F5331] shadow-[0_0_16px_rgba(63,83,49,0.22)]'
+          : 'bg-[#000000] border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.4)]';
+      }
+      if (promotionType === 'highlighted') {
+        return isLight ? 'bg-white border-2 border-[#3F5331]' : 'bg-[#000000] border-2 border-[#3F5331]';
+      }
+      if (promotionType === 'top_category') {
+        return isLight ? 'bg-white border-2 border-gray-200/90 shadow-sm' : 'bg-[#000000] border-2 border-white/20';
       }
     }
-    
-    return 'bg-[#000000] border-2 border-white/20';
+
+    return isLight ? 'bg-white border-2 border-gray-200/90 shadow-sm' : 'bg-[#000000] border-2 border-white/20';
   };
 
   return (
     <div 
-      className={`${getCardStyles()} rounded-2xl overflow-hidden transition-all`}
+      className={`relative ${getCardStyles()} rounded-2xl overflow-hidden transition-all`}
       data-listing-id={listing.id}
     >
       {/* Напівпрозора смуга зверху для статусів */}
@@ -229,7 +239,7 @@ export const ProfileListingCard = ({
 
         {/* Фото */}
         <div 
-          className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden bg-[#2A2A2A] cursor-pointer"
+          className={`relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer ${isLight ? 'bg-gray-200' : 'bg-[#2A2A2A]'}`}
           onClick={() => {
             if (!isPendingModeration && !isDeactivated && !isSold) {
               onSelect(listing);
@@ -248,7 +258,7 @@ export const ProfileListingCard = ({
               loading="lazy"
             />
           ) : (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-white/20">
+            <div className={`absolute inset-0 w-full h-full flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-white/20'}`}>
               <Package size={32} />
             </div>
           )}
@@ -296,6 +306,8 @@ export const ProfileListingCard = ({
                   ? 'text-gray-500 line-through' 
                   : isDeactivated
                   ? 'text-gray-500 line-through'
+                  : isLight
+                  ? 'text-gray-900 hover:text-[#3F5331]'
                   : 'text-white hover:text-[#C8E6A0]'
               }`}
               onClick={() => {
@@ -314,6 +326,8 @@ export const ProfileListingCard = ({
                 ? 'text-gray-500 line-through' 
                 : isDeactivated
                 ? 'text-gray-500 line-through'
+                : isLight
+                ? 'text-gray-900'
                 : 'text-white'
             } text-[clamp(0.6875rem,4vw,1rem)]`}>
               {(() => {
@@ -350,7 +364,7 @@ export const ProfileListingCard = ({
 
           {/* Дати */}
           <div className={`text-[10px] space-y-0.5 mt-2 ${
-            isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : 'text-white/70'
+            isSold || isPendingModeration || isDeactivated ? 'text-gray-500' : isLight ? 'text-gray-600' : 'text-white/70'
           }`}>
             {createdDate && (
               <div className="flex items-center gap-1">
@@ -388,13 +402,13 @@ export const ProfileListingCard = ({
             )}
             {/* Інформація про рекламу */}
             {hasPromotion && isPromotionActive && promotionDaysLeft !== null && (
-              <div className={`flex items-center gap-1.5 ${isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500 font-semibold' : 'text-[#C8E6A0] font-semibold'}`}>
+              <div className={`flex items-center gap-1.5 ${isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500 font-semibold' : isLight ? 'text-[#3F5331] font-semibold' : 'text-[#C8E6A0] font-semibold'}`}>
                 <span>{t('profile.promotion') || 'Реклама'}:</span>
                 <span>{promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}</span>
               </div>
             )}
             {hasPromotion && !isPromotionActive && (
-              <div className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : 'text-white/50'}>
+              <div className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-500' : 'text-white/50'}>
                 {t('profile.promotion') || 'Реклама'} закінчилась
               </div>
             )}
@@ -411,7 +425,11 @@ export const ProfileListingCard = ({
                 >
                   <input
                     type="checkbox"
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/40 bg-black/40 text-[#C8E6A0] focus:ring-[#3F5331]/50"
+                    className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded focus:ring-[#3F5331]/50 ${
+                      isLight
+                        ? 'border-gray-400 bg-white text-[#3F5331]'
+                        : 'border-white/40 bg-black/40 text-[#C8E6A0]'
+                    }`}
                     checked={!!listing.autoRenew}
                     disabled={autoRenewSaving}
                     onChange={async (e) => {
@@ -443,9 +461,9 @@ export const ProfileListingCard = ({
                       }
                     }}
                   />
-                  <span className="text-[10px] leading-snug text-white/75">
-                    <span className="font-semibold text-white/90">{t('sales.autoRenew')}</span>
-                    <span className="block text-white/60 mt-0.5">{t('sales.autoRenewHint')}</span>
+                  <span className={`text-[10px] leading-snug ${isLight ? 'text-gray-600' : 'text-white/75'}`}>
+                    <span className={`font-semibold ${isLight ? 'text-gray-800' : 'text-white/90'}`}>{t('sales.autoRenew')}</span>
+                    <span className={`block mt-0.5 ${isLight ? 'text-gray-500' : 'text-white/60'}`}>{t('sales.autoRenewHint')}</span>
                   </span>
                 </label>
               )}
@@ -453,7 +471,7 @@ export const ProfileListingCard = ({
 
           {/* Статистика */}
           <div className={`flex items-center gap-3 text-xs mt-2 ${
-            isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : 'text-white/70'
+            isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-600' : 'text-white/70'
           }`}>
             <div className="flex items-center gap-1">
               <Eye size={14} className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : ''} />
@@ -464,8 +482,8 @@ export const ProfileListingCard = ({
                 isSold || isPendingModeration || isDeactivated || isRejected
                   ? 'text-gray-500' 
                   : isFavorite 
-                  ? 'fill-[#C8E6A0] text-[#C8E6A0]' 
-                  : ''
+                  ? isLight ? 'fill-[#3F5331] text-[#3F5331]' : 'fill-[#C8E6A0] text-[#C8E6A0]'
+                  : isLight ? 'text-gray-500' : ''
               } />
               <span>{listing.favoritesCount || 0}</span>
             </div>
@@ -490,9 +508,15 @@ export const ProfileListingCard = ({
               disabled={isPendingModeration}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                 isPendingModeration
-                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed opacity-50'
+                  ? isLight
+                    ? 'bg-transparent border-2 border-gray-300 text-gray-400 cursor-not-allowed opacity-60'
+                    : 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed opacity-50'
                   : isDeactivated
-                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  ? isLight
+                    ? 'bg-transparent border-2 border-gray-400 text-gray-500'
+                    : 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  : isLight
+                  ? 'bg-transparent border-2 border-[#3F5331] text-[#3F5331] hover:bg-[#3F5331]/10'
                   : 'bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#3F5331]/20'
               }`}
               title={isPendingModeration ? t('editListing.cannotEditOnModeration') || 'Не можна редагувати під час модерації' : t('common.edit')}
@@ -511,7 +535,11 @@ export const ProfileListingCard = ({
               }}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                 isDeactivated
-                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  ? isLight
+                    ? 'bg-transparent border-2 border-gray-400 text-gray-500'
+                    : 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
+                  : isLight
+                  ? 'bg-transparent border-2 border-[#3F5331] text-[#3F5331] hover:bg-[#3F5331]/10'
                   : 'bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#3F5331]/20'
               }`}
               title={t('editListing.markAsSold')}
@@ -532,7 +560,11 @@ export const ProfileListingCard = ({
                 onReactivate();
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className="w-full bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-[#FFFFFFA6]/10 transition-colors font-semibold text-sm"
+              className={
+                isLight
+                  ? 'w-full bg-transparent border-2 border-gray-400 text-gray-700 rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors font-semibold text-sm'
+                  : 'w-full bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-[#FFFFFFA6]/10 transition-colors font-semibold text-sm'
+              }
             >
               {t('sales.activate') || 'Активувати'}
             </button>
@@ -546,7 +578,9 @@ export const ProfileListingCard = ({
               disabled={isPendingModeration}
               className={`w-full rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors font-semibold text-sm ${
                 isPendingModeration
-                  ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed'
+                  ? isLight
+                    ? 'bg-transparent border-2 border-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed'
                   : 'bg-[#3F5331] text-white hover:bg-[#344728]'
               }`}
             >

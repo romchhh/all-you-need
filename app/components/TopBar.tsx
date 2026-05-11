@@ -51,8 +51,8 @@ export const TopBar = ({
       ? 'w-full rounded-2xl border border-gray-200/90 bg-white py-3 pr-10 text-gray-900 shadow-sm ring-1 ring-black/[0.03] transition-all placeholder:text-gray-500 focus:border-[#3F5331]/30 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/20'
       : 'w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 transition-all text-white placeholder:text-white/60';
     const searchIconClass = isLight
-      ? 'absolute top-1/2 -translate-y-1/2 text-gray-500'
-      : 'absolute top-1/2 -translate-y-1/2 text-white/80';
+      ? 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-gray-600'
+      : 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-white/80';
     const clearBtnClass = isLight
       ? 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors'
       : 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors';

@@ -1,10 +1,11 @@
 import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2, Sparkles, Wrench, CheckCircle, Tag, EyeOff, Check } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Listing } from '@/types';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, type CSSProperties } from 'react';
 import { getCategories } from '@/constants/categories';
 import { germanCities } from '@/constants/german-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useToast } from '@/hooks/useToast';
 import { ConfirmModal } from './ConfirmModal';
 import { CategoryIcon } from './CategoryIcon';
@@ -27,6 +28,7 @@ export const EditListingModal = ({
   tg
 }: EditListingModalProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
   const { showToast } = useToast();
   const categories = getCategories(t);
   const [title, setTitle] = useState(listing.title);
@@ -816,9 +818,13 @@ export const EditListingModal = ({
     return null;
   }
 
+  const scrollBgStyle: CSSProperties = isLight
+    ? { background: 'linear-gradient(180deg, #fcfcfb 0%, #eef0eb 100%)' }
+    : { background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000' };
+
   return (
     <div 
-      className="fixed inset-0 bg-[#000000] flex flex-col overflow-hidden" 
+      className={`fixed inset-0 flex flex-col overflow-hidden ${isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]'}`}
       style={{ 
         zIndex: 9999, 
         isolation: 'isolate',
@@ -836,39 +842,46 @@ export const EditListingModal = ({
         }
       }}
     >
-      <div className="bg-[#000000] w-full h-full flex flex-col relative">
+      <div className={`w-full h-full flex flex-col relative min-h-0 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] ${isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]'}`}>
         {/* Хедер */}
-        <div className="bg-[#000000] border-b border-white/20 px-4 py-4 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-xl font-bold text-white">{t('listing.editListing')}</h2>
+        <div className={`px-4 py-4 flex items-center justify-between flex-shrink-0 border-b ${isLight ? 'bg-white border-gray-200/90' : 'bg-[#000000] border-white/20'}`}>
+          <h2 className={`text-xl font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>{t('listing.editListing')}</h2>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+            className={
+              isLight
+                ? 'w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-800'
+                : 'w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors text-white'
+            }
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32" style={{ 
-          paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))',
-          background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000'
-        }}>
+        <div
+          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 max-lg:pt-2 lg:pt-3"
+          style={{ 
+            paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))',
+            ...scrollBgStyle,
+          }}
+        >
           {/* Інформація про відхилення для відхилених оголошень */}
           {isRejected && listing.rejectionReason && (
-            <div className="bg-red-600/20 border border-red-500/50 rounded-xl p-4 mb-4">
-              <div className="text-red-400 font-semibold text-sm mb-2">
+            <div className={isLight ? 'bg-red-50 border border-red-200 rounded-xl p-4 mb-4' : 'bg-red-600/20 border border-red-500/50 rounded-xl p-4 mb-4'}>
+              <div className={`font-semibold text-sm mb-2 ${isLight ? 'text-red-700' : 'text-red-400'}`}>
                 {t('profile.rejectionReason') || 'Причина відхилення:'}
               </div>
-              <div className="text-red-300 text-sm">
+              <div className={`text-sm ${isLight ? 'text-red-800' : 'text-red-300'}`}>
                 {listing.rejectionReason}
               </div>
-              <div className="text-red-400/70 text-xs mt-2">
+              <div className={`text-xs mt-2 ${isLight ? 'text-red-600/90' : 'text-red-400/70'}`}>
                 {t('editListing.submitAgain') || 'Активувати'} - {t('editListing.submitAgainDescription')}
               </div>
             </div>
           )}
           {/* Фото */}
           <div>
-            <label className="block text-sm font-medium text-white mb-3">
+            <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {t('editListing.photosLabel')} {imagePreviews.length}/10
             </label>
             {/* Прогрес-бар стиснення зображень */}
@@ -897,11 +910,19 @@ export const EditListingModal = ({
                   <div 
                     key={`${index}-${typeof preview === 'string' ? preview.substring(0, 20) : index}`}
                     data-photo-index={index}
-                    className={`relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] border cursor-move select-none ${
+                    className={`relative aspect-square rounded-xl overflow-hidden border cursor-move select-none ${
+                      isLight ? 'bg-gray-100' : 'bg-[#1C1C1C]'
+                    } ${
                       isDragging ? 'opacity-95 z-50 shadow-2xl border-[#3F5331]/50' : 
-                      isHovered ? 'ring-2 ring-[#3F5331] ring-offset-2 ring-offset-[#0A0A0A] border-[#3F5331]/30' : 
-                      isSnapping ? 'border-[#3F5331]/40' :
-                      'border-white/20'
+                      isHovered
+                        ? isLight
+                          ? 'ring-2 ring-[#3F5331] ring-offset-2 ring-offset-gray-100 border-[#3F5331]/30'
+                          : 'ring-2 ring-[#3F5331] ring-offset-2 ring-offset-[#0A0A0A] border-[#3F5331]/30'
+                        : isSnapping
+                          ? 'border-[#3F5331]/40'
+                          : isLight
+                            ? 'border-gray-200'
+                            : 'border-white/20'
                     }`}
                     draggable
                     onDragStart={() => handleDragStart(index)}
@@ -947,7 +968,7 @@ export const EditListingModal = ({
                       target.style.display = 'none';
                       const parent = target.parentElement;
                       if (parent) {
-                        parent.innerHTML = '<div class="w-full h-full flex items-center justify-center text-white/40 text-xs">Помилка</div>';
+                        parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-xs ${isLight ? 'text-gray-500' : 'text-white/40'}">Помилка</div>`;
                       }
                     }}
                   />
@@ -957,7 +978,9 @@ export const EditListingModal = ({
                       e.stopPropagation();
                       removeImage(index);
                     }}
-                    className="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center text-xs hover:bg-black/70 transition-colors z-10"
+                    className={`absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors z-10 ${
+                      isLight ? 'bg-gray-800/75 text-white hover:bg-gray-800' : 'bg-black/50 text-white hover:bg-black/70'
+                    }`}
                   >
                     <X size={14} className="text-white" />
                   </button>
@@ -965,10 +988,10 @@ export const EditListingModal = ({
                 );
               })}
               {imagePreviews.length < 10 && (
-                <label className="aspect-square rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-[#3F5331] transition-colors">
+                <label className={`aspect-square rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-[#3F5331] transition-colors ${isLight ? 'border-gray-300 bg-white/60' : 'border-white/20'}`}>
                   <div className="text-center">
-                    <Upload size={24} className="text-white/70 mx-auto mb-1" />
-                    <span className="text-xs text-white/70">{t('editListing.addPhoto')}</span>
+                    <Upload size={24} className={`mx-auto mb-1 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
+                    <span className={`text-xs ${isLight ? 'text-gray-600' : 'text-white/70'}`}>{t('editListing.addPhoto')}</span>
                   </div>
                   <input
                     type="file"
@@ -987,7 +1010,7 @@ export const EditListingModal = ({
 
           {/* Заголовок */}
           <div>
-            <label className="block text-sm font-medium text-white mb-2">
+            <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {t('editListing.titleLabel')}
             </label>
             <input
@@ -998,9 +1021,11 @@ export const EditListingModal = ({
                 if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
               }}
               placeholder={t('editListing.titlePlaceholder')}
-              className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
-                errors.title ? 'border-red-500' : 'border-white/20'
-              } focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331]`}
+              className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] ${
+                isLight
+                  ? 'bg-white text-gray-900 placeholder:text-gray-400'
+                  : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
+              } ${errors.title ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
               maxLength={100}
             />
             {errors.title && (
@@ -1010,7 +1035,7 @@ export const EditListingModal = ({
 
           {/* Опис */}
           <div>
-            <label className="block text-sm font-medium text-white mb-2">
+            <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {t('editListing.descriptionLabel')}
             </label>
             <textarea
@@ -1021,9 +1046,11 @@ export const EditListingModal = ({
               }}
               placeholder={t('editListing.descriptionPlaceholder')}
               rows={4}
-              className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
-                errors.description ? 'border-red-500' : 'border-white/20'
-              } focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] resize-none`}
+              className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] resize-none ${
+                isLight
+                  ? 'bg-white text-gray-900 placeholder:text-gray-400'
+                  : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
+              } ${errors.description ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
               maxLength={2000}
             />
             {errors.description && (
@@ -1045,7 +1072,7 @@ export const EditListingModal = ({
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isFree
                     ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
-                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
@@ -1072,7 +1099,7 @@ export const EditListingModal = ({
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isNegotiable
                     ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
-                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
@@ -1107,9 +1134,11 @@ export const EditListingModal = ({
                       if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                     }}
                     placeholder={t('editListing.pricePlaceholder')}
-                    className={`flex-1 px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
-                      errors.price ? 'border-red-500' : 'border-white/20'
-                    } focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331]`}
+                    className={`flex-1 px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] ${
+                      isLight
+                        ? 'bg-white text-gray-900 placeholder:text-gray-400'
+                        : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
+                    } ${errors.price ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
                   />
                     <button
                     ref={currencyRef}
@@ -1118,12 +1147,16 @@ export const EditListingModal = ({
                         setIsCurrencyOpen(!isCurrencyOpen);
                         tg?.HapticFeedback.impactOccurred('light');
                       }}
-                      className="px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 hover:border-white/40 transition-colors flex items-center gap-0.5 min-w-[80px] text-white"
+                      className={
+                        isLight
+                          ? 'px-4 py-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-0.5 min-w-[80px] text-gray-900'
+                          : 'px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 hover:border-white/40 transition-colors flex items-center gap-0.5 min-w-[80px] text-white'
+                      }
                     >
                       <span className="font-medium">
                         {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
                       </span>
-                      <ChevronDown size={16} className={`text-white/70 transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1`} />
+                      <ChevronDown size={16} className={`transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
                     </button>
                 </div>
                 {errors.price && (
@@ -1135,7 +1168,7 @@ export const EditListingModal = ({
 
           {/* Розділ */}
           <div>
-            <label className="block text-sm font-medium text-white mb-3">
+            <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {t('editListing.categoryLabel')}
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -1153,8 +1186,8 @@ export const EditListingModal = ({
                   category === cat.id
                     ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                     : errors.category
-                    ? 'border-red-500 bg-[#1C1C1C] text-white'
-                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                    ? isLight ? 'border-red-500 bg-white text-gray-900' : 'border-red-500 bg-[#1C1C1C] text-white'
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -1172,7 +1205,7 @@ export const EditListingModal = ({
           {/* Тип */}
           {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-white mb-3">
+              <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
                 {t('editListing.subcategoryLabel')}
               </label>
               {(() => {
@@ -1201,7 +1234,7 @@ export const EditListingModal = ({
                           className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
                             !subcategory
                               ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
-                              : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                              : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                           }`}
                         >
                           Всі типи
@@ -1217,7 +1250,7 @@ export const EditListingModal = ({
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
                                 ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
-                                : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                                : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                             }`}
                           >
                             {sub.name}
@@ -1236,7 +1269,7 @@ export const EditListingModal = ({
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
                                 ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
-                                : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                                : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                             }`}
                           >
                             {sub.name}
@@ -1259,7 +1292,7 @@ export const EditListingModal = ({
                       className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
                         !subcategory
                           ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
-                          : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                          : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                       }`}
                     >
                       Всі типи
@@ -1275,7 +1308,7 @@ export const EditListingModal = ({
                         className={`px-4 py-2 rounded-xl border-2 transition-all ${
                           subcategory === sub.id
                             ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
-                            : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                            : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                         }`}
                       >
                         {sub.name}
@@ -1289,13 +1322,17 @@ export const EditListingModal = ({
 
           {/* Стан */}
           <div className="relative" ref={conditionRef}>
-            <label className="block text-sm font-medium text-white mb-2">
+            <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {t('editListing.conditionLabel')}
             </label>
             <button
               type="button"
               onClick={() => setIsConditionOpen(!isConditionOpen)}
-              className="w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 flex items-center justify-between hover:border-white/40 transition-colors text-white"
+              className={
+                isLight
+                  ? 'w-full px-4 py-3 bg-white rounded-xl border border-gray-200 flex items-center justify-between hover:border-gray-300 transition-colors text-gray-900'
+                  : 'w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 flex items-center justify-between hover:border-white/40 transition-colors text-white'
+              }
             >
               <div className="flex items-center gap-2">
                 {selectedCondition && (
@@ -1305,13 +1342,13 @@ export const EditListingModal = ({
                   </>
                 )}
                 {!selectedCondition && (
-                  <span className="text-white/50">{t('editListing.selectCondition')}</span>
+                  <span className={isLight ? 'text-gray-400' : 'text-white/50'}>{t('editListing.selectCondition')}</span>
                 )}
               </div>
-              <ChevronDown size={20} className={`text-white/70 transition-transform ${isConditionOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={20} className={`transition-transform ${isConditionOpen ? 'rotate-180' : ''} ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
             </button>
             {isConditionOpen && (
-              <div className="absolute left-0 right-0 mt-2 bg-[#1C1C1C] border border-white/20 rounded-xl shadow-lg z-20">
+              <div className={`absolute left-0 right-0 mt-2 rounded-xl shadow-lg z-20 border ${isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white/20'}`}>
                 {conditionOptions.map(option => {
                   const IconComponent = option.icon;
                   return (
@@ -1323,7 +1360,11 @@ export const EditListingModal = ({
                         setIsConditionOpen(false);
                         tg?.HapticFeedback.impactOccurred('light');
                       }}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors border-b border-white/10 last:border-b-0 text-white"
+                      className={`w-full px-4 py-3 flex items-center justify-between transition-colors border-b last:border-b-0 ${
+                        isLight
+                          ? 'hover:bg-gray-50 border-gray-100 text-gray-900'
+                          : 'hover:bg-white/10 border-white/10 text-white'
+                      }`}
                     >
                       <div className="flex items-center gap-3">
                         <IconComponent size={20} className="text-[#3F5331]" />
@@ -1341,7 +1382,7 @@ export const EditListingModal = ({
 
           {/* Локація */}
           <div className="relative" ref={locationRef}>
-            <label className="block text-sm font-medium text-white mb-2">
+            <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {t('editListing.locationLabel')}
             </label>
             <div className="relative">
@@ -1364,18 +1405,20 @@ export const EditListingModal = ({
                 }}
                 onFocus={() => setIsLocationOpen(true)}
                 placeholder={t('editListing.locationPlaceholder')}
-                className={`w-full px-4 py-3 pl-10 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
-                  errors.location ? 'border-red-500' : 'border-white/20'
-                } focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331]`}
+                className={`w-full px-4 py-3 pl-10 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] ${
+                  isLight
+                    ? 'bg-white text-gray-900 placeholder:text-gray-400'
+                    : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
+                } ${errors.location ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
               />
               <MapPin 
                 size={18} 
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70"
+                className={`absolute left-3 top-1/2 -translate-y-1/2 z-[1] ${isLight ? 'text-gray-500' : 'text-white/70'}`}
               />
             </div>
             
             {isLocationOpen && filteredCities.length > 0 && (
-              <div className="absolute z-50 w-full mt-2 bg-[#1C1C1C] rounded-xl border border-white/20 shadow-lg max-h-60 overflow-y-auto" style={{ maxHeight: 'calc(15rem - env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+              <div className={`absolute z-50 w-full mt-2 rounded-xl border shadow-lg max-h-60 overflow-y-auto ${isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white/20'}`} style={{ maxHeight: 'calc(15rem - env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
                 {filteredCities.map((city) => (
                   <button
                     key={city}
@@ -1386,9 +1429,9 @@ export const EditListingModal = ({
                       setIsLocationOpen(false);
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
-                    className="w-full px-4 py-3 text-left hover:bg-white/10 transition-colors flex items-center gap-2.5 text-white"
+                    className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2.5 ${isLight ? 'hover:bg-gray-50 text-gray-900' : 'hover:bg-white/10 text-white'}`}
                   >
-                    <MapPin size={16} className="text-white/70 flex-shrink-0" />
+                    <MapPin size={16} className={`flex-shrink-0 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
                     <span>{city}</span>
                   </button>
                 ))}
@@ -1401,7 +1444,7 @@ export const EditListingModal = ({
 
           {/* Статус */}
           <div>
-            <label className="block text-sm font-medium text-white mb-3">
+            <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {t('editListing.status') || 'Статус'}
             </label>
             <div className="space-y-3">
@@ -1414,7 +1457,7 @@ export const EditListingModal = ({
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'active'
                     ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
-                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <CheckCircle size={20} />
@@ -1441,10 +1484,14 @@ export const EditListingModal = ({
                 disabled={(listing.status as string) === 'pending_moderation' || isRejected || (listing.status as string) === 'rejected'}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   (listing.status as string) === 'pending_moderation' || isRejected || (listing.status as string) === 'rejected'
-                    ? 'border-white/10 bg-[#1C1C1C]/50 text-white/50 cursor-not-allowed opacity-50'
+                    ? isLight
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-70'
+                      : 'border-white/10 bg-[#1C1C1C]/50 text-white/50 cursor-not-allowed opacity-50'
                     : status === 'sold'
-                    ? 'border-white/40 bg-white/10 text-white shadow-sm'
-                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                    ? isLight
+                      ? 'border-[#3F5331] bg-[#3F5331]/12 text-[#3F5331] shadow-sm'
+                      : 'border-white/40 bg-white/10 text-white shadow-sm'
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <Tag size={20} />
@@ -1458,8 +1505,10 @@ export const EditListingModal = ({
                 }}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'deactivated'
-                    ? 'border-orange-500/70 bg-orange-500/20 text-orange-400 shadow-sm'
-                    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                    ? isLight
+                      ? 'border-orange-400 bg-orange-50 text-orange-800 shadow-sm'
+                      : 'border-orange-500/70 bg-orange-500/20 text-orange-400 shadow-sm'
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <EyeOff size={20} />
@@ -1472,7 +1521,9 @@ export const EditListingModal = ({
         {/* Кнопки - фіксовані знизу поверх головного меню */}
         <div 
           ref={buttonsRef}
-          className="bg-[#000000] border-t border-white/20 px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg transition-transform duration-200 ease-in-out" 
+          className={`border-t px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg transition-transform duration-200 ease-in-out ${
+            isLight ? 'bg-white border-gray-200/90' : 'bg-[#000000] border-white/20'
+          }`} 
           style={{ 
             paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))', 
             position: 'fixed',
@@ -1491,7 +1542,11 @@ export const EditListingModal = ({
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-transparent border border-red-500/50 text-red-500 rounded-xl text-sm font-medium hover:bg-red-500/10 hover:border-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className={`flex-1 px-4 py-3 bg-transparent border rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+              isLight
+                ? 'border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
+                : 'border-red-500/50 text-red-500 hover:bg-red-500/10 hover:border-red-500'
+            }`}
           >
             <Trash2 size={16} />
             {t('common.delete')}
@@ -1503,7 +1558,7 @@ export const EditListingModal = ({
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
+                <div className={`w-4 h-4 border-2 rounded-full animate-spin ${isLight ? 'border-gray-200 border-t-gray-700' : 'border-black/30 border-t-black'}`}></div>
                 <span>{isRejected ? t('editListing.savingAndSubmitting') : t('editListing.saving')}</span>
               </>
             ) : (
@@ -1527,7 +1582,7 @@ export const EditListingModal = ({
         {isCurrencyOpen && (
           <div 
             data-currency-menu
-            className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] min-w-[120px]"
+            className={`fixed rounded-xl border shadow-2xl z-[10000] min-w-[120px] ${isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white/20'}`}
             style={{
               top: `${currencyMenuPosition.top + 8}px`,
               left: `${currencyMenuPosition.left}px`,
@@ -1542,9 +1597,9 @@ export const EditListingModal = ({
                 setIsCurrencyOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-white/10 text-white ${
-                currency === 'UAH' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : 'hover:bg-white/10'
-              }`}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
+                isLight ? 'border-gray-100 hover:bg-gray-50 text-gray-900' : 'border-white/10 hover:bg-white/10 text-white'
+              } ${currency === 'UAH' ? 'bg-[#3F5331]/15 text-[#3F5331] font-semibold' : ''}`}
             >
               <span>₴ UAH</span>
               {currency === 'UAH' && <span className="ml-auto text-[#3F5331]">✓</span>}
@@ -1556,9 +1611,9 @@ export const EditListingModal = ({
                 setIsCurrencyOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-white/10 text-white ${
-                currency === 'EUR' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : 'hover:bg-white/10'
-              }`}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
+                isLight ? 'border-gray-100 hover:bg-gray-50 text-gray-900' : 'border-white/10 hover:bg-white/10 text-white'
+              } ${currency === 'EUR' ? 'bg-[#3F5331]/15 text-[#3F5331] font-semibold' : ''}`}
             >
               <span>€ EUR</span>
               {currency === 'EUR' && <span className="ml-auto text-[#3F5331]">✓</span>}
@@ -1570,9 +1625,9 @@ export const EditListingModal = ({
                 setIsCurrencyOpen(false);
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 text-white ${
-                currency === 'USD' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : 'hover:bg-white/10'
-              }`}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
+                isLight ? 'hover:bg-gray-50 text-gray-900' : 'hover:bg-white/10 text-white'
+              } ${currency === 'USD' ? 'bg-[#3F5331]/15 text-[#3F5331] font-semibold' : ''}`}
             >
               <span>$ USD</span>
               {currency === 'USD' && <span className="ml-auto text-[#3F5331]">✓</span>}
