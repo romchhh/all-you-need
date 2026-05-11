@@ -333,7 +333,7 @@ export const CategoriesTab = ({
       {/* Оголошення */}
       {filteredListings.length > 0 && (
         <>
-          <div className="mx-auto grid w-full grid-cols-2 gap-3 px-4 pb-4 pt-4 lg:max-w-4xl lg:px-6 xl:max-w-5xl">
+          <div className="mx-auto grid w-full max-w-[1680px] grid-cols-2 gap-3 px-4 pb-4 pt-4 lg:grid-cols-3 lg:px-6">
             {filteredListings.map(listing => (
               <ListingCard 
                 key={listing.id} 

@@ -130,7 +130,7 @@ export const FavoritesTab = ({
         <h2 className={`text-2xl font-bold mb-2 ${ac.pageHeading}`}>Обране</h2>
         <p className={`text-sm mb-4 ${ac.nothingFound}`}>Тут товари, які вам сподобалися</p>
         
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           {favoritedListings.map(listing => (
             <ListingCard 
               key={listing.id} 

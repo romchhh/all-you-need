@@ -414,7 +414,7 @@ export const UserProfilePage = ({
           <div className={`text-center py-8 ${ac.mutedText}`}>{t('common.loading')}</div>
         ) : listings.length > 0 ? (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
               {listings.map(listing => (
                 <ListingCard 
                   key={listing.id} 
