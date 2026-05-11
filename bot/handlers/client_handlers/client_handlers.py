@@ -107,7 +107,7 @@ async def scheduler_jobs():
 
         if VIEW_BOOST_ENABLED:
             register_view_boost_job(scheduler)
-            print("✅ Scheduler job 'view_boost_daily' зареєстровано (view_boost.scheduler)")
+            print("✅ Scheduler job 'view_boost_interval' зареєстровано (view_boost.scheduler)")
     except Exception as e:
         print(f"❌ Помилка реєстрації VIEW_BOOST job: {e}")
         import traceback

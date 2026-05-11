@@ -211,8 +211,7 @@
         "subscribedCitiesMenu": "Города из подписок",
         "subscribedCitiesEmpty": "В подписках пока нет городов",
         "activityOnlineSuffix": "онлайн",
-        "activityListingsPrefix": "За сутки",
-        "activityListingsSuffix": "новых объявлений"
+        "activityListingsTail": "новых объявлений сегодня"
   },
   "favorites": {
     "title": "Избранное",

@@ -61,21 +61,25 @@ export type FakeHomeStats = {
 
 export function getFakeHomeStats(now: Date = new Date()): FakeHomeStats {
   const slot = getFakeHomeStatsSlotKey(now);
-  const { hour } = kyivDateHourMinute(now);
+  const { dateKey, hour } = kyivDateHourMinute(now);
   const s = dayStrengthKyiv(hour);
 
   const hOnline = fnv1a32(`ayn-home-online-v1|${slot}`);
-  const hList = fnv1a32(`ayn-home-listings-v1|${slot}`);
 
   const onlineMin = Math.round(95 + (1 - s) * 140);
   const onlineMax = Math.round(2600 + s * 2700);
   const onlineSpan = Math.max(80, onlineMax - onlineMin);
   const online = onlineMin + (hOnline % onlineSpan);
 
-  const listMin = Math.round(5 + (1 - s) * 28);
-  const listMax = Math.round(48 + s * 310);
-  const listSpan = Math.max(6, listMax - listMin);
-  const listingsLastDay = listMin + (hList % listSpan);
+  // «За добу»: без різких стрибків — база від доби/години + невеликі шари (день, година, 15 хв)
+  const hDaily = fnv1a32(`ayn-list-d|${dateKey}`);
+  const dailyJitter = (hDaily % 15) - 7;
+  const hHour = fnv1a32(`ayn-list-h|${dateKey}|${hour}`);
+  const hourJitter = (hHour % 7) - 3;
+  const hMicro = fnv1a32(`ayn-list-micro|${slot}`);
+  const microJitter = (hMicro % 5) - 2;
+  const baseListings = Math.round(18 + s * 165);
+  const listingsLastDay = Math.max(6, baseListings + dailyJitter + hourJitter + microJitter);
 
   return { online, listingsLastDay };
 }

@@ -17,7 +17,7 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
 
   useEffect(() => {
     const refresh = () => setStats(getFakeHomeStats());
-    const id = setInterval(refresh, 45_000);
+    const id = setInterval(refresh, 120_000);
     const onVis = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') refresh();
     };
@@ -60,14 +60,16 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
         <span className={iconWrap} aria-hidden>
           <ListPlus size={16} strokeWidth={2.25} />
         </span>
-        <span className={`min-w-0 leading-snug ${ac.pageHeading}`}>
-          <span className={`font-medium ${ac.mutedText}`}>{t('bazaar.activityListingsPrefix')} </span>
+          <span className={`min-w-0 leading-snug ${ac.pageHeading}`}>
           <span
-            className={`font-semibold tabular-nums ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
+            className={`inline-block min-w-[4.5ch] font-semibold tabular-nums ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
           >
             +{fmt(stats.listingsLastDay)}
           </span>
-          <span className={`font-normal ${ac.mutedText}`}> {t('bazaar.activityListingsSuffix')}</span>
+          <span className={`font-normal ${ac.mutedText}`}>
+            {' '}
+            {t('bazaar.activityListingsTail')}
+          </span>
         </span>
       </div>
     </div>

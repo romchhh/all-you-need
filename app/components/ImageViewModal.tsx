@@ -119,10 +119,15 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
 
   if (!isOpen || imageList.length === 0) return null;
 
-  const topInset = 'calc(1rem + env(safe-area-inset-top, 0px))';
+  /** Вирівняно з рядом назад / Поділитися / серце на ListingDetail (лого + body padding на max-lg). */
+  const closeTopClass =
+    'max-lg:top-[calc(env(safe-area-inset-top,0px)+6rem)] lg:top-[calc(env(safe-area-inset-top,0px)+4rem)]';
   const roundBtn = isLight
     ? 'bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50'
     : 'bg-[#1C1C1C] border border-white/20 backdrop-blur-sm text-white hover:bg-white/10';
+  const closeBtnSurface = isLight
+    ? 'border border-gray-300 bg-white/95 text-gray-900 shadow-sm hover:bg-gray-100'
+    : 'border border-white bg-black/40 text-white backdrop-blur-sm hover:bg-white/10';
 
   const modalContent = (
     <div
@@ -143,22 +148,15 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
         right: 0,
         bottom: 0,
         backgroundColor: isLight ? '#f4f4f5' : '#000000',
-        paddingTop: 'env(safe-area-inset-top, 0px)',
       }}
     >
       <button
         type="button"
         onClick={onClose}
-        className={`absolute right-4 w-10 h-10 rounded-full flex items-center justify-center transition-colors z-[100000] shrink-0 flex-shrink-0 ${roundBtn}`}
-        style={{
-          minWidth: '40px',
-          minHeight: '40px',
-          maxWidth: '40px',
-          maxHeight: '40px',
-          top: topInset,
-        }}
+        className={`absolute right-4 z-[100000] flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${closeTopClass} ${closeBtnSurface}`}
+        aria-label="Закрити"
       >
-        <X size={24} style={{ flexShrink: 0 }} />
+        <X size={20} strokeWidth={2.25} className="shrink-0" />
       </button>
 
       {imageList.length > 1 && (
@@ -189,8 +187,8 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
       )}
 
       <div
-        className="flex flex-1 w-full min-h-0 items-center justify-center px-2 pb-[env(safe-area-inset-bottom,0px)]"
-        style={{ width: '100vw', maxWidth: '100vw', paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
+        className="flex min-h-0 w-full flex-1 items-center justify-center px-2 pb-[env(safe-area-inset-bottom,0px)] max-lg:pt-[calc(env(safe-area-inset-top,0px)+8.75rem)] lg:pt-[calc(env(safe-area-inset-top,0px)+6.75rem)]"
+        style={{ width: '100vw', maxWidth: '100vw' }}
         onClick={(e) => e.stopPropagation()}
       >
         {imageError ? (
@@ -204,7 +202,8 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
               width: '100%',
               maxWidth: '100%',
               height: 'auto',
-              maxHeight: 'min(90vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 5.5rem))',
+              maxHeight:
+                'min(90vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 10rem))',
               objectFit: 'contain',
               display: 'block',
             }}

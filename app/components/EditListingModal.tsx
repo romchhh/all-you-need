@@ -978,7 +978,7 @@ export const EditListingModal = ({
                       e.stopPropagation();
                       removeImage(index);
                     }}
-                    className={`absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors z-10 ${
+                    className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors z-10 ${
                       isLight ? 'bg-gray-800/75 text-white hover:bg-gray-800' : 'bg-black/50 text-white hover:bg-black/70'
                     }`}
                   >

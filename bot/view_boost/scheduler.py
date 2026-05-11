@@ -2,14 +2,13 @@
 Планові «м'які» додаткові перегляди та лічильник обраного (favoriteBoost) для активних оголошень.
 
 Поведінка:
-  - Раз на добу (cron): +views, +favoriteBoost (обидва з різними обмеженнями).
+  - За інтервал (за замовчуванням кожні 5 хв): +views, +favoriteBoost (малі кроки).
   - Нові оголошення — менші прирости.
   - VIP / highlighted / top_category — вищий коефіцієнт, якщо promotionEnds у майбутньому.
 
 Налаштування (константи в цьому файлі, не з .env):
-  VIEW_BOOST_ENABLED     — увімкнути щоденний job і цикл накрутки.
-  VIEW_BOOST_CRON_HOUR   — година cron (0–23).
-  VIEW_BOOST_CRON_MINUTE — хвилина cron (0–59).
+  VIEW_BOOST_ENABLED          — увімкнути job і цикл накрутки.
+  VIEW_BOOST_INTERVAL_MINUTES — інтервал між прогонами (APScheduler + standalone).
 
 Запуск окремо: cd bot && python -m view_boost.scheduler
 """
@@ -32,8 +31,7 @@ logger = logging.getLogger(__name__)
 from database_functions.db_config import DATABASE_PATH
 
 VIEW_BOOST_ENABLED: bool = True
-VIEW_BOOST_CRON_HOUR: int = 4
-VIEW_BOOST_CRON_MINUTE: int = 0
+VIEW_BOOST_INTERVAL_MINUTES: int = 5
 
 
 def _parse_sqlite_dt(value: str | None) -> datetime | None:
@@ -82,41 +80,41 @@ def _promo_multiplier(promotion_type: str | None, promotion_ends: str | None, no
 
 
 def _compute_views_increment(age_days: float, promo_mult: float) -> int:
-    """Перегляди за один денний прогін (трохи вище за стару версію для «живості»)."""
+    """Перегляди за один короткий інтервал — ~×2 від попередньої версії (частіші прогони)."""
     if age_days < 1.5:
-        base = random.choices([0, 1, 2, 3], weights=[0.22, 0.42, 0.28, 0.08])[0]
-        boosted = int(round(base * promo_mult))
-        return max(0, min(boosted, 4))
-    if age_days < 7:
-        base = random.randint(1, 4)
-        boosted = int(round(base * promo_mult))
-        return max(0, min(boosted, 8))
-    if age_days < 30:
-        base = random.randint(3, 7)
-        boosted = int(round(base * promo_mult))
-        return max(0, min(boosted, 15))
-    base = random.randint(4, 10)
-    boosted = int(round(base * promo_mult))
-    return max(0, min(boosted, 22))
-
-
-def _compute_favorites_increment(age_days: float, promo_mult: float) -> int:
-    """Обране — повільніше за перегляди; без різких стрибків на нових."""
-    if age_days < 1.5:
-        base = random.choices([0, 1], weights=[0.5, 0.5])[0]
+        base = random.choices([0, 1], weights=[0.76, 0.24])[0]
         boosted = int(round(base * promo_mult))
         return max(0, min(boosted, 2))
     if age_days < 7:
-        base = random.choices([0, 1, 2], weights=[0.2, 0.55, 0.25])[0]
+        base = random.choices([0, 1], weights=[0.48, 0.52])[0]
+        boosted = int(round(base * promo_mult))
+        return max(0, min(boosted, 2))
+    if age_days < 30:
+        base = random.choices([0, 1, 2], weights=[0.30, 0.40, 0.30])[0]
         boosted = int(round(base * promo_mult))
         return max(0, min(boosted, 4))
-    if age_days < 30:
-        base = random.randint(1, 3)
-        boosted = int(round(base * promo_mult))
-        return max(0, min(boosted, 6))
-    base = random.randint(1, 4)
+    base = random.choices([0, 1, 2], weights=[0.22, 0.39, 0.39])[0]
     boosted = int(round(base * promo_mult))
-    return max(0, min(boosted, 9))
+    return max(0, min(boosted, 4))
+
+
+def _compute_favorites_increment(age_days: float, promo_mult: float) -> int:
+    """Обране — ще менші кроки за перегляди."""
+    if age_days < 1.5:
+        base = random.choices([0, 1], weights=[0.94, 0.06])[0]
+        boosted = int(round(base * promo_mult))
+        return max(0, min(boosted, 1))
+    if age_days < 7:
+        base = random.choices([0, 1], weights=[0.82, 0.18])[0]
+        boosted = int(round(base * promo_mult))
+        return max(0, min(boosted, 1))
+    if age_days < 30:
+        base = random.choices([0, 1], weights=[0.72, 0.28])[0]
+        boosted = int(round(base * promo_mult))
+        return max(0, min(boosted, 1))
+    base = random.choices([0, 1], weights=[0.62, 0.38])[0]
+    boosted = int(round(base * promo_mult))
+    return max(0, min(boosted, 1))
 
 
 def _ensure_favorite_boost_column(cur: sqlite3.Cursor) -> None:
@@ -195,41 +193,47 @@ async def run_view_boost_cycle() -> None:
 
 
 def register_view_boost_job(scheduler) -> None:
+    from apscheduler.triggers.interval import IntervalTrigger
+
     if not VIEW_BOOST_ENABLED:
         logger.info("VIEW_BOOST: не реєструємо job (VIEW_BOOST_ENABLED вимкнено).")
         return
-    job_id = "view_boost_daily"
-    existing = scheduler.get_job(job_id)
-    if existing:
-        scheduler.remove_job(job_id)
+    for legacy_id in ("view_boost_daily", "view_boost_interval"):
+        existing = scheduler.get_job(legacy_id)
+        if existing:
+            scheduler.remove_job(legacy_id)
+    job_id = "view_boost_interval"
     scheduler.add_job(
         run_view_boost_cycle,
-        "cron",
-        hour=VIEW_BOOST_CRON_HOUR,
-        minute=VIEW_BOOST_CRON_MINUTE,
+        IntervalTrigger(minutes=VIEW_BOOST_INTERVAL_MINUTES),
         id=job_id,
         replace_existing=True,
         max_instances=1,
-        misfire_grace_time=3600,
+        misfire_grace_time=max(300, VIEW_BOOST_INTERVAL_MINUTES * 60),
     )
     logger.info(
-        "VIEW_BOOST: job '%s' щодня о %02d:%02d",
+        "VIEW_BOOST: job '%s' кожні %s хв.",
         job_id,
-        VIEW_BOOST_CRON_HOUR,
-        VIEW_BOOST_CRON_MINUTE,
+        VIEW_BOOST_INTERVAL_MINUTES,
     )
 
 
 async def _standalone_loop() -> None:
-    interval_sec = 24 * 3600
+    interval_sec = VIEW_BOOST_INTERVAL_MINUTES * 60
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
-    logger.info("VIEW_BOOST standalone: старт (раз на 24 год).")
+    logger.info(
+        "VIEW_BOOST standalone: старт (кожні %s хв).",
+        VIEW_BOOST_INTERVAL_MINUTES,
+    )
     while True:
         await run_view_boost_cycle()
-        logger.info("VIEW_BOOST: наступний запуск через 24 год.")
+        logger.info(
+            "VIEW_BOOST: наступний запуск через %s хв.",
+            VIEW_BOOST_INTERVAL_MINUTES,
+        )
         await asyncio.sleep(interval_sec)
 
 

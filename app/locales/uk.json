@@ -211,8 +211,7 @@
         "subscribedCitiesMenu": "Міста з підписок",
         "subscribedCitiesEmpty": "Немає міст у підписці",
         "activityOnlineSuffix": "онлайн",
-        "activityListingsPrefix": "За добу",
-        "activityListingsSuffix": "нових оголошень"
+        "activityListingsTail": "нових оголошень сьогодні"
   },
   "favorites": {
     "title": "Обране",
