@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { executeWithRetry, ensureCurrencyColumn } from '@/lib/prisma';
+import { executeWithRetry, ensureCurrencyColumn, ensureListingApiRawColumns } from '@/lib/prisma';
+import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
 
 // SQLite може повертати COUNT як number, bigint або string
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
 
     const telegramIdNum = parseInt(telegramId);
     const currencyColumnExists = await ensureCurrencyColumn();
+    await ensureListingApiRawColumns();
 
     // Знаходимо користувача
     const users = await executeWithRetry(() =>
@@ -133,18 +135,20 @@ export async function GET(request: NextRequest) {
         l.status,
         l.promotionType,
         l.promotionEnds,
+        l.expiresAt,
         l.images,
         l.optimizedImages,
         l.tags,
         l.createdAt,
         l.publishedAt,
+        COALESCE(l.autoRenew, 0) as autoRenew,
         u.username as sellerUsername,
         u.firstName as sellerFirstName,
         u.lastName as sellerLastName,
         u.avatar as sellerAvatar,
         u.phone as sellerPhone,
         CAST(u.telegramId AS INTEGER) as sellerTelegramId,
-        COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount
+        ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
       FROM Listing l
       JOIN User u ON l.userId = u.id
       ${whereClause}
@@ -171,13 +175,22 @@ export async function GET(request: NextRequest) {
         ...queryParams
       ) as any[];
     } catch (error: any) {
-      if (error.message?.includes('no such table: Favorite') || error.message?.includes('Favorite')) {
-        const queryWithoutFavorites = query.replace(', COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount', '');
+      const em = error?.message || '';
+      if (em.includes('no such table: Favorite') || em.includes('Favorite') || em.includes('autoRenew')) {
+        let queryWithoutFavorites = query.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+        queryWithoutFavorites = queryWithoutFavorites.replace(
+          ', COALESCE(l.autoRenew, 0) as autoRenew',
+          ''
+        );
         userListings = await prisma.$queryRawUnsafe(
           queryWithoutFavorites,
           ...queryParams
         ) as any[];
-        userListings = userListings.map((listing: any) => ({ ...listing, favoritesCount: 0 }));
+        userListings = userListings.map((listing: any) => ({
+          ...listing,
+          favoritesCount: 0,
+          autoRenew: false,
+        }));
       } else {
         throw error;
       }
@@ -236,6 +249,8 @@ export async function GET(request: NextRequest) {
         status: listing.status ?? 'active',
         promotionType: listing.promotionType || null,
         promotionEnds: listing.promotionEnds || null,
+        expiresAt: listing.expiresAt || null,
+        autoRenew: listing.autoRenew === 1 || listing.autoRenew === true,
         favoritesCount: normalizeFavoritesCount(listing.favoritesCount),
       };
     });

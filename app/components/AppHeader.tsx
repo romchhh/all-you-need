@@ -15,6 +15,6 @@ export const AppHeader: React.FC = () => {
   };
 
   return (
-    <TradeGroundLogo onClick={handleClick} className="pt-[1mm]" />
+    <TradeGroundLogo onClick={handleClick} />
   );
 };

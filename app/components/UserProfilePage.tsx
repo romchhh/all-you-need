@@ -386,7 +386,7 @@ export const UserProfilePage = ({
               window.location.href = link;
             }
           }}
-          className="w-full bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 text-black font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-[#3F5331] hover:bg-[#344728] text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
         >
           {((userData?.username || sellerUsername) ?? '').trim() !== '' ? (
             <>

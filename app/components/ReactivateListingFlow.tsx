@@ -443,7 +443,7 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
               className="absolute inset-0 rounded-full animate-spin"
               style={{ 
                 border: '2px solid transparent',
-                borderTop: '2px solid #D3F1A7',
+                borderTop: '2px solid #3F5331',
                 borderRight: '2px solid rgba(211, 241, 167, 0.3)',
                 animationDuration: '1s',
                 animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)'
@@ -472,7 +472,7 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[99999] flex items-center justify-center">
           <div className="bg-[#000000] rounded-2xl border-2 border-white p-6 max-w-sm w-full mx-4">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-4 border-[#D3F1A7] border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-12 h-12 border-4 border-[#3F5331] border-t-transparent rounded-full animate-spin"></div>
               <p className="text-white text-center font-medium">
                 {t('payments.processing') || 'Обробка платежу...'}
               </p>

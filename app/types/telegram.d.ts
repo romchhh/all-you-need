@@ -17,6 +17,16 @@ interface TelegramInitData {
 export interface TelegramWebApp {
   ready(): void;
   expand(): void;
+  /** Bot API 8.0+ — повноекранний режим Mini App */
+  requestFullscreen?(): void;
+  exitFullscreen?(): void;
+  isFullscreen?: boolean;
+  isVersionAtLeast?(version: string): boolean;
+  setHeaderColor?(color: string): void;
+  setBackgroundColor?(color: string): void;
+  /** Bot API 7.7+ — щоб жест «вниз» не згортав додаток */
+  disableVerticalSwipes?(): void;
+  enableVerticalSwipes?(): void;
   close(): void;
   enableClosingConfirmation?(): void;
   disableClosingConfirmation?(): void;

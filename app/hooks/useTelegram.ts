@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TelegramWebApp } from '@/types/telegram';
+import { ensureTelegramViewportFullscreen } from '@/utils/telegramViewport';
 
 interface TelegramUser {
   id: number;
@@ -30,13 +31,8 @@ export const useTelegram = () => {
       console.log('initDataUnsafe (full):', telegram.initDataUnsafe);
       console.log('initDataUnsafe.user:', telegram.initDataUnsafe?.user);
       
-      // Викликаємо ready() першим
-      telegram.ready();
-      console.log('✅ telegram.ready() called');
-      
-      // Розгортаємо на весь екран
-      telegram.expand();
-      console.log('✅ telegram.expand() called');
+      ensureTelegramViewportFullscreen();
+      console.log('✅ ensureTelegramViewportFullscreen() applied');
       
       // Приховуємо основну кнопку
       telegram.MainButton.hide();

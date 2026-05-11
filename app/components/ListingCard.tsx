@@ -1,4 +1,4 @@
-import { Heart, Image as ImageIcon } from 'lucide-react';
+import { Heart, Image as ImageIcon, Eye } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
@@ -81,11 +81,11 @@ const ListingCardComponent = ({
     if (promotionTypes.length === 0) return defaultPromoBorder;
 
     if (promotionTypes.includes('vip')) {
-      return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+      return 'border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.4)]';
     }
 
     if (promotionTypes.includes('highlighted')) {
-      return 'border-2 border-[#D3F1A7]';
+      return 'border-2 border-[#3F5331]';
     }
 
     if (promotionTypes.includes('top_category')) {
@@ -99,7 +99,7 @@ const ListingCardComponent = ({
     // Якщо є VIP - показуємо VIP бейдж
     if (promotionTypes.includes('vip')) {
       return (
-        <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           VIP
         </div>
       );
@@ -108,7 +108,7 @@ const ListingCardComponent = ({
     // Якщо є top_category - показуємо TOP бейдж
     if (promotionTypes.includes('top_category')) {
       return (
-        <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           TOP
         </div>
       );
@@ -338,7 +338,7 @@ const ListingCardComponent = ({
           {(() => {
             const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
             const isFree = listing.isFree;
-            const priceClass = `block font-bold text-balance break-words [overflow-wrap:anywhere] ${isLight ? 'text-[#3F5331]' : 'text-white'}`;
+            const priceClass = `block font-bold text-balance break-words [overflow-wrap:anywhere] ${isLight ? 'text-[#152A12]' : 'text-white'}`;
             const fluidSize = isStacked
               ? 'text-[clamp(0.6875rem,4vw,1.5rem)] sm:max-w-full'
               : 'text-[clamp(0.6875rem,4vw,1.5rem)] sm:max-w-full lg:text-xl xl:text-2xl';
@@ -350,7 +350,7 @@ const ListingCardComponent = ({
                 <span
                   className={`block min-w-0 truncate font-bold leading-none tracking-tight whitespace-nowrap text-[clamp(0.5rem,2.6vw,0.8125rem)] sm:text-[clamp(0.5625rem,2.2vw,0.875rem)] ${
                     isStacked ? '' : 'lg:text-[clamp(0.625rem,1.1vw,0.8125rem)]'
-                  } ${isLight ? 'text-[#3F5331]' : 'text-white'}`}
+                  } ${isLight ? 'text-[#152A12]' : 'text-white'}`}
                   title={t('common.negotiable')}
                 >
                   {t('common.negotiableShort')}
@@ -395,6 +395,16 @@ const ListingCardComponent = ({
             isLight ? 'text-gray-500' : 'text-white/60'
           }`}
         >
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+            <span className="inline-flex items-center gap-0.5 tabular-nums" title={t('listing.viewsLabel')}>
+              <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
+              {listing.views ?? 0}
+            </span>
+            <span className="inline-flex items-center gap-0.5 tabular-nums" title={t('listing.favoritesLabel')}>
+              <Heart size={10} className="flex-shrink-0 opacity-80" aria-hidden />
+              {listing.favoritesCount ?? 0}
+            </span>
+          </div>
           <div className="flex items-center gap-1">
             <svg
               width="10"
@@ -427,6 +437,8 @@ export const ListingCard = memo(ListingCardComponent, (prevProps, nextProps) => 
     prevProps.listing.title === nextProps.listing.title &&
     prevProps.listing.promotionType === nextProps.listing.promotionType &&
     prevProps.listing.promotionEnds === nextProps.listing.promotionEnds &&
+    prevProps.listing.views === nextProps.listing.views &&
+    prevProps.listing.favoritesCount === nextProps.listing.favoritesCount &&
     prevProps.isFavorite === nextProps.isFavorite &&
     prevProps.isSold === nextProps.isSold &&
     prevProps.isDeactivated === nextProps.isDeactivated &&

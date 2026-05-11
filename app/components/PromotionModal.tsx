@@ -213,11 +213,11 @@ export default function PromotionModal({
         <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-4" data-scrollable>
           {/* Інформація про активну рекламу */}
           {activePromotions.length > 0 && (
-            <div className="mb-4 p-4 rounded-xl bg-[#D3F1A7]/10 border-2 border-[#D3F1A7]">
+            <div className="mb-4 p-4 rounded-xl bg-[#3F5331]/10 border-2 border-[#3F5331]">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className="text-[#D3F1A7] font-semibold">{t('sales.promotion')}:</span>
+                <span className="text-[#C8E6A0] font-semibold">{t('sales.promotion')}:</span>
                 {activePromotions.map((promoType) => (
-                  <div key={promoType} className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                  <div key={promoType} className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap">
                     {promoType === 'vip' ? 'VIP' : promoType === 'top_category' ? 'TOP' : t('promotions.highlighted')}
                   </div>
                 ))}
@@ -249,7 +249,7 @@ export default function PromotionModal({
                 isDisabled
                   ? 'border-white/10 bg-[#1C1C1C]/50 opacity-50 cursor-not-allowed'
                   : selectedPromotion === promo.type
-                  ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 shadow-lg scale-[1.02]'
+                  ? 'border-[#3F5331] bg-[#3F5331]/20 shadow-lg scale-[1.02]'
                   : 'border-white/20 bg-[#1C1C1C] hover:border-white/40 hover:bg-white/5'
               }`}
             >
@@ -264,17 +264,17 @@ export default function PromotionModal({
                         : 'bg-[#1C1C1C] border border-white/20'
                     }`}>
                       {promo.type === 'highlighted' && (
-                        <svg className="w-6 h-6 text-[#D3F1A7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-6 h-6 text-[#C8E6A0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                         </svg>
                       )}
                       {promo.type === 'top_category' && (
-                        <svg className="w-6 h-6 text-[#D3F1A7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-6 h-6 text-[#C8E6A0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                         </svg>
                       )}
                       {promo.type === 'vip' && (
-                        <svg className="w-6 h-6 text-[#D3F1A7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-6 h-6 text-[#C8E6A0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                         </svg>
                       )}
@@ -284,7 +284,7 @@ export default function PromotionModal({
                         {t(`promotions.${promo.type}`)}
                       </h3>
                       {promo.badge && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[#D3F1A7]/20 text-[#D3F1A7] border border-[#D3F1A7]/30">
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[#3F5331]/20 text-[#C8E6A0] border border-[#3F5331]/30">
                           {t(`promotions.${promo.badge}`)}
                         </span>
                       )}
@@ -305,7 +305,7 @@ export default function PromotionModal({
                     <div>
                       {isDisabled ? (
                         <>
-                          <p className="text-sm font-semibold text-[#D3F1A7]">
+                          <p className="text-sm font-semibold text-[#C8E6A0]">
                             {t('common.active') || 'Активна'}
                           </p>
                           <p className="text-xs text-white/70">
@@ -316,7 +316,7 @@ export default function PromotionModal({
                         </>
                       ) : (
                         <>
-                          <p className="text-2xl font-bold text-[#D3F1A7]">
+                          <p className="text-2xl font-bold text-[#C8E6A0]">
                             {promo.price.toFixed(1)}€
                           </p>
                           <p className="text-xs text-white/70">
@@ -331,11 +331,11 @@ export default function PromotionModal({
                 {!isDisabled && (
                   <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
                     selectedPromotion === promo.type
-                      ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                      ? 'border-[#3F5331] bg-[#3F5331]'
                       : 'border-white/30'
                   }`}>
                     {selectedPromotion === promo.type && (
-                      <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -352,10 +352,10 @@ export default function PromotionModal({
           <button
             onClick={handleSelectPromotion}
             disabled={!selectedPromotion || loading}
-            className={`w-full py-4 rounded-xl font-semibold text-black transition-all ${
+            className={`w-full py-4 rounded-xl font-semibold transition-all ${
               !selectedPromotion || loading
                 ? 'bg-white/20 cursor-not-allowed text-white/50'
-                : 'bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 shadow-lg hover:shadow-xl'
+                : 'bg-[#3F5331] text-white hover:bg-[#344728] shadow-lg hover:shadow-xl'
             }`}
           >
             {loading ? t('common.loading') : t('common.continue')}
@@ -369,7 +369,7 @@ export default function PromotionModal({
             >
               <span>{t('promotions.noPromotion')}</span>
               <span 
-                className="px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap inline-block"
+                className="px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap inline-block"
                 style={{ transform: 'rotate(-8deg)' }}
               >
                 {t('common.free') || 'Free'}

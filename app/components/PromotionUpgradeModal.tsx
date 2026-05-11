@@ -218,7 +218,7 @@ export default function PromotionUpgradeModal({
                 <span className="font-semibold">{t('promotions.current')}:</span> {t(`promotions.${currentPromotion}`)}
               </p>
               {currentPromotion === 'vip' && daysLeft !== null && daysLeft > 0 && (
-                <p className="text-sm text-[#D3F1A7] mt-2 font-medium">
+                <p className="text-sm text-[#C8E6A0] mt-2 font-medium">
                   {daysLeft === 1 
                     ? t('promotions.vipActiveOneDay', { days: String(daysLeft) })
                     : t('promotions.vipActiveDays', { days: String(daysLeft) })}
@@ -246,7 +246,7 @@ export default function PromotionUpgradeModal({
           <div className="bg-[#1C1C1C] rounded-xl p-4 border border-white/20">
             <div className="flex justify-between items-center">
               <p className="text-sm text-white/70">{t('payments.currentBalance')}</p>
-              <p className="text-2xl font-bold text-[#D3F1A7]">{balance.toFixed(2)}€</p>
+              <p className="text-2xl font-bold text-[#C8E6A0]">{balance.toFixed(2)}€</p>
             </div>
           </div>
 
@@ -272,7 +272,7 @@ export default function PromotionUpgradeModal({
                     onClick={() => setSelectedPromotion(type)}
                     className={`w-full text-left rounded-xl p-5 border-2 transition-all ${
                       selectedPromotion === type
-                        ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 shadow-lg scale-[1.02]'
+                        ? 'border-[#3F5331] bg-[#3F5331]/20 shadow-lg scale-[1.02]'
                         : 'border-white/20 hover:border-white/40 hover:shadow-md bg-[#1C1C1C]'
                     }`}
                   >
@@ -280,7 +280,7 @@ export default function PromotionUpgradeModal({
                       <div className="flex-1">
                         <div className="mb-2">
                           <h3 className={`font-bold text-lg ${
-                            selectedPromotion === type ? 'text-[#D3F1A7]' : 'text-white'
+                            selectedPromotion === type ? 'text-[#C8E6A0]' : 'text-white'
                           }`}>
                             {t(`promotions.${type}`)}
                           </h3>
@@ -296,7 +296,7 @@ export default function PromotionUpgradeModal({
                           <div>
                             <div className="flex items-baseline gap-2">
                               <p className={`text-2xl font-bold ${
-                                selectedPromotion === type ? 'text-[#D3F1A7]' : 'text-white'
+                                selectedPromotion === type ? 'text-[#C8E6A0]' : 'text-white'
                               }`}>
                                 {upgradePrice.toFixed(1)}€
                               </p>
@@ -307,7 +307,7 @@ export default function PromotionUpgradeModal({
                               )}
                             </div>
                             {isDiscount && (
-                              <p className="text-xs text-[#D3F1A7] font-medium">
+                              <p className="text-xs text-[#C8E6A0] font-medium">
                                 {t('promotions.upgradeDiscount')} {(fullPrice - upgradePrice).toFixed(1)}€
                               </p>
                             )}
@@ -317,11 +317,11 @@ export default function PromotionUpgradeModal({
                       
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
                         selectedPromotion === type
-                          ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                          ? 'border-[#3F5331] bg-[#3F5331]'
                           : 'border-white/30'
                       }`}>
                         {selectedPromotion === type && (
-                          <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
                         )}
@@ -342,7 +342,7 @@ export default function PromotionUpgradeModal({
                 onClick={() => setPaymentMethod('balance')}
                 className={`w-full text-left rounded-xl p-4 border-2 transition-all ${
                   paymentMethod === 'balance'
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20'
+                    ? 'border-[#3F5331] bg-[#3F5331]/20'
                     : 'border-white/20 hover:border-white/40 bg-[#1C1C1C]'
                 }`}
               >
@@ -355,18 +355,18 @@ export default function PromotionUpgradeModal({
                     </div>
                     <div>
                       <p className={`font-medium ${
-                        paymentMethod === 'balance' ? 'text-[#D3F1A7]' : 'text-white'
+                        paymentMethod === 'balance' ? 'text-[#C8E6A0]' : 'text-white'
                       }`}>{t('payments.payFromBalance')}</p>
                       <p className="text-sm text-white/70">{balance.toFixed(2)}€</p>
                     </div>
                   </div>
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                     paymentMethod === 'balance'
-                      ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                      ? 'border-[#3F5331] bg-[#3F5331]'
                       : 'border-white/30'
                   }`}>
                     {paymentMethod === 'balance' && (
-                      <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -378,7 +378,7 @@ export default function PromotionUpgradeModal({
                 onClick={() => setPaymentMethod('direct')}
                 className={`w-full text-left rounded-xl p-4 border-2 transition-all ${
                   paymentMethod === 'direct'
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20'
+                    ? 'border-[#3F5331] bg-[#3F5331]/20'
                     : 'border-white/20 hover:border-white/40 bg-[#1C1C1C]'
                 }`}
               >
@@ -391,18 +391,18 @@ export default function PromotionUpgradeModal({
                     </div>
                     <div>
                       <p className={`font-medium ${
-                        paymentMethod === 'direct' ? 'text-[#D3F1A7]' : 'text-white'
+                        paymentMethod === 'direct' ? 'text-[#C8E6A0]' : 'text-white'
                       }`}>{t('payments.payDirect')}</p>
                       <p className="text-sm text-white/70">Monobank</p>
                     </div>
                   </div>
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                     paymentMethod === 'direct'
-                      ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                      ? 'border-[#3F5331] bg-[#3F5331]'
                       : 'border-white/30'
                   }`}>
                     {paymentMethod === 'direct' && (
-                      <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -422,7 +422,7 @@ export default function PromotionUpgradeModal({
               className={`w-full py-4 rounded-xl font-semibold transition-all ${
                 !selectedPromotion || loading
                   ? 'bg-white/20 text-white/50 cursor-not-allowed border border-white/20'
-                  : 'bg-[#D3F1A7] text-black hover:bg-[#D3F1A7]/90 shadow-lg hover:shadow-xl'
+                  : 'bg-[#3F5331] text-white hover:bg-[#344728] shadow-lg hover:shadow-xl'
               }`}
             >
               {loading ? t('common.loading') : currentPromotion ? t('promotions.upgradeNow') : t('promotions.addPromotion')}

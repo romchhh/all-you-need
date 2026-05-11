@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export const EditProfileModal = ({
   const [phoneError, setPhoneError] = useState<string>('');
   const { toast, showToast, hideToast } = useToast();
   const { t } = useLanguage();
+  const { isLight } = useTheme();
 
   // Валідація номера телефону
   const validatePhone = (phoneNumber: string): boolean => {
@@ -217,6 +219,26 @@ export const EditProfileModal = ({
 
   if (!isOpen) return null;
 
+  const panel = isLight
+    ? 'bg-white border-2 border-gray-200 shadow-2xl'
+    : 'bg-[#000000] border-2 border-white shadow-2xl';
+  const heading = isLight ? 'text-gray-900' : 'text-white';
+  const closeBtn = isLight
+    ? 'bg-gray-100 border border-gray-200 hover:bg-gray-200'
+    : 'bg-[#1C1C1C] border border-white/20 hover:bg-white/10';
+  const label = isLight ? 'text-gray-800' : 'text-white';
+  const input = isLight
+    ? 'bg-white border border-gray-200 text-gray-900 placeholder:text-gray-400 focus:ring-[#3F5331]/25 focus:border-[#5a7c2e]/50'
+    : 'bg-[#1C1C1C] border border-white/20 text-white placeholder:text-white/50 focus:ring-[#3F5331]/50 focus:border-[#3F5331]';
+  const hint = isLight ? 'text-gray-500' : 'text-white/50';
+  const avatarRing = isLight ? 'border-2 border-gray-200' : 'border-2 border-white';
+  const changePhotoBtn = isLight
+    ? 'border-2 border-gray-300 text-gray-900 hover:bg-gray-50'
+    : 'border-2 border-white text-white hover:bg-white/10';
+  const cancelBtn = isLight
+    ? 'border border-gray-200 text-gray-800 hover:bg-gray-50'
+    : 'border border-white/20 text-white hover:bg-white/10';
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -256,7 +278,9 @@ export const EditProfileModal = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-start sm:items-center justify-center p-4 pb-24 sm:pb-4 overflow-y-auto"
+      className={`fixed inset-0 backdrop-blur-sm z-[99999] flex items-start sm:items-center justify-center p-4 pb-24 sm:pb-4 overflow-y-auto ${
+        isLight ? 'bg-black/30' : 'bg-black/50'
+      }`}
       onTouchStart={(e) => e.stopPropagation()}
       onTouchMove={(e) => {
         // Запобігаємо свайпу вниз для закриття додатку
@@ -267,24 +291,24 @@ export const EditProfileModal = ({
     >
       <div 
         data-edit-profile-scrollable 
-        className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl relative z-[100000] my-4 sm:my-0 max-h-[calc(100vh-8rem)] sm:max-h-[90vh] overflow-y-auto overscroll-contain"
+        className={`rounded-3xl w-full max-w-md p-6 relative z-[100000] my-4 sm:my-0 max-h-[calc(100vh-8rem)] sm:max-h-[90vh] overflow-y-auto overscroll-contain ${panel}`}
         style={{ touchAction: 'pan-y' }}
       >
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white">{t('profile.editProfile')}</h2>
+          <h2 className={`text-2xl font-bold ${heading}`}>{t('profile.editProfile')}</h2>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors"
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
           >
-            <X size={20} className="text-white" />
+            <X size={20} className={isLight ? 'text-gray-800' : 'text-white'} />
           </button>
         </div>
 
         {/* Аватар */}
         <div className="flex flex-col items-center mb-6">
-          <label className="block text-sm font-medium text-white mb-2">{t('profile.avatar')}</label>
-          <div className="w-24 h-24 rounded-full overflow-hidden bg-white border-2 border-white mb-4 relative">
+          <label className={`block text-sm font-medium mb-2 ${label}`}>{t('profile.avatar')}</label>
+          <div className={`w-24 h-24 rounded-full overflow-hidden bg-gray-100 mb-4 relative ${avatarRing}`}>
             {avatarPreview ? (
               <img 
                 src={avatarPreview} 
@@ -309,7 +333,7 @@ export const EditProfileModal = ({
               {(firstName || lastName) ? (firstName.charAt(0) + (lastName?.charAt(0) || '')).toUpperCase() : 'U'}
             </div>
           </div>
-          <label className="px-4 py-2 bg-transparent border-2 border-white text-white rounded-xl cursor-pointer hover:bg-white/10 transition-colors flex items-center gap-2">
+          <label className={`px-4 py-2 bg-transparent rounded-xl cursor-pointer transition-colors flex items-center gap-2 ${changePhotoBtn}`}>
             <Upload size={18} />
             <span>{t('profile.changePhoto')}</span>
             <input
@@ -323,7 +347,7 @@ export const EditProfileModal = ({
 
         {/* Ім'я */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-white mb-2">
+          <label className={`block text-sm font-medium mb-2 ${label}`}>
             {t('profile.firstName')}
           </label>
           <input
@@ -331,13 +355,13 @@ export const EditProfileModal = ({
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             placeholder={t('profile.firstNamePlaceholder')}
-            className="w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]"
+            className={`w-full px-4 py-3 rounded-xl focus:outline-none focus:ring-2 ${input}`}
           />
         </div>
 
         {/* Прізвище */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-white mb-2">
+          <label className={`block text-sm font-medium mb-2 ${label}`}>
             {t('profile.lastName')}
           </label>
           <input
@@ -345,13 +369,13 @@ export const EditProfileModal = ({
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             placeholder={t('profile.lastNamePlaceholder')}
-            className="w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]"
+            className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 ${input}`}
           />
         </div>
 
         {/* Телефон */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-white mb-2">
+          <label className={`block text-sm font-medium mb-2 ${label}`}>
             {t('profile.phone') || 'Номер телефону'}
           </label>
           <input
@@ -359,16 +383,16 @@ export const EditProfileModal = ({
             value={phone}
             onChange={(e) => handlePhoneChange(e.target.value)}
             placeholder={t('profile.phonePlaceholder') || '+380XXXXXXXXX'}
-            className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border ${
+            className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 ${input} ${
               phoneError 
-                ? 'border-red-500 focus:ring-2 focus:ring-red-500/50' 
-                : 'border-white/20 focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]'
-            } text-white placeholder:text-white/50 focus:outline-none`}
+                ? 'border-red-500 focus:ring-red-500/50' 
+                : ''
+            }`}
           />
           {phoneError && (
             <p className="mt-1 text-sm text-red-500">{phoneError}</p>
           )}
-          <p className="mt-1 text-xs text-white/50">
+          <p className={`mt-1 text-xs ${hint}`}>
             {t('profile.phoneHint') || 'Формат: +380XXXXXXXXX (не обов\'язково)'}
           </p>
         </div>
@@ -377,14 +401,14 @@ export const EditProfileModal = ({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-transparent border border-white/20 text-white rounded-xl font-medium hover:bg-white/10 transition-colors"
+            className={`flex-1 px-4 py-3 bg-transparent rounded-xl font-medium transition-colors ${cancelBtn}`}
           >
             {t('common.cancel') || 'Скасувати'}
           </button>
           <button
             onClick={handleSave}
             disabled={loading || !firstName.trim()}
-            className="flex-1 px-4 py-3 bg-[#D3F1A7] text-black rounded-xl font-medium hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-[#3F5331] text-white rounded-xl font-medium hover:bg-[#344728] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (t('common.saving') || 'Збереження...') : (t('common.save') || 'Зберегти')}
           </button>

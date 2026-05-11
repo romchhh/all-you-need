@@ -57,12 +57,16 @@ model Listing {
   condition         String?  // new, like_new, good, fair
   location          String
   views             Int      @default(0)
+  /** Додано до COUNT(Favorite) у публічному API (накрутка «обраного»). */
+  favoriteBoost     Int      @default(0)
   status            String   @default("pending_moderation") // draft, pending_moderation, approved, active, sold, expired, deactivated, hidden
   moderationStatus  String   @default("pending") // pending, approved (rejected listings are deleted)
   rejectionReason   String?  // DEPRECATED: Причина відхилення модератором (rejected listings are now deleted)
   promotionType     String?  // null, highlighted, top_category, vip
   promotionEnds     DateTime?
   expiresAt         DateTime? // Дата закінчення активності оголошення (30 днів)
+  /** Автопродовження терміну на +30 днів при закінченні expiresAt (cron). */
+  autoRenew         Boolean  @default(false)
   images            String   // JSON array of original image URLs
   optimizedImages   String?  // JSON array of optimized image URLs (WebP, 1200x1200)
   tags              String?  // JSON array of tags

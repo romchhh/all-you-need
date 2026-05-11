@@ -70,7 +70,7 @@ export default function BusinessPage() {
           {/* Опис послуг */}
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
             <div className="flex items-center gap-3 mb-4">
-              <Info size={24} className="text-[#D3F1A7]" />
+              <Info size={24} className="text-[#3F5331]" />
               <h2 className="text-xl font-bold text-white">
                 {t('business.about.title') || 'Про наші послуги'}
               </h2>
@@ -84,8 +84,8 @@ export default function BusinessPage() {
                 const Icon = service.icon;
                 return (
                   <div key={index} className="flex gap-4 items-start">
-                    <div className="w-10 h-10 rounded-xl bg-[#D3F1A7]/20 flex items-center justify-center flex-shrink-0">
-                      <Icon size={20} className="text-[#D3F1A7]" />
+                    <div className="w-10 h-10 rounded-xl bg-[#3F5331]/20 flex items-center justify-center flex-shrink-0">
+                      <Icon size={20} className="text-[#3F5331]" />
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-white mb-1">{service.title}</h3>
@@ -100,7 +100,7 @@ export default function BusinessPage() {
           {/* Посилання на каталог */}
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
             <div className="flex items-center gap-3 mb-4">
-              <ShoppingBag size={24} className="text-[#D3F1A7]" />
+              <ShoppingBag size={24} className="text-[#3F5331]" />
               <h2 className="text-xl font-bold text-white">
                 {t('business.catalog.title') || 'Каталог товарів'}
               </h2>
@@ -113,7 +113,7 @@ export default function BusinessPage() {
                 router.push(businessInfo.catalogUrl);
                 tg?.HapticFeedback.impactOccurred('medium');
               }}
-              className="w-full bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 text-black font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+              className="w-full bg-[#3F5331] hover:bg-[#344728] text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
             >
               <ShoppingBag size={20} />
               <span>{t('business.catalog.button') || 'Відкрити каталог'}</span>
@@ -124,7 +124,7 @@ export default function BusinessPage() {
           {/* Реквізити ФОП */}
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
             <div className="flex items-center gap-3 mb-4">
-              <Building2 size={24} className="text-[#D3F1A7]" />
+              <Building2 size={24} className="text-[#3F5331]" />
               <h2 className="text-xl font-bold text-white">
                 {t('business.details.title') || 'Реквізити для поповнення'}
               </h2>

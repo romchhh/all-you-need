@@ -22,8 +22,14 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
       onClick={onClick}
     >
       <div
-        className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden border ${
-          isActive ? 'border-[#D3F1A7]' : isLight ? 'border-transparent' : 'border-white'
+        className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden ${
+          isActive
+            ? isLight
+              ? 'border-2 border-[#3F5331] bg-[#3F5331]/25 shadow-sm'
+              : 'border border-[#3F5331]'
+            : isLight
+              ? 'border-2 border-[#3F5331]'
+              : 'border border-white'
         }`}
         style={{ background: tileBg }}
       >
@@ -31,7 +37,7 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
       </div>
       <span
         className={`text-xs font-medium text-center whitespace-normal leading-tight px-0.5 ${
-          isActive ? 'text-[#D3F1A7]' : isLight ? 'text-gray-800' : 'text-white'
+          isActive ? (isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]') : isLight ? 'text-gray-800' : 'text-white'
         }`}
       >
         {category.name}

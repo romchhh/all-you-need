@@ -100,6 +100,8 @@
     "subcategory": "Подраздел",
     "seller": "Продавец",
     "views": "просмотров",
+    "viewsLabel": "Просмотры",
+    "favoritesLabel": "Избранное",
     "created": "Создано",
     "publishedDate": "Дата публикации",
     "active": "Активное",
@@ -207,7 +209,10 @@
         "citySubscribeRemoved": "Подписка на город отменена",
         "citySubscribePickOneCity": "Выберите один город в фильтре, чтобы подписаться",
         "subscribedCitiesMenu": "Города из подписок",
-        "subscribedCitiesEmpty": "В подписках пока нет городов"
+        "subscribedCitiesEmpty": "В подписках пока нет городов",
+        "activityOnlineSuffix": "онлайн",
+        "activityListingsPrefix": "За сутки",
+        "activityListingsSuffix": "новых объявлений"
   },
   "favorites": {
     "title": "Избранное",
@@ -231,6 +236,7 @@
     "active": "активных",
     "sold": "продано",
     "pending": "Ожидает",
+    "expired": "Истекло",
     "deactivated": "Деактивировано",
     "rejected": "Отклонено",
     "showMore": "Показать больше",
@@ -241,7 +247,11 @@
     "expires": "Заканчивается",
     "reactivate": "Активировать снова",
     "activate": "Активировать",
-    "reactivateDescription": "Срок действия объявления истек. Чтобы активировать снова, нужно оплатить объявление."
+    "reactivateDescription": "Срок действия объявления истек. Чтобы активировать снова, нужно оплатить объявление.",
+    "autoRenew": "Автопродление +30 дней",
+    "autoRenewHint": "Когда срок закончится, объявление само продлится ещё на 30 дней. В Telegram придёт сообщение и предложение купить рекламу.",
+    "autoRenewSaved": "Сохранено",
+    "autoRenewError": "Не удалось сохранить"
   },
   "share": {
     "title": "Поделиться",

@@ -117,7 +117,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
               className="h-2 rounded-full transition-all cursor-pointer"
               style={{
                 width: i === activeIndex ? 20 : 8,
-                background: i === activeIndex ? '#D3F1A7' : 'rgba(211,241,167,.5)',
+                background: i === activeIndex ? '#3F5331' : 'rgba(63,83,49,.5)',
               }}
               aria-label={`Перейти до фото ${i + 1}`}
             />

@@ -2,6 +2,7 @@ import { X, Copy, MessageCircle, Mail, Share2 } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 
@@ -27,6 +28,7 @@ export const ShareModal = ({
   tg,
 }: ShareModalProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
   const { toast, showToast, hideToast } = useToast();
   const [showFallback, setShowFallback] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -181,34 +183,58 @@ export const ShareModal = ({
   return (
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-        <div className="bg-[#000000] rounded-3xl border-2 border-white w-full max-w-md p-6 shadow-2xl">
+        <div
+          className={`rounded-3xl border-2 w-full max-w-md p-6 shadow-2xl ${
+            isLight
+              ? 'bg-white border-gray-200 ring-1 ring-black/[0.04]'
+              : 'bg-[#000000] border-white'
+          }`}
+        >
           {/* Хедер */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-white">{t('share.title')}</h2>
+            <h2 className={`text-xl font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>{t('share.title')}</h2>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors"
+              className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+                isLight
+                  ? 'bg-gray-50 border-gray-200 text-gray-900 hover:bg-gray-100'
+                  : 'bg-[#1C1C1C] border-white/20 text-white hover:bg-white/10'
+              }`}
             >
-              <X size={20} className="text-white" />
+              <X size={20} className={isLight ? 'text-gray-900' : 'text-white'} />
             </button>
           </div>
 
           {/* Основна кнопка поділу */}
           <button
             onClick={handleShare}
-            className="w-full px-6 py-5 bg-[#D3F1A7] text-black rounded-2xl font-semibold hover:bg-[#D3F1A7]/90 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mb-4"
+            className="w-full px-6 py-5 bg-[#3F5331] text-white rounded-2xl font-semibold hover:bg-[#344728] transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mb-4"
           >
             <Share2 size={24} />
             <span className="text-lg">{t('share.title')}</span>
           </button>
 
           {/* Попередній перегляд посилання */}
-          <div className="p-3 bg-[#1C1C1C] rounded-xl border border-white/20">
+          <div
+            className={`p-3 rounded-xl border ${
+              isLight ? 'bg-gray-50 border-gray-200' : 'bg-[#1C1C1C] border-white/20'
+            }`}
+          >
             <div className="flex items-center gap-2 mb-2">
-              <MessageCircle size={16} className="text-white/70" />
-              <span className="text-xs text-white/70 uppercase tracking-wide">{t('share.link')}</span>
+              <MessageCircle size={16} className={isLight ? 'text-gray-500' : 'text-white/70'} />
+              <span
+                className={`text-xs uppercase tracking-wide ${isLight ? 'text-gray-500' : 'text-white/70'}`}
+              >
+                {t('share.link')}
+              </span>
             </div>
-            <div className="text-sm text-white/90 break-all font-mono bg-[#000000] p-2 rounded-lg border border-white/20">
+            <div
+              className={`text-sm break-all font-mono p-2 rounded-lg border ${
+                isLight
+                  ? 'text-gray-800 bg-white border-gray-200'
+                  : 'text-white/90 bg-[#000000] border-white/20'
+              }`}
+            >
               {shareLink}
             </div>
           </div>
@@ -218,44 +244,76 @@ export const ShareModal = ({
       {/* Fallback меню якщо Web Share API не підтримується */}
       {showFallback && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-end justify-center animate-fadeIn">
-          <div className="bg-[#000000] rounded-t-3xl border-t-2 border-white w-full max-w-md p-6 animate-slideUp">
-            <div className="w-12 h-1 bg-white/30 rounded-full mx-auto mb-6"></div>
-            
-            <h3 className="text-lg font-semibold text-white mb-4">
+          <div
+            className={`rounded-t-3xl border-t-2 w-full max-w-md p-6 animate-slideUp ${
+              isLight
+                ? 'bg-white border-gray-200 ring-1 ring-black/[0.06]'
+                : 'bg-[#000000] border-white'
+            }`}
+          >
+            <div
+              className={`w-12 h-1 rounded-full mx-auto mb-6 ${isLight ? 'bg-gray-300' : 'bg-white/30'}`}
+            />
+
+            <h3 className={`text-lg font-semibold mb-4 ${isLight ? 'text-gray-900' : 'text-white'}`}>
               {t('share.shareVia')}
             </h3>
 
             <div className="space-y-2">
               <button
                 onClick={handleCopyLink}
-                className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
+                className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors border ${
+                  isLight
+                    ? 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    : 'border-white/20 bg-[#1C1C1C] hover:bg-white/10'
+                }`}
               >
-                <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
-                  <Copy className="w-6 h-6 text-white" />
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center border ${
+                    isLight ? 'bg-white border-gray-200' : 'bg-[#000000] border-white/20'
+                  }`}
+                >
+                  <Copy className={`w-6 h-6 ${isLight ? 'text-gray-800' : 'text-white'}`} />
                 </div>
-                <span className="text-white font-medium">
+                <span className={`font-medium ${isLight ? 'text-gray-900' : 'text-white'}`}>
                   {copied ? t('share.linkCopied') : t('share.copyLink')}
                 </span>
               </button>
 
               <button
                 onClick={shareViaTelegram}
-                className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
+                className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors border ${
+                  isLight
+                    ? 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    : 'border-white/20 bg-[#1C1C1C] hover:bg-white/10'
+                }`}
               >
-                <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
-                  <MessageCircle className="w-6 h-6 text-white" />
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center border ${
+                    isLight ? 'bg-white border-gray-200' : 'bg-[#000000] border-white/20'
+                  }`}
+                >
+                  <MessageCircle className={`w-6 h-6 ${isLight ? 'text-gray-800' : 'text-white'}`} />
                 </div>
-                <span className="text-white font-medium">Telegram</span>
+                <span className={`font-medium ${isLight ? 'text-gray-900' : 'text-white'}`}>Telegram</span>
               </button>
 
               <button
                 onClick={shareViaEmail}
-                className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
+                className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors border ${
+                  isLight
+                    ? 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    : 'border-white/20 bg-[#1C1C1C] hover:bg-white/10'
+                }`}
               >
-                <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
-                  <Mail className="w-6 h-6 text-white" />
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center border ${
+                    isLight ? 'bg-white border-gray-200' : 'bg-[#000000] border-white/20'
+                  }`}
+                >
+                  <Mail className={`w-6 h-6 ${isLight ? 'text-gray-800' : 'text-white'}`} />
                 </div>
-                <span className="text-white font-medium">{t('share.email')}</span>
+                <span className={`font-medium ${isLight ? 'text-gray-900' : 'text-white'}`}>{t('share.email')}</span>
               </button>
             </div>
 
@@ -264,7 +322,11 @@ export const ShareModal = ({
                 setShowFallback(false);
                 onClose();
               }}
-              className="w-full mt-6 py-3 text-white/70 font-medium hover:text-white rounded-xl"
+              className={`w-full mt-6 py-3 font-medium rounded-xl transition-colors ${
+                isLight
+                  ? 'text-gray-500 hover:text-gray-900'
+                  : 'text-white/70 hover:text-white'
+              }`}
             >
               {t('share.cancel')}
             </button>

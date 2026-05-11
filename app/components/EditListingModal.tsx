@@ -898,9 +898,9 @@ export const EditListingModal = ({
                     key={`${index}-${typeof preview === 'string' ? preview.substring(0, 20) : index}`}
                     data-photo-index={index}
                     className={`relative aspect-square rounded-xl overflow-hidden bg-[#1C1C1C] border cursor-move select-none ${
-                      isDragging ? 'opacity-95 z-50 shadow-2xl border-[#D3F1A7]/50' : 
-                      isHovered ? 'ring-2 ring-[#D3F1A7] ring-offset-2 ring-offset-[#0A0A0A] border-[#D3F1A7]/30' : 
-                      isSnapping ? 'border-[#D3F1A7]/40' :
+                      isDragging ? 'opacity-95 z-50 shadow-2xl border-[#3F5331]/50' : 
+                      isHovered ? 'ring-2 ring-[#3F5331] ring-offset-2 ring-offset-[#0A0A0A] border-[#3F5331]/30' : 
+                      isSnapping ? 'border-[#3F5331]/40' :
                       'border-white/20'
                     }`}
                     draggable
@@ -965,7 +965,7 @@ export const EditListingModal = ({
                 );
               })}
               {imagePreviews.length < 10 && (
-                <label className="aspect-square rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-[#D3F1A7] transition-colors">
+                <label className="aspect-square rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center cursor-pointer hover:border-[#3F5331] transition-colors">
                   <div className="text-center">
                     <Upload size={24} className="text-white/70 mx-auto mb-1" />
                     <span className="text-xs text-white/70">{t('editListing.addPhoto')}</span>
@@ -1000,7 +1000,7 @@ export const EditListingModal = ({
               placeholder={t('editListing.titlePlaceholder')}
               className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                 errors.title ? 'border-red-500' : 'border-white/20'
-              } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
+              } focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331]`}
               maxLength={100}
             />
             {errors.title && (
@@ -1023,7 +1023,7 @@ export const EditListingModal = ({
               rows={4}
               className={`w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                 errors.description ? 'border-red-500' : 'border-white/20'
-              } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7] resize-none`}
+              } focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] resize-none`}
               maxLength={2000}
             />
             {errors.description && (
@@ -1044,17 +1044,17 @@ export const EditListingModal = ({
                 }}
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isFree
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
                     : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                   isFree
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    ? 'border-[#3F5331] bg-[#3F5331]'
                     : 'border-white/40 bg-transparent'
                 }`}>
                   {isFree && (
-                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -1071,17 +1071,17 @@ export const EditListingModal = ({
                 }}
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isNegotiable
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
                     : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                   isNegotiable
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    ? 'border-[#3F5331] bg-[#3F5331]'
                     : 'border-white/40 bg-transparent'
                 }`}>
                   {isNegotiable && (
-                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -1109,7 +1109,7 @@ export const EditListingModal = ({
                     placeholder={t('editListing.pricePlaceholder')}
                     className={`flex-1 px-4 py-3 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                       errors.price ? 'border-red-500' : 'border-white/20'
-                    } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
+                    } focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331]`}
                   />
                     <button
                     ref={currencyRef}
@@ -1151,7 +1151,7 @@ export const EditListingModal = ({
                   }}
                 className={`px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
                   category === cat.id
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                     : errors.category
                     ? 'border-red-500 bg-[#1C1C1C] text-white'
                     : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
@@ -1200,7 +1200,7 @@ export const EditListingModal = ({
                           }}
                           className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
                             !subcategory
-                              ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                              ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                               : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                           }`}
                         >
@@ -1216,7 +1216,7 @@ export const EditListingModal = ({
                             }}
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
-                                ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                                ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                                 : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                             }`}
                           >
@@ -1235,7 +1235,7 @@ export const EditListingModal = ({
                             }}
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
-                                ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                                ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                                 : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                             }`}
                           >
@@ -1258,7 +1258,7 @@ export const EditListingModal = ({
                       }}
                       className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
                         !subcategory
-                          ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                          ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                           : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                       }`}
                     >
@@ -1274,7 +1274,7 @@ export const EditListingModal = ({
                         }}
                         className={`px-4 py-2 rounded-xl border-2 transition-all ${
                           subcategory === sub.id
-                            ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                            ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                             : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                         }`}
                       >
@@ -1300,7 +1300,7 @@ export const EditListingModal = ({
               <div className="flex items-center gap-2">
                 {selectedCondition && (
                   <>
-                    {selectedCondition.icon && <selectedCondition.icon size={20} className="text-[#D3F1A7]" />}
+                    {selectedCondition.icon && <selectedCondition.icon size={20} className="text-[#3F5331]" />}
                     <span className="font-medium">{selectedCondition.label}</span>
                   </>
                 )}
@@ -1326,11 +1326,11 @@ export const EditListingModal = ({
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors border-b border-white/10 last:border-b-0 text-white"
                     >
                       <div className="flex items-center gap-3">
-                        <IconComponent size={20} className="text-[#D3F1A7]" />
+                        <IconComponent size={20} className="text-[#3F5331]" />
                         <span>{option.label}</span>
                       </div>
                       {selectedCondition?.value === option.value && (
-                        <span className="text-[#D3F1A7]">✓</span>
+                        <span className="text-[#3F5331]">✓</span>
                       )}
                     </button>
                   );
@@ -1366,7 +1366,7 @@ export const EditListingModal = ({
                 placeholder={t('editListing.locationPlaceholder')}
                 className={`w-full px-4 py-3 pl-10 bg-[#1C1C1C] rounded-xl border text-white placeholder:text-white/50 ${
                   errors.location ? 'border-red-500' : 'border-white/20'
-                } focus:outline-none focus:ring-2 focus:ring-[#D3F1A7]/50 focus:border-[#D3F1A7]`}
+                } focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331]`}
               />
               <MapPin 
                 size={18} 
@@ -1413,7 +1413,7 @@ export const EditListingModal = ({
                 }}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'active'
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
                     : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
@@ -1499,7 +1499,7 @@ export const EditListingModal = ({
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-[#D3F1A7] text-black rounded-xl text-sm font-medium hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-3 bg-[#3F5331] text-white rounded-xl text-sm font-medium hover:bg-[#344728] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
@@ -1543,11 +1543,11 @@ export const EditListingModal = ({
                 tg?.HapticFeedback.impactOccurred('light');
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-white/10 text-white ${
-                currency === 'UAH' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'hover:bg-white/10'
+                currency === 'UAH' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : 'hover:bg-white/10'
               }`}
             >
               <span>₴ UAH</span>
-              {currency === 'UAH' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
+              {currency === 'UAH' && <span className="ml-auto text-[#3F5331]">✓</span>}
             </button>
                 <button
               type="button"
@@ -1557,11 +1557,11 @@ export const EditListingModal = ({
                 tg?.HapticFeedback.impactOccurred('light');
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b border-white/10 text-white ${
-                currency === 'EUR' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'hover:bg-white/10'
+                currency === 'EUR' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : 'hover:bg-white/10'
               }`}
             >
               <span>€ EUR</span>
-              {currency === 'EUR' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
+              {currency === 'EUR' && <span className="ml-auto text-[#3F5331]">✓</span>}
                 </button>
                 <button
               type="button"
@@ -1571,11 +1571,11 @@ export const EditListingModal = ({
                 tg?.HapticFeedback.impactOccurred('light');
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 text-white ${
-                currency === 'USD' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : 'hover:bg-white/10'
+                currency === 'USD' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : 'hover:bg-white/10'
               }`}
             >
               <span>$ USD</span>
-              {currency === 'USD' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
+              {currency === 'USD' && <span className="ml-auto text-[#3F5331]">✓</span>}
                 </button>
           </div>
         )}

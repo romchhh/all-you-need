@@ -36,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="uk" suppressHydrationWarning>
+    <html lang="uk" data-theme="light" suppressHydrationWarning>
       <head>
         {/* Meta теги для Telegram WebApp */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -50,7 +50,7 @@ export default function RootLayout({
       >
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k='appAppearanceTheme',t=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',t==='light'||t==='dark'?t:'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+            __html: `(function(){try{var k='appAppearanceTheme',t=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',t==='light'||t==='dark'?t:'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`,
           }}
         />
         <ErrorBoundary>

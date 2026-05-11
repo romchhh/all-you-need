@@ -485,7 +485,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                       window.location.href = botLink;
                     }
                   }}
-                  className="inline-flex w-full items-center justify-center rounded-2xl bg-[#D3F1A7] px-4 py-3 text-sm font-semibold text-black hover:bg-[#c5e895]"
+                  className="inline-flex w-full items-center justify-center rounded-2xl bg-[#3F5331] px-4 py-3 text-sm font-semibold text-white hover:bg-[#344728]"
                 >
                   {t('profileNotFound.createButton')}
                 </button>
@@ -647,7 +647,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       <div className="px-4 space-y-3 pb-4">
         {/* Кнопка поповнення балансу */}
         <button 
-          className="w-full bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 text-black font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-[#3F5331] hover:bg-[#344728] text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
           onClick={() => {
             setShowTopUpModal(true);
             tg?.HapticFeedback.impactOccurred('medium');
@@ -789,9 +789,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   className={`w-full px-3 py-2.5 text-left text-sm transition-colors border-b last:border-b-0 ${
                     isLight
                       ? 'border-gray-100 hover:bg-gray-50 ' +
-                        (selectedStatus === status ? 'bg-[#D3F1A7]/20 text-[#3F5331]' : 'text-gray-900')
+                        (selectedStatus === status ? 'bg-[#3F5331]/20 text-[#3F5331]' : 'text-gray-900')
                       : 'border-white/10 hover:bg-white/10 ' +
-                        (selectedStatus === status ? 'bg-[#D3F1A7]/20 text-[#D3F1A7]' : 'text-white')
+                        (selectedStatus === status ? 'bg-[#3F5331]/20 text-[#C8E6A0]' : 'text-white')
                   }`}
                 >
                   {status === 'all' ? t('sales.allStatuses') : 
@@ -800,7 +800,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                    status === 'rejected' ? t('sales.rejected') :
                    status === 'deactivated' ? t('sales.deactivated') :
                    status === 'sold' ? t('listing.sold') : status}
-                  {selectedStatus === status && <span className="text-[#D3F1A7] ml-2">✓</span>}
+                  {selectedStatus === status && (
+                    <span className={`ml-2 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>✓</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -859,14 +861,18 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   isLight ? 'border-gray-100' : 'border-white/10'
                 } ${
                   selectedCategory === 'all'
-                    ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
+                    ? isLight
+                      ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold'
+                      : 'bg-[#3F5331]/20 text-[#C8E6A0] font-semibold'
                     : isLight
                       ? 'text-gray-900 hover:bg-gray-50'
                       : 'text-white hover:bg-white/10'
                 }`}
               >
                 <span className="flex-1">{t('sales.allCategories')}</span>
-                {selectedCategory === 'all' && <span className="text-[#D3F1A7]">✓</span>}
+                {selectedCategory === 'all' && (
+                  <span className={isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}>✓</span>
+                )}
               </button>
               {categories.map(cat => (
                 <button
@@ -883,14 +889,18 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     isLight ? 'border-gray-100' : 'border-white/10'
                   } ${
                     selectedCategory === cat.id
-                      ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
+                      ? isLight
+                        ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold'
+                        : 'bg-[#3F5331]/20 text-[#C8E6A0] font-semibold'
                       : isLight
                         ? 'text-gray-900 hover:bg-gray-50'
                         : 'text-white hover:bg-white/10'
                   }`}
                 >
                   <span className="flex-1">{cat.name}</span>
-                  {selectedCategory === cat.id && <span className="text-[#D3F1A7] flex-shrink-0">✓</span>}
+                  {selectedCategory === cat.id && (
+                    <span className={`flex-shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>✓</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -1018,6 +1028,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                         setShowPromotionModal(true);
                         setPromotionOpenSource('manual');
                         tg?.HapticFeedback.impactOccurred('light');
+                      }}
+                      viewerTelegramId={profile.telegramId}
+                      showToast={showToast}
+                      onAutoRenewChange={(listingId, autoRenew) => {
+                        setUserListings(prev =>
+                          prev.map(l => (l.id === listingId ? { ...l, autoRenew } : l))
+                        );
                       }}
                       tg={tg}
                     />

@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone, Eye } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -30,6 +30,7 @@ import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { BRAND_GREEN_ON_DARK, BRAND_GREEN_PRICE_ON_LIGHT } from '@/constants/brandColors';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
 const PromotionModal = dynamic(() => import('./PromotionModal'), {
@@ -108,6 +109,8 @@ export const ListingDetail = ({
   const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [showMarkSoldConfirm, setShowMarkSoldConfirm] = useState(false);
+  const [autoRenewLocal, setAutoRenewLocal] = useState(!!listing.autoRenew);
+  const [autoRenewSaving, setAutoRenewSaving] = useState(false);
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
   const { t, language } = useLanguage();
@@ -197,6 +200,12 @@ export const ListingDetail = ({
     
     return isOwn;
   }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
+
+  useEffect(() => {
+    setAutoRenewLocal(!!listing.autoRenew);
+  }, [listing.id, listing.autoRenew]);
+
+  const viewerTelegramIdStr = String(currentUser?.id || profile?.telegramId || '');
 
   // Скролимо нагору при відкритті нового оголошення
   // useLayoutEffect виконується СИНХРОННО перед рендером - це ключ до успіху
@@ -523,84 +532,82 @@ export const ListingDetail = ({
         />
       )}
       
-      {/* Кнопки управління - фіксовані */}
-      <div 
-        className="pointer-events-none fixed left-0 right-0 top-4 z-[100] flex justify-center px-4 lg:px-8"
-        style={{
-          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
-          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
-        }}
-      >
-        <div className="flex w-full max-w-5xl items-center justify-between xl:max-w-6xl">
-        <button
-          onClick={() => {
-            if (onBack) {
-              onBack();
-            } else {
-              onClose();
-            }
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-            isLight
-              ? 'bg-white text-gray-900 shadow-md ring-1 ring-gray-900/[0.06] hover:bg-gray-50'
-              : 'bg-white text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <ArrowLeft size={20} className="text-gray-900" />
-        </button>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setShowShareModal(true);
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-              isLight
-                ? 'bg-white text-gray-900 shadow-md ring-1 ring-gray-900/[0.06] hover:bg-gray-50'
-                : 'bg-white text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <Share2 size={20} className="text-gray-900" />
-          </button>
-          <button
-            onClick={() => {
-              onToggleFavorite(listing.id);
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-              isLight
-                ? 'bg-white text-gray-900 shadow-md ring-1 ring-gray-900/[0.06] hover:bg-gray-50'
-                : 'bg-white text-gray-900 hover:bg-gray-100'
-            }`}
-          >
-            <Heart 
-              size={20} 
-              className={isFavorite ? 'text-red-500' : 'text-gray-900'}
-              fill={isFavorite ? 'currentColor' : 'none'}
-            />
-          </button>
-        </div>
-        </div>
-      </div>
-
-      {/* Лого Trade Ground - частина сторінки */}
-      <div className="w-full px-4 lg:px-6 xl:px-8">
-      <TradeGroundLogo
-        paddingX={false}
-        onClick={() => {
-          if (typeof window !== 'undefined') {
-            window.location.href = `/${lang}/bazaar`;
-          }
-        }}
-        className="pb-3 pt-[calc(1rem+1mm)]"
+      {/* Лого зверху як на головній; ряд кнопок нижче — у потоці, як на сторінці профілю продавця */}
+      <div
+        className="w-full lg:pt-4"
         style={{
           transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
           transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
           opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
         }}
-      />
+      >
+        <div className="w-full px-4 lg:px-6 xl:px-8">
+          <TradeGroundLogo
+            paddingX={false}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.href = `/${lang}/bazaar`;
+              }
+            }}
+            className="pb-3"
+          />
+        </div>
+        <div className="px-4 pb-1 lg:px-6 xl:px-8">
+          <div className="mb-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                if (onBack) {
+                  onBack();
+                } else {
+                  onClose();
+                }
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+                isLight
+                  ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                  : 'border-white text-white hover:bg-white/10'
+              }`}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowShareModal(true);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+                  isLight
+                    ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                    : 'border-white text-white hover:bg-white/10'
+                }`}
+              >
+                <Share2 size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleFavorite(listing.id);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+                  isLight
+                    ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                    : 'border-white text-white hover:bg-white/10'
+                }`}
+              >
+                <Heart
+                  size={20}
+                  className={isFavorite ? 'text-red-500' : ''}
+                  fill={isFavorite ? 'currentColor' : 'none'}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       
       {/* Покращений pull-to-refresh індикатор */}
@@ -608,7 +615,7 @@ export const ListingDetail = ({
         <div 
           className="fixed left-0 right-0 flex items-center justify-center z-40 pointer-events-none"
           style={{
-            top: '70px',
+            top: 'max(5.75rem, calc(env(safe-area-inset-top, 0px) + 5.75rem))',
             height: `${Math.min(pullDistance * 0.8, 100)}px`,
             opacity: Math.min(pullProgress * 1.2, 1),
             transform: `translateY(${Math.min(pullDistance * 0.4 - 50, 0)}px)`,
@@ -637,7 +644,7 @@ export const ListingDetail = ({
               <>
                 <div className="relative w-8 h-8">
                   <div className="absolute inset-0 rounded-full flex items-center justify-center" style={{ background: '#3F5331' }}>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#D3F1A7">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#3F5331">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
@@ -741,9 +748,10 @@ export const ListingDetail = ({
                   const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
                   const isFree = listing.isFree;
                   
+                  const priceColor = isLight ? BRAND_GREEN_PRICE_ON_LIGHT : BRAND_GREEN_ON_DARK;
                   if (isFree) {
                     return (
-                      <div className="text-3xl font-bold mb-1" style={{ color: '#D3F1A7' }}>
+                      <div className="text-3xl font-bold mb-1" style={{ color: priceColor }}>
                         {t('common.free')}
                       </div>
                     );
@@ -751,7 +759,7 @@ export const ListingDetail = ({
                   
                   if (isNegotiable) {
                     return (
-                      <div className="text-xl font-bold mb-1" style={{ color: '#D3F1A7' }}>
+                      <div className="text-xl font-bold mb-1" style={{ color: priceColor }}>
                         {t('common.negotiable')}
                       </div>
                     );
@@ -759,11 +767,11 @@ export const ListingDetail = ({
                   
                   return (
                     <>
-                      <div className="text-3xl font-bold mb-1" style={{ color: '#D3F1A7' }}>
+                      <div className="text-3xl font-bold mb-1" style={{ color: priceColor }}>
                         {listing.price}
                       </div>
                       {listing.currency && (
-                        <span className="text-3xl font-bold" style={{ color: '#D3F1A7' }}>{getCurrencySymbol(listing.currency)}</span>
+                        <span className="text-3xl font-bold" style={{ color: priceColor }}>{getCurrencySymbol(listing.currency)}</span>
                       )}
                     </>
                   );
@@ -782,7 +790,15 @@ export const ListingDetail = ({
         )}
 
         {/* Статистика */}
-        <div className={`flex gap-4 mb-6 text-sm ${ac.mutedText}`}>
+        <div className={`flex flex-wrap gap-x-4 gap-y-2 mb-6 text-sm ${ac.mutedText}`}>
+          <div className="flex items-center gap-2 tabular-nums" title={t('listing.viewsLabel')}>
+            <Eye size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
+            <span>{listing.views ?? 0}</span>
+          </div>
+          <div className="flex items-center gap-2 tabular-nums" title={t('listing.favoritesLabel')}>
+            <Heart size={16} className={`flex-shrink-0 ${ac.mutedText}`} strokeWidth={2} />
+            <span>{listing.favoritesCount ?? 0}</span>
+          </div>
           <div className="flex items-center gap-2">
             <MapPin size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
             <span>{listing.location}</span>
@@ -850,21 +866,21 @@ export const ListingDetail = ({
                 const trimmedType = promoType.trim();
                 if (trimmedType === 'vip') {
                   return (
-                    <div key="vip" className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                    <div key="vip" className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap">
                       VIP
                     </div>
                   );
                 }
                 if (trimmedType === 'top_category') {
                   return (
-                    <div key="top" className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap">
+                    <div key="top" className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap">
                       TOP
                     </div>
                   );
                 }
                 if (trimmedType === 'highlighted') {
                   return (
-                    <span key="highlighted" className="text-[#D3F1A7] font-semibold">{t('promotions.highlighted')}</span>
+                    <span key="highlighted" className={`font-semibold ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>{t('promotions.highlighted')}</span>
                   );
                 }
                 return null;
@@ -1031,6 +1047,65 @@ export const ListingDetail = ({
         className="fixed bottom-28 left-0 right-0 z-[50] mx-auto max-w-2xl space-y-3 px-4 py-4 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8"
         style={{ pointerEvents: 'auto' }}
       >
+        {isOwnListing &&
+          listing.status === 'active' &&
+          isTelegramEnv &&
+          !isSeoListingRoute &&
+          viewerTelegramIdStr && (
+            <label
+              className={`flex cursor-pointer select-none items-start gap-3 rounded-2xl border px-3 py-2.5 ${
+                isLight
+                  ? 'border-gray-200 bg-white/95 text-gray-900 shadow-sm'
+                  : 'border-white/15 bg-black/50 text-white/90 backdrop-blur-sm'
+              }`}
+            >
+              <input
+                type="checkbox"
+                className={`mt-0.5 h-4 w-4 shrink-0 rounded border focus:ring-2 ${
+                  isLight
+                    ? 'border-gray-300 text-[#5a7c2e] focus:ring-[#3F5331]/60'
+                    : 'border-white/40 bg-black/40 text-[#C8E6A0] focus:ring-[#3F5331]/50'
+                }`}
+                checked={autoRenewLocal}
+                disabled={autoRenewSaving}
+                onChange={async (e) => {
+                  const next = e.target.checked;
+                  setAutoRenewSaving(true);
+                  try {
+                    const res = await fetch(`/api/listings/${listing.id}/auto-renew`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        telegramId: viewerTelegramIdStr,
+                        autoRenew: next,
+                      }),
+                    });
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => ({}));
+                      throw new Error((err as { error?: string }).error || 'Request failed');
+                    }
+                    setAutoRenewLocal(next);
+                    showToast(t('sales.autoRenewSaved'), 'success');
+                    tg?.HapticFeedback?.impactOccurred('light');
+                  } catch {
+                    e.target.checked = !next;
+                    showToast(t('sales.autoRenewError'), 'error');
+                    tg?.HapticFeedback?.notificationOccurred('error');
+                  } finally {
+                    setAutoRenewSaving(false);
+                  }
+                }}
+              />
+              <span className="min-w-0 text-xs leading-snug">
+                <span className={`font-semibold ${isLight ? 'text-gray-900' : 'text-white'}`}>
+                  {t('sales.autoRenew')}
+                </span>
+                <span className={`mt-0.5 block ${isLight ? 'text-gray-600' : 'text-white/65'}`}>
+                  {t('sales.autoRenewHint')}
+                </span>
+              </span>
+            </label>
+          )}
         {(isSeoListingRoute || !isTelegramEnv) && (
           <div
             className={`rounded-xl px-3 py-2 text-center text-xs shadow-sm ${
@@ -1045,7 +1120,7 @@ export const ListingDetail = ({
         {isSeoListingRoute ? (
           <a
             href="https://t.me/TradeGroundBot?start=linktowatch_12"
-            className="w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl bg-[#D3F1A7] text-black border-none"
+            className="w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl bg-[#3F5331] text-white border-none"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -1100,10 +1175,10 @@ export const ListingDetail = ({
                 window.location.href = link;
               }
             }}
-            className="w-full py-4 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl"
+            className="w-full py-4 rounded-2xl font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl text-white [&_svg]:text-white"
             style={{
-              background: '#D3F1A7',
-              color: '#000000',
+              background: '#3F5331',
+              color: '#ffffff',
               border: 'none'
             }}
           >
@@ -1131,7 +1206,7 @@ export const ListingDetail = ({
         ) : (
           <a
             href="https://t.me/TradeGroundBot?start=linktowatch_12"
-            className="w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl bg-[#D3F1A7] text-black border-none"
+            className="w-full py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 cursor-pointer font-montserrat text-xl bg-[#3F5331] text-white border-none"
             target="_blank"
             rel="noopener noreferrer"
           >

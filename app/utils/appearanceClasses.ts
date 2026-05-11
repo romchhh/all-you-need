@@ -40,7 +40,7 @@ export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
       suggestionIcon: 'text-gray-400',
       ghostIconButton:
         'relative flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200/90 bg-white/80 shadow-sm transition-colors hover:border-gray-300 hover:bg-white',
-      ghostIconButtonActiveBorder: 'border-[#3F5331]/35 bg-[#D3F1A7]/15 ring-1 ring-[#3F5331]/20',
+      ghostIconButtonActiveBorder: 'border-[#3F5331]/35 bg-[#3F5331]/15 ring-1 ring-[#3F5331]/20',
       ghostIconButtonInactiveIcon: 'text-gray-700',
       ghostIconButtonActiveIcon: 'text-[#3F5331]',
       categoryRowLabel: 'text-gray-800',
@@ -72,9 +72,9 @@ export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
     suggestionIcon: 'text-gray-400',
     ghostIconButton:
       'w-12 h-12 rounded-xl flex items-center justify-center transition-colors relative border border-white bg-transparent hover:bg-white/10',
-    ghostIconButtonActiveBorder: 'border-[#D3F1A7] bg-transparent',
+    ghostIconButtonActiveBorder: 'border-[#3F5331] bg-transparent',
     ghostIconButtonInactiveIcon: 'text-white',
-    ghostIconButtonActiveIcon: 'text-[#D3F1A7]',
+    ghostIconButtonActiveIcon: 'text-[#C8E6A0]',
     categoryRowLabel: 'text-white',
     outlineButton:
       'px-4 py-2 rounded-xl text-sm font-medium border border-white text-white bg-transparent hover:bg-white/10 transition-colors',

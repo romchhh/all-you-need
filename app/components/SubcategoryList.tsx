@@ -44,7 +44,7 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
       }}
       className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
         selectedSubcategory === subcategory.id
-          ? 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+          ? 'border border-[#3F5331] text-[#3F5331] bg-transparent'
           : subIdle
       }`}
     >
@@ -81,7 +81,7 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
               }}
               className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                 selectedSubcategory === null
-                  ? 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                  ? 'border border-[#3F5331] text-[#3F5331] bg-transparent'
                   : subIdle
               }`}
             >
@@ -120,7 +120,7 @@ export const SubcategoryList = ({ subcategories, selectedSubcategory, onSelect, 
             }}
             className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
               selectedSubcategory === null
-                ? 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent'
+                ? 'border border-[#3F5331] text-[#3F5331] bg-transparent'
                 : subIdle
             }`}
           >

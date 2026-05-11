@@ -47,11 +47,11 @@ const ListingCardColumnComponent = ({
     if (promotionTypes.length === 0) return defaultPromoBorder;
 
     if (promotionTypes.includes('vip')) {
-      return 'border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+      return 'border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.4)]';
     }
 
     if (promotionTypes.includes('highlighted')) {
-      return 'border-2 border-[#D3F1A7]';
+      return 'border-2 border-[#3F5331]';
     }
 
     if (promotionTypes.includes('top_category')) {
@@ -69,7 +69,7 @@ const ListingCardColumnComponent = ({
     // Якщо є VIP - показуємо VIP бейдж
     if (promotionTypes.includes('vip')) {
       return (
-        <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           VIP
         </div>
       );
@@ -78,7 +78,7 @@ const ListingCardColumnComponent = ({
     // Якщо є top_category - показуємо TOP бейдж
     if (promotionTypes.includes('top_category')) {
       return (
-        <div className="px-2.5 py-1 bg-[#D3F1A7] text-black text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           TOP
         </div>
       );
@@ -180,7 +180,7 @@ const ListingCardColumnComponent = ({
                 if (isFree) {
                   return (
                     <span
-                      className={`min-w-0 font-bold ${fluidSize} ${isLight ? 'text-[#3F5331]' : 'text-white'}`}
+                      className={`min-w-0 font-bold ${fluidSize} ${isLight ? 'text-[#152A12]' : 'text-white'}`}
                     >
                       {t('common.free')}
                     </span>
@@ -190,7 +190,7 @@ const ListingCardColumnComponent = ({
                   return (
                     <span
                       className={`min-w-0 max-w-full truncate font-bold leading-none tracking-tight whitespace-nowrap text-[clamp(0.5rem,2.8vw,0.8125rem)] sm:text-[clamp(0.5625rem,2.2vw,0.875rem)] ${
-                        isLight ? 'text-[#3F5331]' : 'text-white'
+                        isLight ? 'text-[#152A12]' : 'text-white'
                       }`}
                       title={t('common.negotiable')}
                     >
@@ -201,7 +201,7 @@ const ListingCardColumnComponent = ({
                 return (
                   <span
                     className={`min-w-0 max-w-full font-bold break-words text-balance [overflow-wrap:anywhere] ${fluidSize} ${
-                      isLight ? 'text-[#3F5331]' : 'text-white'
+                      isLight ? 'text-[#152A12]' : 'text-white'
                     }`}
                   >
                     {`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}
@@ -220,8 +220,22 @@ const ListingCardColumnComponent = ({
             </div>
           </div>
 
-          {/* Нижня частина: розташування та час */}
+          {/* Нижня частина: перегляди / обране, локація, час */}
           <div className="flex flex-col gap-1 text-[10px] min-w-0 mb-1">
+            <div
+              className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 tabular-nums ${
+                isLight ? 'text-gray-500' : 'text-white/60'
+              }`}
+            >
+              <span className="inline-flex items-center gap-0.5" title={t('listing.viewsLabel')}>
+                <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
+                {listing.views ?? 0}
+              </span>
+              <span className="inline-flex items-center gap-0.5" title={t('listing.favoritesLabel')}>
+                <Heart size={10} className="flex-shrink-0 opacity-80" aria-hidden />
+                {listing.favoritesCount ?? 0}
+              </span>
+            </div>
             {listing.location && (
               <div
                 className={`flex items-center gap-1.5 ${isLight ? 'text-gray-600' : 'text-white/80'}`}

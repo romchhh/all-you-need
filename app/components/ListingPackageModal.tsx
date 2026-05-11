@@ -115,20 +115,20 @@ export default function ListingPackageModal({
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm text-white/70">{t('payments.currentBalance')}</p>
-                <p className="text-2xl font-bold text-[#D3F1A7]">{balance.toFixed(2)}€</p>
+                <p className="text-2xl font-bold text-[#C8E6A0]">{balance.toFixed(2)}€</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-[#D3F1A7]">{packagesBalance}</p>
+                <p className="text-2xl font-bold text-[#C8E6A0]">{packagesBalance}</p>
               </div>
             </div>
           </div>
 
           {/* Безкоштовне оголошення */}
           {!hasUsedFreeAd && (
-            <div className="bg-[#1C1C1C] rounded-xl p-4 border-2 border-[#D3F1A7]/30">
+            <div className="bg-[#1C1C1C] rounded-xl p-4 border-2 border-[#3F5331]/30">
               <div className="flex items-start gap-3">
-                <div className="bg-[#D3F1A7] rounded-full p-2 flex-shrink-0">
-                  <svg className="w-5 h-5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="bg-[#3F5331] rounded-full p-2 flex-shrink-0">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
@@ -149,7 +149,7 @@ export default function ListingPackageModal({
               onClick={() => setSelectedPackage(pkg.type)}
               className={`w-full text-left rounded-xl p-4 border-2 transition-all ${
                 selectedPackage === pkg.type
-                  ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 shadow-md scale-[1.02]'
+                  ? 'border-[#3F5331] bg-[#3F5331]/20 shadow-md scale-[1.02]'
                   : 'border-white/20 bg-[#1C1C1C] hover:border-white/40 hover:bg-white/5'
               }`}
             >
@@ -168,18 +168,18 @@ export default function ListingPackageModal({
                     {pkg.badge && (
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                         pkg.badge === 'mostPopular' 
-                          ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] border border-[#D3F1A7]/30' 
-                          : 'bg-[#D3F1A7]/20 text-[#D3F1A7] border border-[#D3F1A7]/30'
+                          ? 'bg-[#3F5331]/20 text-[#C8E6A0] border border-[#3F5331]/30' 
+                          : 'bg-[#3F5331]/20 text-[#C8E6A0] border border-[#3F5331]/30'
                       }`}>
                         {t(`listingPackages.${pkg.badge}`)}
                       </span>
                     )}
                   </div>
-                  <p className="text-2xl font-bold text-[#D3F1A7] mt-2">
+                  <p className="text-2xl font-bold text-[#C8E6A0] mt-2">
                     {pkg.price.toFixed(1)}€
                   </p>
                   {pkg.save && (
-                    <p className="text-sm text-[#D3F1A7] font-medium mt-1">
+                    <p className="text-sm text-[#C8E6A0] font-medium mt-1">
                       {t('listingPackages.save')}: {pkg.save}
                     </p>
                   )}
@@ -189,11 +189,11 @@ export default function ListingPackageModal({
                 </div>
                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                   selectedPackage === pkg.type
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    ? 'border-[#3F5331] bg-[#3F5331]'
                     : 'border-white/30'
                 }`}>
                   {selectedPackage === pkg.type && (
-                    <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -208,10 +208,10 @@ export default function ListingPackageModal({
           <button
             onClick={handleSelectPackage}
             disabled={!selectedPackage || loading}
-            className={`w-full py-4 rounded-xl font-semibold text-black transition-all ${
+            className={`w-full py-4 rounded-xl font-semibold transition-all ${
               !selectedPackage || loading
                 ? 'bg-white/20 cursor-not-allowed text-white/50'
-                : 'bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 shadow-lg hover:shadow-xl'
+                : 'bg-[#3F5331] text-white hover:bg-[#344728] shadow-lg hover:shadow-xl'
             }`}
           >
             {loading ? t('common.loading') : t('common.continue')}

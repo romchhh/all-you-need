@@ -922,12 +922,12 @@ export const CreateListingModal = ({
       }}
     >
       <div className="w-full h-full flex flex-col">
-        <div className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32" style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}>
-          {/* Лого Trade Ground */}
-          <TradeGroundLogo
-            className="pb-3 pt-[calc(1rem+1mm)]"
-            paddingX={false}
-          />
+        <div
+          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 max-lg:pt-[calc(env(safe-area-inset-top,0px)+2.25rem)] lg:pt-8"
+          style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}
+        >
+          {/* Лого: як на головній — верх = safe area + body offset; відступи рядка всередині TradeGroundLogo */}
+          <TradeGroundLogo className="pb-3" paddingX={false} />
           
           {/* Заголовок */}
           <div className="flex items-center justify-center px-4 pb-4">
@@ -989,13 +989,13 @@ export const CreateListingModal = ({
                         className={`relative aspect-square rounded-xl overflow-hidden border cursor-move select-none ${
                           isLight ? 'bg-gray-100' : 'bg-[#1C1C1C]'
                         } ${
-                          isDragging ? 'opacity-95 z-50 shadow-2xl border-[#D3F1A7]/50' : 
+                          isDragging ? 'opacity-95 z-50 shadow-2xl border-[#3F5331]/50' : 
                           isHovered
-                            ? `ring-2 ring-[#D3F1A7] ring-offset-2 border-[#D3F1A7]/30 ${
+                            ? `ring-2 ring-[#3F5331] ring-offset-2 border-[#3F5331]/30 ${
                                 isLight ? 'ring-offset-gray-100' : 'ring-offset-[#0A0A0A]'
                               }`
                             : 
-                          isSnapping ? 'border-[#D3F1A7]/40' :
+                          isSnapping ? 'border-[#3F5331]/40' :
                           isLight ? 'border-gray-200' : 'border-white/20'
                         }`}
                         draggable
@@ -1134,17 +1134,17 @@ export const CreateListingModal = ({
                 }}
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isFree
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
                     : chipIdle
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                   isFree
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    ? 'border-[#3F5331] bg-[#3F5331]'
                     : checkBorderIdle
                 }`}>
                   {isFree && (
-                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -1161,17 +1161,17 @@ export const CreateListingModal = ({
                 }}
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isNegotiable
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7] shadow-sm'
+                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
                     : chipIdle
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                   isNegotiable
-                    ? 'border-[#D3F1A7] bg-[#D3F1A7]'
+                    ? 'border-[#3F5331] bg-[#3F5331]'
                     : checkBorderIdle
                 }`}>
                   {isNegotiable && (
-                    <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -1248,7 +1248,9 @@ export const CreateListingModal = ({
                   }}
                   className={`px-4 py-3 rounded-xl border-2 transition-all text-left ${
                     category === cat.id
-                      ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                      ? isLight
+                        ? 'border-[#3F5331] bg-[#3F5331]/12 text-[#3F5331]'
+                        : 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                       : errors.category
                       ? `border-red-500 ${isLight ? 'bg-white text-gray-900' : 'bg-[#1C1C1C] text-white'}`
                       : chipIdle
@@ -1305,7 +1307,7 @@ export const CreateListingModal = ({
                           }}
                           className={`px-4 py-2 rounded-xl border-2 transition-all ${
                             subcategory === ''
-                              ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                              ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                               : chipSmallIdle
                           }`}
                         >
@@ -1321,7 +1323,7 @@ export const CreateListingModal = ({
                             }}
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
-                                ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                                ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                                 : chipSmallIdle
                             }`}
                           >
@@ -1340,7 +1342,7 @@ export const CreateListingModal = ({
                             }}
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
-                                ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                                ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                                 : chipSmallIdle
                             }`}
                           >
@@ -1363,7 +1365,7 @@ export const CreateListingModal = ({
                       }}
                       className={`px-4 py-2 rounded-xl border-2 transition-all ${
                         subcategory === ''
-                          ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                          ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                           : chipSmallIdle
                       }`}
                     >
@@ -1379,7 +1381,7 @@ export const CreateListingModal = ({
                         }}
                         className={`px-4 py-2 rounded-xl border-2 transition-all ${
                           subcategory === sub.id
-                            ? 'border-[#D3F1A7] bg-[#D3F1A7]/20 text-[#D3F1A7]'
+                            ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
                             : chipSmallIdle
                         }`}
                       >
@@ -1440,18 +1442,18 @@ export const CreateListingModal = ({
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
                     className={`w-full px-4 py-3 flex items-center gap-3 transition-colors ${rowHover} ${
-                      condition === option.value ? 'bg-[#D3F1A7]/20 text-[#D3F1A7]' : ac.pageHeading
+                      condition === option.value ? 'bg-[#3F5331]/20 text-[#3F5331]' : ac.pageHeading
                     }`}
                   >
                     {option.icon && (
                       <option.icon 
                         size={20} 
-                        className={condition === option.value ? 'text-[#D3F1A7]' : ac.pageHeading} 
+                        className={condition === option.value ? 'text-[#3F5331]' : ac.pageHeading} 
                       />
                     )}
                     <span className="font-medium">{option.label}</span>
                     {condition === option.value && (
-                      <span className="ml-auto text-[#D3F1A7]">✓</span>
+                      <span className="ml-auto text-[#3F5331]">✓</span>
                     )}
                   </button>
                 ))}
@@ -1478,7 +1480,7 @@ export const CreateListingModal = ({
               >
               <MapPin 
                 size={18} 
-                className="absolute top-1/2 -translate-y-1/2 text-[#D3F1A7] pointer-events-none"
+                className="absolute top-1/2 -translate-y-1/2 text-[#3F5331] pointer-events-none"
                 style={{ left: '16px' }}
               />
                 <span className={location ? `font-medium ${ac.pageHeading}` : ac.mutedText}>
@@ -1547,7 +1549,7 @@ export const CreateListingModal = ({
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-1.5 bg-[#D3F1A7] text-black rounded-xl text-base font-semibold hover:bg-[#D3F1A7]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-montserrat"
+            className="flex-1 px-4 py-1.5 bg-[#3F5331] text-white rounded-xl text-base font-semibold hover:bg-[#344728] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-montserrat"
           >
             {loading ? t('createListing.creating') : t('createListing.title')}
           </button>
@@ -1602,11 +1604,11 @@ export const CreateListingModal = ({
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
                 isLight ? 'border-gray-100' : 'border-white/10'
               } ${
-                currency === 'UAH' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : `${ac.pageHeading} ${rowHover}`
+                currency === 'UAH' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : `${ac.pageHeading} ${rowHover}`
               }`}
             >
               <span>₴ UAH</span>
-              {currency === 'UAH' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
+              {currency === 'UAH' && <span className="ml-auto text-[#3F5331]">✓</span>}
             </button>
             <button
               type="button"
@@ -1624,11 +1626,11 @@ export const CreateListingModal = ({
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
                 isLight ? 'border-gray-100' : 'border-white/10'
               } ${
-                currency === 'EUR' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : `${ac.pageHeading} ${rowHover}`
+                currency === 'EUR' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : `${ac.pageHeading} ${rowHover}`
               }`}
             >
               <span>€ EUR</span>
-              {currency === 'EUR' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
+              {currency === 'EUR' && <span className="ml-auto text-[#3F5331]">✓</span>}
             </button>
             <button
               type="button"
@@ -1644,11 +1646,11 @@ export const CreateListingModal = ({
                 tg?.HapticFeedback.impactOccurred('light');
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                currency === 'USD' ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold' : `${ac.pageHeading} ${rowHover}`
+                currency === 'USD' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : `${ac.pageHeading} ${rowHover}`
               }`}
             >
               <span>$ USD</span>
-              {currency === 'USD' && <span className="ml-auto text-[#D3F1A7]">✓</span>}
+              {currency === 'USD' && <span className="ml-auto text-[#3F5331]">✓</span>}
             </button>
           </div>
         )}
@@ -1723,7 +1725,7 @@ export const CreateListingModal = ({
               />
               <MapPin 
                 size={18} 
-                className="absolute top-1/2 -translate-y-1/2 text-[#D3F1A7] pointer-events-none"
+                className="absolute top-1/2 -translate-y-1/2 text-[#3F5331] pointer-events-none"
                 style={{ left: '12px' }}
               />
               {locationQuery && (
@@ -1749,7 +1751,7 @@ export const CreateListingModal = ({
           <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
             {loadingCities ? (
               <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="w-8 h-8 border-2 border-[#D3F1A7] border-t-transparent rounded-full animate-spin mb-4"></div>
+                <div className="w-8 h-8 border-2 border-[#3F5331] border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p className={`text-sm ${ac.mutedText}`}>{t('common.loading')}</p>
               </div>
             ) : filteredCities.length > 0 ? (
@@ -1772,11 +1774,11 @@ export const CreateListingModal = ({
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
                     className={`w-full px-4 py-4 text-left transition-colors flex items-center gap-3 ${
-                      isLight ? 'hover:bg-gray-100 active:bg-[#D3F1A7]/15' : 'hover:bg-[#D3F1A7]/10 active:bg-[#D3F1A7]/20'
+                      isLight ? 'hover:bg-gray-100 active:bg-[#3F5331]/15' : 'hover:bg-[#3F5331]/10 active:bg-[#3F5331]/20'
                     }`}
                   >
-                    <div className="w-10 h-10 rounded-full bg-[#D3F1A7]/20 flex items-center justify-center flex-shrink-0">
-                      <MapPin size={18} className="text-[#D3F1A7]" />
+                    <div className="w-10 h-10 rounded-full bg-[#3F5331]/20 flex items-center justify-center flex-shrink-0">
+                      <MapPin size={18} className="text-[#3F5331]" />
                     </div>
                     <span className={`font-medium text-base ${ac.pageHeading}`}>{city}</span>
                   </button>

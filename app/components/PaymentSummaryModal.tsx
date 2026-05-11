@@ -183,7 +183,7 @@ export const PaymentSummaryModal = ({
                 <span className="font-bold text-white text-lg">
                   {t('payment.total') || 'Всього'}
                 </span>
-                <span className="font-bold text-[#D3F1A7] text-xl">{totalPrice} €</span>
+                <span className="font-bold text-[#C8E6A0] text-xl">{totalPrice} €</span>
               </div>
             </div>
           </div>
@@ -194,7 +194,7 @@ export const PaymentSummaryModal = ({
               <span className="text-white/70">
                 {t('payment.yourBalance') || 'Ваш баланс'}
               </span>
-              <span className="font-semibold text-[#D3F1A7] text-lg">{userBalance.toFixed(2)} €</span>
+              <span className="font-semibold text-[#C8E6A0] text-lg">{userBalance.toFixed(2)} €</span>
             </div>
           </div>
 
@@ -210,17 +210,17 @@ export const PaymentSummaryModal = ({
               disabled={!canPayWithBalance}
               className={`w-full p-4 rounded-2xl border-2 transition-all ${
                 paymentMethod === 'balance'
-                  ? 'border-[#D3F1A7] bg-[#D3F1A7]/20'
+                  ? 'border-[#3F5331] bg-[#3F5331]/20'
                   : 'border-white/20 bg-[#1C1C1C]'
               } ${!canPayWithBalance ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    paymentMethod === 'balance' ? 'border-[#D3F1A7]' : 'border-white/30'
+                    paymentMethod === 'balance' ? 'border-[#3F5331]' : 'border-white/30'
                   }`}>
                     {paymentMethod === 'balance' && (
-                      <div className="w-3 h-3 rounded-full bg-[#D3F1A7]" />
+                      <div className="w-3 h-3 rounded-full bg-[#3F5331]" />
                     )}
                   </div>
                   <div className="text-left">
@@ -243,17 +243,17 @@ export const PaymentSummaryModal = ({
               onClick={() => setPaymentMethod('direct')}
               className={`w-full p-4 rounded-2xl border-2 transition-all ${
                 paymentMethod === 'direct'
-                  ? 'border-[#D3F1A7] bg-[#D3F1A7]/20'
+                  ? 'border-[#3F5331] bg-[#3F5331]/20'
                   : 'border-white/20 bg-[#1C1C1C]'
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    paymentMethod === 'direct' ? 'border-[#D3F1A7]' : 'border-white/30'
+                    paymentMethod === 'direct' ? 'border-[#3F5331]' : 'border-white/30'
                   }`}>
                     {paymentMethod === 'direct' && (
-                      <div className="w-3 h-3 rounded-full bg-[#D3F1A7]" />
+                      <div className="w-3 h-3 rounded-full bg-[#3F5331]" />
                     )}
                   </div>
                   <div className="text-left">
@@ -276,10 +276,10 @@ export const PaymentSummaryModal = ({
           <button
             onClick={() => onConfirm(paymentMethod)}
             disabled={paymentMethod === 'balance' && !canPayWithBalance}
-            className={`w-full py-4 rounded-xl font-semibold text-black transition-all ${
+            className={`w-full py-4 rounded-xl font-semibold transition-all ${
               paymentMethod === 'balance' && !canPayWithBalance
                 ? 'bg-white/20 cursor-not-allowed text-white/50'
-                : 'bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 shadow-lg hover:shadow-xl'
+                : 'bg-[#3F5331] text-white hover:bg-[#344728] shadow-lg hover:shadow-xl'
             }`}
           >
             {t('payment.confirm') || `Підтвердити оплату ${totalPrice} €`}

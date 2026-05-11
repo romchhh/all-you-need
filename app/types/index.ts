@@ -32,6 +32,8 @@ export interface Listing {
   promotionType?: 'highlighted' | 'top_category' | 'vip' | null;
   promotionEnds?: string | null;
   expiresAt?: string | null;
+  /** Автопродовження активності ще на 30 днів при закінченні терміну (лише власник). */
+  autoRenew?: boolean;
   favoritesCount?: number;
 }
 

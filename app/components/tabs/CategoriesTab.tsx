@@ -214,7 +214,7 @@ export const CategoriesTab = ({
           }}
           className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl transition-colors border ${
             selectedCategory === 'free'
-              ? 'bg-green-500/20 text-[#D3F1A7] border-[#D3F1A7]'
+              ? 'bg-green-500/20 text-[#3F5331] border-[#3F5331]'
               : isLight
                 ? 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-50'
                 : 'bg-gray-800/50 text-gray-300 border-transparent hover:bg-gray-700/50'
@@ -260,12 +260,14 @@ export const CategoriesTab = ({
                 }
                 tg?.HapticFeedback.impactOccurred('light');
               }}
-              className={`p-4 rounded-2xl border transition-all text-left relative overflow-hidden ${
+              className={`p-4 rounded-2xl transition-all text-left relative overflow-hidden ${
                 selectedCategory === category.id
-                  ? 'border-[#D3F1A7]'
+                  ? isLight
+                    ? 'border-2 border-[#3F5331]'
+                    : 'border border-[#3F5331]'
                   : isLight
-                    ? 'border-gray-200 hover:border-gray-300'
-                    : 'border-white hover:border-white/80'
+                    ? 'border border-gray-200 hover:border-gray-300'
+                    : 'border border-white hover:border-white/80'
               }`}
               style={{
                 background: isLight
@@ -283,7 +285,9 @@ export const CategoriesTab = ({
               <div
                 className={`font-semibold text-sm ${
                   selectedCategory === category.id
-                    ? 'text-[#D3F1A7]'
+                    ? isLight
+                      ? 'text-[#3F5331]'
+                      : 'text-[#C8E6A0]'
                     : isLight
                       ? 'text-gray-800'
                       : 'text-white'

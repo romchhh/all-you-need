@@ -42,7 +42,7 @@ export const ConfirmModal = ({
       <div className="bg-[#000000] rounded-2xl border-2 border-white p-6 max-w-sm w-full shadow-2xl">
         <div className="flex items-center justify-center mb-4">
           <div className="w-12 h-12 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center">
-            <AlertTriangle size={24} className="text-[#D3F1A7]" />
+            <AlertTriangle size={24} className="text-[#3F5331]" />
           </div>
         </div>
         <h3 className="text-xl font-bold text-white mb-2 text-center">{title}</h3>
@@ -56,7 +56,7 @@ export const ConfirmModal = ({
           </button>
           <button
             onClick={handleConfirm}
-            className={`flex-1 px-4 py-3 ${confirmButtonClass === 'bg-red-500 hover:bg-red-600' ? 'bg-red-500 hover:bg-red-600' : 'bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 text-black'} rounded-xl font-medium transition-colors`}
+            className={`flex-1 px-4 py-3 ${confirmButtonClass === 'bg-red-500 hover:bg-red-600' ? 'bg-red-500 hover:bg-red-600' : 'bg-[#3F5331] hover:bg-[#344728] text-white'} rounded-xl font-medium transition-colors`}
           >
             {confirmText}
           </button>

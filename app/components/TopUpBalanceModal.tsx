@@ -129,7 +129,7 @@ export const TopUpBalanceModal = ({
           <div className="flex items-center justify-between p-6 border-b border-white/20">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center">
-                <Wallet size={20} className="text-[#D3F1A7]" />
+                <Wallet size={20} className="text-[#C8E6A0]" />
               </div>
               <h2 className="text-xl font-bold text-white">
                 {t('profile.topUpBalance') || 'Поповнити баланс'}
@@ -151,7 +151,7 @@ export const TopUpBalanceModal = ({
               <p className="text-sm text-white/70 mb-1">
                 {t('profile.balance') || 'Баланс'}
               </p>
-              <p className="text-2xl font-bold text-[#D3F1A7]">
+              <p className="text-2xl font-bold text-[#C8E6A0]">
                 {currentBalance.toFixed(2)} €
               </p>
             </div>
@@ -174,7 +174,7 @@ export const TopUpBalanceModal = ({
                     }}
                     className={`px-4 py-2.5 rounded-xl border-2 font-bold text-base transition-all ${
                       amount === quickAmount.toString()
-                        ? 'border-[#D3F1A7] bg-[#D3F1A7] text-black shadow-lg'
+                        ? 'border-[#3F5331] bg-[#3F5331] text-white shadow-lg'
                         : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/10'
                     }`}
                     disabled={loading}
@@ -199,7 +199,7 @@ export const TopUpBalanceModal = ({
             <button
               onClick={handleSubmit}
               disabled={loading || !amount || parseFloat(amount) <= 0}
-              className="flex-1 px-4 py-3 bg-[#D3F1A7] hover:bg-[#D3F1A7]/90 disabled:bg-white/20 disabled:cursor-not-allowed text-black font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 bg-[#3F5331] hover:bg-[#344728] disabled:bg-white/20 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

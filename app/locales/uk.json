@@ -100,6 +100,8 @@
     "subcategory": "Підрозділ",
     "seller": "Продавець",
     "views": "переглядів",
+    "viewsLabel": "Перегляди",
+    "favoritesLabel": "Обрання",
     "created": "Створено",
     "publishedDate": "Дата публікації",
     "active": "Активне",
@@ -207,7 +209,10 @@
         "citySubscribeRemoved": "Підписку на місто скасовано",
         "citySubscribePickOneCity": "Оберіть одне місто у фільтрі, щоб підписатися",
         "subscribedCitiesMenu": "Міста з підписок",
-        "subscribedCitiesEmpty": "Немає міст у підписці"
+        "subscribedCitiesEmpty": "Немає міст у підписці",
+        "activityOnlineSuffix": "онлайн",
+        "activityListingsPrefix": "За добу",
+        "activityListingsSuffix": "нових оголошень"
   },
   "favorites": {
     "title": "Обране",
@@ -242,7 +247,11 @@
     "expires": "Закінчується",
     "reactivate": "Активувати знову",
     "activate": "Активувати",
-    "reactivateDescription": "Термін дії оголошення закінчився. Щоб активувати знову, потрібно оплатити оголошення."
+    "reactivateDescription": "Термін дії оголошення закінчився. Щоб активувати знову, потрібно оплатити оголошення.",
+    "autoRenew": "Автопродовження +30 днів",
+    "autoRenewHint": "Коли термін закінчиться, оголошення само продовжиться ще на 30 днів. У Telegram прийде повідомлення та пропозиція купити рекламу.",
+    "autoRenewSaved": "Збережено",
+    "autoRenewError": "Не вдалося зберегти"
   },
   "share": {
     "title": "Поділитися",

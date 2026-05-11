@@ -15,6 +15,10 @@ interface ProfileListingCardProps {
   onMarkAsSold: () => void;
   onPromote: () => void;
   onReactivate?: () => void;
+  /** Telegram id власника для API автопродовження */
+  viewerTelegramId?: string | null;
+  onAutoRenewChange?: (listingId: number, autoRenew: boolean) => void;
+  showToast?: (message: string, type: 'success' | 'error' | 'info') => void;
   tg: TelegramWebApp | null;
 }
 
@@ -28,9 +32,13 @@ export const ProfileListingCard = ({
   onMarkAsSold,
   onPromote,
   onReactivate,
+  viewerTelegramId,
+  onAutoRenewChange,
+  showToast,
   tg
 }: ProfileListingCardProps) => {
   const { t } = useLanguage();
+  const [autoRenewSaving, setAutoRenewSaving] = useState(false);
 
   // Перевіряємо статус модерації
   const isPendingModeration = listing.status === 'pending_moderation';
@@ -88,21 +96,21 @@ export const ProfileListingCard = ({
         {promotionsToShow.map((promoType: string) => {
           if (promoType === 'vip') {
             return (
-              <span key="vip" className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+              <span key="vip" className="inline-flex items-center px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded mr-1.5 whitespace-nowrap">
                 VIP
               </span>
             );
           }
           if (promoType === 'top_category') {
             return (
-              <span key="top" className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+              <span key="top" className="inline-flex items-center px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded mr-1.5 whitespace-nowrap">
                 TOP
               </span>
             );
           }
           if (promoType === 'highlighted') {
             return (
-              <span key="highlighted" className="inline-flex items-center px-2 py-0.5 bg-[#D3F1A7] text-black text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+              <span key="highlighted" className="inline-flex items-center px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded mr-1.5 whitespace-nowrap">
                 {t('promotions.highlighted')}
               </span>
             );
@@ -154,10 +162,10 @@ export const ProfileListingCard = ({
       
       if (promotionType === 'vip') {
         // ВИП - рамка з тінню
-        return 'bg-[#000000] border-2 border-[#D3F1A7] shadow-[0_0_20px_rgba(211,241,167,0.4)]';
+        return 'bg-[#000000] border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.4)]';
       } else if (promotionType === 'highlighted') {
         // Выделение цветом - рамка без тіні
-        return 'bg-[#000000] border-2 border-[#D3F1A7]';
+        return 'bg-[#000000] border-2 border-[#3F5331]';
       } else if (promotionType === 'top_category') {
         // ТОП - без рамки (стандартна рамка)
         return 'bg-[#000000] border-2 border-white/20';
@@ -251,21 +259,21 @@ export const ProfileListingCard = ({
               {promotionsToShow.map((promoType: string) => {
                 if (promoType === 'vip') {
                   return (
-                    <div key="vip" className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
+                    <div key="vip" className="px-2 py-0.5 bg-[#3F5331] text-white text-[10px] font-bold rounded shadow-lg">
                       VIP
                     </div>
                   );
                 }
                 if (promoType === 'top_category') {
                   return (
-                    <div key="top" className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
+                    <div key="top" className="px-2 py-0.5 bg-[#3F5331] text-white text-[10px] font-bold rounded shadow-lg">
                       TOP
                     </div>
                   );
                 }
                 if (promoType === 'highlighted') {
                   return (
-                    <div key="highlighted" className="px-2 py-0.5 bg-[#D3F1A7] text-black text-[10px] font-bold rounded shadow-lg">
+                    <div key="highlighted" className="px-2 py-0.5 bg-[#3F5331] text-white text-[10px] font-bold rounded shadow-lg">
                       {t('promotions.highlighted')}
                     </div>
                   );
@@ -288,7 +296,7 @@ export const ProfileListingCard = ({
                   ? 'text-gray-500 line-through' 
                   : isDeactivated
                   ? 'text-gray-500 line-through'
-                  : 'text-white hover:text-[#D3F1A7]'
+                  : 'text-white hover:text-[#C8E6A0]'
               }`}
               onClick={() => {
                 if (!isPendingModeration && !isDeactivated && !isSold) {
@@ -380,7 +388,7 @@ export const ProfileListingCard = ({
             )}
             {/* Інформація про рекламу */}
             {hasPromotion && isPromotionActive && promotionDaysLeft !== null && (
-              <div className={`flex items-center gap-1.5 ${isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500 font-semibold' : 'text-[#D3F1A7] font-semibold'}`}>
+              <div className={`flex items-center gap-1.5 ${isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500 font-semibold' : 'text-[#C8E6A0] font-semibold'}`}>
                 <span>{t('profile.promotion') || 'Реклама'}:</span>
                 <span>{promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}</span>
               </div>
@@ -390,6 +398,57 @@ export const ProfileListingCard = ({
                 {t('profile.promotion') || 'Реклама'} закінчилась
               </div>
             )}
+            {listing.status === 'active' &&
+              !isPendingModeration &&
+              !isSold &&
+              !isRejected &&
+              !isDeactivated &&
+              viewerTelegramId && (
+                <label
+                  className="flex items-start gap-2 mt-2 cursor-pointer select-none"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/40 bg-black/40 text-[#C8E6A0] focus:ring-[#3F5331]/50"
+                    checked={!!listing.autoRenew}
+                    disabled={autoRenewSaving}
+                    onChange={async (e) => {
+                      e.stopPropagation();
+                      const next = e.target.checked;
+                      setAutoRenewSaving(true);
+                      try {
+                        const res = await fetch(`/api/listings/${listing.id}/auto-renew`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            telegramId: String(viewerTelegramId),
+                            autoRenew: next,
+                          }),
+                        });
+                        if (!res.ok) {
+                          const err = await res.json().catch(() => ({}));
+                          throw new Error((err as { error?: string }).error || 'Request failed');
+                        }
+                        onAutoRenewChange?.(listing.id, next);
+                        showToast?.(t('sales.autoRenewSaved'), 'success');
+                        tg?.HapticFeedback?.impactOccurred('light');
+                      } catch {
+                        e.target.checked = !next;
+                        showToast?.(t('sales.autoRenewError'), 'error');
+                        tg?.HapticFeedback?.notificationOccurred('error');
+                      } finally {
+                        setAutoRenewSaving(false);
+                      }
+                    }}
+                  />
+                  <span className="text-[10px] leading-snug text-white/75">
+                    <span className="font-semibold text-white/90">{t('sales.autoRenew')}</span>
+                    <span className="block text-white/60 mt-0.5">{t('sales.autoRenewHint')}</span>
+                  </span>
+                </label>
+              )}
           </div>
 
           {/* Статистика */}
@@ -405,7 +464,7 @@ export const ProfileListingCard = ({
                 isSold || isPendingModeration || isDeactivated || isRejected
                   ? 'text-gray-500' 
                   : isFavorite 
-                  ? 'fill-[#D3F1A7] text-[#D3F1A7]' 
+                  ? 'fill-[#C8E6A0] text-[#C8E6A0]' 
                   : ''
               } />
               <span>{listing.favoritesCount || 0}</span>
@@ -434,7 +493,7 @@ export const ProfileListingCard = ({
                   ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed opacity-50'
                   : isDeactivated
                   ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
-                  : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
+                  : 'bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#3F5331]/20'
               }`}
               title={isPendingModeration ? t('editListing.cannotEditOnModeration') || 'Не можна редагувати під час модерації' : t('common.edit')}
             >
@@ -453,7 +512,7 @@ export const ProfileListingCard = ({
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                 isDeactivated
                   ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
-                  : 'bg-transparent border-2 border-[#D3F1A7] text-[#D3F1A7] hover:bg-[#D3F1A7]/20'
+                  : 'bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#3F5331]/20'
               }`}
               title={t('editListing.markAsSold')}
             >
@@ -488,7 +547,7 @@ export const ProfileListingCard = ({
               className={`w-full rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors font-semibold text-sm ${
                 isPendingModeration
                   ? 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed'
-                  : 'bg-[#D3F1A7] text-black hover:bg-[#D3F1A7]/90'
+                  : 'bg-[#3F5331] text-white hover:bg-[#344728]'
               }`}
             >
               <Megaphone size={16} />

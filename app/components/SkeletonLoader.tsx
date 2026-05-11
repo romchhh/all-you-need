@@ -25,7 +25,7 @@ export const ListingGridSkeleton = ({ count = 6, showLoadingText = false, loadin
       {showLoadingText && loadingText && (
         <div className="flex items-center justify-center py-8">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-[#D3F1A7] border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-2 border-[#3F5331] border-t-transparent rounded-full animate-spin"></div>
             <p className="text-white/70 text-sm">{loadingText}</p>
           </div>
         </div>

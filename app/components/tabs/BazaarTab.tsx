@@ -9,6 +9,7 @@ import { SortModal } from '../SortModal';
 import { CityModal } from '../CityModal';
 import { SubcategoryList } from '../SubcategoryList';
 import { TopBar } from '../TopBar';
+import { HomeActivityStats } from '../HomeActivityStats';
 import { ListingGridSkeleton } from '../SkeletonLoader';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -597,7 +598,7 @@ const BazaarTabComponent = ({
             }}
             className={`p-2 rounded-lg transition-colors ${
               viewMode === 'grid'
-                ? 'bg-[#D3F1A7] text-gray-900 shadow-sm'
+                ? 'bg-[#3F5331] text-white shadow-sm'
                 : ac.toggleInactive
             }`}
             aria-pressed={viewMode === 'grid'}
@@ -612,7 +613,7 @@ const BazaarTabComponent = ({
             }}
             className={`p-2 rounded-lg transition-colors ${
               viewMode === 'list'
-                ? 'bg-[#D3F1A7] text-gray-900 shadow-sm'
+                ? 'bg-[#3F5331] text-white shadow-sm'
                 : ac.toggleInactive
             }`}
             aria-pressed={viewMode === 'list'}
@@ -628,13 +629,7 @@ const BazaarTabComponent = ({
     <div className="pb-24">
       {/* Пошук з TopBar — на десктопі вужчий і по центру */}
       <div className="relative">
-        <div
-          className={`sticky top-0 z-20 p-4 lg:flex lg:justify-center lg:py-4 ${
-            isLight
-              ? 'border-b border-gray-200/70 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/70'
-              : 'border-b border-white/10 bg-black/40 backdrop-blur-md'
-          }`}
-        >
+        <div className="sticky top-0 z-20 bg-transparent p-4 lg:flex lg:justify-center lg:py-4">
           <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl" ref={suggestionsRef}>
             <div className="flex gap-1 items-center">
               <TopBar
@@ -700,7 +695,7 @@ const BazaarTabComponent = ({
                 onClick={() => setIsCityModalOpen(true)}
                 className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors relative border ${
                   selectedCities.length > 0
-                    ? 'border-[#D3F1A7] bg-transparent'
+                    ? 'border-[#3F5331] bg-transparent'
                     : isLight
                       ? 'border-gray-300 bg-transparent hover:bg-gray-100'
                       : 'border-white bg-transparent hover:bg-white/10'
@@ -710,14 +705,16 @@ const BazaarTabComponent = ({
                   size={18}
                   className={
                     selectedCities.length > 0
-                      ? 'text-[#D3F1A7]'
+                      ? isLight
+                        ? 'text-[#3F5331]'
+                        : 'text-[#C8E6A0]'
                       : isLight
                         ? 'text-gray-700'
                         : 'text-white'
                   }
                 />
                 {selectedCities.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#D3F1A7] text-black text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  <span className="absolute -top-1 -right-1 bg-[#3F5331] text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {selectedCities.length > 9 ? '9+' : selectedCities.length}
                   </span>
                 )}
@@ -727,7 +724,13 @@ const BazaarTabComponent = ({
         </div>
       </div>
 
-
+      {!searchQuery.trim() && (
+        <div className="px-4 pb-3 lg:flex lg:justify-center lg:px-6">
+          <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
+            <HomeActivityStats isLight={isLight} />
+          </div>
+        </div>
+      )}
 
       {/* Розділи - показуємо тільки якщо не вибрана категорія та немає пошуку */}
       {categories.length > 0 && !selectedCategory && !searchQuery.trim() && (
@@ -763,8 +766,8 @@ const BazaarTabComponent = ({
                 }}
               >
                 <div
-                  className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden border ${
-                    isLight ? 'border-transparent' : 'border-white'
+                  className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden ${
+                    isLight ? 'border-2 border-[#3F5331]' : 'border border-white'
                   }`}
                   style={{
                     background: isLight

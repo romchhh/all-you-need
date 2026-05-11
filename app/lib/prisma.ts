@@ -335,6 +335,14 @@ export async function ensureListingApiRawColumns(): Promise<void> {
     );
     await addColumn('rejectionReason', 'ALTER TABLE Listing ADD COLUMN rejectionReason TEXT');
     await addColumn('optimizedImages', 'ALTER TABLE Listing ADD COLUMN optimizedImages TEXT');
+    await addColumn(
+      'favoriteBoost',
+      'ALTER TABLE Listing ADD COLUMN favoriteBoost INTEGER NOT NULL DEFAULT 0'
+    );
+    await addColumn(
+      'autoRenew',
+      'ALTER TABLE Listing ADD COLUMN autoRenew INTEGER NOT NULL DEFAULT 0'
+    );
 
     if (names.has('optimizedImages')) {
       optimizedImagesColumnExists = true;

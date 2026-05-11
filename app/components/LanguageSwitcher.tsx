@@ -6,6 +6,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useUser } from '@/hooks/useUser';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface LanguageSwitcherProps {
   tg?: TelegramWebApp | null;
@@ -14,6 +15,7 @@ interface LanguageSwitcherProps {
 
 export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProps) => {
   const { language, setLanguage, t } = useLanguage();
+  const { isLight } = useTheme();
   const { profile } = useUser();
   const pathname = usePathname();
   const router = useRouter();
@@ -129,6 +131,24 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
     return currentLang === 'uk' ? 'Українська' : 'Русский';
   };
 
+  const fwBtn = isLight
+    ? 'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center justify-between shadow-sm transition-colors hover:bg-gray-50'
+    : 'w-full bg-transparent border border-white/20 rounded-xl px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors';
+  const fwGlobe = isLight ? 'text-gray-500' : 'text-white/70';
+  const fwLabel = isLight ? 'text-gray-900 font-medium' : 'text-white font-medium';
+  const fwValue = isLight ? 'text-gray-600 font-medium text-sm' : 'text-white/70 font-medium text-sm';
+  const fwMenu = isLight
+    ? 'fixed rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-900/10 z-[10000] overflow-hidden'
+    : 'fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] overflow-hidden';
+  const fwItemActive = isLight
+    ? 'bg-[#3F5331]/30 text-[#2d3d24] font-semibold'
+    : 'bg-[#3F5331]/20 text-[#C8E6A0] font-semibold';
+  const fwItemIdle = isLight
+    ? 'text-gray-800 hover:bg-gray-50'
+    : 'text-white hover:bg-white/10';
+  const fwCheck = isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]';
+  const fwDivider = isLight ? 'h-px bg-gray-200' : 'h-px bg-white/10';
+
   if (fullWidth) {
     return (
       <>
@@ -141,15 +161,15 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
             setIsOpen(prev => !prev);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className="w-full bg-transparent border border-white/20 rounded-xl px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors"
+          className={fwBtn}
         >
           <div className="flex items-center gap-3">
-            <Globe size={20} className="text-white/70" />
-            <span className="text-white font-medium">{t('common.language')}</span>
+            <Globe size={20} className={fwGlobe} />
+            <span className={fwLabel}>{t('common.language')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-white/70 font-medium text-sm">{getLanguageLabel()}</span>
-            <ChevronDown size={16} className={`text-white/70 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            <span className={fwValue}>{getLanguageLabel()}</span>
+            <ChevronDown size={16} className={`${fwGlobe} transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </div>
         </button>
 
@@ -165,7 +185,7 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
         {isOpen && (
           <div 
             id="language-menu"
-            className="fixed bg-[#1C1C1C] rounded-xl border border-white/20 shadow-2xl z-[10000] overflow-hidden"
+            className={fwMenu}
             style={{
               top: `${menuPosition.top + 8}px`,
               left: `${menuPosition.left}px`,
@@ -181,15 +201,13 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
                 handleLanguageChange('uk');
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
-                currentLang === 'uk'
-                  ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
-                  : 'text-white hover:bg-white/10'
+                currentLang === 'uk' ? fwItemActive : fwItemIdle
               }`}
             >
               <span className="text-sm">Українська</span>
-              {currentLang === 'uk' && <span className="text-[#D3F1A7]">✓</span>}
+              {currentLang === 'uk' && <span className={fwCheck}>✓</span>}
             </button>
-            <div className="h-px bg-white/10"></div>
+            <div className={fwDivider} />
             <button
               type="button"
               onClick={(e) => {
@@ -198,13 +216,11 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
                 handleLanguageChange('ru');
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
-                currentLang === 'ru'
-                  ? 'bg-[#D3F1A7]/20 text-[#D3F1A7] font-semibold'
-                  : 'text-white hover:bg-white/10'
+                currentLang === 'ru' ? fwItemActive : fwItemIdle
               }`}
             >
               <span className="text-sm">Русский</span>
-              {currentLang === 'ru' && <span className="text-[#D3F1A7]">✓</span>}
+              {currentLang === 'ru' && <span className={fwCheck}>✓</span>}
             </button>
           </div>
         )}
@@ -224,12 +240,16 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
           tg?.HapticFeedback.impactOccurred('light');
         }}
         className={`p-2.5 rounded-xl transition-all duration-200 ${
-          isOpen
-            ? 'bg-blue-100'
-            : 'bg-gray-100 hover:bg-gray-200'
+          isLight
+            ? isOpen
+              ? 'bg-[#3F5331]/40 ring-1 ring-[#3F5331]/20'
+              : 'bg-gray-100 hover:bg-gray-200'
+            : isOpen
+              ? 'bg-white/15 ring-1 ring-white/30'
+              : 'bg-white/10 hover:bg-white/15'
         }`}
       >
-        <Globe size={20} className="text-gray-900" />
+        <Globe size={20} className={isLight ? 'text-gray-900' : 'text-white'} />
       </button>
 
       {/* Backdrop */}
@@ -244,7 +264,11 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
       {isOpen && (
         <div 
           id="language-menu"
-          className="fixed bg-white rounded-xl border border-gray-200 shadow-2xl z-[10000] overflow-hidden"
+          className={
+            isLight
+              ? 'fixed rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-900/10 z-[10000] overflow-hidden'
+              : 'fixed rounded-xl border border-white/20 bg-[#1C1C1C] shadow-2xl z-[10000] overflow-hidden'
+          }
           style={{
             top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
@@ -261,14 +285,20 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
             }}
             className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
               currentLang === 'uk'
-                ? 'bg-blue-50 text-blue-600 font-semibold'
-                : 'text-gray-700 hover:bg-gray-50'
+                ? isLight
+                  ? 'bg-[#3F5331]/30 text-[#2d3d24] font-semibold'
+                  : 'bg-[#3F5331]/20 text-[#C8E6A0] font-semibold'
+                : isLight
+                  ? 'text-gray-700 hover:bg-gray-50'
+                  : 'text-white hover:bg-white/10'
             }`}
           >
             <span className="text-sm">Українська</span>
-            {currentLang === 'uk' && <span className="text-blue-500">✓</span>}
+            {currentLang === 'uk' && (
+              <span className={isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}>✓</span>
+            )}
           </button>
-          <div className="h-px bg-gray-200"></div>
+          <div className={isLight ? 'h-px bg-gray-200' : 'h-px bg-white/10'} />
           <button
             type="button"
             onClick={(e) => {
@@ -278,12 +308,18 @@ export const LanguageSwitcher = ({ tg, fullWidth = false }: LanguageSwitcherProp
             }}
             className={`w-full px-4 py-3 text-left transition-colors flex items-center justify-center gap-2 ${
               currentLang === 'ru'
-                ? 'bg-blue-50 text-blue-600 font-semibold'
-                : 'text-gray-700 hover:bg-gray-50'
+                ? isLight
+                  ? 'bg-[#3F5331]/30 text-[#2d3d24] font-semibold'
+                  : 'bg-[#3F5331]/20 text-[#C8E6A0] font-semibold'
+                : isLight
+                  ? 'text-gray-700 hover:bg-gray-50'
+                  : 'text-white hover:bg-white/10'
             }`}
           >
             <span className="text-sm">Русский</span>
-            {currentLang === 'ru' && <span className="text-blue-500">✓</span>}
+            {currentLang === 'ru' && (
+              <span className={isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}>✓</span>
+            )}
           </button>
         </div>
       )}

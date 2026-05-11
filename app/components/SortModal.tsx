@@ -18,7 +18,7 @@ const sliderStyles = `
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #D3F1A7;
+    background: #3F5331;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
@@ -27,7 +27,7 @@ const sliderStyles = `
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #D3F1A7;
+    background: #3F5331;
     cursor: pointer;
     border: none;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -79,7 +79,11 @@ export const SortModal = ({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  const chipActive = 'border border-[#D3F1A7] text-[#D3F1A7] bg-transparent font-medium';
+  const chipActive = 'border border-[#3F5331] text-[#3F5331] bg-transparent font-medium';
+  /** Активна категорія з іконкою — світла тема: обводка навколо кнопки, не навколо іконки */
+  const chipActiveCategory = isLight
+    ? 'border-2 border-[#3F5331] text-[#3F5331] bg-[#3F5331]/12 font-medium'
+    : 'border border-[#3F5331] text-[#3F5331] bg-transparent font-medium';
   const chipIdle = isLight
     ? 'border border-gray-300 text-gray-800 bg-transparent hover:bg-gray-100'
     : 'border border-white text-white bg-transparent hover:bg-white/10';
@@ -383,7 +387,7 @@ export const SortModal = ({
                         ref={selectedCategory === category.id ? selectedCategoryButtonRef : null}
                         onClick={() => handleCategorySelect(category.id)}
                         className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all flex-shrink-0 flex items-center gap-2 ${
-                          localSelectedCategory === category.id ? chipActive : chipIdle
+                          localSelectedCategory === category.id ? chipActiveCategory : chipIdle
                         }`}
                       >
                         <CategoryIcon categoryId={category.id} isActive={localSelectedCategory === category.id} size={20} />
@@ -540,7 +544,7 @@ export const SortModal = ({
                         isLight ? 'bg-gray-200' : 'bg-gray-700'
                       }`}
                       style={{
-                            background: `linear-gradient(to right, #D3F1A7 0%, #D3F1A7 ${(localMinPrice / currentMaxPrice) * 100}%, ${rangeTrackMuted} ${(localMinPrice / currentMaxPrice) * 100}%, ${rangeTrackMuted} 100%)`
+                            background: `linear-gradient(to right, #3F5331 0%, #3F5331 ${(localMinPrice / currentMaxPrice) * 100}%, ${rangeTrackMuted} ${(localMinPrice / currentMaxPrice) * 100}%, ${rangeTrackMuted} 100%)`
                       }}
                     />
                     <input
@@ -582,7 +586,7 @@ export const SortModal = ({
                         isLight ? 'bg-gray-200' : 'bg-gray-700'
                       }`}
                       style={{
-                            background: `linear-gradient(to right, ${rangeTrackMuted} 0%, ${rangeTrackMuted} ${(localMaxPrice / currentMaxPrice) * 100}%, #D3F1A7 ${(localMaxPrice / currentMaxPrice) * 100}%, #D3F1A7 100%)`
+                            background: `linear-gradient(to right, ${rangeTrackMuted} 0%, ${rangeTrackMuted} ${(localMaxPrice / currentMaxPrice) * 100}%, #3F5331 ${(localMaxPrice / currentMaxPrice) * 100}%, #3F5331 100%)`
                       }}
                     />
                     <input
@@ -623,10 +627,10 @@ export const SortModal = ({
                       onToggleFreeOnly(e.target.checked);
                       onClose();
                     }}
-                    className={`w-5 h-5 rounded text-[#D3F1A7] focus:ring-[#D3F1A7] bg-transparent ${
+                    className={`w-5 h-5 rounded text-[#3F5331] focus:ring-[#3F5331] bg-transparent ${
                       isLight ? 'border-gray-400' : 'border-white'
                     }`}
-                    style={{ accentColor: '#D3F1A7' }}
+                    style={{ accentColor: '#3F5331' }}
                   />
                   <span className={`font-medium ${ac.pageHeading}`}>{t('bazaar.freeOnly')}</span>
                 </label>
@@ -665,7 +669,7 @@ export const SortModal = ({
                       onCloseRef.current();
                     }, 50);
                   }}
-                  className="w-full px-4 py-3 bg-[#D3F1A7] text-black rounded-xl font-semibold hover:bg-[#D3F1A7]/80 transition-colors active:bg-[#D3F1A7]/70 cursor-pointer"
+                  className="w-full px-4 py-3 bg-[#3F5331] text-white rounded-xl font-semibold hover:bg-[#3F5331]/80 transition-colors active:bg-[#2d3d26] cursor-pointer"
                 >
                   {t('common.apply')}
                 </button>

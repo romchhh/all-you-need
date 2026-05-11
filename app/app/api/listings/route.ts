@@ -4,6 +4,7 @@ import { normalizeCityInput } from '@/utils/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
 import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
+import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 
 // Відключаємо кешування для API route
 export const dynamic = 'force-dynamic';
@@ -258,6 +259,7 @@ export async function GET(request: NextRequest) {
           l.promotionType,
           l.promotionEnds,
           l.expiresAt,
+          COALESCE(l.autoRenew, 0) as autoRenew,
           l.images,
           l.optimizedImages,
           l.tags,
@@ -269,7 +271,7 @@ export async function GET(request: NextRequest) {
           u.avatar as sellerAvatar,
           u.phone as sellerPhone,
           CAST(u.telegramId AS INTEGER) as sellerTelegramId,
-          COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount
+          ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
         FROM Listing l
         JOIN User u ON l.userId = u.id
         ${whereClause}
@@ -322,8 +324,16 @@ export async function GET(request: NextRequest) {
       }>;
       } catch (error: any) {
         // Якщо таблиця Favorite не існує, виконуємо запит без favoritesCount
-        if (error.message?.includes('no such table: Favorite') || error.message?.includes('Favorite')) {
-          const queryWithoutFavorites = query.replace(', COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount', '');
+        if (
+          error.message?.includes('no such table: Favorite') ||
+          error.message?.includes('Favorite') ||
+          error.message?.includes('autoRenew')
+        ) {
+          let queryWithoutFavorites = query.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+          queryWithoutFavorites = queryWithoutFavorites.replace(
+            ', COALESCE(l.autoRenew, 0) as autoRenew',
+            ''
+          );
           userListings = await prisma.$queryRawUnsafe(
             queryWithoutFavorites,
             ...queryParams
@@ -414,6 +424,8 @@ export async function GET(request: NextRequest) {
           promotionType: listing.promotionType || null,
           promotionEnds: listing.promotionEnds || null,
           expiresAt: listing.expiresAt || null,
+          autoRenew:
+            (listing as any).autoRenew === 1 || (listing as any).autoRenew === true,
           favoritesCount: normalizeFavoritesCount(listing.favoritesCount),
         };
       });
@@ -553,6 +565,7 @@ export async function GET(request: NextRequest) {
                l.promotionType,
                l.promotionEnds,
                l.expiresAt,
+               COALESCE(l.autoRenew, 0) as autoRenew,
                l.images,
                l.tags,
                l.createdAt,
@@ -563,7 +576,7 @@ export async function GET(request: NextRequest) {
                u.avatar as sellerAvatar,
                u.phone as sellerPhone,
                CAST(u.telegramId AS INTEGER) as sellerTelegramId,
-               COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount
+               ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
              FROM Listing l
              JOIN User u ON l.userId = u.id
              ${whereClause}
@@ -602,8 +615,16 @@ export async function GET(request: NextRequest) {
         totalCountData = count;
       } catch (error: any) {
         // Якщо таблиця Favorite не існує, виконуємо запит без favoritesCount
-        if (error.message?.includes('no such table: Favorite') || error.message?.includes('Favorite')) {
-          const queryWithoutFavorites = listingsQuery.replace(', COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount', '');
+        if (
+          error.message?.includes('no such table: Favorite') ||
+          error.message?.includes('Favorite') ||
+          error.message?.includes('autoRenew')
+        ) {
+          let queryWithoutFavorites = listingsQuery.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+          queryWithoutFavorites = queryWithoutFavorites.replace(
+            ', COALESCE(l.autoRenew, 0) as autoRenew',
+            ''
+          );
           const [data, count] = await Promise.all([
             prisma.$queryRawUnsafe(
               queryWithoutFavorites,
@@ -756,6 +777,8 @@ export async function GET(request: NextRequest) {
                promotionType: listing.promotionType || null,
                promotionEnds: listing.promotionEnds || null,
                expiresAt: listing.expiresAt || null,
+               autoRenew:
+                 (listing as any).autoRenew === 1 || (listing as any).autoRenew === true,
                favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
              };
     });

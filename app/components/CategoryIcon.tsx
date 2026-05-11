@@ -27,6 +27,10 @@ const iconMap: Record<string, string> = {
   all_categories: '/images/categories_icons/all_categories.svg',
 };
 
+/** Трохи більший масштаб гліфа (однаково у світлій і темній темі) */
+const LARGER_ICON_IDS = new Set(['appliances', 'beauty_wellness']);
+const LARGER_ICON_SCALE = 1.16;
+
 function toDarkVariantPath(defaultPath: string): string {
   return defaultPath.replace(
     '/images/categories_icons/',
@@ -50,6 +54,16 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({
   const useDarkAsset = isLight && !isActive;
   const iconPath = useDarkAsset ? toDarkVariantPath(defaultPath) : defaultPath;
 
+  const enlarge = LARGER_ICON_IDS.has(categoryId);
+  const imgStyle: React.CSSProperties = {
+    ...(enlarge
+      ? { transform: `scale(${LARGER_ICON_SCALE})`, transformOrigin: 'center center' }
+      : {}),
+    filter: isActive
+      ? 'brightness(0) saturate(100%) invert(85%) sepia(20%) saturate(500%) hue-rotate(60deg) brightness(110%)'
+      : 'none',
+  };
+
   const img = (
     <img
       src={iconPath}
@@ -57,26 +71,16 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({
       width={size}
       height={size}
       className="block max-w-full max-h-full object-contain"
-      style={{
-        filter: isActive
-          ? 'brightness(0) saturate(100%) invert(85%) sepia(20%) saturate(500%) hue-rotate(60deg) brightness(110%)'
-          : 'none',
-      }}
+      style={imgStyle}
     />
   );
 
-  if (isLight) {
-    return (
-      <div className={`inline-flex items-center justify-center shrink-0 ${className}`}>
-        <div className="rounded-lg border-2 border-[#3F5331] bg-white p-0.5 box-border inline-flex items-center justify-center">
-          {img}
-        </div>
-      </div>
-    );
-  }
-
+  /* У світлій темі зелена рамка лише на батьківській кнопці/плитці — тут тільки іконка без обводки */
   return (
-    <div className={`flex items-center justify-center shrink-0 ${className}`} style={{ width: size, height: size }}>
+    <div
+      className={`flex items-center justify-center shrink-0 overflow-visible ${className}`}
+      style={{ width: size, height: size }}
+    >
       {img}
     </div>
   );

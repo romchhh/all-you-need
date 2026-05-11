@@ -116,7 +116,7 @@ export const TopBar = ({
         >
           <SlidersHorizontal size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
           {hasActiveFilters && (
-            <span className="absolute top-1 right-1 w-2 h-2 bg-[#D3F1A7] rounded-full"></span>
+            <span className="absolute top-1 right-1 w-2 h-2 bg-[#3F5331] rounded-full"></span>
           )}
         </button>
       </div>

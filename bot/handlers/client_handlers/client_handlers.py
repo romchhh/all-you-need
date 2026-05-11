@@ -101,6 +101,18 @@ async def scheduler_jobs():
             import traceback
             traceback.print_exc()
 
+    # Мікросервіс плавного накручування переглядів (окремий пакет view_boost, як parser)
+    try:
+        from view_boost.scheduler import VIEW_BOOST_ENABLED, register_view_boost_job
+
+        if VIEW_BOOST_ENABLED:
+            register_view_boost_job(scheduler)
+            print("✅ Scheduler job 'view_boost_daily' зареєстровано (view_boost.scheduler)")
+    except Exception as e:
+        print(f"❌ Помилка реєстрації VIEW_BOOST job: {e}")
+        import traceback
+        traceback.print_exc()
+
     # Job для пакетних (digest) сповіщень по підписці на міста
     try:
         digest_job_id = "city_digest_notifications"

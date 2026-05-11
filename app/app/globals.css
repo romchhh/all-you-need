@@ -79,6 +79,13 @@ body {
   min-height: var(--tg-viewport-height, 100dvh);
 }
 
+/* Мобільні: трохи більший відступ від верху (safe area + додатковий зазор) — усі сторінки, крім адмінки */
+@media (max-width: 1023px) {
+  body:not(.admin-panel) {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2.25rem);
+  }
+}
+
 .font-montserrat {
   font-family: var(--font-montserrat), sans-serif;
 }

@@ -1,10 +1,11 @@
-import { X, Copy, MessageCircle, Mail, Share2, Gift, Users, Award, Coins } from 'lucide-react';
+import { X, Copy, MessageCircle, Share2, Users, Award, Coins } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { getBotStartLink } from '@/utils/botLinks';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface ReferralModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface ReferralModalProps {
 
 export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModalProps) => {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
   const { toast, showToast, hideToast } = useToast();
   const [showFallback, setShowFallback] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -131,58 +133,97 @@ export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModal
     onClose();
   };
 
+  const sheet = isLight
+    ? 'bg-white rounded-t-3xl border-t-2 border-gray-200 shadow-[0_-8px_30px_rgba(0,0,0,0.08)]'
+    : 'bg-[#000000] rounded-t-3xl border-t-2 border-white';
+  const handleBar = isLight ? 'bg-gray-300' : 'bg-white/30';
+  const titleCls = isLight ? 'text-gray-900' : 'text-white';
+  const closeBtn = isLight
+    ? 'bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-900'
+    : 'bg-[#1C1C1C] border border-white/20 hover:bg-white/10 text-white';
+  const descCls = isLight ? 'text-gray-600' : 'text-white/50';
+  const statBox = isLight
+    ? 'bg-gray-50 border border-gray-200'
+    : 'bg-[#1C1C1C] border border-white/20';
+  const statCard = isLight
+    ? 'bg-white border border-gray-200'
+    : 'bg-[#000000] border border-white/10';
+  const statIconMuted = isLight ? 'text-gray-500' : 'text-white/70';
+  const statValue = isLight ? 'text-gray-900' : 'text-white';
+  const statLabel = isLight ? 'text-gray-600' : 'text-white/60';
+  const accentCoin = 'text-[#5a7c2e]';
+  const accentCoinDark = 'text-[#C8E6A0]';
+  const linkBox = isLight
+    ? 'bg-gray-50 border border-gray-200'
+    : 'bg-[#1C1C1C] border border-white/20';
+  const linkLabel = isLight ? 'text-gray-600' : 'text-white/70';
+  const linkText = isLight ? 'text-gray-900' : 'text-white';
+  const secondaryRow = isLight
+    ? 'border border-gray-200 bg-white hover:bg-gray-50'
+    : 'border border-white/20 bg-[#1C1C1C] hover:bg-white/10';
+  const iconCircle = isLight
+    ? 'bg-gray-100 border border-gray-200'
+    : 'bg-[#000000] border border-white/20';
+  const iconInCircle = isLight ? 'text-gray-800' : 'text-white';
+
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end justify-center animate-fadeIn">
-        <div className="bg-[#000000] rounded-t-3xl border-t-2 border-white w-full max-w-md p-6 animate-slideUp max-h-[90vh] overflow-y-auto">
-          <div className="w-12 h-1 bg-white/30 rounded-full mx-auto mb-6"></div>
+      <div
+        className={`fixed inset-0 backdrop-blur-sm z-[100] flex items-end justify-center animate-fadeIn ${
+          isLight ? 'bg-black/25' : 'bg-black/50'
+        }`}
+      >
+        <div
+          className={`${sheet} w-full max-w-md p-6 animate-slideUp max-h-[90vh] overflow-y-auto`}
+        >
+          <div className={`w-12 h-1 ${handleBar} rounded-full mx-auto mb-6`} />
           
           {/* Хедер */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-white">{t('referral.title')}</h2>
+            <h2 className={`text-xl font-bold ${titleCls}`}>{t('referral.title')}</h2>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors"
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
             >
-              <X size={20} className="text-white" />
+              <X size={20} className={isLight ? 'text-gray-800' : 'text-white'} />
             </button>
           </div>
 
           {/* Опис */}
           <div className="mb-4 px-2">
-            <p className="text-xs text-white/50 leading-relaxed whitespace-pre-line">
+            <p className={`text-xs leading-relaxed whitespace-pre-line ${descCls}`}>
               {t('referral.description')}
             </p>
           </div>
 
           {/* Статистика */}
           {stats && (
-            <div className="mb-4 p-3 bg-[#1C1C1C] rounded-xl border border-white/20">
-              <h3 className="text-white text-xs font-semibold mb-2">{t('referral.statsTitle')}</h3>
+            <div className={`mb-4 p-3 rounded-xl ${statBox}`}>
+              <h3 className={`text-xs font-semibold mb-2 ${titleCls}`}>{t('referral.statsTitle')}</h3>
               <div className="grid grid-cols-3 gap-2">
-                <div className="flex flex-col items-center p-2 bg-[#000000] rounded-lg border border-white/10">
-                  <Users size={16} className="text-white/70 mb-1" />
-                  <span className="text-white text-base font-bold">{stats.total_referrals}</span>
-                  <span className="text-white/60 text-[10px] text-center leading-tight mt-0.5">{t('referral.totalReferrals')}</span>
+                <div className={`flex flex-col items-center p-2 rounded-lg ${statCard}`}>
+                  <Users size={16} className={`${statIconMuted} mb-1`} />
+                  <span className={`text-base font-bold ${statValue}`}>{stats.total_referrals}</span>
+                  <span className={`${statLabel} text-[10px] text-center leading-tight mt-0.5`}>{t('referral.totalReferrals')}</span>
                 </div>
-                <div className="flex flex-col items-center p-2 bg-[#000000] rounded-lg border border-white/10">
-                  <Award size={16} className="text-white/70 mb-1" />
-                  <span className="text-white text-base font-bold">{stats.paid_referrals}</span>
-                  <span className="text-white/60 text-[10px] text-center leading-tight mt-0.5">{t('referral.paidReferrals')}</span>
+                <div className={`flex flex-col items-center p-2 rounded-lg ${statCard}`}>
+                  <Award size={16} className={`${statIconMuted} mb-1`} />
+                  <span className={`text-base font-bold ${statValue}`}>{stats.paid_referrals}</span>
+                  <span className={`${statLabel} text-[10px] text-center leading-tight mt-0.5`}>{t('referral.paidReferrals')}</span>
                 </div>
-                <div className="flex flex-col items-center p-2 bg-[#000000] rounded-lg border border-white/10">
-                  <Coins size={16} className="text-[#D3F1A7] mb-1" />
-                  <span className="text-[#D3F1A7] text-base font-bold">{stats.total_reward.toFixed(2)}€</span>
-                  <span className="text-white/60 text-[10px] text-center leading-tight mt-0.5">{t('referral.totalReward')}</span>
+                <div className={`flex flex-col items-center p-2 rounded-lg ${statCard}`}>
+                  <Coins size={16} className={`${isLight ? accentCoin : accentCoinDark} mb-1`} />
+                  <span className={`text-base font-bold ${isLight ? accentCoin : accentCoinDark}`}>{stats.total_reward.toFixed(2)}€</span>
+                  <span className={`${statLabel} text-[10px] text-center leading-tight mt-0.5`}>{t('referral.totalReward')}</span>
                 </div>
               </div>
             </div>
           )}
 
           {/* Попередній перегляд посилання */}
-          <div className="p-4 bg-[#1C1C1C] rounded-xl border border-white/20 mb-4">
-            <div className="text-sm text-white/70 mb-2">{t('share.link')}</div>
-            <div className="text-sm text-white font-mono font-semibold break-all">
+          <div className={`p-4 rounded-xl mb-4 ${linkBox}`}>
+            <div className={`text-sm mb-2 ${linkLabel}`}>{t('share.link')}</div>
+            <div className={`text-sm font-mono font-semibold break-all ${linkText}`}>
               {referralLink}
             </div>
           </div>
@@ -191,7 +232,7 @@ export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModal
           <div className="space-y-3">
             <button
               onClick={handleShare}
-              className="w-full px-6 py-4 bg-[#D3F1A7] text-black rounded-2xl font-semibold hover:bg-[#D3F1A7]/90 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+              className="w-full px-6 py-4 bg-[#3F5331] text-white rounded-2xl font-semibold hover:bg-[#344728] transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
             >
               <Share2 size={24} />
               <span className="text-lg">{t('referral.shareButton')}</span>
@@ -199,12 +240,12 @@ export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModal
 
             <button
               onClick={handleCopyLink}
-              className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
+              className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors ${secondaryRow}`}
             >
-              <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
-                <Copy className="w-6 h-6 text-white" />
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${iconCircle}`}>
+                <Copy className={`w-6 h-6 ${iconInCircle}`} />
               </div>
-              <span className="text-white font-medium">
+              <span className={`font-medium ${titleCls}`}>
                 {copied ? t('share.linkCopied') : t('share.copyLink')}
               </span>
             </button>
@@ -214,35 +255,39 @@ export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModal
 
       {/* Fallback меню */}
       {showFallback && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-end justify-center animate-fadeIn">
-          <div className="bg-[#000000] rounded-t-3xl border-t-2 border-white w-full max-w-md p-6 animate-slideUp">
-            <div className="w-12 h-1 bg-white/30 rounded-full mx-auto mb-6"></div>
+        <div
+          className={`fixed inset-0 backdrop-blur-sm z-[110] flex items-end justify-center animate-fadeIn ${
+            isLight ? 'bg-black/25' : 'bg-black/50'
+          }`}
+        >
+          <div className={`${sheet} w-full max-w-md p-6 animate-slideUp`}>
+            <div className={`w-12 h-1 ${handleBar} rounded-full mx-auto mb-6`} />
             
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className={`text-lg font-semibold mb-4 ${titleCls}`}>
               {t('share.shareVia')}
             </h3>
 
             <div className="space-y-3">
               <button
                 onClick={handleCopyLink}
-                className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
+                className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors ${secondaryRow}`}
               >
-                <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
-                  <Copy className="w-6 h-6 text-white" />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${iconCircle}`}>
+                  <Copy className={`w-6 h-6 ${iconInCircle}`} />
                 </div>
-                <span className="text-white font-medium">
+                <span className={`font-medium ${titleCls}`}>
                   {copied ? t('share.linkCopied') : t('share.copyLink')}
                 </span>
               </button>
 
               <button
                 onClick={shareViaTelegram}
-                className="w-full flex items-center gap-4 p-4 hover:bg-white/10 rounded-xl transition-colors border border-white/20 bg-[#1C1C1C]"
+                className={`w-full flex items-center gap-4 p-4 rounded-xl transition-colors ${secondaryRow}`}
               >
-                <div className="w-12 h-12 bg-[#000000] border border-white/20 rounded-full flex items-center justify-center">
-                  <MessageCircle className="w-6 h-6 text-white" />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${iconCircle}`}>
+                  <MessageCircle className={`w-6 h-6 ${iconInCircle}`} />
                 </div>
-                <span className="text-white font-medium">Telegram</span>
+                <span className={`font-medium ${titleCls}`}>Telegram</span>
               </button>
             </div>
           </div>

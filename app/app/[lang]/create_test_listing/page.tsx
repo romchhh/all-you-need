@@ -50,7 +50,7 @@ export default function CreateTestListingPage() {
 
       {status === 'ok' && data && (
         <div className="space-y-4 text-left max-w-md w-full">
-          <p className="text-[#D3F1A7] font-medium">Готово.</p>
+          <p className="text-[#C8E6A0] font-medium">Готово.</p>
           {data.users && data.users.length > 0 && (
             <ul className="text-sm space-y-1">
               {data.users.map((u) => (

@@ -77,7 +77,7 @@ export default function ReferralPage() {
             </p>
             <button
               onClick={openBot}
-              className="mt-3 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[#D3F1A7] text-black font-semibold text-sm hover:bg-[#c7e480] transition-colors"
+              className="mt-3 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[#3F5331] text-white font-semibold text-sm hover:bg-[#c7e480] transition-colors"
             >
               Открыть реферальный раздел в @TradeGroundBot
             </button>

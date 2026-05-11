@@ -213,6 +213,59 @@ export async function sendListingExpiredNotification(
 }
 
 /**
+ * Оголошення автоматично продовжено на 30 днів — запропонувати рекламу.
+ */
+export async function sendListingAutoRenewedNotification(
+  telegramId: number | string,
+  listingTitle: string,
+  listingId: number,
+  newExpiresAt: Date
+): Promise<boolean> {
+  const webappUrl = process.env.WEBAPP_URL || 'http://localhost:3000';
+  const { getUserLanguage } = await import('@/utils/userHelpers');
+  const lang = await getUserLanguage(telegramId);
+  const tid = typeof telegramId === 'string' ? telegramId : String(telegramId);
+  const listingUrl = `${webappUrl}/${lang}/bazaar?listing=${listingId}&telegramId=${tid}`;
+  const profileUrl = `${webappUrl}/${lang}/profile?telegramId=${tid}`;
+  const locale = lang === 'ru' ? 'ru-RU' : 'uk-UA';
+  const until = newExpiresAt.toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const safeTitle = escapeHtmlTelegram(listingTitle || '—');
+
+  let message: string;
+  let btnListing: string;
+  let btnPromo: string;
+  if (lang === 'ru') {
+    message =
+      `🔄 <b>Объявление продлено автоматически</b>\n\n` +
+      `«<b>${safeTitle}</b>» снова активно ещё <b>30 дней</b> (до <b>${until}</b>).\n\n` +
+      `Чтобы больше покупателей его увидели, оформите <b>рекламу</b> (VIP, TOP, выделение) в разделе «Мои объявления».`;
+    btnListing = '🔗 Открыть объявление';
+    btnPromo = '📣 Купить рекламу';
+  } else {
+    message =
+      `🔄 <b>Оголошення автоматично продовжено</b>\n\n` +
+      `«<b>${safeTitle}</b>» знову активне ще <b>30 днів</b> (до <b>${until}</b>).\n\n` +
+      `Щоб його бачило більше покупців, оформіть <b>рекламу</b> (VIP, TOP, виділення) у розділі «Мої оголошення».`;
+    btnListing = '🔗 Відкрити оголошення';
+    btnPromo = '📣 Купити рекламу';
+  }
+
+  return await sendTelegramMessage(telegramId, message, {
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: btnListing, web_app: { url: listingUrl } }],
+        [{ text: btnPromo, web_app: { url: profileUrl } }],
+      ],
+    },
+  });
+}
+
+/**
  * Попередження про закінчення терміну дії
  */
 export async function sendListingExpiringWarning(

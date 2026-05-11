@@ -294,10 +294,10 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
           currentActiveTab === 'bazaar'
             ? isLight
               ? 'font-semibold text-[#3F5331]'
-              : 'text-[#D3F1A7]'
+              : 'font-semibold text-[#C8E6A0]'
             : isLight
               ? 'text-gray-600 hover:text-[#3F5331]'
-              : 'text-white hover:text-[#D3F1A7]'
+              : 'text-white hover:text-[#C8E6A0]'
         }`}
       >
         <div
@@ -317,7 +317,7 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
           }
         }}
         className={`flex flex-col items-center min-w-0 flex-1 py-1 px-1 rounded-xl transition-all group ${
-          isLight ? 'text-gray-600 hover:text-[#3F5331]' : 'text-white hover:text-[#D3F1A7]'
+          isLight ? 'text-gray-600 hover:text-[#3F5331]' : 'text-white hover:text-[#C8E6A0]'
         }`}
       >
         <div className="shrink-0 transition-transform">
@@ -333,10 +333,10 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
           currentActiveTab === 'favorites'
             ? isLight
               ? 'font-semibold text-[#3F5331]'
-              : 'text-[#D3F1A7]'
+              : 'font-semibold text-[#C8E6A0]'
             : isLight
               ? 'text-gray-600 hover:text-[#3F5331]'
-              : 'text-white hover:text-[#D3F1A7]'
+              : 'text-white hover:text-[#C8E6A0]'
         }`}
       >
         <div
@@ -354,10 +354,10 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
           currentActiveTab === 'profile'
             ? isLight
               ? 'font-semibold text-[#3F5331]'
-              : 'text-[#D3F1A7]'
+              : 'font-semibold text-[#C8E6A0]'
             : isLight
               ? 'text-gray-600 hover:text-[#3F5331]'
-              : 'text-white hover:text-[#D3F1A7]'
+              : 'text-white hover:text-[#C8E6A0]'
         }`}
       >
         <div
