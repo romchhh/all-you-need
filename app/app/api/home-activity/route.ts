@@ -36,7 +36,8 @@ function startOfKyivDay(ref: Date): Date {
   return d;
 }
 
-const ONLINE_DISPLAY_CAP = 50;
+const ONLINE_DISPLAY_MIN = 30;
+const ONLINE_DISPLAY_MAX = 55;
 
 // Публічна статистика для головної / базару (без аутентифікації)
 export async function GET() {
@@ -63,7 +64,7 @@ export async function GET() {
       ) as Promise<Array<{ count: bigint }>>
     ).catch(() => [{ count: BigInt(0) }]);
     const rawOnline = Number(onlineUsersResult[0]?.count || 0);
-    const online = Math.min(rawOnline, ONLINE_DISPLAY_CAP);
+    const online = Math.min(ONLINE_DISPLAY_MAX, Math.max(ONLINE_DISPLAY_MIN, rawOnline));
 
     return NextResponse.json({
       online,

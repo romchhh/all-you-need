@@ -12,7 +12,7 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { CategoryIcon } from './CategoryIcon';
-import { TradeGroundLogo } from '@/components/TradeGroundLogo';
+import { FixedLogoHeader } from '@/components/FixedLogoHeader';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -27,7 +27,7 @@ export const CreateListingModal = ({
   onSave,
   tg
 }: CreateListingModalProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
   const categories = getCategories(t);
   const [title, setTitle] = useState('');
@@ -62,6 +62,7 @@ export const CreateListingModal = ({
   const buttonsRef = useRef<HTMLDivElement>(null);
   const [currencyMenuPosition, setCurrencyMenuPosition] = useState({ top: 0, left: 0, width: 0 });
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [formScrollParent, setFormScrollParent] = useState<HTMLDivElement | null>(null);
 
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
@@ -928,11 +929,21 @@ export const CreateListingModal = ({
     >
       <div className="w-full h-full flex flex-col">
         <div
-          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 max-lg:pt-[calc(env(safe-area-inset-top,0px)+2.25rem)] lg:pt-8"
+          ref={setFormScrollParent}
+          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 lg:pt-6"
           style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          {/* Лого: як на головній — верх = safe area + body offset; відступи рядка всередині TradeGroundLogo */}
-          <TradeGroundLogo className="pb-3" paddingX={false} />
+          <FixedLogoHeader
+            mode="sticky"
+            scrollParent={formScrollParent}
+            paddingX={false}
+            zClassName="z-10"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.href = `/${language}/bazaar`;
+              }
+            }}
+          />
           
           {/* Заголовок */}
           <div className="flex items-center justify-center px-4 pb-4">

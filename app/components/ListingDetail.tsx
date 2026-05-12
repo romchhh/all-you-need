@@ -7,7 +7,6 @@ import { ShareModal } from './ShareModal';
 import { ImageViewModal } from './ImageViewModal';
 import { PhoneModal } from './PhoneModal';
 import dynamic from 'next/dynamic';
-import { TopBar } from './TopBar';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getListingShareLink } from '@/utils/botLinks';
 import { useTelegram } from '@/hooks/useTelegram';
@@ -24,7 +23,7 @@ import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { descriptionWithLinks } from '@/utils/descriptionLinks';
 import { useRouter, useParams } from 'next/navigation';
-import { TradeGroundLogo } from '@/components/TradeGroundLogo';
+import { FixedLogoHeader } from '@/components/FixedLogoHeader';
 import { getCategories } from '@/constants/categories';
 import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
@@ -527,7 +526,19 @@ export const ListingDetail = ({
         />
       )}
       
-      {/* Лого зверху як на головній; ряд кнопок нижче — у потоці, як на сторінці профілю продавця */}
+      <FixedLogoHeader
+        mode="window-fixed"
+        zClassName="z-[50]"
+        paddingX={false}
+        outerClassName="px-4 lg:px-6 xl:px-8"
+        onClick={() => {
+          if (typeof window !== 'undefined') {
+            window.location.href = `/${lang}/bazaar`;
+          }
+        }}
+      />
+
+      {/* Ряд кнопок — у потоці; свайп як раніше */}
       <div
         className="w-full lg:pt-4"
         style={{
@@ -536,17 +547,6 @@ export const ListingDetail = ({
           opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
         }}
       >
-        <div className="w-full px-4 lg:px-6 xl:px-8">
-          <TradeGroundLogo
-            paddingX={false}
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.location.href = `/${lang}/bazaar`;
-              }
-            }}
-            className="pb-3"
-          />
-        </div>
         <div className="px-4 pb-1 lg:px-6 xl:px-8">
           <div className="mb-4 flex items-center justify-between">
             <button
@@ -608,9 +608,8 @@ export const ListingDetail = ({
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 
-          className="fixed left-0 right-0 flex items-center justify-center z-40 pointer-events-none"
+          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(2.25rem+0.625rem+max(env(safe-area-inset-top,0px),10px)+0.75rem+0.35rem)] lg:top-[5rem]"
           style={{
-            top: 'max(5.75rem, calc(env(safe-area-inset-top, 0px) + 5.75rem))',
             height: `${Math.min(pullDistance * 0.8, 100)}px`,
             opacity: Math.min(pullProgress * 1.2, 1),
             transform: `translateY(${Math.min(pullDistance * 0.4 - 50, 0)}px)`,
