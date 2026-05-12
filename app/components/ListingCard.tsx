@@ -9,6 +9,7 @@ import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCategories } from '@/constants/categories';
 import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
+import { shouldShowListingViews } from '@/utils/listingViewsDisplay';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface ListingCardProps {
@@ -396,10 +397,12 @@ const ListingCardComponent = ({
           }`}
         >
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-            <span className="inline-flex items-center gap-0.5 tabular-nums" title={t('listing.viewsLabel')}>
-              <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
-              {listing.views ?? 0}
-            </span>
+            {shouldShowListingViews(listing.views) && (
+              <span className="inline-flex items-center gap-0.5 tabular-nums" title={t('listing.viewsLabel')}>
+                <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
+                {listing.views ?? 0}
+              </span>
+            )}
             <span className="inline-flex items-center gap-0.5 tabular-nums" title={t('listing.favoritesLabel')}>
               <Heart size={10} className="flex-shrink-0 opacity-80" aria-hidden />
               {listing.favoritesCount ?? 0}

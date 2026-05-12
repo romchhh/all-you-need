@@ -690,6 +690,9 @@ const FavoritesPage = () => {
           }}
           favorites={favorites}
           tg={tg}
+          onAutoRenewPersist={(id, autoRenew) =>
+            setSelectedListing((prev) => (prev && prev.id === id ? { ...prev, autoRenew } : prev))
+          }
         />
       );
     }

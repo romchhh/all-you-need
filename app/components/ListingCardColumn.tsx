@@ -7,6 +7,7 @@ import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCurrencySymbol } from '@/utils/currency';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
+import { shouldShowListingViews } from '@/utils/listingViewsDisplay';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface ListingCardColumnProps {
@@ -227,10 +228,12 @@ const ListingCardColumnComponent = ({
                 isLight ? 'text-gray-500' : 'text-white/60'
               }`}
             >
-              <span className="inline-flex items-center gap-0.5" title={t('listing.viewsLabel')}>
-                <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
-                {listing.views ?? 0}
-              </span>
+              {shouldShowListingViews(listing.views) && (
+                <span className="inline-flex items-center gap-0.5" title={t('listing.viewsLabel')}>
+                  <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
+                  {listing.views ?? 0}
+                </span>
+              )}
               <span className="inline-flex items-center gap-0.5" title={t('listing.favoritesLabel')}>
                 <Heart size={10} className="flex-shrink-0 opacity-80" aria-hidden />
                 {listing.favoritesCount ?? 0}

@@ -13,6 +13,8 @@ export type TradeGroundLogoProps = {
   paddingX?: boolean;
   /** Прозорість зображення */
   imageOpacity?: number;
+  /** У фіксованому AppHeader: без верхніх відступів рядка логотипу (safe area дає батько) */
+  embedInFixedHeader?: boolean;
 };
 
 /**
@@ -33,12 +35,14 @@ export function TradeGroundLogo({
   style,
   paddingX = true,
   imageOpacity = 1,
+  embedInFixedHeader = false,
 }: TradeGroundLogoProps) {
   const { isLight } = useTheme();
   const logoSrc = isLight ? LOGO_SRC_LIGHT : LOGO_SRC_DARK;
+  const verticalPad = embedInFixedHeader ? '' : LOGO_ROW_PADDING;
 
   return (
-    <div className={`w-full shrink-0 min-h-0 ${LOGO_ROW_PADDING} ${className}`.trim()} style={style}>
+    <div className={`w-full shrink-0 min-h-0 ${verticalPad} ${className}`.trim()} style={style}>
       <div
         className={`mx-auto flex w-full min-h-0 max-w-full items-center justify-center overflow-hidden ${
           paddingX ? 'px-4' : ''

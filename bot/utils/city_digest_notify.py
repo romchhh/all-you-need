@@ -20,7 +20,11 @@ from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from database_functions.telegram_listing_db import get_connection
-from utils.city_subscription_notify import listing_city_key_from_location, _user_language
+from utils.city_subscription_notify import (
+    listing_city_key_from_location,
+    _listing_photo_urls,
+    _user_language,
+)
 
 
 def _ensure_city_digest_tables(cursor: sqlite3.Cursor) -> None:
@@ -126,18 +130,22 @@ async def send_city_digest_notifications(bot: Bot, max_listings_per_city: int = 
             )
             total_pending = int((cur.fetchone() or [0])[0])
 
-            # Витягаємо дані лістингів (id, userId, title)
+            # Витягаємо дані лістингів (id, userId, title, images JSON для фото в Telegram)
             placeholders = ",".join(["?"] * len(listing_ids))
             cur.execute(
                 f"""
-                SELECT id, userId, COALESCE(title, '')
+                SELECT id, userId, COALESCE(title, ''), COALESCE(images, '')
                 FROM Listing
                 WHERE id IN ({placeholders})
                 """,
                 tuple(listing_ids),
             )
             listing_rows = cur.fetchall() or []
-            listings = {int(r[0]): (int(r[1]), str(r[2] or "")) for r in listing_rows if r and r[0] is not None}
+            listings = {
+                int(r[0]): (int(r[1]), str(r[2] or ""), str(r[3] or ""))
+                for r in listing_rows
+                if r and r[0] is not None
+            }
             if not listings:
                 # Якщо лістинги вже зникли — просто позначимо як processed
                 cur.execute(
@@ -182,16 +190,18 @@ async def send_city_digest_notifications(bot: Bot, max_listings_per_city: int = 
 
                 # Відкидаємо listings автора (як і в “миттєвій” розсилці)
                 allowed = [
-                    (lid, title)
-                    for lid, (author_uid, title) in listings.items()
+                    (lid, title, images_raw)
+                    for lid, (author_uid, title, images_raw) in listings.items()
                     if author_uid != sub_user_id
                 ]
                 if not allowed:
                     continue
 
                 allowed.sort(key=lambda x: x[0])
-                first_listing_id, first_title = allowed[0]
+                first_listing_id, first_title, first_images_raw = allowed[0]
                 more = max(0, total_pending - 1)
+                photo_urls = _listing_photo_urls(first_images_raw, webapp_url)
+                first_photo_url = photo_urls[0] if photo_urls else ""
 
                 lang = _user_language(cur, tid)
                 listing_url = f"{webapp_url}/{lang}/bazaar?listing={first_listing_id}&telegramId={tid}"
@@ -225,15 +235,36 @@ async def send_city_digest_notifications(bot: Bot, max_listings_per_city: int = 
                     ]
                 )
                 try:
-                    await bot.send_message(
-                        chat_id=tid,
-                        text=text,
-                        parse_mode="HTML",
-                        reply_markup=kb,
-                        disable_web_page_preview=True,
-                    )
+                    if first_photo_url:
+                        await bot.send_photo(
+                            chat_id=tid,
+                            photo=first_photo_url,
+                            caption=text[:1024],
+                            parse_mode="HTML",
+                            reply_markup=kb,
+                        )
+                    else:
+                        await bot.send_message(
+                            chat_id=tid,
+                            text=text,
+                            parse_mode="HTML",
+                            reply_markup=kb,
+                            disable_web_page_preview=True,
+                        )
                     sent_any = True
                 except Exception:
+                    if first_photo_url:
+                        try:
+                            await bot.send_message(
+                                chat_id=tid,
+                                text=text,
+                                parse_mode="HTML",
+                                reply_markup=kb,
+                                disable_web_page_preview=True,
+                            )
+                            sent_any = True
+                        except Exception:
+                            pass
                     # мовчки — користувач міг заблокувати
                     continue
 

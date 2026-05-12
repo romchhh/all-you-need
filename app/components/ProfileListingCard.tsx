@@ -1,10 +1,12 @@
-import { Eye, Heart, Edit2, Check, Megaphone, Package, DollarSign, Loader2, Info } from 'lucide-react';
+import { Eye, Heart, Edit2, Check, Megaphone, Package, DollarSign, Loader2 } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
+import { shouldShowListingViews } from '@/utils/listingViewsDisplay';
+import { ListingAutoRenewSection } from '@/components/ListingAutoRenewSection';
 
 interface ProfileListingCardProps {
   listing: Listing;
@@ -19,7 +21,7 @@ interface ProfileListingCardProps {
   /** Telegram id власника для API автопродовження */
   viewerTelegramId?: string | null;
   onAutoRenewChange?: (listingId: number, autoRenew: boolean) => void;
-  showToast?: (message: string, type: 'success' | 'error' | 'info') => void;
+  showToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
   tg: TelegramWebApp | null;
 }
 
@@ -40,18 +42,6 @@ export const ProfileListingCard = ({
 }: ProfileListingCardProps) => {
   const { t } = useLanguage();
   const { isLight } = useTheme();
-  const [autoRenewLocal, setAutoRenewLocal] = useState(!!listing.autoRenew);
-  const [autoRenewSaving, setAutoRenewSaving] = useState(false);
-  const [pendingAutoRenewOff, setPendingAutoRenewOff] = useState(false);
-
-  useEffect(() => {
-    setPendingAutoRenewOff(false);
-  }, [listing.id]);
-
-  useEffect(() => {
-    if (autoRenewSaving) return;
-    setAutoRenewLocal(!!listing.autoRenew);
-  }, [listing.id, listing.autoRenew, autoRenewSaving]);
 
   // Перевіряємо статус модерації
   const isPendingModeration = listing.status === 'pending_moderation';
@@ -194,37 +184,6 @@ export const ProfileListingCard = ({
     }
 
     return isLight ? 'bg-white border-2 border-gray-200/90 shadow-sm' : 'bg-[#000000] border-2 border-white/20';
-  };
-
-  const persistAutoRenew = async (next: boolean): Promise<boolean> => {
-    if (!viewerTelegramId) return false;
-    setAutoRenewSaving(true);
-    setAutoRenewLocal(next);
-    try {
-      const res = await fetch(`/api/listings/${listing.id}/auto-renew`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramId: String(viewerTelegramId),
-          autoRenew: next,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as { error?: string }).error || 'Request failed');
-      }
-      onAutoRenewChange?.(listing.id, next);
-      showToast?.(t('sales.autoRenewSaved'), 'success');
-      tg?.HapticFeedback?.impactOccurred('light');
-      return true;
-    } catch {
-      setAutoRenewLocal(!next);
-      showToast?.(t('sales.autoRenewError'), 'error');
-      tg?.HapticFeedback?.notificationOccurred('error');
-      return false;
-    } finally {
-      setAutoRenewSaving(false);
-    }
   };
 
   return (
@@ -465,80 +424,16 @@ export const ProfileListingCard = ({
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
-                  {pendingAutoRenewOff ? (
-                    <div
-                      className={`flex flex-wrap items-center gap-1 rounded-lg px-1.5 py-1 ${
-                        isLight ? 'bg-amber-50/95 ring-1 ring-amber-200/80' : 'bg-amber-950/40 ring-1 ring-amber-600/35'
-                      }`}
-                    >
-                      <span
-                        className={`text-[10px] font-medium leading-none ${isLight ? 'text-amber-900' : 'text-amber-100/95'}`}
-                      >
-                        {t('sales.autoRenewOffAsk')}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={autoRenewSaving}
-                        onClick={async () => {
-                          const ok = await persistAutoRenew(false);
-                          if (ok) setPendingAutoRenewOff(false);
-                        }}
-                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none disabled:opacity-50 ${
-                          isLight
-                            ? 'bg-red-600 text-white hover:bg-red-700'
-                            : 'bg-red-500/90 text-white hover:bg-red-500'
-                        }`}
-                      >
-                        {t('sales.autoRenewDisable')}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={autoRenewSaving}
-                        onClick={() => setPendingAutoRenewOff(false)}
-                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none disabled:opacity-50 ${
-                          isLight
-                            ? 'border border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
-                            : 'border border-white/25 bg-black/30 text-white/90 hover:bg-white/10'
-                        }`}
-                      >
-                        {t('sales.autoRenewKeepOn')}
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="inline-flex max-w-full cursor-pointer select-none items-center gap-1">
-                      <input
-                        type="checkbox"
-                        className={`h-3 w-3 shrink-0 rounded border accent-[#3F5331] focus:ring-1 focus:ring-[#3F5331]/40 ${
-                          isLight
-                            ? 'border-gray-400 bg-white'
-                            : 'border-white/35 bg-black/50 accent-[#C8E6A0]'
-                        }`}
-                        checked={autoRenewLocal}
-                        disabled={autoRenewSaving}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          const next = e.target.checked;
-                          if (!next && autoRenewLocal) {
-                            setPendingAutoRenewOff(true);
-                            return;
-                          }
-                          void persistAutoRenew(next);
-                        }}
-                      />
-                      <span
-                        className={`min-w-0 truncate text-[10px] font-medium leading-none ${isLight ? 'text-gray-700' : 'text-white/85'}`}
-                      >
-                        {t('sales.autoRenewShort')}
-                      </span>
-                      <span
-                        className={`inline-flex shrink-0 ${isLight ? 'text-gray-400' : 'text-white/45'}`}
-                        title={t('sales.autoRenewHint')}
-                        aria-label={t('sales.autoRenewHint')}
-                      >
-                        <Info className="h-3 w-3" strokeWidth={2.25} />
-                      </span>
-                    </label>
-                  )}
+                  <ListingAutoRenewSection
+                    compact
+                    listingId={listing.id}
+                    serverAutoRenew={listing.autoRenew}
+                    viewerTelegramId={String(viewerTelegramId)}
+                    isLight={isLight}
+                    showToast={showToast ?? (() => {})}
+                    onPersistSuccess={(next) => onAutoRenewChange?.(listing.id, next)}
+                    tg={tg}
+                  />
                 </div>
               )}
           </div>
@@ -547,10 +442,12 @@ export const ProfileListingCard = ({
           <div className={`flex items-center gap-3 text-xs mt-2 ${
             isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-600' : 'text-white/70'
           }`}>
-            <div className="flex items-center gap-1">
-              <Eye size={14} className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : ''} />
-              <span>{listing.views || 0}</span>
-            </div>
+            {shouldShowListingViews(listing.views) && (
+              <div className="flex items-center gap-1">
+                <Eye size={14} className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : ''} />
+                <span>{listing.views || 0}</span>
+              </div>
+            )}
             <div className="flex items-center gap-1">
               <Heart size={14} className={
                 isSold || isPendingModeration || isDeactivated || isRejected

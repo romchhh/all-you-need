@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone, Eye, Info } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone, Eye } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -18,7 +18,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
-import { useState, useEffect, useMemo, useLayoutEffect } from 'react';
+import { useState, useEffect, useMemo, useLayoutEffect, useCallback } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
@@ -30,6 +30,8 @@ import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { ListingAutoRenewSection } from '@/components/ListingAutoRenewSection';
+import { shouldShowListingViews } from '@/utils/listingViewsDisplay';
 import { BRAND_GREEN_ON_DARK, BRAND_GREEN_PRICE_ON_LIGHT } from '@/constants/brandColors';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
@@ -76,6 +78,8 @@ interface ListingDetailProps {
   favorites: Set<number>;
   tg: TelegramWebApp | null;
   onBack?: () => void;
+  /** Оновити кеш оголошення у батька після зміни автопродовження (щоб проп `autoRenew` збігався з БД). */
+  onAutoRenewPersist?: (listingId: number, autoRenew: boolean) => void;
 }
 
 export const ListingDetail = ({ 
@@ -87,7 +91,8 @@ export const ListingDetail = ({
   onViewSellerProfile,
   favorites,
   tg,
-  onBack
+  onBack,
+  onAutoRenewPersist,
 }: ListingDetailProps) => {
   const sellerUsername = listing.seller.username;
   const sellerPhone = listing.seller.phone;
@@ -109,9 +114,6 @@ export const ListingDetail = ({
   const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [showMarkSoldConfirm, setShowMarkSoldConfirm] = useState(false);
-  const [autoRenewLocal, setAutoRenewLocal] = useState(!!listing.autoRenew);
-  const [autoRenewSaving, setAutoRenewSaving] = useState(false);
-  const [pendingAutoRenewOff, setPendingAutoRenewOff] = useState(false);
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
   const { t, language } = useLanguage();
@@ -179,43 +181,26 @@ export const ListingDetail = ({
   
   // Перевіряємо, чи це власне оголошення
   const isOwnListing = useMemo(() => {
-    // Спробуємо отримати telegramId з різних джерел
     const currentTelegramId = currentUser?.id || (profile?.telegramId ? parseInt(profile.telegramId) : null);
     const sellerTelegramId = listing.seller.telegramId;
-    
+
     if (!currentTelegramId || !sellerTelegramId) {
-      console.log('Missing IDs for comparison:', { currentTelegramId, sellerTelegramId, currentUser, profile, seller: listing.seller });
       return false;
     }
-    
+
     const currentIdStr = String(currentTelegramId);
     const sellerIdStr = String(sellerTelegramId);
-    const isOwn = currentIdStr === sellerIdStr;
-    
-    console.log('Checking if own listing:', {
-      currentTelegramId,
-      sellerTelegramId,
-      currentIdStr,
-      sellerIdStr,
-      isOwn,
-      currentUser,
-      profile,
-      seller: listing.seller
-    });
-    
-    return isOwn;
+    return currentIdStr === sellerIdStr;
   }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
 
-  useEffect(() => {
-    if (autoRenewSaving) return;
-    setAutoRenewLocal(!!listing.autoRenew);
-  }, [listing.id, listing.autoRenew, autoRenewSaving]);
-
-  useEffect(() => {
-    setPendingAutoRenewOff(false);
-  }, [listing.id]);
-
   const viewerTelegramIdStr = String(currentUser?.id || profile?.telegramId || '');
+
+  const persistAutoRenewToParent = useCallback(
+    (next: boolean) => {
+      onAutoRenewPersist?.(listing.id, next);
+    },
+    [listing.id, onAutoRenewPersist]
+  );
 
   // Скролимо нагору при відкритті нового оголошення
   // useLayoutEffect виконується СИНХРОННО перед рендером - це ключ до успіху
@@ -801,10 +786,12 @@ export const ListingDetail = ({
 
         {/* Статистика */}
         <div className={`flex flex-wrap gap-x-4 gap-y-2 mb-6 text-sm ${ac.mutedText}`}>
-          <div className="flex items-center gap-2 tabular-nums" title={t('listing.viewsLabel')}>
-            <Eye size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
-            <span>{listing.views ?? 0}</span>
-          </div>
+          {shouldShowListingViews(listing.views) && (
+            <div className="flex items-center gap-2 tabular-nums" title={t('listing.viewsLabel')}>
+              <Eye size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
+              <span>{listing.views ?? 0}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 tabular-nums" title={t('listing.favoritesLabel')}>
             <Heart size={16} className={`flex-shrink-0 ${ac.mutedText}`} strokeWidth={2} />
             <span>{listing.favoritesCount ?? 0}</span>
@@ -898,6 +885,24 @@ export const ListingDetail = ({
             </div>
           </div>
         )}
+
+        {isOwnListing &&
+          listing.status === 'active' &&
+          isTelegramEnv &&
+          !isSeoListingRoute &&
+          viewerTelegramIdStr && (
+            <div className="mb-6">
+              <ListingAutoRenewSection
+                listingId={listing.id}
+                serverAutoRenew={listing.autoRenew}
+                viewerTelegramId={viewerTelegramIdStr}
+                isLight={isLight}
+                showToast={showToast}
+                onPersistSuccess={persistAutoRenewToParent}
+                tg={tg}
+              />
+            </div>
+          )}
 
         {/* Продавець */}
         <div
@@ -1057,134 +1062,6 @@ export const ListingDetail = ({
         className="fixed bottom-28 left-0 right-0 z-[50] mx-auto max-w-2xl space-y-3 px-4 py-4 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8"
         style={{ pointerEvents: 'auto' }}
       >
-        {isOwnListing &&
-          listing.status === 'active' &&
-          isTelegramEnv &&
-          !isSeoListingRoute &&
-          viewerTelegramIdStr && (
-            <div
-              className={`rounded-xl border px-2.5 py-1.5 shadow-sm ${
-                isLight
-                  ? 'border-gray-200/90 bg-white/95 text-gray-900'
-                  : 'border-white/15 bg-black/50 text-white/90 backdrop-blur-sm'
-              }`}
-            >
-              {pendingAutoRenewOff ? (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span
-                    className={`text-[11px] font-medium leading-tight ${isLight ? 'text-amber-900' : 'text-amber-100/95'}`}
-                  >
-                    {t('sales.autoRenewOffAsk')}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={autoRenewSaving}
-                    onClick={async () => {
-                      setAutoRenewSaving(true);
-                      setAutoRenewLocal(false);
-                      try {
-                        const res = await fetch(`/api/listings/${listing.id}/auto-renew`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            telegramId: viewerTelegramIdStr,
-                            autoRenew: false,
-                          }),
-                        });
-                        if (!res.ok) {
-                          const err = await res.json().catch(() => ({}));
-                          throw new Error((err as { error?: string }).error || 'Request failed');
-                        }
-                        showToast(t('sales.autoRenewSaved'), 'success');
-                        tg?.HapticFeedback?.impactOccurred('light');
-                        setPendingAutoRenewOff(false);
-                      } catch {
-                        setAutoRenewLocal(true);
-                        setPendingAutoRenewOff(false);
-                        showToast(t('sales.autoRenewError'), 'error');
-                        tg?.HapticFeedback?.notificationOccurred('error');
-                      } finally {
-                        setAutoRenewSaving(false);
-                      }
-                    }}
-                    className={`rounded px-2 py-0.5 text-[11px] font-semibold leading-none disabled:opacity-50 ${
-                      isLight ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-500/90 text-white hover:bg-red-500'
-                    }`}
-                  >
-                    {t('sales.autoRenewDisable')}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={autoRenewSaving}
-                    onClick={() => setPendingAutoRenewOff(false)}
-                    className={`rounded px-2 py-0.5 text-[11px] font-medium leading-none disabled:opacity-50 ${
-                      isLight
-                        ? 'border border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
-                        : 'border border-white/25 bg-black/30 text-white/90 hover:bg-white/10'
-                    }`}
-                  >
-                    {t('sales.autoRenewKeepOn')}
-                  </button>
-                </div>
-              ) : (
-                <label className="flex cursor-pointer select-none items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className={`h-3.5 w-3.5 shrink-0 rounded border accent-[#3F5331] focus:ring-1 focus:ring-[#3F5331]/50 ${
-                      isLight
-                        ? 'border-gray-300 bg-white'
-                        : 'border-white/40 bg-black/40 accent-[#C8E6A0]'
-                    }`}
-                    checked={autoRenewLocal}
-                    disabled={autoRenewSaving}
-                    onChange={async (e) => {
-                      const next = e.target.checked;
-                      if (!next && autoRenewLocal) {
-                        setPendingAutoRenewOff(true);
-                        return;
-                      }
-                      setAutoRenewSaving(true);
-                      setAutoRenewLocal(next);
-                      try {
-                        const res = await fetch(`/api/listings/${listing.id}/auto-renew`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            telegramId: viewerTelegramIdStr,
-                            autoRenew: next,
-                          }),
-                        });
-                        if (!res.ok) {
-                          const err = await res.json().catch(() => ({}));
-                          throw new Error((err as { error?: string }).error || 'Request failed');
-                        }
-                        showToast(t('sales.autoRenewSaved'), 'success');
-                        tg?.HapticFeedback?.impactOccurred('light');
-                      } catch {
-                        setAutoRenewLocal(!next);
-                        showToast(t('sales.autoRenewError'), 'error');
-                        tg?.HapticFeedback?.notificationOccurred('error');
-                      } finally {
-                        setAutoRenewSaving(false);
-                      }
-                    }}
-                  />
-                  <span
-                    className={`min-w-0 flex-1 truncate text-[11px] font-medium leading-tight ${isLight ? 'text-gray-800' : 'text-white/90'}`}
-                  >
-                    {t('sales.autoRenewShort')}
-                  </span>
-                  <span
-                    className={`inline-flex shrink-0 ${isLight ? 'text-gray-400' : 'text-white/45'}`}
-                    title={t('sales.autoRenewHint')}
-                    aria-label={t('sales.autoRenewHint')}
-                  >
-                    <Info className="h-3.5 w-3.5" strokeWidth={2.25} />
-                  </span>
-                </label>
-              )}
-            </div>
-          )}
         {(isSeoListingRoute || !isTelegramEnv) && (
           <div
             className={`rounded-xl px-3 py-2 text-center text-xs shadow-sm ${
