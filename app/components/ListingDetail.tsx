@@ -608,7 +608,7 @@ export const ListingDetail = ({
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 
-          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(2.25rem+0.625rem+max(env(safe-area-inset-top,0px),10px)+0.75rem+0.35rem)] lg:top-[5rem]"
+          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+1.75rem+2.25rem+0.625rem+0.35rem)] lg:top-[5rem]"
           style={{
             height: `${Math.min(pullDistance * 0.8, 100)}px`,
             opacity: Math.min(pullProgress * 1.2, 1),

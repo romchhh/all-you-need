@@ -4,12 +4,16 @@ import React, { useEffect, useState } from 'react';
 import { TradeGroundLogo } from '@/components/TradeGroundLogo';
 import { useTheme } from '@/contexts/ThemeContext';
 
-/** Спейсер під фіксований логотип (узгоджено з внутрішніми відступами хедера) */
+/** Висота фіксованого блоку = safe-top + дод. відступ (моб pt-7) + ряд лого + pb */
 export const FIXED_LOGO_SPACER_CLASS =
-  'w-full shrink-0 max-lg:h-[calc(2.25rem+0.625rem+max(env(safe-area-inset-top,0px),10px)+0.75rem)] lg:h-[calc(2.25rem+0.625rem+max(env(safe-area-inset-top,0px),2px))]';
+  'w-full shrink-0 max-lg:h-[calc(max(env(safe-area-inset-top,0px),10px)+1.75rem+2.25rem+0.625rem)] lg:h-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
 
-const innerLayoutClass =
-  'mx-auto w-full max-w-2xl pb-2.5 max-lg:pt-[calc(max(env(safe-area-inset-top,0px),10px)+0.75rem)] lg:pt-[max(env(safe-area-inset-top,0px),2px)] lg:max-w-5xl xl:max-w-6xl';
+/** Safe area окремо — щоб не покладатися на вкладений max() у calc() у arbitrary-класах */
+const safeTopShellClass =
+  'max-lg:pt-[max(env(safe-area-inset-top,0px),10px)] lg:pt-[max(env(safe-area-inset-top,0px),2px)]';
+
+const innerContentClass =
+  'mx-auto w-full max-w-2xl pb-2.5 max-lg:pt-7 lg:pt-2 lg:max-w-5xl xl:max-w-6xl';
 
 export type FixedLogoHeaderMode = 'window-fixed' | 'sticky';
 
@@ -75,13 +79,15 @@ export function FixedLogoHeader({
     transition: 'box-shadow 0.2s ease-out, background-color 0.2s ease-out',
   };
 
-  const innerClasses = `${innerLayoutClass} ${outerClassName}`.trim();
+  const innerClasses = `${innerContentClass} ${outerClassName}`.trim();
 
   if (mode === 'sticky') {
     return (
       <div className={`sticky top-0 ${zClassName} w-full max-w-full`} style={shellStyle}>
-        <div className={innerClasses}>
-          <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+        <div className={safeTopShellClass}>
+          <div className={innerClasses}>
+            <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+          </div>
         </div>
       </div>
     );
@@ -90,8 +96,10 @@ export function FixedLogoHeader({
   return (
     <>
       <header className={`fixed left-0 right-0 top-0 ${zClassName} w-full max-w-full`} style={shellStyle}>
-        <div className={innerClasses}>
-          <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+        <div className={safeTopShellClass}>
+          <div className={innerClasses}>
+            <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+          </div>
         </div>
       </header>
       <div className={FIXED_LOGO_SPACER_CLASS} aria-hidden />
