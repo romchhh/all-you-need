@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getUserListingStatsForUserId } from '@/lib/userBootstrapQueries';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,39 +30,12 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = users[0].id;
-    const createdAt = users[0].createdAt;
+    const createdAtRaw = users[0].createdAt as unknown;
+    const created =
+      createdAtRaw instanceof Date ? createdAtRaw.toISOString() : String(createdAtRaw);
+    const payload = await getUserListingStatsForUserId(userId, created);
 
-    // Отримуємо статистику
-    const stats = await prisma.$queryRawUnsafe(
-      `SELECT 
-        COUNT(*) as totalListings,
-        SUM(views) as totalViews,
-        SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) as soldListings,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings
-      FROM Listing
-      WHERE userId = ?`,
-      userId
-    ) as Array<{
-      totalListings: bigint;
-      totalViews: bigint;
-      soldListings: bigint;
-      activeListings: bigint;
-    }>;
-
-    const stat = stats[0] || {
-      totalListings: BigInt(0),
-      totalViews: BigInt(0),
-      soldListings: BigInt(0),
-      activeListings: BigInt(0),
-    };
-
-    return NextResponse.json({
-      totalListings: Number(stat.totalListings),
-      totalViews: Number(stat.totalViews),
-      soldListings: Number(stat.soldListings),
-      activeListings: Number(stat.activeListings),
-      createdAt: createdAt,
-    });
+    return NextResponse.json(payload);
   } catch (error) {
     console.error('Error fetching user stats:', error);
     return NextResponse.json(

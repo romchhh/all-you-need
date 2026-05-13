@@ -67,11 +67,7 @@ export const PhoneModal = ({ isOpen, onClose, phoneNumber, tg }: PhoneModalProps
       }
     } catch (error) {
       console.error('Error copying phone number:', error);
-      if (tg) {
-        tg.showAlert(t('phone.copyError'));
-      } else {
-        showToast(t('phone.copyError'), 'error');
-      }
+      showToast(t('phone.copyError'), 'error');
     }
   };
 

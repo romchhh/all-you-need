@@ -18,9 +18,9 @@ export type TradeGroundLogoProps = {
 };
 
 /**
- * Логотип Trade Ground: один рядок 2.25rem + верхній відступ (моб: pt-3 + pt-7-еквівалент, десктоп: 1mm + 8px).
+ * Логотип Trade Ground: один рядок 2.25rem + верхній відступ (моб: pt-3 + дод. як у AppHeader, десктоп: 1mm + 8px).
  */
-const LOGO_ROW_PADDING = 'max-lg:pt-[calc(0.75rem+1.75rem)] lg:pt-[calc(1mm+0.5rem)]';
+const LOGO_ROW_PADDING = 'max-lg:pt-[calc(0.75rem+2.25rem)] lg:pt-[calc(1mm+0.5rem)]';
 /** Фіксована висота рядка логотипу (як на головній), без 11svh — розмір стабільний скрізь */
 const LOGO_ROW_HEIGHT = '2.25rem';
 

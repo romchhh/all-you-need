@@ -349,9 +349,9 @@ const ListingCardComponent = ({
             if (isNegotiable) {
               return (
                 <span
-                  className={`block min-w-0 truncate font-bold leading-none tracking-tight whitespace-nowrap text-[clamp(0.5rem,2.6vw,0.8125rem)] sm:text-[clamp(0.5625rem,2.2vw,0.875rem)] ${
-                    isStacked ? '' : 'lg:text-[clamp(0.625rem,1.1vw,0.8125rem)]'
-                  } ${isLight ? 'text-[#152A12]' : 'text-white'}`}
+                  className={`block min-w-0 truncate font-bold leading-tight whitespace-nowrap ${fluidSize} ${
+                    isLight ? 'text-[#152A12]' : 'text-white'
+                  }`}
                   title={t('common.negotiable')}
                 >
                   {t('common.negotiableShort')}
@@ -403,10 +403,6 @@ const ListingCardComponent = ({
                 {listing.views ?? 0}
               </span>
             )}
-            <span className="inline-flex items-center gap-0.5 tabular-nums" title={t('listing.favoritesLabel')}>
-              <Heart size={10} className="flex-shrink-0 opacity-80" aria-hidden />
-              {listing.favoritesCount ?? 0}
-            </span>
           </div>
           <div className="flex items-center gap-1">
             <svg
@@ -441,7 +437,6 @@ export const ListingCard = memo(ListingCardComponent, (prevProps, nextProps) => 
     prevProps.listing.promotionType === nextProps.listing.promotionType &&
     prevProps.listing.promotionEnds === nextProps.listing.promotionEnds &&
     prevProps.listing.views === nextProps.listing.views &&
-    prevProps.listing.favoritesCount === nextProps.listing.favoritesCount &&
     prevProps.isFavorite === nextProps.isFavorite &&
     prevProps.isSold === nextProps.isSold &&
     prevProps.isDeactivated === nextProps.isDeactivated &&

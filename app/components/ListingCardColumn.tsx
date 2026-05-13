@@ -190,7 +190,7 @@ const ListingCardColumnComponent = ({
                 if (isNegotiable) {
                   return (
                     <span
-                      className={`min-w-0 max-w-full truncate font-bold leading-none tracking-tight whitespace-nowrap text-[clamp(0.5rem,2.8vw,0.8125rem)] sm:text-[clamp(0.5625rem,2.2vw,0.875rem)] ${
+                      className={`min-w-0 max-w-full truncate font-bold leading-tight whitespace-nowrap ${fluidSize} ${
                         isLight ? 'text-[#152A12]' : 'text-white'
                       }`}
                       title={t('common.negotiable')}
@@ -234,10 +234,6 @@ const ListingCardColumnComponent = ({
                   {listing.views ?? 0}
                 </span>
               )}
-              <span className="inline-flex items-center gap-0.5" title={t('listing.favoritesLabel')}>
-                <Heart size={10} className="flex-shrink-0 opacity-80" aria-hidden />
-                {listing.favoritesCount ?? 0}
-              </span>
             </div>
             {listing.location && (
               <div
@@ -267,7 +263,6 @@ export const ListingCardColumn = memo(ListingCardColumnComponent, (prevProps, ne
   return (
     prevProps.listing.id === nextProps.listing.id &&
     prevProps.isFavorite === nextProps.isFavorite &&
-    prevProps.listing.views === nextProps.listing.views &&
-    prevProps.listing.favoritesCount === nextProps.listing.favoritesCount
+    prevProps.listing.views === nextProps.listing.views
   );
 });

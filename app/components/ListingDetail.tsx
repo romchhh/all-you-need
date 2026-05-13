@@ -30,7 +30,7 @@ import { buildListingImageUrl } from '@/utils/listingImageUrl';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { ListingAutoRenewSection } from '@/components/ListingAutoRenewSection';
-import { shouldShowListingViews } from '@/utils/listingViewsDisplay';
+import { shouldShowListingFavorites, shouldShowListingViews } from '@/utils/listingViewsDisplay';
 import { BRAND_GREEN_ON_DARK, BRAND_GREEN_PRICE_ON_LIGHT } from '@/constants/brandColors';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
@@ -608,7 +608,7 @@ export const ListingDetail = ({
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 
-          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+1.75rem+2.25rem+0.625rem+0.35rem)] lg:top-[5rem]"
+          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[5rem]"
           style={{
             height: `${Math.min(pullDistance * 0.8, 100)}px`,
             opacity: Math.min(pullProgress * 1.2, 1),
@@ -753,7 +753,7 @@ export const ListingDetail = ({
                   
                   if (isNegotiable) {
                     return (
-                      <div className="text-xl font-bold mb-1" style={{ color: priceColor }}>
+                      <div className="text-3xl font-bold mb-1" style={{ color: priceColor }}>
                         {t('common.negotiable')}
                       </div>
                     );
@@ -791,10 +791,12 @@ export const ListingDetail = ({
               <span>{listing.views ?? 0}</span>
             </div>
           )}
-          <div className="flex items-center gap-2 tabular-nums" title={t('listing.favoritesLabel')}>
-            <Heart size={16} className={`flex-shrink-0 ${ac.mutedText}`} strokeWidth={2} />
-            <span>{listing.favoritesCount ?? 0}</span>
-          </div>
+          {shouldShowListingFavorites(listing.views, listing.favoritesCount) && (
+            <div className="flex items-center gap-2 tabular-nums" title={t('listing.favoritesLabel')}>
+              <Heart size={16} className={`flex-shrink-0 ${ac.mutedText}`} strokeWidth={2} />
+              <span>{listing.favoritesCount ?? 0}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <MapPin size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
             <span>{listing.location}</span>
@@ -1109,11 +1111,7 @@ export const ListingDetail = ({
                   return;
                 } else {
                   // Немає ні username, ні телефону
-                  if (tg) {
-                    tg.showAlert(t('listingDetail.telegramIdNotFound'));
-                  } else {
-                    showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                  }
+                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
                   return;
                 }
               }

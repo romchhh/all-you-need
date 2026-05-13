@@ -59,7 +59,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const router = useRouter();
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
-  const { profile, loading, refetch } = useUser();
+  const { profile, dashboardStats, loading, refetch, refetchStats } = useUser();
   const [userListings, setUserListings] = useState<Listing[]>([]);
   const [favoritesLocal, setFavoritesLocal] = useState<Set<number>>(new Set());
   const favorites = favoritesProp ?? favoritesLocal;
@@ -119,12 +119,6 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [hasMore, setHasMore] = useState(false);
   const [listingsOffset, setListingsOffset] = useState(0);
   const [totalListings, setTotalListings] = useState(0);
-  const [stats, setStats] = useState<{
-    totalListings: number;
-    totalViews: number;
-    soldListings: number;
-    activeListings: number;
-  } | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [pendingStatus, setPendingStatus] = useState<string>('all');
@@ -296,24 +290,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   };
 
   useEffect(() => {
+    if (profile && typeof profile.balance === 'number') {
+      setUserBalance(profile.balance);
+    }
     if (profile?.telegramId) {
       fetchListingsWithFilters(0, true);
-      fetchUserBalance();
-
-      // Завантажуємо статистику
-      fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
-        .then(res => {
-          if (res.ok) {
-            return res.json();
-          }
-          return null;
-        })
-        .then(data => {
-          if (data) {
-            setStats(data);
-          }
-        })
-        .catch(err => console.error('Error fetching stats:', err));
     }
   }, [profile]);
 
@@ -625,10 +606,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             
             {/* Статистика */}
             <div className="space-y-1.5 mt-3">
-              {stats && (
+              {dashboardStats && (
                 <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
                   <Megaphone size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
-                  <span>{stats.activeListings} {t('sales.active')}</span>
+                  <span>{dashboardStats.activeListings} {t('sales.active')}</span>
                 </div>
               )}
               {profile.balance !== undefined && (
@@ -992,20 +973,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                                   setConfirmModal({ ...confirmModal, isOpen: false });
                                   // Оновлюємо список оголошень
                                   await fetchListingsWithFilters(0, true);
-                                  // Оновлюємо статистику
-                                  fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
-                                    .then(res => {
-                                      if (res.ok) {
-                                        return res.json();
-                                      }
-                                      return null;
-                                    })
-                                    .then(data => {
-                                      if (data) {
-                                        setStats(data);
-                                      }
-                                    })
-                                    .catch(err => console.error('Error fetching stats:', err));
+                                  void refetchStats();
                                   // Оновлюємо сторінку
                                   router.refresh();
                                 } else {
@@ -1166,16 +1134,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             // Очікуємо завершення refetch перед закриттям модального вікна
             await refetch();
             setIsEditModalOpen(false);
-            // Показуємо повідомлення про успішне збереження
-            if (tg) {
-              tg.showAlert(t('profile.profileUpdated') || 'Профіль оновлено');
-            }
+            showToast(t('profile.profileUpdated') || 'Профіль оновлено', 'success');
+            tg?.HapticFeedback?.notificationOccurred('success');
           } else {
             const errorData = await response.json();
             console.error('Error updating profile:', errorData);
-            if (tg) {
-              tg.showAlert(t('profile.saveError') || 'Помилка збереження профілю');
-            }
+            showToast(t('profile.saveError') || 'Помилка збереження профілю', 'error');
+            tg?.HapticFeedback?.notificationOccurred('error');
           }
         }}
         tg={tg}
@@ -1321,20 +1286,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             
             // Оновлюємо список з урахуванням поточних фільтрів
             await fetchListingsWithFilters(0, true);
-            // Оновлюємо статистику
-            fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
-              .then(res => {
-                if (res.ok) {
-                  return res.json();
-                }
-                return null;
-              })
-              .then(data => {
-                if (data) {
-                  setStats(data);
-                }
-              })
-              .catch(err => console.error('Error fetching stats:', err));
+            void refetchStats();
             
             setEditingListing(null);
             // Оновлюємо сторінку
@@ -1355,20 +1307,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               showToast(t('editListing.listingDeleted'), 'success');
               // Оновлюємо список з урахуванням поточних фільтрів
               await fetchListingsWithFilters(0, true);
-              // Оновлюємо статистику
-              fetch(`/api/user/stats?telegramId=${profile.telegramId}`)
-                .then(res => {
-                  if (res.ok) {
-                    return res.json();
-                  }
-                  return null;
-                })
-                .then(data => {
-                  if (data) {
-                    setStats(data);
-                  }
-                })
-                .catch(err => console.error('Error fetching stats:', err));
+              void refetchStats();
               
               setEditingListing(null);
               // Оновлюємо сторінку

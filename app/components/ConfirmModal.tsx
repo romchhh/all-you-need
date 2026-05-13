@@ -62,7 +62,7 @@ export const ConfirmModal = ({
 
   return (
     <div
-      className={`fixed inset-0 z-[100010] flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:items-center sm:pt-4 ${overlay}`}
+      className={`fixed inset-0 z-[100010] flex max-lg:flex-col max-lg:items-center max-lg:justify-start justify-center overflow-y-auto overscroll-contain p-4 max-lg:pt-[max(32dvh,calc(env(safe-area-inset-top,0px)+9rem))] lg:items-center lg:justify-center lg:pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] ${overlay}`}
     >
       <div className={card}>
         <div className="flex items-center justify-center mb-4">

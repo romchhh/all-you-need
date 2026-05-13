@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma, executeWithRetry, ensureUserSessionTable } from '@/lib/prisma';
+import { prisma, executeWithRetry } from '@/lib/prisma';
 
 const KYIV_TZ = 'Europe/Kyiv';
 
@@ -36,8 +36,31 @@ function startOfKyivDay(ref: Date): Date {
   return d;
 }
 
-const ONLINE_DISPLAY_MIN = 30;
-const ONLINE_DISPLAY_MAX = 55;
+const DISPLAY_ONLINE_MIN = 30;
+const DISPLAY_ONLINE_MAX = 60;
+
+/**
+ * Показ «онлайн» 30–60: однаковий для усіх, змінюється з часом (київська година + 4-хв слот).
+ * Детерміновано, без реального трекінгу сесій у цьому полі.
+ */
+function displayOnlineSynced(now: Date): number {
+  const hour = parseInt(
+    new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, hour: '2-digit', hour12: false }).format(now),
+    10
+  );
+  const minute = parseInt(
+    new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, minute: '2-digit' }).format(now),
+    10
+  );
+  const ymd = kyivYmd(now).replace(/\D/g, '');
+  const slot = Math.floor(now.getTime() / (4 * 60 * 1000));
+  let x = slot * 0x9e3779b1 + hour * 0x85ebca6b + minute * 17 + parseInt(ymd.slice(-6), 10);
+  x ^= x << 13;
+  x ^= x >>> 17;
+  x ^= x << 5;
+  const span = DISPLAY_ONLINE_MAX - DISPLAY_ONLINE_MIN + 1;
+  return DISPLAY_ONLINE_MIN + (Math.abs(x | 0) % span);
+}
 
 // Публічна статистика для головної / базару (без аутентифікації)
 export async function GET() {
@@ -54,17 +77,7 @@ export async function GET() {
     );
     const newListingsToday = Number(newListingsTodayResult[0]?.count || 0);
 
-    await ensureUserSessionTable();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    const oneHourAgoStr = oneHourAgo.toISOString().replace('T', ' ').substring(0, 19);
-    const onlineUsersResult = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT COUNT(DISTINCT userId) as count FROM UserSession WHERE datetime(lastActiveAt) >= datetime(?)`,
-        oneHourAgoStr
-      ) as Promise<Array<{ count: bigint }>>
-    ).catch(() => [{ count: BigInt(0) }]);
-    const rawOnline = Number(onlineUsersResult[0]?.count || 0);
-    const online = Math.min(ONLINE_DISPLAY_MAX, Math.max(ONLINE_DISPLAY_MIN, rawOnline));
+    const online = displayOnlineSynced(now);
 
     return NextResponse.json({
       online,

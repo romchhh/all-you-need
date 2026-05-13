@@ -1,8 +1,0 @@
--- Додавання нової категорії "Краса та здоров'я" / "Красота и здоровье"
-
--- Перевіряємо чи категорія вже існує і додаємо якщо немає
-INSERT OR IGNORE INTO Category (name, icon, parentId, sortOrder, isActive, createdAt)
-VALUES ('Краса та здоров''я', '💆', NULL, 8, 1, CURRENT_TIMESTAMP);
-
--- Оновлюємо sortOrder для категорії "Інше" щоб вона була останньою
-UPDATE Category SET sortOrder = 9 WHERE name = 'Інше' AND parentId IS NULL;

@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
-import { shouldShowListingViews } from '@/utils/listingViewsDisplay';
+import { shouldShowListingFavorites, shouldShowListingViews } from '@/utils/listingViewsDisplay';
 import { ListingAutoRenewSection } from '@/components/ListingAutoRenewSection';
 
 interface ProfileListingCardProps {
@@ -201,7 +201,7 @@ export const ProfileListingCard = ({
         }`} />
       )}
       
-      <div className="flex gap-3 p-3 relative">
+      <div className="flex items-start gap-3 p-3 relative">
         {/* Бейдж "Відхилено" - у верхньому лівому куті картки (найвищий пріоритет) */}
         {isRejected && (
           <div className="absolute top-3 left-3 z-10">
@@ -238,7 +238,8 @@ export const ProfileListingCard = ({
           </div>
         )}
 
-        {/* Фото */}
+        {/* Фото + перегляди / лайки під фото */}
+        <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
         <div 
           className={`relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer ${isLight ? 'bg-gray-200' : 'bg-[#2A2A2A]'}`}
           onClick={() => {
@@ -295,6 +296,42 @@ export const ProfileListingCard = ({
           )}
         </div>
 
+        {(shouldShowListingViews(listing.views) ||
+          shouldShowListingFavorites(listing.views, listing.favoritesCount)) && (
+        <div
+          className={`flex w-full max-w-[6.5rem] items-center justify-center gap-2.5 text-[11px] leading-none ${
+            isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-600' : 'text-white/75'
+          }`}
+        >
+          {shouldShowListingViews(listing.views) && (
+            <div className="flex items-center gap-0.5" title={t('sales.views')}>
+              <Eye size={12} className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : ''} />
+              <span className="tabular-nums font-medium">{listing.views || 0}</span>
+            </div>
+          )}
+          {shouldShowListingFavorites(listing.views, listing.favoritesCount) && (
+            <div className="flex items-center gap-0.5" title={t('navigation.favorites')}>
+              <Heart
+                size={12}
+                className={
+                  isSold || isPendingModeration || isDeactivated || isRejected
+                    ? 'text-gray-500'
+                    : isFavorite
+                      ? isLight
+                        ? 'fill-[#3F5331] text-[#3F5331]'
+                        : 'fill-[#C8E6A0] text-[#C8E6A0]'
+                      : isLight
+                        ? 'text-gray-500'
+                        : 'text-white/50'
+                }
+              />
+              <span className="tabular-nums font-medium">{listing.favoritesCount || 0}</span>
+            </div>
+          )}
+        </div>
+        )}
+        </div>
+
         {/* Інформація */}
         <div className="flex-1 flex flex-col justify-between min-w-0">
           {/* Верхня частина: назва + ціна */}
@@ -338,7 +375,11 @@ export const ProfileListingCard = ({
                   return t('common.free');
                 }
                 if (isNegotiable) {
-                  return <span className="whitespace-nowrap text-[clamp(0.5rem,3.5vw,1rem)]" title={t('common.negotiable')}>{t('common.negotiableShort')}</span>;
+                  return (
+                    <span className="whitespace-nowrap font-bold text-[clamp(0.6875rem,4vw,1rem)]" title={t('common.negotiable')}>
+                      {t('common.negotiableShort')}
+                    </span>
+                  );
                 }
                 return `${listing.price} ${listing.currency || '$'}`;
               })()}
@@ -408,11 +449,6 @@ export const ProfileListingCard = ({
                 <span>{promotionDaysLeft} {promotionDaysLeft === 1 ? 'день' : promotionDaysLeft <= 4 ? 'дні' : 'днів'}</span>
               </div>
             )}
-            {hasPromotion && !isPromotionActive && (
-              <div className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-500' : 'text-white/50'}>
-                {t('profile.promotion') || 'Реклама'} закінчилась
-              </div>
-            )}
             {listing.status === 'active' &&
               !isPendingModeration &&
               !isSold &&
@@ -437,32 +473,10 @@ export const ProfileListingCard = ({
                 </div>
               )}
           </div>
-
-          {/* Статистика */}
-          <div className={`flex items-center gap-3 text-xs mt-2 ${
-            isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-600' : 'text-white/70'
-          }`}>
-            {shouldShowListingViews(listing.views) && (
-              <div className="flex items-center gap-1">
-                <Eye size={14} className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : ''} />
-                <span>{listing.views || 0}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-1">
-              <Heart size={14} className={
-                isSold || isPendingModeration || isDeactivated || isRejected
-                  ? 'text-gray-500' 
-                  : isFavorite 
-                  ? isLight ? 'fill-[#3F5331] text-[#3F5331]' : 'fill-[#C8E6A0] text-[#C8E6A0]'
-                  : isLight ? 'text-gray-500' : ''
-              } />
-              <span>{listing.favoritesCount || 0}</span>
-            </div>
-          </div>
         </div>
 
-        {/* Кнопки дій */}
-        <div className="flex flex-col gap-2 justify-center relative">
+        {/* Кнопки дій — вирівняні вгорі біля назви */}
+        <div className="relative flex shrink-0 flex-col gap-2 self-start pt-0.5">
           {/* Кнопка редагувати - прихована для проданих та заблокована для модерації */}
           {!isSold && (
             <button

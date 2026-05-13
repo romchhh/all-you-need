@@ -265,11 +265,7 @@ export const EditProfileModal = ({
       onClose();
     } catch (error) {
       console.error('Error saving profile:', error);
-      if (tg) {
-        tg.showAlert(t('profile.saveError'));
-      } else {
-        showToast(t('profile.saveError'), 'error');
-      }
+      showToast(t('profile.saveError'), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
     } finally {
       setLoading(false);
@@ -278,7 +274,7 @@ export const EditProfileModal = ({
 
   return (
     <div 
-      className={`fixed inset-0 backdrop-blur-sm z-[99999] flex items-start sm:items-center justify-center p-4 pb-24 sm:pb-4 overflow-y-auto ${
+      className={`fixed inset-0 backdrop-blur-sm z-[99999] flex max-lg:flex-col max-lg:items-center max-lg:justify-start lg:items-center lg:justify-center justify-center p-4 max-lg:pt-[max(32dvh,calc(env(safe-area-inset-top,0px)+9rem))] lg:pt-4 pb-24 lg:pb-4 overflow-y-auto ${
         isLight ? 'bg-black/30' : 'bg-black/50'
       }`}
       onTouchStart={(e) => e.stopPropagation()}
@@ -291,7 +287,7 @@ export const EditProfileModal = ({
     >
       <div 
         data-edit-profile-scrollable 
-        className={`rounded-3xl w-full max-w-md p-6 relative z-[100000] my-4 sm:my-0 max-h-[calc(100vh-8rem)] sm:max-h-[90vh] overflow-y-auto overscroll-contain ${panel}`}
+        className={`rounded-3xl w-full max-w-md p-6 relative z-[100000] my-4 max-lg:my-2 sm:my-0 max-h-[min(calc(100dvh-max(32dvh,9rem)-6rem),90vh)] lg:max-h-[90vh] overflow-y-auto overscroll-contain ${panel}`}
         style={{ touchAction: 'pan-y' }}
       >
         {/* Заголовок */}

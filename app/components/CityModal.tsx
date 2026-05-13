@@ -101,7 +101,9 @@ export const CityModal = ({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  const chipActive = 'border border-[#3F5331] text-[#3F5331] bg-transparent';
+  const chipActive = isLight
+    ? 'border border-[#3F5331] text-[#3F5331] bg-transparent'
+    : 'border border-[#C8E6A0]/70 text-[#C8E6A0] bg-[#C8E6A0]/10';
   const chipIdle = isLight
     ? 'border border-gray-300 text-gray-800 bg-transparent hover:bg-gray-100'
     : 'border border-white text-white bg-transparent hover:bg-white/10';
@@ -369,14 +371,14 @@ export const CityModal = ({
         ? 'border-gray-900/35 bg-black/10'
         : 'border-black/25 hover:bg-black/8'
       : sub
-        ? 'border-[#3F5331] bg-[#3F5331]/15'
+        ? 'border-[#C8E6A0]/55 bg-[#C8E6A0]/12'
         : 'border-white/40 hover:bg-white/10';
     const icon = onLightBg
       ? sub
         ? 'text-gray-900'
         : 'text-gray-800'
       : sub
-        ? 'text-[#3F5331]'
+        ? 'text-[#C8E6A0]'
         : 'text-white/80';
     return (
       <button
@@ -581,7 +583,13 @@ export const CityModal = ({
                   <MapPin
                     size={16}
                     className={`flex-shrink-0 mr-2 ${
-                      localSelectedCities.length === 0 ? 'text-[#3F5331]' : isLight ? 'text-gray-700' : 'text-white'
+                      localSelectedCities.length === 0
+                        ? isLight
+                          ? 'text-[#3F5331]'
+                          : 'text-[#C8E6A0]'
+                        : isLight
+                          ? 'text-gray-700'
+                          : 'text-white'
                     }`}
                   />
                   <span className={`font-medium truncate ${ac.pageHeading}`}>{t('bazaar.allCities') || 'Всі міста'}</span>
@@ -593,7 +601,9 @@ export const CityModal = ({
                       onClick={() => setSubsDropdownOpen((o) => !o)}
                       className={`h-full min-h-[48px] min-w-[50px] px-3 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-colors ${
                         subsDropdownOpen
-                          ? 'border-[#3F5331] text-[#3F5331] ' + (isLight ? 'bg-gray-100' : 'bg-white/5')
+                          ? isLight
+                            ? 'border-[#3F5331] text-[#3F5331] bg-gray-100'
+                            : 'border-[#C8E6A0] text-[#C8E6A0] bg-white/5'
                           : isLight
                             ? 'border-gray-300 text-gray-800 hover:bg-gray-100'
                             : 'border-white text-white hover:bg-white/10'
@@ -605,17 +615,25 @@ export const CityModal = ({
                       <Bell
                         size={16}
                         className={
-                          subsDropdownOpen ? 'text-[#3F5331]' : isLight ? 'text-gray-700' : 'text-white'
+                          subsDropdownOpen
+                            ? isLight
+                              ? 'text-[#3F5331]'
+                              : 'text-[#C8E6A0]'
+                            : isLight
+                              ? 'text-gray-700'
+                              : 'text-white'
                         }
                       />
                       <ChevronDown
                         size={14}
                         className={`opacity-90 transition-transform ${
                           subsDropdownOpen
-                            ? 'rotate-180 text-[#3F5331]'
+                            ? isLight
+                              ? 'rotate-180 text-[#3F5331]'
+                              : 'rotate-180 text-[#C8E6A0]'
                             : isLight
                               ? 'text-gray-600'
-                              : ''
+                              : 'text-white/80'
                         }`}
                       />
                     </button>
@@ -661,10 +679,22 @@ export const CityModal = ({
                         >
                           <span
                             className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                              selected ? 'border-[#3F5331] bg-[#3F5331]' : isLight ? 'border-gray-400' : 'border-white/50'
+                              selected
+                                ? isLight
+                                  ? 'border-[#3F5331] bg-[#3F5331]'
+                                  : 'border-[#C8E6A0] bg-[#C8E6A0]/25'
+                                : isLight
+                                  ? 'border-gray-400'
+                                  : 'border-white/50'
                             }`}
                           >
-                            {selected ? <Check size={10} className="text-white" strokeWidth={3} /> : null}
+                            {selected ? (
+                              <Check
+                                size={10}
+                                className={isLight ? 'text-white' : 'text-[#C8E6A0]'}
+                                strokeWidth={3}
+                              />
+                            ) : null}
                           </span>
                           <span className="truncate">{label}</span>
                         </button>
@@ -698,14 +728,20 @@ export const CityModal = ({
                     {localSelectedCities.map((city) => (
                       <div
                         key={city}
-                        className="inline-flex items-center gap-1 pl-2 py-1 pr-1 bg-[#3F5331] text-white rounded-lg text-sm font-medium"
+                        className={
+                          isLight
+                            ? 'inline-flex items-center gap-1 pl-2 py-1 pr-1 bg-[#3F5331] text-white rounded-lg text-sm font-medium'
+                            : 'inline-flex items-center gap-1 pl-2 py-1 pr-1 rounded-lg text-sm font-medium border border-[#C8E6A0]/55 bg-[#C8E6A0]/12 text-[#C8E6A0]'
+                        }
                       >
                         <span className="truncate max-w-[min(140px,40vw)]">{city}</span>
-                        {renderCityBell(city, true)}
+                        {renderCityBell(city, isLight)}
                         <button
                           type="button"
                           onClick={() => toggleCity(city)}
-                          className="p-1.5 rounded-lg hover:bg-black/10 transition-colors shrink-0"
+                          className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+                            isLight ? 'hover:bg-black/10' : 'hover:bg-white/10'
+                          }`}
                           aria-label={t('common.close')}
                         >
                           <X size={14} />
@@ -735,20 +771,32 @@ export const CityModal = ({
                             <div
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                                 isSelected
-                                  ? 'border-[#3F5331] bg-[#3F5331]'
+                                  ? isLight
+                                    ? 'border-[#3F5331] bg-[#3F5331]'
+                                    : 'border-[#C8E6A0] bg-[#C8E6A0]/25'
                                   : isLight
                                     ? 'border-gray-400'
                                     : 'border-white'
                               }`}
                             >
                               {isSelected && (
-                                <Check size={12} className="text-white" strokeWidth={3} />
+                                <Check
+                                  size={12}
+                                  className={isLight ? 'text-white' : 'text-[#C8E6A0]'}
+                                  strokeWidth={3}
+                                />
                               )}
                             </div>
                             <MapPin
                               size={16}
                               className={`flex-shrink-0 ${
-                                isSelected ? 'text-[#3F5331]' : isLight ? 'text-gray-700' : 'text-white'
+                                isSelected
+                                  ? isLight
+                                    ? 'text-[#3F5331]'
+                                    : 'text-[#C8E6A0]'
+                                  : isLight
+                                    ? 'text-gray-700'
+                                    : 'text-white'
                               }`}
                             />
                             <span className={`truncate ${ac.pageHeading}`}>{city}</span>
@@ -766,7 +814,11 @@ export const CityModal = ({
                 <div>
                   {loadingCities ? (
                     <div className="flex flex-col items-center justify-center py-8">
-                      <div className="w-6 h-6 border-2 border-[#3F5331] border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <div
+                        className={`w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mb-2 ${
+                          isLight ? 'border-[#3F5331]' : 'border-[#C8E6A0]'
+                        }`}
+                      />
                       <p className={`text-sm ${ac.mutedText}`}>{t('common.loading')}</p>
                     </div>
                   ) : searchResults.length > 0 ? (
@@ -787,20 +839,32 @@ export const CityModal = ({
                                 <div
                                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                                     isSelected
-                                      ? 'border-[#3F5331] bg-[#3F5331]'
+                                      ? isLight
+                                        ? 'border-[#3F5331] bg-[#3F5331]'
+                                        : 'border-[#C8E6A0] bg-[#C8E6A0]/25'
                                       : isLight
                                         ? 'border-gray-400'
                                         : 'border-white'
                                   }`}
                                 >
                                   {isSelected && (
-                                    <Check size={12} className="text-white" strokeWidth={3} />
+                                    <Check
+                                      size={12}
+                                      className={isLight ? 'text-white' : 'text-[#C8E6A0]'}
+                                      strokeWidth={3}
+                                    />
                                   )}
                                 </div>
                                 <MapPin
                                   size={16}
                                   className={`flex-shrink-0 ${
-                                    isSelected ? 'text-[#3F5331]' : isLight ? 'text-gray-700' : 'text-white'
+                                    isSelected
+                                      ? isLight
+                                        ? 'text-[#3F5331]'
+                                        : 'text-[#C8E6A0]'
+                                      : isLight
+                                        ? 'text-gray-700'
+                                        : 'text-white'
                                   }`}
                                 />
                                 <span className={`truncate ${ac.pageHeading}`}>{city}</span>

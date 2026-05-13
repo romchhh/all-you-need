@@ -150,11 +150,7 @@ export const ShareModal = ({
       }
     } catch (error) {
       console.error('Error copying link:', error);
-      if (tg) {
-        tg.showAlert(t('share.copyError'));
-      } else {
-        showToast(t('share.copyError'), 'error');
-      }
+      showToast(t('share.copyError'), 'error');
     }
   };
 

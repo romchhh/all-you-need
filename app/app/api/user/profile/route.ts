@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureUserSessionTable, updateUserActivity } from '@/lib/prisma';
+import {
+  getUserLanguageForTelegramId,
+  getUserListingStatsForUserId,
+} from '@/lib/userBootstrapQueries';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -305,6 +309,12 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const telegramId = searchParams.get('telegramId');
+    const expand = new Set(
+      (searchParams.get('expand') || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    );
 
     if (!telegramId) {
       return NextResponse.json(
@@ -403,7 +413,7 @@ export async function GET(request: NextRequest) {
       rawAgreed === '1' ||
       (typeof rawAgreed === 'bigint' && rawAgreed === BigInt(1));
 
-    const response = {
+    const response: Record<string, unknown> = {
       id: userData.id,
       telegramId: telegramIdResponse,
       username: userData.username,
@@ -418,7 +428,17 @@ export async function GET(request: NextRequest) {
       agreementAccepted: Boolean(agreementAccepted),
       createdAt: userData.createdAt,
     };
-    
+
+    if (expand.has('language')) {
+      response.language = await getUserLanguageForTelegramId(telegramId);
+    }
+    if (expand.has('stats')) {
+      const rawCreated = userData.createdAt as unknown;
+      const created =
+        rawCreated instanceof Date ? rawCreated.toISOString() : String(rawCreated);
+      response.stats = await getUserListingStatsForUserId(userData.id, created);
+    }
+
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error fetching user profile:', error);

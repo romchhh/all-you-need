@@ -8,6 +8,7 @@ import { ListingCardColumn } from '../ListingCardColumn';
 import { SortModal } from '../SortModal';
 import { CityModal } from '../CityModal';
 import { SubcategoryList } from '../SubcategoryList';
+import { STICKY_BELOW_APP_HEADER_CLASS } from '../FixedLogoHeader';
 import { TopBar } from '../TopBar';
 import { HomeActivityStats } from '../HomeActivityStats';
 import { ListingGridSkeleton } from '../SkeletonLoader';
@@ -629,7 +630,7 @@ const BazaarTabComponent = ({
     <div className="pb-24">
       {/* Пошук з TopBar — на десктопі вужчий і по центру */}
       <div className="relative">
-        <div className="sticky top-0 z-20 bg-transparent p-4 lg:flex lg:justify-center lg:py-4">
+        <div className={`${STICKY_BELOW_APP_HEADER_CLASS} bg-transparent p-4 lg:flex lg:justify-center lg:py-4`}>
           <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl" ref={suggestionsRef}>
             <div className="flex gap-1 items-center">
               <TopBar
@@ -695,7 +696,9 @@ const BazaarTabComponent = ({
                 onClick={() => setIsCityModalOpen(true)}
                 className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors relative border ${
                   selectedCities.length > 0
-                    ? 'border-[#3F5331] bg-transparent'
+                    ? isLight
+                      ? 'border-[#3F5331] bg-transparent'
+                      : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
                     : isLight
                       ? 'border-gray-300 bg-transparent hover:bg-gray-100'
                       : 'border-white bg-transparent hover:bg-white/10'
@@ -716,12 +719,20 @@ const BazaarTabComponent = ({
                 {selectedCities.length > 0 && (
                   <>
                     <span
-                      className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full bg-[#3F5331] ring-2 ${
-                        isLight ? 'ring-gray-100' : 'ring-black'
+                      className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
+                        isLight
+                          ? 'bg-[#3F5331] ring-gray-100'
+                          : 'bg-[#C8E6A0] ring-black/50 shadow-[0_0_8px_rgba(200,230,160,0.75)]'
                       }`}
                       aria-hidden
                     />
-                    <span className="absolute bottom-0.5 right-0.5 z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#3F5331] px-1 text-xs font-bold text-white">
+                    <span
+                      className={`absolute bottom-0.5 right-0.5 z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-xs font-bold ${
+                        isLight
+                          ? 'bg-[#3F5331] text-white'
+                          : 'bg-[#C8E6A0] text-[#0f1408]'
+                      }`}
+                    >
                       {selectedCities.length > 9 ? '9+' : selectedCities.length}
                     </span>
                   </>

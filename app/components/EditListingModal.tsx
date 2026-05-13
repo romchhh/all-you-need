@@ -7,6 +7,8 @@ import { germanCities } from '@/constants/german-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useToast } from '@/hooks/useToast';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { FixedLogoHeader } from '@/components/FixedLogoHeader';
 import { ConfirmModal } from './ConfirmModal';
 import { CategoryIcon } from './CategoryIcon';
 
@@ -27,9 +29,11 @@ export const EditListingModal = ({
   onDelete,
   tg
 }: EditListingModalProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
   const { showToast } = useToast();
+  const [formScrollParent, setFormScrollParent] = useState<HTMLDivElement | null>(null);
   const categories = getCategories(t);
   const [title, setTitle] = useState(listing.title);
   const [description, setDescription] = useState(listing.description);
@@ -842,29 +846,41 @@ export const EditListingModal = ({
         }
       }}
     >
-      <div className={`w-full h-full flex flex-col relative min-h-0 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] ${isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]'}`}>
-        {/* Хедер */}
-        <div className={`px-4 py-4 flex items-center justify-between flex-shrink-0 border-b ${isLight ? 'bg-white border-gray-200/90' : 'bg-[#000000] border-white/20'}`}>
-          <h2 className={`text-xl font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>{t('listing.editListing')}</h2>
-          <button
-            onClick={onClose}
-            className={
-              isLight
-                ? 'w-10 h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-800'
-                : 'w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors text-white'
-            }
-          >
-            <X size={20} />
-          </button>
-        </div>
-
+      <div className={`w-full h-full flex flex-col relative min-h-0 ${isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]'}`}>
         <div
-          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 max-lg:pt-2 lg:pt-3"
-          style={{ 
+          ref={setFormScrollParent}
+          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 lg:pt-6"
+          style={{
             paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))',
             ...scrollBgStyle,
           }}
         >
+          <FixedLogoHeader
+            mode="sticky"
+            scrollParent={formScrollParent}
+            paddingX={false}
+            zClassName="z-10"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.href = `/${language}/bazaar`;
+              }
+            }}
+          />
+
+          <div className="flex items-center justify-between pb-4">
+            <h2 className={`text-xl font-bold ${ac.pageHeading}`}>{t('listing.editListing')}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className={
+                isLight
+                  ? 'w-10 h-10 shrink-0 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-800'
+                  : 'w-10 h-10 shrink-0 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors text-white'
+              }
+            >
+              <X size={20} />
+            </button>
+          </div>
           {/* Інформація про відхилення для відхилених оголошень */}
           {isRejected && listing.rejectionReason && (
             <div className={isLight ? 'bg-red-50 border border-red-200 rounded-xl p-4 mb-4' : 'bg-red-600/20 border border-red-500/50 rounded-xl p-4 mb-4'}>

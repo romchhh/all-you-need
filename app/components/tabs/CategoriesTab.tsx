@@ -4,6 +4,7 @@ import { CategoryChip } from '../CategoryChip';
 import { SubcategoryList } from '../SubcategoryList';
 import { ListingCard } from '../ListingCard';
 import { CategoryIcon } from '../CategoryIcon';
+import { STICKY_BELOW_APP_HEADER_CLASS } from '../FixedLogoHeader';
 import { useState, useMemo, useEffect } from 'react';
 import { Gift, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -190,7 +191,7 @@ export const CategoriesTab = ({
     <div className="mx-auto w-full max-w-2xl pb-24 lg:max-w-4xl xl:max-w-5xl">
       {/* Заголовок */}
       <div
-        className={`sticky top-0 z-10 border-b px-4 pb-3 pt-2 lg:px-6 ${
+        className={`${STICKY_BELOW_APP_HEADER_CLASS} border-b px-4 pb-3 pt-2 lg:px-6 ${
           isLight
             ? 'border-gray-200/80 bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/75'
             : 'border-gray-800/50 bg-black/30 backdrop-blur-md'

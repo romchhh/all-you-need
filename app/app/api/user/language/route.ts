@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getUserLanguageForTelegramId } from '@/lib/userBootstrapQueries';
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,38 +92,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const telegramIdNum = parseInt(telegramId);
-
-    // Спочатку перевіряємо legacy таблицю (основне джерело)
-    try {
-      const legacyUsers = await prisma.$queryRawUnsafe(`
-        SELECT language FROM users_legacy 
-        WHERE user_id = ?
-      `, telegramId) as Array<{ language: string | null }>;
-
-      if (legacyUsers.length > 0 && legacyUsers[0].language) {
-        return NextResponse.json({ language: legacyUsers[0].language });
-      }
-    } catch (legacyError) {
-      // Якщо legacy таблиці немає, це не критично - продовжуємо
-    }
-
-    // Потім перевіряємо таблицю User (якщо колонка language існує)
-    try {
-      const users = await prisma.$queryRawUnsafe(`
-        SELECT language FROM User 
-        WHERE CAST(telegramId AS INTEGER) = ?
-      `, telegramIdNum) as Array<{ language: string | null }>;
-
-      if (users.length > 0 && users[0].language) {
-        return NextResponse.json({ language: users[0].language });
-      }
-    } catch (error: any) {
-      // Якщо поле language не існує в таблиці User, це нормально - просто ігноруємо
-    }
-
-    // За замовчуванням повертаємо 'uk'
-    return NextResponse.json({ language: 'uk' });
+    const language = await getUserLanguageForTelegramId(telegramId);
+    return NextResponse.json({ language });
   } catch (error) {
     console.error('Error getting user language:', error);
     return NextResponse.json(

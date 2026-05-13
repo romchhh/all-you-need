@@ -36,8 +36,12 @@ export const Toast = ({ message, type, isVisible, onClose, duration = 3000 }: To
   };
 
   return (
-    <div className="fixed top-4 inset-x-0 z-[100] animate-slide-down flex justify-center">
-      <div className={`${bgColors[type]} border rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-[90vw]`}>
+    <div
+      className="fixed inset-x-0 z-[140] flex justify-center px-3 pointer-events-none max-lg:bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] max-lg:top-auto max-lg:animate-slide-up lg:top-[max(1rem,calc(env(safe-area-inset-top,0px)+1.25rem))] lg:bottom-auto lg:animate-slide-down"
+    >
+      <div
+        className={`pointer-events-auto ${bgColors[type]} border rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-[90vw]`}
+      >
         {icons[type]}
         <p className="flex-1 text-sm font-medium text-gray-900">{message}</p>
         <button

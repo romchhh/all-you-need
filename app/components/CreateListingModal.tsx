@@ -570,11 +570,7 @@ export const CreateListingModal = ({
     
     // Якщо вже досягнуто ліміт, не приймаємо нові фото
     if (images.length >= MAX_PHOTOS) {
-      if (tg) {
-        tg.showAlert(t('createListing.maxPhotos'));
-      } else {
-        showToast(t('createListing.maxPhotos'), 'error');
-      }
+      showToast(t('createListing.maxPhotos'), 'error');
       e.target.value = '';
       return;
     }
@@ -586,12 +582,7 @@ export const CreateListingModal = ({
 
     // Якщо є файли, які не вмістилися, показуємо уведомлення
     if (rejectedCount > 0) {
-      const message = t('createListing.maxPhotos');
-      if (tg) {
-        tg.showAlert(message);
-      } else {
-        showToast(message, 'error');
-      }
+      showToast(t('createListing.maxPhotos'), 'error');
     }
 
     // Якщо немає файлів для додавання, скидаємо input
@@ -905,11 +896,7 @@ export const CreateListingModal = ({
       // Це буде зроблено в CreateListingFlow після завершення всього потоку
     } catch (error) {
       console.error('Error creating listing:', error);
-      if (tg) {
-        tg.showAlert(t('createListing.errorCreating'));
-      } else {
-        showToast(t('createListing.errorCreating'), 'error');
-      }
+      showToast(t('createListing.errorCreating'), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
     } finally {
       setLoading(false);

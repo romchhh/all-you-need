@@ -365,11 +365,7 @@ export const UserProfilePage = ({
                 return;
               } else {
                 // Немає ні username, ні телефону
-                if (tg) {
-                  tg.showAlert(t('listingDetail.telegramIdNotFound'));
-                } else {
-                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                }
+                showToast(t('listingDetail.telegramIdNotFound'), 'error');
                 return;
               }
             }

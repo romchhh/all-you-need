@@ -154,8 +154,22 @@ function parseTelegramIdFromInitData(initData: string): number | null {
   return null;
 }
 
+// Дедуплікація POST синхронізації (React Strict Mode подвійний mount, паралель з useUser).
+let lastTelegramProfileSyncAt = 0;
+let lastTelegramProfileSyncUserId = 0;
+
 // Оновлення профілю в БД з даних Telegram (якщо є нові дані)
 async function updateProfileFromTelegram(telegramUser: any) {
+  const now = Date.now();
+  if (
+    telegramUser?.id === lastTelegramProfileSyncUserId &&
+    now - lastTelegramProfileSyncAt < 3500
+  ) {
+    return;
+  }
+  lastTelegramProfileSyncUserId = telegramUser?.id ?? 0;
+  lastTelegramProfileSyncAt = now;
+
   try {
     console.log('Updating profile from Telegram data:', {
       telegramId: telegramUser.id,

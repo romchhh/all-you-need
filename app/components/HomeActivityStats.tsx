@@ -34,13 +34,16 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
 
   useEffect(() => {
     void load();
-    const id = setInterval(() => void load(), 120_000);
+    const id = setInterval(() => void load(), 30_000);
     const onVis = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') void load();
     };
+    const onFocus = () => void load();
+    window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVis);
     return () => {
       clearInterval(id);
+      window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVis);
     };
   }, [load]);
@@ -62,19 +65,23 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
   return (
     <div className="flex w-full flex-wrap gap-2 sm:gap-2.5">
       <div className={pill} role="status">
-        <span className={iconClass} aria-hidden>
-          <Users size={16} strokeWidth={2.25} />
-        </span>
-        <span className={`min-w-0 leading-snug ${ac.pageHeading}`}>
+        <span
+          className={
+            isLight
+              ? 'h-2.5 w-2.5 shrink-0 rounded-full bg-[#22e078] shadow-[0_0_10px_3px_rgba(34,224,120,0.55),0_0_20px_4px_rgba(34,224,120,0.25)] ring-2 ring-[#22e078]/35'
+              : 'h-2.5 w-2.5 shrink-0 rounded-full bg-[#7fff5c] shadow-[0_0_12px_4px_rgba(127,255,92,0.85),0_0_28px_6px_rgba(127,255,92,0.35)] ring-2 ring-[#b8ff9a]/45'
+          }
+          aria-hidden
+        />
+        <span className={`min-w-0 flex-1 leading-snug ${ac.pageHeading}`}>
           <span className="font-semibold tabular-nums">
             {online === null ? '…' : fmt(online)}
           </span>
           <span className={`font-normal ${ac.mutedText}`}> {t('bazaar.activityOnlineSuffix')}</span>
         </span>
-        <span
-          className="ml-auto h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.65)]"
-          aria-hidden
-        />
+        <span className={`${iconClass} shrink-0`} aria-hidden>
+          <Users size={16} strokeWidth={2.25} />
+        </span>
       </div>
       <div className={pill} role="status">
         <span className={iconClass} aria-hidden>

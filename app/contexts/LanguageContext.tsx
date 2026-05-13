@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { loadProfileBundle } from '@/utils/loadProfileBundle';
 
 type Language = 'uk' | 'ru';
 
@@ -93,10 +94,10 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
       if (finalTelegramId) {
         setIsLoadingLanguage(true);
         try {
-          const response = await fetch(`/api/user/language?telegramId=${finalTelegramId}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.language && (data.language === 'uk' || data.language === 'ru')) {
+          const tid = parseInt(finalTelegramId, 10);
+          if (!Number.isNaN(tid)) {
+            const { res, data } = await loadProfileBundle(tid);
+            if (res.ok && data.language && (data.language === 'uk' || data.language === 'ru')) {
               const dbLang = data.language as Language;
               setLanguageState(dbLang);
               localStorage.setItem('language', dbLang);

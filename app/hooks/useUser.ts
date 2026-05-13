@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTelegram } from './useTelegram';
+import { loadProfileBundle } from '@/utils/loadProfileBundle';
 
 interface UserProfile {
   id: number;
@@ -15,6 +16,14 @@ interface UserProfile {
   rating: number;
   reviewsCount: number;
   agreementAccepted?: boolean;
+  createdAt: string;
+}
+
+interface UserDashboardStats {
+  totalListings: number;
+  totalViews: number;
+  soldListings: number;
+  activeListings: number;
   createdAt: string;
 }
 
@@ -33,6 +42,7 @@ export const useUser = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [dashboardStats, setDashboardStats] = useState<UserDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [isBlocked, setIsBlocked] = useState(false);
   const [currentTelegramId, setCurrentTelegramId] = useState<number | null>(null);
@@ -100,29 +110,26 @@ export const useUser = () => {
 
   const fetchProfile = async (telegramId: number) => {
     try {
-      // Оновлюємо активність користувача
-      try {
-        await fetch('/api/user/activity', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId }),
-        });
-      } catch (err) {
-        // Тиха обробка помилок оновлення активності
-      }
+      const { res, data } = await loadProfileBundle(telegramId);
 
-      const response = await fetch(`/api/user/profile?telegramId=${telegramId}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
+      if (res.ok) {
+        const raw = data as unknown as UserProfile & {
+          language?: string;
+          stats?: UserDashboardStats;
+        };
+        const { language: _l, stats, ...rest } = raw;
+        void _l;
+        setProfile(rest as UserProfile);
+        setDashboardStats(stats ?? null);
         setIsBlocked(false);
-      } else if (response.status === 403) {
+      } else if (res.status === 403) {
         setProfile(null);
+        setDashboardStats(null);
         setIsBlocked(true);
-      } else if (response.status === 404) {
+      } else if (res.status === 404) {
         setIsBlocked(false);
         setProfile(null);
+        setDashboardStats(null);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -139,6 +146,20 @@ export const useUser = () => {
     }
   };
 
+  const refetchStats = async () => {
+    const telegramId = currentTelegramId || telegramUser?.id;
+    if (!telegramId) return;
+    try {
+      const res = await fetch(`/api/user/stats?telegramId=${telegramId}`);
+      if (res.ok) {
+        const data = (await res.json()) as UserDashboardStats;
+        setDashboardStats(data);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   // Є контекст Telegram у міні-апі (після першого циклу effect — currentTelegramId виставлений)
   const hasTelegramIdentity = currentTelegramId != null;
 
@@ -152,6 +173,6 @@ export const useUser = () => {
       (profile === null || !agreed || !hasContact)
   );
 
-  return { profile, loading, refetch, isBlocked, isRegistrationIncomplete };
+  return { profile, dashboardStats, loading, refetch, refetchStats, isBlocked, isRegistrationIncomplete };
 };
 

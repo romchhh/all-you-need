@@ -3,7 +3,7 @@ import { useUser } from './useUser';
 
 /**
  * Hook для періодичного оновлення активності користувача (heartbeat)
- * Оновлює активність кожні 2 хвилини, коли користувач активний на сторінці
+ * Оновлює активність кожну хвилину + при подіях, щоб «онлайн» на головній відповідав реальності
  */
 export function useActivityHeartbeat() {
   const { profile } = useUser();
@@ -28,8 +28,8 @@ export function useActivityHeartbeat() {
       try {
         // Перевіряємо, чи пройшло достатньо часу з останнього оновлення (мінімум 30 секунд)
         const now = Date.now();
-        if (now - lastUpdateRef.current < 30000) {
-          return; // Не оновлюємо занадто часто
+        if (now - lastUpdateRef.current < 20_000) {
+          return; // Не спамимо БД — мінімум 20 с між оновленнями
         }
 
         await fetch('/api/user/activity', {
@@ -50,8 +50,7 @@ export function useActivityHeartbeat() {
     // Оновлюємо активність одразу при завантаженні
     updateActivity();
 
-    // Оновлюємо активність кожні 2 хвилини
-    intervalRef.current = setInterval(updateActivity, 2 * 60 * 1000);
+    intervalRef.current = setInterval(updateActivity, 60 * 1000);
 
     // Оновлюємо активність при взаємодії користувача зі сторінкою
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];

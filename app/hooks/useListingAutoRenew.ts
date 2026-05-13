@@ -15,12 +15,10 @@ export type UseListingAutoRenewArgs = {
 export function useListingAutoRenew({ listingId, serverAutoRenew, onPersistSuccess }: UseListingAutoRenewArgs) {
   const [local, setLocal] = useState(() => !!serverAutoRenew);
   const [saving, setSaving] = useState(false);
-  const [pendingOff, setPendingOff] = useState(false);
 
   useEffect(() => {
     setLocal(!!serverAutoRenew);
-    setPendingOff(false);
-  }, [listingId]);
+  }, [listingId, serverAutoRenew]);
 
   const persist = useCallback(
     async (telegramId: string, next: boolean): Promise<boolean> => {
@@ -49,5 +47,5 @@ export function useListingAutoRenew({ listingId, serverAutoRenew, onPersistSucce
     [listingId, onPersistSuccess]
   );
 
-  return { autoRenewLocal: local, autoRenewSaving: saving, pendingAutoRenewOff: pendingOff, setPendingAutoRenewOff: setPendingOff, persistAutoRenew: persist };
+  return { autoRenewLocal: local, autoRenewSaving: saving, persistAutoRenew: persist };
 }

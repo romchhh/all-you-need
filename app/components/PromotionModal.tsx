@@ -176,7 +176,7 @@ export default function PromotionModal({
 
   return (
     <div 
-      className={`fixed inset-0 z-[99999] flex items-start sm:items-center justify-center overflow-y-auto overscroll-contain p-4 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] pb-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:pt-6 sm:pb-8 ${overlayClass}`}
+      className={`fixed inset-0 z-[99999] flex max-lg:flex-col max-lg:items-center max-lg:justify-start lg:items-center lg:justify-center justify-center overflow-y-auto overscroll-contain p-4 max-lg:pt-[max(32dvh,calc(env(safe-area-inset-top,0px)+9rem))] lg:pt-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-8 ${overlayClass}`}
       style={{ touchAction: 'none' }}
       onTouchMove={(e) => {
         if (e.target === e.currentTarget) {
@@ -185,7 +185,7 @@ export default function PromotionModal({
       }}
     >
       <div 
-        className={`max-w-md w-full max-h-[min(calc(100dvh-env(safe-area-inset-top,0px)-7rem),calc(100vh-env(safe-area-inset-top,0px)-7rem))] sm:max-h-[90vh] overflow-hidden flex flex-col relative z-[100000] my-4 sm:my-2 ${cardShell}`}
+        className={`max-w-md w-full max-h-[min(calc(100dvh-env(safe-area-inset-top,0px)-max(32dvh,9rem)),calc(100vh-env(safe-area-inset-top,0px)-max(32dvh,9rem)))] lg:max-h-[90vh] overflow-hidden flex flex-col relative z-[100000] my-4 max-lg:my-2 sm:my-2 ${cardShell}`}
         onTouchMove={(e) => {
           // Дозволяємо скрол тільки всередині контенту модального вікна
           const target = e.currentTarget;
