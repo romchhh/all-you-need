@@ -5,7 +5,7 @@ import { isAdminAuthenticated } from '@/utils/adminAuth';
 import { toSQLiteDate, addDays } from '@/utils/dateHelpers';
 import { mkdir, readdir, unlink, rm, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import path from 'node:path';
 import { createHash } from 'crypto';
 import { createReadStream, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const tempDir = join(process.cwd(), 'temp', 'import');
-  const uploadsDir = join(process.cwd(), 'public', 'listings', 'originals');
+  const tempDir = path.join(process.cwd(), 'temp', 'import');
+  const uploadsDir = path.join(process.cwd(), 'public', 'listings', 'originals');
   let zipExtractedPath: string | null = null;
 
   try {
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     // Розархівуємо ZIP якщо він є
     if (zipFile) {
       console.log('[Import] Starting ZIP extraction...');
-      zipExtractedPath = join(tempDir, `extracted_${Date.now()}`);
+      zipExtractedPath = path.join(tempDir, `extracted_${Date.now()}`);
       await mkdir(zipExtractedPath, { recursive: true });
       console.log('[Import] Extraction directory created:', zipExtractedPath);
 
@@ -215,9 +215,9 @@ export async function POST(request: NextRequest) {
     async function findImageSourcePath(imageName: string): Promise<string | null> {
       if (!zipExtractedPath) return null;
       const possiblePaths = [
-        join(zipExtractedPath, imageName),
-        join(zipExtractedPath, imageName.toLowerCase()),
-        join(zipExtractedPath, imageName.toUpperCase()),
+        path.join(zipExtractedPath, imageName),
+        path.join(zipExtractedPath, imageName.toLowerCase()),
+        path.join(zipExtractedPath, imageName.toUpperCase()),
       ];
       for (const path of possiblePaths) {
         if (existsSync(path)) return path;
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
         try {
           const entries = await readdir(dir, { withFileTypes: true });
           for (const entry of entries) {
-            const fullPath = join(dir, entry.name);
+            const fullPath = path.join(dir, entry.name);
             if (entry.isDirectory()) {
               const found = await findRecursive(fullPath, targetName);
               if (found) return found;
@@ -345,7 +345,7 @@ export async function POST(request: NextRequest) {
               // Копіюємо файл в public/listings/originals
               const ext = imageName.split('.').pop() || 'jpg';
               const newFilename = `listing_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-              const destPath = join(uploadsDir, newFilename);
+              const destPath = path.join(uploadsDir, newFilename);
 
               // Копіюємо файл
               const sourceStream = createReadStream(sourcePath);

@@ -117,12 +117,27 @@ export function FixedLogoHeader({
       };
     }
 
-    const root = typeof document !== 'undefined' ? document.scrollingElement ?? document.documentElement : null;
+    const root =
+      typeof document !== 'undefined'
+        ? document.scrollingElement ?? document.documentElement
+        : null;
     const body = typeof document !== 'undefined' ? document.body : null;
-    const targets: (Window | Document | HTMLElement)[] = [window, document, root, body].filter(
-      (x): x is Window | Document | HTMLElement => x != null
-    );
-    targets.forEach((t) => t.addEventListener('scroll', onScroll, { passive: true, capture: true }));
+
+    const isScrollTarget = (x: unknown): x is Window | Document | HTMLElement => {
+      if (x == null) return false;
+      if (x === window || x === document) return true;
+      return typeof HTMLElement !== 'undefined' && x instanceof HTMLElement;
+    };
+
+    const candidates: unknown[] = [window, document, root, body];
+    const targets: (Window | Document | HTMLElement)[] = [];
+    for (const x of candidates) {
+      if (isScrollTarget(x)) targets.push(x);
+    }
+
+    for (const el of targets) {
+      el.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    }
 
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     vv?.addEventListener('scroll', onScroll);
@@ -135,7 +150,9 @@ export function FixedLogoHeader({
     const poll = window.setInterval(onScroll, 120);
 
     return () => {
-      targets.forEach((t) => t.removeEventListener('scroll', onScroll, true));
+      for (const el of targets) {
+        el.removeEventListener('scroll', onScroll, true);
+      }
       vv?.removeEventListener('scroll', onScroll);
       vv?.removeEventListener('resize', onScroll);
       window.removeEventListener('resize', initBaseline);
