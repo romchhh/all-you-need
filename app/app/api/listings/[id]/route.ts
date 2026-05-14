@@ -96,21 +96,25 @@ export async function GET(
       favoritesCount?: number | bigint | string;
     }>;
     } catch (error: any) {
-      const msg = error?.message || '';
-      if (
+      const msg = String(error?.message || '');
+      const favBroken =
         msg.includes('no such table: Favorite') ||
-        msg.includes('Favorite') ||
-        msg.includes('autoRenew')
-      ) {
-        let q = queryWithFavorites.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
-        q = q.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
-        listings = (await prisma.$queryRawUnsafe(q, listingId)) as Array<any>;
-        if (listings[0]) {
-          (listings[0] as any).favoritesCount = 0;
-          (listings[0] as any).autoRenew = false;
-        }
-      } else {
+        (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
+      const arBroken = msg.includes('autoRenew');
+      if (!favBroken && !arBroken) {
         throw error;
+      }
+      let q = queryWithFavorites;
+      if (favBroken) {
+        q = q.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+      }
+      if (arBroken) {
+        q = q.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
+      }
+      listings = (await prisma.$queryRawUnsafe(q, listingId)) as Array<any>;
+      if (listings[0]) {
+        if (favBroken) (listings[0] as any).favoritesCount = 0;
+        if (arBroken) (listings[0] as any).autoRenew = listings[0].autoRenew ?? 0;
       }
     }
 
@@ -214,7 +218,8 @@ export async function GET(
         status: listing.status || 'active',
         promotionType: listing.promotionType || null,
         promotionEnds: listing.promotionEnds || null,
-        autoRenew: (listing as any).autoRenew === 1 || (listing as any).autoRenew === true,
+        autoRenew:
+          (listing as any).autoRenew === true || Number((listing as any).autoRenew) === 1,
         favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
       };
 

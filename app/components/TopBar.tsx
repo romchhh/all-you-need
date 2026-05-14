@@ -49,7 +49,7 @@ export const TopBar = ({
   if (variant === 'main') {
     const inputClass = isLight
       ? 'w-full rounded-2xl border border-gray-200/90 bg-white py-3 pr-10 text-gray-900 shadow-sm ring-1 ring-black/[0.03] transition-all placeholder:text-gray-500 focus:border-[#3F5331]/30 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/20'
-      : 'w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 transition-all text-white placeholder:text-white/60';
+      : 'w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30 focus:border-[#C8E6A0]/50 transition-all text-white placeholder:text-white/60';
     const searchIconClass = isLight
       ? 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-gray-600'
       : 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-white/80';
@@ -117,8 +117,10 @@ export const TopBar = ({
           <SlidersHorizontal size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
           {hasActiveFilters && (
             <span
-              className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full bg-[#3F5331] ring-2 ${
-                isLight ? 'ring-gray-100' : 'ring-black'
+              className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
+                isLight
+                  ? 'bg-[#3F5331] ring-gray-100'
+                  : 'bg-[#C8E6A0] ring-black/50 shadow-[0_0_8px_rgba(200,230,160,0.75)]'
               }`}
               aria-hidden
             />

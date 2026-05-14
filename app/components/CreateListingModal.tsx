@@ -72,7 +72,7 @@ export const CreateListingModal = ({
       ({
         background: isLight
           ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63,83,49,0.14) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63,83,49,0.1) 0%, transparent 45%), #f3f4f6'
-          : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000',
+          : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.20) 0%, transparent 40%), #000000',
         touchAction: 'pan-y',
         position: 'fixed' as const,
         width: '100%',
@@ -83,11 +83,11 @@ export const CreateListingModal = ({
     [isLight]
   );
 
-  const inField =
-    'rounded-xl border focus:outline-none focus:ring-2 ' +
-    (isLight
-      ? 'bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:ring-[#3F5331]/25 focus:border-[#3F5331]/50'
-      : 'bg-[#1C1C1C] border-white/20 text-white placeholder:text-white/50 focus:ring-white/50 focus:border-white/50');
+  const inField = `rounded-xl border ${
+    isLight
+      ? 'bg-white border-gray-200 text-gray-900 placeholder:text-gray-400'
+      : 'bg-[#1C1C1C] border-white/20 text-white placeholder:text-white/50'
+  } ${ac.formFocusRing}`;
 
   const chipIdle = isLight
     ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50'
@@ -992,13 +992,11 @@ export const CreateListingModal = ({
                         className={`relative aspect-square rounded-xl overflow-hidden border cursor-move select-none ${
                           isLight ? 'bg-gray-100' : 'bg-[#1C1C1C]'
                         } ${
-                          isDragging ? 'opacity-95 z-50 shadow-2xl border-[#3F5331]/50' : 
+                          isDragging ? (isLight ? 'opacity-95 z-50 shadow-2xl border-[#3F5331]/50' : 'opacity-95 z-50 shadow-2xl border-[#C8E6A0]/65') :
                           isHovered
-                            ? `ring-2 ring-[#3F5331] ring-offset-2 border-[#3F5331]/30 ${
-                                isLight ? 'ring-offset-gray-100' : 'ring-offset-[#0A0A0A]'
-                              }`
-                            : 
-                          isSnapping ? 'border-[#3F5331]/40' :
+                            ? ac.formPhotoActiveRing
+                            :
+                          isSnapping ? (isLight ? 'border-[#3F5331]/40' : 'border-[#C8E6A0]/50') :
                           isLight ? 'border-gray-200' : 'border-white/20'
                         }`}
                         draggable
@@ -1137,17 +1135,17 @@ export const CreateListingModal = ({
                 }}
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isFree
-                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
+                    ? ac.formChipSelected
                     : chipIdle
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                   isFree
-                    ? 'border-[#3F5331] bg-[#3F5331]'
+                    ? ac.formCheckboxFilled
                     : checkBorderIdle
                 }`}>
                   {isFree && (
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-3 h-3 ${isLight ? 'text-white' : 'text-[#0f1408]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -1164,17 +1162,17 @@ export const CreateListingModal = ({
                 }}
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isNegotiable
-                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
+                    ? ac.formChipSelected
                     : chipIdle
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                   isNegotiable
-                    ? 'border-[#3F5331] bg-[#3F5331]'
+                    ? ac.formCheckboxFilled
                     : checkBorderIdle
                 }`}>
                   {isNegotiable && (
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-3 h-3 ${isLight ? 'text-white' : 'text-[#0f1408]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -1251,9 +1249,7 @@ export const CreateListingModal = ({
                   }}
                   className={`px-4 py-3 rounded-xl border-2 transition-all text-left ${
                     category === cat.id
-                      ? isLight
-                        ? 'border-[#3F5331] bg-[#3F5331]/12 text-[#3F5331]'
-                        : 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                      ? ac.formChipSelected
                       : errors.category
                       ? `border-red-500 ${isLight ? 'bg-white text-gray-900' : 'bg-[#1C1C1C] text-white'}`
                       : chipIdle
@@ -1262,7 +1258,7 @@ export const CreateListingModal = ({
                     category !== cat.id && !errors.category && !isLight
                       ? {
                           background:
-                            'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000',
+                            'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.26) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.18) 0%, transparent 40%), #000000',
                         }
                       : {}
                   }
@@ -1310,7 +1306,7 @@ export const CreateListingModal = ({
                           }}
                           className={`px-4 py-2 rounded-xl border-2 transition-all ${
                             subcategory === ''
-                              ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                              ? ac.formChipSelected
                               : chipSmallIdle
                           }`}
                         >
@@ -1326,7 +1322,7 @@ export const CreateListingModal = ({
                             }}
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
-                                ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                                ? ac.formChipSelected
                                 : chipSmallIdle
                             }`}
                           >
@@ -1345,7 +1341,7 @@ export const CreateListingModal = ({
                             }}
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
-                                ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                                ? ac.formChipSelected
                                 : chipSmallIdle
                             }`}
                           >
@@ -1368,7 +1364,7 @@ export const CreateListingModal = ({
                       }}
                       className={`px-4 py-2 rounded-xl border-2 transition-all ${
                         subcategory === ''
-                          ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                          ? ac.formChipSelected
                           : chipSmallIdle
                       }`}
                     >
@@ -1384,7 +1380,7 @@ export const CreateListingModal = ({
                         }}
                         className={`px-4 py-2 rounded-xl border-2 transition-all ${
                           subcategory === sub.id
-                            ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                            ? ac.formChipSelected
                             : chipSmallIdle
                         }`}
                       >
@@ -1445,18 +1441,18 @@ export const CreateListingModal = ({
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
                     className={`w-full px-4 py-3 flex items-center gap-3 transition-colors ${rowHover} ${
-                      condition === option.value ? 'bg-[#3F5331]/20 text-[#3F5331]' : ac.pageHeading
+                      condition === option.value ? ac.formMenuRowSelected : ac.pageHeading
                     }`}
                   >
                     {option.icon && (
                       <option.icon 
                         size={20} 
-                        className={condition === option.value ? 'text-[#3F5331]' : ac.pageHeading} 
+                        className={condition === option.value ? ac.formAccentFg : ac.pageHeading} 
                       />
                     )}
                     <span className="font-medium">{option.label}</span>
                     {condition === option.value && (
-                      <span className="ml-auto text-[#3F5331]">✓</span>
+                      <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>
                     )}
                   </button>
                 ))}
@@ -1483,7 +1479,7 @@ export const CreateListingModal = ({
               >
               <MapPin 
                 size={18} 
-                className="absolute top-1/2 -translate-y-1/2 text-[#3F5331] pointer-events-none"
+                className={`absolute top-1/2 -translate-y-1/2 pointer-events-none ${ac.formAccentFg}`}
                 style={{ left: '16px' }}
               />
                 <span className={location ? `font-medium ${ac.pageHeading}` : ac.mutedText}>
@@ -1607,11 +1603,11 @@ export const CreateListingModal = ({
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
                 isLight ? 'border-gray-100' : 'border-white/10'
               } ${
-                currency === 'UAH' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : `${ac.pageHeading} ${rowHover}`
+                currency === 'UAH' ? ac.formMenuRowSelected : `${ac.pageHeading} ${rowHover}`
               }`}
             >
               <span>₴ UAH</span>
-              {currency === 'UAH' && <span className="ml-auto text-[#3F5331]">✓</span>}
+              {currency === 'UAH' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
             </button>
             <button
               type="button"
@@ -1629,11 +1625,11 @@ export const CreateListingModal = ({
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
                 isLight ? 'border-gray-100' : 'border-white/10'
               } ${
-                currency === 'EUR' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : `${ac.pageHeading} ${rowHover}`
+                currency === 'EUR' ? ac.formMenuRowSelected : `${ac.pageHeading} ${rowHover}`
               }`}
             >
               <span>€ EUR</span>
-              {currency === 'EUR' && <span className="ml-auto text-[#3F5331]">✓</span>}
+              {currency === 'EUR' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
             </button>
             <button
               type="button"
@@ -1649,11 +1645,11 @@ export const CreateListingModal = ({
                 tg?.HapticFeedback.impactOccurred('light');
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
-                currency === 'USD' ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold' : `${ac.pageHeading} ${rowHover}`
+                currency === 'USD' ? ac.formMenuRowSelected : `${ac.pageHeading} ${rowHover}`
               }`}
             >
               <span>$ USD</span>
-              {currency === 'USD' && <span className="ml-auto text-[#3F5331]">✓</span>}
+              {currency === 'USD' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
             </button>
           </div>
         )}
@@ -1728,7 +1724,7 @@ export const CreateListingModal = ({
               />
               <MapPin 
                 size={18} 
-                className="absolute top-1/2 -translate-y-1/2 text-[#3F5331] pointer-events-none"
+                className={`absolute top-1/2 -translate-y-1/2 pointer-events-none ${ac.formAccentFg}`}
                 style={{ left: '12px' }}
               />
               {locationQuery && (
@@ -1754,7 +1750,7 @@ export const CreateListingModal = ({
           <div className="flex-1 overflow-y-auto overscroll-contain" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
             {loadingCities ? (
               <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="w-8 h-8 border-2 border-[#3F5331] border-t-transparent rounded-full animate-spin mb-4"></div>
+                <div className={`w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mb-4 ${isLight ? 'border-[#3F5331]' : 'border-[#C8E6A0]'}`}></div>
                 <p className={`text-sm ${ac.mutedText}`}>{t('common.loading')}</p>
               </div>
             ) : filteredCities.length > 0 ? (
@@ -1777,11 +1773,11 @@ export const CreateListingModal = ({
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
                     className={`w-full px-4 py-4 text-left transition-colors flex items-center gap-3 ${
-                      isLight ? 'hover:bg-gray-100 active:bg-[#3F5331]/15' : 'hover:bg-[#3F5331]/10 active:bg-[#3F5331]/20'
+                      isLight ? 'hover:bg-gray-100 active:bg-[#3F5331]/15' : 'hover:bg-white/[0.06] active:bg-[#C8E6A0]/12'
                     }`}
                   >
-                    <div className="w-10 h-10 rounded-full bg-[#3F5331]/20 flex items-center justify-center flex-shrink-0">
-                      <MapPin size={18} className="text-[#3F5331]" />
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isLight ? 'bg-[#3F5331]/20' : 'bg-[#C8E6A0]/12'}`}>
+                      <MapPin size={18} className={ac.formAccentFg} />
                     </div>
                     <span className={`font-medium text-base ${ac.pageHeading}`}>{city}</span>
                   </button>

@@ -99,21 +99,36 @@ export const ProfileListingCard = ({
         {promotionsToShow.map((promoType: string) => {
           if (promoType === 'vip') {
             return (
-              <span key="vip" className="inline-flex items-center px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+              <span
+                key="vip"
+                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap ${
+                  isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                }`}
+              >
                 VIP
               </span>
             );
           }
           if (promoType === 'top_category') {
             return (
-              <span key="top" className="inline-flex items-center px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+              <span
+                key="top"
+                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap ${
+                  isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                }`}
+              >
                 TOP
               </span>
             );
           }
           if (promoType === 'highlighted') {
             return (
-              <span key="highlighted" className="inline-flex items-center px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded mr-1.5 whitespace-nowrap">
+              <span
+                key="highlighted"
+                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap ${
+                  isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                }`}
+              >
                 {t('promotions.highlighted')}
               </span>
             );
@@ -173,10 +188,10 @@ export const ProfileListingCard = ({
       if (promotionType === 'vip') {
         return isLight
           ? 'bg-white border-2 border-[#3F5331] shadow-[0_0_16px_rgba(63,83,49,0.22)]'
-          : 'bg-[#000000] border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.4)]';
+          : 'bg-[#000000] border-2 border-[#C8E6A0] shadow-[0_0_22px_rgba(200,230,160,0.45)]';
       }
       if (promotionType === 'highlighted') {
-        return isLight ? 'bg-white border-2 border-[#3F5331]' : 'bg-[#000000] border-2 border-[#3F5331]';
+        return isLight ? 'bg-white border-2 border-[#3F5331]' : 'bg-[#000000] border-2 border-[#C8E6A0]';
       }
       if (promotionType === 'top_category') {
         return isLight ? 'bg-white border-2 border-gray-200/90 shadow-sm' : 'bg-[#000000] border-2 border-white/20';
@@ -271,21 +286,36 @@ export const ProfileListingCard = ({
               {promotionsToShow.map((promoType: string) => {
                 if (promoType === 'vip') {
                   return (
-                    <div key="vip" className="px-2 py-0.5 bg-[#3F5331] text-white text-[10px] font-bold rounded shadow-lg">
+                    <div
+                      key="vip"
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg ${
+                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                      }`}
+                    >
                       VIP
                     </div>
                   );
                 }
                 if (promoType === 'top_category') {
                   return (
-                    <div key="top" className="px-2 py-0.5 bg-[#3F5331] text-white text-[10px] font-bold rounded shadow-lg">
+                    <div
+                      key="top"
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg ${
+                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                      }`}
+                    >
                       TOP
                     </div>
                   );
                 }
                 if (promoType === 'highlighted') {
                   return (
-                    <div key="highlighted" className="px-2 py-0.5 bg-[#3F5331] text-white text-[10px] font-bold rounded shadow-lg">
+                    <div
+                      key="highlighted"
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg ${
+                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                      }`}
+                    >
                       {t('promotions.highlighted')}
                     </div>
                   );
@@ -299,7 +329,7 @@ export const ProfileListingCard = ({
         {(shouldShowListingViews(listing.views) ||
           shouldShowListingFavorites(listing.views, listing.favoritesCount)) && (
         <div
-          className={`flex w-full max-w-[6.5rem] items-center justify-center gap-2.5 text-[11px] leading-none ${
+          className={`mt-1 flex w-full max-w-[6.5rem] items-center justify-center gap-2.5 text-[11px] leading-none ${
             isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-600' : 'text-white/75'
           }`}
         >
@@ -502,7 +532,7 @@ export const ProfileListingCard = ({
                     : 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
                   : isLight
                   ? 'bg-transparent border-2 border-[#3F5331] text-[#3F5331] hover:bg-[#3F5331]/10'
-                  : 'bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#3F5331]/20'
+                  : 'bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#C8E6A0]/12'
               }`}
               title={isPendingModeration ? t('editListing.cannotEditOnModeration') || 'Не можна редагувати під час модерації' : t('common.edit')}
             >
@@ -525,7 +555,7 @@ export const ProfileListingCard = ({
                     : 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6]'
                   : isLight
                   ? 'bg-transparent border-2 border-[#3F5331] text-[#3F5331] hover:bg-[#3F5331]/10'
-                  : 'bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#3F5331]/20'
+                  : 'bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#C8E6A0]/12'
               }`}
               title={t('editListing.markAsSold')}
             >

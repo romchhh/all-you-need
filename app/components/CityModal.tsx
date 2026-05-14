@@ -109,7 +109,7 @@ export const CityModal = ({
     : 'border border-white text-white bg-transparent hover:bg-white/10';
   const sheetBackground = isLight
     ? 'radial-gradient(ellipse 85% 100% at 18% 0%, rgba(63, 83, 49, 0.14) 0%, transparent 45%), linear-gradient(180deg, #ffffff 0%, #f6f8f4 100%)'
-    : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000';
+    : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.20) 0%, transparent 40%), #000000';
   const [localSelectedCities, setLocalSelectedCities] = useState<string[]>(selectedCities);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[]>([]);
@@ -566,7 +566,7 @@ export const CityModal = ({
                   className={
                     isLight
                       ? 'w-full pr-4 py-3 pl-10 bg-white rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/25 text-gray-900 placeholder:text-gray-500'
-                      : 'w-full pr-4 py-3 pl-10 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder:text-white/60'
+                      : 'w-full pr-4 py-3 pl-10 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30 focus:border-[#C8E6A0]/50 text-white placeholder:text-white/60'
                   }
                 />
               </div>
@@ -682,7 +682,7 @@ export const CityModal = ({
                               selected
                                 ? isLight
                                   ? 'border-[#3F5331] bg-[#3F5331]'
-                                  : 'border-[#C8E6A0] bg-[#C8E6A0]/25'
+                                  : 'border-[#C8E6A0] bg-[#C8E6A0]'
                                 : isLight
                                   ? 'border-gray-400'
                                   : 'border-white/50'
@@ -691,7 +691,7 @@ export const CityModal = ({
                             {selected ? (
                               <Check
                                 size={10}
-                                className={isLight ? 'text-white' : 'text-[#C8E6A0]'}
+                                className={isLight ? 'text-white' : 'text-[#0f1408]'}
                                 strokeWidth={3}
                               />
                             ) : null}
@@ -773,7 +773,7 @@ export const CityModal = ({
                                 isSelected
                                   ? isLight
                                     ? 'border-[#3F5331] bg-[#3F5331]'
-                                    : 'border-[#C8E6A0] bg-[#C8E6A0]/25'
+                                    : 'border-[#C8E6A0] bg-[#C8E6A0]'
                                   : isLight
                                     ? 'border-gray-400'
                                     : 'border-white'
@@ -782,7 +782,7 @@ export const CityModal = ({
                               {isSelected && (
                                 <Check
                                   size={12}
-                                  className={isLight ? 'text-white' : 'text-[#C8E6A0]'}
+                                  className={isLight ? 'text-white' : 'text-[#0f1408]'}
                                   strokeWidth={3}
                                 />
                               )}
@@ -841,7 +841,7 @@ export const CityModal = ({
                                     isSelected
                                       ? isLight
                                         ? 'border-[#3F5331] bg-[#3F5331]'
-                                        : 'border-[#C8E6A0] bg-[#C8E6A0]/25'
+                                        : 'border-[#C8E6A0] bg-[#C8E6A0]'
                                       : isLight
                                         ? 'border-gray-400'
                                         : 'border-white'
@@ -850,7 +850,7 @@ export const CityModal = ({
                                   {isSelected && (
                                     <Check
                                       size={12}
-                                      className={isLight ? 'text-white' : 'text-[#C8E6A0]'}
+                                      className={isLight ? 'text-white' : 'text-[#0f1408]'}
                                       strokeWidth={3}
                                     />
                                   )}

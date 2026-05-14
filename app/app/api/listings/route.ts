@@ -323,26 +323,27 @@ export async function GET(request: NextRequest) {
         favoritesCount?: number;
       }>;
       } catch (error: any) {
-        // Якщо таблиця Favorite не існує, виконуємо запит без favoritesCount
-        if (
-          error.message?.includes('no such table: Favorite') ||
-          error.message?.includes('Favorite') ||
-          error.message?.includes('autoRenew')
-        ) {
-          let queryWithoutFavorites = query.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
-          queryWithoutFavorites = queryWithoutFavorites.replace(
-            ', COALESCE(l.autoRenew, 0) as autoRenew',
-            ''
-          );
-          userListings = await prisma.$queryRawUnsafe(
-            queryWithoutFavorites,
-            ...queryParams
-          ) as any[];
-          // Додаємо favoritesCount = 0 для всіх записів
-          userListings = userListings.map((listing: any) => ({ ...listing, favoritesCount: 0 }));
-        } else {
+        const msg = String(error?.message || '');
+        const favBroken =
+          msg.includes('no such table: Favorite') ||
+          (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
+        const arBroken = msg.includes('autoRenew');
+        if (!favBroken && !arBroken) {
           throw error;
         }
+        let queryFallback = query;
+        if (favBroken) {
+          queryFallback = queryFallback.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+        }
+        if (arBroken) {
+          queryFallback = queryFallback.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
+        }
+        userListings = await prisma.$queryRawUnsafe(queryFallback, ...queryParams) as any[];
+        userListings = userListings.map((listing: any) => ({
+          ...listing,
+          ...(favBroken ? { favoritesCount: 0 } : {}),
+          ...(arBroken ? { autoRenew: listing.autoRenew ?? 0 } : {}),
+        }));
       }
 
       const countQuery = `SELECT COUNT(*) as count
@@ -425,7 +426,7 @@ export async function GET(request: NextRequest) {
           promotionEnds: listing.promotionEnds || null,
           expiresAt: listing.expiresAt || null,
           autoRenew:
-            (listing as any).autoRenew === 1 || (listing as any).autoRenew === true,
+            (listing as any).autoRenew === true || Number((listing as any).autoRenew) === 1,
           favoritesCount: normalizeFavoritesCount(listing.favoritesCount),
         };
       });
@@ -614,36 +615,31 @@ export async function GET(request: NextRequest) {
         listingsData = data;
         totalCountData = count;
       } catch (error: any) {
-        // Якщо таблиця Favorite не існує, виконуємо запит без favoritesCount
-        if (
-          error.message?.includes('no such table: Favorite') ||
-          error.message?.includes('Favorite') ||
-          error.message?.includes('autoRenew')
-        ) {
-          let queryWithoutFavorites = listingsQuery.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
-          queryWithoutFavorites = queryWithoutFavorites.replace(
-            ', COALESCE(l.autoRenew, 0) as autoRenew',
-            ''
-          );
-          const [data, count] = await Promise.all([
-            prisma.$queryRawUnsafe(
-              queryWithoutFavorites,
-              ...params,
-              limit,
-              offset
-            ) as any,
-            prisma.$queryRawUnsafe(
-              countQuery,
-              ...params
-            ) as Promise<Array<{ count: bigint }>>
-          ]);
-          
-          // Додаємо favoritesCount = 0 для всіх записів
-          listingsData = data.map((listing: any) => ({ ...listing, favoritesCount: 0 }));
-          totalCountData = count;
-        } else {
+        const msg = String(error?.message || '');
+        const favBroken =
+          msg.includes('no such table: Favorite') ||
+          (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
+        const arBroken = msg.includes('autoRenew');
+        if (!favBroken && !arBroken) {
           throw error;
         }
+        let queryFallback = listingsQuery;
+        if (favBroken) {
+          queryFallback = queryFallback.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+        }
+        if (arBroken) {
+          queryFallback = queryFallback.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
+        }
+        const [data, count] = await Promise.all([
+          prisma.$queryRawUnsafe(queryFallback, ...params, limit, offset) as any,
+          prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>,
+        ]);
+        listingsData = data.map((listing: any) => ({
+          ...listing,
+          ...(favBroken ? { favoritesCount: 0 } : {}),
+          ...(arBroken ? { autoRenew: listing.autoRenew ?? 0 } : {}),
+        }));
+        totalCountData = count;
       }
 
       listings = listingsData;
@@ -778,7 +774,7 @@ export async function GET(request: NextRequest) {
                promotionEnds: listing.promotionEnds || null,
                expiresAt: listing.expiresAt || null,
                autoRenew:
-                 (listing as any).autoRenew === 1 || (listing as any).autoRenew === true,
+                 (listing as any).autoRenew === true || Number((listing as any).autoRenew) === 1,
                favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
              };
     });

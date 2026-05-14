@@ -14,7 +14,7 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
   const { isLight } = useTheme();
   const tileBg = isLight
     ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.22) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), #ffffff'
-    : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000';
+    : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.26) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.18) 0%, transparent 40%), #000000';
 
   return (
     <div
@@ -26,7 +26,7 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
           isActive
             ? isLight
               ? 'border-2 border-[#3F5331] bg-[#3F5331]/25 shadow-sm'
-              : 'border border-[#3F5331]'
+              : 'border border-[#C8E6A0] shadow-[0_0_12px_rgba(200,230,160,0.2)]'
             : isLight
               ? 'border-2 border-[#3F5331]'
               : 'border border-white'

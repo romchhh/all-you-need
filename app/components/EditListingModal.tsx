@@ -824,7 +824,7 @@ export const EditListingModal = ({
 
   const scrollBgStyle: CSSProperties = isLight
     ? { background: 'linear-gradient(180deg, #fcfcfb 0%, #eef0eb 100%)' }
-    : { background: 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000' };
+    : { background: 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.20) 0%, transparent 40%), #000000' };
 
   return (
     <div 
@@ -929,13 +929,11 @@ export const EditListingModal = ({
                     className={`relative aspect-square rounded-xl overflow-hidden border cursor-move select-none ${
                       isLight ? 'bg-gray-100' : 'bg-[#1C1C1C]'
                     } ${
-                      isDragging ? 'opacity-95 z-50 shadow-2xl border-[#3F5331]/50' : 
+                      isDragging ? (isLight ? 'opacity-95 z-50 shadow-2xl border-[#3F5331]/50' : 'opacity-95 z-50 shadow-2xl border-[#C8E6A0]/65') : 
                       isHovered
-                        ? isLight
-                          ? 'ring-2 ring-[#3F5331] ring-offset-2 ring-offset-gray-100 border-[#3F5331]/30'
-                          : 'ring-2 ring-[#3F5331] ring-offset-2 ring-offset-[#0A0A0A] border-[#3F5331]/30'
+                        ? ac.formPhotoActiveRing
                         : isSnapping
-                          ? 'border-[#3F5331]/40'
+                          ? (isLight ? 'border-[#3F5331]/40' : 'border-[#C8E6A0]/50')
                           : isLight
                             ? 'border-gray-200'
                             : 'border-white/20'
@@ -1004,7 +1002,9 @@ export const EditListingModal = ({
                 );
               })}
               {imagePreviews.length < 10 && (
-                <label className={`aspect-square rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-[#3F5331] transition-colors ${isLight ? 'border-gray-300 bg-white/60' : 'border-white/20'}`}>
+                <label className={`aspect-square rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${
+                  isLight ? 'border-gray-300 bg-white/60 hover:border-[#3F5331]' : 'border-white/20 hover:border-[#C8E6A0]/80'
+                }`}>
                   <div className="text-center">
                     <Upload size={24} className={`mx-auto mb-1 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
                     <span className={`text-xs ${isLight ? 'text-gray-600' : 'text-white/70'}`}>{t('editListing.addPhoto')}</span>
@@ -1037,7 +1037,7 @@ export const EditListingModal = ({
                 if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
               }}
               placeholder={t('editListing.titlePlaceholder')}
-              className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] ${
+              className={`w-full px-4 py-3 rounded-xl border ${ac.formFocusRing} ${
                 isLight
                   ? 'bg-white text-gray-900 placeholder:text-gray-400'
                   : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
@@ -1062,7 +1062,7 @@ export const EditListingModal = ({
               }}
               placeholder={t('editListing.descriptionPlaceholder')}
               rows={4}
-              className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] resize-none ${
+              className={`w-full px-4 py-3 rounded-xl border ${ac.formFocusRing} resize-none ${
                 isLight
                   ? 'bg-white text-gray-900 placeholder:text-gray-400'
                   : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
@@ -1087,17 +1087,17 @@ export const EditListingModal = ({
                 }}
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isFree
-                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
+                    ? ac.formChipSelected
                     : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                   isFree
-                    ? 'border-[#3F5331] bg-[#3F5331]'
-                    : 'border-white/40 bg-transparent'
+                    ? ac.formCheckboxFilled
+                    : isLight ? 'border-gray-400 bg-transparent' : 'border-white/40 bg-transparent'
                 }`}>
                   {isFree && (
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-3 h-3 ${isLight ? 'text-white' : 'text-[#0f1408]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -1114,17 +1114,17 @@ export const EditListingModal = ({
                 }}
                 className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   isNegotiable
-                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
+                    ? ac.formChipSelected
                     : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                   isNegotiable
-                    ? 'border-[#3F5331] bg-[#3F5331]'
-                    : 'border-white/40 bg-transparent'
+                    ? ac.formCheckboxFilled
+                    : isLight ? 'border-gray-400 bg-transparent' : 'border-white/40 bg-transparent'
                 }`}>
                   {isNegotiable && (
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-3 h-3 ${isLight ? 'text-white' : 'text-[#0f1408]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -1150,7 +1150,7 @@ export const EditListingModal = ({
                       if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                     }}
                     placeholder={t('editListing.pricePlaceholder')}
-                    className={`flex-1 px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] ${
+                    className={`flex-1 px-4 py-3 rounded-xl border ${ac.formFocusRing} ${
                       isLight
                         ? 'bg-white text-gray-900 placeholder:text-gray-400'
                         : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
@@ -1200,7 +1200,7 @@ export const EditListingModal = ({
                   }}
                 className={`px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
                   category === cat.id
-                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                    ? ac.formChipSelected
                     : errors.category
                     ? isLight ? 'border-red-500 bg-white text-gray-900' : 'border-red-500 bg-[#1C1C1C] text-white'
                     : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
@@ -1249,7 +1249,7 @@ export const EditListingModal = ({
                           }}
                           className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
                             !subcategory
-                              ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                              ? ac.formChipSelected
                               : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                           }`}
                         >
@@ -1265,7 +1265,7 @@ export const EditListingModal = ({
                             }}
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
-                                ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                                ? ac.formChipSelected
                                 : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                             }`}
                           >
@@ -1284,7 +1284,7 @@ export const EditListingModal = ({
                             }}
                             className={`px-4 py-2 rounded-xl border-2 transition-all ${
                               subcategory === sub.id
-                                ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                                ? ac.formChipSelected
                                 : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                             }`}
                           >
@@ -1307,7 +1307,7 @@ export const EditListingModal = ({
                       }}
                       className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
                         !subcategory
-                          ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                          ? ac.formChipSelected
                           : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                       }`}
                     >
@@ -1323,7 +1323,7 @@ export const EditListingModal = ({
                         }}
                         className={`px-4 py-2 rounded-xl border-2 transition-all ${
                           subcategory === sub.id
-                            ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331]'
+                            ? ac.formChipSelected
                             : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
                         }`}
                       >
@@ -1353,7 +1353,7 @@ export const EditListingModal = ({
               <div className="flex items-center gap-2">
                 {selectedCondition && (
                   <>
-                    {selectedCondition.icon && <selectedCondition.icon size={20} className="text-[#3F5331]" />}
+                    {selectedCondition.icon && <selectedCondition.icon size={20} className={ac.formAccentFg} />}
                     <span className="font-medium">{selectedCondition.label}</span>
                   </>
                 )}
@@ -1380,14 +1380,14 @@ export const EditListingModal = ({
                         isLight
                           ? 'hover:bg-gray-50 border-gray-100 text-gray-900'
                           : 'hover:bg-white/10 border-white/10 text-white'
-                      }`}
+                      } ${condition === option.value ? ac.formMenuRowSelected : ''}`}
                     >
                       <div className="flex items-center gap-3">
-                        <IconComponent size={20} className="text-[#3F5331]" />
+                        <IconComponent size={20} className={condition === option.value ? ac.formAccentFg : isLight ? 'text-[#3F5331]' : 'text-white/80'} />
                         <span>{option.label}</span>
                       </div>
                       {selectedCondition?.value === option.value && (
-                        <span className="text-[#3F5331]">✓</span>
+                        <span className={ac.formAccentFg}>✓</span>
                       )}
                     </button>
                   );
@@ -1421,7 +1421,7 @@ export const EditListingModal = ({
                 }}
                 onFocus={() => setIsLocationOpen(true)}
                 placeholder={t('editListing.locationPlaceholder')}
-                className={`w-full px-4 py-3 pl-10 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331] ${
+                className={`w-full px-4 py-3 pl-10 rounded-xl border ${ac.formFocusRing} ${
                   isLight
                     ? 'bg-white text-gray-900 placeholder:text-gray-400'
                     : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
@@ -1472,7 +1472,7 @@ export const EditListingModal = ({
                 }}
                 className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
                   status === 'active'
-                    ? 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm'
+                    ? ac.formChipSelected
                     : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
@@ -1506,7 +1506,7 @@ export const EditListingModal = ({
                     : status === 'sold'
                     ? isLight
                       ? 'border-[#3F5331] bg-[#3F5331]/12 text-[#3F5331] shadow-sm'
-                      : 'border-white/40 bg-white/10 text-white shadow-sm'
+                      : ac.formChipSelected
                     : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
               >
@@ -1615,10 +1615,10 @@ export const EditListingModal = ({
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
                 isLight ? 'border-gray-100 hover:bg-gray-50 text-gray-900' : 'border-white/10 hover:bg-white/10 text-white'
-              } ${currency === 'UAH' ? 'bg-[#3F5331]/15 text-[#3F5331] font-semibold' : ''}`}
+              } ${currency === 'UAH' ? ac.formMenuRowSelected : ''}`}
             >
               <span>₴ UAH</span>
-              {currency === 'UAH' && <span className="ml-auto text-[#3F5331]">✓</span>}
+              {currency === 'UAH' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
             </button>
                 <button
               type="button"
@@ -1629,10 +1629,10 @@ export const EditListingModal = ({
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
                 isLight ? 'border-gray-100 hover:bg-gray-50 text-gray-900' : 'border-white/10 hover:bg-white/10 text-white'
-              } ${currency === 'EUR' ? 'bg-[#3F5331]/15 text-[#3F5331] font-semibold' : ''}`}
+              } ${currency === 'EUR' ? ac.formMenuRowSelected : ''}`}
             >
               <span>€ EUR</span>
-              {currency === 'EUR' && <span className="ml-auto text-[#3F5331]">✓</span>}
+              {currency === 'EUR' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
                 </button>
                 <button
               type="button"
@@ -1643,10 +1643,10 @@ export const EditListingModal = ({
               }}
               className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
                 isLight ? 'hover:bg-gray-50 text-gray-900' : 'hover:bg-white/10 text-white'
-              } ${currency === 'USD' ? 'bg-[#3F5331]/15 text-[#3F5331] font-semibold' : ''}`}
+              } ${currency === 'USD' ? ac.formMenuRowSelected : ''}`}
             >
               <span>$ USD</span>
-              {currency === 'USD' && <span className="ml-auto text-[#3F5331]">✓</span>}
+              {currency === 'USD' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
                 </button>
           </div>
         )}

@@ -599,7 +599,7 @@ const BazaarTabComponent = ({
             }}
             className={`p-2 rounded-lg transition-colors ${
               viewMode === 'grid'
-                ? 'bg-[#3F5331] text-white shadow-sm'
+                ? ac.segmentedActive
                 : ac.toggleInactive
             }`}
             aria-pressed={viewMode === 'grid'}
@@ -614,7 +614,7 @@ const BazaarTabComponent = ({
             }}
             className={`p-2 rounded-lg transition-colors ${
               viewMode === 'list'
-                ? 'bg-[#3F5331] text-white shadow-sm'
+                ? ac.segmentedActive
                 : ac.toggleInactive
             }`}
             aria-pressed={viewMode === 'list'}
@@ -791,7 +791,7 @@ const BazaarTabComponent = ({
                   style={{
                     background: isLight
                       ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.22) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), #ffffff'
-                      : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000',
+                      : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.26) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.18) 0%, transparent 40%), #000000',
                   }}
                 >
                   <CategoryIcon categoryId="all_categories" isActive={false} size={32} />

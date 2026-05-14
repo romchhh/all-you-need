@@ -4,7 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from 'react';
@@ -37,7 +37,7 @@ function readStoredTheme(): AppAppearance {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<AppAppearance>('light');
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const stored = readStoredTheme();
     setThemeState(stored);
     document.documentElement.setAttribute('data-theme', stored);

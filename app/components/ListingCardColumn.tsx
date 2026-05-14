@@ -48,11 +48,13 @@ const ListingCardColumnComponent = ({
     if (promotionTypes.length === 0) return defaultPromoBorder;
 
     if (promotionTypes.includes('vip')) {
-      return 'border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.4)]';
+      return isLight
+        ? 'border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.35)]'
+        : 'border-2 border-[#C8E6A0] shadow-[0_0_22px_rgba(200,230,160,0.45)]';
     }
 
     if (promotionTypes.includes('highlighted')) {
-      return 'border-2 border-[#3F5331]';
+      return isLight ? 'border-2 border-[#3F5331]' : 'border-2 border-[#C8E6A0]';
     }
 
     if (promotionTypes.includes('top_category')) {
@@ -70,7 +72,12 @@ const ListingCardColumnComponent = ({
     // Якщо є VIP - показуємо VIP бейдж
     if (promotionTypes.includes('vip')) {
       return (
-        <div className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div
+          className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
+            isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+          }`}
+          style={{ width: 'auto', maxWidth: 'fit-content' }}
+        >
           VIP
         </div>
       );
@@ -79,7 +86,12 @@ const ListingCardColumnComponent = ({
     // Якщо є top_category - показуємо TOP бейдж
     if (promotionTypes.includes('top_category')) {
       return (
-        <div className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div
+          className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
+            isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+          }`}
+          style={{ width: 'auto', maxWidth: 'fit-content' }}
+        >
           TOP
         </div>
       );
@@ -221,20 +233,8 @@ const ListingCardColumnComponent = ({
             </div>
           </div>
 
-          {/* Нижня частина: перегляди / обране, локація, час */}
+          {/* Нижня частина: локація, час + перегляди в одному ряду */}
           <div className="flex flex-col gap-1 text-[10px] min-w-0 mb-1">
-            <div
-              className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 tabular-nums ${
-                isLight ? 'text-gray-500' : 'text-white/60'
-              }`}
-            >
-              {shouldShowListingViews(listing.views) && (
-                <span className="inline-flex items-center gap-0.5" title={t('listing.viewsLabel')}>
-                  <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
-                  {listing.views ?? 0}
-                </span>
-              )}
-            </div>
             {listing.location && (
               <div
                 className={`flex items-center gap-1.5 ${isLight ? 'text-gray-600' : 'text-white/80'}`}
@@ -246,10 +246,20 @@ const ListingCardColumnComponent = ({
                 <span className="line-clamp-1 truncate">{listing.location.split(',')[0]}</span>
               </div>
             )}
-            {formattedTime && (
-              <span className={`truncate ${isLight ? 'text-gray-500' : 'text-white/60'}`}>
-                {formattedTime}
-              </span>
+            {(formattedTime || shouldShowListingViews(listing.views)) && (
+              <div
+                className={`flex min-w-0 items-center gap-2 tabular-nums ${
+                  formattedTime ? 'justify-between' : 'justify-end'
+                } ${isLight ? 'text-gray-500' : 'text-white/60'}`}
+              >
+                {formattedTime ? <span className="min-w-0 truncate">{formattedTime}</span> : null}
+                {shouldShowListingViews(listing.views) ? (
+                  <span className="inline-flex shrink-0 items-center gap-0.5" title={t('listing.viewsLabel')}>
+                    <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
+                    {listing.views ?? 0}
+                  </span>
+                ) : null}
+              </div>
             )}
           </div>
         </div>

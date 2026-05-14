@@ -175,25 +175,27 @@ export async function GET(request: NextRequest) {
         ...queryParams
       ) as any[];
     } catch (error: any) {
-      const em = error?.message || '';
-      if (em.includes('no such table: Favorite') || em.includes('Favorite') || em.includes('autoRenew')) {
-        let queryWithoutFavorites = query.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
-        queryWithoutFavorites = queryWithoutFavorites.replace(
-          ', COALESCE(l.autoRenew, 0) as autoRenew',
-          ''
-        );
-        userListings = await prisma.$queryRawUnsafe(
-          queryWithoutFavorites,
-          ...queryParams
-        ) as any[];
-        userListings = userListings.map((listing: any) => ({
-          ...listing,
-          favoritesCount: 0,
-          autoRenew: false,
-        }));
-      } else {
+      const msg = String(error?.message || '');
+      const favBroken =
+        msg.includes('no such table: Favorite') ||
+        (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
+      const arBroken = msg.includes('autoRenew');
+      if (!favBroken && !arBroken) {
         throw error;
       }
+      let queryFallback = query;
+      if (favBroken) {
+        queryFallback = queryFallback.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+      }
+      if (arBroken) {
+        queryFallback = queryFallback.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
+      }
+      userListings = await prisma.$queryRawUnsafe(queryFallback, ...queryParams) as any[];
+      userListings = userListings.map((listing: any) => ({
+        ...listing,
+        ...(favBroken ? { favoritesCount: 0 } : {}),
+        ...(arBroken ? { autoRenew: listing.autoRenew ?? 0 } : {}),
+      }));
     }
 
     const countQuery = `SELECT COUNT(*) as count
@@ -250,7 +252,7 @@ export async function GET(request: NextRequest) {
         promotionType: listing.promotionType || null,
         promotionEnds: listing.promotionEnds || null,
         expiresAt: listing.expiresAt || null,
-        autoRenew: listing.autoRenew === 1 || listing.autoRenew === true,
+        autoRenew: listing.autoRenew === true || Number(listing.autoRenew) === 1,
         favoritesCount: normalizeFavoritesCount(listing.favoritesCount),
       };
     });

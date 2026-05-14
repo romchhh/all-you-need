@@ -215,7 +215,9 @@ export const CategoriesTab = ({
           }}
           className={`w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl transition-colors border ${
             selectedCategory === 'free'
-              ? 'bg-green-500/20 text-[#3F5331] border-[#3F5331]'
+              ? isLight
+                ? 'bg-green-500/20 text-[#3F5331] border-[#3F5331]'
+                : 'bg-[#C8E6A0]/12 text-[#C8E6A0] border-[#C8E6A0]/70'
               : isLight
                 ? 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-50'
                 : 'bg-gray-800/50 text-gray-300 border-transparent hover:bg-gray-700/50'
@@ -265,7 +267,7 @@ export const CategoriesTab = ({
                 selectedCategory === category.id
                   ? isLight
                     ? 'border-2 border-[#3F5331]'
-                    : 'border border-[#3F5331]'
+                    : 'border border-[#C8E6A0] shadow-[0_0_14px_rgba(200,230,160,0.18)]'
                   : isLight
                     ? 'border border-gray-200 hover:border-gray-300'
                     : 'border border-white hover:border-white/80'
@@ -276,8 +278,8 @@ export const CategoriesTab = ({
                     ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.25) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), #ffffff'
                     : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.14) 0%, transparent 45%), #ffffff'
                   : selectedCategory === category.id
-                    ? 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000'
-                    : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000',
+                    ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.34) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.22) 0%, transparent 40%), #000000'
+                    : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.14) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.10) 0%, transparent 40%), #000000',
               }}
             >
               <div className="mb-2">

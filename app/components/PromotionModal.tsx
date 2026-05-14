@@ -226,7 +226,7 @@ export default function PromotionModal({
               className={
                 isLight
                   ? 'mb-4 p-4 rounded-xl bg-[#3F5331]/8 border-2 border-[#3F5331]/35'
-                  : 'mb-4 p-4 rounded-xl bg-[#3F5331]/10 border-2 border-[#3F5331]'
+                  : 'mb-4 p-4 rounded-xl bg-[#C8E6A0]/08 border-2 border-[#C8E6A0]/55'
               }
             >
               <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -234,7 +234,11 @@ export default function PromotionModal({
                 {activePromotions.map((promoType) => (
                   <div
                     key={promoType}
-                    className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap"
+                    className={
+                      isLight
+                        ? 'px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap'
+                        : 'px-2.5 py-1 bg-[#C8E6A0] text-[#0f1408] text-xs font-bold rounded whitespace-nowrap'
+                    }
                   >
                     {promoType === 'vip' ? 'VIP' : promoType === 'top_category' ? 'TOP' : t('promotions.highlighted')}
                   </div>
@@ -271,7 +275,7 @@ export default function PromotionModal({
                   : selectedPromotion === promo.type
                   ? isLight
                     ? 'border-[#3F5331] bg-[#3F5331]/10 shadow-lg scale-[1.02]'
-                    : 'border-[#3F5331] bg-[#3F5331]/20 shadow-lg scale-[1.02]'
+                    : 'border-[#C8E6A0] bg-[#C8E6A0]/12 shadow-lg scale-[1.02]'
                   : isLight
                   ? 'border-gray-200/90 bg-gray-50/90 hover:border-[#3F5331]/35 hover:bg-white'
                   : 'border-white/20 bg-[#1C1C1C] hover:border-white/40 hover:bg-white/5'
@@ -325,7 +329,7 @@ export default function PromotionModal({
                           className={
                             isLight
                               ? 'text-xs px-2 py-0.5 rounded-full font-medium bg-[#3F5331]/12 text-[#3F5331] border border-[#3F5331]/25'
-                              : 'text-xs px-2 py-0.5 rounded-full font-medium bg-[#3F5331]/20 text-[#C8E6A0] border border-[#3F5331]/30'
+                              : 'text-xs px-2 py-0.5 rounded-full font-medium bg-[#C8E6A0]/12 text-[#C8E6A0] border border-[#C8E6A0]/35'
                           }
                         >
                           {t(`promotions.${promo.badge}`)}
@@ -378,15 +382,18 @@ export default function PromotionModal({
                 </div>
                 
                 {!isDisabled && (
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
+                  <div
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
                     selectedPromotion === promo.type
-                      ? 'border-[#3F5331] bg-[#3F5331]'
+                      ? isLight
+                        ? 'border-[#3F5331] bg-[#3F5331]'
+                        : 'border-[#C8E6A0] bg-[#C8E6A0]'
                       : isLight
                         ? 'border-gray-400'
                         : 'border-white/30'
                   }`}>
                     {selectedPromotion === promo.type && (
-                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className={`w-4 h-4 ${isLight ? 'text-white' : 'text-[#0f1408]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     )}

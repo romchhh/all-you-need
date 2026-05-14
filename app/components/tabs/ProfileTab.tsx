@@ -521,7 +521,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     <>
     <div className="pb-24 min-h-screen">
       {/* Профіль хедер */}
-      <div className="px-4 pt-4 pb-4">
+      <div className="px-4 pt-1 pb-4 max-lg:-mt-0.5">
         <div className="flex items-start gap-4">
           {/* Фото профілю */}
           <div 
@@ -772,7 +772,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                       ? 'border-gray-100 hover:bg-gray-50 ' +
                         (selectedStatus === status ? 'bg-[#3F5331]/20 text-[#3F5331]' : 'text-gray-900')
                       : 'border-white/10 hover:bg-white/10 ' +
-                        (selectedStatus === status ? 'bg-[#3F5331]/20 text-[#C8E6A0]' : 'text-white')
+                        (selectedStatus === status ? 'bg-[#C8E6A0]/12 text-[#C8E6A0]' : 'text-white')
                   }`}
                 >
                   {status === 'all' ? t('sales.allStatuses') : 
@@ -844,7 +844,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   selectedCategory === 'all'
                     ? isLight
                       ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold'
-                      : 'bg-[#3F5331]/20 text-[#C8E6A0] font-semibold'
+                      : 'bg-[#C8E6A0]/12 text-[#C8E6A0] font-semibold'
                     : isLight
                       ? 'text-gray-900 hover:bg-gray-50'
                       : 'text-white hover:bg-white/10'
@@ -872,7 +872,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     selectedCategory === cat.id
                       ? isLight
                         ? 'bg-[#3F5331]/20 text-[#3F5331] font-semibold'
-                        : 'bg-[#3F5331]/20 text-[#C8E6A0] font-semibold'
+                        : 'bg-[#C8E6A0]/12 text-[#C8E6A0] font-semibold'
                       : isLight
                         ? 'text-gray-900 hover:bg-gray-50'
                         : 'text-white hover:bg-white/10'

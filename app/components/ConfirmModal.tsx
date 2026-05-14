@@ -67,7 +67,7 @@ export const ConfirmModal = ({
       <div className={card}>
         <div className="flex items-center justify-center mb-4">
           <div className={iconWrap}>
-            <AlertTriangle size={24} className="text-[#3F5331]" />
+            <AlertTriangle size={24} className={isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'} />
           </div>
         </div>
         <h3 className={`text-xl font-bold mb-2 text-center ${titleCls}`}>{title}</h3>

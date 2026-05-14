@@ -82,11 +82,13 @@ const ListingCardComponent = ({
     if (promotionTypes.length === 0) return defaultPromoBorder;
 
     if (promotionTypes.includes('vip')) {
-      return 'border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.4)]';
+      return isLight
+        ? 'border-2 border-[#3F5331] shadow-[0_0_20px_rgba(63,83,49,0.35)]'
+        : 'border-2 border-[#C8E6A0] shadow-[0_0_22px_rgba(200,230,160,0.45)]';
     }
 
     if (promotionTypes.includes('highlighted')) {
-      return 'border-2 border-[#3F5331]';
+      return isLight ? 'border-2 border-[#3F5331]' : 'border-2 border-[#C8E6A0]';
     }
 
     if (promotionTypes.includes('top_category')) {
@@ -100,7 +102,12 @@ const ListingCardComponent = ({
     // Якщо є VIP - показуємо VIP бейдж
     if (promotionTypes.includes('vip')) {
       return (
-        <div className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div
+          className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
+            isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+          }`}
+          style={{ width: 'auto', maxWidth: 'fit-content' }}
+        >
           VIP
         </div>
       );
@@ -109,7 +116,12 @@ const ListingCardComponent = ({
     // Якщо є top_category - показуємо TOP бейдж
     if (promotionTypes.includes('top_category')) {
       return (
-        <div className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div
+          className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
+            isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+          }`}
+          style={{ width: 'auto', maxWidth: 'fit-content' }}
+        >
           TOP
         </div>
       );
@@ -319,7 +331,7 @@ const ListingCardComponent = ({
       
       {/* Інфо-блок: знизу на мобільному, справа на десктопі */}
       <div
-        className={`relative z-30 flex min-h-0 flex-1 flex-col px-4 pb-2 pt-3 -mt-5 rounded-t-3xl rounded-b-2xl ${
+        className={`relative z-30 flex min-h-0 flex-1 flex-col px-3 pb-2 pt-3 -mt-5 rounded-t-3xl rounded-b-2xl sm:px-4 ${
           isStacked
             ? ''
             : 'lg:mt-0 lg:rounded-none lg:rounded-r-2xl lg:rounded-bl-2xl lg:justify-center lg:py-4 lg:pl-5'
@@ -396,15 +408,7 @@ const ListingCardComponent = ({
             isLight ? 'text-gray-500' : 'text-white/60'
           }`}
         >
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-            {shouldShowListingViews(listing.views) && (
-              <span className="inline-flex items-center gap-0.5 tabular-nums" title={t('listing.viewsLabel')}>
-                <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
-                {listing.views ?? 0}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 min-w-0">
             <svg
               width="10"
               height="10"
@@ -419,7 +423,15 @@ const ListingCardComponent = ({
             </svg>
             <span className="truncate">{listing.location?.split(',')[0] || ''}</span>
           </div>
-          <div className="truncate">{formattedTime}</div>
+          <div className="flex min-w-0 items-center justify-between gap-2 tabular-nums">
+            <span className="min-w-0 truncate">{formattedTime}</span>
+            {shouldShowListingViews(listing.views) && (
+              <span className="inline-flex shrink-0 items-center gap-0.5" title={t('listing.viewsLabel')}>
+                <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
+                {listing.views ?? 0}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

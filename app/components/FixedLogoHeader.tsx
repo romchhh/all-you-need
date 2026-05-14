@@ -19,6 +19,12 @@ export const STICKY_BELOW_APP_HEADER_CLASS =
 const safeTopShellClass =
   'max-lg:pt-[max(env(safe-area-inset-top,0px),10px)] lg:pt-[max(env(safe-area-inset-top,0px),2px)]';
 
+/** Ті ж градієнти, що у `globals.css` для `body`, щоб шапка при скролі не «перефарбовувалась» суцільним тлом. */
+const HEADER_PATTERN_LIGHT =
+  'radial-gradient(ellipse 90% 120% at 15% -10%, rgba(63, 83, 49, 0.12) 0%, transparent 52%), radial-gradient(ellipse 80% 100% at 90% 100%, rgba(63, 83, 49, 0.08) 0%, transparent 48%), linear-gradient(180deg, #ffffff 0%, #f7f8f5 45%, #f3f4f0 100%)';
+const HEADER_PATTERN_DARK =
+  'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.20) 0%, transparent 40%), #000000';
+
 const innerContentClass =
   'mx-auto w-full max-w-2xl pb-2.5 max-lg:pt-9 lg:pt-2 lg:max-w-5xl xl:max-w-6xl';
 
@@ -41,7 +47,7 @@ export function FixedLogoHeader({
   mode,
   scrollParent,
 }: FixedLogoHeaderProps) {
-  const { isLight } = useTheme();
+  const { isLight, theme } = useTheme();
   const [scrollProgress, setScrollProgress] = useState(0);
   const spacerRef = useRef<HTMLDivElement | null>(null);
   const spacerBaselineRef = useRef<number | null>(null);
@@ -163,25 +169,30 @@ export function FixedLogoHeader({
   }, [mode, scrollParent]);
 
   const p = scrollProgress;
-  /* y=0 — прозоро; при скролі — суцільніший фон (без «невидимого» порогу) */
-  const bgAlpha = p <= 0 ? 0 : 0.18 + p * 0.82;
-  const bg = isLight ? `rgba(255, 255, 255, ${bgAlpha})` : `rgba(17, 20, 14, ${bgAlpha})`;
-  const blurPx = p < 0.05 ? 0 : Math.round(4 + p * 12);
+  const pattern = isLight ? HEADER_PATTERN_LIGHT : HEADER_PATTERN_DARK;
+  const veilA = p <= 0 ? 0 : isLight ? Math.min(0.2, p * 0.22) : Math.min(0.16, p * 0.18);
+  const veil = isLight
+    ? `linear-gradient(180deg, rgba(255,255,255,${veilA}) 0%, rgba(247,248,245,${veilA * 0.92}) 100%)`
+    : `linear-gradient(180deg, rgba(0,0,0,${veilA}) 0%, rgba(0,0,0,${veilA * 0.75}) 100%)`;
+  const blurPx = p < 0.08 ? 0 : Math.round(2 + p * 8);
   const borderAlpha = isLight ? p * 0.12 : p * 0.14;
 
   const shellStyle: React.CSSProperties = {
-    backgroundColor: bg,
+    backgroundColor: 'transparent',
+    backgroundImage: `${veil}, ${pattern}`,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: 'auto',
     backdropFilter: blurPx > 0 ? `saturate(160%) blur(${blurPx}px)` : 'none',
     WebkitBackdropFilter: blurPx > 0 ? `saturate(160%) blur(${blurPx}px)` : 'none',
-    boxShadow: p > 0.15 ? `0 1px 0 0 rgba(0, 0, 0, ${borderAlpha})` : 'none',
-    transition: 'box-shadow 0.2s ease-out, background-color 0.2s ease-out',
+    boxShadow: p > 0.12 ? `0 1px 0 0 rgba(0, 0, 0, ${borderAlpha})` : 'none',
+    transition: 'box-shadow 0.2s ease-out',
   };
 
   const innerClasses = `${innerContentClass} ${outerClassName}`.trim();
 
   if (mode === 'sticky') {
     return (
-      <div className={`sticky top-0 ${zClassName} w-full max-w-full`} style={shellStyle}>
+      <div key={`tg-app-header-${theme}`} className={`sticky top-0 ${zClassName} w-full max-w-full`} style={shellStyle}>
         <div className={safeTopShellClass}>
           <div className={innerClasses}>
             <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
@@ -194,6 +205,7 @@ export function FixedLogoHeader({
   return (
     <>
       <header
+        key={`tg-app-header-${theme}`}
         className={`fixed left-0 right-0 top-0 ${zClassName} w-full max-w-full`}
         style={shellStyle}
       >

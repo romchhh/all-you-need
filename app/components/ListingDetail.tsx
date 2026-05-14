@@ -125,7 +125,7 @@ export const ListingDetail = ({
   const isTelegramEnv = !!tg;
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  /** Нижня CTA на сторінці товару: у темній темі — неоновий лайм як основний акцент */
+  /** Нижня CTA на сторінці товару: у темній темі — фірмовий світло-зелений (BRAND_GREEN_ON_DARK) */
   const listingPrimaryCtaClass = isLight
     ? 'bg-[#3F5331] text-white hover:bg-[#344728] [&_svg]:text-white'
     : 'border-none bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_22px_rgba(200,230,160,0.48)] hover:bg-[#dff5c0] hover:shadow-[0_0_28px_rgba(200,230,160,0.58)] [&_svg]:text-[#0f1408]';
@@ -498,7 +498,7 @@ export const ListingDetail = ({
 
   const pageBackground = isLight
     ? 'radial-gradient(ellipse 90% 120% at 14% -8%, rgba(63, 83, 49, 0.1) 0%, transparent 52%), linear-gradient(180deg, #ffffff 0%, #f5f6f3 100%)'
-    : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), #000000';
+    : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 88% 100%, rgba(200, 230, 160, 0.18) 0%, transparent 42%), #000000';
 
   return (
     <div 
@@ -784,13 +784,7 @@ export const ListingDetail = ({
         )}
 
         {/* Статистика */}
-        <div className={`flex flex-wrap gap-x-4 gap-y-2 mb-6 text-sm ${ac.mutedText}`}>
-          {shouldShowListingViews(listing.views) && (
-            <div className="flex items-center gap-2 tabular-nums" title={t('listing.viewsLabel')}>
-              <Eye size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
-              <span>{listing.views ?? 0}</span>
-            </div>
-          )}
+        <div className={`mb-6 space-y-2 text-sm ${ac.mutedText}`}>
           {shouldShowListingFavorites(listing.views, listing.favoritesCount) && (
             <div className="flex items-center gap-2 tabular-nums" title={t('listing.favoritesLabel')}>
               <Heart size={16} className={`flex-shrink-0 ${ac.mutedText}`} strokeWidth={2} />
@@ -801,9 +795,17 @@ export const ListingDetail = ({
             <MapPin size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
             <span>{listing.location}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Clock size={16} className={ac.mutedText} />
-            <span>{t('listing.created')}: {formattedTime}</span>
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-1">
+              <Clock size={16} className={`shrink-0 ${ac.mutedText}`} />
+              <span className="truncate">{t('listing.created')}: {formattedTime}</span>
+            </div>
+            {shouldShowListingViews(listing.views) && (
+              <div className="flex shrink-0 items-center gap-2 tabular-nums" title={t('listing.viewsLabel')}>
+                <Eye size={16} className={`shrink-0 ${ac.mutedText}`} />
+                <span>{listing.views ?? 0}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -864,14 +866,24 @@ export const ListingDetail = ({
                 const trimmedType = promoType.trim();
                 if (trimmedType === 'vip') {
                   return (
-                    <div key="vip" className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap">
+                    <div
+                      key="vip"
+                      className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
+                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                      }`}
+                    >
                       VIP
                     </div>
                   );
                 }
                 if (trimmedType === 'top_category') {
                   return (
-                    <div key="top" className="px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap">
+                    <div
+                      key="top"
+                      className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
+                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                      }`}
+                    >
                       TOP
                     </div>
                   );

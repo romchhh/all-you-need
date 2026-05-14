@@ -229,7 +229,7 @@ export const EditProfileModal = ({
   const label = isLight ? 'text-gray-800' : 'text-white';
   const input = isLight
     ? 'bg-white border border-gray-200 text-gray-900 placeholder:text-gray-400 focus:ring-[#3F5331]/25 focus:border-[#5a7c2e]/50'
-    : 'bg-[#1C1C1C] border border-white/20 text-white placeholder:text-white/50 focus:ring-[#3F5331]/50 focus:border-[#3F5331]';
+    : 'bg-[#1C1C1C] border border-white/20 text-white placeholder:text-white/50 focus:ring-[#C8E6A0]/35 focus:border-[#C8E6A0]/55';
   const hint = isLight ? 'text-gray-500' : 'text-white/50';
   const avatarRing = isLight ? 'border-2 border-gray-200' : 'border-2 border-white';
   const changePhotoBtn = isLight
