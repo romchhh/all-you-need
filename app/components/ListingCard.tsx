@@ -35,7 +35,7 @@ const ListingCardComponent = ({
   layout = 'responsive',
 }: ListingCardProps) => {
   const isStacked = layout === 'stacked';
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const categories = useMemo(() => getCategories(t), [t]);
   const categoryLabel = useMemo(
@@ -299,33 +299,51 @@ const ListingCardComponent = ({
           </div>
         )}
         
-        {/* Кнопка лайку - правий верхній кут */}
+        {/* Лайк + кількість: liquid glass (як на референсі — число зліва, серце справа) */}
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggleFavorite(listing.id);
             tg?.HapticFeedback.impactOccurred('light');
           }}
-          className={`absolute top-2 right-2 w-8 h-8 flex items-center justify-center backdrop-blur-sm rounded-full transition-all z-10 ${
+          className={`absolute top-2 right-2 z-10 flex h-8 min-h-8 items-center gap-0 overflow-hidden rounded-full border px-0 text-left backdrop-blur-xl transition-[transform,box-shadow] active:scale-[0.98] ${
             isLight
-              ? 'bg-white/80 border border-gray-300/80 hover:bg-white'
-              : 'bg-black/40 border border-white/30 hover:bg-black/60'
+              ? 'border-white/80 bg-white/45 text-neutral-900 shadow-[0_2px_20px_rgba(0,0,0,0.08),inset_0_1px_0_0_rgba(255,255,255,0.75)] hover:bg-white/55'
+              : 'border-white/35 bg-black/35 text-white shadow-[0_2px_16px_rgba(0,0,0,0.35),inset_0_1px_0_0_rgba(255,255,255,0.15)] hover:bg-black/45'
           }`}
+          aria-pressed={isFavorite}
+          aria-label={t('navigation.favorites')}
         >
-          <Heart 
-            size={16} 
-            className={
-              isFavorite
-                ? isLight
-                  ? 'text-red-500 fill-red-500'
-                  : 'text-white fill-white'
-                : isLight
-                  ? 'text-gray-600'
-                  : 'text-white'
-            }
-            fill={isFavorite ? 'currentColor' : 'none'}
-            strokeWidth={isFavorite ? 0 : 2}
-          />
+          <span
+            className={`min-w-[1.5rem] shrink-0 pl-2.5 pr-1 text-[13px] font-medium tabular-nums leading-none ${
+              isLight ? 'text-neutral-900' : 'text-white'
+            }`}
+          >
+            {Math.max(0, listing.favoritesCount ?? 0).toLocaleString(
+              language === 'ru' ? 'ru-RU' : 'uk-UA'
+            )}
+          </span>
+          <span
+            className={`flex h-8 w-9 flex-shrink-0 items-center justify-center border-l ${
+              isLight ? 'border-white/55' : 'border-white/20'
+            }`}
+          >
+            <Heart
+              size={16}
+              className={
+                isFavorite
+                  ? isLight
+                    ? 'text-red-500 fill-red-500'
+                    : 'fill-red-400 text-red-400'
+                  : isLight
+                    ? 'text-neutral-900'
+                    : 'text-white'
+              }
+              fill={isFavorite ? 'currentColor' : 'none'}
+              strokeWidth={isFavorite ? 0 : 2}
+            />
+          </span>
         </button>
       </div>
       

@@ -39,12 +39,15 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') void load();
     };
     const onFocus = () => void load();
+    const onHomeRefresh = () => void load();
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('tradeground-home-refresh', onHomeRefresh);
     return () => {
       clearInterval(id);
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('tradeground-home-refresh', onHomeRefresh);
     };
   }, [load]);
 
@@ -53,13 +56,13 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
 
   const pillOnline =
     isLight
-      ? 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-1.5 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3 sm:py-2'
-      : 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-2.5 py-1.5 text-xs text-white shadow-sm sm:text-sm sm:px-3 sm:py-2';
+      ? 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3 sm:py-2'
+      : 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-2.5 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3 sm:py-2';
 
   const pillListings =
     isLight
-      ? 'flex min-w-0 flex-1 items-start gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3.5'
-      : 'flex min-w-0 flex-1 items-start gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3.5';
+      ? 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3.5'
+      : 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3.5';
 
   const iconClass =
     isLight ? 'shrink-0 text-[#3F5331]' : 'shrink-0 text-[#C8E6A0]';
@@ -89,7 +92,7 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
         </span>
       </div>
       <div className={pillListings} role="status">
-        <span className={`${iconClass} mt-0.5 shrink-0`} aria-hidden>
+        <span className={`${iconClass} shrink-0`} aria-hidden>
           <Package size={16} strokeWidth={2.25} />
         </span>
         <span className={`min-w-0 flex-1 leading-snug`}>

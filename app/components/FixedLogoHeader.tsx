@@ -1,8 +1,26 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { TradeGroundLogo } from '@/components/TradeGroundLogo';
 import { useTheme } from '@/contexts/ThemeContext';
+
+const MOBILE_MAX_LG = '(max-width: 1023px)';
+
+function subscribeMobileMaxLg(onStoreChange: () => void) {
+  if (typeof window === 'undefined') return () => {};
+  const mq = window.matchMedia(MOBILE_MAX_LG);
+  mq.addEventListener('change', onStoreChange);
+  return () => mq.removeEventListener('change', onStoreChange);
+}
+
+function getMobileMaxLgSnapshot() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia(MOBILE_MAX_LG).matches;
+}
+
+function getServerSnapshotMobileMaxLg() {
+  return false;
+}
 
 /**
  * Висота блоку шапки = safe-top + внутрішній відступ (моб pt-9) + ряд лого + pb.
@@ -48,6 +66,13 @@ export function FixedLogoHeader({
   scrollParent,
 }: FixedLogoHeaderProps) {
   const { isLight, theme } = useTheme();
+  const isMobileViewport = useSyncExternalStore(
+    subscribeMobileMaxLg,
+    getMobileMaxLgSnapshot,
+    getServerSnapshotMobileMaxLg
+  );
+  /** На мобільному світла тема: той самий фон шапки, що й у темній (темне тло + акцентні радіали). */
+  const useDarkHeaderShell = !isLight || (isLight && isMobileViewport);
   const [scrollProgress, setScrollProgress] = useState(0);
   const spacerRef = useRef<HTMLDivElement | null>(null);
   const spacerBaselineRef = useRef<number | null>(null);
@@ -169,13 +194,13 @@ export function FixedLogoHeader({
   }, [mode, scrollParent]);
 
   const p = scrollProgress;
-  const pattern = isLight ? HEADER_PATTERN_LIGHT : HEADER_PATTERN_DARK;
-  const veilA = p <= 0 ? 0 : isLight ? Math.min(0.2, p * 0.22) : Math.min(0.16, p * 0.18);
-  const veil = isLight
-    ? `linear-gradient(180deg, rgba(255,255,255,${veilA}) 0%, rgba(247,248,245,${veilA * 0.92}) 100%)`
-    : `linear-gradient(180deg, rgba(0,0,0,${veilA}) 0%, rgba(0,0,0,${veilA * 0.75}) 100%)`;
+  const pattern = useDarkHeaderShell ? HEADER_PATTERN_DARK : HEADER_PATTERN_LIGHT;
+  const veilA = p <= 0 ? 0 : useDarkHeaderShell ? Math.min(0.16, p * 0.18) : Math.min(0.2, p * 0.22);
+  const veil = useDarkHeaderShell
+    ? `linear-gradient(180deg, rgba(0,0,0,${veilA}) 0%, rgba(0,0,0,${veilA * 0.75}) 100%)`
+    : `linear-gradient(180deg, rgba(255,255,255,${veilA}) 0%, rgba(247,248,245,${veilA * 0.92}) 100%)`;
   const blurPx = p < 0.08 ? 0 : Math.round(2 + p * 8);
-  const borderAlpha = isLight ? p * 0.12 : p * 0.14;
+  const borderAlpha = useDarkHeaderShell ? p * 0.14 : p * 0.12;
 
   const shellStyle: React.CSSProperties = {
     backgroundColor: 'transparent',

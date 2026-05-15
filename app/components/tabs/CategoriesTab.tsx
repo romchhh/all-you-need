@@ -266,21 +266,12 @@ export const CategoriesTab = ({
               className={`p-4 rounded-2xl transition-all text-left relative overflow-hidden ${
                 selectedCategory === category.id
                   ? isLight
-                    ? 'border-2 border-[#3F5331]'
-                    : 'border border-[#C8E6A0] shadow-[0_0_14px_rgba(200,230,160,0.18)]'
+                    ? 'border-2 border-[#3F5331] bg-[#3F5331]/12'
+                    : 'border border-[#C8E6A0] bg-[#C8E6A0]/12 shadow-[0_0_14px_rgba(200,230,160,0.18)]'
                   : isLight
-                    ? 'border border-gray-200 hover:border-gray-300'
-                    : 'border border-white hover:border-white/80'
+                    ? 'border border-gray-200 bg-white hover:border-gray-300'
+                    : 'border border-white/20 bg-[#1C1C1C] hover:border-white/40'
               }`}
-              style={{
-                background: isLight
-                  ? selectedCategory === category.id
-                    ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.25) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), #ffffff'
-                    : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.14) 0%, transparent 45%), #ffffff'
-                  : selectedCategory === category.id
-                    ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.34) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.22) 0%, transparent 40%), #000000'
-                    : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.14) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.10) 0%, transparent 40%), #000000',
-              }}
             >
               <div className="mb-2">
                 <CategoryIcon categoryId={category.id} isActive={selectedCategory === category.id} size={32} />

@@ -766,7 +766,11 @@ export const EditListingModal = ({
   };
 
   const handleSave = async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      showToast(t('createListing.fillAllFields'), 'error');
+      tg?.HapticFeedback?.notificationOccurred?.('error');
+      return;
+    }
 
     setLoading(true);
     // Показуємо індикатор завантаження одразу
@@ -1134,7 +1138,7 @@ export const EditListingModal = ({
             </div>
             {!isFree && !isNegotiable && (
               <>
-                <div className="flex gap-2 mb-2">
+                <div className="flex gap-2 items-center mb-2">
                   <input
                     type="number"
                     inputMode="decimal"
@@ -1150,30 +1154,30 @@ export const EditListingModal = ({
                       if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
                     }}
                     placeholder={t('editListing.pricePlaceholder')}
-                    className={`flex-1 px-4 py-3 rounded-xl border ${ac.formFocusRing} ${
+                    className={`min-h-[48px] flex-1 px-4 py-3 rounded-xl border ${ac.formFocusRing} ${
                       isLight
                         ? 'bg-white text-gray-900 placeholder:text-gray-400'
                         : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
                     } ${errors.price ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
                   />
-                    <button
+                  <button
                     ref={currencyRef}
-                      type="button"
-                      onClick={() => {
-                        setIsCurrencyOpen(!isCurrencyOpen);
-                        tg?.HapticFeedback.impactOccurred('light');
-                      }}
-                      className={
-                        isLight
-                          ? 'px-4 py-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors flex items-center gap-0.5 min-w-[80px] text-gray-900'
-                          : 'px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 hover:border-white/40 transition-colors flex items-center gap-0.5 min-w-[80px] text-white'
-                      }
-                    >
-                      <span className="font-medium">
-                        {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
-                      </span>
-                      <ChevronDown size={16} className={`transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
-                    </button>
+                    type="button"
+                    onClick={() => {
+                      setIsCurrencyOpen(!isCurrencyOpen);
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className={
+                      isLight
+                        ? 'min-h-[48px] shrink-0 px-4 py-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors inline-flex items-center justify-center gap-0.5 min-w-[80px] text-gray-900'
+                        : 'min-h-[48px] shrink-0 px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 hover:border-white/40 transition-colors inline-flex items-center justify-center gap-0.5 min-w-[80px] text-white'
+                    }
+                  >
+                    <span className="font-medium leading-none">
+                      {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
+                    </span>
+                    <ChevronDown size={16} className={`transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
+                  </button>
                 </div>
                 {errors.price && (
                   <p className="mt-1 text-sm text-red-400">{errors.price}</p>
@@ -1401,7 +1405,21 @@ export const EditListingModal = ({
             <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
               {t('editListing.locationLabel')}
             </label>
-            <div className="relative">
+            <div
+              className={`flex min-h-[48px] w-full items-center rounded-xl border transition-shadow ${
+                isLight
+                  ? 'bg-white focus-within:border-[#3F5331] focus-within:ring-2 focus-within:ring-[#3F5331]/50'
+                  : 'bg-[#1C1C1C] focus-within:border-[#C8E6A0] focus-within:ring-2 focus-within:ring-[#C8E6A0]/35'
+              } ${errors.location ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
+            >
+              <span
+                className={`flex h-[48px] shrink-0 items-center justify-center pl-4 pr-2.5 ${
+                  isLight ? 'text-gray-500' : 'text-white/70'
+                }`}
+                aria-hidden
+              >
+                <MapPin size={18} className="shrink-0" />
+              </span>
               <input
                 type="text"
                 value={location}
@@ -1421,15 +1439,11 @@ export const EditListingModal = ({
                 }}
                 onFocus={() => setIsLocationOpen(true)}
                 placeholder={t('editListing.locationPlaceholder')}
-                className={`w-full px-4 py-3 pl-10 rounded-xl border ${ac.formFocusRing} ${
+                className={`min-h-[48px] min-w-0 flex-1 border-0 bg-transparent py-3 pr-4 text-[16px] leading-normal outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 ${
                   isLight
-                    ? 'bg-white text-gray-900 placeholder:text-gray-400'
-                    : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
-                } ${errors.location ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
-              />
-              <MapPin 
-                size={18} 
-                className={`absolute left-3 top-1/2 -translate-y-1/2 z-[1] ${isLight ? 'text-gray-500' : 'text-white/70'}`}
+                    ? 'text-gray-900 placeholder:text-gray-400'
+                    : 'text-white placeholder:text-white/50'
+                }`}
               />
             </div>
             

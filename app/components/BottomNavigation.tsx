@@ -204,8 +204,14 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
   const currentActiveTab = getActiveTab();
   
   const handleTabChange = (tab: string) => {
-    // Якщо це той самий таб, не робимо нічого
+    // Повторне натискання «Головна» (базар) — оновлення сторінки та лічильників
     if (tab === currentActiveTab) {
+      if (tab === 'bazaar') {
+        router.refresh();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('tradeground-home-refresh'));
+        }
+      }
       return;
     }
     

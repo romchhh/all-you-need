@@ -630,7 +630,7 @@ const BazaarTabComponent = ({
     <div className="pb-24">
       {/* Пошук з TopBar — на десктопі вужчий і по центру */}
       <div className="relative">
-        <div className={`${STICKY_BELOW_APP_HEADER_CLASS} bg-transparent p-4 lg:flex lg:justify-center lg:py-4`}>
+        <div className={`${STICKY_BELOW_APP_HEADER_CLASS} bg-transparent px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`}>
           <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl" ref={suggestionsRef}>
             <div className="flex gap-1 items-center">
               <TopBar
@@ -786,13 +786,8 @@ const BazaarTabComponent = ({
               >
                 <div
                   className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden ${
-                    isLight ? 'border-2 border-[#3F5331]' : 'border border-white'
+                    isLight ? 'border-2 border-[#3F5331] bg-white' : 'border border-white/25 bg-[#1C1C1C]'
                   }`}
-                  style={{
-                    background: isLight
-                      ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.22) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), #ffffff'
-                      : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.26) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.18) 0%, transparent 40%), #000000',
-                  }}
                 >
                   <CategoryIcon categoryId="all_categories" isActive={false} size={32} />
                 </div>

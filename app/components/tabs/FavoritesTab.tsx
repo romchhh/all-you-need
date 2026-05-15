@@ -85,7 +85,7 @@ export const FavoritesTab = ({
   if (favoritedListings.length === 0) {
     return (
       <div 
-        className="pb-24 flex flex-col h-screen overflow-hidden px-4"
+        className="pb-24 flex flex-col h-screen overflow-hidden px-4 max-lg:pt-0"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -126,7 +126,7 @@ export const FavoritesTab = ({
       onTouchEnd={handleTouchEnd}
       style={{ touchAction: 'pan-y' }}
     >
-      <div className="p-4 pt-2">
+      <div className="px-4 pt-1 pb-3 max-lg:pt-0">
         <h2 className={`text-2xl font-bold mb-2 ${ac.pageHeading}`}>Обране</h2>
         <p className={`text-sm mb-4 ${ac.nothingFound}`}>Тут товари, які вам сподобалися</p>
         

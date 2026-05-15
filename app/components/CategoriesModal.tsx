@@ -8,7 +8,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { getCategories } from '@/constants/categories';
 import { CategoryIcon } from './CategoryIcon';
-import { useEffect, type CSSProperties } from 'react';
+import { useEffect } from 'react';
 
 interface CategoriesModalProps {
   isOpen: boolean;
@@ -30,11 +30,6 @@ export const CategoriesModal = ({
   const sheetBackground = isLight
     ? 'radial-gradient(ellipse 85% 100% at 18% 0%, rgba(63, 83, 49, 0.14) 0%, transparent 45%), linear-gradient(180deg, #ffffff 0%, #f6f8f4 100%)'
     : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000';
-  const darkIconTileStyle: CSSProperties = {
-    background:
-      'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000',
-  };
-
   // Блокуємо скрол body при відкритому модальному вікні
   useEffect(() => {
     if (isOpen) {
@@ -132,9 +127,8 @@ export const CategoriesModal = ({
           >
             <div
               className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 relative overflow-hidden ${
-                isLight ? '' : 'border border-white'
+                isLight ? 'bg-gray-100' : 'border border-white/25 bg-[#1C1C1C]'
               }`}
-              style={isLight ? undefined : darkIconTileStyle}
             >
               <CategoryIcon categoryId="all_categories" size={24} />
             </div>
@@ -161,9 +155,8 @@ export const CategoriesModal = ({
             >
               <div
                 className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 relative overflow-hidden ${
-                  isLight ? '' : 'border border-white'
+                  isLight ? 'bg-gray-100' : 'border border-white/25 bg-[#1C1C1C]'
                 }`}
-                style={isLight ? undefined : darkIconTileStyle}
               >
                 <CategoryIcon categoryId={category.id} size={24} />
               </div>

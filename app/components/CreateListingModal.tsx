@@ -872,6 +872,8 @@ export const CreateListingModal = ({
 
   const handleSave = async () => {
     if (!validate()) {
+      showToast(t('createListing.fillAllFields'), 'error');
+      tg?.HapticFeedback?.notificationOccurred?.('error');
       return;
     }
 
@@ -914,26 +916,25 @@ export const CreateListingModal = ({
         }
       }}
     >
-      <div className="w-full h-full flex flex-col">
+      <div className="w-full h-full flex flex-col min-h-0">
+        <FixedLogoHeader
+          mode="sticky"
+          scrollParent={formScrollParent}
+          paddingX={false}
+          zClassName="z-[60] shrink-0"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.location.href = `/${language}/bazaar`;
+            }
+          }}
+        />
         <div
           ref={setFormScrollParent}
-          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 lg:pt-6"
+          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 max-lg:pt-2 lg:pt-4"
           style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <FixedLogoHeader
-            mode="sticky"
-            scrollParent={formScrollParent}
-            paddingX={false}
-            zClassName="z-10"
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.location.href = `/${language}/bazaar`;
-              }
-            }}
-          />
-          
           {/* Заголовок */}
-          <div className="flex items-center justify-center px-4 pb-4">
+          <div className="flex items-center justify-center px-4 pb-2 max-lg:pb-3">
             <h2 className={`text-xl font-bold ${ac.pageHeading}`}>{t('createListing.title')}</h2>
           </div>
           {/* Фото */}
@@ -1182,7 +1183,7 @@ export const CreateListingModal = ({
             </div>
             {!isFree && !isNegotiable && (
               <>
-                <div className="flex gap-2 mb-2">
+                <div className="flex gap-2 items-center mb-2">
                   <input
                     type="number"
                     inputMode="decimal"

@@ -12,9 +12,6 @@ interface CategoryChipProps {
 
 export const CategoryChip = ({ category, isActive = false, onClick }: CategoryChipProps) => {
   const { isLight } = useTheme();
-  const tileBg = isLight
-    ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.22) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.18) 0%, transparent 45%), #ffffff'
-    : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.26) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.18) 0%, transparent 40%), #000000';
 
   return (
     <div
@@ -25,13 +22,12 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
         className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden ${
           isActive
             ? isLight
-              ? 'border-2 border-[#3F5331] bg-[#3F5331]/25 shadow-sm'
-              : 'border border-[#C8E6A0] shadow-[0_0_12px_rgba(200,230,160,0.2)]'
+              ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
+              : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
             : isLight
-              ? 'border-2 border-[#3F5331]'
-              : 'border border-white'
+              ? 'border-2 border-[#3F5331] bg-white'
+              : 'border border-white/25 bg-[#1C1C1C]'
         }`}
-        style={{ background: tileBg }}
       >
         <CategoryIcon categoryId={category.id} isActive={isActive} size={32} />
       </div>

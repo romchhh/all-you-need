@@ -36,7 +36,8 @@ function startOfKyivDay(ref: Date): Date {
   return d;
 }
 
-const LISTINGS_DAY_START_HOUR_KYIV = 7;
+/** Початок «дня» для статистики нових оголошень: 06:00 Europe/Kyiv до наступних 06:00. */
+const LISTINGS_DAY_START_HOUR_KYIV = 6;
 
 /** UTC-момент «HH:MM» у Europe/Kyiv для календарної дати ymd (YYYY-MM-DD). */
 function utcAtKyivYmdHourMinute(ymd: string, hour: number, minute: number): Date {
@@ -64,8 +65,8 @@ function utcAtKyivYmdHourMinute(ymd: string, hour: number, minute: number): Date
 }
 
 /**
- * Початок періоду для «нових оголошень сьогодні»: о 07:00 Europe/Kyiv.
- * До 07:00 рахуємо з учорашньої 07:00 (лічильник «оновлюється» о 7 ранку).
+ * Початок поточного «добового» вікна для нових оголошень: о 06:00 Europe/Kyiv.
+ * До 06:00 поточної календарної доби в Києві вікно починається з учорашніх 06:00.
  */
 function startOfKyivListingsReportingWindow(ref: Date): Date {
   const hourKyiv = parseInt(
@@ -111,15 +112,16 @@ export async function GET() {
   try {
     const now = new Date();
     const dayStart = startOfKyivListingsReportingWindow(now);
-    const dayStartIso = dayStart.toISOString();
 
-    const newListingsTodayResult = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT COUNT(*) as count FROM Listing WHERE createdAt >= ?`,
-        dayStartIso
-      ) as Promise<Array<{ count: bigint }>>
+    /** Лише активні оголошення (як у каталозі), створені з 06:00 до «зараз» у поточному 6–6 вікні. */
+    const newListingsToday = await executeWithRetry(() =>
+      prisma.listing.count({
+        where: {
+          status: 'active',
+          createdAt: { gte: dayStart, lte: now },
+        },
+      })
     );
-    const newListingsToday = Number(newListingsTodayResult[0]?.count || 0);
 
     const online = displayOnlineSynced(now);
 

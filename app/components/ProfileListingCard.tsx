@@ -40,7 +40,7 @@ export const ProfileListingCard = ({
   showToast,
   tg
 }: ProfileListingCardProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isLight } = useTheme();
 
   // Перевіряємо статус модерації
@@ -329,7 +329,7 @@ export const ProfileListingCard = ({
         {(shouldShowListingViews(listing.views) ||
           shouldShowListingFavorites(listing.views, listing.favoritesCount)) && (
         <div
-          className={`mt-1 flex w-full max-w-[6.5rem] items-center justify-center gap-2.5 text-[11px] leading-none ${
+          className={`mt-1 flex w-full max-w-full flex-wrap items-center justify-center gap-2 text-[11px] leading-none ${
             isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-600' : 'text-white/75'
           }`}
         >
@@ -340,22 +340,51 @@ export const ProfileListingCard = ({
             </div>
           )}
           {shouldShowListingFavorites(listing.views, listing.favoritesCount) && (
-            <div className="flex items-center gap-0.5" title={t('navigation.favorites')}>
-              <Heart
-                size={12}
-                className={
+            <div
+              className={`flex h-6 min-h-6 max-w-full items-center gap-0 overflow-hidden rounded-full border backdrop-blur-xl ${
+                isSold || isPendingModeration || isDeactivated || isRejected
+                  ? isLight
+                    ? 'border-gray-200/80 bg-gray-100/90'
+                    : 'border-white/10 bg-white/5'
+                  : isLight
+                    ? 'border-white/80 bg-white/45 text-neutral-900 shadow-[0_2px_14px_rgba(0,0,0,0.06),inset_0_1px_0_0_rgba(255,255,255,0.7)]'
+                    : 'border-white/30 bg-black/35 text-white shadow-[0_2px_12px_rgba(0,0,0,0.3),inset_0_1px_0_0_rgba(255,255,255,0.12)]'
+              }`}
+              title={t('navigation.favorites')}
+            >
+              <div
+                className={`flex min-w-[1.25rem] items-center justify-center py-0.5 pl-1.5 pr-0.5 text-[11px] font-medium tabular-nums ${
                   isSold || isPendingModeration || isDeactivated || isRejected
-                    ? 'text-gray-500'
-                    : isFavorite
-                      ? isLight
-                        ? 'fill-[#3F5331] text-[#3F5331]'
-                        : 'fill-[#C8E6A0] text-[#C8E6A0]'
-                      : isLight
-                        ? 'text-gray-500'
-                        : 'text-white/50'
-                }
-              />
-              <span className="tabular-nums font-medium">{listing.favoritesCount || 0}</span>
+                    ? ''
+                    : isLight
+                      ? 'text-neutral-900'
+                      : 'text-white'
+                }`}
+              >
+                {(listing.favoritesCount ?? 0).toLocaleString(language === 'ru' ? 'ru-RU' : 'uk-UA')}
+              </div>
+              <div
+                className={`flex h-6 w-6 flex-shrink-0 items-center justify-center border-l py-0.5 ${
+                  isLight ? 'border-white/50' : 'border-white/18'
+                }`}
+              >
+                <Heart
+                  size={12}
+                  className={
+                    isSold || isPendingModeration || isDeactivated || isRejected
+                      ? 'text-gray-500'
+                      : isFavorite
+                        ? isLight
+                          ? 'fill-red-500 text-red-500'
+                          : 'fill-red-400 text-red-400'
+                        : isLight
+                          ? 'text-neutral-900'
+                          : 'text-white'
+                  }
+                  fill={isFavorite && !(isSold || isPendingModeration || isDeactivated || isRejected) ? 'currentColor' : 'none'}
+                  strokeWidth={isFavorite && !(isSold || isPendingModeration || isDeactivated || isRejected) ? 0 : 2}
+                />
+              </div>
             </div>
           )}
         </div>
