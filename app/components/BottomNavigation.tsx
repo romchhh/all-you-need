@@ -206,11 +206,9 @@ export const BottomNavigation = ({ activeTab, onTabChange, onCloseDetail, onCrea
   const handleTabChange = (tab: string) => {
     // Повторне натискання «Головна» (базар) — оновлення сторінки та лічильників
     if (tab === currentActiveTab) {
-      if (tab === 'bazaar') {
-        router.refresh();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('tradeground-home-refresh'));
-        }
+      if (tab === 'bazaar' && typeof window !== 'undefined') {
+        // Як при натисканні на лого в хедері — повне перезавантаження сторінки
+        window.location.href = `/${lang}/bazaar`;
       }
       return;
     }

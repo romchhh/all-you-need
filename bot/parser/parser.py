@@ -11,6 +11,9 @@ numeric chat id (експериментально) після першого joi
 Оголошення категорії «Послуги» (services_work) надсилаються в окремий канал модерації
 (за замовч. -1003714727651). Інші — у PARSER_GROUP_ID (admin_notify).
 Перевизначення: PARSER_SERVICES_MODERATION_CHANNEL_ID у .env
+
+Після підтвердження послуги в маркетплейс копія поста йде в публічний канал послуг
+(змінна TRADE_SERVICES_CHANNEL_ID, той самий BOT_TOKEN — бот має бути адміністратором каналу).
 """
 
 import asyncio

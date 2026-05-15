@@ -341,19 +341,19 @@ export const ProfileListingCard = ({
           )}
           {shouldShowListingFavorites(listing.views, listing.favoritesCount) && (
             <div
-              className={`flex h-6 min-h-6 max-w-full items-center gap-0 overflow-hidden rounded-full border backdrop-blur-xl ${
+              className={`flex h-[22px] min-h-[22px] max-w-full items-center gap-0 overflow-hidden rounded-full border backdrop-blur-xl ${
                 isSold || isPendingModeration || isDeactivated || isRejected
                   ? isLight
                     ? 'border-gray-200/80 bg-gray-100/90'
                     : 'border-white/10 bg-white/5'
                   : isLight
-                    ? 'border-white/80 bg-white/45 text-neutral-900 shadow-[0_2px_14px_rgba(0,0,0,0.06),inset_0_1px_0_0_rgba(255,255,255,0.7)]'
-                    : 'border-white/30 bg-black/35 text-white shadow-[0_2px_12px_rgba(0,0,0,0.3),inset_0_1px_0_0_rgba(255,255,255,0.12)]'
+                    ? 'border-white/80 bg-white/45 text-neutral-900 shadow-[0_2px_10px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(255,255,255,0.65)]'
+                    : 'border-white/30 bg-black/35 text-white shadow-[0_2px_10px_rgba(0,0,0,0.25),inset_0_1px_0_0_rgba(255,255,255,0.1)]'
               }`}
               title={t('navigation.favorites')}
             >
               <div
-                className={`flex min-w-[1.25rem] items-center justify-center py-0.5 pl-1.5 pr-0.5 text-[11px] font-medium tabular-nums ${
+                className={`flex min-w-[1.1rem] items-center justify-center py-0.5 pl-1 pr-0.5 text-[10px] font-medium tabular-nums ${
                   isSold || isPendingModeration || isDeactivated || isRejected
                     ? ''
                     : isLight
@@ -364,19 +364,19 @@ export const ProfileListingCard = ({
                 {(listing.favoritesCount ?? 0).toLocaleString(language === 'ru' ? 'ru-RU' : 'uk-UA')}
               </div>
               <div
-                className={`flex h-6 w-6 flex-shrink-0 items-center justify-center border-l py-0.5 ${
+                className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-l py-0.5 ${
                   isLight ? 'border-white/50' : 'border-white/18'
                 }`}
               >
                 <Heart
-                  size={12}
+                  size={11}
                   className={
                     isSold || isPendingModeration || isDeactivated || isRejected
                       ? 'text-gray-500'
                       : isFavorite
                         ? isLight
-                          ? 'fill-red-500 text-red-500'
-                          : 'fill-red-400 text-red-400'
+                          ? 'fill-[#3F5331] text-[#3F5331]'
+                          : 'fill-white text-white'
                         : isLight
                           ? 'text-neutral-900'
                           : 'text-white'

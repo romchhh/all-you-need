@@ -83,9 +83,21 @@ function startOfKyivListingsReportingWindow(ref: Date): Date {
 
 const DISPLAY_ONLINE_MIN = 30;
 const DISPLAY_ONLINE_MAX = 60;
+/** Вечір і ніч за Києвом — менший діапазон, щоб виглядало природніше. */
+const DISPLAY_ONLINE_NIGHT_MIN = 10;
+const DISPLAY_ONLINE_NIGHT_MAX = 15;
+
+/** 20:00–06:59 Europe/Kyiv — «вечір ближче до ночі» + ніч. */
+function isKyivEveningOrNight(now: Date): boolean {
+  const hourKyiv = parseInt(
+    new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, hour: '2-digit', hour12: false }).format(now),
+    10
+  );
+  return hourKyiv >= 20 || hourKyiv < 7;
+}
 
 /**
- * Показ «онлайн» 30–60: однаковий для усіх, змінюється з часом (київська година + 4-хв слот).
+ * Показ «онлайн»: денний діапазон 30–60, вечір/ніч 10–15; змінюється з часом (4-хв слот).
  * Детерміновано, без реального трекінгу сесій у цьому полі.
  */
 function displayOnlineSynced(now: Date): number {
@@ -103,6 +115,10 @@ function displayOnlineSynced(now: Date): number {
   x ^= x << 13;
   x ^= x >>> 17;
   x ^= x << 5;
+  if (isKyivEveningOrNight(now)) {
+    const span = DISPLAY_ONLINE_NIGHT_MAX - DISPLAY_ONLINE_NIGHT_MIN + 1;
+    return DISPLAY_ONLINE_NIGHT_MIN + (Math.abs(x | 0) % span);
+  }
   const span = DISPLAY_ONLINE_MAX - DISPLAY_ONLINE_MIN + 1;
   return DISPLAY_ONLINE_MIN + (Math.abs(x | 0) % span);
 }

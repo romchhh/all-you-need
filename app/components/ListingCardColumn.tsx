@@ -111,6 +111,8 @@ const ListingCardColumnComponent = ({
     return listing.posted || '';
   }, [listing.createdAt, listing.publishedAt, listing.posted, t]);
 
+  const favCount = Math.max(0, listing.favoritesCount ?? 0);
+
   return (
     <div 
       data-listing-id={listing.id}
@@ -153,53 +155,80 @@ const ListingCardColumnComponent = ({
 
         {/* Інформація */}
         <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5 relative">
-          {/* Лайк + кількість: liquid glass, число зліва — серце справа */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(listing.id);
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className={`absolute top-0 right-0 z-10 flex h-8 min-h-8 items-center gap-0 overflow-hidden rounded-full border px-0 backdrop-blur-xl transition-[transform,box-shadow] active:scale-[0.98] ${
-              isLight
-                ? 'border-white/80 bg-white/45 text-neutral-900 shadow-[0_2px_20px_rgba(0,0,0,0.08),inset_0_1px_0_0_rgba(255,255,255,0.75)] hover:bg-white/55'
-                : 'border-white/35 bg-black/35 text-white shadow-[0_2px_16px_rgba(0,0,0,0.35),inset_0_1px_0_0_rgba(255,255,255,0.15)] hover:bg-black/45'
-            }`}
-            aria-pressed={isFavorite}
-            aria-label={t('navigation.favorites')}
-          >
-            <span
-              className={`min-w-[1.4rem] shrink-0 pl-2 pr-1 text-[12px] font-medium tabular-nums leading-none ${
-                isLight ? 'text-neutral-900' : 'text-white'
-              }`}
-            >
-              {Math.max(0, listing.favoritesCount ?? 0).toLocaleString(
-                language === 'ru' ? 'ru-RU' : 'uk-UA'
-              )}
-            </span>
-            <span
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center border-l ${
-                isLight ? 'border-white/55' : 'border-white/20'
-              }`}
-            >
-              <Heart
-                size={18}
-                className={
-                  isFavorite
-                    ? 'text-red-500 fill-red-500'
-                    : isLight
-                      ? 'text-neutral-900'
-                      : 'text-white'
-                }
-                fill={isFavorite ? 'currentColor' : 'none'}
-                strokeWidth={isFavorite ? 0 : 2}
-              />
-            </span>
-          </button>
+          {(() => {
+            const filledHeart =
+              isFavorite
+                ? isLight
+                  ? 'text-[#3F5331] fill-[#3F5331]'
+                  : 'text-white fill-white'
+                : isLight
+                  ? 'text-gray-500'
+                  : 'text-white';
+
+            if (favCount === 0) {
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(listing.id);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  className="absolute top-0 right-0 z-10 flex h-8 w-8 items-center justify-center transition-transform hover:scale-110 active:scale-95"
+                  aria-pressed={isFavorite}
+                  aria-label={t('navigation.favorites')}
+                >
+                  <Heart
+                    size={18}
+                    className={filledHeart}
+                    fill={isFavorite ? 'currentColor' : 'none'}
+                    strokeWidth={isFavorite ? 0 : 2}
+                  />
+                </button>
+              );
+            }
+
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(listing.id);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={`absolute top-0 right-0 z-10 flex h-7 min-h-7 items-center gap-0 overflow-hidden rounded-full border px-0 backdrop-blur-xl transition-[transform,box-shadow] active:scale-[0.98] ${
+                  isLight
+                    ? 'border-white/80 bg-white/45 text-neutral-900 shadow-[0_2px_16px_rgba(0,0,0,0.07),inset_0_1px_0_0_rgba(255,255,255,0.75)] hover:bg-white/55'
+                    : 'border-white/35 bg-black/35 text-white shadow-[0_2px_12px_rgba(0,0,0,0.32),inset_0_1px_0_0_rgba(255,255,255,0.15)] hover:bg-black/45'
+                }`}
+                aria-pressed={isFavorite}
+                aria-label={t('navigation.favorites')}
+              >
+                <span
+                  className={`min-w-[1.2rem] shrink-0 pl-1.5 pr-0.5 text-[10px] font-medium tabular-nums leading-none ${
+                    isLight ? 'text-neutral-900' : 'text-white'
+                  }`}
+                >
+                  {favCount.toLocaleString(language === 'ru' ? 'ru-RU' : 'uk-UA')}
+                </span>
+                <span
+                  className={`flex h-7 w-7 flex-shrink-0 items-center justify-center border-l ${
+                    isLight ? 'border-white/55' : 'border-white/20'
+                  }`}
+                >
+                  <Heart
+                    size={15}
+                    className={filledHeart}
+                    fill={isFavorite ? 'currentColor' : 'none'}
+                    strokeWidth={isFavorite ? 0 : 2}
+                  />
+                </span>
+              </button>
+            );
+          })()}
 
           {/* Верхня частина: назва + ціна */}
-          <div className="flex-1 min-w-0 pr-[5.25rem]">
+          <div className={`flex-1 min-w-0 ${favCount > 0 ? 'pr-[4.5rem]' : 'pr-10'}`}>
             <div
               className={`font-semibold text-base line-clamp-2 leading-snug mb-1.5 ${
                 isLight ? 'text-gray-900' : 'text-white'

@@ -353,7 +353,7 @@ export async function publishListingToChannel(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chat_id: TRADE_CHANNEL_ID,
+            chat_id: channelId,
             text: text,
             parse_mode: 'HTML',
           }),
