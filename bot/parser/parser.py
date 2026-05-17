@@ -38,11 +38,17 @@ CHANNELS: dict[str, str] = {
     "baraholkaberlin": "Berlin",
     "kaufberli": "Berlin",
     "beauty_berlin_ua": "Berlin",
+    "Berlin_UA2025": "Berlin",
     # Leipzig
     "Leipzig_Flohmarkt": "Leipzig",
     # Hamburg
     "secondhand_hh": "Hamburg",
     "HamburgBeauty": "Hamburg",
+    "gamburg_baraxlanet": "Hamburg",
+    "Hamburggggggg": "Hamburg",
+    # Frankfurt
+    "ukraincifrankfurt": "Frankfurt",
+    "FrankfurtamMaincity": "Frankfurt",
     # Munich / Bayern
     "Flohmark11": "Munich",
     # Düsseldorf, Essen, NRW
@@ -124,13 +130,20 @@ def _channels_from_env() -> dict[str, str]:
 
 CHANNELS = dedupe_channels({**CHANNELS, **_channels_from_env()})
 
-# Канали з переважно послугами (краса): більше емодзі та інколи без фото — м’якші правила
+# Канали з переважно послугами (краса): м’якші правила якості + категорія services_work
 BEAUTY_SERVICE_CHANNELS: frozenset[str] = frozenset({
     "beauty_berlin_ua",
     "beautynrw",
     "beautydusseldorf",
     "hamburgbeauty",
 })
+
+# Інші канали лише з послугами (не краса): теж services_work, підкатегорія з тексту
+SERVICE_ONLY_CHANNELS: frozenset[str] = frozenset({
+    "hamburggggggg",
+})
+
+SERVICE_CHANNELS: frozenset[str] = BEAUTY_SERVICE_CHANNELS | SERVICE_ONLY_CHANNELS
 
 # Скільки останніх повідомлень перевіряти за один прохід
 FETCH_LIMIT: int = int(os.getenv("PARSER_FETCH_LIMIT", "100"))
@@ -461,9 +474,10 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             stats["reasons"]["дублікат (текст)"] = stats["reasons"].get("дублікат (текст)", 0) + 1
             continue
 
+        channel_key = normalize_channel_key(channel)
         pre_category, _ = detect_category(text, skip_free=False)
         relaxed_quality = (
-            channel in BEAUTY_SERVICE_CHANNELS
+            channel_key in BEAUTY_SERVICE_CHANNELS
             or pre_category == "services_work"
             or is_likely_service_ad(text)
         )
@@ -499,6 +513,13 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             continue
 
         category, subcategory = detect_category(text, skip_free=(price_str is not None and not is_free))
+        if channel_key in SERVICE_CHANNELS:
+            detected_sub = subcategory if category == "services_work" else None
+            category = "services_work"
+            if channel_key in BEAUTY_SERVICE_CHANNELS:
+                subcategory = detected_sub or "beauty_services"
+            else:
+                subcategory = detected_sub or "other_services"
         condition = detect_condition(text, category)
 
         author_username = get_sender_username(msg_for_link)
