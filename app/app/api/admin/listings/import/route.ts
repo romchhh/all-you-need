@@ -214,19 +214,22 @@ export async function POST(request: NextRequest) {
     /** Повертає шлях до файлу зображення в ZIP (або null) */
     async function findImageSourcePath(imageName: string): Promise<string | null> {
       if (!zipExtractedPath) return null;
+      const base = zipExtractedPath.endsWith(path.sep)
+        ? zipExtractedPath.slice(0, -1)
+        : zipExtractedPath;
       const possiblePaths = [
-        path.join(zipExtractedPath, imageName),
-        path.join(zipExtractedPath, imageName.toLowerCase()),
-        path.join(zipExtractedPath, imageName.toUpperCase()),
+        `${base}${path.sep}${imageName}`,
+        `${base}${path.sep}${imageName.toLowerCase()}`,
+        `${base}${path.sep}${imageName.toUpperCase()}`,
       ];
-      for (const path of possiblePaths) {
-        if (existsSync(path)) return path;
+      for (const candidatePath of possiblePaths) {
+        if (existsSync(candidatePath)) return candidatePath;
       }
       async function findRecursive(dir: string, targetName: string): Promise<string | null> {
         try {
           const entries = await readdir(dir, { withFileTypes: true });
           for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
+            const fullPath = `${dir}${path.sep}${entry.name}`;
             if (entry.isDirectory()) {
               const found = await findRecursive(fullPath, targetName);
               if (found) return found;

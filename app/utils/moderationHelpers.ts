@@ -159,12 +159,14 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
     }
   }
 
+  const expiresAtDate = parseDbDate(expiresAtStr) ?? addDays(new Date(), 30);
+
   // Надсилаємо повідомлення
   await sendListingApprovedNotification(
     listing.telegramId,
     listing.title,
     listing.id,
-    expiresAt
+    expiresAtDate
   ).catch(err => {
     console.error('[approveListing] Failed to send Telegram notification:', err);
   });
