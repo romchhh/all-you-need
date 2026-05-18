@@ -14,20 +14,6 @@ export async function getUserLanguageForTelegramId(telegramId: string): Promise<
   if (Number.isNaN(telegramIdNum)) return 'uk';
 
   try {
-    const legacyUsers = (await prisma.$queryRawUnsafe(
-      `SELECT language FROM users_legacy WHERE user_id = ?`,
-      telegramId
-    )) as Array<{ language: string | null }>;
-
-    if (legacyUsers.length > 0 && legacyUsers[0].language) {
-      const l = legacyUsers[0].language;
-      if (l === 'uk' || l === 'ru') return l;
-    }
-  } catch {
-    // ignore
-  }
-
-  try {
     const users = (await prisma.$queryRawUnsafe(
       `SELECT language FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
       telegramIdNum
@@ -35,6 +21,20 @@ export async function getUserLanguageForTelegramId(telegramId: string): Promise<
 
     if (users.length > 0 && users[0].language) {
       const l = users[0].language;
+      if (l === 'uk' || l === 'ru') return l;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const legacyUsers = (await prisma.$queryRawUnsafe(
+      `SELECT language FROM users_legacy WHERE user_id = ?`,
+      telegramId
+    )) as Array<{ language: string | null }>;
+
+    if (legacyUsers.length > 0 && legacyUsers[0].language) {
+      const l = legacyUsers[0].language;
       if (l === 'uk' || l === 'ru') return l;
     }
   } catch {

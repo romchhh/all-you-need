@@ -154,21 +154,22 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
     if (typeof window !== 'undefined' && !isLoadingLanguage) {
       localStorage.setItem('language', language);
       setLangCookie(language);
-      if (userTelegramId) {
+      const telegramIdForSync = userTelegramId || getTelegramIdSync();
+      if (telegramIdForSync) {
         fetch('/api/user/language', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            telegramId: userTelegramId,
+            telegramId: telegramIdForSync,
             language: language,
           }),
         }).catch((error) => {
           console.error('Failed to save language to database:', error);
         });
       }
-      
+
       // URL оновлюється через router.push в LanguageSwitcher
       // Тут не оновлюємо URL, щоб уникнути конфліктів
     }

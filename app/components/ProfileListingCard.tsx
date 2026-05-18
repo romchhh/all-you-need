@@ -23,6 +23,8 @@ interface ProfileListingCardProps {
   onAutoRenewChange?: (listingId: number, autoRenew: boolean) => void;
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
   tg: TelegramWebApp | null;
+  /** У «Мої оголошення» — завжди показувати перегляди та обране (однаковий стиль). */
+  alwaysShowStats?: boolean;
 }
 
 export const ProfileListingCard = ({
@@ -38,7 +40,8 @@ export const ProfileListingCard = ({
   viewerTelegramId,
   onAutoRenewChange,
   showToast,
-  tg
+  tg,
+  alwaysShowStats = false,
 }: ProfileListingCardProps) => {
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
@@ -326,69 +329,43 @@ export const ProfileListingCard = ({
           )}
         </div>
 
-        {(shouldShowListingViews(listing.views) ||
-          shouldShowListingFavorites(listing.views, listing.favoritesCount)) && (
-        <div
-          className={`mt-1 flex w-full max-w-full flex-wrap items-center justify-center gap-2 text-[11px] leading-none ${
-            isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : isLight ? 'text-gray-600' : 'text-white/75'
-          }`}
-        >
-          {shouldShowListingViews(listing.views) && (
-            <div className="flex items-center gap-0.5" title={t('sales.views')}>
-              <Eye size={12} className={isSold || isPendingModeration || isDeactivated || isRejected ? 'text-gray-500' : ''} />
-              <span className="tabular-nums font-medium">{listing.views || 0}</span>
-            </div>
-          )}
-          {shouldShowListingFavorites(listing.views, listing.favoritesCount) && (
+        {(() => {
+          const showViews =
+            alwaysShowStats || shouldShowListingViews(listing.views);
+          const showFavorites = alwaysShowStats
+            ? true
+            : shouldShowListingFavorites(listing.views, listing.favoritesCount);
+          if (!showViews && !showFavorites) return null;
+          const statsMuted =
+            isSold || isPendingModeration || isDeactivated || isRejected;
+          const statsTextClass = statsMuted
+            ? 'text-gray-500'
+            : isLight
+              ? 'text-gray-600'
+              : 'text-white/75';
+          return (
             <div
-              className={`flex h-[22px] min-h-[22px] max-w-full items-center gap-0 overflow-hidden rounded-full border backdrop-blur-xl ${
-                isSold || isPendingModeration || isDeactivated || isRejected
-                  ? isLight
-                    ? 'border-gray-200/80 bg-gray-100/90'
-                    : 'border-white/10 bg-white/5'
-                  : isLight
-                    ? 'border-white/80 bg-white/45 text-neutral-900 shadow-[0_2px_10px_rgba(0,0,0,0.05),inset_0_1px_0_0_rgba(255,255,255,0.65)]'
-                    : 'border-white/30 bg-black/35 text-white shadow-[0_2px_10px_rgba(0,0,0,0.25),inset_0_1px_0_0_rgba(255,255,255,0.1)]'
-              }`}
-              title={t('navigation.favorites')}
+              className={`mt-1 flex w-full max-w-full flex-wrap items-center justify-center gap-2 text-[11px] leading-none ${statsTextClass}`}
             >
-              <div
-                className={`flex min-w-[1.1rem] items-center justify-center py-0.5 pl-1 pr-0.5 text-[10px] font-medium tabular-nums ${
-                  isSold || isPendingModeration || isDeactivated || isRejected
-                    ? ''
-                    : isLight
-                      ? 'text-neutral-900'
-                      : 'text-white'
-                }`}
-              >
-                {(listing.favoritesCount ?? 0).toLocaleString(language === 'ru' ? 'ru-RU' : 'uk-UA')}
-              </div>
-              <div
-                className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center border-l py-0.5 ${
-                  isLight ? 'border-white/50' : 'border-white/18'
-                }`}
-              >
-                <Heart
-                  size={11}
-                  className={
-                    isSold || isPendingModeration || isDeactivated || isRejected
-                      ? 'text-gray-500'
-                      : isFavorite
-                        ? isLight
-                          ? 'fill-[#3F5331] text-[#3F5331]'
-                          : 'fill-white text-white'
-                        : isLight
-                          ? 'text-neutral-900'
-                          : 'text-white'
-                  }
-                  fill={isFavorite && !(isSold || isPendingModeration || isDeactivated || isRejected) ? 'currentColor' : 'none'}
-                  strokeWidth={isFavorite && !(isSold || isPendingModeration || isDeactivated || isRejected) ? 0 : 2}
-                />
-              </div>
+              {showViews && (
+                <div className="flex items-center gap-0.5" title={t('sales.views')}>
+                  <Eye size={12} className={statsMuted ? 'text-gray-500' : ''} />
+                  <span className="tabular-nums font-medium">{listing.views || 0}</span>
+                </div>
+              )}
+              {showFavorites && (
+                <div className="flex items-center gap-0.5" title={t('navigation.favorites')}>
+                  <Heart size={12} className={statsMuted ? 'text-gray-500' : ''} fill="none" strokeWidth={2} />
+                  <span className="tabular-nums font-medium">
+                    {(listing.favoritesCount ?? 0).toLocaleString(
+                      language === 'ru' ? 'ru-RU' : 'uk-UA'
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        )}
+          );
+        })()}
         </div>
 
         {/* Інформація */}

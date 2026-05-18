@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma, executeWithRetry } from '@/lib/prisma';
+import { toSQLiteDate } from '@/utils/dateHelpers';
 
 const KYIV_TZ = 'Europe/Kyiv';
 
@@ -128,16 +129,26 @@ export async function GET() {
   try {
     const now = new Date();
     const dayStart = startOfKyivListingsReportingWindow(now);
+    const dayStartStr = toSQLiteDate(dayStart);
+    const nowStr = toSQLiteDate(now);
 
-    /** Лише активні оголошення (як у каталозі), створені з 06:00 до «зараз» у поточному 6–6 вікні. */
-    const newListingsToday = await executeWithRetry(() =>
-      prisma.listing.count({
-        where: {
-          status: 'active',
-          createdAt: { gte: dayStart, lte: now },
-        },
-      })
+    /**
+     * Активні оголошення, вперше опубліковані у вікні 06:00–06:00 (Kyiv).
+     * COALESCE(publishedAt, createdAt) + datetime() — коректно для SQLite-рядків UTC.
+     * Повторна модерація не змінює publishedAt → не потрапляють у «сьогодні» знову.
+     */
+    const countRows = await executeWithRetry(
+      () =>
+        prisma.$queryRawUnsafe(
+          `SELECT COUNT(*) AS count FROM Listing
+           WHERE status = 'active'
+             AND datetime(COALESCE(publishedAt, createdAt)) >= datetime(?)
+             AND datetime(COALESCE(publishedAt, createdAt)) <= datetime(?)`,
+          dayStartStr,
+          nowStr
+        ) as Promise<Array<{ count: bigint | number }>>
     );
+    const newListingsToday = Number(countRows[0]?.count ?? 0);
 
     const online = displayOnlineSynced(now);
 

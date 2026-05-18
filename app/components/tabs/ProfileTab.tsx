@@ -899,6 +899,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     <ProfileListingCard
                       key={listing.id}
                         listing={{ ...listing, favoritesCount: listing.favoritesCount || 0 }}
+                        alwaysShowStats
                         isFavorite={favorites.has(listing.id)}
                         isSold={isSold}
                         isDeactivated={isDeactivated || isExpired}

@@ -284,49 +284,75 @@ def set_user_phone(user_id: str, phone: str):
 
 
 def get_user_language(user_id: int) -> str:
-    """Отримує мову користувача.
+    """Отримує мову користувача (telegram id).
 
-    Використовуємо тільки таблицю users_legacy, щоб уникнути помилок,
-    оскільки в таблиці User немає колонки language.
+    Пріоритет: User.language (маркетплейс / міні-ап) → users_legacy (бот) → uk.
     """
-    # Шукаємо мову в users_legacy
+    # 1. Маркетплейс — мова з веб-додатку
+    try:
+        cursor.execute(
+            'SELECT language FROM User WHERE CAST(telegramId AS INTEGER) = ?',
+            (int(user_id),),
+        )
+        row = cursor.fetchone()
+        if row and row[0] in ('uk', 'ru'):
+            return row[0]
+    except Exception as e:
+        print(f"Error getting language from User table: {e}")
+
+    # 2. Legacy-таблиця бота
     try:
         cursor.execute('SELECT language FROM users_legacy WHERE user_id = ?', (str(user_id),))
         result = cursor.fetchone()
-        if result and result[0]:
-            lang = result[0]
-            if lang in ['uk', 'ru']:
-                return lang
+        if result and result[0] in ('uk', 'ru'):
+            return result[0]
     except Exception as e:
         print(f"Error getting language from users_legacy table: {e}")
-    
+
     return 'uk'
 
 
 def set_user_language(user_id: int, language: str):
-    """Встановлює мову користувача.
-
-    Зберігаємо значення тільки в таблиці users_legacy.
-    """
+    """Встановлює мову користувача в User та users_legacy."""
     if language not in ['uk', 'ru']:
         print(f"Invalid language: {language}")
         return
 
-    # Оновлюємо або створюємо запис в users_legacy
+    # User (маркетплейс)
+    try:
+        cursor.execute(
+            'UPDATE User SET language = ? WHERE CAST(telegramId AS INTEGER) = ?',
+            (language, int(user_id)),
+        )
+    except Exception as e:
+        print(f"Error setting language on User table: {e}")
+
+    # users_legacy (бот)
     cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
     result = cursor.fetchone()
 
     if result:
-        cursor.execute('''
-            UPDATE users_legacy 
-            SET language = ? 
+        cursor.execute(
+            '''
+            UPDATE users_legacy
+            SET language = ?
             WHERE user_id = ?
-        ''', (language, str(user_id)))
+        ''',
+            (language, str(user_id)),
+        )
     else:
-        cursor.execute('''
+        cursor.execute(
+            '''
             INSERT INTO users_legacy (user_id, language, join_date, last_activity)
             VALUES (?, ?, ?, ?)
-        ''', (str(user_id), language, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        ''',
+            (
+                str(user_id),
+                language,
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            ),
+        )
 
     conn.commit()
     print(f"Language {language} set for user {user_id}")

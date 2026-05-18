@@ -341,10 +341,11 @@ export async function POST(request: NextRequest) {
         region: (listing as any).region || 'hamburg', // Додаємо регіон
       });
 
-      // Схвалюємо TelegramListing
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
-      const nowStr = new Date().toISOString();
+      // Схвалюємо TelegramListing (publishedAt лишаємо при повторному схваленні)
+      const { nowSQLite } = await import('@/utils/dateHelpers');
+      const { preservedDbTimestamp } = await import('@/utils/moderationHelpers');
+      const nowStr = nowSQLite();
+      const publishedAtStr = preservedDbTimestamp(listing.publishedAt, nowSQLite);
       
       // Перевіряємо чи є колонка channelMessageId
       const tableInfo = await prisma.$queryRawUnsafe(
@@ -368,7 +369,7 @@ export async function POST(request: NextRequest) {
                updatedAt = ?,
                channelMessageId = ?
            WHERE id = ?`,
-          nowStr,
+          publishedAtStr,
           nowStr,
           nowStr,
           channelMessageId,
@@ -383,7 +384,7 @@ export async function POST(request: NextRequest) {
                moderatedAt = ?,
                updatedAt = ?
            WHERE id = ?`,
-          nowStr,
+          publishedAtStr,
           nowStr,
           nowStr,
           listing.id

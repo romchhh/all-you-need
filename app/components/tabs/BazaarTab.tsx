@@ -91,56 +91,20 @@ const BazaarTabComponent = ({
   const { isLight, toggleTheme } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
-    if (savedState?.selectedCategory !== undefined) {
+    if (savedState?.selectedCategory != null) {
       return savedState.selectedCategory;
     }
-    if (initialSelectedCategory !== undefined) {
+    if (initialSelectedCategory != null) {
       return initialSelectedCategory;
-    }
-    // Fallback до localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.selectedCategory || null;
-        } catch (e) {
-          // ignore
-        }
-      }
     }
     return null;
   });
-  
-  // Синхронізуємо selectedCategory з initialSelectedCategory (тільки якщо немає збереженого стану)
+
   useEffect(() => {
-    if (initialSelectedCategory !== undefined && initialSelectedCategory !== null) {
-      // Перевіряємо, чи є збережений стан в localStorage або savedState
-      const hasSavedCategory = savedState?.selectedCategory || 
-        (typeof window !== 'undefined' && (() => {
-          const saved = localStorage.getItem('bazaarTabState');
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved);
-              return parsed.selectedCategory;
-            } catch (e) {
-              // ignore
-            }
-          }
-          return null;
-        })());
-      
-      // Якщо є збережена категорія, не перезаписуємо її initialSelectedCategory
-      if (hasSavedCategory) {
-        return;
-      }
-      
-      // Оновлюємо тільки якщо немає збереженого стану
-      if (initialSelectedCategory !== selectedCategory) {
+    if (initialSelectedCategory != null && savedState?.selectedCategory == null) {
       setSelectedCategory(initialSelectedCategory);
-      }
     }
-  }, [initialSelectedCategory]);
+  }, [initialSelectedCategory, savedState?.selectedCategory]);
   
   // Синхронізуємо локальний стан з savedState при монтуванні та при зміні
   useEffect(() => {
@@ -195,17 +159,6 @@ const BazaarTabComponent = ({
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(() => {
     if (savedState?.selectedSubcategory !== undefined) {
       return savedState.selectedSubcategory;
-    }
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.selectedSubcategory || null;
-        } catch (e) {
-          // ignore
-        }
-      }
     }
     return null;
   });

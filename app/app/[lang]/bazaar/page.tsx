@@ -24,6 +24,11 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useAutoPrefetch } from '@/hooks/usePrefetch';
 import { logTelegramEnvironment } from '@/utils/telegramDebug';
 import { AppHeader } from '@/components/AppHeader';
+import {
+  loadBazaarTabStateFromStorage,
+  persistBazaarTabState,
+  type BazaarTabPersistedState,
+} from '@/utils/bazaarTabStateStorage';
 
 const BazaarPage = () => {
   const params = useParams();
@@ -148,48 +153,15 @@ const BazaarPage = () => {
   }, [profile]);
   
   // Зберігаємо стан для вкладки bazaar
-  const [bazaarTabState, setBazaarTabState] = useState<{
-    selectedCategory: string | null;
-    selectedSubcategory: string | null;
-    selectedCities: string[];
-    minPrice: number | null;
-    maxPrice: number | null;
-    selectedCondition: 'new' | 'used' | null;
-    selectedCurrency: string | null;
-    sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
-    showFreeOnly: boolean;
-  }>(() => {
-    // Завантажуємо збережений стан з localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return {
-      selectedCategory: null,
-      selectedSubcategory: null,
-      selectedCities: [],
-      minPrice: null,
-      maxPrice: null,
-      selectedCondition: null,
-      selectedCurrency: null,
-      sortBy: 'newest',
-      showFreeOnly: false,
-    };
-  });
+  const [bazaarTabState, setBazaarTabState] = useState<BazaarTabPersistedState>(() =>
+    loadBazaarTabStateFromStorage()
+  );
   
   // ВИДАЛЕНО: Збереження скролу при скролі - не потрібно, зберігаємо тільки перед відкриттям
 
-  // Зберігаємо стан в localStorage
+  // Зберігаємо стан в localStorage (категорія — лише в памʼяті сесії)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('bazaarTabState', JSON.stringify(bazaarTabState));
-    }
+    persistBazaarTabState(bazaarTabState);
   }, [bazaarTabState]);
 
   // Завантажуємо обране з localStorage при завантаженні

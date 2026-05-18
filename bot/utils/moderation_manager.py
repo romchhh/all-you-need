@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, FSInputFile
 from dotenv import load_dotenv
@@ -338,13 +338,21 @@ class ModerationManager:
                     if not has_channel_message_id:
                         cursor.execute("ALTER TABLE TelegramListing ADD COLUMN channelMessageId INTEGER")
                     # channelMessageId вже збережено в _publish_to_channel (JSON з усіма message_id медіа-групи) — не перезаписуємо
+                    cursor.execute(
+                        "SELECT publishedAt FROM TelegramListing WHERE id = ?",
+                        (listing_id,),
+                    )
+                    tl_row = cursor.fetchone()
+                    existing_tl_published = tl_row[0] if tl_row else None
+                    published_tl_at = existing_tl_published if existing_tl_published else datetime.now()
+
                     cursor.execute("""
                         UPDATE TelegramListing
                         SET status = 'approved',
                             publishedAt = ?,
                             updatedAt = ?
                         WHERE id = ?
-                    """, (datetime.now(), datetime.now(), listing_id))
+                    """, (published_tl_at, datetime.now(), listing_id))
                     
                     conn.commit()
                     conn.close()
@@ -382,6 +390,16 @@ class ModerationManager:
                 if admin_telegram_id:
                     admin_id = self._get_admin_id_by_telegram_id(admin_telegram_id)
                 
+                cursor.execute(
+                    "SELECT publishedAt, expiresAt FROM Listing WHERE id = ?",
+                    (listing_id,),
+                )
+                row = cursor.fetchone()
+                existing_published = row[0] if row else None
+                existing_expires = row[1] if row else None
+                published_at = existing_published if existing_published else datetime.now()
+                expires_at = existing_expires if existing_expires else datetime.now() + timedelta(days=30)
+
                 cursor.execute("""
                     UPDATE Listing
                     SET moderationStatus = 'approved',
@@ -389,9 +407,10 @@ class ModerationManager:
                         publishedAt = ?,
                         moderatedAt = ?,
                         moderatedBy = ?,
+                        expiresAt = ?,
                         updatedAt = ?
                     WHERE id = ?
-                """, (datetime.now(), datetime.now(), admin_id, datetime.now(), listing_id))
+                """, (published_at, datetime.now(), admin_id, expires_at, datetime.now(), listing_id))
                 
                 success = cursor.rowcount > 0
                 conn.commit()

@@ -3,6 +3,7 @@ import { sendListingApprovedNotification, sendListingRejectedNotification } from
 import { enqueueCityDigestListing } from './cityDigestQueue';
 import { getSystemSetting, createTransaction } from './dbHelpers';
 import { toSQLiteDate, addDays, nowSQLite } from './dateHelpers';
+import { parseDbDate } from './parseDbDate';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -45,14 +46,30 @@ export async function getListingWithUser(listingId: number): Promise<ListingWith
   return listing;
 }
 
+/** Зберігає дату першої публікації при повторному схваленні після редагування. */
+export function preservedDbTimestamp(
+  existing: string | Date | null | undefined,
+  fallback: () => string
+): string {
+  if (existing != null && String(existing).trim() !== '') {
+    const parsed = parseDbDate(existing);
+    if (parsed) return toSQLiteDate(parsed);
+    return String(existing).trim();
+  }
+  return fallback();
+}
+
 /**
  * Схвалює оголошення
  */
 export async function approveListing(listing: ListingWithUser): Promise<void> {
   await ensurePromotionPurchaseTable();
-  const expiresAt = addDays(new Date(), 30);
-  const expiresAtStr = toSQLiteDate(expiresAt);
   const nowStr = nowSQLite();
+  const publishedAtStr = preservedDbTimestamp(listing.publishedAt, nowSQLite);
+  const expiresAtStr = preservedDbTimestamp(
+    listing.expiresAt,
+    () => toSQLiteDate(addDays(new Date(), 30))
+  );
   
   // Оновлюємо оголошення - встановлюємо статус 'active'
   await prisma.$executeRawUnsafe(
@@ -64,7 +81,7 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
          expiresAt = ?,
          updatedAt = ?
      WHERE id = ?`,
-    nowStr,
+    publishedAtStr,
     nowStr,
     expiresAtStr,
     nowStr,
