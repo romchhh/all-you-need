@@ -3,6 +3,29 @@ import { Category } from '@/types';
 // Функція для отримання категорій з перекладами
 export const getCategories = (t: (key: string) => string): Category[] => [
   {
+    id: 'services_work',
+    name: t('categories.services_work'),
+    icon: '💼',
+    subcategories: [
+      { id: 'services', name: t('categories.subcategories.services') },
+      { id: 'repair_installation', name: t('categories.subcategories.repair_installation') },
+      { id: 'cleaning', name: t('categories.subcategories.cleaning') },
+      { id: 'transportation', name: t('categories.subcategories.transportation') },
+      { id: 'beauty_health', name: t('categories.subcategories.beauty_health') },
+      { id: 'it_design_websites', name: t('categories.subcategories.it_design_websites') },
+      { id: 'photo_video', name: t('categories.subcategories.photo_video') },
+      { id: 'education_tutors', name: t('categories.subcategories.education_tutors') },
+      { id: 'translations', name: t('categories.subcategories.translations') },
+      { id: 'auto_services', name: t('categories.subcategories.auto_services') },
+      { id: 'consultations', name: t('categories.subcategories.consultations') },
+      { id: 'other_services', name: t('categories.subcategories.other_services') },
+      { id: 'vacancies', name: t('categories.subcategories.vacancies') },
+      { id: 'part_time', name: t('categories.subcategories.part_time') },
+      { id: 'looking_for_work', name: t('categories.subcategories.looking_for_work') },
+      { id: 'other_work', name: t('categories.subcategories.other_work') }
+    ]
+  },
+  {
     id: 'fashion',
     name: t('categories.fashion'),
     icon: '👕',
@@ -118,6 +141,17 @@ export const getCategories = (t: (key: string) => string): Category[] => [
     ]
   },
   {
+    id: 'pets',
+    name: t('categories.pets'),
+    icon: '🐾',
+    subcategories: [
+      { id: 'sell_giveaway', name: t('categories.subcategories.sell_giveaway') },
+      { id: 'pet_goods', name: t('categories.subcategories.pet_goods') },
+      { id: 'pet_services', name: t('categories.subcategories.pet_services') },
+      { id: 'other', name: t('categories.subcategories.other') }
+    ]
+  },
+  {
     id: 'realestate',
     name: t('categories.realestate'),
     icon: '🏠',
@@ -129,29 +163,6 @@ export const getCategories = (t: (key: string) => string): Category[] => [
       { id: 'commercial', name: t('categories.subcategories.commercial') },
       { id: 'garages_parking', name: t('categories.subcategories.garages_parking') },
       { id: 'other', name: t('categories.subcategories.other') }
-    ]
-  },
-  {
-    id: 'services_work',
-    name: t('categories.services_work'),
-    icon: '💼',
-    subcategories: [
-      { id: 'services', name: t('categories.subcategories.services') },
-      { id: 'repair_installation', name: t('categories.subcategories.repair_installation') },
-      { id: 'cleaning', name: t('categories.subcategories.cleaning') },
-      { id: 'transportation', name: t('categories.subcategories.transportation') },
-      { id: 'beauty_health', name: t('categories.subcategories.beauty_health') },
-      { id: 'it_design_websites', name: t('categories.subcategories.it_design_websites') },
-      { id: 'photo_video', name: t('categories.subcategories.photo_video') },
-      { id: 'education_tutors', name: t('categories.subcategories.education_tutors') },
-      { id: 'translations', name: t('categories.subcategories.translations') },
-      { id: 'auto_services', name: t('categories.subcategories.auto_services') },
-      { id: 'consultations', name: t('categories.subcategories.consultations') },
-      { id: 'other_services', name: t('categories.subcategories.other_services') },
-      { id: 'vacancies', name: t('categories.subcategories.vacancies') },
-      { id: 'part_time', name: t('categories.subcategories.part_time') },
-      { id: 'looking_for_work', name: t('categories.subcategories.looking_for_work') },
-      { id: 'other_work', name: t('categories.subcategories.other_work') }
     ]
   },
   {
@@ -175,6 +186,7 @@ export const categories: Category[] = getCategories((key: string) => {
     'categories.home': 'Для дому',
     'categories.auto': 'Авто',
     'categories.hobby_sports': 'Хобі / Спорт',
+    'categories.pets': 'Улюбленці',
     'categories.realestate': 'Нерухомість',
     'categories.services_work': 'Послуги та робота',
     'categories.free': 'Безкоштовно / Віддам',

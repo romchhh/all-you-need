@@ -1,41 +1,63 @@
-export const ListingCardSkeleton = () => {
+'use client';
+
+import { useTheme } from '@/contexts/ThemeContext';
+
+export const ListingCardSkeleton = ({ index = 0 }: { index?: number }) => {
+  const { isLight } = useTheme();
+  const block = isLight ? 'bg-gray-200/80' : 'bg-white/10';
+  const card = isLight ? 'bg-white shadow-sm ring-1 ring-black/[0.04]' : 'bg-[#1C1C1C] ring-1 ring-white/10';
+
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm animate-pulse">
-      <div className="aspect-square bg-gray-200"></div>
-      <div className="p-3">
-        <div className="h-6 bg-gray-200 rounded mb-2 w-24"></div>
-        <div className="h-4 bg-gray-200 rounded mb-1 w-full"></div>
-        <div className="h-4 bg-gray-200 rounded mb-2 w-3/4"></div>
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-6 h-6 bg-gray-200 rounded-full"></div>
-          <div className="h-3 bg-gray-200 rounded w-20"></div>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="h-3 bg-gray-200 rounded w-16"></div>
-          <div className="h-3 bg-gray-200 rounded w-16"></div>
+    <div
+      className={`overflow-hidden rounded-2xl animate-pulse ${card}`}
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
+      <div className={`aspect-square ${block}`} />
+      <div className="space-y-2 p-3">
+        <div className={`h-5 w-24 rounded ${block}`} />
+        <div className={`h-4 w-full rounded ${block}`} />
+        <div className={`h-4 w-3/4 rounded ${block}`} />
+        <div className="flex items-center gap-2">
+          <div className={`h-6 w-6 rounded-full ${block}`} />
+          <div className={`h-3 w-20 rounded ${block}`} />
         </div>
       </div>
     </div>
   );
 };
 
-export const ListingGridSkeleton = ({ count = 6, showLoadingText = false, loadingText }: { count?: number; showLoadingText?: boolean; loadingText?: string }) => {
+export const ListingGridSkeleton = ({
+  count = 6,
+  showLoadingText = false,
+  loadingText,
+  compact = false,
+}: {
+  count?: number;
+  showLoadingText?: boolean;
+  loadingText?: string;
+  compact?: boolean;
+}) => {
+  const { isLight } = useTheme();
+
   return (
-    <div className="px-4">
+    <div className={compact ? '' : 'w-full'}>
       {showLoadingText && loadingText && (
-        <div className="flex items-center justify-center py-8">
+        <div className="flex animate-content-in items-center justify-center py-8">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-[#3F5331] border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-white/70 text-sm">{loadingText}</p>
+            <div
+              className={`h-8 w-8 animate-spin rounded-full border-2 border-t-transparent ${
+                isLight ? 'border-[#3F5331]/30 border-t-[#3F5331]' : 'border-white/20 border-t-[#C8E6A0]'
+              }`}
+            />
+            <p className={`text-sm ${isLight ? 'text-gray-600' : 'text-white/70'}`}>{loadingText}</p>
           </div>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
         {Array.from({ length: count }).map((_, i) => (
-          <ListingCardSkeleton key={i} />
+          <ListingCardSkeleton key={i} index={i} />
         ))}
       </div>
     </div>
   );
 };
-

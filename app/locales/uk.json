@@ -12,6 +12,7 @@
     "edit": "Редагувати",
     "close": "Закрити",
     "share": "Поділитися",
+    "more": "Ще",
     "write": "Написати",
     "call": "Зателефонувати",
     "search": "Пошук",
@@ -187,6 +188,30 @@
         "tryPostalCode": "Спробуйте ввести назву міста",
         "allCategories": "Всі категорії",
         "clearFilters": "Очистити фільтри",
+        "search": {
+          "popularQueries": "Популярні запити",
+          "recentQueries": "Останні пошуки",
+          "recentSearchListings": "З останніх пошуків",
+          "recentViewed": "Нещодавно переглянуті",
+          "popularListings": "Популярні товари",
+          "clearHistory": "Очистити",
+          "searchFor": "Шукати: «{query}»",
+          "resultsTitle": "Результати: «{query}»",
+          "resultsCount": "{count} знайдено",
+          "pressSearch": "Натисніть «Пошук» або Enter",
+          "searching": "Пошук…",
+          "backToDiscover": "Назад",
+          "queries": {
+            "iphone": "iPhone",
+            "sofa": "Диван",
+            "bicycle": "Велосипед",
+            "rent": "Оренда квартири",
+            "job": "Робота",
+            "stroller": "Коляска",
+            "laptop": "Ноутбук",
+            "cleaning": "Прибирання"
+          }
+        },
         "sort": {
           "newest": "Новіші спочатку",
           "priceLow": "Від дешевих",
@@ -211,7 +236,10 @@
         "subscribedCitiesMenu": "Міста з підписок",
         "subscribedCitiesEmpty": "Немає міст у підписці",
         "activityOnlineSuffix": "онлайн",
-        "activityListingsTail": "нових оголошень сьогодні"
+        "activityListingsTail": "нових оголошень сьогодні",
+        "activityListingsByCity": "По містах",
+        "activityListingsByCityEmpty": "Сьогодні ще немає нових оголошень",
+        "activityOtherCity": "Інше"
   },
   "favorites": {
     "title": "Обране",
@@ -586,6 +614,7 @@
     "home": "Для дому",
     "auto": "Авто",
     "hobby_sports": "Хобі / Спорт",
+    "pets": "Улюбленці",
     "realestate": "Нерухомість",
     "services_work": "Послуги та робота",
     "free": "Безкоштовно / Віддам",
@@ -599,6 +628,7 @@
       "home": "Товари для дому та декор",
       "auto": "Автомобілі, мотоцикли та запчастини",
       "hobby_sports": "Спорт, хобі та розваги",
+      "pets": "Тварини, аксесуари та послуги для улюбленців",
       "realestate": "Нерухомість та оренда",
       "services_work": "Послуги та вакансії",
       "free": "Безкоштовні товари та речі, які віддають"
@@ -642,6 +672,9 @@
       "tourism": "Туризм",
       "collections_hobby": "Колекції / хобі",
       "books_learning": "Книги / навчання",
+      "sell_giveaway": "Продам / Віддам",
+      "pet_goods": "Товари",
+      "pet_services": "Послуги",
       "cosmetics": "Косметика",
       "perfumery": "Парфумерія",
       "personal_care": "Догляд",
@@ -881,5 +914,30 @@
     "share_text": "Приєднуйтесь до TradeGround!",
     "menuButton": "Реферальна програма",
     "menu_button": "Реферальна програма"
+  },
+  "platformTicker": {
+    "system": {
+      "marketplace": "TradeGround — маркетплейс для українців у Німеччині",
+      "freeListing": "Публікуйте оголошення безкоштовно — прямо в Telegram",
+      "community": "Спільнота українців: купуйте, продавайте, знаходьте послуги",
+      "germany": "Оголошення по містах Німеччини — від Берліна до Гамбурга",
+      "safeDeals": "Спілкуйтесь із продавцями напряму через Telegram",
+      "telegram": "TradeGround працює як зручний міні-застосунок у Telegram"
+    },
+    "activity": {
+      "newToday": "Сьогодні на платформі +{count} нових оголошень",
+      "cityToday": "У {city} сьогодні {count} нових оголошень",
+      "categoryToday": "Категорія «{category}» — {count} нових сьогодні",
+      "explore": "Перегляньте каталог — нові оголошення з’являються щодня"
+    },
+    "welcome": "Вітаємо в TradeGround — знайдіть потрібне поруч із вами",
+    "tips": {
+      "favorites": "Збережіть цікаве оголошення — натисніть на серце",
+      "cityFilter": "Оберіть місто поруч із пошуком для точніших результатів",
+      "categories": "Скористайтесь категоріями — швидше знайдете потрібне",
+      "photos": "Оголошення з кількома фото отримують більше переглядів",
+      "price": "Вкажіть чесну ціну — покупці швидше відгукнуться",
+      "share": "Поділіться оголошенням з друзями — допоможіть продавцю"
+    }
   }
 }

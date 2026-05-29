@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone, Eye } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone, Eye, LayoutGrid } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
@@ -77,6 +77,8 @@ interface ListingDetailProps {
   favorites: Set<number>;
   tg: TelegramWebApp | null;
   onBack?: () => void;
+  /** Перейти до каталогу з фільтром категорії цього оголошення. */
+  onNavigateToCategory?: (categoryId: string, subcategoryId: string | null) => void;
   /** Оновити кеш оголошення у батька після зміни автопродовження (щоб проп `autoRenew` збігався з БД). */
   onAutoRenewPersist?: (listingId: number, autoRenew: boolean) => void;
 }
@@ -91,6 +93,7 @@ export const ListingDetail = ({
   favorites,
   tg,
   onBack,
+  onNavigateToCategory,
   onAutoRenewPersist,
 }: ListingDetailProps) => {
   const sellerUsername = listing.seller.username;
@@ -200,6 +203,38 @@ export const ListingDetail = ({
     },
     [listing.id, onAutoRenewPersist]
   );
+
+  const handleBack = useCallback(() => {
+    if (onBack) {
+      onBack();
+    } else {
+      onClose();
+    }
+    tg?.HapticFeedback.impactOccurred('light');
+  }, [onBack, onClose, tg]);
+
+  const handleOpenCategory = useCallback(() => {
+    tg?.HapticFeedback.impactOccurred('light');
+    if (onNavigateToCategory) {
+      onNavigateToCategory(listing.category, listing.subcategory ?? null);
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(
+        'pendingListingCategory',
+        JSON.stringify({
+          category: listing.category,
+          subcategory: listing.subcategory ?? null,
+        })
+      );
+    }
+    onClose();
+    router.push(`/${lang}/bazaar`);
+  }, [lang, listing.category, listing.subcategory, onClose, onNavigateToCategory, router, tg]);
+
+  const listingHeaderActionClass = isLight
+    ? 'border-gray-300/90 bg-white/95 text-gray-900 shadow-sm hover:bg-white'
+    : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
 
   // Скролимо нагору при відкритті нового оголошення
   // useLayoutEffect виконується СИНХРОННО перед рендером - це ключ до успіху
@@ -502,7 +537,7 @@ export const ListingDetail = ({
 
   return (
     <div 
-      className="min-h-screen pb-20 font-montserrat lg:px-6 xl:px-8" 
+      className="min-h-screen pb-[calc(env(safe-area-inset-bottom,0px)+9rem)] font-montserrat" 
       style={{ 
         position: 'relative', 
         overflowX: 'hidden',
@@ -525,7 +560,7 @@ export const ListingDetail = ({
           }}
         />
       )}
-      
+
       <FixedLogoHeader
         mode="window-fixed"
         zClassName="z-[50]"
@@ -538,77 +573,20 @@ export const ListingDetail = ({
         }}
       />
 
-      {/* Ряд кнопок — у потоці; свайп як раніше */}
-      <div
-        className="w-full max-lg:pt-0.5 lg:pt-4"
-        style={{
-          transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
-          transition: swipeProgress === 0 ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out' : 'none',
-          opacity: swipeProgress > 0 ? 1 - (swipeProgress / 250) : 1,
-        }}
+      {/* Кнопка «Назад» — фіксована під шапкою з лого */}
+      <button
+        type="button"
+        onClick={handleBack}
+        aria-label={t('common.back')}
+        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+0.35rem)] ${listingHeaderActionClass}`}
       >
-        <div className="px-4 pb-1 pt-0 max-lg:pt-0 lg:px-6 xl:px-8">
-          <div className="mb-2 flex items-center justify-between lg:mb-4">
-            <button
-              type="button"
-              onClick={() => {
-                if (onBack) {
-                  onBack();
-                } else {
-                  onClose();
-                }
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              className={`flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
-                isLight
-                  ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
-                  : 'border-white text-white hover:bg-white/10'
-              }`}
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowShareModal(true);
-                  tg?.HapticFeedback.impactOccurred('light');
-                }}
-                className={`flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
-                  isLight
-                    ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
-                    : 'border-white text-white hover:bg-white/10'
-                }`}
-              >
-                <Share2 size={18} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleFavorite(listing.id);
-                  tg?.HapticFeedback.impactOccurred('light');
-                }}
-                className={`flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
-                  isLight
-                    ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
-                    : 'border-white text-white hover:bg-white/10'
-                }`}
-              >
-                <Heart
-                  size={20}
-                  className={isFavorite ? 'text-red-500' : ''}
-                  fill={isFavorite ? 'currentColor' : 'none'}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+        <ArrowLeft size={20} />
+      </button>
       
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 
-          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[5rem]"
+          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+0.35rem)]"
           style={{
             height: `${Math.min(pullDistance * 0.8, 100)}px`,
             opacity: Math.min(pullProgress * 1.2, 1),
@@ -698,12 +676,10 @@ export const ListingDetail = ({
         </div>
       )}
 
-      {/* Блок з рамкою зверху — на десктопі: галерея зліва, текст справа */}
+      {/* Картка товару — на весь екран */}
       <div 
-        className={`mx-4 mt-4 overflow-hidden rounded-3xl lg:mx-auto lg:mt-8 lg:max-w-5xl xl:max-w-6xl ${
-          isLight
-            ? 'bg-white shadow-md shadow-gray-900/[0.07] ring-1 ring-gray-900/[0.04]'
-            : 'bg-[#000000] shadow-lg shadow-black/30'
+        className={`w-full overflow-hidden ${
+          isLight ? 'bg-white lg:bg-transparent' : 'bg-[#000000]'
         }`}
         style={{
           transform: swipeProgress > 0 ? `translateX(${swipeProgress}px)` : 'translateX(0)',
@@ -712,11 +688,11 @@ export const ListingDetail = ({
           overflow: 'visible'
         }}
       >
-        <div className="w-full min-w-0 lg:flex lg:flex-row lg:items-stretch lg:gap-8 xl:gap-10">
-        {/* Галерея фото */}
+        <div className="w-full min-w-0 lg:mx-auto lg:flex lg:max-w-6xl lg:flex-row lg:items-stretch lg:gap-8 xl:gap-10">
+        {/* Галерея фото — edge-to-edge */}
         <div 
-          className={`w-full min-h-[360px] max-h-[620px] px-0 pb-0 pt-4 sm:max-h-[640px] lg:flex lg:h-auto lg:min-h-[min(420px,70vh)] lg:max-h-[min(640px,85vh)] lg:w-[42%] lg:max-w-xl lg:min-w-[300px] lg:shrink-0 lg:items-center lg:justify-center lg:self-stretch lg:pl-8 lg:pr-2 lg:pt-0 lg:pb-6 xl:pl-10 ${
-            isMobile ? 'h-[60svh]' : 'h-[85svh] max-lg:h-[85svh]'
+          className={`w-full min-h-[320px] max-h-[620px] px-0 pb-0 pt-0 sm:max-h-[640px] lg:flex lg:h-auto lg:min-h-[min(420px,70vh)] lg:max-h-[min(640px,85vh)] lg:w-[42%] lg:max-w-xl lg:min-w-[300px] lg:shrink-0 lg:items-center lg:justify-center lg:self-stretch lg:pl-6 lg:pr-2 lg:pt-6 lg:pb-6 xl:pl-8 ${
+            isMobile ? 'h-[52svh]' : 'h-[55svh] max-lg:h-[55svh]'
           }`}
           style={{ 
             ...(tg ? { paddingBottom: '0px' } : {})
@@ -733,11 +709,12 @@ export const ListingDetail = ({
 
         {/* Контент */}
         <div 
-          className={`min-w-0 flex-1 px-4 pb-6 lg:pl-4 lg:pr-10 lg:pb-10 lg:pt-8 xl:pr-12 ${tg ? 'max-lg:pt-1' : 'max-lg:pt-2'}`}
+          className={`min-w-0 flex-1 px-4 pb-6 lg:pl-4 lg:pr-10 lg:pb-10 lg:pt-8 xl:pr-12 ${tg ? 'max-lg:pt-3' : 'max-lg:pt-4'}`}
         >
-            {/* Ціна */}
-            <div className="mt-3 mb-4">
-              <div className="flex items-center gap-2">
+            {/* Ціна + дії */}
+            <div className="mt-1 mb-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {(() => {
                   const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
                   const isFree = listing.isFree;
@@ -770,6 +747,56 @@ export const ListingDetail = ({
                     </>
                   );
                 })()}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowShareModal(true);
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    aria-label={t('common.share')}
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                      isLight
+                        ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                        : 'border-white/30 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Share2 size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onToggleFavorite(listing.id);
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    aria-label={t('listing.favoritesLabel')}
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                      isLight
+                        ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                        : 'border-white/30 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Heart
+                      size={18}
+                      className={isFavorite ? 'text-red-500' : ''}
+                      fill={isFavorite ? 'currentColor' : 'none'}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenCategory}
+                    aria-label={t('common.more')}
+                    title={t('common.more')}
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                      isLight
+                        ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+                        : 'border-white/30 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <LayoutGrid size={17} />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1070,9 +1097,9 @@ export const ListingDetail = ({
       </div>
 
 
-      {/* Нижня панель з кнопкою */}
+      {/* Нижня панель з кнопкою — ближче до меню, з невеликим відступом */}
       <div
-        className="fixed bottom-28 left-0 right-0 z-[50] mx-auto max-w-2xl space-y-3 px-4 py-4 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] left-0 right-0 z-[50] mx-auto max-w-2xl space-y-3 px-4 py-2 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8"
         style={{ pointerEvents: 'auto' }}
       >
         {(isSeoListingRoute || !isTelegramEnv) && (

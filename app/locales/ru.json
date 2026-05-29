@@ -12,6 +12,7 @@
     "edit": "Редактировать",
     "close": "Закрыть",
     "share": "Поделиться",
+    "more": "Ещё",
     "write": "Написать",
     "call": "Позвонить",
     "search": "Поиск",
@@ -187,6 +188,30 @@
         "tryPostalCode": "Попробуйте ввести название города",
         "allCategories": "Все категории",
         "clearFilters": "Очистить фильтры",
+        "search": {
+          "popularQueries": "Популярные запросы",
+          "recentQueries": "Последние поиски",
+          "recentSearchListings": "Из последних поисков",
+          "recentViewed": "Недавно просмотренные",
+          "popularListings": "Популярные товары",
+          "clearHistory": "Очистить",
+          "searchFor": "Искать: «{query}»",
+          "resultsTitle": "Результаты: «{query}»",
+          "resultsCount": "Найдено: {count}",
+          "pressSearch": "Нажмите «Поиск» или Enter",
+          "searching": "Поиск…",
+          "backToDiscover": "Назад",
+          "queries": {
+            "iphone": "iPhone",
+            "sofa": "Диван",
+            "bicycle": "Велосипед",
+            "rent": "Аренда квартиры",
+            "job": "Работа",
+            "stroller": "Коляска",
+            "laptop": "Ноутбук",
+            "cleaning": "Уборка"
+          }
+        },
         "sort": {
           "newest": "Новейшие сначала",
           "priceLow": "От дешевых",
@@ -211,7 +236,10 @@
         "subscribedCitiesMenu": "Города из подписок",
         "subscribedCitiesEmpty": "В подписках пока нет городов",
         "activityOnlineSuffix": "онлайн",
-        "activityListingsTail": "новых объявлений сегодня"
+        "activityListingsTail": "новых объявлений сегодня",
+        "activityListingsByCity": "По городам",
+        "activityListingsByCityEmpty": "Сегодня ещё нет новых объявлений",
+        "activityOtherCity": "Другое"
   },
   "favorites": {
     "title": "Избранное",
@@ -584,6 +612,7 @@
     "home": "Для дома",
     "auto": "Авто",
     "hobby_sports": "Хобби / Спорт",
+    "pets": "Питомцы",
     "realestate": "Недвижимость",
     "services_work": "Услуги и работа",
     "free": "Бесплатно / Отдам",
@@ -597,6 +626,7 @@
       "home": "Товары для дома и декор",
       "auto": "Автомобили, мотоциклы и запчасти",
       "hobby_sports": "Спорт, хобби и развлечения",
+      "pets": "Животные, аксессуары и услуги для питомцев",
       "realestate": "Недвижимость и аренда",
       "services_work": "Услуги и вакансии",
       "free": "Бесплатные товары и вещи, которые отдают"
@@ -640,6 +670,9 @@
       "tourism": "Туризм",
       "collections_hobby": "Коллекции / хобби",
       "books_learning": "Книги / обучение",
+      "sell_giveaway": "Продам / Отдам",
+      "pet_goods": "Товары",
+      "pet_services": "Услуги",
       "cosmetics": "Косметика",
       "perfumery": "Парфюмерия",
       "personal_care": "Уход",
@@ -879,6 +912,31 @@
     "share_text": "Присоединяйтесь к TradeGround!",
     "menuButton": "Реферальная программа",
     "menu_button": "Реферальная программа"
+  },
+  "platformTicker": {
+    "system": {
+      "marketplace": "TradeGround — маркетплейс для украинцев в Германии",
+      "freeListing": "Публикуйте объявления бесплатно — прямо в Telegram",
+      "community": "Сообщество украинцев: покупайте, продавайте, находите услуги",
+      "germany": "Объявления по городам Германии — от Берлина до Гамбурга",
+      "safeDeals": "Общайтесь с продавцами напрямую через Telegram",
+      "telegram": "TradeGround работает как удобное мини-приложение в Telegram"
+    },
+    "activity": {
+      "newToday": "Сегодня на платформе +{count} новых объявлений",
+      "cityToday": "В {city} сегодня {count} новых объявлений",
+      "categoryToday": "Категория «{category}» — {count} новых сегодня",
+      "explore": "Посмотрите каталог — новые объявления появляются каждый день"
+    },
+    "welcome": "Добро пожаловать в TradeGround — найдите нужное рядом с вами",
+    "tips": {
+      "favorites": "Сохраните интересное объявление — нажмите на сердце",
+      "cityFilter": "Выберите город рядом с поиском для точных результатов",
+      "categories": "Используйте категории — быстрее найдёте нужное",
+      "photos": "Объявления с несколькими фото получают больше просмотров",
+      "price": "Укажите честную цену — покупатели быстрее откликнутся",
+      "share": "Поделитесь объявлением с друзьями — помогите продавцу"
+    }
   }
 }
 

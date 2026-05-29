@@ -21,6 +21,7 @@ const iconMap: Record<string, string> = {
   home: '/images/categories_icons/home.svg',
   auto: '/images/categories_icons/auto.svg',
   hobby_sports: '/images/categories_icons/hobby_sports.svg',
+  pets: '/images/categories_icons/pets.svg',
   realestate: '/images/categories_icons/realestate.svg',
   services_work: '/images/categories_icons/services_work.svg',
   free: '/images/categories_icons/free.svg',

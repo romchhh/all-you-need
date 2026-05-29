@@ -6,8 +6,6 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
-import { getCategories } from '@/constants/categories';
-import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 import { shouldShowListingViews } from '@/utils/listingViewsDisplay';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -37,11 +35,6 @@ const ListingCardComponent = ({
   const isStacked = layout === 'stacked';
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
-  const categories = useMemo(() => getCategories(t), [t]);
-  const categoryLabel = useMemo(
-    () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
-    [categories, listing.category, listing.subcategory, t]
-  );
   
   // Перевіряємо чи оголошення має активну рекламу
   const hasPromotion = listing.promotionType && listing.promotionEnds 
@@ -444,12 +437,6 @@ const ListingCardComponent = ({
         >
           {listing.title}
         </p>
-
-        {categoryLabel && (
-          <div className={`text-[11px] truncate mt-1 ${isLight ? 'text-gray-600' : 'text-white/70'}`}>
-            {categoryLabel}
-          </div>
-        )}
 
         <div
           className={`flex flex-col gap-0.5 text-[10px] mt-0.5 mb-0 ${

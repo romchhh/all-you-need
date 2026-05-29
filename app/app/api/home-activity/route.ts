@@ -1,113 +1,25 @@
 import { NextResponse } from 'next/server';
 import { prisma, executeWithRetry } from '@/lib/prisma';
 import { toSQLiteDate } from '@/utils/dateHelpers';
-
-const KYIV_TZ = 'Europe/Kyiv';
-
-/** YYYY-MM-DD у календарі Europe/Kyiv для моменту ref. */
-function kyivYmd(ref: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: KYIV_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(ref);
-}
-
-/** UTC-момент початку доби 00:00 у Europe/Kyiv для того ж «київського дня», що й ref. */
-function startOfKyivDay(ref: Date): Date {
-  const ymd = kyivYmd(ref);
-  const from = ref.getTime() - 30 * 3600000;
-  const to = ref.getTime() + 3600000;
-  for (let t = from; t <= to; t += 60 * 1000) {
-    const d = new Date(t);
-    if (kyivYmd(d) !== ymd) continue;
-    const h = parseInt(
-      new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, hour: '2-digit', hour12: false }).format(d),
-      10
-    );
-    const mi = parseInt(
-      new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, minute: '2-digit' }).format(d),
-      10
-    );
-    if (h === 0 && mi === 0) return d;
-  }
-  const d = new Date(ref);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-/** Початок «дня» для статистики нових оголошень: 06:00 Europe/Kyiv до наступних 06:00. */
-const LISTINGS_DAY_START_HOUR_KYIV = 6;
-
-/** UTC-момент «HH:MM» у Europe/Kyiv для календарної дати ymd (YYYY-MM-DD). */
-function utcAtKyivYmdHourMinute(ymd: string, hour: number, minute: number): Date {
-  const [yStr, mStr, dStr] = ymd.split('-');
-  const y = Number(yStr);
-  const mo = Number(mStr);
-  const d = Number(dStr);
-  const center = Date.UTC(y, mo - 1, d, 10, 0, 0);
-  const from = center - 48 * 3600000;
-  const to = center + 48 * 3600000;
-  for (let t = from; t <= to; t += 60 * 1000) {
-    const dt = new Date(t);
-    if (kyivYmd(dt) !== ymd) continue;
-    const h = parseInt(
-      new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, hour: '2-digit', hour12: false }).format(dt),
-      10
-    );
-    const mi = parseInt(
-      new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, minute: '2-digit' }).format(dt),
-      10
-    );
-    if (h === hour && mi === minute) return dt;
-  }
-  throw new Error(`[home-activity] Could not resolve Kyiv instant for ${ymd} ${hour}:${minute}`);
-}
-
-/**
- * Початок поточного «добового» вікна для нових оголошень: о 06:00 Europe/Kyiv.
- * До 06:00 поточної календарної доби в Києві вікно починається з учорашніх 06:00.
- */
-function startOfKyivListingsReportingWindow(ref: Date): Date {
-  const hourKyiv = parseInt(
-    new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, hour: '2-digit', hour12: false }).format(ref),
-    10
-  );
-  let anchorYmd = kyivYmd(ref);
-  if (hourKyiv < LISTINGS_DAY_START_HOUR_KYIV) {
-    const midnightTodayKyiv = startOfKyivDay(ref);
-    anchorYmd = kyivYmd(new Date(midnightTodayKyiv.getTime() - 1));
-  }
-  return utcAtKyivYmdHourMinute(anchorYmd, LISTINGS_DAY_START_HOUR_KYIV, 0);
-}
+import {
+  isKyivEveningOrNight,
+  kyivListingsWindowKey,
+  kyivYmd,
+  startOfKyivListingsReportingWindow,
+} from '@/utils/kyivListingsDayWindow';
 
 const DISPLAY_ONLINE_MIN = 30;
 const DISPLAY_ONLINE_MAX = 60;
-/** Вечір і ніч за Києвом — менший діапазон, щоб виглядало природніше. */
 const DISPLAY_ONLINE_NIGHT_MIN = 10;
 const DISPLAY_ONLINE_NIGHT_MAX = 15;
 
-/** 20:00–06:59 Europe/Kyiv — «вечір ближче до ночі» + ніч. */
-function isKyivEveningOrNight(now: Date): boolean {
-  const hourKyiv = parseInt(
-    new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, hour: '2-digit', hour12: false }).format(now),
-    10
-  );
-  return hourKyiv >= 20 || hourKyiv < 7;
-}
-
-/**
- * Показ «онлайн»: денний діапазон 30–60, вечір/ніч 10–15; змінюється з часом (4-хв слот).
- * Детерміновано, без реального трекінгу сесій у цьому полі.
- */
 function displayOnlineSynced(now: Date): number {
   const hour = parseInt(
-    new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, hour: '2-digit', hour12: false }).format(now),
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Kyiv', hour: '2-digit', hour12: false }).format(now),
     10
   );
   const minute = parseInt(
-    new Intl.DateTimeFormat('en-GB', { timeZone: KYIV_TZ, minute: '2-digit' }).format(now),
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Kyiv', minute: '2-digit' }).format(now),
     10
   );
   const ymd = kyivYmd(now).replace(/\D/g, '');
@@ -124,6 +36,12 @@ function displayOnlineSynced(now: Date): number {
   return DISPLAY_ONLINE_MIN + (Math.abs(x | 0) % span);
 }
 
+const NEW_LISTINGS_TODAY_SQL = `
+  status = 'active'
+  AND datetime(COALESCE(publishedAt, createdAt)) >= datetime(?)
+  AND datetime(COALESCE(publishedAt, createdAt)) <= datetime(?)
+`;
+
 // Публічна статистика для головної / базару (без аутентифікації)
 export async function GET() {
   try {
@@ -131,35 +49,77 @@ export async function GET() {
     const dayStart = startOfKyivListingsReportingWindow(now);
     const dayStartStr = toSQLiteDate(dayStart);
     const nowStr = toSQLiteDate(now);
+    const windowKey = kyivListingsWindowKey(now);
 
-    /**
-     * Активні оголошення, вперше опубліковані у вікні 06:00–06:00 (Kyiv).
-     * COALESCE(publishedAt, createdAt) + datetime() — коректно для SQLite-рядків UTC.
-     * Повторна модерація не змінює publishedAt → не потрапляють у «сьогодні» знову.
-     */
     const countRows = await executeWithRetry(
       () =>
         prisma.$queryRawUnsafe(
-          `SELECT COUNT(*) AS count FROM Listing
-           WHERE status = 'active'
-             AND datetime(COALESCE(publishedAt, createdAt)) >= datetime(?)
-             AND datetime(COALESCE(publishedAt, createdAt)) <= datetime(?)`,
+          `SELECT COUNT(*) AS count FROM Listing WHERE ${NEW_LISTINGS_TODAY_SQL}`,
           dayStartStr,
           nowStr
         ) as Promise<Array<{ count: bigint | number }>>
     );
     const newListingsToday = Number(countRows[0]?.count ?? 0);
 
+    const cityRows = await executeWithRetry(
+      () =>
+        prisma.$queryRawUnsafe(
+          `SELECT
+             CASE
+               WHEN location IS NULL OR TRIM(location) = '' THEN ''
+               ELSE TRIM(SUBSTR(location || ',', 1, INSTR(location || ',', ',') - 1))
+             END AS city,
+             COUNT(*) AS count
+           FROM Listing
+           WHERE ${NEW_LISTINGS_TODAY_SQL}
+           GROUP BY CASE
+             WHEN location IS NULL OR TRIM(location) = '' THEN ''
+             ELSE TRIM(SUBSTR(location || ',', 1, INSTR(location || ',', ',') - 1))
+           END
+           ORDER BY count DESC, city ASC`,
+          dayStartStr,
+          nowStr
+        ) as Promise<Array<{ city: string; count: bigint | number }>>
+    );
+
+    const newListingsByCity = cityRows.map((row) => ({
+      city: (row.city || '').trim(),
+      count: Number(row.count ?? 0),
+    }));
+
+    const categoryRows = await executeWithRetry(
+      () =>
+        prisma.$queryRawUnsafe(
+          `SELECT category, COUNT(*) AS count
+           FROM Listing
+           WHERE ${NEW_LISTINGS_TODAY_SQL}
+             AND category IS NOT NULL AND TRIM(category) != ''
+           GROUP BY category
+           ORDER BY count DESC, category ASC
+           LIMIT 8`,
+          dayStartStr,
+          nowStr
+        ) as Promise<Array<{ category: string; count: bigint | number }>>
+    );
+
+    const newListingsByCategory = categoryRows.map((row) => ({
+      category: (row.category || '').trim(),
+      count: Number(row.count ?? 0),
+    }));
+
     const online = displayOnlineSynced(now);
 
     return NextResponse.json({
       online,
       newListingsToday,
+      newListingsByCity,
+      newListingsByCategory,
+      windowKey,
     });
   } catch (error) {
     console.error('[home-activity]', error);
     return NextResponse.json(
-      { online: 0, newListingsToday: 0, error: 'unavailable' },
+      { online: 0, newListingsToday: 0, newListingsByCity: [], newListingsByCategory: [], windowKey: '', error: 'unavailable' },
       { status: 503 }
     );
   }

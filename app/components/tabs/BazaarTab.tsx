@@ -1,4 +1,4 @@
-import { Search, X, Gift, Clock, MapPin, SlidersHorizontal, Grid3x3, List, Sun, Moon } from 'lucide-react';
+import { X, Gift, MapPin, SlidersHorizontal, Grid3x3, List, Sun, Moon } from 'lucide-react';
 import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '../CategoryChip';
@@ -11,12 +11,15 @@ import { SubcategoryList } from '../SubcategoryList';
 import { STICKY_BELOW_APP_HEADER_CLASS } from '../FixedLogoHeader';
 import { TopBar } from '../TopBar';
 import { HomeActivityStats } from '../HomeActivityStats';
+import { HomePlatformTicker } from '../HomePlatformTicker';
+import { ListingsRefreshOverlay } from '../ListingsRefreshOverlay';
 import { ListingGridSkeleton } from '../SkeletonLoader';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Currency } from '@/utils/currency';
 
 interface BazaarTabProps {
@@ -31,6 +34,11 @@ interface BazaarTabProps {
   onCreateListing?: () => void;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  loadingMore?: boolean;
+  initialLoading?: boolean;
+  isRefreshing?: boolean;
+  loadError?: boolean;
+  onRetryLoad?: () => void;
   onNavigateToCategories?: () => void;
   onOpenCategoriesModal?: () => void;
   initialSelectedCategory?: string | null;
@@ -78,6 +86,11 @@ const BazaarTabComponent = ({
   onCreateListing,
   hasMore = false,
   onLoadMore,
+  loadingMore = false,
+  initialLoading = false,
+  isRefreshing = false,
+  loadError = false,
+  onRetryLoad,
   onNavigateToCategories,
   onOpenCategoriesModal,
   initialSelectedCategory,
@@ -89,6 +102,9 @@ const BazaarTabComponent = ({
 }: BazaarTabProps) => {
   const { t } = useLanguage();
   const { isLight, toggleTheme } = useTheme();
+  const router = useRouter();
+  const params = useParams();
+  const lang = (params?.lang as string) || 'uk';
   const ac = getAppearanceClasses(isLight);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
     if (savedState?.selectedCategory != null) {
@@ -199,7 +215,6 @@ const BazaarTabComponent = ({
     return 'newest';
   });
   const [showSortModal, setShowSortModal] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<Listing[]>([]);
   const [showRecommendations, setShowRecommendations] = useState(false);
@@ -222,6 +237,10 @@ const BazaarTabComponent = ({
   });
   
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const seenListingIdsRef = useRef<Set<number>>(new Set());
+  const listingsInitializedRef = useRef(false);
+  const [appearingListingIds, setAppearingListingIds] = useState<Set<number>>(new Set());
   
   const [minPrice, setMinPrice] = useState<number | null>(() => {
     if (savedState?.minPrice !== undefined) {
@@ -327,8 +346,6 @@ const BazaarTabComponent = ({
       });
     }
   }, [selectedCategory, selectedSubcategory, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency, sortBy, showFreeOnly, onStateChange]);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Завантажуємо історію пошуку
   useEffect(() => {
@@ -383,22 +400,28 @@ const BazaarTabComponent = ({
     return Array.from(suggestionsSet).slice(0, 5);
   }, [searchQuery, listings, searchHistory]);
 
-  // Закриваємо підказки при кліку поза ними
+  // Плавна поява нових оголошень при підвантаженні
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target as Node) &&
-        searchInputRef.current &&
-        !searchInputRef.current.contains(event.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
-    };
+    if (!listingsInitializedRef.current) {
+      listings.forEach((l) => seenListingIdsRef.current.add(l.id));
+      listingsInitializedRef.current = true;
+      return;
+    }
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const fresh = new Set<number>();
+    listings.forEach((l) => {
+      if (!seenListingIdsRef.current.has(l.id)) {
+        fresh.add(l.id);
+        seenListingIdsRef.current.add(l.id);
+      }
+    });
+
+    if (fresh.size > 0) {
+      setAppearingListingIds(fresh);
+      const timer = setTimeout(() => setAppearingListingIds(new Set()), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [listings]);
 
   const filteredAndSortedListings = useMemo(() => {
     // Early return для порожнього списку
@@ -514,6 +537,24 @@ const BazaarTabComponent = ({
     return filtered;
   }, [listings, selectedCategory, selectedSubcategory, showFreeOnly, deferredSearchQuery, searchQuery, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
 
+  // Автопідвантаження при прокрутці до кінця списку
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || !onLoadMore || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loadingMore) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: '320px 0px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, onLoadMore, filteredAndSortedListings.length]);
+
   const getSortLabel = () => {
     switch (sortBy) {
       case 'newest': return t('bazaar.sort.newest');
@@ -584,21 +625,24 @@ const BazaarTabComponent = ({
       {/* Пошук з TopBar — на десктопі вужчий і по центру */}
       <div className="relative">
         <div className={`${STICKY_BELOW_APP_HEADER_CLASS} bg-transparent px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`}>
-          <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl" ref={suggestionsRef}>
+          <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl">
             <div className="flex gap-1 items-center">
               <TopBar
                 variant="main"
+                searchTriggerMode
+                onOpenSearchModal={() => {
+                  const q = searchQuery.trim();
+                  const query = q ? `?q=${encodeURIComponent(q)}` : '';
+                  router.push(`/${lang}/search${query}`);
+                  tg?.HapticFeedback?.impactOccurred?.('light');
+                }}
                 onSearchChange={(query) => {
                   onSearchChange(query);
-                  setShowSuggestions(true);
                 }}
                 onSearchSubmit={(query) => {
-                  // Обробка натискання Enter/Search
                   onSearchChange(query);
-                  setShowSuggestions(false);
                   addToSearchHistory(query);
                   setSearchHistory(getSearchHistory());
-                  searchInputRef.current?.blur();
                 }}
                 onFilterClick={() => {
                   setShowSortModal(true);
@@ -606,42 +650,11 @@ const BazaarTabComponent = ({
                 }}
                 onSearchClear={() => {
                   onSearchChange('');
-                  setShowSuggestions(false);
                 }}
                 searchQuery={searchQuery}
                 searchPlaceholder={selectedCities.length > 0 ? t('bazaar.searchInCity', { city: selectedCities[0] }) : t('bazaar.whatInterestsYou')}
-                searchInputRef={searchInputRef}
                 hasActiveFilters={hasActiveFilters}
                 tg={tg}
-                searchSuggestions={
-                  showSuggestions && searchSuggestions.length > 0 ? (
-                    <div className={`absolute left-0 right-0 top-full mt-2 z-50 max-h-60 overflow-y-auto ${ac.suggestionDropdown}`}>
-                      {searchSuggestions.map((suggestion, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          onClick={() => {
-                            // При кліку на підказку виконуємо пошук
-                            onSearchChange(suggestion);
-                            addToSearchHistory(suggestion);
-                            setSearchHistory(getSearchHistory());
-                            setShowSuggestions(false);
-                            searchInputRef.current?.blur();
-                            tg?.HapticFeedback.impactOccurred('light');
-                          }}
-                          className={ac.suggestionRow}
-                        >
-                          {!searchQuery.trim() ? (
-                            <Clock size={16} className={ac.suggestionIcon} />
-                          ) : (
-                            <Search size={16} className={ac.suggestionIcon} />
-                          )}
-                          <span>{suggestion}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : undefined
-                }
               />
               
               {/* Кнопка вибору міста */}
@@ -697,11 +710,18 @@ const BazaarTabComponent = ({
       </div>
 
       {!searchQuery.trim() && (
-        <div className="px-4 pb-3 lg:flex lg:justify-center lg:px-6">
-          <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
-            <HomeActivityStats isLight={isLight} />
+        <>
+          <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
+            <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
+              <HomePlatformTicker isLight={isLight} />
+            </div>
           </div>
-        </div>
+          <div className="animate-content-in px-4 pb-3 lg:flex lg:justify-center lg:px-6">
+            <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
+              <HomeActivityStats isLight={isLight} />
+            </div>
+          </div>
+        </>
       )}
 
       {/* Розділи - показуємо тільки якщо не вибрана категорія та немає пошуку */}
@@ -834,53 +854,93 @@ const BazaarTabComponent = ({
       )}
 
       {/* Сітка або список оголошень */}
-      {filteredAndSortedListings.length > 0 ? (
+      {initialLoading && filteredAndSortedListings.length === 0 ? (
+        <div className="animate-content-in px-4 pb-4 sm:px-6 w-full max-w-[1680px] mx-auto">
+          <ListingGridSkeleton count={6} compact />
+        </div>
+      ) : filteredAndSortedListings.length > 0 ? (
         <>
-          {viewMode === 'grid' ? (
-            <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
-              {filteredAndSortedListings.map(listing => (
-                <ListingCard 
-                  key={listing.id} 
-                  listing={listing}
-                  isFavorite={favorites.has(listing.id)}
-                  onSelect={onSelectListing}
-                  onToggleFavorite={onToggleFavorite}
-                  tg={tg}
-                />
-              ))}
+          <div
+            className={`relative transition-opacity duration-300 ease-out ${
+              isRefreshing ? 'opacity-45' : 'opacity-100'
+            }`}
+          >
+            {isRefreshing && <ListingsRefreshOverlay />}
+            {viewMode === 'grid' ? (
+              <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
+                  {filteredAndSortedListings.map((listing) => (
+                    <div
+                      key={listing.id}
+                      className={
+                        appearingListingIds.has(listing.id) ? 'animate-listing-appear' : undefined
+                      }
+                    >
+                      <ListingCard
+                        listing={listing}
+                        isFavorite={favorites.has(listing.id)}
+                        onSelect={onSelectListing}
+                        onToggleFavorite={onToggleFavorite}
+                        tg={tg}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="px-4 space-y-3 pb-4">
-              {filteredAndSortedListings.map(listing => (
-                <ListingCardColumn
-                  key={listing.id}
-                  listing={listing}
-                  isFavorite={favorites.has(listing.id)}
-                  onSelect={onSelectListing}
-                  onToggleFavorite={onToggleFavorite}
-                  tg={tg}
+            ) : (
+              <div className="space-y-3 px-4 pb-4">
+                {filteredAndSortedListings.map((listing) => (
+                  <div
+                    key={listing.id}
+                    className={
+                      appearingListingIds.has(listing.id) ? 'animate-listing-appear' : undefined
+                    }
+                  >
+                    <ListingCardColumn
+                      listing={listing}
+                      isFavorite={favorites.has(listing.id)}
+                      onSelect={onSelectListing}
+                      onToggleFavorite={onToggleFavorite}
+                      tg={tg}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Автопідвантаження — sentinel + індикатор */}
+          {(hasMore || loadingMore) && (
+            <div ref={loadMoreSentinelRef} className="flex justify-center px-4 py-6 pb-24">
+              {loadingMore && (
+                <div
+                  className={`h-6 w-6 animate-spin rounded-full border-2 border-t-transparent ${
+                    isLight ? 'border-[#3F5331]/30 border-t-[#3F5331]' : 'border-white/20 border-t-[#C8E6A0]'
+                  }`}
                 />
-              ))}
-            </div>
-          )}
-          
-          {/* Кнопка "Показати ще" - після списку товарів, перед нижнім меню */}
-          {hasMore && filteredAndSortedListings.length > 0 && onLoadMore && (
-            <div className="px-4 py-4 pb-24 text-center">
-              <button
-                onClick={() => {
-                  onLoadMore();
-                  tg?.HapticFeedback.impactOccurred('light');
-                }}
-                className={ac.outlineButton}
-              >
-                {t('common.showMore')}
-              </button>
+              )}
             </div>
           )}
         </>
+      ) : isRefreshing ? (
+        <div className="relative min-h-[40vh] px-4 py-16">
+          <ListingsRefreshOverlay />
+        </div>
+      ) : loadError ? (
+        <div className="flex min-h-[40vh] flex-col items-center justify-center px-6 py-12 text-center">
+          <p className={`max-w-sm text-base font-medium leading-relaxed ${ac.pageHeading}`}>
+            {t('common.listingsLoadFailed')}
+          </p>
+          {onRetryLoad && (
+            <button
+              type="button"
+              onClick={onRetryLoad}
+              className={`mt-6 rounded-xl px-8 py-3.5 text-sm font-semibold transition-colors ${ac.outlineButton}`}
+            >
+              {t('common.tryAgain')}
+            </button>
+          )}
+        </div>
       ) : (
         <div className="px-4 py-16 text-center">
           <p className={ac.nothingFound}>{t('common.nothingFound')}</p>

@@ -21,6 +21,9 @@ interface TopBarProps {
   hasActiveFilters?: boolean;
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
   onSearchClear?: () => void;
+  /** Відкривати пошук на окремій сторінці замість inline-поля */
+  searchTriggerMode?: boolean;
+  onOpenSearchModal?: () => void;
   tg: TelegramWebApp | null;
   searchSuggestions?: React.ReactNode;
 }
@@ -40,6 +43,8 @@ export const TopBar = ({
   hasActiveFilters = false,
   searchInputRef,
   onSearchClear,
+  searchTriggerMode = false,
+  onOpenSearchModal,
   tg,
   searchSuggestions
 }: TopBarProps) => {
@@ -68,6 +73,37 @@ export const TopBar = ({
             size={18} 
             style={{ left: '16px' }}
           />
+          {searchTriggerMode ? (
+            <>
+            <button
+              type="button"
+              onClick={() => {
+                onOpenSearchModal?.();
+                tg?.HapticFeedback?.impactOccurred?.('light');
+              }}
+              className={`${inputClass} flex items-center text-left`}
+              style={{ paddingLeft: '44px', paddingRight: searchQuery && onSearchClear ? '44px' : undefined, fontSize: '16px' }}
+            >
+              <span className={`truncate ${searchQuery ? (isLight ? 'text-gray-900' : 'text-white') : (isLight ? 'text-gray-500' : 'text-white/60')}`}>
+                {searchQuery || searchPlaceholder || t('bazaar.whatInterestsYou')}
+              </span>
+            </button>
+            {searchQuery && onSearchClear && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSearchClear();
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={clearBtnClass}
+              >
+                <X size={14} className={isLight ? 'text-gray-700' : 'text-white'} />
+              </button>
+            )}
+            </>
+          ) : (
+          <>
           <input
             ref={searchInputRef}
             type="text"
@@ -106,6 +142,8 @@ export const TopBar = ({
           
           {/* Підказки автодоповнення - позиціоновані під полем вводу */}
           {searchSuggestions}
+          </>
+          )}
         </div>
         <button
           onClick={() => {

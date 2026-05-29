@@ -12,7 +12,6 @@ import { BazaarTab } from '@/components/tabs/BazaarTab';
 import { Toast } from '@/components/Toast';
 import { useToast } from '@/hooks/useToast';
 import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
-import { ListingGridSkeleton } from '@/components/SkeletonLoader';
 import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
 import CreateListingFlow from '@/components/CreateListingFlow';
 import { CategoriesModal } from '@/components/CategoriesModal';
@@ -29,6 +28,7 @@ import {
   persistBazaarTabState,
   type BazaarTabPersistedState,
 } from '@/utils/bazaarTabStateStorage';
+import { listingToSearchPreview, updateSearchHistoryListings } from '@/utils/searchHistory';
 
 const BazaarPage = () => {
   const params = useParams();
@@ -134,6 +134,17 @@ const BazaarPage = () => {
     }
   }, [searchQuery]);
 
+  // Синхронізуємо пошук після повернення зі сторінки /search
+  useEffect(() => {
+    const syncSearchFromStorage = () => {
+      if (typeof window === 'undefined') return;
+      const saved = localStorage.getItem('bazaarSearchQuery') ?? '';
+      setSearchQuery(saved);
+    };
+    window.addEventListener('pageshow', syncSearchFromStorage);
+    return () => window.removeEventListener('pageshow', syncSearchFromStorage);
+  }, []);
+
   // Deep-link: ?create=1 відкриває форму створення оголошення (товари) одразу
   const createLinkHandledRef = useRef(false);
   useEffect(() => {
@@ -164,6 +175,28 @@ const BazaarPage = () => {
     persistBazaarTabState(bazaarTabState);
   }, [bazaarTabState]);
 
+  // Категорія з картки товару (кнопка «Ще») — застосовуємо після закриття overlay
+  useEffect(() => {
+    if (selectedListing) return;
+    if (typeof window === 'undefined') return;
+    const raw = sessionStorage.getItem('pendingListingCategory');
+    if (!raw) return;
+    sessionStorage.removeItem('pendingListingCategory');
+    try {
+      const { category, subcategory } = JSON.parse(raw) as {
+        category: string;
+        subcategory: string | null;
+      };
+      setBazaarTabState((prev) => ({
+        ...prev,
+        selectedCategory: category,
+        selectedSubcategory: subcategory ?? null,
+      }));
+    } catch {
+      /* ignore malformed payload */
+    }
+  }, [selectedListing]);
+
   // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {
     const favorites = getFavoritesFromStorage();
@@ -173,12 +206,18 @@ const BazaarPage = () => {
   const PAGE_SIZE = 20;
 
   const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isListingsRefreshing, setIsListingsRefreshing] = useState(false);
+  const listingsCountRef = useRef(0);
   const [listingsLoadError, setListingsLoadError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalListings, setTotalListings] = useState(0);
   const [listingsOffset, setListingsOffset] = useState(0);
   const { tg } = useTelegram();
+
+  useEffect(() => {
+    listingsCountRef.current = listings.length;
+  }, [listings]);
 
   // Якщо відкрито з браузера (поза Telegram Mini App) з параметром ?listing=,
   // одразу перенаправляємо на SEO-сторінку товару /[lang]/listing/[id]
@@ -272,9 +311,14 @@ const BazaarPage = () => {
 
   // Функція завантаження оголошень (з фільтрами та пошуком)
   const fetchListings = useCallback(async (forceRefresh: boolean = false, initialSearch?: string) => {
-    try {
-      setLoading(true);
+    const hasExistingListings = listingsCountRef.current > 0;
+    if (hasExistingListings) {
+      setIsListingsRefreshing(true);
+    } else {
+      setInitialLoading(true);
+    }
 
+    try {
       const searchForRequest = (initialSearch ?? debouncedSearchQuery ?? '').trim();
       const useSearch = Boolean(searchForRequest);
 
@@ -290,7 +334,8 @@ const BazaarPage = () => {
               setTotalListings(parsed.total || 0);
               setHasMore((parsed.listings?.length ?? 0) < (parsed.total ?? 0));
               setListingsOffset(parsed.offset ?? PAGE_SIZE);
-              setLoading(false);
+              setInitialLoading(false);
+              setIsListingsRefreshing(false);
               return;
             }
           } catch (e) {
@@ -310,6 +355,13 @@ const BazaarPage = () => {
         setTotalListings(total);
         setHasMore(more);
         setListingsOffset(list.length);
+
+        if (useSearch && searchForRequest?.trim() && list.length > 0) {
+          updateSearchHistoryListings(
+            searchForRequest.trim(),
+            list.slice(0, 6).map(listingToSearchPreview)
+          );
+        }
 
         if (!hasActiveFilters && !useSearch && typeof window !== 'undefined') {
           setCachedData('bazaarListingsState', {
@@ -340,7 +392,8 @@ const BazaarPage = () => {
       setListingsOffset(0);
       setListingsLoadError(true);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setIsListingsRefreshing(false);
     }
   }, [showToast, t, buildListingsUrl, hasActiveFilters, hasSearchQuery, debouncedSearchQuery, PAGE_SIZE]);
 
@@ -361,7 +414,7 @@ const BazaarPage = () => {
       setTotalListings(cached.total || 0);
       setHasMore((cached.listings?.length ?? 0) < (cached.total ?? 0));
       setListingsOffset(cached.offset ?? PAGE_SIZE);
-      setLoading(false);
+      setInitialLoading(false);
       hasLoadedListings.current = true;
       previousFilterKey.current = filterKey;
       return;
@@ -389,10 +442,6 @@ const BazaarPage = () => {
       sessionStorage.removeItem('bazaarListingsState');
       localStorage.removeItem('bazaarListingsState');
     }
-    setListings([]);
-    setListingsOffset(0);
-    setTotalListings(0);
-    setHasMore(false);
     fetchListings(true);
   }, [bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, bazaarTabState.selectedCities, debouncedSearchQuery, fetchListings]);
 
@@ -461,24 +510,6 @@ const BazaarPage = () => {
       setLoadingMore(false);
     }
   }, [loadingMore, hasMore, listingsOffset, listings, tg, showToast, buildListingsUrl, hasActiveFilters, PAGE_SIZE]);
-
-  // Infinite scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      if (loadingMore || !hasMore) return;
-      
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-      
-      if (scrollTop + windowHeight >= documentHeight - 300) {
-        loadMoreListings();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [loadingMore, hasMore, loadMoreListings]);
 
   const toggleFavorite = async (id: number) => {
     const isFavorite = favorites.has(id);
@@ -701,6 +732,14 @@ const BazaarPage = () => {
           onBack={() => {
             setSelectedListing(null);
           }}
+          onNavigateToCategory={(categoryId, subcategoryId) => {
+            setBazaarTabState((prev) => ({
+              ...prev,
+              selectedCategory: categoryId,
+              selectedSubcategory: subcategoryId,
+            }));
+            setSelectedListing(null);
+          }}
           onToggleFavorite={toggleFavorite}
           onSelectListing={(listing) => {
             // Переходимо в режим товару
@@ -738,34 +777,17 @@ const BazaarPage = () => {
       );
     }
 
-    if (loading) {
-      return <ListingGridSkeleton count={6} showLoadingText={true} loadingText={t('common.loading')} />;
-    }
-
-    if (listingsLoadError && listings.length === 0) {
-      return (
-        <div className="min-h-[55vh] flex flex-col items-center justify-center px-6 py-12 text-center">
-          <p className="text-white/90 text-base font-medium leading-relaxed max-w-sm">
-            {t('common.listingsLoadFailed')}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setListingsLoadError(false);
-              fetchListings(true);
-            }}
-            className="mt-6 rounded-xl bg-white/12 hover:bg-white/18 active:bg-white/10 text-white text-sm font-semibold py-3.5 px-8 transition-colors"
-          >
-            {t('common.tryAgain')}
-          </button>
-        </div>
-      );
-    }
-
     return (
       <BazaarTab
         categories={categories}
         listings={listings}
+        initialLoading={initialLoading}
+        isRefreshing={isListingsRefreshing}
+        loadError={listingsLoadError}
+        onRetryLoad={() => {
+          setListingsLoadError(false);
+          fetchListings(true);
+        }}
         searchQuery={searchQuery}
         deferredSearchQuery={deferredSearchQuery}
         onSearchChange={handleSearchChange}
@@ -802,6 +824,7 @@ const BazaarPage = () => {
         onCreateListing={handleCreateListing}
         hasMore={hasMore}
         onLoadMore={loadMoreListings}
+        loadingMore={loadingMore}
         onNavigateToCategories={handleNavigateToCategories}
         onOpenCategoriesModal={handleOpenCategoriesModal}
         initialSelectedCategory={selectedCategoryFromModal}
