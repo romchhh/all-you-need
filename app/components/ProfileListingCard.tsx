@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/utils/listingViewsDisplay';
+import { displayListingFavoritesCount, displayListingViews } from '@/utils/listingDisplayStats';
 import { ListingAutoRenewSection } from '@/components/ListingAutoRenewSection';
 
 interface ProfileListingCardProps {
@@ -45,6 +46,15 @@ export const ProfileListingCard = ({
 }: ProfileListingCardProps) => {
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
+
+  const shownViews = useMemo(
+    () => displayListingViews(listing),
+    [listing.views, listing.createdAt, listing.publishedAt, listing.posted]
+  );
+  const shownFavorites = useMemo(
+    () => displayListingFavoritesCount(listing),
+    [listing.favoritesCount, listing.createdAt, listing.publishedAt, listing.posted]
+  );
 
   // Перевіряємо статус модерації
   const isPendingModeration = listing.status === 'pending_moderation';
@@ -331,10 +341,10 @@ export const ProfileListingCard = ({
 
         {(() => {
           const showViews =
-            alwaysShowStats || shouldShowListingViews(listing.views);
+            alwaysShowStats || shouldShowListingViews(shownViews);
           const showFavorites = alwaysShowStats
-            ? true
-            : shouldShowListingFavorites(listing.views, listing.favoritesCount);
+            ? shownFavorites > 0
+            : shouldShowListingFavorites(shownViews, shownFavorites);
           if (!showViews && !showFavorites) return null;
           const statsMuted =
             isSold || isPendingModeration || isDeactivated || isRejected;
@@ -350,14 +360,14 @@ export const ProfileListingCard = ({
               {showViews && (
                 <div className="flex items-center gap-0.5" title={t('sales.views')}>
                   <Eye size={12} className={statsMuted ? 'text-gray-500' : ''} />
-                  <span className="tabular-nums font-medium">{listing.views || 0}</span>
+                  <span className="tabular-nums font-medium">{shownViews}</span>
                 </div>
               )}
               {showFavorites && (
                 <div className="flex items-center gap-0.5" title={t('navigation.favorites')}>
                   <Heart size={12} className={statsMuted ? 'text-gray-500' : ''} fill="none" strokeWidth={2} />
                   <span className="tabular-nums font-medium">
-                    {(listing.favoritesCount ?? 0).toLocaleString(
+                    {shownFavorites.toLocaleString(
                       language === 'ru' ? 'ru-RU' : 'uk-UA'
                     )}
                   </span>

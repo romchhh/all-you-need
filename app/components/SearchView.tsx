@@ -17,7 +17,6 @@ import {
   listingToSearchPreview,
   updateSearchHistoryListings,
 } from '@/utils/searchHistory';
-import { STICKY_BELOW_APP_HEADER_CLASS } from './FixedLogoHeader';
 import { CategoryChip } from './CategoryChip';
 import { CategoryIcon } from './CategoryIcon';
 import { ListingCard } from './ListingCard';
@@ -590,48 +589,27 @@ export function SearchView({
     </div>
   );
 
+  const backBtnClass = isLight
+    ? 'border-gray-300/90 bg-white/95 text-gray-900 shadow-sm hover:bg-white'
+    : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
+
   return (
     <>
-      <div
-        className={`${STICKY_BELOW_APP_HEADER_CLASS} z-20 border-b px-4 py-3 ${
-          isLight
-            ? 'border-gray-200 bg-white/90 backdrop-blur-md'
-            : 'border-gray-700/50 bg-black/80 backdrop-blur-md'
-        }`}
-      >
-        <div className="mx-auto flex w-full max-w-xl items-center gap-3 xl:max-w-2xl">
-          <button
-            type="button"
-            onClick={() => {
-              tg?.HapticFeedback?.impactOccurred?.('light');
-              onBack();
-            }}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
-              isLight ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-800/50 hover:bg-gray-700/50'
-            }`}
-          >
-            <ArrowLeft size={20} className={isLight ? 'text-gray-900' : 'text-white'} />
-          </button>
-          <h1 className={`min-w-0 flex-1 truncate text-lg font-bold ${ac.pageHeading}`}>
-            {t('common.search')}
-          </h1>
-          {trimmedLocal && (
-            <button
-              type="button"
-              onClick={handleClearQuery}
-              className={`shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                isLight
-                  ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
-                  : 'border-white text-white hover:bg-white/10'
-              }`}
-            >
-              {t('common.clear')}
-            </button>
-          )}
-        </div>
+      <div className="px-4 pb-1 pt-0">
+        <button
+          type="button"
+          onClick={() => {
+            tg?.HapticFeedback?.impactOccurred?.('light');
+            onBack();
+          }}
+          aria-label={t('common.back')}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
+        >
+          <ArrowLeft size={20} />
+        </button>
       </div>
 
-      <div className="w-full pb-1 pt-2">
+      <div className="w-full pb-1 pt-1">
         <div
           className="scrollbar-hide w-full max-w-full overflow-x-auto lg:px-6"
           style={{

@@ -62,12 +62,12 @@ export const TopBar = ({
       ? 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors'
       : 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors';
     const filterBtnClass = isLight
-      ? 'relative flex h-12 w-12 items-center justify-center rounded-2xl border border-gray-200/90 bg-white shadow-sm ring-1 ring-black/[0.03] transition-colors hover:border-gray-300 hover:bg-gray-50/80'
-      : 'relative w-12 h-12 rounded-xl bg-transparent border border-white flex items-center justify-center hover:bg-white/10 transition-colors';
+      ? 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gray-200/90 bg-white shadow-sm ring-1 ring-black/[0.03] transition-colors hover:border-gray-300 hover:bg-gray-50/80'
+      : 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white bg-transparent transition-colors hover:bg-white/10';
 
     return (
-      <div className="flex gap-1 items-center flex-1">
-        <div className="relative flex-1">
+      <div className="flex min-w-0 flex-1 items-center gap-1">
+        <div className="relative min-w-0 flex-1">
           <Search 
             className={searchIconClass}
             size={18} 
@@ -81,7 +81,7 @@ export const TopBar = ({
                 onOpenSearchModal?.();
                 tg?.HapticFeedback?.impactOccurred?.('light');
               }}
-              className={`${inputClass} flex items-center text-left`}
+              className={`${inputClass} flex min-w-0 items-center text-left`}
               style={{ paddingLeft: '44px', paddingRight: searchQuery && onSearchClear ? '44px' : undefined, fontSize: '16px' }}
             >
               <span className={`truncate ${searchQuery ? (isLight ? 'text-gray-900' : 'text-white') : (isLight ? 'text-gray-500' : 'text-white/60')}`}>
@@ -122,10 +122,10 @@ export const TopBar = ({
             onFocus={() => {
               // Можна додати логіку для показу підказок
             }}
-            className={inputClass}
-            style={{ 
+            className={`${inputClass} min-w-0`}
+            style={{
               paddingLeft: '44px',
-              fontSize: '16px' // Запобігаємо зуму на iOS при фокусі
+              fontSize: '16px',
             }}
           />
           {searchQuery && onSearchClear && (

@@ -80,45 +80,48 @@ def _promo_multiplier(promotion_type: str | None, promotion_ends: str | None, no
 
 
 def _compute_views_increment(age_days: float, promo_mult: float) -> int:
-    """Перегляди за один короткий інтервал — ~×2 від попередньої версії (частіші прогони)."""
+    """М'які прирости переглядів; для старих оголошень — рідше і менше."""
     if age_days < 1.5:
-        base = random.choices([0, 1], weights=[0.76, 0.24])[0]
+        base = random.choices([0, 1], weights=[0.91, 0.09])[0]
         boosted = int(round(base * promo_mult))
-        return max(0, min(boosted, 2))
+        return max(0, min(boosted, 1))
     if age_days < 7:
-        base = random.choices([0, 1], weights=[0.48, 0.52])[0]
+        base = random.choices([0, 1], weights=[0.84, 0.16])[0]
         boosted = int(round(base * promo_mult))
-        return max(0, min(boosted, 2))
+        return max(0, min(boosted, 1))
     if age_days < 30:
-        base = random.choices([0, 1, 2], weights=[0.30, 0.40, 0.30])[0]
+        base = random.choices([0, 1], weights=[0.92, 0.08])[0]
         boosted = int(round(base * promo_mult))
-        return max(0, min(boosted, 4))
-    base = random.choices([0, 1, 2], weights=[0.22, 0.39, 0.39])[0]
-    boosted = int(round(base * promo_mult))
-    return max(0, min(boosted, 4))
+        return max(0, min(boosted, 1))
+    if age_days < 90:
+        if random.random() < 0.94:
+            return 0
+        boosted = int(round(1 * promo_mult))
+        return max(0, min(boosted, 1))
+    if random.random() < 0.985:
+        return 0
+    boosted = int(round(1 * promo_mult))
+    return max(0, min(boosted, 1))
 
 
 def _compute_favorites_increment(age_days: float, promo_mult: float) -> int:
-    """Обране — ще менші кроки за перегляди (~×2 повільше ніж раніше)."""
+    """Обране — значно рідше за перегляди; для старих майже не росте."""
     if age_days < 1.5:
-        base = random.choices([0, 1], weights=[0.97, 0.03])[0]
-        boosted = int(round(base * promo_mult))
-        out = max(0, min(boosted, 1))
-    elif age_days < 7:
-        base = random.choices([0, 1], weights=[0.91, 0.09])[0]
-        boosted = int(round(base * promo_mult))
-        out = max(0, min(boosted, 1))
-    elif age_days < 30:
-        base = random.choices([0, 1], weights=[0.86, 0.14])[0]
-        boosted = int(round(base * promo_mult))
-        out = max(0, min(boosted, 1))
-    else:
-        base = random.choices([0, 1], weights=[0.81, 0.19])[0]
-        boosted = int(round(base * promo_mult))
-        out = max(0, min(boosted, 1))
-    if out > 0 and random.random() < 0.5:
-        return 0
-    return out
+        if random.random() < 0.985:
+            return 0
+        boosted = int(round(1 * promo_mult))
+        return max(0, min(boosted, 1))
+    if age_days < 7:
+        if random.random() < 0.992:
+            return 0
+        boosted = int(round(1 * promo_mult))
+        return max(0, min(boosted, 1))
+    if age_days < 30:
+        if random.random() < 0.996:
+            return 0
+        boosted = int(round(1 * promo_mult))
+        return max(0, min(boosted, 1))
+    return 0
 
 
 def _ensure_favorite_boost_column(cur: sqlite3.Cursor) -> None:

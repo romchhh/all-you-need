@@ -31,6 +31,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { ListingAutoRenewSection } from '@/components/ListingAutoRenewSection';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/utils/listingViewsDisplay';
+import { displayListingFavoritesCount, displayListingViews } from '@/utils/listingDisplayStats';
 import { BRAND_GREEN_ON_DARK, BRAND_GREEN_PRICE_ON_LIGHT } from '@/constants/brandColors';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
@@ -180,6 +181,15 @@ export const ListingDetail = ({
     if (d) return formatTimeAgo(d, t);
     return listing.posted || '';
   }, [listing.createdAt, listing.publishedAt, listing.posted, t]);
+
+  const shownViews = useMemo(
+    () => displayListingViews(listing),
+    [listing.views, listing.createdAt, listing.publishedAt, listing.posted]
+  );
+  const shownFavorites = useMemo(
+    () => displayListingFavoritesCount(listing),
+    [listing.favoritesCount, listing.createdAt, listing.publishedAt, listing.posted]
+  );
   
   // Перевіряємо, чи це власне оголошення
   const isOwnListing = useMemo(() => {
@@ -812,10 +822,10 @@ export const ListingDetail = ({
 
         {/* Статистика */}
         <div className={`mb-6 space-y-2 text-sm ${ac.mutedText}`}>
-          {shouldShowListingFavorites(listing.views, listing.favoritesCount) && (
+          {shouldShowListingFavorites(shownViews, shownFavorites) && (
             <div className="flex items-center gap-2 tabular-nums" title={t('listing.favoritesLabel')}>
               <Heart size={16} className={`flex-shrink-0 ${ac.mutedText}`} strokeWidth={2} />
-              <span>{listing.favoritesCount ?? 0}</span>
+              <span>{shownFavorites}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
@@ -827,10 +837,10 @@ export const ListingDetail = ({
               <Clock size={16} className={`shrink-0 ${ac.mutedText}`} />
               <span className="truncate">{t('listing.created')}: {formattedTime}</span>
             </div>
-            {shouldShowListingViews(listing.views) && (
+            {shouldShowListingViews(shownViews) && (
               <div className="flex shrink-0 items-center gap-2 tabular-nums" title={t('listing.viewsLabel')}>
                 <Eye size={16} className={`shrink-0 ${ac.mutedText}`} />
-                <span>{listing.views ?? 0}</span>
+                <span>{shownViews}</span>
               </div>
             )}
           </div>

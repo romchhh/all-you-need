@@ -12,15 +12,10 @@ import {
   type TickerMessage,
   type TickerMessageType,
 } from '@/utils/platformTickerMessages';
+import { fetchHomeActivity } from '@/utils/homeActivityClient';
 
 type HomePlatformTickerProps = {
   isLight: boolean;
-};
-
-type ActivityPayload = {
-  newListingsToday: number;
-  newListingsByCity: Array<{ city: string; count: number }>;
-  newListingsByCategory: Array<{ category: string; count: number }>;
 };
 
 const WELCOME_ID = 'platformTicker:welcome';
@@ -114,15 +109,12 @@ export function HomePlatformTicker({ isLight }: HomePlatformTickerProps) {
 
     const load = async (initial: boolean) => {
       try {
-        const res = await fetch('/api/home-activity', { cache: 'no-store' });
-        if (cancelled) return;
-
-        if (!res.ok) {
-          if (initial) applyTickerPools(true, started);
+        const data = await fetchHomeActivity();
+        if (cancelled || !data) {
+          if (initial && !started.value) applyTickerPools(true, started);
           return;
         }
 
-        const data = (await res.json()) as ActivityPayload;
         const categories = getCategories(t);
         const messages = buildTickerMessages(t, categories, {
           newListingsToday: data.newListingsToday ?? 0,
@@ -146,7 +138,7 @@ export function HomePlatformTicker({ isLight }: HomePlatformTickerProps) {
 
     void load(true);
 
-    const refreshId = setInterval(() => void load(false), 120_000);
+    const refreshId = setInterval(() => void load(false), 5 * 60_000);
 
     return () => {
       cancelled = true;

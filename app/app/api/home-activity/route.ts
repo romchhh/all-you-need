@@ -4,14 +4,20 @@ import { toSQLiteDate } from '@/utils/dateHelpers';
 import {
   isKyivEveningOrNight,
   kyivListingsWindowKey,
-  kyivYmd,
   startOfKyivListingsReportingWindow,
 } from '@/utils/kyivListingsDayWindow';
 
-const DISPLAY_ONLINE_MIN = 30;
-const DISPLAY_ONLINE_MAX = 60;
-const DISPLAY_ONLINE_NIGHT_MIN = 10;
-const DISPLAY_ONLINE_NIGHT_MAX = 15;
+const DISPLAY_ONLINE_MIN = 22;
+const DISPLAY_ONLINE_MAX = 58;
+const DISPLAY_ONLINE_NIGHT_MIN = 7;
+const DISPLAY_ONLINE_NIGHT_MAX = 18;
+
+function mix32(x: number): number {
+  let v = x | 0;
+  v = Math.imul(v ^ (v >>> 16), 0x7feb352d);
+  v = Math.imul(v ^ (v >>> 15), 0x846ca68b);
+  return (v ^ (v >>> 16)) >>> 0;
+}
 
 function displayOnlineSynced(now: Date): number {
   const hour = parseInt(
@@ -22,19 +28,39 @@ function displayOnlineSynced(now: Date): number {
     new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Kyiv', minute: '2-digit' }).format(now),
     10
   );
-  const ymd = kyivYmd(now).replace(/\D/g, '');
-  const slot = Math.floor(now.getTime() / (4 * 60 * 1000));
-  let x = slot * 0x9e3779b1 + hour * 0x85ebca6b + minute * 17 + parseInt(ymd.slice(-6), 10);
-  x ^= x << 13;
-  x ^= x >>> 17;
-  x ^= x << 5;
+  const second = now.getSeconds();
+  const weekdayChar = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Kyiv',
+    weekday: 'narrow',
+  }).format(now).charCodeAt(0);
+  const ymd = kyivListingsWindowKey(now).replace(/\D/g, '');
+
+  /** 90-секундні слоти + секунда — більше варіацій, рідше повторення числа. */
+  const slot = Math.floor(now.getTime() / (90 * 1000));
+  let seed =
+    slot * 0x9e3779b1 +
+    hour * 0x85ebca6b +
+    minute * 0x27d4eb2d +
+    second * 131 +
+    weekdayChar * 977 +
+    parseInt(ymd.slice(-6), 10) * 0x517cc1b7;
+  seed = mix32(seed ^ (slot >>> 7) ^ minute);
+
   if (isKyivEveningOrNight(now)) {
     const span = DISPLAY_ONLINE_NIGHT_MAX - DISPLAY_ONLINE_NIGHT_MIN + 1;
-    return DISPLAY_ONLINE_NIGHT_MIN + (Math.abs(x | 0) % span);
+    return DISPLAY_ONLINE_NIGHT_MIN + (seed % span);
   }
   const span = DISPLAY_ONLINE_MAX - DISPLAY_ONLINE_MIN + 1;
-  return DISPLAY_ONLINE_MIN + (Math.abs(x | 0) % span);
+  return DISPLAY_ONLINE_MIN + (seed % span);
 }
+
+/** In-memory кеш відповіді — зменшує навантаження на БД при кожному заході на головну. */
+const SERVER_CACHE_TTL_MS = 45_000;
+let serverCache: {
+  windowKey: string;
+  payload: Record<string, unknown>;
+  expiresAt: number;
+} | null = null;
 
 const NEW_LISTINGS_TODAY_SQL = `
   status = 'active'
@@ -46,10 +72,23 @@ const NEW_LISTINGS_TODAY_SQL = `
 export async function GET() {
   try {
     const now = new Date();
+    const windowKey = kyivListingsWindowKey(now);
+
+    if (
+      serverCache &&
+      serverCache.windowKey === windowKey &&
+      Date.now() < serverCache.expiresAt
+    ) {
+      return NextResponse.json(serverCache.payload, {
+        headers: {
+          'Cache-Control': 'public, max-age=60, stale-while-revalidate=120',
+        },
+      });
+    }
+
     const dayStart = startOfKyivListingsReportingWindow(now);
     const dayStartStr = toSQLiteDate(dayStart);
     const nowStr = toSQLiteDate(now);
-    const windowKey = kyivListingsWindowKey(now);
 
     const countRows = await executeWithRetry(
       () =>
@@ -109,12 +148,24 @@ export async function GET() {
 
     const online = displayOnlineSynced(now);
 
-    return NextResponse.json({
+    const payload = {
       online,
       newListingsToday,
       newListingsByCity,
       newListingsByCategory,
       windowKey,
+    };
+
+    serverCache = {
+      windowKey,
+      payload,
+      expiresAt: Date.now() + SERVER_CACHE_TTL_MS,
+    };
+
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=120',
+      },
     });
   } catch (error) {
     console.error('[home-activity]', error);

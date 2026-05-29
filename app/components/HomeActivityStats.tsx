@@ -4,67 +4,53 @@ import { Users, Package, ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import {
+  fetchHomeActivity,
+  HOME_ACTIVITY_CLIENT_TTL_MS,
+  readHomeActivityCache,
+  type HomeActivityData,
+} from '@/utils/homeActivityClient';
 
 type HomeActivityStatsProps = {
   isLight: boolean;
 };
 
-type CityStat = { city: string; count: number };
-
-type ActivityPayload = {
-  online: number;
-  newListingsToday: number;
-  newListingsByCity: CityStat[];
-  windowKey: string;
-};
-
 export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
   const { t, language } = useLanguage();
   const ac = getAppearanceClasses(isLight);
-  const [stats, setStats] = useState<ActivityPayload | null>(null);
+  const [stats, setStats] = useState<HomeActivityData | null>(() => readHomeActivityCache());
   const [menuOpen, setMenuOpen] = useState(false);
   const listingsRef = useRef<HTMLDivElement>(null);
-  const windowKeyRef = useRef<string>('');
+  const windowKeyRef = useRef<string>(stats?.windowKey ?? '');
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/home-activity', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = (await res.json()) as ActivityPayload;
-      if (typeof data.online !== 'number' || typeof data.newListingsToday !== 'number') return;
-
-      const cities = Array.isArray(data.newListingsByCity)
-        ? data.newListingsByCity.filter(
-            (row) => row && typeof row.city === 'string' && typeof row.count === 'number'
-          )
-        : [];
-
-      if (data.windowKey && windowKeyRef.current && data.windowKey !== windowKeyRef.current) {
-        setMenuOpen(false);
-      }
-      if (data.windowKey) {
-        windowKeyRef.current = data.windowKey;
-      }
-
-      setStats({
-        online: data.online,
-        newListingsToday: data.newListingsToday,
-        newListingsByCity: cities,
-        windowKey: data.windowKey || '',
-      });
-    } catch {
-      /* keep previous stats */
+  const applyStats = useCallback((data: HomeActivityData) => {
+    if (data.windowKey && windowKeyRef.current && data.windowKey !== windowKeyRef.current) {
+      setMenuOpen(false);
     }
+    if (data.windowKey) {
+      windowKeyRef.current = data.windowKey;
+    }
+    setStats(data);
   }, []);
 
+  const load = useCallback(
+    async (force = false) => {
+      const data = await fetchHomeActivity(force ? { force: true } : undefined);
+      if (data) applyStats(data);
+    },
+    [applyStats]
+  );
+
   useEffect(() => {
-    void load();
-    const id = setInterval(() => void load(), 30_000);
+    void load(false);
+    const id = setInterval(() => void load(false), HOME_ACTIVITY_CLIENT_TTL_MS);
     const onVis = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') void load();
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void load(false);
+      }
     };
-    const onFocus = () => void load();
-    const onHomeRefresh = () => void load();
+    const onFocus = () => void load(false);
+    const onHomeRefresh = () => void load(true);
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('tradeground-home-refresh', onHomeRefresh);
@@ -192,16 +178,16 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
                 {cities.map(({ city, count }) => {
                   const label = city ? city : t('bazaar.activityOtherCity');
                   return (
-                  <li
-                    key={city || '__other__'}
-                    className={`flex items-center justify-between gap-3 px-3 py-2 text-sm ${
-                      isLight ? 'text-gray-900' : 'text-white'
-                    }`}
-                    role="option"
-                  >
-                    <span className="min-w-0 truncate">{label}</span>
-                    <span className={`shrink-0 tabular-nums font-semibold ${numClass}`}>+{fmt(count)}</span>
-                  </li>
+                    <li
+                      key={city || '__other__'}
+                      className={`flex items-center justify-between gap-3 px-3 py-2 text-sm ${
+                        isLight ? 'text-gray-900' : 'text-white'
+                      }`}
+                      role="option"
+                    >
+                      <span className="min-w-0 truncate">{label}</span>
+                      <span className={`shrink-0 tabular-nums font-semibold ${numClass}`}>+{fmt(count)}</span>
+                    </li>
                   );
                 })}
               </ul>

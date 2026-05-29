@@ -626,7 +626,8 @@ const BazaarTabComponent = ({
       <div className="relative">
         <div className={`${STICKY_BELOW_APP_HEADER_CLASS} bg-transparent px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`}>
           <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl">
-            <div className="flex gap-1 items-center">
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="min-w-0 flex-1">
               <TopBar
                 variant="main"
                 searchTriggerMode
@@ -656,11 +657,12 @@ const BazaarTabComponent = ({
                 hasActiveFilters={hasActiveFilters}
                 tg={tg}
               />
+              </div>
               
               {/* Кнопка вибору міста */}
               <button
                 onClick={() => setIsCityModalOpen(true)}
-                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors relative border ${
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition-colors relative ${
                   selectedCities.length > 0
                     ? isLight
                       ? 'border-[#3F5331] bg-transparent'

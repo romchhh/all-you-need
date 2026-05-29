@@ -8,6 +8,7 @@ import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 import { shouldShowListingViews } from '@/utils/listingViewsDisplay';
+import { displayListingFavoritesCount, displayListingViews } from '@/utils/listingDisplayStats';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface ListingCardProps {
@@ -134,6 +135,14 @@ const ListingCardComponent = ({
     if (d) return formatTimeAgo(d, t);
     return listing.posted || '';
   }, [listing.createdAt, listing.publishedAt, listing.posted, t]);
+  const shownViews = useMemo(
+    () => displayListingViews(listing),
+    [listing.views, listing.createdAt, listing.publishedAt, listing.posted]
+  );
+  const shownFavorites = useMemo(
+    () => displayListingFavoritesCount(listing),
+    [listing.favoritesCount, listing.createdAt, listing.publishedAt, listing.posted]
+  );
   const imageLoadedRef = useRef<Set<string>>(new Set());
   
   // Перевіряємо, чи зображення вже завантажене при ініціалізації
@@ -293,7 +302,7 @@ const ListingCardComponent = ({
         )}
         
         {(() => {
-          const favCount = Math.max(0, listing.favoritesCount ?? 0);
+          const favCount = shownFavorites;
           const filledHeart =
             isFavorite
               ? isLight
@@ -460,10 +469,10 @@ const ListingCardComponent = ({
           </div>
           <div className="flex min-w-0 items-center justify-between gap-2 tabular-nums">
             <span className="min-w-0 truncate">{formattedTime}</span>
-            {shouldShowListingViews(listing.views) && (
+            {shouldShowListingViews(shownViews) && (
               <span className="inline-flex shrink-0 items-center gap-0.5" title={t('listing.viewsLabel')}>
                 <Eye size={10} className="flex-shrink-0 opacity-80" aria-hidden />
-                {listing.views ?? 0}
+                {shownViews}
               </span>
             )}
           </div>

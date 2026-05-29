@@ -1,8 +1,7 @@
 /**
- * Мінімум переглядів, з якого показуємо лічильник (компроміс між 10 і 15).
- * Показуємо при views >= цього значення.
+ * Мінімум переглядів, з якого показуємо лічильник у каталозі.
  */
-export const LISTING_VIEWS_DISPLAY_MIN = 12;
+export const LISTING_VIEWS_DISPLAY_MIN = 8;
 
 export function shouldShowListingViews(views: number | null | undefined): boolean {
   return (views ?? 0) >= LISTING_VIEWS_DISPLAY_MIN;
