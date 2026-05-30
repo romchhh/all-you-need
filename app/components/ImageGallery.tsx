@@ -67,7 +67,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
         {imageUrls.map((src, index) => (
           <div
             key={`${images[index]}-${index}`}
-            className="snap-start shrink-0 w-full h-full relative"
+            className="snap-start shrink-0 w-full h-full relative flex items-center justify-center bg-black"
             style={{ minWidth: '100%' }}
             onClick={() => onImageClick?.(index)}
           >
@@ -75,7 +75,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
               <img
                 src={src}
                 alt={`${title} ${index + 1}`}
-                className="w-full h-full object-cover select-none"
+                className="w-full h-full object-contain select-none"
                 draggable={false}
                 loading={index === 0 ? 'eager' : 'lazy'}
                 decoding="async"

@@ -701,9 +701,7 @@ export const ListingDetail = ({
         <div className="w-full min-w-0 lg:mx-auto lg:flex lg:max-w-6xl lg:flex-row lg:items-stretch lg:gap-8 xl:gap-10">
         {/* Галерея фото — edge-to-edge */}
         <div 
-          className={`w-full min-h-[320px] max-h-[620px] px-0 pb-0 pt-0 sm:max-h-[640px] lg:flex lg:h-auto lg:min-h-[min(420px,70vh)] lg:max-h-[min(640px,85vh)] lg:w-[42%] lg:max-w-xl lg:min-w-[300px] lg:shrink-0 lg:items-center lg:justify-center lg:self-stretch lg:pl-6 lg:pr-2 lg:pt-6 lg:pb-6 xl:pl-8 ${
-            isMobile ? 'h-[52svh]' : 'h-[55svh] max-lg:h-[55svh]'
-          }`}
+          className="w-full min-h-[380px] h-[min(72svh,860px)] px-0 pb-0 pt-0 lg:flex lg:h-auto lg:min-h-[min(480px,78vh)] lg:w-[42%] lg:max-w-xl lg:min-w-[300px] lg:shrink-0 lg:items-center lg:justify-center lg:self-stretch lg:pl-6 lg:pr-2 lg:pt-6 lg:pb-6 xl:pl-8"
           style={{ 
             ...(tg ? { paddingBottom: '0px' } : {})
           }}

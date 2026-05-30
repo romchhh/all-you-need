@@ -89,39 +89,19 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
   };
 
   useEffect(() => {
-    if (isOpen) {
-      const scrollY = window.scrollY;
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
-    }
-
+    if (!isOpen) return;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, [isOpen]);
 
   if (!isOpen || imageList.length === 0) return null;
 
-  /** Вирівняно з рядом назад / Поділитися / серце на ListingDetail (лого + body padding на max-lg). */
-  const closeTopClass =
-    'max-lg:top-[calc(env(safe-area-inset-top,0px)+6rem)] lg:top-[calc(env(safe-area-inset-top,0px)+4rem)]';
   const roundBtn = isLight
     ? 'bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50'
     : 'bg-[#1C1C1C] border border-white/20 backdrop-blur-sm text-white hover:bg-white/10';
@@ -131,29 +111,28 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
 
   const modalContent = (
     <div
-      className={`fixed inset-0 flex flex-col ${isLight ? 'bg-zinc-100' : ''}`}
+      className="fixed inset-0 z-[99999] flex items-center justify-center"
       onClick={onClose}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       style={{
         touchAction: 'none',
-        padding: 0,
         width: '100vw',
+        height: '100dvh',
         maxWidth: '100vw',
-        zIndex: 99999,
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        maxHeight: '100dvh',
         backgroundColor: isLight ? '#f4f4f5' : '#000000',
+        paddingTop: 'max(env(safe-area-inset-top,0px),8px)',
+        paddingBottom: 'max(env(safe-area-inset-bottom,0px),8px)',
+        paddingLeft: 'max(env(safe-area-inset-left,0px),8px)',
+        paddingRight: 'max(env(safe-area-inset-right,0px),8px)',
       }}
     >
       <button
         type="button"
         onClick={onClose}
-        className={`absolute right-4 z-[100000] flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${closeTopClass} ${closeBtnSurface}`}
+        className={`absolute right-4 top-[max(env(safe-area-inset-top,0px),12px)] z-[100000] flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${closeBtnSurface}`}
         aria-label="Закрити"
       >
         <X size={20} strokeWidth={2.25} className="shrink-0" />
@@ -167,10 +146,10 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
               e.stopPropagation();
               prevImage();
             }}
-            className={`absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center transition-colors z-[100000] shrink-0 flex-shrink-0 ${roundBtn}`}
-            style={{ minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
+            className={`absolute left-3 top-1/2 z-[100000] flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-colors ${roundBtn}`}
+            aria-label="Попереднє фото"
           >
-            <ChevronLeft size={24} style={{ flexShrink: 0 }} />
+            <ChevronLeft size={24} />
           </button>
           <button
             type="button"
@@ -178,33 +157,32 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
               e.stopPropagation();
               nextImage();
             }}
-            className={`absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center transition-colors z-[100000] shrink-0 flex-shrink-0 ${roundBtn}`}
-            style={{ minWidth: '40px', minHeight: '40px', maxWidth: '40px', maxHeight: '40px' }}
+            className={`absolute right-3 top-1/2 z-[100000] flex h-10 w-10 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition-colors ${roundBtn}`}
+            aria-label="Наступне фото"
           >
-            <ChevronRight size={24} style={{ flexShrink: 0 }} />
+            <ChevronRight size={24} />
           </button>
         </>
       )}
 
       <div
-        className="flex min-h-0 w-full flex-1 items-center justify-center px-2 pb-[env(safe-area-inset-bottom,0px)] max-lg:pt-[calc(env(safe-area-inset-top,0px)+8.75rem)] lg:pt-[calc(env(safe-area-inset-top,0px)+6.75rem)]"
-        style={{ width: '100vw', maxWidth: '100vw' }}
+        className="flex h-full w-full max-h-full max-w-full items-center justify-center px-12"
         onClick={(e) => e.stopPropagation()}
       >
         {imageError ? (
-          <div className={`text-center px-4 ${isLight ? 'text-gray-600' : 'text-white/70'}`}>Зображення не завантажилось</div>
+          <div className={`px-4 text-center ${isLight ? 'text-gray-600' : 'text-white/70'}`}>
+            Зображення не завантажилось
+          </div>
         ) : (
           <img
             src={imageList[currentIndex]}
             alt={`${alt} - фото ${currentIndex + 1}`}
-            className="transition-opacity duration-300"
+            className="max-h-full max-w-full object-contain"
             style={{
-              width: '100%',
-              maxWidth: '100%',
+              width: 'auto',
               height: 'auto',
-              maxHeight:
-                'min(90vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 10rem))',
-              objectFit: 'contain',
+              maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)',
+              maxWidth: '100%',
               display: 'block',
             }}
             onClick={(e) => e.stopPropagation()}
