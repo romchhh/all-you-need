@@ -1,6 +1,9 @@
+'use client';
+
 import { Image as ImageIcon } from 'lucide-react';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface ImageGalleryProps {
   images: string[];
@@ -9,15 +12,16 @@ interface ImageGalleryProps {
 }
 
 export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps) => {
+  const { isLight } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Мемоізуємо URL зображень, щоб уникнути зайвих запитів
+  const slideBgClass = isLight ? 'bg-white' : 'bg-black';
+
   const imageUrls = useMemo(() => {
     return images.map((imagePath) => buildListingImageUrl(imagePath));
   }, [images]);
 
-  // Скидаємо activeIndex до 0 при зміні images (новий товар)
   useEffect(() => {
     setActiveIndex(0);
     if (containerRef.current) {
@@ -42,24 +46,29 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   };
 
   if (!images.length) {
-    const placeholderHeight = typeof window !== 'undefined' && window.innerWidth < 768 ? '300px' : '400px';
+    const placeholderHeight = typeof window !== 'undefined' && window.innerWidth < 768 ? '280px' : '360px';
     return (
-      <div className="flex items-center justify-center rounded-2xl bg-black/50" style={{ height: placeholderHeight, width: '100%' }}>
+      <div
+        className={`flex items-center justify-center ${slideBgClass}`}
+        style={{ height: placeholderHeight, width: '100%' }}
+      >
         <div className="text-center">
-          <ImageIcon size={window.innerWidth < 768 ? 48 : 64} className="mx-auto mb-2 text-white/40" />
-          <p className="text-sm text-white/70">Немає фото</p>
+          <ImageIcon
+            size={window.innerWidth < 768 ? 48 : 64}
+            className={`mx-auto mb-2 ${isLight ? 'text-gray-300' : 'text-white/40'}`}
+          />
+          <p className={`text-sm ${isLight ? 'text-gray-500' : 'text-white/70'}`}>Немає фото</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-full">
-      {/* Scroll container */}
+    <div className={`relative h-full w-full ${slideBgClass}`}>
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth rounded-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full"
+        className={`flex h-full w-full snap-x snap-mandatory scroll-smooth overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${slideBgClass}`}
         style={{
           WebkitOverflowScrolling: 'touch',
         }}
@@ -67,7 +76,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
         {imageUrls.map((src, index) => (
           <div
             key={`${images[index]}-${index}`}
-            className="snap-start shrink-0 w-full h-full relative flex items-center justify-center bg-black"
+            className={`relative flex h-full w-full shrink-0 snap-start items-center justify-center ${slideBgClass}`}
             style={{ minWidth: '100%' }}
             onClick={() => onImageClick?.(index)}
           >
@@ -75,7 +84,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
               <img
                 src={src}
                 alt={`${title} ${index + 1}`}
-                className="w-full h-full object-contain select-none"
+                className="block h-auto max-h-full w-full max-w-full select-none object-contain"
                 draggable={false}
                 loading={index === 0 ? 'eager' : 'lazy'}
                 decoding="async"
@@ -90,23 +99,21 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
                 }}
               />
             ) : null}
-            {/* Placeholder для помилки завантаження */}
             <div
-              className="error-placeholder absolute inset-0 flex items-center justify-center bg-black/50"
+              className={`error-placeholder absolute inset-0 flex items-center justify-center ${slideBgClass}`}
               style={{ display: src ? 'none' : 'flex' }}
             >
               <div className="text-center">
-                <ImageIcon size={64} className="mx-auto mb-2 text-white/40" />
-                <p className="text-sm text-white/70">Помилка завантаження</p>
+                <ImageIcon size={64} className={`mx-auto mb-2 ${isLight ? 'text-gray-300' : 'text-white/40'}`} />
+                <p className={`text-sm ${isLight ? 'text-gray-500' : 'text-white/70'}`}>Помилка завантаження</p>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Dots */}
       {images.length > 1 && (
-        <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2 z-20">
+        <div className="absolute bottom-3 left-0 right-0 z-20 flex justify-center gap-2">
           {images.map((_, i) => (
             <button
               key={i}
@@ -114,7 +121,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
                 e.stopPropagation();
                 goToImage(i);
               }}
-              className="h-2 rounded-full transition-all cursor-pointer"
+              className="h-2 cursor-pointer rounded-full transition-all"
               style={{
                 width: i === activeIndex ? 20 : 8,
                 background: i === activeIndex ? '#3F5331' : 'rgba(63,83,49,.5)',

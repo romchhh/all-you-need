@@ -109,6 +109,9 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
     ? 'border border-gray-300 bg-white/95 text-gray-900 shadow-sm hover:bg-gray-100'
     : 'border border-white bg-black/40 text-white backdrop-blur-sm hover:bg-white/10';
 
+  const closeTopClass =
+    'max-lg:top-[calc(env(safe-area-inset-top,0px)+6rem)] lg:top-[calc(env(safe-area-inset-top,0px)+4rem)]';
+
   const modalContent = (
     <div
       className="fixed inset-0 z-[99999] flex items-center justify-center"
@@ -122,7 +125,7 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
         height: '100dvh',
         maxWidth: '100vw',
         maxHeight: '100dvh',
-        backgroundColor: isLight ? '#f4f4f5' : '#000000',
+        backgroundColor: isLight ? '#ffffff' : '#000000',
         paddingTop: 'max(env(safe-area-inset-top,0px),8px)',
         paddingBottom: 'max(env(safe-area-inset-bottom,0px),8px)',
         paddingLeft: 'max(env(safe-area-inset-left,0px),8px)',
@@ -132,7 +135,7 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
       <button
         type="button"
         onClick={onClose}
-        className={`absolute right-4 top-[max(env(safe-area-inset-top,0px),12px)] z-[100000] flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${closeBtnSurface}`}
+        className={`absolute right-4 z-[100000] flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${closeTopClass} ${closeBtnSurface}`}
         aria-label="Закрити"
       >
         <X size={20} strokeWidth={2.25} className="shrink-0" />
