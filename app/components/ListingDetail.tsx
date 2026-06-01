@@ -2,6 +2,7 @@ import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, Trendi
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from './ImageGallery';
+import { SimilarListingsStrip } from './SimilarListingsStrip';
 import { ListingCard } from './ListingCard';
 import { ShareModal } from './ShareModal';
 import { ImageViewModal } from './ImageViewModal';
@@ -699,9 +700,10 @@ export const ListingDetail = ({
         }}
       >
         <div className="w-full min-w-0 lg:mx-auto lg:flex lg:max-w-6xl lg:flex-row lg:items-stretch lg:gap-8 xl:gap-10">
-        {/* Галерея фото — edge-to-edge */}
+        {/* Галерея + схожі товари (колонка зліва на десктопі) */}
+        <div className="flex w-full min-w-0 flex-col lg:w-[42%] lg:max-w-xl lg:min-w-[300px] lg:shrink-0 lg:self-stretch">
         <div 
-          className="w-full h-[min(58svh,620px)] min-h-[260px] px-0 pb-0 pt-0 lg:flex lg:h-auto lg:min-h-[min(400px,62vh)] lg:max-h-[min(520px,62vh)] lg:w-[42%] lg:max-w-xl lg:min-w-[300px] lg:shrink-0 lg:items-center lg:justify-center lg:self-stretch lg:pl-6 lg:pr-2 lg:pt-6 lg:pb-6 xl:pl-8"
+          className="w-full h-[min(58svh,620px)] min-h-[260px] px-0 pb-0 pt-0 lg:flex lg:h-auto lg:min-h-[min(400px,62vh)] lg:max-h-[min(520px,62vh)] lg:items-center lg:justify-center lg:pl-6 lg:pr-2 lg:pt-6 lg:pb-0 xl:pl-8"
           style={{ 
             ...(tg ? { paddingBottom: '0px' } : {})
           }}
@@ -713,6 +715,17 @@ export const ListingDetail = ({
             onImageClick={(index) => setSelectedImageIndex(index)}
           />
           </div>
+        </div>
+
+        {categoryListings.length > 0 && (
+          <SimilarListingsStrip
+            listings={categoryListings}
+            isLight={isLight}
+            onSelect={onSelectListing}
+            onSeeMore={handleOpenCategory}
+            tg={tg}
+          />
+        )}
         </div>
 
         {/* Контент */}
@@ -1067,7 +1080,7 @@ export const ListingDetail = ({
           </div>
         )}
 
-        {/* Оголошення з категорії */}
+        {/* Старий блок «Схожі товари» (великі ListingCard) — залишено для можливого повернення
         {categoryListings.length > 0 && (
           <div
             className="w-full min-w-0 px-4 pb-8 pt-10 lg:px-6 lg:pb-10 lg:pt-12"
@@ -1102,6 +1115,7 @@ export const ListingDetail = ({
             </div>
           </div>
         )}
+        */}
       </div>
 
 

@@ -88,21 +88,23 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
       ? 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3 sm:py-2'
       : 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-2.5 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3 sm:py-2';
 
-  const pillListingsBase =
-    isLight
-      ? 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3.5'
-      : 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm sm:text-sm sm:px-3.5';
+  const pillListingsBase = isLight
+    ? 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3.5'
+    : 'flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-transparent px-1 py-2 text-xs text-white sm:text-sm sm:px-2';
 
   const pillListingsIdle = isLight
-    ? `${pillListingsBase} border-gray-200/90 bg-white/90`
-    : `${pillListingsBase} border-white/12 bg-white/[0.06] text-white`;
+    ? pillListingsBase
+    : pillListingsBase;
 
   const pillListingsActive = isLight
-    ? `${pillListingsBase} border-[#3F5331]/40 bg-white ring-[#3F5331]/15`
-    : `${pillListingsBase} border-[#C8E6A0]/35 bg-white/[0.08] text-white ring-[#C8E6A0]/20`;
+    ? `${pillListingsBase} border-[#3F5331]/40 ring-[#3F5331]/15`
+    : 'flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-white/[0.08] px-2 py-2 text-xs text-white sm:text-sm';
 
-  const iconClass = isLight ? 'shrink-0 text-[#3F5331]' : 'shrink-0 text-[#C8E6A0]';
-  const numClass = `font-semibold tabular-nums ${ac.pageHeading}`;
+  const iconClass = isLight ? 'shrink-0 text-[#3F5331]' : 'shrink-0 text-white/90';
+  const numClass = isLight
+    ? `font-semibold tabular-nums ${ac.pageHeading}`
+    : 'font-semibold tabular-nums text-white';
+  const mutedClass = isLight ? ac.mutedText : 'text-white/75';
 
   const online = stats?.online ?? null;
   const listings = stats?.newListingsToday ?? null;
@@ -110,7 +112,14 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
 
   const dropdownPanel = isLight
     ? 'absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-y-auto rounded-xl border border-gray-200/90 bg-white py-1.5 shadow-lg ring-1 ring-black/[0.04]'
-    : 'absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-y-auto rounded-xl border border-white/12 bg-[#1a1a1a] py-1.5 shadow-lg';
+    : 'absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-y-auto rounded-xl bg-[#0a0a0a] py-2 shadow-lg';
+
+  const dropdownHeaderClass = isLight
+    ? `px-3 pb-1.5 pt-0.5 text-[11px] font-medium uppercase tracking-wide ${ac.mutedText}`
+    : 'px-3 pb-1.5 pt-0.5 text-[11px] font-medium uppercase tracking-wide text-white/50';
+
+  const dropdownRowClass = isLight ? 'text-gray-900' : 'text-white';
+  const dropdownDivider = isLight ? 'divide-black/[0.04]' : 'divide-white/[0.08]';
 
   return (
     <div className="flex w-full flex-wrap gap-2 sm:gap-2.5">
@@ -152,13 +161,13 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
           </span>
           <span className="min-w-0 flex-1 leading-snug">
             <span className={numClass}>{listings === null ? '…' : `+${fmt(listings)}`}</span>{' '}
-            <span className={`break-words font-normal ${ac.mutedText}`}>{t('bazaar.activityListingsTail')}</span>
+            <span className={`break-words font-normal ${mutedClass}`}>{t('bazaar.activityListingsTail')}</span>
           </span>
           {stats && (
             <ChevronDown
               size={16}
               strokeWidth={2.25}
-              className={`shrink-0 transition-transform ${menuOpen ? 'rotate-180' : ''} ${ac.mutedText}`}
+              className={`shrink-0 transition-transform ${menuOpen ? 'rotate-180' : ''} ${isLight ? ac.mutedText : 'text-white/60'}`}
               aria-hidden
             />
           )}
@@ -166,27 +175,29 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
 
         {menuOpen && stats && (
           <div className={dropdownPanel} role="listbox" aria-label={t('bazaar.activityListingsByCity')}>
-            <div
-              className={`px-3 pb-1.5 pt-0.5 text-[11px] font-medium uppercase tracking-wide ${ac.mutedText}`}
-            >
+            <div className={dropdownHeaderClass}>
               {t('bazaar.activityListingsByCity')}
             </div>
             {cities.length === 0 ? (
-              <p className={`px-3 py-2 text-sm ${ac.mutedText}`}>{t('bazaar.activityListingsByCityEmpty')}</p>
+              <p className={`px-3 py-2 text-sm ${isLight ? ac.mutedText : 'text-white/70'}`}>
+                {t('bazaar.activityListingsByCityEmpty')}
+              </p>
             ) : (
-              <ul className="divide-y divide-black/[0.04] dark:divide-white/[0.06]">
+              <ul className={`divide-y ${dropdownDivider}`}>
                 {cities.map(({ city, count }) => {
                   const label = city ? city : t('bazaar.activityOtherCity');
                   return (
                     <li
                       key={city || '__other__'}
-                      className={`flex items-center justify-between gap-3 px-3 py-2 text-sm ${
-                        isLight ? 'text-gray-900' : 'text-white'
-                      }`}
+                      className={`px-3 py-2.5 text-sm leading-snug ${dropdownRowClass}`}
                       role="option"
                     >
-                      <span className="min-w-0 truncate">{label}</span>
-                      <span className={`shrink-0 tabular-nums font-semibold ${numClass}`}>+{fmt(count)}</span>
+                      <span className="block min-w-0">
+                        {t('platformTicker.activity.cityToday', {
+                          city: label,
+                          count: String(count),
+                        })}
+                      </span>
                     </li>
                   );
                 })}

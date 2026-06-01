@@ -1,6 +1,5 @@
 'use client';
 
-import { Info } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getCategories } from '@/constants/categories';
@@ -9,6 +8,7 @@ import {
   groupTickerMessages,
   pickNextTickerMessage,
   randomTickerIntervalMs,
+  WELCOME_TICKER_EMOJI,
   type TickerMessage,
   type TickerMessageType,
 } from '@/utils/platformTickerMessages';
@@ -29,6 +29,7 @@ export function HomePlatformTicker({ isLight }: HomePlatformTickerProps) {
     () => ({
       id: WELCOME_ID,
       text: t('platformTicker.welcome'),
+      emoji: WELCOME_TICKER_EMOJI,
       type: 'system',
     }),
     [t]
@@ -151,15 +152,16 @@ export function HomePlatformTicker({ isLight }: HomePlatformTickerProps) {
   const displayMessage = current ?? welcomeMessage;
 
   const barClass = isLight
-    ? 'flex items-center gap-2 rounded-xl border border-[#C8E6A0]/70 bg-[#C8E6A0]/45 px-3 py-2 text-xs shadow-sm sm:text-sm'
-    : 'flex items-center gap-2 rounded-xl border border-[#C8E6A0]/35 bg-[#C8E6A0]/12 px-3 py-2 text-xs shadow-sm sm:text-sm';
+    ? 'flex w-full items-center gap-2.5 rounded-xl border border-[#3F5331]/25 bg-[#C8E6A0]/75 px-3 py-2 text-xs shadow-sm ring-1 ring-[#3F5331]/10 sm:text-sm'
+    : 'flex w-full items-center gap-2.5 rounded-xl bg-[#C8E6A0]/95 px-3 py-2 text-xs sm:text-sm';
 
-  const iconClass = isLight ? 'shrink-0 text-[#3F5331]' : 'shrink-0 text-[#C8E6A0]';
-  const textClass = isLight ? 'text-[#2a4018]' : 'text-[#C8E6A0]';
+  const textClass = isLight ? 'text-[#1e2e18] font-medium' : 'text-[#0f1408] font-medium';
 
   return (
     <div className={barClass} role="status" aria-live="polite">
-      <Info size={15} className={iconClass} aria-hidden />
+      <span className="shrink-0 text-lg leading-none" aria-hidden>
+        {displayMessage.emoji}
+      </span>
       <p
         key={displayMessage.id}
         className={`min-w-0 flex-1 truncate leading-snug ${animClass} ${textClass}`}
