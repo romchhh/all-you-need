@@ -139,7 +139,7 @@ export function HomePlatformTicker({ isLight }: HomePlatformTickerProps) {
 
     void load(true);
 
-    const refreshId = setInterval(() => void load(false), 5 * 60_000);
+    const refreshId = setInterval(() => void load(false), 10 * 60_000);
 
     return () => {
       cancelled = true;

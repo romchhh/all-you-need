@@ -55,7 +55,7 @@ function displayOnlineSynced(now: Date): number {
 }
 
 /** In-memory кеш відповіді — зменшує навантаження на БД при кожному заході на головну. */
-const SERVER_CACHE_TTL_MS = 45_000;
+const SERVER_CACHE_TTL_MS = 120_000;
 let serverCache: {
   windowKey: string;
   payload: Record<string, unknown>;
@@ -64,8 +64,34 @@ let serverCache: {
 
 const NEW_LISTINGS_TODAY_SQL = `
   status = 'active'
-  AND datetime(COALESCE(publishedAt, createdAt)) >= datetime(?)
-  AND datetime(COALESCE(publishedAt, createdAt)) <= datetime(?)
+  AND COALESCE(publishedAt, createdAt) >= ?
+  AND COALESCE(publishedAt, createdAt) <= ?
+`;
+
+const CITY_LISTINGS_SQL = `
+  SELECT
+    CASE
+      WHEN location IS NULL OR TRIM(location) = '' THEN ''
+      ELSE TRIM(SUBSTR(location, 1, INSTR(location || ',', ',') - 1))
+    END AS city,
+    COUNT(*) AS count
+  FROM Listing
+  WHERE ${NEW_LISTINGS_TODAY_SQL}
+  GROUP BY city
+  HAVING count > 0
+  ORDER BY count DESC, city ASC
+  LIMIT 10
+`;
+
+const CATEGORY_LISTINGS_SQL = `
+  SELECT category, COUNT(*) AS count
+  FROM Listing
+  WHERE ${NEW_LISTINGS_TODAY_SQL}
+    AND category IS NOT NULL AND TRIM(category) != ''
+  GROUP BY category
+  HAVING count > 0
+  ORDER BY count DESC
+  LIMIT 8
 `;
 
 // Публічна статистика для головної / базару (без аутентифікації)
@@ -81,7 +107,7 @@ export async function GET() {
     ) {
       return NextResponse.json(serverCache.payload, {
         headers: {
-          'Cache-Control': 'public, max-age=60, stale-while-revalidate=120',
+          'Cache-Control': 'public, max-age=120, stale-while-revalidate=240',
         },
       });
     }
@@ -103,19 +129,7 @@ export async function GET() {
     const cityRows = await executeWithRetry(
       () =>
         prisma.$queryRawUnsafe(
-          `SELECT
-             CASE
-               WHEN location IS NULL OR TRIM(location) = '' THEN ''
-               ELSE TRIM(SUBSTR(location || ',', 1, INSTR(location || ',', ',') - 1))
-             END AS city,
-             COUNT(*) AS count
-           FROM Listing
-           WHERE ${NEW_LISTINGS_TODAY_SQL}
-           GROUP BY CASE
-             WHEN location IS NULL OR TRIM(location) = '' THEN ''
-             ELSE TRIM(SUBSTR(location || ',', 1, INSTR(location || ',', ',') - 1))
-           END
-           ORDER BY count DESC, city ASC`,
+          CITY_LISTINGS_SQL,
           dayStartStr,
           nowStr
         ) as Promise<Array<{ city: string; count: bigint | number }>>
@@ -129,13 +143,7 @@ export async function GET() {
     const categoryRows = await executeWithRetry(
       () =>
         prisma.$queryRawUnsafe(
-          `SELECT category, COUNT(*) AS count
-           FROM Listing
-           WHERE ${NEW_LISTINGS_TODAY_SQL}
-             AND category IS NOT NULL AND TRIM(category) != ''
-           GROUP BY category
-           ORDER BY count DESC, category ASC
-           LIMIT 8`,
+          CATEGORY_LISTINGS_SQL,
           dayStartStr,
           nowStr
         ) as Promise<Array<{ category: string; count: bigint | number }>>
@@ -164,7 +172,7 @@ export async function GET() {
 
     return NextResponse.json(payload, {
       headers: {
-        'Cache-Control': 'public, max-age=60, stale-while-revalidate=120',
+        'Cache-Control': 'public, max-age=120, stale-while-revalidate=240',
       },
     });
   } catch (error) {

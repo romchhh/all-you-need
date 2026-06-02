@@ -1,7 +1,7 @@
 'use client';
 
 import { Users, Package, ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import {
@@ -22,6 +22,7 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const listingsRef = useRef<HTMLDivElement>(null);
   const windowKeyRef = useRef<string>(stats?.windowKey ?? '');
+  const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applyStats = useCallback((data: HomeActivityData) => {
     if (data.windowKey && windowKeyRef.current && data.windowKey !== windowKeyRef.current) {
@@ -41,6 +42,9 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
     [applyStats]
   );
 
+  const locale = useMemo(() => (language === 'ru' ? 'ru-RU' : 'uk-UA'), [language]);
+  const fmt = useCallback((n: number) => n.toLocaleString(locale), [locale]);
+
   useEffect(() => {
     void load(false);
     const id = setInterval(() => void load(false), HOME_ACTIVITY_CLIENT_TTL_MS);
@@ -59,6 +63,7 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('tradeground-home-refresh', onHomeRefresh);
+      if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
     };
   }, [load]);
 
@@ -80,13 +85,15 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
     };
   }, [menuOpen]);
 
-  const locale = language === 'ru' ? 'ru-RU' : 'uk-UA';
-  const fmt = (n: number) => n.toLocaleString(locale);
+  const online = useMemo(() => stats?.online ?? null, [stats?.online]);
+  const listings = useMemo(() => stats?.newListingsToday ?? null, [stats?.newListingsToday]);
+  const cities = useMemo(() => stats?.newListingsByCity ?? [], [stats?.newListingsByCity]);
 
-  const pillOnline =
+  const pillOnline = useMemo(() =>
     isLight
       ? 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3 sm:py-2'
-      : 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-2.5 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3 sm:py-2';
+      : 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-2.5 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3 sm:py-2',
+  [isLight]);
 
   const pillListingsBase = isLight
     ? 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3.5'
@@ -105,10 +112,6 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
     ? `font-semibold tabular-nums ${ac.pageHeading}`
     : 'font-semibold tabular-nums text-white';
   const mutedClass = isLight ? ac.mutedText : 'text-white/75';
-
-  const online = stats?.online ?? null;
-  const listings = stats?.newListingsToday ?? null;
-  const cities = stats?.newListingsByCity ?? [];
 
   const dropdownPanel = isLight
     ? 'absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-y-auto rounded-xl border border-gray-200/90 bg-white py-1.5 shadow-lg ring-1 ring-black/[0.04]'
@@ -153,6 +156,10 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
           disabled={!stats}
           onClick={() => {
             if (!stats) return;
+            if (clickTimeoutRef.current) return;
+            clickTimeoutRef.current = setTimeout(() => {
+              clickTimeoutRef.current = null;
+            }, 300);
             setMenuOpen((open) => !open);
           }}
         >
