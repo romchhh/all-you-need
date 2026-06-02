@@ -239,7 +239,8 @@
         "activityOnlineSuffix": "онлайн",
         "activityListingsTail": "нових оголошень сьогодні",
         "activityListingsByCity": "По містах",
-        "activityListingsByCityEmpty": "Сьогодні ще немає нових оголошень",
+        "activityListingsByCityEmpty": "Ще не було оголошень в жодному місті",
+        "activityCityRow": "У {city} — {count} нових оголошень",
         "activityOtherCity": "Інше"
   },
   "favorites": {

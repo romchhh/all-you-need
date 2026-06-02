@@ -718,8 +718,8 @@ const BazaarTabComponent = ({
               <HomePlatformTicker isLight={isLight} />
             </div>
           </div>
-          <div className="animate-content-in px-4 pb-3 lg:flex lg:justify-center lg:px-6">
-            <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
+          <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
+            <div className="w-full max-w-full overflow-visible lg:max-w-xl xl:max-w-2xl">
               <HomeActivityStats isLight={isLight} />
             </div>
           </div>

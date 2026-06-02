@@ -49,20 +49,19 @@ const ListingCardComponent = ({
   
   const promotionType = promotionTypes.length > 0 ? promotionTypes[0] : null;
   
-  // Логування для діагностики
+  // Логування для діагностики — вимкнено в prod
   useEffect(() => {
-    if (listing.promotionType) {
-      console.log('Listing promotion data:', {
-        id: listing.id,
-        promotionType: listing.promotionType,
-        promotionEnds: listing.promotionEnds,
-        hasPromotion,
-        now: new Date().toISOString(),
-        endsAt: listing.promotionEnds ? new Date(listing.promotionEnds).toISOString() : null,
-        isExpired: listing.promotionEnds ? new Date(listing.promotionEnds) <= new Date() : null
-      });
-    }
-  }, [listing.id, listing.promotionType, listing.promotionEnds]);
+    if (process.env.NODE_ENV !== 'development' || !listing.promotionType) return;
+    console.log('Listing promotion data:', {
+      id: listing.id,
+      promotionType: listing.promotionType,
+      promotionEnds: listing.promotionEnds,
+      hasPromotion,
+      now: new Date().toISOString(),
+      endsAt: listing.promotionEnds ? new Date(listing.promotionEnds).toISOString() : null,
+      isExpired: listing.promotionEnds ? new Date(listing.promotionEnds) <= new Date() : null,
+    });
+  }, [listing.id, listing.promotionType, listing.promotionEnds, hasPromotion]);
   
   // Визначаємо стилі в залежності від типу реклами
   // Правила:

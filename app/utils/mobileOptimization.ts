@@ -11,48 +11,36 @@ export function addMobileOptimizations(): void {
   // Додаємо стилі для оптимізації анімацій
   const style = document.createElement('style');
   style.textContent = `
-    /* Оптимізація для мобільних пристроїв */
+    /* Оптимізація для мobile */
     * {
       -webkit-tap-highlight-color: transparent;
-      -webkit-touch-callout: none;
     }
     
-    /* Використовуємо GPU прискорення для анімацій */
-    [class*="transition"],
-    [class*="animate"],
-    img,
-    button,
-    .hover\\:scale-110 {
-      will-change: transform;
-      transform: translateZ(0);
-      backface-visibility: hidden;
-      perspective: 1000px;
+    /* GPU для зображень — без transform на контейнерах (ламає position: fixed) */
+    img {
+      image-rendering: -webkit-optimize-contrast;
     }
     
-    /* Оптимізація скролу */
     body {
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
     
-    /* Оптимізація зображень */
-    img {
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: crisp-edges;
-    }
-    
-    /* Вимкнення виділення тексту для кращої продуктивності на мобільних */
     button,
     [role="button"] {
       -webkit-user-select: none;
       user-select: none;
     }
-    
-    /* Оптимізація шрифтів */
-    body {
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+
+    [data-bottom-nav] {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      z-index: 1000 !important;
     }
   `;
   document.head.appendChild(style);

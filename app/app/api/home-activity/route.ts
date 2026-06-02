@@ -64,21 +64,25 @@ let serverCache: {
 
 const NEW_LISTINGS_TODAY_SQL = `
   status = 'active'
-  AND COALESCE(publishedAt, createdAt) >= ?
-  AND COALESCE(publishedAt, createdAt) <= ?
+  AND datetime(COALESCE(publishedAt, createdAt)) >= datetime(?)
+  AND datetime(COALESCE(publishedAt, createdAt)) <= datetime(?)
+`;
+
+const CITY_EXPR = `
+  CASE
+    WHEN location IS NULL OR TRIM(location) = '' THEN ''
+    ELSE TRIM(SUBSTR(location, 1, INSTR(location || ',', ',') - 1))
+  END
 `;
 
 const CITY_LISTINGS_SQL = `
   SELECT
-    CASE
-      WHEN location IS NULL OR TRIM(location) = '' THEN ''
-      ELSE TRIM(SUBSTR(location, 1, INSTR(location || ',', ',') - 1))
-    END AS city,
+    ${CITY_EXPR} AS city,
     COUNT(*) AS count
   FROM Listing
   WHERE ${NEW_LISTINGS_TODAY_SQL}
-  GROUP BY city
-  HAVING count > 0
+  GROUP BY ${CITY_EXPR}
+  HAVING COUNT(*) > 0
   ORDER BY count DESC, city ASC
   LIMIT 10
 `;
@@ -89,7 +93,7 @@ const CATEGORY_LISTINGS_SQL = `
   WHERE ${NEW_LISTINGS_TODAY_SQL}
     AND category IS NOT NULL AND TRIM(category) != ''
   GROUP BY category
-  HAVING count > 0
+  HAVING COUNT(*) > 0
   ORDER BY count DESC
   LIMIT 8
 `;
@@ -126,33 +130,41 @@ export async function GET() {
     );
     const newListingsToday = Number(countRows[0]?.count ?? 0);
 
-    const cityRows = await executeWithRetry(
-      () =>
-        prisma.$queryRawUnsafe(
-          CITY_LISTINGS_SQL,
-          dayStartStr,
-          nowStr
-        ) as Promise<Array<{ city: string; count: bigint | number }>>
-    );
+    let newListingsByCity: Array<{ city: string; count: number }> = [];
+    try {
+      const cityRows = await executeWithRetry(
+        () =>
+          prisma.$queryRawUnsafe(
+            CITY_LISTINGS_SQL,
+            dayStartStr,
+            nowStr
+          ) as Promise<Array<{ city: string; count: bigint | number }>>
+      );
+      newListingsByCity = cityRows.map((row) => ({
+        city: (row.city || '').trim(),
+        count: Number(row.count ?? 0),
+      }));
+    } catch (cityErr) {
+      console.error('[home-activity] city breakdown failed:', cityErr);
+    }
 
-    const newListingsByCity = cityRows.map((row) => ({
-      city: (row.city || '').trim(),
-      count: Number(row.count ?? 0),
-    }));
-
-    const categoryRows = await executeWithRetry(
-      () =>
-        prisma.$queryRawUnsafe(
-          CATEGORY_LISTINGS_SQL,
-          dayStartStr,
-          nowStr
-        ) as Promise<Array<{ category: string; count: bigint | number }>>
-    );
-
-    const newListingsByCategory = categoryRows.map((row) => ({
-      category: (row.category || '').trim(),
-      count: Number(row.count ?? 0),
-    }));
+    let newListingsByCategory: Array<{ category: string; count: number }> = [];
+    try {
+      const categoryRows = await executeWithRetry(
+        () =>
+          prisma.$queryRawUnsafe(
+            CATEGORY_LISTINGS_SQL,
+            dayStartStr,
+            nowStr
+          ) as Promise<Array<{ category: string; count: bigint | number }>>
+      );
+      newListingsByCategory = categoryRows.map((row) => ({
+        category: (row.category || '').trim(),
+        count: Number(row.count ?? 0),
+      }));
+    } catch (catErr) {
+      console.error('[home-activity] category breakdown failed:', catErr);
+    }
 
     const online = displayOnlineSynced(now);
 

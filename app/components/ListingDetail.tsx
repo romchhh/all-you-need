@@ -584,12 +584,12 @@ export const ListingDetail = ({
         }}
       />
 
-      {/* Кнопка «Назад» — фіксована під шапкою з лого */}
+      {/* Кнопка «Назад» — фіксована під шапкою з лого, трохи нижче */}
       <button
         type="button"
         onClick={handleBack}
         aria-label={t('common.back')}
-        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+0.35rem)] ${listingHeaderActionClass}`}
+        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)] ${listingHeaderActionClass}`}
       >
         <ArrowLeft size={20} />
       </button>

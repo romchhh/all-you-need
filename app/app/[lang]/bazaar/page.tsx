@@ -115,6 +115,7 @@ const BazaarPage = () => {
   const [isCategoriesModalOpen, setIsCategoriesModalOpen] = useState(false);
   const [selectedCategoryFromModal, setSelectedCategoryFromModal] = useState<string | null>(null);
   const previousListingRef = useRef<Listing | null>(null); // Зберігаємо картку товару перед відкриттям профілю продавця
+  const listingHistoryStack = useRef<Listing[]>([]); // Стек історії переглянутих товарів для навігації назад
   const prevSelectedSeller = useRef<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const lastViewedListingIdRef = useRef<number | null>(null); // Зберігаємо ID останнього переглянутого товару
   const viewModeRef = useRef<'catalog' | 'listing'>('catalog'); // Явний режим перегляду
@@ -728,9 +729,18 @@ const BazaarPage = () => {
           isFavorite={favorites.has(selectedListing.id)}
           onClose={() => {
             setSelectedListing(null);
+            listingHistoryStack.current = []; // Очищаємо стек при закритті
           }}
           onBack={() => {
-            setSelectedListing(null);
+            // Якщо є товари в стеку - повертаємося на попередній
+            if (listingHistoryStack.current.length > 0) {
+              const previousListing = listingHistoryStack.current.pop()!;
+              setSelectedListing(previousListing);
+            } else {
+              // Інакше закриваємо деталі
+              setSelectedListing(null);
+              listingHistoryStack.current = [];
+            }
           }}
           onNavigateToCategory={(categoryId, subcategoryId) => {
             setBazaarTabState((prev) => ({
@@ -742,6 +752,11 @@ const BazaarPage = () => {
           }}
           onToggleFavorite={toggleFavorite}
           onSelectListing={(listing) => {
+            // Додаємо поточний товар в стек перед переходом на новий
+            if (selectedListing) {
+              listingHistoryStack.current.push(selectedListing);
+            }
+            
             // Переходимо в режим товару
             viewModeRef.current = 'listing';
             
@@ -793,6 +808,9 @@ const BazaarPage = () => {
         onSearchChange={handleSearchChange}
         favorites={favorites}
         onSelectListing={(listing) => {
+          // Очищаємо стек при відкритті з каталогу (початок нової навігації)
+          listingHistoryStack.current = [];
+          
           // Переходимо в режим товару
           viewModeRef.current = 'listing';
           
@@ -838,7 +856,7 @@ const BazaarPage = () => {
   };
 
   return (
-    <div className="min-h-screen pb-20 overflow-x-hidden max-w-full">
+    <div className="min-h-screen overflow-x-hidden max-w-full pb-20 animate-content-crossfade">
       {!selectedListing && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (

@@ -38,15 +38,13 @@ export function useAutoPrefetch(currentPath: string) {
   const { prefetchPages } = usePrefetch();
 
   useEffect(() => {
-    // Prefetch популярні сторінки на основі поточної
-    if (currentPath.includes('/bazaar')) {
-      prefetchPages(['/uk/categories', '/uk/favorites', '/uk/profile']);
-    } else if (currentPath.includes('/categories')) {
-      prefetchPages(['/uk/bazaar', '/uk/favorites', '/uk/profile']);
-    } else if (currentPath.includes('/favorites')) {
-      prefetchPages(['/uk/bazaar', '/uk/categories', '/uk/profile']);
-    } else if (currentPath.includes('/profile')) {
-      prefetchPages(['/uk/bazaar', '/uk/categories', '/uk/favorites']);
-    }
+    const langMatch = currentPath.match(/^\/(uk|ru)/);
+    const lang = langMatch?.[1] ?? 'uk';
+    const tabs = ['bazaar', 'categories', 'favorites', 'profile'] as const;
+    const current = tabs.find((tab) => currentPath.includes(`/${tab}`));
+    const toPrefetch = tabs
+      .filter((tab) => tab !== current)
+      .map((tab) => `/${lang}/${tab}`);
+    prefetchPages(toPrefetch);
   }, [currentPath, prefetchPages]);
 }

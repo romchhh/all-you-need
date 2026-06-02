@@ -13,7 +13,7 @@ type CacheEnvelope = {
   fetchedAt: number;
 };
 
-const STORAGE_KEY = 'tradeground.homeActivity.v1';
+const STORAGE_KEY = 'tradeground.homeActivity.v2';
 /** Показуємо кеш одразу; фонове оновлення — не частіше ніж раз на 3 хв (зменшує навантаження). */
 export const HOME_ACTIVITY_CLIENT_TTL_MS = 180 * 1000;
 /** Якщо API недоступний — можна показувати застарілі дані до 15 хв. */

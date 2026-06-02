@@ -1,7 +1,8 @@
 'use client';
 
 import { Users, Package, ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, useMemo, memo } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import {
@@ -15,11 +16,18 @@ type HomeActivityStatsProps = {
   isLight: boolean;
 };
 
+type MenuPosition = {
+  top: number;
+  left: number;
+  width: number;
+};
+
 export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
   const { t, language } = useLanguage();
   const ac = getAppearanceClasses(isLight);
   const [stats, setStats] = useState<HomeActivityData | null>(() => readHomeActivityCache());
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<MenuPosition | null>(null);
   const listingsRef = useRef<HTMLDivElement>(null);
   const windowKeyRef = useRef<string>(stats?.windowKey ?? '');
 
@@ -65,19 +73,46 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
     };
   }, [load]);
 
+  const updateMenuPosition = useCallback(() => {
+    const el = listingsRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setMenuPos({
+      top: rect.bottom + 6,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setMenuPos(null);
+      return;
+    }
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [menuOpen, updateMenuPosition]);
+
   useEffect(() => {
     if (!menuOpen) return;
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (listingsRef.current && !listingsRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
+      const target = event.target as Node;
+      if (listingsRef.current?.contains(target)) return;
+      const portal = document.getElementById('home-activity-city-menu');
+      if (portal?.contains(target)) return;
+      setMenuOpen(false);
     };
-    const timeoutId = setTimeout(() => {
+    const id = window.setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside, { passive: true });
     }, 0);
     return () => {
-      clearTimeout(timeoutId);
+      window.clearTimeout(id);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
@@ -87,19 +122,19 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
   const listings = useMemo(() => stats?.newListingsToday ?? null, [stats?.newListingsToday]);
   const cities = useMemo(() => stats?.newListingsByCity ?? [], [stats?.newListingsByCity]);
 
-  const pillOnline = useMemo(() =>
-    isLight
-      ? 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3 sm:py-2'
-      : 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-2.5 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3 sm:py-2',
-  [isLight]);
+  const pillOnline = useMemo(
+    () =>
+      isLight
+        ? 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3 sm:py-2'
+        : 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-2.5 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3 sm:py-2',
+    [isLight]
+  );
 
   const pillListingsBase = isLight
     ? 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3.5'
     : 'flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-transparent px-1 py-2 text-xs text-white sm:text-sm sm:px-2';
 
-  const pillListingsIdle = isLight
-    ? pillListingsBase
-    : pillListingsBase;
+  const pillListingsIdle = pillListingsBase;
 
   const pillListingsActive = isLight
     ? `${pillListingsBase} border-[#3F5331]/40 ring-[#3F5331]/15`
@@ -111,9 +146,9 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
     : 'font-semibold tabular-nums text-white';
   const mutedClass = isLight ? ac.mutedText : 'text-white/75';
 
-  const dropdownPanel = isLight
-    ? 'absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-y-auto rounded-xl border border-gray-200/90 bg-white py-1.5 shadow-lg ring-1 ring-black/[0.04]'
-    : 'absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-y-auto rounded-xl bg-[#0a0a0a] py-2 shadow-lg';
+  const dropdownPanelClass = isLight
+    ? 'max-h-56 overflow-y-auto rounded-xl border border-gray-200/90 bg-white py-1.5 shadow-lg ring-1 ring-black/[0.04]'
+    : 'max-h-56 overflow-y-auto rounded-xl border border-white/10 bg-[#0a0a0a] py-2 shadow-lg';
 
   const dropdownHeaderClass = isLight
     ? `px-3 pb-1.5 pt-0.5 text-[11px] font-medium uppercase tracking-wide ${ac.mutedText}`
@@ -122,8 +157,55 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
   const dropdownRowClass = isLight ? 'text-gray-900' : 'text-white';
   const dropdownDivider = isLight ? 'divide-black/[0.04]' : 'divide-white/[0.08]';
 
+  const cityMenu =
+    menuOpen && stats && menuPos && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            id="home-activity-city-menu"
+            role="listbox"
+            aria-label={t('bazaar.activityListingsByCity')}
+            className={dropdownPanelClass}
+            style={{
+              position: 'fixed',
+              top: menuPos.top,
+              left: menuPos.left,
+              width: menuPos.width,
+              zIndex: 200,
+            }}
+          >
+            <div className={dropdownHeaderClass}>{t('bazaar.activityListingsByCity')}</div>
+            {cities.length === 0 ? (
+              <p className={`px-3 py-2.5 text-sm leading-snug ${isLight ? ac.mutedText : 'text-white/70'}`}>
+                {t('bazaar.activityListingsByCityEmpty')}
+              </p>
+            ) : (
+              <ul className={`divide-y ${dropdownDivider}`}>
+                {cities.map(({ city, count }) => {
+                  const label = city ? city : t('bazaar.activityOtherCity');
+                  return (
+                    <li
+                      key={city || '__other__'}
+                      className={`px-3 py-2.5 text-sm leading-snug ${dropdownRowClass}`}
+                      role="option"
+                    >
+                      <span className="block min-w-0">
+                        {t('bazaar.activityCityRow', {
+                          city: label,
+                          count: fmt(count),
+                        })}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
-    <div className="flex w-full flex-wrap gap-2 sm:gap-2.5">
+    <div className="relative z-20 flex w-full flex-wrap gap-2 sm:gap-2.5">
       <div className={pillOnline} role="status">
         <span
           className={
@@ -173,40 +255,9 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
             />
           )}
         </button>
-
-        {menuOpen && stats && (
-          <div className={dropdownPanel} role="listbox" aria-label={t('bazaar.activityListingsByCity')}>
-            <div className={dropdownHeaderClass}>
-              {t('bazaar.activityListingsByCity')}
-            </div>
-            {cities.length === 0 ? (
-              <p className={`px-3 py-2 text-sm ${isLight ? ac.mutedText : 'text-white/70'}`}>
-                {t('bazaar.activityListingsByCityEmpty')}
-              </p>
-            ) : (
-              <ul className={`divide-y ${dropdownDivider}`}>
-                {cities.map(({ city, count }) => {
-                  const label = city ? city : t('bazaar.activityOtherCity');
-                  return (
-                    <li
-                      key={city || '__other__'}
-                      className={`px-3 py-2.5 text-sm leading-snug ${dropdownRowClass}`}
-                      role="option"
-                    >
-                      <span className="block min-w-0">
-                        {t('platformTicker.activity.cityToday', {
-                          city: label,
-                          count: String(count),
-                        })}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        )}
       </div>
+
+      {cityMenu}
     </div>
   );
 });

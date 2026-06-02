@@ -396,9 +396,11 @@ class ModerationManager:
                 )
                 row = cursor.fetchone()
                 existing_published = row[0] if row else None
-                existing_expires = row[1] if row else None
+                
+                # При перепублікації в канал завжди оновлюємо expiresAt на нові 30 днів
+                # Це виправляє баг коли оголошення деактивується через 2-3 дні після repost
                 published_at = existing_published if existing_published else datetime.now()
-                expires_at = existing_expires if existing_expires else datetime.now() + timedelta(days=30)
+                expires_at = datetime.now() + timedelta(days=30)  # Завжди нові 30 днів
 
                 cursor.execute("""
                     UPDATE Listing
