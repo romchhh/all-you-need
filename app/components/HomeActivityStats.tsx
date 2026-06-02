@@ -1,7 +1,7 @@
 'use client';
 
 import { Users, Package, ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import {
@@ -15,14 +15,13 @@ type HomeActivityStatsProps = {
   isLight: boolean;
 };
 
-export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
+export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
   const { t, language } = useLanguage();
   const ac = getAppearanceClasses(isLight);
   const [stats, setStats] = useState<HomeActivityData | null>(() => readHomeActivityCache());
   const [menuOpen, setMenuOpen] = useState(false);
   const listingsRef = useRef<HTMLDivElement>(null);
   const windowKeyRef = useRef<string>(stats?.windowKey ?? '');
-  const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applyStats = useCallback((data: HomeActivityData) => {
     if (data.windowKey && windowKeyRef.current && data.windowKey !== windowKeyRef.current) {
@@ -63,7 +62,6 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('tradeground-home-refresh', onHomeRefresh);
-      if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
     };
   }, [load]);
 
@@ -156,10 +154,6 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
           disabled={!stats}
           onClick={() => {
             if (!stats) return;
-            if (clickTimeoutRef.current) return;
-            clickTimeoutRef.current = setTimeout(() => {
-              clickTimeoutRef.current = null;
-            }, 300);
             setMenuOpen((open) => !open);
           }}
         >
@@ -215,4 +209,4 @@ export function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
       </div>
     </div>
   );
-}
+});

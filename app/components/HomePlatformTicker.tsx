@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getCategories } from '@/constants/categories';
 import {
@@ -20,7 +20,7 @@ type HomePlatformTickerProps = {
 
 const WELCOME_ID = 'platformTicker:welcome';
 
-export function HomePlatformTicker({ isLight }: HomePlatformTickerProps) {
+export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: HomePlatformTickerProps) {
   const { t } = useLanguage();
   const [current, setCurrent] = useState<TickerMessage | null>(null);
   const [animClass, setAnimClass] = useState<'animate-ticker-in' | 'animate-ticker-out'>('animate-ticker-in');
@@ -170,4 +170,4 @@ export function HomePlatformTicker({ isLight }: HomePlatformTickerProps) {
       </p>
     </div>
   );
-}
+});
