@@ -610,7 +610,7 @@ const ProfilePage = () => {
         {renderContent()}
       </div>
 
-      {!isEditModalOpen && (
+      {!isEditModalOpen && !isCreateListingModalOpen && (
       <BottomNavigation
         activeTab="profile"
         onTabChange={(tab) => {

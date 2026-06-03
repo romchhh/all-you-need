@@ -12,7 +12,7 @@ import {
   type TickerMessage,
   type TickerMessageType,
 } from '@/utils/platformTickerMessages';
-import { fetchHomeActivity } from '@/utils/homeActivityClient';
+import { fetchHomeActivity, onHomeActivityDayRollover } from '@/utils/homeActivityClient';
 
 type HomePlatformTickerProps = {
   isLight: boolean;
@@ -86,14 +86,20 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
   }, [pickAndShow]);
 
   const applyTickerPools = useCallback(
-    (initial: boolean, started: { value: boolean }) => {
+    (initial: boolean, started: { value: boolean }, activity?: {
+      newListingsToday: number;
+      newListingsByCity: Array<{ city: string; count: number }>;
+      newListingsByCategory: Array<{ category: string; count: number }>;
+    }) => {
       const categories = getCategories(t);
       const messages = buildTickerMessages(t, categories, {
-        newListingsToday: 0,
-        newListingsByCity: [],
-        newListingsByCategory: [],
+        newListingsToday: activity?.newListingsToday ?? 0,
+        newListingsByCity: activity?.newListingsByCity ?? [],
+        newListingsByCategory: activity?.newListingsByCategory ?? [],
       });
       poolsRef.current = groupTickerMessages(messages);
+      shownRef.current.clear();
+      typeCountsRef.current = { system: 0, activity: 0, tips: 0 };
 
       if (initial && !started.value) {
         started.value = true;
@@ -104,50 +110,54 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
     [pickAndShow, scheduleNext, t]
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    const started = { value: false };
-
-    const load = async (initial: boolean) => {
+  const reloadActivityPools = useCallback(
+    async (initial: boolean, started: { value: boolean }) => {
       try {
-        const data = await fetchHomeActivity();
-        if (cancelled || !data) {
-          if (initial && !started.value) applyTickerPools(true, started);
+        const data = await fetchHomeActivity({ force: true });
+        if (!data) {
+          if (initial) applyTickerPools(true, started);
           return;
         }
 
-        const categories = getCategories(t);
-        const messages = buildTickerMessages(t, categories, {
+        applyTickerPools(initial, started, {
           newListingsToday: data.newListingsToday ?? 0,
           newListingsByCity: Array.isArray(data.newListingsByCity) ? data.newListingsByCity : [],
           newListingsByCategory: Array.isArray(data.newListingsByCategory)
             ? data.newListingsByCategory
             : [],
         });
-
-        poolsRef.current = groupTickerMessages(messages);
-
-        if (initial && !started.value) {
-          started.value = true;
-          pickAndShow(true);
-          scheduleNext();
-        }
       } catch {
-        if (!cancelled && initial) applyTickerPools(true, started);
+        if (initial) applyTickerPools(true, started);
       }
+    },
+    [applyTickerPools]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const started = { value: false };
+
+    const load = async (initial: boolean) => {
+      if (cancelled) return;
+      await reloadActivityPools(initial, started);
     };
 
     void load(true);
 
     const refreshId = setInterval(() => void load(false), 10 * 60_000);
+    const unsubscribeRollover = onHomeActivityDayRollover(() => {
+      if (cancelled) return;
+      void reloadActivityPools(false, started);
+    });
 
     return () => {
       cancelled = true;
       clearInterval(refreshId);
+      unsubscribeRollover();
       if (timerRef.current) clearTimeout(timerRef.current);
       if (transitionRef.current) clearTimeout(transitionRef.current);
     };
-  }, [t, pickAndShow, scheduleNext, applyTickerPools]);
+  }, [reloadActivityPools]);
 
   const displayMessage = current ?? welcomeMessage;
 

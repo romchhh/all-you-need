@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/useToast';
+import { useHideBottomNav } from '@/hooks/useHideBottomNav';
 
 // Динамічні імпорти для оптимізації
 const ListingPackageModal = dynamic(() => import('./ListingPackageModal'), { ssr: false });
@@ -39,6 +40,8 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
   const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'balance' | 'direct'>('balance');
   const [userBalance, setUserBalance] = useState<number>(0);
+
+  useHideBottomNav(isOpen);
 
   // Хелпер для отримання telegramId з різних джерел
   const getTelegramId = (): string | null => {

@@ -907,7 +907,7 @@ export const CreateListingModal = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[70] flex flex-col overflow-hidden font-montserrat"
+      className="fixed inset-0 z-[1100] flex flex-col overflow-hidden font-montserrat"
       style={rootOverlayStyle}
       onTouchMove={(e) => {
         // Предотвращаем закрытие приложения во время перетаскивания
@@ -1516,10 +1516,10 @@ export const CreateListingModal = ({
           )}
         </div>
 
-        {/* Кнопки - фіксовані знизу поверх головного меню */}
+        {/* Кнопки - фіксовані знизу (меню ховається через useHideBottomNav) */}
         <div 
           ref={buttonsRef}
-          className={`fixed bottom-0 left-0 right-0 border-t px-4 pt-3 pb-3 flex gap-2 z-[80] safe-area-bottom transition-transform duration-200 ease-in-out ${
+          className={`fixed bottom-0 left-0 right-0 border-t px-4 pt-3 pb-3 flex gap-2 z-[1101] safe-area-bottom transition-transform duration-200 ease-in-out ${
             isLight ? 'bg-white border-gray-200' : 'bg-black border-white/20'
           }`} 
           style={{ 

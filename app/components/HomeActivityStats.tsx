@@ -7,7 +7,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import {
   fetchHomeActivity,
+  getHomeActivityWindowKey,
   HOME_ACTIVITY_CLIENT_TTL_MS,
+  onHomeActivityDayRollover,
   readHomeActivityCache,
   type HomeActivityData,
 } from '@/utils/homeActivityClient';
@@ -71,6 +73,22 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('tradeground-home-refresh', onHomeRefresh);
     };
+  }, [load]);
+
+  useEffect(() => {
+    return onHomeActivityDayRollover(() => {
+      const windowKey = getHomeActivityWindowKey();
+      windowKeyRef.current = windowKey;
+      setMenuOpen(false);
+      setStats((prev) => ({
+        online: prev?.online ?? 0,
+        newListingsToday: 0,
+        newListingsByCity: [],
+        newListingsByCategory: [],
+        windowKey,
+      }));
+      void load(true);
+    });
   }, [load]);
 
   const updateMenuPosition = useCallback(() => {

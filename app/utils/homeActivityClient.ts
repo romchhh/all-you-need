@@ -1,4 +1,7 @@
-import { kyivListingsWindowKey } from '@/utils/kyivListingsDayWindow';
+import {
+  kyivListingsWindowKey,
+  msUntilNextKyivListingsWindowBoundary,
+} from '@/utils/kyivListingsDayWindow';
 
 export type HomeActivityData = {
   online: number;
@@ -21,6 +24,12 @@ const STALE_FALLBACK_MS = 15 * 60 * 1000;
 
 let memoryCache: CacheEnvelope | null = null;
 let inflight: Promise<HomeActivityData | null> | null = null;
+
+type DayRolloverListener = () => void;
+const dayRolloverListeners = new Set<DayRolloverListener>();
+let dayRolloverTimer: ReturnType<typeof setTimeout> | null = null;
+let dayRolloverWatchStarted = false;
+let lastKnownWindowKey = '';
 
 function isValidPayload(data: unknown): data is HomeActivityData {
   if (!data || typeof data !== 'object') return false;
@@ -77,6 +86,67 @@ function writeStorage(envelope: CacheEnvelope): void {
 
 function currentWindowKey(): string {
   return kyivListingsWindowKey(new Date());
+}
+
+export function getHomeActivityWindowKey(): string {
+  return currentWindowKey();
+}
+
+export function clearHomeActivityCache(): void {
+  memoryCache = null;
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function notifyDayRollover(): void {
+  clearHomeActivityCache();
+  lastKnownWindowKey = currentWindowKey();
+  dayRolloverListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      /* ignore listener errors */
+    }
+  });
+}
+
+function scheduleDayRolloverTimer(): void {
+  if (typeof window === 'undefined') return;
+  if (dayRolloverTimer) clearTimeout(dayRolloverTimer);
+  const delay = msUntilNextKyivListingsWindowBoundary() + 250;
+  dayRolloverTimer = setTimeout(() => {
+    notifyDayRollover();
+    scheduleDayRolloverTimer();
+  }, delay);
+}
+
+function ensureDayRolloverWatch(): void {
+  if (dayRolloverWatchStarted || typeof window === 'undefined') return;
+  dayRolloverWatchStarted = true;
+  lastKnownWindowKey = currentWindowKey();
+  scheduleDayRolloverTimer();
+
+  // Fallback: у фоновій вкладці setTimeout може спрацювати пізніше.
+  window.setInterval(() => {
+    const key = currentWindowKey();
+    if (lastKnownWindowKey && lastKnownWindowKey !== key) {
+      notifyDayRollover();
+      scheduleDayRolloverTimer();
+    }
+  }, 60_000);
+}
+
+/** Підписка на скидання «+N сьогодні» о 06:00 Europe/Kyiv. */
+export function onHomeActivityDayRollover(listener: DayRolloverListener): () => void {
+  ensureDayRolloverWatch();
+  dayRolloverListeners.add(listener);
+  return () => {
+    dayRolloverListeners.delete(listener);
+  };
 }
 
 function isFresh(envelope: CacheEnvelope, windowKey: string): boolean {
@@ -144,7 +214,10 @@ export async function fetchHomeActivity(options?: {
   });
 
   const fresh = await inflight;
-  if (fresh) return fresh;
+  if (fresh) {
+    lastKnownWindowKey = fresh.windowKey || currentWindowKey();
+    return fresh;
+  }
 
   if (cached && isUsable(cached, windowKey)) {
     return cached.data;

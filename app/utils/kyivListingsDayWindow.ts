@@ -76,6 +76,17 @@ export function startOfKyivListingsReportingWindow(ref: Date): Date {
   return utcAtKyivYmdHourMinute(anchorYmd, LISTINGS_DAY_START_HOUR_KYIV, 0);
 }
 
+/** Кінець поточного добового вікна — наступні 06:00 Europe/Kyiv. */
+export function endOfKyivListingsReportingWindow(ref: Date): Date {
+  const start = startOfKyivListingsReportingWindow(ref);
+  return new Date(start.getTime() + 24 * 60 * 60 * 1000);
+}
+
+/** Мілісекунди до наступного скидання «сьогодні» (06:00 Kyiv). */
+export function msUntilNextKyivListingsWindowBoundary(ref: Date = new Date()): number {
+  return Math.max(0, endOfKyivListingsReportingWindow(ref).getTime() - ref.getTime());
+}
+
 /** Ключ вікна для клієнта: змінюється о 06:00 Kyiv → скидання «сьогодні». */
 export function kyivListingsWindowKey(ref: Date): string {
   return kyivYmd(startOfKyivListingsReportingWindow(ref));

@@ -31,9 +31,26 @@ export const BottomNavigation = ({
   const pathname = usePathname();
   const lang = (params?.lang as string) || 'uk';
   const [mounted, setMounted] = useState(false);
+  const [hiddenByOverlay, setHiddenByOverlay] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const syncHiddenState = () => {
+      setHiddenByOverlay(document.body.hasAttribute('data-hide-bottom-nav'));
+    };
+
+    syncHiddenState();
+
+    const observer = new MutationObserver(syncHiddenState);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-hide-bottom-nav'],
+    });
+
+    return () => observer.disconnect();
   }, []);
 
   const getActiveTab = () => {
@@ -92,7 +109,7 @@ export const BottomNavigation = ({
     router.push(`/${lang}/${route}`);
   };
 
-  if (!mounted || typeof document === 'undefined') {
+  if (!mounted || hiddenByOverlay || typeof document === 'undefined') {
     return null;
   }
 

@@ -7,6 +7,7 @@ import { germanCities } from '@/constants/german-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useToast } from '@/hooks/useToast';
+import { useHideBottomNav } from '@/hooks/useHideBottomNav';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { FixedLogoHeader } from '@/components/FixedLogoHeader';
 import { ConfirmModal } from './ConfirmModal';
@@ -33,6 +34,7 @@ export const EditListingModal = ({
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const { showToast } = useToast();
+  useHideBottomNav(isOpen);
   const [formScrollParent, setFormScrollParent] = useState<HTMLDivElement | null>(null);
   const categories = getCategories(t);
   const [title, setTitle] = useState(listing.title);
@@ -1548,7 +1550,7 @@ export const EditListingModal = ({
           </div>
         </div>
 
-        {/* Кнопки - фіксовані знизу поверх головного меню */}
+        {/* Кнопки - фіксовані знизу (меню ховається через useHideBottomNav) */}
         <div 
           ref={buttonsRef}
           className={`border-t px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg transition-transform duration-200 ease-in-out ${
