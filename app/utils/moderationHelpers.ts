@@ -46,6 +46,52 @@ export async function getListingWithUser(listingId: number): Promise<ListingWith
   return listing;
 }
 
+/** Чи потрібна нова дата публікації (реактивація після expired/rejected/deactivated). */
+export function shouldResetPublicationDate(listing: {
+  publishedAt?: string | Date | null;
+  expiresAt?: string | Date | null;
+  status?: string | null;
+  moderationStatus?: string | null;
+}): boolean {
+  const status = (listing.status || '').toLowerCase();
+  const mod = (listing.moderationStatus || '').toLowerCase();
+  if (['expired', 'rejected', 'deactivated', 'sold', 'hidden'].includes(status)) {
+    return true;
+  }
+  if (['expired', 'rejected'].includes(mod)) {
+    return true;
+  }
+  const published = listing.publishedAt ? parseDbDate(listing.publishedAt) : null;
+  if (published && published.getTime() < addDays(new Date(), -30).getTime()) {
+    return true;
+  }
+  const expires = listing.expiresAt ? parseDbDate(listing.expiresAt) : null;
+  if (expires && expires.getTime() <= Date.now()) {
+    return true;
+  }
+  return false;
+}
+
+/** Дати публікації/закінчення після схвалення модерації. */
+export function getPublicationTimestampsForApproval(listing: {
+  publishedAt?: string | Date | null;
+  expiresAt?: string | Date | null;
+  status?: string | null;
+  moderationStatus?: string | null;
+}): { publishedAt: string; expiresAt: string } {
+  const now = new Date();
+  if (shouldResetPublicationDate(listing)) {
+    return {
+      publishedAt: nowSQLite(),
+      expiresAt: toSQLiteDate(addDays(now, 30)),
+    };
+  }
+  return {
+    publishedAt: preservedDbTimestamp(listing.publishedAt, nowSQLite),
+    expiresAt: preservedDbTimestamp(listing.expiresAt, () => toSQLiteDate(addDays(now, 30))),
+  };
+}
+
 /** Зберігає дату першої публікації при повторному схваленні після редагування. */
 export function preservedDbTimestamp(
   existing: string | Date | null | undefined,
@@ -65,11 +111,13 @@ export function preservedDbTimestamp(
 export async function approveListing(listing: ListingWithUser): Promise<void> {
   await ensurePromotionPurchaseTable();
   const nowStr = nowSQLite();
-  const publishedAtStr = preservedDbTimestamp(listing.publishedAt, nowSQLite);
-  const expiresAtStr = preservedDbTimestamp(
-    listing.expiresAt,
-    () => toSQLiteDate(addDays(new Date(), 30))
-  );
+  const { publishedAt: publishedAtStr, expiresAt: expiresAtStr } =
+    getPublicationTimestampsForApproval({
+      publishedAt: listing.publishedAt,
+      expiresAt: listing.expiresAt,
+      status: listing.status,
+      moderationStatus: listing.moderationStatus,
+    });
   
   // Оновлюємо оголошення - встановлюємо статус 'active'
   await prisma.$executeRawUnsafe(

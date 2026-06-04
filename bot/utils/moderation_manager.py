@@ -299,6 +299,31 @@ class ModerationManager:
         except:
             return str(date_str)
     
+    def _should_reset_publication_date(self, listing: Optional[dict]) -> bool:
+        """Нова дата публікації для реактивованих (expired/rejected) або прострочених оголошень."""
+        if not listing:
+            return True
+        status = (listing.get('status') or '').lower()
+        mod = (listing.get('moderationStatus') or '').lower()
+        if status in ('expired', 'rejected', 'deactivated', 'sold'):
+            return True
+        if mod in ('expired', 'rejected'):
+            return True
+        published_at = listing.get('publishedAt')
+        if published_at:
+            try:
+                if isinstance(published_at, str):
+                    pub = datetime.fromisoformat(str(published_at).replace('Z', '+00:00'))
+                else:
+                    pub = published_at
+                if getattr(pub, 'tzinfo', None):
+                    pub = pub.replace(tzinfo=None)
+                if pub < datetime.now() - timedelta(days=30):
+                    return True
+            except Exception:
+                pass
+        return False
+
     async def approve_listing(
         self,
         listing_id: int,
@@ -310,7 +335,10 @@ class ModerationManager:
                 admin_id = None
                 if admin_telegram_id:
                     admin_id = self._get_admin_id_by_telegram_id(admin_telegram_id)
-                
+
+                listing_before = get_telegram_listing_by_id(listing_id)
+                reset_publication = self._should_reset_publication_date(listing_before)
+
                 success = update_telegram_listing_moderation_status(
                     listing_id=listing_id,
                     status='approved',
@@ -324,6 +352,12 @@ class ModerationManager:
                     if payment_status != 'paid':
                         print(f"Listing {listing_id} не оплачене. Публікація неможлива.")
                         return False
+
+                    if reset_publication:
+                        try:
+                            await self.delete_from_channel(listing_id)
+                        except Exception as del_err:
+                            print(f"Не вдалося видалити старе повідомлення з каналу для {listing_id}: {del_err}")
                     
                     channel_message_id = await self._publish_to_channel(listing_id)
                     
@@ -338,13 +372,15 @@ class ModerationManager:
                     if not has_channel_message_id:
                         cursor.execute("ALTER TABLE TelegramListing ADD COLUMN channelMessageId INTEGER")
                     # channelMessageId вже збережено в _publish_to_channel (JSON з усіма message_id медіа-групи) — не перезаписуємо
-                    cursor.execute(
-                        "SELECT publishedAt FROM TelegramListing WHERE id = ?",
-                        (listing_id,),
-                    )
-                    tl_row = cursor.fetchone()
-                    existing_tl_published = tl_row[0] if tl_row else None
-                    published_tl_at = existing_tl_published if existing_tl_published else datetime.now()
+                    published_tl_at = datetime.now() if reset_publication else None
+                    if published_tl_at is None:
+                        cursor.execute(
+                            "SELECT publishedAt FROM TelegramListing WHERE id = ?",
+                            (listing_id,),
+                        )
+                        tl_row = cursor.fetchone()
+                        existing_tl_published = tl_row[0] if tl_row else None
+                        published_tl_at = existing_tl_published if existing_tl_published else datetime.now()
 
                     cursor.execute("""
                         UPDATE TelegramListing
@@ -391,16 +427,24 @@ class ModerationManager:
                     admin_id = self._get_admin_id_by_telegram_id(admin_telegram_id)
                 
                 cursor.execute(
-                    "SELECT publishedAt, expiresAt FROM Listing WHERE id = ?",
+                    "SELECT publishedAt, expiresAt, status, moderationStatus FROM Listing WHERE id = ?",
                     (listing_id,),
                 )
                 row = cursor.fetchone()
                 existing_published = row[0] if row else None
+                listing_snapshot = {
+                    'publishedAt': existing_published,
+                    'expiresAt': row[1] if row else None,
+                    'status': row[2] if row else None,
+                    'moderationStatus': row[3] if row else None,
+                }
+                reset_publication = self._should_reset_publication_date(listing_snapshot)
                 
-                # При перепублікації в канал завжди оновлюємо expiresAt на нові 30 днів
-                # Це виправляє баг коли оголошення деактивується через 2-3 дні після repost
-                published_at = existing_published if existing_published else datetime.now()
-                expires_at = datetime.now() + timedelta(days=30)  # Завжди нові 30 днів
+                # При перепублікації завжди оновлюємо expiresAt на нові 30 днів
+                published_at = datetime.now() if reset_publication else (
+                    existing_published if existing_published else datetime.now()
+                )
+                expires_at = datetime.now() + timedelta(days=30)
 
                 cursor.execute("""
                     UPDATE Listing
