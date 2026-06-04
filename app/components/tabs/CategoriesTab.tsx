@@ -5,7 +5,7 @@ import { SubcategoryList } from '../SubcategoryList';
 import { ListingCard } from '../ListingCard';
 import { CategoryIcon } from '../CategoryIcon';
 import { STICKY_BELOW_APP_HEADER_CLASS } from '../FixedLogoHeader';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { Gift, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -49,79 +49,27 @@ export const CategoriesTab = ({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  // Ініціалізуємо стан з savedState або з localStorage як fallback
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
-    if (savedState?.selectedCategory !== undefined) {
-      return savedState.selectedCategory;
-    }
-    // Fallback до localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('categoriesTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.selectedCategory || null;
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return null;
-  });
-  
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(() => {
-    if (savedState?.selectedSubcategory !== undefined) {
-      return savedState.selectedSubcategory;
-    }
-    // Fallback до localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('categoriesTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.selectedSubcategory || null;
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return null;
-  });
-  
-  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(() => {
-    if (savedState?.showFreeOnly !== undefined) {
-      return savedState.showFreeOnly;
-    }
-    // Fallback до localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('categoriesTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.showFreeOnly || false;
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return false;
-  });
-  
-  // Синхронізуємо локальний стан з savedState при його зміні
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(
+    () => savedState?.selectedCategory ?? null
+  );
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(
+    () => savedState?.selectedSubcategory ?? null
+  );
+  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(() => savedState?.showFreeOnly ?? false);
+  const categoryButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
   useEffect(() => {
-    if (savedState) {
-      // Оновлюємо стан тільки якщо він справді змінився, щоб уникнути нескінченних циклів
-      if (savedState.selectedCategory !== selectedCategory) {
-        setSelectedCategory(savedState.selectedCategory);
-      }
-      if (savedState.selectedSubcategory !== selectedSubcategory) {
-        setSelectedSubcategory(savedState.selectedSubcategory);
-      }
-      if (savedState.showFreeOnly !== showFreeOnly) {
-        setShowFreeOnly(savedState.showFreeOnly);
-      }
-    }
+    if (!savedState) return;
+    setSelectedCategory(savedState.selectedCategory);
+    setSelectedSubcategory(savedState.selectedSubcategory);
+    setShowFreeOnly(savedState.showFreeOnly);
   }, [savedState?.selectedCategory, savedState?.selectedSubcategory, savedState?.showFreeOnly]);
+
+  useLayoutEffect(() => {
+    if (!selectedCategory) return;
+    const button = categoryButtonRefs.current.get(selectedCategory);
+    button?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [selectedCategory, selectedSubcategory]);
   
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   
@@ -174,15 +122,7 @@ export const CategoriesTab = ({
       filtered = filtered.filter(listing => listing.isFree || listing.price.toLowerCase().includes('безкоштовно'));
     }
 
-    // Фільтр по категорії
-    if (selectedCategory && selectedCategory !== 'free') {
-      filtered = filtered.filter(listing => listing.category === selectedCategory);
-    }
-
-    // Фільтр по підкатегорії
-    if (selectedSubcategory) {
-      filtered = filtered.filter(listing => listing.subcategory === selectedSubcategory);
-    }
+    // Категорія/підкатегорія — на сервері (сторінка categories). Тут лише «безкоштовні».
 
     return filtered;
   }, [listings, selectedCategory, selectedSubcategory, showFreeOnly]);
@@ -253,6 +193,10 @@ export const CategoriesTab = ({
           {allCategories.map(category => (
             <button
               key={category.id}
+              ref={(node) => {
+                if (node) categoryButtonRefs.current.set(category.id, node);
+                else categoryButtonRefs.current.delete(category.id);
+              }}
               onClick={() => {
                 if (selectedCategory === category.id) {
                   setSelectedCategory(null);

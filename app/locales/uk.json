@@ -190,6 +190,7 @@
         "allCategories": "Всі категорії",
         "clearFilters": "Очистити фільтри",
         "search": {
+          "pageTitle": "Пошук по категоріях",
           "popularQueries": "Популярні запити",
           "recentQueries": "Останні пошуки",
           "recentSearchListings": "З останніх пошуків",
@@ -430,7 +431,14 @@
     "soldListings": "проданих оголошень"
   },
   "listingDetail": {
-    "telegramIdNotFound": "Telegram ID не знайдено"
+    "telegramIdNotFound": "Telegram ID не знайдено",
+    "guestViewHint": "Повний перегляд товару, актуальний статус та зв'язок з продавцем доступні у Telegram-боті Trade Ground Marketplace.",
+    "openInTelegramBot": "Відкрити товар у\nTelegram-боті",
+    "guestLoading": "Завантаження товару...",
+    "guestNotFound": "Товар не знайдено або вже неактивний.",
+    "guestNotFoundHint": "Актуальний стан оголошення можна перевірити у нашому Telegram-боті Trade Ground Marketplace.",
+    "guestBackToMarket": "Повернутись на маркет",
+    "guestOpenTelegramBotShort": "Відкрити\nTelegram-бот"
   },
   "faq": {
     "title": "Часті запитання",

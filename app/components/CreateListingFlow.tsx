@@ -292,6 +292,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       formData.append('subcategory', data.subcategory || '');
       formData.append('location', data.location);
       formData.append('condition', data.condition);
+      formData.append('autoRenew', (data.autoRenew === true).toString());
 
       compressedImages.forEach((image: File) => {
         formData.append('images', image);

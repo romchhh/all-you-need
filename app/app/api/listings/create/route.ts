@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
     const subcategory = formData.get('subcategory') as string | null;
     const location = formData.get('location') as string;
     const condition = formData.get('condition') as string;
+    const autoRenew = formData.get('autoRenew') === 'true';
     const allImages = formData.getAll('images') as File[];
     const MAX_PHOTOS = 10;
 
@@ -175,7 +176,18 @@ export async function POST(request: NextRequest) {
     try {
       listingId = await createDraftListing(
         user.id,
-        { title, description, price, currency, isFree, category, subcategory, condition, location: normalizedLocation },
+        {
+          title,
+          description,
+          price,
+          currency,
+          isFree,
+          category,
+          subcategory,
+          condition,
+          location: normalizedLocation,
+          autoRenew,
+        },
         savedImageUrls
       );
       console.log('[Create Listing API] Listing created with ID:', listingId);

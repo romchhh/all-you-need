@@ -8,6 +8,10 @@ import { useTelegram } from '@/hooks/useTelegram';
 import { useToast } from '@/hooks/useToast';
 import { Toast } from '@/components/Toast';
 import { ListingDetail } from '@/components/ListingDetail';
+import { guestListingCopy } from '@/utils/guestListingCopy';
+import { getCategories } from '@/constants/categories';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { navigateToListingCategory } from '@/utils/navigateToListingCategory';
 
 interface ListingPageClientProps {
   listingId: number;
@@ -18,9 +22,11 @@ export default function ListingPageClient({ listingId, lang }: ListingPageClient
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const { tg } = useTelegram();
+  const { t } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const categories = useMemo(() => getCategories(t), [t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -111,31 +117,34 @@ export default function ListingPageClient({ listingId, lang }: ListingPageClient
 
   if (loading) {
     content = (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white">
-        <p>Завантаження товару...</p>
+      <div className="min-h-screen flex items-center justify-center bg-black text-white px-4 text-center">
+        <p>{guestListingCopy.loading}</p>
       </div>
     );
   } else if (!listing) {
     content = (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white px-4 text-center">
-        <p className="mb-3">Товар не знайдено або вже неактивний.</p>
-        <p className="mb-5 text-sm text-white/80 max-w-md">
-          Актуальний стан оголошення можна перевірити у нашому Telegram‑боті Trade Ground Marketplace.
+        <p className="mb-3">{guestListingCopy.notFound}</p>
+        <p className="mb-5 text-sm text-white/80 max-w-md leading-relaxed">
+          {guestListingCopy.notFoundHint}
         </p>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex w-full max-w-sm flex-col gap-3 sm:flex-row sm:justify-center">
           <button
+            type="button"
             onClick={() => router.replace(`/${lang}/bazaar`)}
-            className="px-4 py-2 rounded-xl bg-white text-black font-semibold"
+            className="w-full rounded-xl bg-white px-4 py-3 text-center font-semibold text-black"
           >
-            Повернутись на маркет
+            {guestListingCopy.backToMarket}
           </button>
           <a
             href="https://t.me/TradeGroundBot?start=linktowatch_12"
-            className="px-4 py-2 rounded-xl border border-white text-white font-semibold"
+            className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-white px-4 py-3 text-center font-semibold text-white"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Відкрити Telegram‑бот
+            <span className="block w-full whitespace-pre-line text-center leading-tight">
+              {guestListingCopy.openTelegramBotShort}
+            </span>
           </a>
         </div>
       </div>
@@ -166,6 +175,9 @@ export default function ListingPageClient({ listingId, lang }: ListingPageClient
         }}
         favorites={new Set<number>()}
         tg={tg}
+        onNavigateToCategory={(categoryId, subcategoryId) => {
+          navigateToListingCategory(router, lang, categories, categoryId, subcategoryId);
+        }}
       />
     );
   }

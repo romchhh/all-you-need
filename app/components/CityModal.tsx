@@ -5,6 +5,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { useHideBottomNav } from '@/hooks/useHideBottomNav';
 import { useState, useEffect, Fragment, useRef, useCallback, useMemo, type MouseEvent } from 'react';
 import { normalizeCityInput } from '@/utils/cityNormalization';
 import { germanCities, fetchGermanCitiesFromAPI, isGermanCityValid } from '@/constants/german-cities';
@@ -101,9 +102,10 @@ export const CityModal = ({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
+  useHideBottomNav(isOpen);
   const chipActive = isLight
-    ? 'border border-[#3F5331] text-[#3F5331] bg-transparent'
-    : 'border border-[#C8E6A0]/70 text-[#C8E6A0] bg-[#C8E6A0]/10';
+    ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 text-[#3F5331] font-semibold'
+    : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
   const chipIdle = isLight
     ? 'border border-gray-300 text-gray-800 bg-transparent hover:bg-gray-100'
     : 'border border-white text-white bg-transparent hover:bg-white/10';
@@ -439,7 +441,7 @@ export const CityModal = ({
   return (
     <Fragment>
       <div 
-        className="fixed inset-0 bg-black/40 z-50 flex items-end" 
+        className="fixed inset-0 z-[1100] flex items-end bg-black/40" 
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             // При закритті через клік на фон - застосовуємо вибір міста (якщо є зміни)
@@ -885,7 +887,10 @@ export const CityModal = ({
               )}
 
               {/* Кнопки застосування */}
-              <div className="pt-4 pb-24 flex gap-3">
+              <div
+                className="flex gap-3 pt-4"
+                style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+              >
                 <button
                   type="button"
                   onClick={handleReset}

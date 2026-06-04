@@ -1,4 +1,4 @@
-import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Sparkles, Wrench } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Sparkles, Wrench, Info } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category } from '@/types';
 import { useState, useRef, useEffect, useMemo, type CSSProperties } from 'react';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { CategoryIcon } from './CategoryIcon';
 import { FixedLogoHeader } from '@/components/FixedLogoHeader';
+import { useHideBottomNav } from '@/hooks/useHideBottomNav';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -28,8 +29,12 @@ export const CreateListingModal = ({
   tg
 }: CreateListingModalProps) => {
   const { t, language } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
+  useHideBottomNav(isOpen);
   const { toast, showToast, hideToast } = useToast();
   const categories = getCategories(t);
+  const [autoRenew, setAutoRenew] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -63,9 +68,6 @@ export const CreateListingModal = ({
   const [currencyMenuPosition, setCurrencyMenuPosition] = useState({ top: 0, left: 0, width: 0 });
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [formScrollParent, setFormScrollParent] = useState<HTMLDivElement | null>(null);
-
-  const { isLight } = useTheme();
-  const ac = getAppearanceClasses(isLight);
 
   const rootOverlayStyle = useMemo(
     () =>
@@ -891,6 +893,7 @@ export const CreateListingModal = ({
         location,
         condition,
         images,
+        autoRenew,
       });
       tg?.HapticFeedback.notificationOccurred('success');
       
@@ -1509,6 +1512,47 @@ export const CreateListingModal = ({
             {errors.location && (
               <p className="mt-1 text-sm text-red-400">{errors.location}</p>
             )}
+          </div>
+
+          {/* Автопродовження — останній пункт форми */}
+          <div
+            className={`rounded-2xl border p-4 sm:p-5 ${
+              isLight
+                ? 'border-gray-200/90 bg-white/90 shadow-sm ring-1 ring-black/[0.03]'
+                : 'border-white/12 bg-white/[0.04]'
+            }`}
+          >
+            <div className="mb-3">
+              <h3 className={`text-sm font-semibold sm:text-base ${ac.pageHeading}`}>{t('sales.autoRenew')}</h3>
+              <p className={`mt-1 text-xs leading-relaxed sm:text-sm ${ac.mutedText}`}>{t('sales.autoRenewHint')}</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <label className="flex min-h-[44px] flex-1 cursor-pointer select-none items-center gap-3 sm:min-h-0">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-checked={autoRenew}
+                  className={`h-4 w-4 shrink-0 rounded border accent-[#3F5331] focus:ring-2 focus:ring-[#3F5331]/30 ${
+                    isLight ? 'border-gray-300 bg-white' : 'border-white/40 bg-black/40 accent-[#C8E6A0]'
+                  }`}
+                  checked={autoRenew}
+                  onChange={(e) => {
+                    setAutoRenew(e.target.checked);
+                    tg?.HapticFeedback?.impactOccurred('light');
+                  }}
+                />
+                <span className={`min-w-0 flex-1 text-sm font-medium leading-snug ${ac.pageHeading}`}>
+                  {t('sales.autoRenewShort')}
+                </span>
+              </label>
+              <span
+                className={`mt-0.5 inline-flex shrink-0 ${isLight ? 'text-gray-400' : 'text-white/45'}`}
+                title={t('sales.autoRenewHint')}
+                aria-label={t('sales.autoRenewHint')}
+              >
+                <Info className="h-5 w-5" strokeWidth={2.25} />
+              </span>
+            </div>
           </div>
 
           {errors.images && (

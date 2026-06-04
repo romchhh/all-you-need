@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useHideBottomNav } from '@/hooks/useHideBottomNav';
 
 interface Promotion {
   type: string;
@@ -41,6 +42,7 @@ export default function PromotionModal({
 }: PromotionModalProps) {
   const { t } = useLanguage();
   const { isLight } = useTheme();
+  useHideBottomNav(isOpen);
   const [selectedPromotion, setSelectedPromotion] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [activePromotions, setActivePromotions] = useState<string[]>([]);
@@ -161,8 +163,8 @@ export default function PromotionModal({
 
   const overlayClass = isLight ? 'bg-black/35 backdrop-blur-sm' : 'bg-black/50 backdrop-blur-sm';
   const cardShell = isLight
-    ? 'bg-white rounded-2xl border-2 border-gray-200/90 shadow-xl ring-1 ring-black/[0.06]'
-    : 'bg-[#000000] rounded-2xl border-2 border-white';
+    ? 'bg-white border-gray-200/90 shadow-xl ring-1 ring-black/[0.06]'
+    : 'bg-[#000000] border-white';
   const headerBar = isLight
     ? 'bg-white border-b border-gray-200/90'
     : 'bg-[#000000] border-b border-white/20';
@@ -176,8 +178,12 @@ export default function PromotionModal({
 
   return (
     <div 
-      className={`fixed inset-0 z-[99999] flex max-lg:flex-col max-lg:items-center max-lg:justify-start lg:items-center lg:justify-center justify-center overflow-y-auto overscroll-contain p-4 max-lg:pt-[max(32dvh,calc(env(safe-area-inset-top,0px)+9rem))] lg:pt-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-8 ${overlayClass}`}
-      style={{ touchAction: 'none' }}
+      className={`fixed inset-0 z-[99999] flex items-center justify-center px-4 ${overlayClass}`}
+      style={{
+        touchAction: 'none',
+        paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+      }}
       onTouchMove={(e) => {
         if (e.target === e.currentTarget) {
           e.preventDefault();
@@ -185,7 +191,7 @@ export default function PromotionModal({
       }}
     >
       <div 
-        className={`max-w-md w-full max-h-[min(calc(100dvh-env(safe-area-inset-top,0px)-max(32dvh,9rem)),calc(100vh-env(safe-area-inset-top,0px)-max(32dvh,9rem)))] lg:max-h-[90vh] overflow-hidden flex flex-col relative z-[100000] my-4 max-lg:my-2 sm:my-2 ${cardShell}`}
+        className={`relative z-[100000] flex h-[80dvh] max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border-2 ${cardShell}`}
         onTouchMove={(e) => {
           // Дозволяємо скрол тільки всередині контенту модального вікна
           const target = e.currentTarget;
@@ -199,7 +205,7 @@ export default function PromotionModal({
         }}
       >
         {/* Header */}
-        <div className={`flex-shrink-0 px-6 py-4 rounded-t-2xl ${headerBar}`}>
+        <div className={`flex-shrink-0 px-6 py-4 ${headerBar}`}>
           <div className="flex items-center justify-between">
             <h2 className={`text-xl font-bold ${titleClass}`}>
               {t('promotions.title')}
@@ -406,7 +412,12 @@ export default function PromotionModal({
         </div>
 
         {/* Footer */}
-        <div className={`flex-shrink-0 px-6 py-4 rounded-b-2xl space-y-2 ${footerBar}`}>
+        <div
+          className={`flex-shrink-0 space-y-2 px-6 py-4 ${footerBar}`}
+          style={{
+            paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+          }}
+        >
           <button
             onClick={handleSelectPromotion}
             disabled={!selectedPromotion || loading}

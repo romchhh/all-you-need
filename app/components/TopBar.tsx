@@ -5,6 +5,7 @@ import React from 'react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { dismissMobileKeyboard } from '@/utils/dismissMobileKeyboard';
 
 interface TopBarProps {
   variant: 'main' | 'detail' | 'profile';
@@ -113,6 +114,8 @@ export const TopBar = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === 'Search') {
                 e.preventDefault();
+                dismissMobileKeyboard();
+                searchInputRef?.current?.blur();
                 const query = searchQuery.trim();
                 if (query && onSearchSubmit) {
                   onSearchSubmit(query);

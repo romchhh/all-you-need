@@ -5,6 +5,7 @@ import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
 import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
+import { resolveStoredListingImages } from '@/utils/resolveListingImageStorage';
 
 // Відключаємо кешування для API route
 export const dynamic = 'force-dynamic';
@@ -382,7 +383,8 @@ export async function GET(request: NextRequest) {
 
       // Форматуємо дані для профілю користувача
       listings = userListings.map((listing: any) => {
-        const images = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+        const rawImages = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+        const images = resolveStoredListingImages(rawImages);
         const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
         const timeFields = listingTimeFieldsForApi(listing);
         let status = listing.status ?? 'active';
@@ -708,8 +710,9 @@ export async function GET(request: NextRequest) {
       const optimizedImages = listing.optimizedImages 
         ? (typeof listing.optimizedImages === 'string' ? JSON.parse(listing.optimizedImages) : listing.optimizedImages)
         : null;
-      // Використовуємо оптимізовані версії якщо є, інакше оригінали
-      const images = optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
+      const sourceImages =
+        optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
+      const images = resolveStoredListingImages(sourceImages);
       const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
       const timeFields = listingTimeFieldsForApi(listing);
 

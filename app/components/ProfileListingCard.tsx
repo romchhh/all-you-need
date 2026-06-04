@@ -24,7 +24,7 @@ interface ProfileListingCardProps {
   onAutoRenewChange?: (listingId: number, autoRenew: boolean) => void;
   showToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
   tg: TelegramWebApp | null;
-  /** У «Мої оголошення» — завжди показувати перегляди та обране (однаковий стиль). */
+  /** У «Мої оголошення» — завжди показувати око та серце з фактичними лічильниками (навіть 0). */
   alwaysShowStats?: boolean;
 }
 
@@ -47,14 +47,21 @@ export const ProfileListingCard = ({
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
 
-  const shownViews = useMemo(
-    () => displayListingViews(listing),
-    [listing.views, listing.createdAt, listing.publishedAt, listing.posted]
-  );
-  const shownFavorites = useMemo(
-    () => displayListingFavoritesCount(listing),
-    [listing.favoritesCount, listing.createdAt, listing.publishedAt, listing.posted]
-  );
+  const shownViews = useMemo(() => {
+    if (alwaysShowStats) return Math.max(0, listing.views ?? 0);
+    return displayListingViews(listing);
+  }, [alwaysShowStats, listing.views, listing.createdAt, listing.publishedAt, listing.posted]);
+
+  const shownFavorites = useMemo(() => {
+    if (alwaysShowStats) return Math.max(0, listing.favoritesCount ?? 0);
+    return displayListingFavoritesCount(listing);
+  }, [
+    alwaysShowStats,
+    listing.favoritesCount,
+    listing.createdAt,
+    listing.publishedAt,
+    listing.posted,
+  ]);
 
   // Перевіряємо статус модерації
   const isPendingModeration = listing.status === 'pending_moderation';
@@ -342,9 +349,8 @@ export const ProfileListingCard = ({
         {(() => {
           const showViews =
             alwaysShowStats || shouldShowListingViews(shownViews);
-          const showFavorites = alwaysShowStats
-            ? shownFavorites > 0
-            : shouldShowListingFavorites(shownViews, shownFavorites);
+          const showFavorites =
+            alwaysShowStats || shouldShowListingFavorites(shownViews, shownFavorites);
           if (!showViews && !showFavorites) return null;
           const statsMuted =
             isSold || isPendingModeration || isDeactivated || isRejected;

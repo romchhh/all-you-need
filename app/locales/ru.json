@@ -190,6 +190,7 @@
         "allCategories": "Все категории",
         "clearFilters": "Очистить фильтры",
         "search": {
+          "pageTitle": "Поиск по категориям",
           "popularQueries": "Популярные запросы",
           "recentQueries": "Последние поиски",
           "recentSearchListings": "Из последних поисков",
@@ -428,7 +429,14 @@
     "soldListings": "проданных объявлений"
   },
   "listingDetail": {
-    "telegramIdNotFound": "Telegram ID не найден"
+    "telegramIdNotFound": "Telegram ID не найден",
+    "guestViewHint": "Полный просмотр товара, актуальный статус и связь с продавцом доступны в Telegram-боте Trade Ground Marketplace.",
+    "openInTelegramBot": "Открыть товар в\nTelegram-боте",
+    "guestLoading": "Загрузка товара...",
+    "guestNotFound": "Товар не найден или уже неактивен.",
+    "guestNotFoundHint": "Актуальный статус объявления можно проверить в нашем Telegram-боте Trade Ground Marketplace.",
+    "guestBackToMarket": "Вернуться на маркет",
+    "guestOpenTelegramBotShort": "Открыть\nTelegram-бот"
   },
   "faq": {
     "title": "Частые вопросы",

@@ -20,6 +20,7 @@ import {
 } from '@/utils/favorites';
 import { loadBazaarTabStateFromStorage } from '@/utils/bazaarTabStateStorage';
 import { getCategories } from '@/constants/categories';
+import { navigateToListingCategory } from '@/utils/navigateToListingCategory';
 
 export default function SearchPage() {
   const params = useParams();
@@ -289,6 +290,9 @@ export default function SearchPage() {
           onAutoRenewPersist={(id, autoRenew) =>
             setSelectedListing((prev) => (prev && prev.id === id ? { ...prev, autoRenew } : prev))
           }
+          onNavigateToCategory={(categoryId, subcategoryId) => {
+            navigateToListingCategory(router, lang, categories, categoryId, subcategoryId);
+          }}
         />
         <Toast
           message={toast.message}

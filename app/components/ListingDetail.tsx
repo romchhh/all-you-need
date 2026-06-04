@@ -27,11 +27,17 @@ import { useRouter, useParams } from 'next/navigation';
 import { FixedLogoHeader } from '@/components/FixedLogoHeader';
 import { getCategories } from '@/constants/categories';
 import { getListingCategoryLabel } from '@/utils/listingCategoryLabel';
+import {
+  resolveListingCategoryFilter,
+  toBazaarHomeCategoryFilter,
+} from '@/utils/listingCategoryFilter';
+import { navigateToListingCategoryResolved } from '@/utils/navigateToListingCategory';
 import { buildListingImageUrl } from '@/utils/listingImageUrl';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { ListingAutoRenewSection } from '@/components/ListingAutoRenewSection';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/utils/listingViewsDisplay';
+import { guestListingCopy } from '@/utils/guestListingCopy';
 import { displayListingFavoritesCount, displayListingViews } from '@/utils/listingDisplayStats';
 import { BRAND_GREEN_ON_DARK, BRAND_GREEN_PRICE_ON_LIGHT } from '@/constants/brandColors';
 
@@ -134,6 +140,8 @@ export const ListingDetail = ({
   const listingPrimaryCtaClass = isLight
     ? 'bg-[#3F5331] text-white hover:bg-[#344728] [&_svg]:text-white'
     : 'border-none bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_22px_rgba(200,230,160,0.48)] hover:bg-[#dff5c0] hover:shadow-[0_0_28px_rgba(200,230,160,0.58)] [&_svg]:text-[#0f1408]';
+  const isGuestBrowserView = isSeoListingRoute || !isTelegramEnv;
+  const guestTelegramCtaClass = `w-full rounded-2xl border-none px-5 py-4 font-montserrat font-semibold flex cursor-pointer flex-col items-center justify-center gap-2.5 text-center transition-colors ${listingPrimaryCtaClass}`;
 
   const categoryLabel = useMemo(
     () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
@@ -226,22 +234,49 @@ export const ListingDetail = ({
 
   const handleOpenCategory = useCallback(() => {
     tg?.HapticFeedback.impactOccurred('light');
+    const resolved = resolveListingCategoryFilter(
+      categories,
+      listing.category,
+      listing.subcategory ?? null
+    );
+    if (!resolved) return;
+
     if (onNavigateToCategory) {
-      onNavigateToCategory(listing.category, listing.subcategory ?? null);
+      const catalog = toBazaarHomeCategoryFilter(resolved);
+      onNavigateToCategory(catalog.categoryId, catalog.subcategoryId);
       return;
     }
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem(
-        'pendingListingCategory',
-        JSON.stringify({
-          category: listing.category,
-          subcategory: listing.subcategory ?? null,
-        })
+
+    navigateToListingCategoryResolved(router, lang, resolved);
+  }, [
+    categories,
+    lang,
+    listing.category,
+    listing.subcategory,
+    onNavigateToCategory,
+    router,
+    tg,
+  ]);
+
+  const buildCategoryListingsSearchParams = useCallback(
+    (offset: number) => {
+      const params = new URLSearchParams({
+        limit: '16',
+        offset: String(offset),
+      });
+      const resolved = resolveListingCategoryFilter(
+        categories,
+        listing.category,
+        listing.subcategory ?? null
       );
-    }
-    onClose();
-    router.push(`/${lang}/bazaar`);
-  }, [lang, listing.category, listing.subcategory, onClose, onNavigateToCategory, router, tg]);
+      if (resolved) {
+        const catalog = toBazaarHomeCategoryFilter(resolved);
+        params.set('category', catalog.categoryId);
+      }
+      return params;
+    },
+    [categories, listing.category, listing.subcategory]
+  );
 
   const listingHeaderActionClass = isLight
     ? 'border-gray-300/90 bg-white/95 text-gray-900 shadow-sm hover:bg-white'
@@ -426,8 +461,9 @@ export const ListingDetail = ({
           }
         }
         
-        // Завантажуємо оголошення з категорії
-        const categoryResponse = await fetch(`/api/listings?category=${listing.category}&limit=16&offset=0`);
+        const categoryResponse = await fetch(
+          `/api/listings?${buildCategoryListingsSearchParams(0).toString()}`
+        );
         if (categoryResponse.ok) {
           const categoryData = await categoryResponse.json();
           const filtered = (categoryData.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -444,7 +480,14 @@ export const ListingDetail = ({
     };
 
     fetchRelatedListings();
-  }, [listing.id, listing.seller.telegramId, listing.category, currentUser?.id]);
+  }, [
+    listing.id,
+    listing.seller.telegramId,
+    listing.category,
+    listing.subcategory,
+    currentUser?.id,
+    buildCategoryListingsSearchParams,
+  ]);
 
   const loadMoreSellerListings = async () => {
     if (!listing.seller.telegramId) return;
@@ -467,7 +510,9 @@ export const ListingDetail = ({
 
   const loadMoreCategoryListings = async () => {
     try {
-      const response = await fetch(`/api/listings?category=${listing.category}&limit=16&offset=${categoryOffset}`);
+      const response = await fetch(
+        `/api/listings?${buildCategoryListingsSearchParams(categoryOffset).toString()}`
+      );
       if (response.ok) {
         const data = await response.json();
         const filtered = (data.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -521,7 +566,9 @@ export const ListingDetail = ({
         }
       }
       
-      const categoryResponse = await fetch(`/api/listings?category=${listing.category}&limit=16&offset=0`);
+      const categoryResponse = await fetch(
+        `/api/listings?${buildCategoryListingsSearchParams(0).toString()}`
+      );
       if (categoryResponse.ok) {
         const categoryData = await categoryResponse.json();
         const filtered = (categoryData.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -1124,26 +1171,28 @@ export const ListingDetail = ({
         className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] left-0 right-0 z-[50] mx-auto max-w-2xl space-y-3 px-4 py-2 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8"
         style={{ pointerEvents: 'auto' }}
       >
-        {(isSeoListingRoute || !isTelegramEnv) && (
+        {isGuestBrowserView && (
           <div
-            className={`rounded-xl px-3 py-2 text-center text-xs shadow-sm ${
+            className={`rounded-xl px-3 py-2.5 text-center text-xs leading-relaxed shadow-sm ${
               isLight
                 ? 'bg-gray-50 text-gray-700 ring-1 ring-gray-900/[0.05]'
                 : 'bg-white/10 text-white/80'
             }`}
           >
-            Повний перегляд товару, актуальний статус та зв'язок з продавцем доступні у Telegram‑боті Trade Ground Marketplace.
+            {guestListingCopy.viewHint}
           </div>
         )}
-        {isSeoListingRoute ? (
+        {isGuestBrowserView ? (
           <a
             href="https://t.me/TradeGroundBot?start=linktowatch_12"
-            className={`w-full rounded-2xl border-none py-4 font-montserrat text-xl font-semibold flex cursor-pointer items-center justify-center gap-2 transition-colors ${listingPrimaryCtaClass}`}
+            className={guestTelegramCtaClass}
             target="_blank"
             rel="noopener noreferrer"
           >
-            <MessageCircle size={24} />
-            Відкрити товар у Telegram‑боті
+            <MessageCircle size={24} className="shrink-0" />
+            <span className="block w-full whitespace-pre-line text-center text-lg leading-tight sm:text-xl">
+              {guestListingCopy.openInTelegramBot}
+            </span>
           </a>
         ) : isTelegramEnv ? (
           <button 
@@ -1212,17 +1261,7 @@ export const ListingDetail = ({
               </>
             )}
           </button>
-        ) : (
-          <a
-            href="https://t.me/TradeGroundBot?start=linktowatch_12"
-            className={`w-full rounded-2xl border-none py-4 font-montserrat text-xl font-semibold flex cursor-pointer items-center justify-center gap-2 transition-colors ${listingPrimaryCtaClass}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <MessageCircle size={24} />
-            Відкрити товар у Telegram‑боті
-          </a>
-        )}
+        ) : null}
       </div>
 
       {/* Модальне вікно поділу */}

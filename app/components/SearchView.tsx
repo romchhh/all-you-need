@@ -1,14 +1,18 @@
 'use client';
 
-import { ArrowLeft, Clock, Flame, Search, Sparkles, TrendingUp, X } from 'lucide-react';
+import { ArrowLeft, Clock, Flame, MapPin, Search, SlidersHorizontal, Sparkles, TrendingUp, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category, Listing } from '@/types';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { dismissMobileKeyboard } from '@/utils/dismissMobileKeyboard';
 import { useDebounce } from '@/hooks/useDebounce';
 import { POPULAR_SEARCH_QUERY_KEYS } from '@/constants/popularSearchQueries';
+import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/FixedLogoHeader';
+import { SortModal } from './SortModal';
+import { CityModal } from './CityModal';
 import {
   addToSearchHistory,
   clearSearchHistory,
@@ -25,6 +29,9 @@ import { ListingCardSkeleton } from './SkeletonLoader';
 
 const SEARCH_DEBOUNCE_MS = 800;
 const MIN_QUERY_LENGTH = 2;
+
+type SearchScreenMode = 'discover' | 'results';
+type SortOption = 'newest' | 'price_low' | 'price_high' | 'popular';
 
 interface SearchViewProps {
   initialQuery: string;
@@ -157,18 +164,30 @@ export function SearchView({
   const lastFetchKeyRef = useRef('');
   const onQueryChangeRef = useRef(onQueryChange);
   const onCategoryChangeRef = useRef(onCategoryChange);
-  const citiesKey = selectedCities.join(',');
 
   onQueryChangeRef.current = onQueryChange;
   onCategoryChangeRef.current = onCategoryChange;
 
+  const initialCommitted =
+    (initialQuery?.trim().length ?? 0) >= MIN_QUERY_LENGTH;
+
+  const [screenMode, setScreenMode] = useState<SearchScreenMode>(() =>
+    initialCommitted ? 'results' : 'discover'
+  );
   const [localQuery, setLocalQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
+  const [localCities, setLocalCities] = useState<string[]>(selectedCities);
+  const citiesKey = localCities.join(',');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [showFreeOnly, setShowFreeOnly] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
   const debouncedQuery = useDebounce(localQuery, SEARCH_DEBOUNCE_MS);
-  const [activeQuery, setActiveQuery] = useState('');
+  const [activeQuery, setActiveQuery] = useState(initialCommitted ? initialQuery.trim() : '');
   const [searchResults, setSearchResults] = useState<Listing[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [previewResults, setPreviewResults] = useState<Listing[]>([]);
 
   const [recentQueries, setRecentQueries] = useState<string[]>([]);
   const [recentSearchListings, setRecentSearchListings] = useState<Listing[]>([]);
@@ -198,10 +217,20 @@ export function SearchView({
     searchRequestRef.current += 1;
     setActiveQuery('');
     setSearchResults([]);
+    setPreviewResults([]);
     setSearchTotal(0);
     setLoadingResults(false);
     lastFetchKeyRef.current = '';
   }, []);
+
+  const goToDiscoverHome = useCallback(() => {
+    setScreenMode('discover');
+    setLocalQuery('');
+    resetSearchState();
+    onQueryChangeRef.current?.('');
+    dismissMobileKeyboard();
+    tg?.HapticFeedback?.impactOccurred?.('light');
+  }, [resetSearchState, tg]);
 
   const buildFetchKey = useCallback(
     (query: string, category: string | null) =>
@@ -212,21 +241,30 @@ export function SearchView({
   const fetchSearchResults = useCallback(
     async (
       query: string,
-      options?: { haptic?: boolean; saveHistory?: boolean; force?: boolean; category?: string | null }
+      options?: {
+        haptic?: boolean;
+        saveHistory?: boolean;
+        force?: boolean;
+        category?: string | null;
+        previewOnly?: boolean;
+      }
     ) => {
       const trimmed = query.trim();
       if (trimmed.length < MIN_QUERY_LENGTH) return;
 
       const category = options?.category !== undefined ? options.category : selectedCategory;
-      const fetchKey = buildFetchKey(trimmed, category);
+      const previewOnly = options?.previewOnly === true;
+      const fetchKey = `${previewOnly ? 'preview' : 'commit'}|${buildFetchKey(trimmed, category)}|${sortBy}|${showFreeOnly}`;
       if (!options?.force && fetchKey === lastFetchKeyRef.current) return;
 
       lastFetchKeyRef.current = fetchKey;
       const requestId = ++searchRequestRef.current;
-      setLoadingResults(true);
-      setActiveQuery(trimmed);
+      if (!previewOnly) {
+        setLoadingResults(true);
+        setActiveQuery(trimmed);
+      }
 
-      if (options?.saveHistory !== false) {
+      if (!previewOnly && options?.saveHistory !== false) {
         addToSearchHistory(trimmed);
         refreshLocalHistory();
       }
@@ -236,9 +274,9 @@ export function SearchView({
 
       try {
         const params = new URLSearchParams({
-          limit: '24',
+          limit: previewOnly ? '12' : '24',
           offset: '0',
-          sortBy: 'newest',
+          sortBy,
           search: trimmed,
         });
         if (citiesKey) {
@@ -247,6 +285,9 @@ export function SearchView({
         if (category) {
           params.set('category', category);
         }
+        if (showFreeOnly) {
+          params.set('isFree', 'true');
+        }
 
         const res = await fetch(`/api/listings?${params.toString()}`, { cache: 'no-store' });
         if (requestId !== searchRequestRef.current) return;
@@ -254,28 +295,58 @@ export function SearchView({
         if (res.ok) {
           const data = await res.json();
           const list = (data.listings || []) as Listing[];
-          setSearchResults(list);
-          setSearchTotal(data.total ?? list.length);
-          if (list.length > 0) {
-            updateSearchHistoryListings(trimmed, list.slice(0, 6).map(listingToSearchPreview));
+          if (previewOnly) {
+            setPreviewResults(list);
+          } else {
+            setSearchResults(list);
+            setSearchTotal(data.total ?? list.length);
+            if (list.length > 0) {
+              updateSearchHistoryListings(trimmed, list.slice(0, 6).map(listingToSearchPreview));
+            }
           }
+        } else if (previewOnly) {
+          setPreviewResults([]);
         } else {
           setSearchResults([]);
           setSearchTotal(0);
         }
       } catch {
         if (requestId === searchRequestRef.current) {
-          setSearchResults([]);
-          setSearchTotal(0);
+          if (previewOnly) {
+            setPreviewResults([]);
+          } else {
+            setSearchResults([]);
+            setSearchTotal(0);
+          }
           lastFetchKeyRef.current = '';
         }
       } finally {
-        if (requestId === searchRequestRef.current) {
+        if (!previewOnly && requestId === searchRequestRef.current) {
           setLoadingResults(false);
         }
       }
     },
-    [buildFetchKey, citiesKey, refreshLocalHistory, selectedCategory, tg]
+    [buildFetchKey, citiesKey, refreshLocalHistory, selectedCategory, showFreeOnly, sortBy, tg]
+  );
+
+  const commitSearch = useCallback(
+    (query: string, options?: { haptic?: boolean; saveHistory?: boolean; category?: string | null }) => {
+      const trimmed = query.trim();
+      if (trimmed.length < MIN_QUERY_LENGTH) return;
+
+      setScreenMode('results');
+      setLocalQuery(trimmed);
+      onQueryChangeRef.current?.(trimmed);
+      dismissMobileKeyboard();
+      lastFetchKeyRef.current = '';
+      void fetchSearchResults(trimmed, {
+        haptic: options?.haptic ?? true,
+        saveHistory: options?.saveHistory ?? true,
+        force: true,
+        category: options?.category,
+      });
+    },
+    [fetchSearchResults]
   );
 
   const handleCategorySelect = useCallback(
@@ -287,29 +358,27 @@ export function SearchView({
       tg?.HapticFeedback?.impactOccurred?.('light');
 
       const query = localQuery.trim();
-      if (query.length >= MIN_QUERY_LENGTH) {
+      if (screenMode === 'results' && query.length >= MIN_QUERY_LENGTH) {
+        lastFetchKeyRef.current = '';
         void fetchSearchResults(query, { force: true, category: next });
+      } else if (screenMode === 'discover' && query.length >= MIN_QUERY_LENGTH) {
+        lastFetchKeyRef.current = '';
+        void fetchSearchResults(query, { previewOnly: true, force: true, category: next });
       }
     },
-    [fetchSearchResults, localQuery, selectedCategory, tg]
+    [fetchSearchResults, localQuery, screenMode, selectedCategory, tg]
   );
 
   const handleClearQuery = useCallback(() => {
-    setLocalQuery('');
-    resetSearchState();
-    onQueryChangeRef.current?.('');
+    goToDiscoverHome();
     inputRef.current?.focus();
-    tg?.HapticFeedback?.impactOccurred?.('light');
-  }, [resetSearchState, tg]);
+  }, [goToDiscoverHome]);
 
   const pickQuery = useCallback(
     (query: string) => {
-      const trimmed = query.trim();
-      setLocalQuery(trimmed);
-      onQueryChangeRef.current?.(trimmed);
-      void fetchSearchResults(trimmed, { haptic: true, saveHistory: true, force: true });
+      commitSearch(query, { haptic: true, saveHistory: true });
     },
-    [fetchSearchResults]
+    [commitSearch]
   );
 
   const openListing = useCallback(
@@ -320,11 +389,8 @@ export function SearchView({
     [tg, onSelectListing]
   );
 
-  // Фокус і історія — лише при монтуванні
   useEffect(() => {
     refreshLocalHistory();
-    const focusTimer = setTimeout(() => inputRef.current?.focus(), 150);
-    return () => clearTimeout(focusTimer);
   }, [refreshLocalHistory]);
 
   // Зовнішня зміна initialQuery (напр. навігація назад з ?q=)
@@ -340,6 +406,7 @@ export function SearchView({
     setSelectedCategory(initialCategory);
     lastFetchKeyRef.current = '';
     if (initialQuery.trim().length >= MIN_QUERY_LENGTH) {
+      setScreenMode('results');
       void fetchSearchResults(initialQuery, {
         saveHistory: false,
         force: true,
@@ -347,24 +414,41 @@ export function SearchView({
       });
     } else {
       resetSearchState();
+      setScreenMode('discover');
     }
   }, [initialQuery, initialCategory, fetchSearchResults, resetSearchState]);
 
-  // Debounced live search
+  // У режимі discover — лише підказки (preview), без переходу в результати
   useEffect(() => {
+    if (screenMode !== 'discover') return;
+
     const trimmed = debouncedQuery.trim();
 
     if (trimmed.length >= MIN_QUERY_LENGTH) {
       onQueryChangeRef.current?.(trimmed);
-      void fetchSearchResults(trimmed, { haptic: false, saveHistory: true });
+      lastFetchKeyRef.current = '';
+      void fetchSearchResults(trimmed, { haptic: false, saveHistory: false, previewOnly: true });
       return;
     }
 
     if (trimmed.length === 0) {
-      resetSearchState();
+      setPreviewResults([]);
       onQueryChangeRef.current?.('');
     }
-  }, [debouncedQuery, fetchSearchResults, resetSearchState]);
+  }, [debouncedQuery, fetchSearchResults, screenMode]);
+
+  const activeQueryRef = useRef(activeQuery);
+  activeQueryRef.current = activeQuery;
+
+  // Зміна фільтрів у режимі результатів — перезавантажити
+  useEffect(() => {
+    if (screenMode !== 'results') return;
+    const q = activeQueryRef.current.trim();
+    if (q.length < MIN_QUERY_LENGTH) return;
+    lastFetchKeyRef.current = '';
+    void fetchSearchResults(q, { saveHistory: false, force: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- лише фільтри, не activeQuery
+  }, [sortBy, showFreeOnly, citiesKey, screenMode, fetchSearchResults]);
 
   // Discover data
   useEffect(() => {
@@ -427,13 +511,16 @@ export function SearchView({
   const suggestions = useMemo(() => {
     const q = localQuery.toLowerCase().trim();
     if (!q || q.length < MIN_QUERY_LENGTH) return [];
-    const pool = [...searchResults, ...popularListings, ...recentViewedListings];
+    const pool =
+      screenMode === 'discover'
+        ? [...previewResults, ...popularListings, ...recentViewedListings]
+        : [...searchResults, ...previewResults, ...popularListings, ...recentViewedListings];
     const titles = new Set<string>();
     pool.forEach((listing) => {
       if (listing.title.toLowerCase().includes(q)) titles.add(listing.title);
     });
-    return Array.from(titles).slice(0, 5);
-  }, [localQuery, searchResults, popularListings, recentViewedListings]);
+    return Array.from(titles).slice(0, 8);
+  }, [localQuery, screenMode, searchResults, previewResults, popularListings, recentViewedListings]);
 
   const inputClass = isLight
     ? 'w-full rounded-xl border border-gray-300 bg-white py-3 pr-10 text-gray-900 placeholder:text-gray-500 focus:border-[#3F5331]/30 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/20'
@@ -446,10 +533,26 @@ export function SearchView({
   const trimmedLocal = localQuery.trim();
   const isTypingPending =
     trimmedLocal.length >= MIN_QUERY_LENGTH && trimmedLocal !== debouncedQuery.trim();
-  const showResultsPanel =
-    trimmedLocal.length >= MIN_QUERY_LENGTH || loadingResults || activeQuery.length >= MIN_QUERY_LENGTH;
-  const showSuggestions =
-    trimmedLocal.length >= MIN_QUERY_LENGTH && suggestions.length > 0 && isTypingPending;
+  const showDiscoverSuggestions =
+    screenMode === 'discover' &&
+    trimmedLocal.length >= MIN_QUERY_LENGTH &&
+    suggestions.length > 0;
+  const showResultsEditSuggestions =
+    screenMode === 'results' &&
+    trimmedLocal.length >= MIN_QUERY_LENGTH &&
+    trimmedLocal !== activeQuery &&
+    suggestions.length > 0;
+  const hasActiveFilters = Boolean(
+    sortBy !== 'newest' || showFreeOnly || selectedCategory || localCities.length > 0
+  );
+
+  const stickyHeaderBg = isLight
+    ? 'border-b border-gray-200/90 bg-white/95 shadow-sm backdrop-blur-md'
+    : 'border-b border-white/10 bg-[#000000]/95 backdrop-blur-md';
+
+  const filterBtnClass = isLight
+    ? 'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200/90 bg-white shadow-sm transition-colors hover:bg-gray-50'
+    : 'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white bg-transparent transition-colors hover:bg-white/10';
 
   const catalogListingsProps = {
     favorites,
@@ -474,23 +577,7 @@ export function SearchView({
         )}
       </div>
 
-      {showSuggestions && (
-        <div className={`overflow-hidden rounded-2xl border ${ac.suggestionDropdown}`}>
-          {suggestions.map((suggestion, index) => (
-            <button
-              key={`${suggestion}-${index}`}
-              type="button"
-              onClick={() => pickQuery(suggestion)}
-              className={ac.suggestionRow}
-            >
-              <Search size={16} className={ac.suggestionIcon} />
-              <span className="truncate text-left">{suggestion}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {loadingResults || isTypingPending ? (
+      {loadingResults || (isTypingPending && trimmedLocal !== activeQuery) ? (
         <CatalogListingsSkeleton count={6} />
       ) : searchResults.length > 0 ? (
         <CatalogListings items={searchResults} {...catalogListingsProps} />
@@ -593,125 +680,262 @@ export function SearchView({
     ? 'border-gray-300/90 bg-white/95 text-gray-900 shadow-sm hover:bg-white'
     : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
 
-  return (
-    <>
-      <div className="px-4 pb-1 pt-0">
-        <button
-          type="button"
-          onClick={() => {
-            tg?.HapticFeedback?.impactOccurred?.('light');
-            onBack();
-          }}
-          aria-label={t('common.back')}
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
-        >
-          <ArrowLeft size={20} />
-        </button>
+  const titleSuggestionsDropdown =
+    (showDiscoverSuggestions || showResultsEditSuggestions) && (
+      <div className={`overflow-hidden rounded-2xl border ${ac.suggestionDropdown}`}>
+        {suggestions.map((suggestion, index) => (
+          <button
+            key={`${suggestion}-${index}`}
+            type="button"
+            onClick={() => pickQuery(suggestion)}
+            className={ac.suggestionRow}
+          >
+            <Search size={16} className={ac.suggestionIcon} />
+            <span className="truncate text-left">{suggestion}</span>
+          </button>
+        ))}
       </div>
+    );
 
-      <div className="w-full pb-1 pt-1">
+  const categoriesRow = (
+    <div
+      className="scrollbar-hide w-full max-w-full overflow-x-auto"
+      style={{
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      }}
+    >
+      <div className="mx-auto flex w-max gap-2 px-4 pb-2 lg:px-0" style={{ minWidth: 'max-content' }}>
         <div
-          className="scrollbar-hide w-full max-w-full overflow-x-auto lg:px-6"
-          style={{
-            WebkitOverflowScrolling: 'touch',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
+          className="flex min-w-[80px] max-w-[90px] flex-shrink-0 cursor-pointer flex-col items-center"
+          onClick={() => handleCategorySelect(null)}
         >
           <div
-            className="mx-auto flex w-max gap-2 px-4 pb-2 lg:px-0"
-            style={{ minWidth: 'max-content' }}
-          >
-            <div
-              className="flex min-w-[80px] max-w-[90px] flex-shrink-0 cursor-pointer flex-col items-center"
-              onClick={() => handleCategorySelect(null)}
-            >
-              <div
-                className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl transition-all ${
-                  !selectedCategory
-                    ? isLight
-                      ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
-                      : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
-                    : isLight
-                      ? 'border-2 border-[#3F5331] bg-white'
-                      : 'border border-white/25 bg-[#1C1C1C]'
-                }`}
-              >
-                <CategoryIcon categoryId="all_categories" isActive={!selectedCategory} size={32} />
-              </div>
-              <span
-                className={`px-0.5 text-center text-xs font-medium leading-tight whitespace-normal ${
-                  !selectedCategory
-                    ? isLight
-                      ? 'text-[#3F5331]'
-                      : 'text-[#C8E6A0]'
-                    : ac.categoryRowLabel
-                }`}
-              >
-                {t('bazaar.allCategories')}
-              </span>
-            </div>
-
-            {categories.map((category) => (
-              <CategoryChip
-                key={category.id}
-                category={category}
-                isActive={selectedCategory === category.id}
-                onClick={() => handleCategorySelect(category.id)}
-              />
-            ))}
-            <div className="w-2 min-w-[0.5rem] flex-shrink-0" aria-hidden />
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto w-full max-w-xl px-4 pb-4 pt-1 xl:max-w-2xl lg:flex lg:justify-center">
-        <div className="relative mb-0 w-full">
-          <Search
-            className={`pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 ${
-              isLight ? 'text-gray-600' : 'text-white/80'
+            className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl transition-all ${
+              !selectedCategory
+                ? isLight
+                  ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
+                  : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
+                : isLight
+                  ? 'border-2 border-[#3F5331] bg-white'
+                  : 'border border-white/25 bg-[#1C1C1C]'
             }`}
-            size={18}
-            style={{ left: '14px' }}
+          >
+            <CategoryIcon categoryId="all_categories" isActive={!selectedCategory} size={32} />
+          </div>
+          <span
+            className={`px-0.5 text-center text-xs font-medium leading-tight whitespace-normal ${
+              !selectedCategory
+                ? isLight
+                  ? 'text-[#3F5331]'
+                  : 'text-[#C8E6A0]'
+                : ac.categoryRowLabel
+            }`}
+          >
+            {t('bazaar.allCategories')}
+          </span>
+        </div>
+        {categories.map((category) => (
+          <CategoryChip
+            key={category.id}
+            category={category}
+            isActive={selectedCategory === category.id}
+            onClick={() => handleCategorySelect(category.id)}
           />
-          <input
-            ref={inputRef}
-            type="search"
-            enterKeyHint="search"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder={searchPlaceholder || t('bazaar.whatInterestsYou')}
-            value={localQuery}
-            onChange={(e) => setLocalQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                const q = localQuery.trim();
-                if (q.length >= MIN_QUERY_LENGTH) {
-                  onQueryChangeRef.current?.(q);
-                  void fetchSearchResults(q, { haptic: true, force: true });
-                }
-              }
-            }}
-            className={inputClass}
-            style={{ paddingLeft: '42px', fontSize: '16px' }}
-          />
-          {localQuery && (
+        ))}
+        <div className="w-2 min-w-[0.5rem] flex-shrink-0" aria-hidden />
+      </div>
+    </div>
+  );
+
+  const searchField = (
+    <div className="relative w-full">
+      <Search
+        className={`pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 ${
+          isLight ? 'text-gray-600' : 'text-white/80'
+        }`}
+        size={18}
+        style={{ left: '14px' }}
+      />
+      <input
+        ref={inputRef}
+        type="search"
+        enterKeyHint="search"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        placeholder={searchPlaceholder || t('bazaar.whatInterestsYou')}
+        value={localQuery}
+        onChange={(e) => setLocalQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const q = localQuery.trim();
+            if (q.length >= MIN_QUERY_LENGTH) {
+              commitSearch(q, { haptic: true, saveHistory: true });
+            }
+          }
+        }}
+        className={inputClass}
+        style={{ paddingLeft: '42px', fontSize: '16px' }}
+      />
+      {localQuery && (
+        <button
+          type="button"
+          onClick={handleClearQuery}
+          aria-label={t('common.clear')}
+          className={`absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full ${
+            isLight ? 'bg-gray-200 hover:bg-gray-300' : 'bg-white/20 hover:bg-white/30'
+          }`}
+        >
+          <X size={14} className={isLight ? 'text-gray-700' : 'text-white'} />
+        </button>
+      )}
+    </div>
+  );
+
+  const resultsToolbar = (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => {
+          setShowCityModal(true);
+          tg?.HapticFeedback?.impactOccurred?.('light');
+        }}
+        className={`${filterBtnClass} ${
+          localCities.length > 0
+            ? isLight
+              ? 'border-[#3F5331]/40 bg-[#3F5331]/10'
+              : 'border-[#C8E6A0]/50 bg-[#C8E6A0]/10'
+            : ''
+        }`}
+        aria-label={t('bazaar.selectCity')}
+      >
+        <MapPin size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
+        {localCities.length > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#3F5331] px-1 text-[10px] font-bold text-white">
+            {localCities.length > 9 ? '9+' : localCities.length}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setShowSortModal(true);
+          tg?.HapticFeedback?.impactOccurred?.('light');
+        }}
+        className={`${filterBtnClass} ${
+          hasActiveFilters && !localCities.length
+            ? isLight
+              ? 'border-[#3F5331]/40 bg-[#3F5331]/10'
+              : 'border-[#C8E6A0]/50 bg-[#C8E6A0]/10'
+            : ''
+        }`}
+        aria-label={t('common.filter')}
+      >
+        <SlidersHorizontal size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
+      </button>
+    </div>
+  );
+
+  return (
+    <>
+      {screenMode === 'discover' ? (
+        <>
+          <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-1">
+            <h1 className={`min-w-0 flex-1 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
+              {t('bazaar.search.pageTitle')}
+            </h1>
             <button
               type="button"
-              onClick={handleClearQuery}
-              className={`absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full ${
-                isLight ? 'bg-gray-200 hover:bg-gray-300' : 'bg-white/20 hover:bg-white/30'
-              }`}
+              onClick={() => {
+                tg?.HapticFeedback?.impactOccurred?.('light');
+                onBack();
+              }}
+              aria-label={t('common.close')}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
             >
-              <X size={14} className={isLight ? 'text-gray-700' : 'text-white'} />
+              <X size={20} />
             </button>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {showResultsPanel ? resultsContent : discoverContent}
+          {categoriesRow}
+
+          <div className="mx-auto w-full max-w-xl space-y-2 px-4 pb-2 pt-1 xl:max-w-2xl lg:mx-auto">
+            {searchField}
+            {titleSuggestionsDropdown}
+          </div>
+
+          {discoverContent}
+        </>
+      ) : (
+        <>
+          <div className={`${STICKY_BELOW_APP_HEADER_CLASS} ${stickyHeaderBg}`}>
+            <div className="mx-auto w-full max-w-xl space-y-2 px-4 pb-2 pt-2 xl:max-w-2xl lg:mx-auto">
+              {searchField}
+              {titleSuggestionsDropdown}
+            </div>
+
+            <div className="flex items-center gap-2 px-4 pb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  tg?.HapticFeedback?.impactOccurred?.('light');
+                  onBack();
+                }}
+                aria-label={t('common.back')}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
+              >
+                <ArrowLeft size={20} />
+              </button>
+              {resultsToolbar}
+            </div>
+
+            {categoriesRow}
+          </div>
+
+          {resultsContent}
+        </>
+      )}
+
+      <SortModal
+        isOpen={showSortModal}
+        currentSort={sortBy}
+        showFreeOnly={showFreeOnly}
+        minPrice={null}
+        maxPrice={null}
+        selectedCategory={selectedCategory}
+        selectedSubcategory={null}
+        selectedCondition={null}
+        selectedCurrency={null}
+        onClose={() => setShowSortModal(false)}
+        onSelect={(sort) => {
+          setSortBy(sort);
+          setShowSortModal(false);
+        }}
+        onToggleFreeOnly={setShowFreeOnly}
+        onCategoryChange={(categoryId) => {
+          setSelectedCategory(categoryId);
+          onCategoryChangeRef.current?.(categoryId);
+          lastFetchKeyRef.current = '';
+        }}
+        onPriceRangeChange={() => {}}
+        tg={tg}
+      />
+
+      <CityModal
+        isOpen={showCityModal}
+        selectedCities={localCities}
+        onClose={() => setShowCityModal(false)}
+        onSelect={(cities) => {
+          setLocalCities(cities);
+          setShowCityModal(false);
+          lastFetchKeyRef.current = '';
+        }}
+        tg={tg}
+        profileTelegramId={profileTelegramId ?? undefined}
+      />
     </>
   );
 }

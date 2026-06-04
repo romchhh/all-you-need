@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAutoPrefetch } from '@/hooks/usePrefetch';
 import { Listing } from '@/types';
@@ -17,6 +17,8 @@ import { useUser } from '@/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { AppHeader } from '@/components/AppHeader';
+import { getCategories } from '@/constants/categories';
+import { navigateToListingCategory } from '@/utils/navigateToListingCategory';
 
 const ProfilePage = () => {
   const params = useParams();
@@ -27,6 +29,7 @@ const ProfilePage = () => {
   const router = useRouter();
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
+  const categories = useMemo(() => getCategories(t), [t]);
   const { profile, refetch: refetchProfile, isBlocked, loading: profileLoading } = useUser();
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -421,6 +424,9 @@ const ProfilePage = () => {
           onAutoRenewPersist={(id, autoRenew) =>
             setSelectedListing((prev) => (prev && prev.id === id ? { ...prev, autoRenew } : prev))
           }
+          onNavigateToCategory={(categoryId, subcategoryId) => {
+            navigateToListingCategory(router, lang, categories, categoryId, subcategoryId);
+          }}
         />
       );
     }

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useParams, useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAutoPrefetch } from '@/hooks/usePrefetch';
 import { Listing } from '@/types';
 import { getCategories } from '@/constants/categories';
@@ -18,6 +18,15 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useUser } from '@/hooks/useUser';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { AppHeader } from '@/components/AppHeader';
+import {
+  buildCategoryCatalogUrl,
+  consumePendingListingCategory,
+  normalizeListingCategoryFilter,
+  readCategoryFilterFromSearchParams,
+  resolveListingCategoryFilter,
+  type ListingCategoryFilter,
+} from '@/utils/listingCategoryFilter';
+import { navigateToListingCategory } from '@/utils/navigateToListingCategory';
 
 const CategoriesPage = () => {
   const params = useParams();
@@ -26,6 +35,7 @@ const CategoriesPage = () => {
   // Автоматичний prefetching для покращення UX
   useAutoPrefetch(pathname);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
   const { profile, isBlocked } = useUser();
@@ -96,23 +106,12 @@ const CategoriesPage = () => {
     selectedCategory: string | null;
     selectedSubcategory: string | null;
     showFreeOnly: boolean;
-  }>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('categoriesTabState');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return {
-      selectedCategory: null,
-      selectedSubcategory: null,
-      showFreeOnly: false,
-    };
+  }>({
+    selectedCategory: null,
+    selectedSubcategory: null,
+    showFreeOnly: false,
   });
+  const catalogInitialLoadDoneRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -323,57 +322,177 @@ const CategoriesPage = () => {
     }
   }, []);
 
-  const hasLoadedCategoriesListings = useRef(false);
-  useEffect(() => {
-    const fetchListings = async (forceRefresh: boolean = false) => {
+  const PAGE_SIZE = 20;
+  const listingsFilterKey = useMemo(
+    () =>
+      `${categoriesTabState.selectedCategory ?? ''}|${categoriesTabState.selectedSubcategory ?? ''}|${categoriesTabState.showFreeOnly}`,
+    [
+      categoriesTabState.selectedCategory,
+      categoriesTabState.selectedSubcategory,
+      categoriesTabState.showFreeOnly,
+    ]
+  );
+
+  const buildListingsUrl = useCallback(
+    (
+      limit: number,
+      offset: number,
+      filter: {
+        selectedCategory: string | null;
+        selectedSubcategory: string | null;
+        showFreeOnly: boolean;
+      } = categoriesTabState
+    ) => {
+      const params = new URLSearchParams();
+      params.set('limit', String(limit));
+      params.set('offset', String(offset));
+      params.set('sortBy', 'newest');
+      const { selectedCategory, selectedSubcategory, showFreeOnly } = filter;
+      if (selectedCategory && selectedCategory !== 'free') {
+        params.set('category', selectedCategory);
+      }
+      if (selectedSubcategory) {
+        params.set('subcategory', selectedSubcategory);
+      }
+      if (showFreeOnly || selectedCategory === 'free') {
+        params.set('isFree', 'true');
+      }
+      return `/api/listings?${params.toString()}`;
+    },
+    [categoriesTabState]
+  );
+
+  const fetchListings = useCallback(
+    async (forceRefresh: boolean = false, override?: ListingCategoryFilter) => {
+      const filterState = override
+        ? {
+            selectedCategory: override.categoryId,
+            selectedSubcategory: override.subcategoryId,
+            showFreeOnly: false,
+          }
+        : categoriesTabState;
+      const cacheKey = `listings:categories:${filterState.selectedCategory ?? ''}|${filterState.selectedSubcategory ?? ''}|${filterState.showFreeOnly}`;
       try {
         setLoading(true);
-        const cacheKey = 'listings:all';
-        
-        // Перевіряємо кеш тільки якщо не примусове оновлення
+
         if (!forceRefresh) {
           const cached = getCachedData(cacheKey);
-          if (cached && cached.listings) {
+          if (cached?.listings) {
             setListings(cached.listings || []);
             setTotalListings(cached.total || 0);
             setHasMore((cached.listings?.length || 0) < (cached.total || 0));
-            setListingsOffset(cached.offset || 16);
+            setListingsOffset(cached.offset ?? PAGE_SIZE);
             setLoading(false);
             return;
           }
         }
-        
-        const response = await fetch('/api/listings?limit=16&offset=0');
+
+        const response = await fetch(buildListingsUrl(PAGE_SIZE, 0, filterState));
         if (response.ok) {
           const data = await response.json();
-          setListings(data.listings || []);
-          setTotalListings(data.total || 0);
-          setHasMore((data.listings?.length || 0) < (data.total || 0));
-          setListingsOffset(16);
-          // Використовуємо уніфікований кеш
+          const list = data.listings || [];
+          const total = data.total ?? 0;
+          setListings(list);
+          setTotalListings(total);
+          setHasMore(list.length < total);
+          setListingsOffset(list.length);
           setCachedData(cacheKey, {
-            listings: data.listings || [],
-            total: data.total || 0,
-            offset: 16,
-            hasMore: (data.listings?.length || 0) < (data.total || 0)
+            listings: list,
+            total,
+            offset: list.length,
+            hasMore: list.length < total,
           });
         } else {
           setListings([]);
+          setTotalListings(0);
+          setHasMore(false);
+          setListingsOffset(0);
         }
       } catch (error) {
         console.error('Error fetching listings:', error);
         setListings([]);
+        setTotalListings(0);
+        setHasMore(false);
+        setListingsOffset(0);
       } finally {
         setLoading(false);
       }
-    };
+    },
+    [buildListingsUrl, listingsFilterKey, PAGE_SIZE]
+  );
 
-    // Завантажуємо тільки один раз при монтуванні
-    if (!hasLoadedCategoriesListings.current) {
-      hasLoadedCategoriesListings.current = true;
-      fetchListings(false);
+  const previousCategoriesFilterKey = useRef<string | null>(null);
+
+  const applyCategoryCatalogFilter = useCallback(
+    (raw: ListingCategoryFilter) => {
+      const normalized =
+        normalizeListingCategoryFilter(categories, raw) ??
+        resolveListingCategoryFilter(categories, raw.categoryId, raw.subcategoryId);
+      if (!normalized) return;
+
+      const nextState = {
+        selectedCategory: normalized.categoryId,
+        selectedSubcategory: normalized.subcategoryId,
+        showFreeOnly: false,
+      };
+      const filterKey = `${normalized.categoryId}|${normalized.subcategoryId ?? ''}|false`;
+
+      setCategoriesTabState(nextState);
+      previousCategoriesFilterKey.current = filterKey;
+      setListings([]);
+      setHasMore(false);
+      setListingsOffset(0);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('categoriesTabState', JSON.stringify(nextState));
+        router.replace(buildCategoryCatalogUrl(lang, normalized));
+        document.body.style.scrollBehavior = 'auto';
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+
+      void fetchListings(true, normalized);
+    },
+    [categories, fetchListings, lang, router]
+  );
+
+  useLayoutEffect(() => {
+    if (catalogInitialLoadDoneRef.current) return;
+    catalogInitialLoadDoneRef.current = true;
+
+    const pending = consumePendingListingCategory();
+    const fromUrl = readCategoryFilterFromSearchParams(categories, searchParams);
+    const resolved = pending ?? fromUrl;
+
+    if (resolved) {
+      applyCategoryCatalogFilter(resolved);
+      return;
     }
-  }, []);
+
+    previousCategoriesFilterKey.current = listingsFilterKey;
+    void fetchListings(false);
+  }, [
+    applyCategoryCatalogFilter,
+    categories,
+    fetchListings,
+    listingsFilterKey,
+    searchParams,
+  ]);
+
+  useEffect(() => {
+    if (!catalogInitialLoadDoneRef.current) return;
+    if (previousCategoriesFilterKey.current === null) {
+      previousCategoriesFilterKey.current = listingsFilterKey;
+      return;
+    }
+    if (previousCategoriesFilterKey.current === listingsFilterKey) return;
+    previousCategoriesFilterKey.current = listingsFilterKey;
+    setListings([]);
+    setHasMore(false);
+    setListingsOffset(0);
+    fetchListings(true);
+  }, [listingsFilterKey, fetchListings]);
 
   // Infinite scroll для categories
   const loadMoreListings = useCallback(async () => {
@@ -381,7 +500,7 @@ const CategoriesPage = () => {
     try {
       setLoadingMore(true);
       
-      const response = await fetch(`/api/listings?limit=16&offset=${listingsOffset}`);
+      const response = await fetch(buildListingsUrl(PAGE_SIZE, listingsOffset));
       if (response.ok) {
         const data = await response.json();
         const newListings = [...listings, ...(data.listings || [])];
@@ -397,7 +516,7 @@ const CategoriesPage = () => {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, hasMore, listingsOffset, listings, tg]);
+  }, [loadingMore, hasMore, listingsOffset, listings, tg, buildListingsUrl, PAGE_SIZE]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -718,6 +837,10 @@ const CategoriesPage = () => {
           onAutoRenewPersist={(id, autoRenew) =>
             setSelectedListing((prev) => (prev && prev.id === id ? { ...prev, autoRenew } : prev))
           }
+          onNavigateToCategory={(rawCategory, rawSubcategory) => {
+            setSelectedListing(null);
+            navigateToListingCategory(router, lang, categories, rawCategory, rawSubcategory);
+          }}
         />
       );
     }

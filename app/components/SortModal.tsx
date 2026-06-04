@@ -10,6 +10,7 @@ import { useState, useEffect, Fragment, useMemo, useCallback, useRef } from 'rea
 import { Category } from '@/types';
 import { getCategories } from '@/constants/categories';
 import { getCurrencySymbol, Currency } from '@/utils/currency';
+import { useHideBottomNav } from '@/hooks/useHideBottomNav';
 
 // Стилі для повзунків
 const sliderStyles = `
@@ -79,11 +80,14 @@ export const SortModal = ({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  const chipActive = 'border border-[#3F5331] text-[#3F5331] bg-transparent font-medium';
+  useHideBottomNav(isOpen);
+  const chipActive = isLight
+    ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 text-[#3F5331] font-semibold'
+    : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
   /** Активна категорія з іконкою — світла тема: обводка навколо кнопки, не навколо іконки */
   const chipActiveCategory = isLight
-    ? 'border-2 border-[#3F5331] text-[#3F5331] bg-[#3F5331]/12 font-medium'
-    : 'border border-[#3F5331] text-[#3F5331] bg-transparent font-medium';
+    ? 'border-2 border-[#3F5331] text-[#3F5331] bg-[#3F5331]/12 font-semibold'
+    : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
   const chipIdle = isLight
     ? 'border border-gray-300 text-gray-800 bg-transparent hover:bg-gray-100'
     : 'border border-white text-white bg-transparent hover:bg-white/10';
@@ -297,7 +301,7 @@ export const SortModal = ({
     <Fragment>
       <style>{sliderStyles}</style>
       <div 
-        className="fixed inset-0 bg-black/40 z-50 flex items-end" 
+        className="fixed inset-0 z-[1100] flex items-end bg-black/40" 
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
@@ -551,9 +555,15 @@ export const SortModal = ({
                       type="number"
                       min="0"
                       max={currentMaxPrice}
-                      value={localMinPrice}
+                      value={localMinPrice === 0 ? '' : localMinPrice}
                       onChange={(e) => {
-                        const value = parseInt(e.target.value) || 0;
+                        const raw = e.target.value.trim();
+                        if (raw === '') {
+                          setLocalMinPrice(0);
+                          return;
+                        }
+                        const value = parseInt(raw, 10);
+                        if (Number.isNaN(value)) return;
                         const clampedValue = Math.min(Math.max(0, value), currentMaxPrice);
                         setLocalMinPrice(clampedValue);
                         if (clampedValue > localMaxPrice) {
@@ -593,9 +603,15 @@ export const SortModal = ({
                       type="number"
                       min="0"
                       max={currentMaxPrice}
-                      value={localMaxPrice}
+                      value={localMaxPrice >= currentMaxPrice ? '' : localMaxPrice}
                       onChange={(e) => {
-                        const value = parseInt(e.target.value) || 0;
+                        const raw = e.target.value.trim();
+                        if (raw === '') {
+                          setLocalMaxPrice(currentMaxPrice);
+                          return;
+                        }
+                        const value = parseInt(raw, 10);
+                        if (Number.isNaN(value)) return;
                         const clampedValue = Math.min(Math.max(0, value), currentMaxPrice);
                         setLocalMaxPrice(clampedValue);
                         if (clampedValue < localMinPrice) {
@@ -679,9 +695,12 @@ export const SortModal = ({
 
           {/* Закріплені кнопки дій */}
           <div
-            className={`p-6 border-t flex-shrink-0 relative z-10 ${
-              isLight ? 'border-gray-200' : 'border-gray-700/50'
+            className={`relative z-10 flex-shrink-0 border-t p-6 ${
+              isLight ? 'border-gray-200 bg-white/95' : 'border-white/15 bg-[#0a0a0a]/95'
             }`}
+            style={{
+              paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+            }}
           >
             <button
               type="button"

@@ -121,16 +121,28 @@ const BazaarTabComponent = ({
       setSelectedCategory(initialSelectedCategory);
     }
   }, [initialSelectedCategory, savedState?.selectedCategory]);
-  
+
+  const lastSyncedCatalogKeyRef = useRef<string | null>(null);
+
   // Синхронізуємо локальний стан з savedState при монтуванні та при зміні
   useEffect(() => {
     if (savedState) {
+      const catalogKey = `${savedState.selectedCategory ?? ''}|${savedState.selectedSubcategory ?? ''}`;
+      const catalogChanged = lastSyncedCatalogKeyRef.current !== catalogKey;
+      lastSyncedCatalogKeyRef.current = catalogKey;
+
       // Оновлюємо стан тільки якщо він справді змінився
       if (savedState.selectedCategory !== selectedCategory && savedState.selectedCategory !== undefined) {
         setSelectedCategory(savedState.selectedCategory);
       }
       if (savedState.selectedSubcategory !== selectedSubcategory && savedState.selectedSubcategory !== undefined) {
         setSelectedSubcategory(savedState.selectedSubcategory);
+      }
+      if (catalogChanged) {
+        setMinPrice(null);
+        setMaxPrice(null);
+        setSelectedCondition(null);
+        setSelectedCurrency(null);
       }
       if (savedState.showFreeOnly !== showFreeOnly && savedState.showFreeOnly !== undefined) {
         setShowFreeOnly(savedState.showFreeOnly);
@@ -330,21 +342,26 @@ const BazaarTabComponent = ({
   }, [viewMode]);
   
   
-  // Зберігаємо стан при зміні
+  // Не відправляємо стан батьку під час першого монтування (уникаємо циклу після закриття картки товару)
+  const skipParentStateEchoRef = useRef(true);
   useEffect(() => {
-    if (onStateChange) {
-      onStateChange({
-        selectedCategory,
-        selectedSubcategory,
-        selectedCities,
-        minPrice,
-        maxPrice,
-        selectedCondition,
-        selectedCurrency,
-        sortBy,
-        showFreeOnly,
-      });
-    }
+    skipParentStateEchoRef.current = false;
+  }, []);
+
+  // Зберігаємо стан при зміні (лише після ініціалізації, лише коли щось змінилось локально)
+  useEffect(() => {
+    if (!onStateChange || skipParentStateEchoRef.current) return;
+    onStateChange({
+      selectedCategory,
+      selectedSubcategory,
+      selectedCities,
+      minPrice,
+      maxPrice,
+      selectedCondition,
+      selectedCurrency,
+      sortBy,
+      showFreeOnly,
+    });
   }, [selectedCategory, selectedSubcategory, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency, sortBy, showFreeOnly, onStateChange]);
 
   // Завантажуємо історію пошуку
@@ -456,17 +473,9 @@ const BazaarTabComponent = ({
       
       // Якщо є пошук, не застосовуємо категорії (повертаємо всі результати пошуку)
       // Застосовуємо тільки інші фільтри
-    } else {
-      // Фільтр по категорії (тільки якщо немає пошуку)
-      if (selectedCategory) {
-        filtered = filtered.filter(listing => listing.category === selectedCategory);
-      }
-
-      // Фільтр по підкатегорії (тільки якщо немає пошуку)
-      if (selectedSubcategory) {
-        filtered = filtered.filter(listing => listing.subcategory === selectedSubcategory);
-      }
     }
+    // Категорія/підкатегорія — лише на сервері (buildListingsUrl). Повторна фільтрація
+    // по вже завантаженій стрічці давала 0–1 оголошення до завершення запиту.
 
     // Фільтр безкоштовних (швидка перевірка)
     if (showFreeOnly) {
@@ -774,8 +783,8 @@ const BazaarTabComponent = ({
               </div>
               
               {categories.map(category => (
-                <CategoryChip 
-                  key={category.id} 
+                <CategoryChip
+                  key={category.id}
                   category={category}
                   isActive={false}
                   onClick={() => {

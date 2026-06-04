@@ -4,6 +4,7 @@ import { trackUserActivity } from '@/utils/trackActivity';
 import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
+import { resolveStoredListingImages } from '@/utils/resolveListingImageStorage';
 
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
@@ -189,8 +190,13 @@ export async function GET(
         title: listing.title,
         price: listing.price,
         currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
-        image: JSON.parse(listing.images)[0] || '',
-        images: JSON.parse(listing.images),
+        image: (() => {
+          const resolved = resolveStoredListingImages(
+            JSON.parse(listing.images) as string[]
+          );
+          return resolved[0] || '';
+        })(),
+        images: resolveStoredListingImages(JSON.parse(listing.images) as string[]),
         seller: {
           name: listing.firstName 
             ? `${listing.firstName} ${listing.lastName || ''}`.trim()

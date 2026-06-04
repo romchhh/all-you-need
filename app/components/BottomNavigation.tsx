@@ -32,6 +32,9 @@ export const BottomNavigation = ({
   const lang = (params?.lang as string) || 'uk';
   const [mounted, setMounted] = useState(false);
   const [hiddenByOverlay, setHiddenByOverlay] = useState(false);
+  const [hiddenByKeyboard, setHiddenByKeyboard] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const isSearchPage = Boolean(pathname?.includes('/search'));
 
   useEffect(() => {
     setMounted(true);
@@ -52,6 +55,85 @@ export const BottomNavigation = ({
 
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const isTextInput = (el: Element | null): boolean => {
+      if (!el || !(el instanceof HTMLElement)) return false;
+      if (el.tagName === 'TEXTAREA') return true;
+      if (el.tagName !== 'INPUT') return el.isContentEditable;
+      const type = (el as HTMLInputElement).type;
+      return !['button', 'checkbox', 'radio', 'submit', 'reset', 'file', 'hidden', 'range', 'color'].includes(
+        type
+      );
+    };
+
+    const updateKeyboardOffset = () => {
+      if (!isSearchPage) {
+        setKeyboardOffset(0);
+        return;
+      }
+      const vv = window.visualViewport;
+      if (!vv || !isTextInput(document.activeElement)) {
+        setKeyboardOffset(0);
+        return;
+      }
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardOffset(offset > 80 ? offset : 0);
+    };
+
+    const syncKeyboardHidden = () => {
+      if (isSearchPage) {
+        setHiddenByKeyboard(false);
+        updateKeyboardOffset();
+        return;
+      }
+      setHiddenByKeyboard(isTextInput(document.activeElement));
+      setKeyboardOffset(0);
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      if (isTextInput(e.target as Element)) {
+        if (isSearchPage) {
+          updateKeyboardOffset();
+        } else {
+          setHiddenByKeyboard(true);
+        }
+      }
+    };
+
+    const onFocusOut = () => {
+      requestAnimationFrame(syncKeyboardHidden);
+    };
+
+    const vv = window.visualViewport;
+    const onViewportResize = () => {
+      if (!vv) return;
+      if (isSearchPage) {
+        updateKeyboardOffset();
+        return;
+      }
+      const keyboardLikelyOpen = window.innerHeight - vv.height > 120;
+      if (keyboardLikelyOpen && isTextInput(document.activeElement)) {
+        setHiddenByKeyboard(true);
+      } else if (!isTextInput(document.activeElement)) {
+        setHiddenByKeyboard(false);
+      }
+    };
+
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    vv?.addEventListener('resize', onViewportResize);
+    vv?.addEventListener('scroll', onViewportResize);
+
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+      vv?.removeEventListener('resize', onViewportResize);
+      vv?.removeEventListener('scroll', onViewportResize);
+    };
+  }, [isSearchPage]);
 
   const getActiveTab = () => {
     if (activeTab) return activeTab;
@@ -109,20 +191,21 @@ export const BottomNavigation = ({
     router.push(`/${lang}/${route}`);
   };
 
-  if (!mounted || hiddenByOverlay || typeof document === 'undefined') {
+  if (!mounted || hiddenByOverlay || (!isSearchPage && hiddenByKeyboard) || typeof document === 'undefined') {
     return null;
   }
 
   return createPortal(
     <nav
       data-bottom-nav
-      className={`fixed bottom-0 left-0 right-0 z-[1000] border-t pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] pt-1.5 ${
+      className={`fixed bottom-0 left-0 right-0 z-[1000] border-t pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] pt-1.5 transition-transform duration-150 ${
         isLight
           ? 'border-gray-200/80 bg-white/95 shadow-[0_-6px_32px_-8px_rgba(0,0,0,0.08)] backdrop-blur-md'
           : 'border-white/10 bg-[#000000] shadow-[0_-8px_40px_-6px_rgba(0,0,0,0.45)]'
       }`}
       style={{
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)',
+        transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : undefined,
       }}
     >
       <div className="mx-auto flex max-w-2xl items-center justify-around px-2 sm:px-4 lg:max-w-6xl lg:px-8">

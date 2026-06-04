@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAutoPrefetch } from '@/hooks/usePrefetch';
 import { Listing } from '@/types';
@@ -18,6 +18,8 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import CreateListingFlow from '@/components/CreateListingFlow';
 import { useUser } from '@/hooks/useUser';
 import { AppHeader } from '@/components/AppHeader';
+import { getCategories } from '@/constants/categories';
+import { navigateToListingCategory } from '@/utils/navigateToListingCategory';
 
 const FavoritesPage = () => {
   const params = useParams();
@@ -28,6 +30,7 @@ const FavoritesPage = () => {
   const router = useRouter();
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
+  const categories = useMemo(() => getCategories(t), [t]);
   const { profile, isBlocked, loading: profileLoading } = useUser();
   const { tg } = useTelegram();
   const { toast, showToast, hideToast } = useToast();
@@ -693,6 +696,9 @@ const FavoritesPage = () => {
           onAutoRenewPersist={(id, autoRenew) =>
             setSelectedListing((prev) => (prev && prev.id === id ? { ...prev, autoRenew } : prev))
           }
+          onNavigateToCategory={(categoryId, subcategoryId) => {
+            navigateToListingCategory(router, lang, categories, categoryId, subcategoryId);
+          }}
         />
       );
     }

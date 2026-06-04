@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/useToast';
 import { Toast } from './Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useHideBottomNav } from '@/hooks/useHideBottomNav';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export const EditProfileModal = ({
   const { toast, showToast, hideToast } = useToast();
   const { t } = useLanguage();
   const { isLight } = useTheme();
+  useHideBottomNav(isOpen);
 
   // Валідація номера телефону
   const validatePhone = (phoneNumber: string): boolean => {
@@ -219,13 +221,18 @@ export const EditProfileModal = ({
 
   if (!isOpen) return null;
 
-  const panel = isLight
-    ? 'bg-white border-2 border-gray-200 shadow-2xl'
-    : 'bg-[#000000] border-2 border-white shadow-2xl';
+  const overlayClass = isLight ? 'bg-black/35 backdrop-blur-sm' : 'bg-black/50 backdrop-blur-sm';
+  const cardShell = isLight
+    ? 'bg-white border-gray-200/90 shadow-xl ring-1 ring-black/[0.06]'
+    : 'bg-[#000000] border-white';
+  const headerBar = isLight
+    ? 'bg-white border-b border-gray-200/90'
+    : 'bg-[#000000] border-b border-white/20';
   const heading = isLight ? 'text-gray-900' : 'text-white';
-  const closeBtn = isLight
-    ? 'bg-gray-100 border border-gray-200 hover:bg-gray-200'
-    : 'bg-[#1C1C1C] border border-white/20 hover:bg-white/10';
+  const closeBtnClass = isLight ? 'text-gray-500 hover:text-gray-900' : 'text-white/70 hover:text-white';
+  const footerBar = isLight
+    ? 'bg-white border-t border-gray-200/90'
+    : 'bg-[#000000] border-t border-white/20';
   const label = isLight ? 'text-gray-800' : 'text-white';
   const input = isLight
     ? 'bg-white border border-gray-200 text-gray-900 placeholder:text-gray-400 focus:ring-[#3F5331]/25 focus:border-[#5a7c2e]/50'
@@ -273,34 +280,48 @@ export const EditProfileModal = ({
   };
 
   return (
-    <div 
-      className={`fixed inset-0 backdrop-blur-sm z-[99999] flex max-lg:flex-col max-lg:items-center max-lg:justify-start lg:items-center lg:justify-center justify-center p-4 max-lg:pt-[max(32dvh,calc(env(safe-area-inset-top,0px)+9rem))] lg:pt-4 pb-24 lg:pb-4 overflow-y-auto ${
-        isLight ? 'bg-black/30' : 'bg-black/50'
-      }`}
-      onTouchStart={(e) => e.stopPropagation()}
-      onTouchMove={(e) => {
-        // Запобігаємо свайпу вниз для закриття додатку
-        e.stopPropagation();
+    <div
+      className={`fixed inset-0 z-[99999] flex items-center justify-center px-4 ${overlayClass}`}
+      style={{
+        touchAction: 'none',
+        paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
       }}
-      onTouchEnd={(e) => e.stopPropagation()}
-      style={{ touchAction: 'none' }}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+        }
+      }}
     >
-      <div 
-        data-edit-profile-scrollable 
-        className={`rounded-3xl w-full max-w-md p-6 relative z-[100000] my-4 max-lg:my-2 sm:my-0 max-h-[min(calc(100dvh-max(32dvh,9rem)-6rem),90vh)] lg:max-h-[90vh] overflow-y-auto overscroll-contain ${panel}`}
-        style={{ touchAction: 'pan-y' }}
+      <div
+        className={`relative z-[100000] flex h-[80dvh] max-h-[80dvh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border-2 ${cardShell}`}
+        onTouchMove={(e) => {
+          const content = e.currentTarget.querySelector('[data-edit-profile-scrollable]') as HTMLElement;
+          if (content?.contains(e.target as Node)) {
+            return;
+          }
+          e.stopPropagation();
+        }}
       >
-        {/* Заголовок */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className={`text-2xl font-bold ${heading}`}>{t('profile.editProfile')}</h2>
-          <button
-            onClick={onClose}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
-          >
-            <X size={20} className={isLight ? 'text-gray-800' : 'text-white'} />
-          </button>
+        <div className={`flex-shrink-0 px-6 py-4 ${headerBar}`}>
+          <div className="flex items-center justify-between">
+            <h2 className={`text-xl font-bold ${heading}`}>{t('profile.editProfile')}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t('common.close')}
+              className={`transition-colors ${closeBtnClass}`}
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
+        <div
+          data-edit-profile-scrollable
+          className="flex-1 overflow-y-auto overscroll-contain px-6 py-4"
+          style={{ touchAction: 'pan-y' }}
+        >
         {/* Аватар */}
         <div className="flex flex-col items-center mb-6">
           <label className={`block text-sm font-medium mb-2 ${label}`}>{t('profile.avatar')}</label>
@@ -370,7 +391,7 @@ export const EditProfileModal = ({
         </div>
 
         {/* Телефон */}
-        <div className="mb-6">
+        <div className="mb-4">
           <label className={`block text-sm font-medium mb-2 ${label}`}>
             {t('profile.phone') || 'Номер телефону'}
           </label>
@@ -392,16 +413,21 @@ export const EditProfileModal = ({
             {t('profile.phoneHint') || 'Формат: +380XXXXXXXXX (не обов\'язково)'}
           </p>
         </div>
+        </div>
 
-        {/* Кнопки */}
-        <div className="flex gap-3">
+        <div
+          className={`flex-shrink-0 flex gap-3 px-6 py-4 ${footerBar}`}
+          style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           <button
+            type="button"
             onClick={onClose}
             className={`flex-1 px-4 py-3 bg-transparent rounded-xl font-medium transition-colors ${cancelBtn}`}
           >
             {t('common.cancel') || 'Скасувати'}
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={loading || !firstName.trim()}
             className="flex-1 px-4 py-3 bg-[#3F5331] text-white rounded-xl font-medium hover:bg-[#344728] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

@@ -23,6 +23,7 @@ interface ListingFormData {
   subcategory: string | null;
   condition: string | null;
   location: string;
+  autoRenew?: boolean;
 }
 
 /**
@@ -418,27 +419,56 @@ export async function createDraftListing(
   
   // Використовуємо executeRawUnsafe без executeWithRetry для швидкості
   // executeWithRetry додає затримки, що сповільнює створення
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO Listing (
-      userId, title, description, price, currency, isFree, category, subcategory,
-      condition, location, images, status, moderationStatus, expiresAt, createdAt, updatedAt, publishedAt
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, NULL)`,
-    userId,
-    data.title,
-    data.description,
-    data.price,
-    data.currency,
-    data.isFree ? 1 : 0,
-    data.category,
-    data.subcategory || null,
-    data.condition || null,
-    data.location,
-    JSON.stringify(imageUrls),
-    expiresTime,
-    createTime,
-    createTime
-  );
+  const autoRenew = data.autoRenew ? 1 : 0;
+
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO Listing (
+        userId, title, description, price, currency, isFree, category, subcategory,
+        condition, location, images, status, moderationStatus, expiresAt, autoRenew, createdAt, updatedAt, publishedAt
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, ?, NULL)`,
+      userId,
+      data.title,
+      data.description,
+      data.price,
+      data.currency,
+      data.isFree ? 1 : 0,
+      data.category,
+      data.subcategory || null,
+      data.condition || null,
+      data.location,
+      JSON.stringify(imageUrls),
+      expiresTime,
+      autoRenew,
+      createTime,
+      createTime
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!msg.includes('autoRenew')) throw err;
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO Listing (
+        userId, title, description, price, currency, isFree, category, subcategory,
+        condition, location, images, status, moderationStatus, expiresAt, createdAt, updatedAt, publishedAt
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, NULL)`,
+      userId,
+      data.title,
+      data.description,
+      data.price,
+      data.currency,
+      data.isFree ? 1 : 0,
+      data.category,
+      data.subcategory || null,
+      data.condition || null,
+      data.location,
+      JSON.stringify(imageUrls),
+      expiresTime,
+      createTime,
+      createTime
+    );
+  }
 
   // Отримуємо ID створеного оголошення
   const result = await prisma.$queryRawUnsafe(

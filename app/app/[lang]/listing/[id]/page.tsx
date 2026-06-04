@@ -44,7 +44,7 @@ export async function generateMetadata(
     };
   }
 
-  const lang = params.lang === 'ru' ? 'ru' : 'uk';
+  const lang = params.lang === 'uk' ? 'uk' : 'ru';
   const baseUrl = (
     process.env.WEBAPP_URL ||
     process.env.NEXT_PUBLIC_BASE_URL ||
@@ -130,7 +130,7 @@ export default async function ListingPage(props: PageProps) {
     notFound();
   }
 
-  const lang = params.lang === 'ru' ? 'ru' : 'uk';
+  const lang = params.lang === 'uk' ? 'uk' : 'ru';
 
   return <ListingPageClient listingId={listing.id} lang={lang} />;
 }
