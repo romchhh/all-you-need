@@ -14,7 +14,13 @@ router = Router()
 
 @router.message(IsAdmin(), F.text.in_(["Адмін панель 💻", "/admin"]))
 async def admin_panel(message: types.Message):
-    await message.answer("<b>💻 Вітаю в адмін панелі</b>\n\nОсь ваші доступні опції.", reply_markup=admin_keyboard(), parse_mode="HTML")
+    await message.answer(
+        "<b>💻 Вітаю в адмін панелі</b>\n\n"
+        "Ось ваші доступні опції.\n\n"
+        "🔍 Ручний парсинг каналів: <code>/parse</code>",
+        reply_markup=admin_keyboard(),
+        parse_mode="HTML",
+    )
     
     
 @router.message(IsAdmin(), F.text.in_(["Статистика"]))
