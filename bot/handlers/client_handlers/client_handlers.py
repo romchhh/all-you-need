@@ -144,6 +144,16 @@ async def scheduler_jobs():
         import traceback
         traceback.print_exc()
 
+    # Авто-розсилка маркетплейсу: Ср 18–20, Сб 11–13 (Europe/Berlin)
+    try:
+        from utils.weekly_marketplace_broadcast import register_weekly_broadcast_jobs
+
+        register_weekly_broadcast_jobs(scheduler, bot)
+    except Exception as e:
+        print(f"❌ Помилка реєстрації weekly marketplace broadcast: {e}")
+        import traceback
+        traceback.print_exc()
+
 router = Router()
 
   

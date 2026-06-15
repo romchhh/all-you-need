@@ -102,6 +102,9 @@ TEXTS = {
                     "🎁 Подача оголошень - <b>БЕЗКОШТОВНО.</b>\n\n"
                     "Оберіть дію в меню нижче 👇"
     },
+    "weekly_broadcast": {
+        "open_marketplace": "Відкрити маркетплейс",
+    },
     "shared": {
         "listing": {
             "title": "📦 <b>{title}</b>",

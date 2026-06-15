@@ -346,6 +346,12 @@ def generate_database_export():
 
 def format_statistics_message():
     stats = get_statistics_summary()
+    try:
+        from utils.weekly_marketplace_broadcast import get_weekly_broadcast_stats_text
+
+        weekly_broadcast_text = get_weekly_broadcast_stats_text(limit=5)
+    except Exception:
+        weekly_broadcast_text = "   Немає даних\n"
     
     language_emoji = {
         'uk': '🇺🇦',
@@ -457,6 +463,10 @@ def format_statistics_message():
 
 <b>🌍 СТАТИСТИКА ПО МОВАХ</b>
 {languages_text}
+
+<b>📬 АВТО-РОЗСИЛКА МАРКЕТПЛЕЙСУ</b>
+<i>Ср 18–20, Сб 11–13 (Німеччина)</i>
+{weekly_broadcast_text}
 
 <i>📅 Оновлено: {datetime.now().strftime('%d.%m.%Y %H:%M')}</i>"""
     
