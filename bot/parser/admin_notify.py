@@ -2,6 +2,7 @@
 Модуль надсилання оголошень адміну в групу модерації з кнопками Підтвердити / Відхилити.
 """
 
+import html
 import os
 import asyncio
 import logging
@@ -259,3 +260,65 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
     except Exception as e:
         logger.error(f"Помилка надсилання оголошення {item_id} в групу: {e}", exc_info=True)
         return None
+
+
+# ──────────────────────────────────────────────
+# Сповіщення адмінів про помилки парсера
+# ──────────────────────────────────────────────
+
+def _parser_error_notify_enabled() -> bool:
+    raw = (os.getenv("PARSER_ERROR_NOTIFY_ADMINS") or "1").strip().lower()
+    return raw not in ("0", "false", "no")
+
+
+async def notify_parser_error_admins(bot: Bot, title: str, details: str) -> None:
+    """Надсилає повідомлення про помилку парсера всім адмінам (config.administrators)."""
+    if not _parser_error_notify_enabled():
+        return
+
+    try:
+        from config import administrators
+    except Exception as e:
+        logger.warning("Не вдалося завантажити administrators: %s", e)
+        return
+
+    if not administrators:
+        return
+
+    safe_title = html.escape(title)
+    safe_details = html.escape(details.strip())
+    if len(safe_details) > 3500:
+        safe_details = safe_details[:3500] + "…"
+
+    body = f"⚠️ <b>Парсер: {safe_title}</b>\n\n<pre>{safe_details}</pre>"
+
+    for admin_id in administrators:
+        try:
+            await bot.send_message(admin_id, body, parse_mode="HTML")
+        except Exception as e:
+            logger.warning("Parser error notify admin %s: %s", admin_id, e)
+
+
+async def notify_parser_channel_errors(
+    bot: Bot,
+    errors: list[dict],
+) -> None:
+    """Зведене сповіщення про помилки парсингу окремих каналів."""
+    if not errors or not _parser_error_notify_enabled():
+        return
+
+    lines = []
+    for err in errors[:25]:
+        channel = html.escape(str(err.get("channel", "?")))
+        message = html.escape(str(err.get("error", "невідома помилка"))[:300])
+        lines.append(f"• <b>{channel}</b>\n  <code>{message}</code>")
+
+    extra = ""
+    if len(errors) > 25:
+        extra = f"\n\n…та ще {len(errors) - 25} канал(ів)"
+
+    await notify_parser_error_admins(
+        bot,
+        "помилки каналів",
+        "\n\n".join(lines) + extra,
+    )

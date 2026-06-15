@@ -606,7 +606,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
 async def run_all_channels(app, notify_callback) -> dict:
     """Парсить всі канали з CHANNELS словника."""
-    total = {"added": 0, "skipped": 0}
+    total: dict = {"added": 0, "skipped": 0, "errors": []}
     for channel, city in CHANNELS.items():
         try:
             stats = await parse_channel(app, channel, city, notify_callback)
@@ -617,4 +617,5 @@ async def run_all_channels(app, notify_callback) -> dict:
             )
         except Exception as e:
             logger.error(f"Помилка парсингу каналу {channel}: {e}", exc_info=True)
+            total["errors"].append({"channel": channel, "city": city, "error": str(e)})
     return total

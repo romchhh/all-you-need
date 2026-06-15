@@ -18,6 +18,7 @@
 import asyncio
 import logging
 import os
+import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -40,43 +41,74 @@ SESSION_PATH = Path(__file__).resolve().parent / "parser_session"
 
 async def run_parser_cycle():
     """Один повний цикл парсингу всіх каналів."""
-    if not PARSER_API_ID or not PARSER_API_HASH or not PARSER_PHONE:
-        logger.error(
-            "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
-        )
-        return
-
-    try:
-        from pyrogram import Client
-    except ImportError:
-        logger.error("Pyrogram не встановлено. Запусти: pip install pyrogram tgcrypto")
+    if not BOT_TOKEN:
+        logger.error("TOKEN не встановлено в .env — парсер не може сповіщати адмінів")
         return
 
     from aiogram import Bot
-    from parser.parser import run_all_channels
-    from parser.admin_notify import notify_admin_group
+    from parser.admin_notify import (
+        notify_admin_group,
+        notify_parser_channel_errors,
+        notify_parser_error_admins,
+    )
+    from parser.session_lock import pyrogram_session_guard
 
     aiogram_bot = Bot(token=BOT_TOKEN)
 
-    async def notify_callback(item_data: dict):
-        await notify_admin_group(aiogram_bot, item_data)
-
-    pyrogram_client = Client(
-        name=str(SESSION_PATH),
-        api_id=PARSER_API_ID,
-        api_hash=PARSER_API_HASH,
-        phone_number=PARSER_PHONE,
-    )
+    async def _notify_error(title: str, details: str) -> None:
+        try:
+            await notify_parser_error_admins(aiogram_bot, title, details)
+        except Exception as notify_err:
+            logger.warning("Не вдалося сповістити адмінів про помилку парсера: %s", notify_err)
 
     try:
-        async with pyrogram_client:
-            logger.info("🔍 Починаємо парсинг каналів...")
-            stats = await run_all_channels(pyrogram_client, notify_callback)
-            logger.info(
-                f"✅ Парсинг завершено: +{stats['added']} нових, пропущено {stats['skipped']}"
+        if not PARSER_API_ID or not PARSER_API_HASH or not PARSER_PHONE:
+            msg = "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
+            logger.error(msg)
+            await _notify_error("налаштування", msg)
+            return
+
+        try:
+            from pyrogram import Client
+        except ImportError:
+            msg = "Pyrogram не встановлено. Запусти: pip install pyrogram tgcrypto"
+            logger.error(msg)
+            await _notify_error("залежності", msg)
+            return
+
+        from parser.parser import run_all_channels
+
+        async def notify_callback(item_data: dict):
+            await notify_admin_group(aiogram_bot, item_data)
+
+        pyrogram_client = Client(
+            name=str(SESSION_PATH),
+            api_id=PARSER_API_ID,
+            api_hash=PARSER_API_HASH,
+            phone_number=PARSER_PHONE,
+        )
+
+        try:
+            async with pyrogram_session_guard(SESSION_PATH):
+                async with pyrogram_client:
+                    logger.info("🔍 Починаємо парсинг каналів...")
+                    stats = await run_all_channels(pyrogram_client, notify_callback)
+                    logger.info(
+                        f"✅ Парсинг завершено: +{stats['added']} нових, "
+                        f"пропущено {stats['skipped']}"
+                    )
+                    channel_errors = stats.get("errors") or []
+                    if channel_errors:
+                        await notify_parser_channel_errors(aiogram_bot, channel_errors)
+        except RuntimeError as e:
+            logger.error("Сесія парсера зайнята: %s", e, exc_info=True)
+            await _notify_error("сесія зайнята", str(e))
+        except Exception as e:
+            logger.error(f"Критична помилка в циклі парсингу: {e}", exc_info=True)
+            await _notify_error(
+                "критична помилка циклу",
+                f"{type(e).__name__}: {e}\n\n{traceback.format_exc()[-3000:]}",
             )
-    except Exception as e:
-        logger.error(f"Критична помилка в циклі парсингу: {e}", exc_info=True)
     finally:
         await aiogram_bot.session.close()
 

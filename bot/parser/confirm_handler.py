@@ -165,6 +165,8 @@ async def _try_notify_author_via_pyrogram(
         logger.warning("Pyrogram не встановлено — пропускаємо сповіщення автору")
         return
 
+    from parser.session_lock import pyrogram_session_guard
+
     plain_text = NOTIFY_AUTHOR_TEXT_RU.format(
         title=title,
         listing_url=_listing_miniapp_url(listing_id),
@@ -177,10 +179,11 @@ async def _try_notify_author_via_pyrogram(
             api_hash=api_hash,
             phone_number=phone,
         )
-        async with app:
-            target = author_id or f"@{author_username}"
-            await app.send_message(target, plain_text)
-            logger.info(f"Pyrogram[{sender_label}]: надіслано сповіщення автору {target}")
+        async with pyrogram_session_guard(session_path, timeout=120):
+            async with app:
+                target = author_id or f"@{author_username}"
+                await app.send_message(target, plain_text)
+                logger.info(f"Pyrogram[{sender_label}]: надіслано сповіщення автору {target}")
     except Exception as e:
         err_s = str(e)
         logger.warning(
