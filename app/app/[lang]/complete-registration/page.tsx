@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { TradeGroundLogo } from '@/components/TradeGroundLogo';
+import { TradeGroundLogo } from '@/components/layout/TradeGroundLogo';
 import { useParams, useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -14,10 +14,10 @@ import {
   Shield,
   Smartphone,
 } from 'lucide-react';
-import { useUser } from '@/hooks/useUser';
+import { useUser } from '@/features/user/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useTelegram } from '@/hooks/useTelegram';
+import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { getBotTelegramOpenUrl } from '@/utils/botLinks';
 
 function StepCard({

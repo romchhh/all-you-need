@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry } from '@/lib/prisma';
 import { requireAdminAuth } from '@/utils/adminAuth';
-import { sendBalanceCreditedNotification } from '@/utils/telegramNotifications';
+import { sendBalanceCreditedNotification } from '@/lib/telegram/telegramNotifications';
 
 /**
  * POST /api/admin/users/[id]/credit-balance

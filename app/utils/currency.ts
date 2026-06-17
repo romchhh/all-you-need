@@ -13,16 +13,3 @@ export const getCurrencySymbol = (currency?: Currency): string => {
   }
 };
 
-export const getCurrencyIcon = (currency?: Currency): string => {
-  switch (currency) {
-    case 'UAH':
-      return '🇺🇦';
-    case 'EUR':
-      return '🇪🇺';
-    case 'USD':
-      return '🇺🇸';
-    default:
-      return '🇺🇦';
-  }
-};
-

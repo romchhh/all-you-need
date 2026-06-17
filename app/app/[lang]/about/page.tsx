@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { useTelegram } from '@/hooks/useTelegram';
+import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import Image from 'next/image';
 
 export default function AboutPage() {

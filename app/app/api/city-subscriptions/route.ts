@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureCitySubscriptionTable } from '@/lib/prisma';
-import { normalizeCityInput } from '@/utils/cityNormalization';
+import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 
 export const dynamic = 'force-dynamic';

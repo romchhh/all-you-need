@@ -5,7 +5,7 @@ export const germanCities = [
   'Hamburg',
   'München',
   'Köln',
-  'Frankfurt am Main',
+  'Frankfurt',
   'Frankfurt (Oder)',
   'Stuttgart',
   'Düsseldorf',

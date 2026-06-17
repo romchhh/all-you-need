@@ -76,7 +76,7 @@ async def run_parser_cycle():
             await _notify_error("залежності", msg)
             return
 
-        from parser.parser import run_all_channels
+        from parser.core.runner import run_all_channels
 
         async def notify_callback(item_data: dict):
             await notify_admin_group(aiogram_bot, item_data)
@@ -132,7 +132,7 @@ def register_parser_job(scheduler):
         minutes=PARSER_INTERVAL_MIN,
         id="telegram_parser",
         replace_existing=True,
-        misfire_grace_time=60,
+        misfire_grace_time=max(60, int(PARSER_INTERVAL_MIN * 60)),
         max_instances=1,
     )
     logger.info(f"✅ Parser scheduler зареєстровано (інтервал: {PARSER_INTERVAL_MIN} хв)")

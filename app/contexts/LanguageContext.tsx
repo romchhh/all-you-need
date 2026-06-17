@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { loadProfileBundle } from '@/utils/loadProfileBundle';
 
@@ -175,11 +175,11 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
     }
   }, [language, isLoadingLanguage, userTelegramId]);
 
-  const setLanguage = (lang: Language) => {
+  const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
-  };
+  }, []);
 
-  const t = (key: string, params?: Record<string, string>): string => {
+  const t = useCallback((key: string, params?: Record<string, string>): string => {
     const keys = key.split('.');
     let value: any = translations;
     
@@ -187,12 +187,11 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
       if (value && typeof value === 'object' && k in value) {
         value = value[k];
       } else {
-        return key; // Повертаємо ключ, якщо переклад не знайдено
+        return key;
       }
     }
     
     if (typeof value === 'string') {
-      // Замінюємо параметри в рядку
       if (params) {
         return value.replace(/\{(\w+)\}/g, (match, paramKey) => {
           return params[paramKey] || match;
@@ -202,10 +201,15 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
     }
     
     return key;
-  };
+  }, [language, translations]);
+
+  const contextValue = useMemo(
+    () => ({ language, setLanguage, t }),
+    [language, setLanguage, t]
+  );
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={contextValue}>
       {children}
     </LanguageContext.Provider>
   );

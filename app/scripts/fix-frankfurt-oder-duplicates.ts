@@ -3,7 +3,7 @@
  * "Frankfurt am Main (Oder) (Oder) (Oder) ..."
  *
  * Оновлює поля `location` у таблицях `Listing` та `TelegramListing`,
- * залишаючи просто "Frankfurt am Main".
+ * залишаючи просто "Frankfurt".
  *
  * Запуск з папки `app`:
  *   npx tsx scripts/fix-frankfurt-oder-duplicates.ts          # реальне оновлення
@@ -18,43 +18,47 @@ const DRY_RUN = process.argv.includes('--dry-run');
 
 async function main() {
   console.log(
-    `Запуск скрипта очищення Frankfurt am Main від зайвих "(Oder)" (${DRY_RUN ? 'DRY RUN — без змін в БД' : 'ON-LINE ОНОВЛЕННЯ'})...\n`
+    `Запуск скрипта очищення Frankfurt від зайвих "(Oder)" (${DRY_RUN ? 'DRY RUN — без змін в БД' : 'ON-LINE ОНОВЛЕННЯ'})...\n`
   );
 
-  const pattern = 'Frankfurt am Main (Oder)%';
+  const patterns = ['Frankfurt am Main (Oder)%', 'Frankfurt (Oder)%'];
 
   if (DRY_RUN) {
-    const listingCount = await prisma.listing.count({
-      where: { location: { startsWith: 'Frankfurt am Main (Oder)' } },
-    });
-    const telegramCount = await prisma.telegramListing.count({
-      where: { location: { startsWith: 'Frankfurt am Main (Oder)' } },
-    });
-
-    console.log(
-      `Listing: буде очищено записів ≈ ${listingCount} (location LIKE "${pattern}")`
-    );
-    console.log(
-      `TelegramListing: буде очищено записів ≈ ${telegramCount} (location LIKE "${pattern}")`
-    );
+    for (const pattern of patterns) {
+      const listingCount = await prisma.listing.count({
+        where: { location: { startsWith: pattern.replace('%', '') } },
+      });
+      const telegramCount = await prisma.telegramListing.count({
+        where: { location: { startsWith: pattern.replace('%', '') } },
+      });
+      console.log(
+        `Pattern "${pattern}": Listing≈${listingCount}, TelegramListing≈${telegramCount}`
+      );
+    }
     console.log('\nГотово (DRY RUN).');
     return;
   }
 
-  // Очищаємо Listing: прибираємо всі " (Oder)" і тримаємо пробіли
-  const listingChanged = await prisma.$executeRawUnsafe(
-    `UPDATE Listing
-     SET location = TRIM(REPLACE(location, ' (Oder)', ''))
-     WHERE location LIKE ?`,
-    pattern
-  );
-
-  const telegramChanged = await prisma.$executeRawUnsafe(
-    `UPDATE TelegramListing
-     SET location = TRIM(REPLACE(location, ' (Oder)', ''))
-     WHERE location LIKE ?`,
-    pattern
-  );
+  let listingChanged = 0;
+  let telegramChanged = 0;
+  for (const pattern of patterns) {
+    listingChanged += Number(
+      await prisma.$executeRawUnsafe(
+        `UPDATE Listing
+         SET location = TRIM(REPLACE(REPLACE(location, 'Frankfurt am Main', 'Frankfurt'), ' (Oder)', ''))
+         WHERE location LIKE ?`,
+        pattern
+      )
+    );
+    telegramChanged += Number(
+      await prisma.$executeRawUnsafe(
+        `UPDATE TelegramListing
+         SET location = TRIM(REPLACE(REPLACE(location, 'Frankfurt am Main', 'Frankfurt'), ' (Oder)', ''))
+         WHERE location LIKE ?`,
+        pattern
+      )
+    );
+  }
 
   console.log(
     `Оновлено записів: Listing=${listingChanged}, TelegramListing=${telegramChanged}`

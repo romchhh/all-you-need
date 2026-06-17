@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendListingExpiredNotification, sendListingAutoRenewedNotification } from '@/utils/telegramNotifications';
+import { sendListingExpiredNotification, sendListingAutoRenewedNotification } from '@/lib/telegram/telegramNotifications';
 import { executeInClause } from '@/utils/dbHelpers';
 import { ensureListingApiRawColumns } from '@/lib/prisma';
 

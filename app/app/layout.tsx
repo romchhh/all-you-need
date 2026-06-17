@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Montserrat } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { PerformanceScript } from "@/components/PerformanceScript";
-import { MobileOptimizationScript } from "@/components/MobileOptimizationScript";
-import { TelegramAccessGuard } from "@/components/TelegramAccessGuard";
-import { RegistrationGate } from "@/components/RegistrationGate";
-import { AppProviders } from "@/components/AppProviders";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { PerformanceScript } from "@/components/system/PerformanceScript";
+import { MobileOptimizationScript } from "@/components/system/MobileOptimizationScript";
+import { TelegramAccessGuard } from "@/components/telegram/TelegramAccessGuard";
+import { RegistrationGate } from "@/components/telegram/RegistrationGate";
+import { AppProviders } from "@/components/layout/AppProviders";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

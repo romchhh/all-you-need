@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ArrowLeft, ExternalLink, ShoppingBag, FileText, Info, Building2, Globe } from 'lucide-react';
-import { useTelegram } from '@/hooks/useTelegram';
+import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 
 export default function BusinessPage() {
   const params = useParams();

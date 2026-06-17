@@ -5,8 +5,8 @@ import {
   isValidPromotionType,
   processPromotionPurchaseFromBalance,
   createPromotionPurchaseRecord,
-} from '@/utils/paymentHelpers';
-import type { PromotionType } from '@/utils/paymentConstants';
+} from '@/lib/payments/paymentHelpers';
+import type { PromotionType } from '@/lib/payments/paymentConstants';
 import { createMonobankInvoice } from '@/lib/monobank';
 
 // Купити рекламу для оголошення

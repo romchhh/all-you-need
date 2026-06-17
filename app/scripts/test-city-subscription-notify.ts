@@ -11,7 +11,7 @@
  */
 
 import { prisma } from '../lib/prisma';
-import { notifyCitySubscribersOfNewMarketplaceListing } from '../utils/citySubscriptionNotifications';
+import { notifyCitySubscribersOfNewMarketplaceListing } from '../lib/city/citySubscriptionNotifications';
 
 async function main() {
   const raw = process.env.LISTING_ID ?? process.argv[2];

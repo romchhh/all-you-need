@@ -6,10 +6,10 @@ import {
   optimizeImages,
   createDraftListing,
   submitListingToModeration,
-} from '@/utils/listingHelpers';
+} from '@/lib/listings/helpers';
 import { getUserIdAndActive } from '@/utils/userHelpers';
 import { prisma } from '@/lib/prisma';
-import { normalizeCityInput } from '@/utils/cityNormalization';
+import { normalizeCityInput } from '@/lib/city/cityNormalization';
 
 // Збільшуємо максимальний час виконання до 5 хвилин для обробки великих файлів
 export const maxDuration = 300; // 5 хвилин

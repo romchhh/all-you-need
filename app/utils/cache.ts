@@ -65,18 +65,6 @@ export const setCachedData = (key: string, data: any, useStorage: boolean = true
   }
 };
 
-export const clearCache = (): void => {
-  cache.clear();
-  if (typeof window !== 'undefined' && window.localStorage) {
-    const keys = Object.keys(localStorage);
-    keys.forEach(key => {
-      if (key.startsWith(STORAGE_PREFIX)) {
-        localStorage.removeItem(key);
-      }
-    });
-  }
-};
-
 export const invalidateCache = (pattern: string): void => {
   // Очищаємо з пам'яті
   for (const key of cache.keys()) {

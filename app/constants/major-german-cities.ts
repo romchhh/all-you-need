@@ -6,7 +6,7 @@ export const majorGermanCities = [
   'Hamburg',
   'München',
   'Köln',
-  'Frankfurt am Main',
+  'Frankfurt',
   'Stuttgart',
   'Düsseldorf',
   'Leipzig',

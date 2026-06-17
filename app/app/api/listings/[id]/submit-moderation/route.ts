@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { submitListingToModeration } from '@/utils/listingHelpers';
+import { submitListingToModeration } from '@/lib/listings/helpers';
 
 export async function POST(
   request: NextRequest,

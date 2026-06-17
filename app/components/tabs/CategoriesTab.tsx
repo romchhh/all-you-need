@@ -1,10 +1,10 @@
 import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { CategoryChip } from '../CategoryChip';
-import { SubcategoryList } from '../SubcategoryList';
-import { ListingCard } from '../ListingCard';
-import { CategoryIcon } from '../CategoryIcon';
-import { STICKY_BELOW_APP_HEADER_CLASS } from '../FixedLogoHeader';
+import { CategoryChip } from '@/components/listing/CategoryChip';
+import { SubcategoryList } from '@/components/listing/SubcategoryList';
+import { ListingCard } from '@/components/listing/ListingCard';
+import { CategoryIcon } from '@/components/listing/CategoryIcon';
+import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
 import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { Gift, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';

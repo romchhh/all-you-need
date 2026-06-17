@@ -19,15 +19,13 @@ const CITY_REPLACEMENTS: { from: string; to: string }[] = [
   { from: 'Munich', to: 'München' },
   { from: 'Cologne', to: 'Köln' },
   { from: 'Koln', to: 'Köln' },
+  { from: 'Frankfurt am Main', to: 'Frankfurt' },
   { from: 'Nuremberg', to: 'Nürnberg' },
   { from: 'Dusseldorf', to: 'Düsseldorf' },
   { from: 'Dusseldrof', to: 'Düsseldorf' },
   { from: 'Duseldorf', to: 'Düsseldorf' },
   { from: 'Stutgart', to: 'Stuttgart' },
-  { from: 'Frankfurt (Oder)', to: 'Frankfurt am Main' },
-  // приклад з уже існуючим скриптом:
   { from: 'Гамбург', to: 'Hamburg' },
-  // ДОДАЙТЕ СЮДИ ІНШІ МІСТА ЗА ПОТРЕБОЮ
 ];
 
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -49,6 +47,7 @@ async function main() {
 
   let totalListingChanged = 0;
   let totalTelegramChanged = 0;
+  let totalParsedChanged = 0;
 
   for (const { from, to } of CITY_REPLACEMENTS) {
     console.log(`Обробка міста "${from}" → "${to}"...`);
@@ -89,14 +88,26 @@ async function main() {
     );
     totalTelegramChanged += Number(telegramChanged);
 
+    const parsedChanged = await prisma.$executeRawUnsafe(
+      `UPDATE parsed_items SET location = REPLACE(location, ?, ?), source_city = REPLACE(source_city, ?, ?) WHERE location LIKE ? OR source_city LIKE ?`,
+      from,
+      to,
+      from,
+      to,
+      `%${from}%`,
+      `%${from}%`
+    );
+    totalParsedChanged += Number(parsedChanged);
+
     console.log(
-      `  Оновлено записів: Listing=${listingChanged}, TelegramListing=${telegramChanged}\n`
+      `  Оновлено записів: Listing=${listingChanged}, TelegramListing=${telegramChanged}, parsed_items=${parsedChanged}\n`
     );
   }
 
   console.log('--- ПІДСУМКИ ---');
   console.log(`Загалом оновлено в Listing: ${totalListingChanged}`);
   console.log(`Загалом оновлено в TelegramListing: ${totalTelegramChanged}`);
+  console.log(`Загалом оновлено в parsed_items: ${totalParsedChanged}`);
 
   console.log('\nГотово.');
 }

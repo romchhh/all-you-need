@@ -5,8 +5,8 @@ import {
   isValidPackageType,
   processPackagePurchaseFromBalance,
   createPackagePurchaseRecord,
-} from '@/utils/paymentHelpers';
-import type { PackageType } from '@/utils/paymentConstants';
+} from '@/lib/payments/paymentHelpers';
+import type { PackageType } from '@/lib/payments/paymentConstants';
 import { createMonobankInvoice } from '@/lib/monobank';
 
 // Купити пакет оголошень

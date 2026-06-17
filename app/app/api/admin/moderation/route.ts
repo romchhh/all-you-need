@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isAdminAuthenticated } from '@/utils/adminAuth';
-import { getListingWithUser, approveListing, rejectListing } from '@/utils/moderationHelpers';
+import { getListingWithUser, approveListing, rejectListing } from '@/lib/moderation/moderationHelpers';
 
 /**
  * @deprecated Використовуйте окремі endpoints:
@@ -300,7 +300,7 @@ export async function POST(request: NextRequest) {
     if (action === 'approve') {
       if (listing.source === 'telegram') {
         // Публікуємо в канал
-        const { publishListingToChannel } = await import('@/utils/publishToChannel');
+        const { publishListingToChannel } = await import('@/lib/moderation/publishToChannel');
         const channelMessageId = await publishListingToChannel(listing.id, {
           id: listing.id,
           title: listing.title,
@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
 
       // Схвалюємо TelegramListing
       const { nowSQLite } = await import('@/utils/dateHelpers');
-      const { getPublicationTimestampsForApproval } = await import('@/utils/moderationHelpers');
+      const { getPublicationTimestampsForApproval } = await import('@/lib/moderation/moderationHelpers');
       const nowStr = nowSQLite();
       const { publishedAt: publishedAtStr } = getPublicationTimestampsForApproval({
         publishedAt: listing.publishedAt,
@@ -372,7 +372,7 @@ export async function POST(request: NextRequest) {
         
         // Надсилаємо повідомлення користувачу з посиланням на канал
         if (listing.telegramId) {
-          const { sendTelegramMessage } = await import('@/utils/telegramNotifications');
+          const { sendTelegramMessage } = await import('@/lib/telegram/telegramNotifications');
           
           // Визначаємо канал на основі регіону
           const region = (listing as any).region || 'hamburg';
@@ -432,7 +432,7 @@ export async function POST(request: NextRequest) {
         
         // Надсилаємо повідомлення користувачу
         if (listing.telegramId) {
-          const { sendTelegramMessage } = await import('@/utils/telegramNotifications');
+          const { sendTelegramMessage } = await import('@/lib/telegram/telegramNotifications');
           const message = `❌ <b>Оголошення відхилено</b>
 
 Ваше оголошення "<b>${listing.title}</b>" не пройшло модерацію.

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendListingExpiringWarning } from '@/utils/telegramNotifications';
+import { sendListingExpiringWarning } from '@/lib/telegram/telegramNotifications';
 import { addDays, daysBetween } from '@/utils/dateHelpers';
 
 // Цей API endpoint викликається cron job'ом для попередження про закінчення оголошень

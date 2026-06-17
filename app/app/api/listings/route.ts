@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { normalizeCityInput } from '@/utils/cityNormalization';
+import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
 import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
-import { resolveStoredListingImages } from '@/utils/resolveListingImageStorage';
+import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
 
 // Відключаємо кешування для API route
 export const dynamic = 'force-dynamic';

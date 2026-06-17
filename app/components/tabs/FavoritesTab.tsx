@@ -1,7 +1,7 @@
 import { Heart, ArrowRight } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { ListingCard } from '../ListingCard';
+import { ListingCard } from '@/components/listing/ListingCard';
 import { useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';

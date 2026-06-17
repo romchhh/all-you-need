@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isAdminAuthenticated } from '@/utils/adminAuth';
-import { getListingWithUser, approveListing, rejectListing } from '@/utils/moderationHelpers';
+import { getListingWithUser, approveListing, rejectListing } from '@/lib/moderation/moderationHelpers';
 
 // Отримати оголошення з маркетплейсу на модерації
 export async function GET(request: NextRequest) {

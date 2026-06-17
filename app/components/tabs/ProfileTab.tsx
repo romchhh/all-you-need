@@ -1,23 +1,23 @@
 import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle, Gift } from 'lucide-react';
-import { NavIcon } from '../NavIcon';
-import { ImageViewModal } from '../ImageViewModal';
+import { NavIcon } from '@/components/layout/NavIcon';
+import { ImageViewModal } from '@/components/modals/ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
-import { useUser } from '@/hooks/useUser';
-import { ListingCard } from '../ListingCard';
-import { ProfileListingCard } from '../ProfileListingCard';
-import { EditProfileModal } from '../EditProfileModal';
-import { EditListingModal } from '../EditListingModal';
-import { ShareModal } from '../ShareModal';
-import { ReferralModal } from '../ReferralModal';
-import { ConfirmModal } from '../ConfirmModal';
-import { TopUpBalanceModal } from '../TopUpBalanceModal';
+import { useUser } from '@/features/user/hooks/useUser';
+import { ListingCard } from '@/components/listing/ListingCard';
+import { ProfileListingCard } from '@/components/listing/ProfileListingCard';
+import { EditProfileModal } from '@/components/modals/EditProfileModal';
+import { EditListingModal } from '@/components/modals/EditListingModal';
+import { ShareModal } from '@/components/modals/ShareModal';
+import { ReferralModal } from '@/components/modals/ReferralModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { TopUpBalanceModal } from '@/components/modals/TopUpBalanceModal';
 import dynamic from 'next/dynamic';
 import { Listing, Category } from '@/types';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getCategories } from '@/constants/categories';
-import { useToast } from '@/hooks/useToast';
-import { Toast } from '../Toast';
-import { useLongPress } from '@/hooks/useLongPress';
+import { useToast } from '@/features/ui/hooks/useToast';
+import { Toast } from '@/components/ui/Toast';
+import { useLongPress } from '@/features/ui/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { getBotBaseUrl, getBotStartLink } from '@/utils/botLinks';
@@ -27,17 +27,17 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useRouter, useParams } from 'next/navigation';
-import { LanguageSwitcher } from '../LanguageSwitcher';
-import { CategoryIcon } from '../CategoryIcon';
+import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
+import { CategoryIcon } from '@/components/listing/CategoryIcon';
 
 // Динамічний імпорт PromotionModal, PaymentSummaryModal та ReactivateListingFlow
-const PromotionModal = dynamic(() => import('../PromotionModal'), {
+const PromotionModal = dynamic(() => import('@/components/modals/PromotionModal'), {
   ssr: false,
 });
-const PaymentSummaryModal = dynamic(() => import('../PaymentSummaryModal').then(mod => ({ default: mod.PaymentSummaryModal })), {
+const PaymentSummaryModal = dynamic(() => import('@/components/modals/PaymentSummaryModal').then(mod => ({ default: mod.PaymentSummaryModal })), {
   ssr: false,
 });
-const ReactivateListingFlow = dynamic(() => import('../ReactivateListingFlow'), {
+const ReactivateListingFlow = dynamic(() => import('@/components/listing/ReactivateListingFlow'), {
   ssr: false,
 });
 

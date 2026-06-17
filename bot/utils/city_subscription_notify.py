@@ -62,8 +62,9 @@ CITY_ALIASES = {
     "нюрнберг": "Nürnberg",
     "nuremberg": "Nürnberg",
     "nürnberg": "Nürnberg",
-    "франкфурт": "Frankfurt am Main",
-    "frankfurt": "Frankfurt am Main",
+    "франкфурт": "Frankfurt",
+    "frankfurt": "Frankfurt",
+    "frankfurt am main": "Frankfurt",
 }
 
 

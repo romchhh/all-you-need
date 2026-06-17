@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
-import { useTelegram } from '@/hooks/useTelegram';
+import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 
 export default function FAQPage() {
   const params = useParams();

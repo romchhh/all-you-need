@@ -1,32 +1,32 @@
 import { X, Gift, MapPin, SlidersHorizontal, Grid3x3, List, Sun, Moon } from 'lucide-react';
 import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { CategoryChip } from '../CategoryChip';
-import { CategoryIcon } from '../CategoryIcon';
-import { ListingCard } from '../ListingCard';
-import { ListingCardColumn } from '../ListingCardColumn';
-import { SortModal } from '../SortModal';
-import { CityModal } from '../CityModal';
-import { SubcategoryList } from '../SubcategoryList';
-import { STICKY_BELOW_APP_HEADER_CLASS } from '../FixedLogoHeader';
-import { TopBar } from '../TopBar';
-import { HomeActivityStats } from '../HomeActivityStats';
-import { HomePlatformTicker } from '../HomePlatformTicker';
-import { ListingsRefreshOverlay } from '../ListingsRefreshOverlay';
-import { ListingGridSkeleton } from '../SkeletonLoader';
+import { CategoryChip } from '@/components/listing/CategoryChip';
+import { CategoryIcon } from '@/components/listing/CategoryIcon';
+import { ListingCard } from '@/components/listing/ListingCard';
+import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
+import { SortModal } from '@/components/modals/SortModal';
+import { CityModal } from '@/components/modals/CityModal';
+import { SubcategoryList } from '@/components/listing/SubcategoryList';
+import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
+import { TopBar } from '@/components/layout/TopBar';
+import { HomeActivityStats } from '@/components/home/HomeActivityStats';
+import { HomePlatformTicker } from '@/components/home/HomePlatformTicker';
+import { ListingsRefreshOverlay } from '@/components/ui/ListingsRefreshOverlay';
+import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { pickBazaarTabField } from '@/lib/bazaar/bazaarTabStateStorage';
 import { Currency } from '@/utils/currency';
 
 interface BazaarTabProps {
   categories: Category[];
   listings: Listing[];
   searchQuery: string;
-  deferredSearchQuery?: string;
   onSearchChange: (query: string) => void;
   favorites: Set<number>;
   onSelectListing: (listing: Listing) => void;
@@ -78,7 +78,6 @@ const BazaarTabComponent = ({
   categories,
   listings,
   searchQuery,
-  deferredSearchQuery,
   onSearchChange,
   favorites,
   onSelectListing,
@@ -170,83 +169,32 @@ const BazaarTabComponent = ({
   
   // Додаткова синхронізація при монтуванні компонента (якщо savedState є)
   useEffect(() => {
-    if (savedState && savedState.selectedCategory !== undefined) {
-      // При монтуванні синхронізуємо стан з savedState
-      setSelectedCategory(savedState.selectedCategory);
-      setSelectedSubcategory(savedState.selectedSubcategory);
-      setShowFreeOnly(savedState.showFreeOnly);
-      setSortBy(savedState.sortBy);
-      setSelectedCities(savedState.selectedCities || []);
-      setMinPrice(savedState.minPrice);
-      setMaxPrice(savedState.maxPrice);
-      setSelectedCondition(savedState.selectedCondition);
-      setSelectedCurrency(savedState.selectedCurrency as Currency | null);
-    }
-  }, []); // Виконується тільки при монтуванні
-  
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(() => {
-    if (savedState?.selectedSubcategory !== undefined) {
-      return savedState.selectedSubcategory;
-    }
-    return null;
-  });
-  
-  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(() => {
-    if (savedState?.showFreeOnly !== undefined) {
-      return savedState.showFreeOnly;
-    }
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.showFreeOnly || false;
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return false;
-  });
-  
-  const [sortBy, setSortBy] = useState<SortOption>(() => {
-    if (savedState?.sortBy !== undefined) {
-      return savedState.sortBy;
-    }
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.sortBy || 'newest';
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return 'newest';
-  });
+    if (!savedState) return;
+    setSelectedCategory(savedState.selectedCategory ?? null);
+    setSelectedSubcategory(savedState.selectedSubcategory ?? null);
+    setShowFreeOnly(savedState.showFreeOnly ?? false);
+    setSortBy(savedState.sortBy ?? 'newest');
+    setSelectedCities(savedState.selectedCities ?? []);
+    setMinPrice(savedState.minPrice ?? null);
+    setMaxPrice(savedState.maxPrice ?? null);
+    setSelectedCondition(savedState.selectedCondition ?? null);
+    setSelectedCurrency((savedState.selectedCurrency as Currency | null) ?? null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- лише при mount
+
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(() =>
+    pickBazaarTabField(savedState, 'selectedSubcategory')
+  );
+
+  const [showFreeOnly, setShowFreeOnly] = useState<boolean>(() =>
+    pickBazaarTabField(savedState, 'showFreeOnly')
+  );
+
+  const [sortBy, setSortBy] = useState<SortOption>(() => pickBazaarTabField(savedState, 'sortBy'));
   const [showSortModal, setShowSortModal] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
-  const [recommendations, setRecommendations] = useState<Listing[]>([]);
-  const [showRecommendations, setShowRecommendations] = useState(false);
-  const [selectedCities, setSelectedCities] = useState<string[]>(() => {
-    if (savedState?.selectedCities !== undefined) {
-      return savedState.selectedCities;
-    }
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.selectedCities || [];
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return [];
-  });
+  const [selectedCities, setSelectedCities] = useState<string[]>(() =>
+    pickBazaarTabField(savedState, 'selectedCities')
+  );
   
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
@@ -254,77 +202,21 @@ const BazaarTabComponent = ({
   const listingsInitializedRef = useRef(false);
   const [appearingListingIds, setAppearingListingIds] = useState<Set<number>>(new Set());
   
-  const [minPrice, setMinPrice] = useState<number | null>(() => {
-    if (savedState?.minPrice !== undefined) {
-      return savedState.minPrice;
-    }
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.minPrice || null;
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return null;
-  });
-  
-  const [maxPrice, setMaxPrice] = useState<number | null>(() => {
-    if (savedState?.maxPrice !== undefined) {
-      return savedState.maxPrice;
-    }
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.maxPrice || null;
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return null;
-  });
-  
-  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(() => {
-    if (savedState?.selectedCondition !== undefined) {
-      return savedState.selectedCondition;
-    }
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.selectedCondition || null;
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return null;
-  });
-  
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(() => {
-    if (savedState?.selectedCurrency !== undefined) {
-      return savedState.selectedCurrency as Currency | null;
-    }
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarTabState');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.selectedCurrency || null;
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return null;
-  });
+  const [minPrice, setMinPrice] = useState<number | null>(() =>
+    pickBazaarTabField(savedState, 'minPrice')
+  );
+
+  const [maxPrice, setMaxPrice] = useState<number | null>(() =>
+    pickBazaarTabField(savedState, 'maxPrice')
+  );
+
+  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(() =>
+    pickBazaarTabField(savedState, 'selectedCondition')
+  );
+
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(() =>
+    (pickBazaarTabField(savedState, 'selectedCurrency') as Currency | null) ?? null
+  );
   
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
     if (typeof window !== 'undefined') {
@@ -367,28 +259,6 @@ const BazaarTabComponent = ({
   // Завантажуємо історію пошуку
   useEffect(() => {
     setSearchHistory(getSearchHistory());
-  }, []);
-
-  // Завантажуємо рекомендації на основі переглянутих товарів
-  useEffect(() => {
-    const fetchRecommendations = async () => {
-      try {
-        const tg = (window as any).Telegram?.WebApp;
-        const telegramId = tg?.initDataUnsafe?.user?.id;
-        if (telegramId) {
-          const response = await fetch(`/api/listings/recommendations?telegramId=${telegramId}&limit=8`);
-          if (response.ok) {
-            const data = await response.json();
-            setRecommendations(data.listings || []);
-            setShowRecommendations((data.listings || []).length > 0);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching recommendations:', error);
-      }
-    };
-
-    fetchRecommendations();
   }, []);
 
   const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
@@ -445,37 +315,9 @@ const BazaarTabComponent = ({
     if (listings.length === 0) return [];
     
     let filtered = listings;
-    
-    // Використовуємо deferredSearchQuery для фільтрації (якщо є), інакше searchQuery
-    const queryToUse = deferredSearchQuery !== undefined ? deferredSearchQuery : searchQuery;
-    
-    // Оптимізація: кешуємо запит для пошуку
-    const trimmedQuery = queryToUse.trim();
-    const hasSearch = Boolean(trimmedQuery);
-    const hasDeferredSearch = deferredSearchQuery !== undefined && deferredSearchQuery.trim().length > 0;
-    
-    // Фільтр по пошуку (при серверному пошуку listings вже відфільтровані; тут лише для миттєвого введення до debounce)
-    // Якщо є deferredSearchQuery з непустим значенням, це означає що сервер вже відфільтрував результати - не фільтруємо повторно
-    // Фільтруємо тільки якщо це локальний пошук (до debounce), коли deferredSearchQuery ще не оновився або порожній
-    if (hasSearch && !hasDeferredSearch) {
-      // Фільтруємо тільки якщо це локальний пошук (до debounce), а не серверний
-      filtered = filtered.filter(listing => {
-        // Використовуємо нормалізацію для коректного порівняння кирилиці
-        const normalize = (text: string) => text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ё/g, 'е').replace(/Ё/g, 'е');
-        const normalizedQuery = normalize(trimmedQuery);
-        const titleNorm = normalize(listing.title || '');
-        const descNorm = normalize(listing.description || '');
-        const locationNorm = normalize(listing.location || '');
-        return titleNorm.includes(normalizedQuery) ||
-          descNorm.includes(normalizedQuery) ||
-          locationNorm.includes(normalizedQuery);
-      });
-      
-      // Якщо є пошук, не застосовуємо категорії (повертаємо всі результати пошуку)
-      // Застосовуємо тільки інші фільтри
-    }
-    // Категорія/підкатегорія — лише на сервері (buildListingsUrl). Повторна фільтрація
-    // по вже завантаженій стрічці давала 0–1 оголошення до завершення запиту.
+
+    // Пошук — на сервері (після debounce). Локальну фільтрацію прибрано: вона дублювала роботу
+    // і гальмувала UI при кожному символі в полі пошуку.
 
     // Фільтр безкоштовних (швидка перевірка)
     if (showFreeOnly) {
@@ -544,7 +386,7 @@ const BazaarTabComponent = ({
     }
 
     return filtered;
-  }, [listings, selectedCategory, selectedSubcategory, showFreeOnly, deferredSearchQuery, searchQuery, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
+  }, [listings, showFreeOnly, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
 
   // Автопідвантаження при прокрутці до кінця списку
   useEffect(() => {
@@ -1035,6 +877,14 @@ export const BazaarTab = memo(BazaarTabComponent, (prevProps, nextProps) => {
     prevProps.savedState?.showFreeOnly === nextProps.savedState?.showFreeOnly &&
     prevProps.initialSelectedCategory === nextProps.initialSelectedCategory &&
     prevProps.profileTelegramId === nextProps.profileTelegramId &&
+    prevProps.initialLoading === nextProps.initialLoading &&
+    prevProps.isRefreshing === nextProps.isRefreshing &&
+    prevProps.loadError === nextProps.loadError &&
+    prevProps.hasMore === nextProps.hasMore &&
+    prevProps.loadingMore === nextProps.loadingMore &&
+    prevProps.onSelectListing === nextProps.onSelectListing &&
+    prevProps.onStateChange === nextProps.onStateChange &&
+    prevProps.onRetryLoad === nextProps.onRetryLoad &&
     prevProps.onToast === nextProps.onToast
   );
 });

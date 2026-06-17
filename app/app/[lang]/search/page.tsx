@@ -3,24 +3,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Listing } from '@/types';
-import { useTelegram } from '@/hooks/useTelegram';
-import { useUser } from '@/hooks/useUser';
+import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { useUser } from '@/features/user/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { AppHeader } from '@/components/AppHeader';
-import { SearchView } from '@/components/SearchView';
-import { ListingDetail } from '@/components/ListingDetail';
-import { UserProfilePage } from '@/components/UserProfilePage';
-import { BottomNavigation } from '@/components/BottomNavigation';
-import { Toast } from '@/components/Toast';
-import { useToast } from '@/hooks/useToast';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { SearchView } from '@/components/search/SearchView';
+import { ListingDetail } from '@/components/listing/ListingDetail';
+import { UserProfilePage } from '@/components/profile/UserProfilePage';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
+import { Toast } from '@/components/ui/Toast';
+import { useToast } from '@/features/ui/hooks/useToast';
 import {
   getFavoritesFromStorage,
   addFavoriteToStorage,
   removeFavoriteFromStorage,
 } from '@/utils/favorites';
-import { loadBazaarTabStateFromStorage } from '@/utils/bazaarTabStateStorage';
+import { loadBazaarTabStateFromStorage } from '@/lib/bazaar/bazaarTabStateStorage';
 import { getCategories } from '@/constants/categories';
-import { navigateToListingCategory } from '@/utils/navigateToListingCategory';
+import { navigateToListingCategory } from '@/lib/listings/navigation';
 
 export default function SearchPage() {
   const params = useParams();

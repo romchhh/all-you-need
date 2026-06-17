@@ -2,22 +2,22 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useAutoPrefetch } from '@/hooks/usePrefetch';
+import { useAutoPrefetch } from '@/features/bazaar/hooks/usePrefetch';
 import { Listing } from '@/types';
 import { getCategories } from '@/constants/categories';
-import { useTelegram } from '@/hooks/useTelegram';
-import { ListingDetail } from '@/components/ListingDetail';
-import { UserProfilePage } from '@/components/UserProfilePage';
-import { BottomNavigation } from '@/components/BottomNavigation';
+import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { ListingDetail } from '@/components/listing/ListingDetail';
+import { UserProfilePage } from '@/components/profile/UserProfilePage';
+import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { CategoriesTab } from '@/components/tabs/CategoriesTab';
-import { Toast } from '@/components/Toast';
-import { useToast } from '@/hooks/useToast';
+import { Toast } from '@/components/ui/Toast';
+import { useToast } from '@/features/ui/hooks/useToast';
 import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
 import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useUser } from '@/hooks/useUser';
-import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import { AppHeader } from '@/components/AppHeader';
+import { useUser } from '@/features/user/hooks/useUser';
+import { usePullToRefresh } from '@/features/ui/hooks/usePullToRefresh';
+import { AppHeader } from '@/components/layout/AppHeader';
 import {
   buildCategoryCatalogUrl,
   consumePendingListingCategory,
@@ -25,8 +25,8 @@ import {
   readCategoryFilterFromSearchParams,
   resolveListingCategoryFilter,
   type ListingCategoryFilter,
-} from '@/utils/listingCategoryFilter';
-import { navigateToListingCategory } from '@/utils/navigateToListingCategory';
+} from '@/lib/listings/categoryFilter';
+import { navigateToListingCategory } from '@/lib/listings/navigation';
 
 const CategoriesPage = () => {
   const params = useParams();

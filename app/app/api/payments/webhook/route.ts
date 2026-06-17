@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Відправляємо на модерацію в ТГ групу
-          const { submitListingToModeration } = await import('@/utils/listingHelpers');
+          const { submitListingToModeration } = await import('@/lib/listings/helpers');
           await submitListingToModeration(promotion.listingId, isRejected).catch(err => {
             console.error('[Webhook] Failed to send listing to moderation group:', err);
           });

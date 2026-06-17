@@ -4,7 +4,7 @@ import { trackUserActivity } from '@/utils/trackActivity';
 import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
-import { resolveStoredListingImages } from '@/utils/resolveListingImageStorage';
+import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
 
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {

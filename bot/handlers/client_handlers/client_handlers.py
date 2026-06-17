@@ -81,21 +81,10 @@ async def scheduler_jobs():
     import os as _os
     if _os.getenv("PARSER_API_ID"):
         try:
-            from parser.scheduler import run_parser_cycle, PARSER_INTERVAL_MIN
-            parser_job_id = 'telegram_parser'
-            existing_parser_job = scheduler.get_job(parser_job_id)
-            if existing_parser_job:
-                scheduler.remove_job(parser_job_id)
-            scheduler.add_job(
-                run_parser_cycle,
-                'interval',
-                minutes=PARSER_INTERVAL_MIN,
-                id=parser_job_id,
-                replace_existing=True,
-                max_instances=1,
-                misfire_grace_time=max(1, int(PARSER_INTERVAL_MIN * 60)),
-            )
-            print(f"✅ Scheduler job '{parser_job_id}' додано (парсинг каналів кожні {PARSER_INTERVAL_MIN} хв)")
+            from parser.scheduler import register_parser_job
+
+            register_parser_job(scheduler)
+            print("✅ Scheduler job 'telegram_parser' додано (парсинг каналів)")
         except Exception as e:
             print(f"❌ Помилка реєстрації parser job: {e}")
             import traceback

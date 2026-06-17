@@ -4,9 +4,9 @@ import { requireAdminAuth } from '@/utils/adminAuth';
 import {
   grantAdminPromotionForListing,
   isValidPromotionType,
-} from '@/utils/paymentHelpers';
-import type { PromotionType } from '@/utils/paymentConstants';
-import { sendAdminPromotionGrantedNotification } from '@/utils/telegramNotifications';
+} from '@/lib/payments/paymentHelpers';
+import type { PromotionType } from '@/lib/payments/paymentConstants';
+import { sendAdminPromotionGrantedNotification } from '@/lib/telegram/telegramNotifications';
 
 export async function POST(
   request: NextRequest,

@@ -91,3 +91,9 @@ coverage/
 # Server-specific scripts (може відрізнятися на різних серверах)
 bot/start_bot.sh
 
+# Pyrogram session files (runtime only)
+*.session
+*.session-journal
+bot/parser/parser_session*
+bot/parser/parser_services_session*
+

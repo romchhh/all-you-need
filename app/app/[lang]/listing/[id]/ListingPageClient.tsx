@@ -4,14 +4,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Listing } from '@/types';
-import { useTelegram } from '@/hooks/useTelegram';
-import { useToast } from '@/hooks/useToast';
-import { Toast } from '@/components/Toast';
-import { ListingDetail } from '@/components/ListingDetail';
+import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { useToast } from '@/features/ui/hooks/useToast';
+import { Toast } from '@/components/ui/Toast';
+import { ListingDetail } from '@/components/listing/ListingDetail';
 import { guestListingCopy } from '@/utils/guestListingCopy';
 import { getCategories } from '@/constants/categories';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { navigateToListingCategory } from '@/utils/navigateToListingCategory';
+import { navigateToListingCategory } from '@/lib/listings/navigation';
 
 interface ListingPageClientProps {
   listingId: number;

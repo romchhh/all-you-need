@@ -10,7 +10,7 @@ import {
   updateListingData,
   needsReactivation,
   submitListingToModeration,
-} from '@/utils/listingHelpers';
+} from '@/lib/listings/helpers';
 import { getUserIdAndActive } from '@/utils/userHelpers';
 
 interface Listing {
@@ -671,7 +671,7 @@ export async function PUT(
               // Відправляємо на модерацію після збереження зображень
               // Передаємо isEdit=true щоб додати пометку про редагування
               try {
-                const { submitListingToModeration } = await import('@/utils/listingHelpers');
+                const { submitListingToModeration } = await import('@/lib/listings/helpers');
                 await submitListingToModeration(listingId, true);
                 console.log('[Update Listing] Listing sent to moderation group after images saved');
               } catch (error) {

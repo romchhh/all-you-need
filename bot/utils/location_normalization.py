@@ -62,8 +62,9 @@ CITY_SYNONYMS = {
     "nuremberg": "Nürnberg",
     "nürnberg": "Nürnberg",
     # Франкфурт (узагальнений ввід користувача)
-    "франкфурт": "Frankfurt am Main",
-    "frankfurt": "Frankfurt am Main",
+    "франкфурт": "Frankfurt",
+    "frankfurt": "Frankfurt",
+    "frankfurt am main": "Frankfurt",
 }
 
 

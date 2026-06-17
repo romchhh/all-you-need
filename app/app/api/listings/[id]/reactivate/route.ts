@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSystemSetting } from '@/utils/dbHelpers';
 import { toSQLiteDate, addDays, nowSQLite } from '@/utils/dateHelpers';
-import { findUserByTelegramIdForListing, deductListingPackage } from '@/utils/listingHelpers';
+import { findUserByTelegramIdForListing, deductListingPackage } from '@/lib/listings/helpers';
 
 // Реактивація оголошення - повний флоу як при створенні
 export async function POST(

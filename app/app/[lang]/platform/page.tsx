@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, MapPin, Layers, Send, UserCircle2 } from 'lucide-react';
-import { useTelegram } from '@/hooks/useTelegram';
+import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import Image from 'next/image';
 
 const BOT_LINK = 'https://t.me/TradeGroundBot?start=linktowatch_12';

@@ -1,0 +1,1395 @@
+import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Trash2, Sparkles, Wrench, CheckCircle, Tag, EyeOff, Check } from 'lucide-react';
+import { TelegramWebApp } from '@/types/telegram';
+import { Listing } from '@/types';
+import { useState, useRef, useEffect, useMemo, type CSSProperties } from 'react';
+import { getCategories } from '@/constants/categories';
+import { germanCities } from '@/constants/german-cities';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useToast } from '@/features/ui/hooks/useToast';
+import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { compressImageOnClient } from '@/utils/imageUtils';
+import { FixedLogoHeader } from '@/components/layout/FixedLogoHeader';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { CategoryIcon } from '@/components/listing/CategoryIcon';
+import { useListingImageUpload } from '@/features/listing-form/hooks/useListingImageUpload';
+import { LISTING_MAX_PHOTOS } from '@/features/listing-form/lib/constants';
+
+interface EditListingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  listing: Listing;
+  onSave: (listingData: any) => Promise<void>;
+  onDelete: () => Promise<void>;
+  tg: TelegramWebApp | null;
+}
+
+export const EditListingModal = ({
+  isOpen,
+  onClose,
+  listing,
+  onSave,
+  onDelete,
+  tg
+}: EditListingModalProps) => {
+  const { t, language } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
+  const { showToast } = useToast();
+  useHideBottomNav(isOpen);
+  const [formScrollParent, setFormScrollParent] = useState<HTMLDivElement | null>(null);
+  const categories = getCategories(t);
+  const [title, setTitle] = useState(listing.title);
+  const [description, setDescription] = useState(listing.description);
+  const [price, setPrice] = useState(listing.isFree ? '' : listing.price);
+  const [currency, setCurrency] = useState<'UAH' | 'EUR' | 'USD'>(listing.currency || 'UAH');
+  const [isFree, setIsFree] = useState(listing.isFree || false);
+  const [isNegotiable, setIsNegotiable] = useState(
+    listing.price === t('common.negotiable') || listing.price === 'Договорная' || listing.price === 'Договірна'
+  );
+  const [category, setCategory] = useState(listing.category);
+  const [subcategory, setSubcategory] = useState(listing.subcategory || '');
+  const [location, setLocation] = useState(listing.location);
+  const [condition, setCondition] = useState<'new' | 'used'>(
+    listing.condition === 'new' ? 'new' : (listing.condition ? 'used' : 'new')
+  );
+  const [loading, setLoading] = useState(false);
+  const listingImagePreviews = useMemo(
+    () => (listing.images || (listing.image ? [listing.image] : [])).filter(Boolean) as string[],
+    [listing.images, listing.image]
+  );
+  const imageUpload = useListingImageUpload({
+    isOpen,
+    maxPhotos: LISTING_MAX_PHOTOS,
+    onMaxPhotos: () => showToast(t('createListing.maxPhotos'), 'error'),
+    initialPreviews: listingImagePreviews,
+  });
+  const {
+    images,
+    imagePreviews,
+    setImagePreviews,
+    setImages,
+    draggedIndex,
+    touchPosition,
+    touchElementRect,
+    hoveredIndex,
+    isLocked,
+    handleImageChange,
+    removeImage,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+  } = imageUpload;
+  const [isConditionOpen, setIsConditionOpen] = useState(false);
+  const [isLocationOpen, setIsLocationOpen] = useState(false);
+  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
+  const [locationQuery, setLocationQuery] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSoldConfirm, setShowSoldConfirm] = useState(false);
+  const [status, setStatus] = useState<string>(listing.status || 'active');
+  const isRejected = (listing.status as string) === 'rejected';
+  const conditionRef = useRef<HTMLDivElement>(null);
+  const locationRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLButtonElement>(null);
+  const buttonsRef = useRef<HTMLDivElement>(null);
+  const [currencyMenuPosition, setCurrencyMenuPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  const selectedCategoryData = categories.find(cat => cat.id === category);
+
+  type ConditionType = 'new' | 'used';
+
+  const conditionOptions: Array<{ value: ConditionType; label: string; icon: typeof Sparkles | typeof Wrench }> = [
+    { value: 'new', label: t('listing.new'), icon: Sparkles },
+    { value: 'used', label: t('listing.used'), icon: Wrench },
+  ];
+
+  const selectedCondition = conditionOptions.find(opt => opt.value === condition);
+
+  // Фільтруємо міста за запитом (по ключових літерах, як на головній сторінці)
+  const filteredCities = useMemo(() => {
+    if (!locationQuery.trim()) {
+      return isLocationOpen ? germanCities.slice(0, 10) : [];
+    }
+    const query = locationQuery.toLowerCase().trim();
+    const queryTrimmed = locationQuery.trim();
+    
+    // Сортуємо: спочатку точні збіги, потім починаються з запиту, потім містять запит
+    const exactMatches: string[] = [];
+    const startsWith: string[] = [];
+    const includes: string[] = [];
+    
+    germanCities.forEach(city => {
+      const cityLower = city.toLowerCase();
+      if (cityLower === query) {
+        exactMatches.push(city);
+      } else if (cityLower.startsWith(query)) {
+        startsWith.push(city);
+      } else if (cityLower.includes(query)) {
+        includes.push(city);
+      }
+    });
+    
+    const allResults = [...exactMatches, ...startsWith, ...includes];
+    
+    // Додаємо введений текст першим, якщо він не точно збігається
+    const hasExactMatch = allResults.some(city => city.toLowerCase() === query);
+    if (!hasExactMatch && queryTrimmed) {
+      allResults.unshift(queryTrimmed);
+    }
+    
+    return allResults.slice(0, 15);
+  }, [locationQuery, isLocationOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Перевіряємо, чи оголошення на модерації - забороняємо редагування
+      if (listing.status === 'pending_moderation') {
+        tg?.HapticFeedback.notificationOccurred('error');
+        // Закриваємо модальне вікно та показуємо повідомлення
+        setTimeout(() => {
+          onClose();
+          // Показуємо повідомлення через toast (потрібно передати showToast через пропси або використати глобальний)
+        }, 0);
+        return;
+      }
+      
+      setTitle(listing.title);
+      setDescription(listing.description);
+      setPrice(listing.isFree ? '' : listing.price);
+      setIsFree(listing.isFree || false);
+      setIsNegotiable(
+        listing.price === t('common.negotiable') || listing.price === 'Договорная' || listing.price === 'Договірна'
+      );
+      setCategory(listing.category);
+      setSubcategory(listing.subcategory || '');
+      setLocation(listing.location);
+      setCondition(listing.condition === 'new' ? 'new' : (listing.condition ? 'used' : 'new'));
+      setCurrency(listing.currency || 'UAH');
+      // Оновлюємо imagePreviews - фільтруємо null/undefined значення
+      const existingImages = (listing.images || (listing.image ? [listing.image] : [])).filter(Boolean);
+      setImagePreviews(existingImages);
+      setImages([]);
+      setStatus(listing.status || 'active');
+      setErrors({});
+    }
+  }, [isOpen, listing, onClose, tg]);
+
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  // Відстежуємо фокус на полях введення для приховування кнопок
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let focusTimeout: NodeJS.Timeout | null = null;
+    let blurTimeout: NodeJS.Timeout | null = null;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      if (blurTimeout) {
+        clearTimeout(blurTimeout);
+        blurTimeout = null;
+      }
+
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+         target.tagName === 'TEXTAREA' ||
+         target.isContentEditable)
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      if (focusTimeout) {
+        clearTimeout(focusTimeout);
+        focusTimeout = null;
+      }
+
+      blurTimeout = setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (
+          !activeElement ||
+          (activeElement instanceof HTMLElement &&
+           activeElement.tagName !== 'INPUT' &&
+           activeElement.tagName !== 'TEXTAREA' &&
+           !activeElement.isContentEditable)
+        ) {
+          setIsInputFocused(false);
+        }
+      }, 150);
+    };
+
+    const handleVisualViewportChange = () => {
+      if (window.visualViewport) {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const keyboardOpen = viewportHeight < windowHeight * 0.75;
+        
+        if (keyboardOpen) {
+          setIsInputFocused(true);
+        } else {
+          const activeElement = document.activeElement;
+          if (
+            !activeElement ||
+            (activeElement instanceof HTMLElement &&
+             activeElement.tagName !== 'INPUT' &&
+             activeElement.tagName !== 'TEXTAREA' &&
+             !activeElement.isContentEditable)
+          ) {
+            setIsInputFocused(false);
+          }
+        }
+      }
+    };
+
+    const checkInitialState = () => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        (activeElement.tagName === 'INPUT' ||
+         activeElement.tagName === 'TEXTAREA' ||
+         activeElement.isContentEditable)
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+
+    checkInitialState();
+
+    document.addEventListener('focusin', handleFocusIn, true);
+    document.addEventListener('focusout', handleFocusOut, true);
+    
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+    }
+
+    return () => {
+      if (focusTimeout) clearTimeout(focusTimeout);
+      if (blurTimeout) clearTimeout(blurTimeout);
+      document.removeEventListener('focusin', handleFocusIn, true);
+      document.removeEventListener('focusout', handleFocusOut, true);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
+      }
+    };
+  }, [isOpen]);
+
+  // Фіксуємо позицію кнопок, щоб вони не підтягувалися при відкритті клавіатури
+  useEffect(() => {
+    if (!isOpen || !buttonsRef.current) return;
+
+    const buttonsElement = buttonsRef.current;
+    
+    const fixButtonsPosition = () => {
+      if (buttonsElement) {
+        requestAnimationFrame(() => {
+          if (buttonsElement) {
+            buttonsElement.style.position = 'fixed';
+            buttonsElement.style.bottom = '0';
+            buttonsElement.style.left = '0';
+            buttonsElement.style.right = '0';
+            // Фіксуємо transform в залежності від стану
+            const transformValue = isInputFocused ? 'translateY(100%)' : 'translateY(0)';
+            buttonsElement.style.transform = transformValue;
+            buttonsElement.style.setProperty('-webkit-transform', transformValue);
+          }
+        });
+      }
+    };
+
+    fixButtonsPosition();
+
+    // Обробляємо зміни viewport
+    const handleResize = () => {
+      if (!isInputFocused) {
+        fixButtonsPosition();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isOpen, isInputFocused]);
+
+  // Блокуємо скрол body та html при відкритому модальному вікні (оптимізовано для плавності)
+  useEffect(() => {
+    if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.setAttribute('data-scroll-y', scrollY.toString());
+      
+      requestAnimationFrame(() => {
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = '100%';
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.touchAction = 'none';
+      });
+    } else {
+      const savedScrollY = document.body.getAttribute('data-scroll-y');
+      
+      requestAnimationFrame(() => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.documentElement.style.overflow = '';
+        document.body.style.touchAction = '';
+        document.body.removeAttribute('data-scroll-y');
+        
+        if (savedScrollY) {
+          const scrollPosition = parseInt(savedScrollY, 10);
+          requestAnimationFrame(() => {
+            window.scrollTo(0, scrollPosition);
+          });
+        }
+      });
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.touchAction = '';
+      document.body.removeAttribute('data-scroll-y');
+    };
+  }, [isOpen]);
+
+  // Оновлюємо позицію меню валюти при відкритті
+  useEffect(() => {
+    if (isCurrencyOpen && currencyRef.current) {
+      const rect = currencyRef.current.getBoundingClientRect();
+      // Зсуваємо вліво на 30% від ширини кнопки
+      const leftOffset = rect.width * 0.3;
+      const menuWidth = Math.min(rect.width, window.innerWidth - 32);
+      const left = Math.max(16, Math.min(rect.left - leftOffset, window.innerWidth - menuWidth - 16));
+      
+      setCurrencyMenuPosition({
+        top: rect.bottom,
+        left: left,
+        width: menuWidth
+      });
+    }
+  }, [isCurrencyOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (conditionRef.current && !conditionRef.current.contains(event.target as Node)) {
+        setIsConditionOpen(false);
+      }
+      // Перевіряємо клік поза меню валюти
+      if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
+        // Перевіряємо чи клік не на самому меню валюти
+        const currencyMenu = document.querySelector('[data-currency-menu]');
+        if (!currencyMenu || !currencyMenu.contains(event.target as Node)) {
+          setIsCurrencyOpen(false);
+        }
+      }
+      if (locationRef.current && !locationRef.current.contains(event.target as Node)) {
+        setIsLocationOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!title.trim()) {
+      newErrors.title = t('editListing.errors.titleRequired');
+    } else if (title.trim().length < 3) {
+      newErrors.title = t('editListing.errors.titleMinLength');
+    }
+
+    if (!description.trim()) {
+      newErrors.description = t('editListing.errors.descriptionRequired');
+    } else if (description.trim().length < 10) {
+      newErrors.description = t('editListing.errors.descriptionMinLength');
+    }
+
+    if (!isFree && !isNegotiable) {
+      if (!price.trim()) {
+        newErrors.price = t('editListing.errors.priceRequired');
+      } else {
+        const priceNum = parseFloat(price.replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (isNaN(priceNum) || priceNum <= 0) {
+          newErrors.price = t('editListing.errors.priceInvalid');
+        }
+      }
+    }
+
+    if (!category) {
+      newErrors.category = t('editListing.errors.categoryRequired');
+    }
+
+    if (imagePreviews.length === 0) {
+      newErrors.images = t('createListing.addPhoto');
+    }
+
+    if (!location.trim()) {
+      newErrors.location = t('editListing.errors.locationRequired');
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) {
+      showToast(t('createListing.fillAllFields'), 'error');
+      tg?.HapticFeedback?.notificationOccurred?.('error');
+      return;
+    }
+
+    setLoading(true);
+    // Показуємо індикатор завантаження одразу
+    tg?.HapticFeedback.impactOccurred('light');
+    
+    try {
+      // Для відхилених оголошень автоматично встановлюємо статус, який призведе до відправки на модерацію
+      // API endpoint автоматично відправить rejected оголошення на модерацію при збереженні
+      const statusToSend = isRejected ? 'rejected' : (status || 'active');
+      
+      await onSave({
+        title,
+        description,
+        price: isFree ? t('common.free') : (isNegotiable ? t('common.negotiable') : price),
+        currency: currency,
+        isFree,
+        isNegotiable,
+        category,
+        subcategory: subcategory || null,
+        condition: condition || null,
+        location,
+        status: statusToSend,
+        images,
+        imagePreviews,
+      });
+      onClose();
+    } catch (error) {
+      console.error('Error saving listing:', error);
+      showToast(t('editListing.updateError') || 'Помилка оновлення оголошення', 'error');
+      tg?.HapticFeedback.notificationOccurred('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await onDelete();
+      setShowDeleteConfirm(false);
+      onClose();
+    } catch (error) {
+      console.error('Error deleting listing:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  // Додаткова захист: якщо оголошення на модерації, не показуємо модальне вікно
+  if (listing.status === 'pending_moderation') {
+    return null;
+  }
+
+  const scrollBgStyle: CSSProperties = isLight
+    ? { background: 'linear-gradient(180deg, #fcfcfb 0%, #eef0eb 100%)' }
+    : { background: 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.20) 0%, transparent 40%), #000000' };
+
+  return (
+    <div 
+      className={`fixed inset-0 flex flex-col overflow-hidden ${isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]'}`}
+      style={{ 
+        zIndex: 9999, 
+        isolation: 'isolate',
+        touchAction: 'pan-y',
+        position: 'fixed',
+        width: '100%',
+        height: '100%',
+        top: 0,
+        left: 0
+      }}
+      onTouchMove={(e) => {
+        // Предотвращаем закрытие приложения во время перетаскивания
+        if (draggedIndex !== null) {
+          e.preventDefault();
+        }
+      }}
+    >
+      <div className={`w-full h-full flex flex-col relative min-h-0 ${isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]'}`}>
+        <div
+          ref={setFormScrollParent}
+          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 lg:pt-6"
+          style={{
+            paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))',
+            ...scrollBgStyle,
+          }}
+        >
+          <FixedLogoHeader
+            mode="sticky"
+            scrollParent={formScrollParent}
+            paddingX={false}
+            zClassName="z-10"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.href = `/${language}/bazaar`;
+              }
+            }}
+          />
+
+          <div className="flex items-center justify-between pb-4">
+            <h2 className={`text-xl font-bold ${ac.pageHeading}`}>{t('listing.editListing')}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className={
+                isLight
+                  ? 'w-10 h-10 shrink-0 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-800'
+                  : 'w-10 h-10 shrink-0 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors text-white'
+              }
+            >
+              <X size={20} />
+            </button>
+          </div>
+          {/* Інформація про відхилення для відхилених оголошень */}
+          {isRejected && listing.rejectionReason && (
+            <div className={isLight ? 'bg-red-50 border border-red-200 rounded-xl p-4 mb-4' : 'bg-red-600/20 border border-red-500/50 rounded-xl p-4 mb-4'}>
+              <div className={`font-semibold text-sm mb-2 ${isLight ? 'text-red-700' : 'text-red-400'}`}>
+                {t('profile.rejectionReason') || 'Причина відхилення:'}
+              </div>
+              <div className={`text-sm ${isLight ? 'text-red-800' : 'text-red-300'}`}>
+                {listing.rejectionReason}
+              </div>
+              <div className={`text-xs mt-2 ${isLight ? 'text-red-600/90' : 'text-red-400/70'}`}>
+                {t('editListing.submitAgain') || 'Активувати'} - {t('editListing.submitAgainDescription')}
+              </div>
+            </div>
+          )}
+          {/* Фото */}
+          <div>
+            <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
+              {t('editListing.photosLabel')} {imagePreviews.length}/10
+            </label>
+            {/* Прогрес-бар стиснення зображень */}
+            <div className="grid grid-cols-3 gap-2 relative">
+              {imagePreviews.map((preview, index) => {
+                const isDragging = draggedIndex === index && touchPosition !== null && touchElementRect !== null && !isLocked;
+                const isHovered = hoveredIndex === index && draggedIndex !== index;
+                const isSnapping = isLocked && draggedIndex === index;
+                
+                // Вычисляем позицию для перетаскиваемого элемента
+                let dragTransform = '';
+                let dragScale = 1;
+                
+                if (isDragging && touchPosition && touchElementRect && !isLocked) {
+                  // Вычисляем смещение от начальной позиции элемента
+                  const offsetX = touchPosition.x - (touchElementRect.left + touchElementRect.width / 2);
+                  const offsetY = touchPosition.y - (touchElementRect.top + touchElementRect.height / 2);
+                  dragScale = 1.08;
+                  dragTransform = `translate(${offsetX}px, ${offsetY}px) scale(${dragScale})`;
+                } else if (isSnapping) {
+                  // Когда фото зафиксировано, плавно возвращаем его на место с небольшим "bounce"
+                  dragTransform = 'translate(0px, 0px) scale(1.02)';
+                }
+                
+                return (
+                  <div 
+                    key={`${index}-${typeof preview === 'string' ? preview.substring(0, 20) : index}`}
+                    data-photo-index={index}
+                    className={`relative aspect-square rounded-xl overflow-hidden border cursor-move select-none ${
+                      isLight ? 'bg-gray-100' : 'bg-[#1C1C1C]'
+                    } ${
+                      isDragging ? (isLight ? 'opacity-95 z-50 shadow-2xl border-[#3F5331]/50' : 'opacity-95 z-50 shadow-2xl border-[#C8E6A0]/65') : 
+                      isHovered
+                        ? ac.formPhotoActiveRing
+                        : isSnapping
+                          ? (isLight ? 'border-[#3F5331]/40' : 'border-[#C8E6A0]/50')
+                          : isLight
+                            ? 'border-gray-200'
+                            : 'border-white/20'
+                    }`}
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                    onTouchStart={(e) => handleTouchStart(e, index)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    style={{ 
+                      touchAction: 'none', 
+                      userSelect: 'none', 
+                      WebkitUserSelect: 'none',
+                      transform: dragTransform || undefined,
+                      transition: isDragging && !isLocked
+                        ? 'box-shadow 0.15s ease-out, border-color 0.15s ease-out' 
+                        : isSnapping
+                        ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease-out, border-color 0.25s ease-out, box-shadow 0.25s ease-out'
+                        : 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-out, border-color 0.2s ease-out',
+                      willChange: isDragging ? 'transform' : 'auto'
+                    }}
+                  >
+                  <img 
+                    src={(() => {
+                      if (typeof preview === 'string') {
+                        // Повні URL (http/https)
+                        if (preview.startsWith('http')) return preview;
+                        // Data URLs (base64 для нових фото)
+                        if (preview.startsWith('data:')) return preview;
+                        // Шляхи до файлів
+                        const cleanPath = preview.split('?')[0];
+                        const pathWithoutSlash = cleanPath?.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                        return pathWithoutSlash ? `/api/images/${pathWithoutSlash}` : '';
+                      }
+                      return '';
+                    })()}
+                    alt={`Preview ${index + 1}`} 
+                    className="w-full h-full object-cover pointer-events-none"
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-xs ${isLight ? 'text-gray-500' : 'text-white/40'}">Помилка</div>`;
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImage(index);
+                    }}
+                    className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors z-10 ${
+                      isLight ? 'bg-gray-800/75 text-white hover:bg-gray-800' : 'bg-black/50 text-white hover:bg-black/70'
+                    }`}
+                  >
+                    <X size={14} className="text-white" />
+                  </button>
+                </div>
+                );
+              })}
+              {imagePreviews.length < 10 && (
+                <label className={`aspect-square rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${
+                  isLight ? 'border-gray-300 bg-white/60 hover:border-[#3F5331]' : 'border-white/20 hover:border-[#C8E6A0]/80'
+                }`}>
+                  <div className="text-center">
+                    <Upload size={24} className={`mx-auto mb-1 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
+                    <span className={`text-xs ${isLight ? 'text-gray-600' : 'text-white/70'}`}>{t('editListing.addPhoto')}</span>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+            {errors.images && (
+              <p className="mt-1 text-sm text-red-400">{errors.images}</p>
+            )}
+          </div>
+
+          {/* Заголовок */}
+          <div>
+            <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
+              {t('editListing.titleLabel')}
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
+              }}
+              placeholder={t('editListing.titlePlaceholder')}
+              className={`w-full px-4 py-3 rounded-xl border ${ac.formFocusRing} ${
+                isLight
+                  ? 'bg-white text-gray-900 placeholder:text-gray-400'
+                  : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
+              } ${errors.title ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
+              maxLength={100}
+            />
+            {errors.title && (
+              <p className="mt-1 text-sm text-red-400">{errors.title}</p>
+            )}
+          </div>
+
+          {/* Опис */}
+          <div>
+            <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
+              {t('editListing.descriptionLabel')}
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (errors.description) setErrors(prev => ({ ...prev, description: '' }));
+              }}
+              placeholder={t('editListing.descriptionPlaceholder')}
+              rows={4}
+              className={`w-full px-4 py-3 rounded-xl border ${ac.formFocusRing} resize-none ${
+                isLight
+                  ? 'bg-white text-gray-900 placeholder:text-gray-400'
+                  : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
+              } ${errors.description ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
+              maxLength={2000}
+            />
+            {errors.description && (
+              <p className="mt-1 text-sm text-red-400">{errors.description}</p>
+            )}
+          </div>
+
+          {/* Ціна */}
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFree(!isFree);
+                  if (!isFree) {
+                    setIsNegotiable(false);
+                  }
+                }}
+                className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  isFree
+                    ? ac.formChipSelected
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  isFree
+                    ? ac.formCheckboxFilled
+                    : isLight ? 'border-gray-400 bg-transparent' : 'border-white/40 bg-transparent'
+                }`}>
+                  {isFree && (
+                    <svg className={`w-3 h-3 ${isLight ? 'text-white' : 'text-[#0f1408]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span>{t('common.free')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNegotiable(!isNegotiable);
+                  if (!isNegotiable) {
+                    setIsFree(false);
+                  }
+                }}
+                className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  isNegotiable
+                    ? ac.formChipSelected
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  isNegotiable
+                    ? ac.formCheckboxFilled
+                    : isLight ? 'border-gray-400 bg-transparent' : 'border-white/40 bg-transparent'
+                }`}>
+                  {isNegotiable && (
+                    <svg className={`w-3 h-3 ${isLight ? 'text-white' : 'text-[#0f1408]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span>{t('common.negotiable')}</span>
+              </button>
+            </div>
+            {!isFree && !isNegotiable && (
+              <>
+                <div className="flex gap-2 items-center mb-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step={0.01}
+                    value={price}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(',', '.');
+                      let numeric = raw.replace(/[^0-9.]/g, '');
+                      const parts = numeric.split('.');
+                      if (parts.length > 2) numeric = parts[0] + '.' + parts.slice(1).join('');
+                      setPrice(numeric);
+                      if (errors.price) setErrors(prev => ({ ...prev, price: '' }));
+                    }}
+                    placeholder={t('editListing.pricePlaceholder')}
+                    className={`min-h-[48px] flex-1 px-4 py-3 rounded-xl border ${ac.formFocusRing} ${
+                      isLight
+                        ? 'bg-white text-gray-900 placeholder:text-gray-400'
+                        : 'bg-[#1C1C1C] text-white placeholder:text-white/50'
+                    } ${errors.price ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
+                  />
+                  <button
+                    ref={currencyRef}
+                    type="button"
+                    onClick={() => {
+                      setIsCurrencyOpen(!isCurrencyOpen);
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className={
+                      isLight
+                        ? 'min-h-[48px] shrink-0 px-4 py-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors inline-flex items-center justify-center gap-0.5 min-w-[80px] text-gray-900'
+                        : 'min-h-[48px] shrink-0 px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 hover:border-white/40 transition-colors inline-flex items-center justify-center gap-0.5 min-w-[80px] text-white'
+                    }
+                  >
+                    <span className="font-medium leading-none">
+                      {currency === 'UAH' ? '₴' : currency === 'EUR' ? '€' : '$'}
+                    </span>
+                    <ChevronDown size={16} className={`transition-transform ${isCurrencyOpen ? 'rotate-180' : ''} -mr-1 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
+                  </button>
+                </div>
+                {errors.price && (
+                  <p className="mt-1 text-sm text-red-400">{errors.price}</p>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Розділ */}
+          <div>
+            <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
+              {t('editListing.categoryLabel')}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setCategory(cat.id);
+                    setSubcategory('');
+                    if (errors.category) setErrors(prev => ({ ...prev, category: '' }));
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                className={`px-3 py-2.5 rounded-xl border-2 transition-all text-left ${
+                  category === cat.id
+                    ? ac.formChipSelected
+                    : errors.category
+                    ? isLight ? 'border-red-500 bg-white text-gray-900' : 'border-red-500 bg-[#1C1C1C] text-white'
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <CategoryIcon categoryId={cat.id} isActive={category === cat.id} size={20} />
+                    <span className="font-medium text-sm">{cat.name}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {errors.category && (
+              <p className="mt-1 text-sm text-red-400">{errors.category}</p>
+            )}
+          </div>
+
+          {/* Тип */}
+          {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
+            <div>
+              <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
+                {t('editListing.subcategoryLabel')}
+              </label>
+              {(() => {
+                // Для категорії "Послуги та робота" розділяємо підкатегорії на дві групи
+                const isServicesWork = category === 'services_work';
+                const workSubcategories = ['vacancies', 'part_time', 'looking_for_work', 'other_work'];
+                
+                const servicesSubcategories = isServicesWork 
+                  ? selectedCategoryData.subcategories.filter(sub => !workSubcategories.includes(sub.id))
+                  : selectedCategoryData.subcategories;
+                const workSubcategoriesList = isServicesWork
+                  ? selectedCategoryData.subcategories.filter(sub => workSubcategories.includes(sub.id))
+                  : [];
+
+                if (isServicesWork && workSubcategoriesList.length > 0) {
+                  // Відображаємо в 2 ряди
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubcategory('');
+                            tg?.HapticFeedback.impactOccurred('light');
+                          }}
+                          className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
+                            !subcategory
+                              ? ac.formChipSelected
+                              : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                          }`}
+                        >
+                          Всі типи
+                        </button>
+                        {servicesSubcategories.map(sub => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => {
+                              setSubcategory(sub.id);
+                              tg?.HapticFeedback.impactOccurred('light');
+                            }}
+                            className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                              subcategory === sub.id
+                                ? ac.formChipSelected
+                                : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                            }`}
+                          >
+                            {sub.name}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {workSubcategoriesList.map(sub => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => {
+                              setSubcategory(sub.id);
+                              tg?.HapticFeedback.impactOccurred('light');
+                            }}
+                            className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                              subcategory === sub.id
+                                ? ac.formChipSelected
+                                : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                            }`}
+                          >
+                            {sub.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Звичайне відображення в один ряд
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubcategory('');
+                        tg?.HapticFeedback.impactOccurred('light');
+                      }}
+                      className={`px-3 py-2 rounded-xl border-2 transition-all text-sm ${
+                        !subcategory
+                          ? ac.formChipSelected
+                          : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                      }`}
+                    >
+                      Всі типи
+                    </button>
+                    {selectedCategoryData.subcategories.map(sub => (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => {
+                          setSubcategory(sub.id);
+                          tg?.HapticFeedback.impactOccurred('light');
+                        }}
+                        className={`px-4 py-2 rounded-xl border-2 transition-all ${
+                          subcategory === sub.id
+                            ? ac.formChipSelected
+                            : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40'
+                        }`}
+                      >
+                        {sub.name}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Стан */}
+          <div className="relative" ref={conditionRef}>
+            <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
+              {t('editListing.conditionLabel')}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsConditionOpen(!isConditionOpen)}
+              className={
+                isLight
+                  ? 'w-full px-4 py-3 bg-white rounded-xl border border-gray-200 flex items-center justify-between hover:border-gray-300 transition-colors text-gray-900'
+                  : 'w-full px-4 py-3 bg-[#1C1C1C] rounded-xl border border-white/20 flex items-center justify-between hover:border-white/40 transition-colors text-white'
+              }
+            >
+              <div className="flex items-center gap-2">
+                {selectedCondition && (
+                  <>
+                    {selectedCondition.icon && <selectedCondition.icon size={20} className={ac.formAccentFg} />}
+                    <span className="font-medium">{selectedCondition.label}</span>
+                  </>
+                )}
+                {!selectedCondition && (
+                  <span className={isLight ? 'text-gray-400' : 'text-white/50'}>{t('editListing.selectCondition')}</span>
+                )}
+              </div>
+              <ChevronDown size={20} className={`transition-transform ${isConditionOpen ? 'rotate-180' : ''} ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
+            </button>
+            {isConditionOpen && (
+              <div className={`absolute left-0 right-0 mt-2 rounded-xl shadow-lg z-20 border ${isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white/20'}`}>
+                {conditionOptions.map(option => {
+                  const IconComponent = option.icon;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setCondition(option.value);
+                        setIsConditionOpen(false);
+                        tg?.HapticFeedback.impactOccurred('light');
+                      }}
+                      className={`w-full px-4 py-3 flex items-center justify-between transition-colors border-b last:border-b-0 ${
+                        isLight
+                          ? 'hover:bg-gray-50 border-gray-100 text-gray-900'
+                          : 'hover:bg-white/10 border-white/10 text-white'
+                      } ${condition === option.value ? ac.formMenuRowSelected : ''}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <IconComponent size={20} className={condition === option.value ? ac.formAccentFg : isLight ? 'text-[#3F5331]' : 'text-white/80'} />
+                        <span>{option.label}</span>
+                      </div>
+                      {selectedCondition?.value === option.value && (
+                        <span className={ac.formAccentFg}>✓</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Локація */}
+          <div className="relative" ref={locationRef}>
+            <label className={`block text-sm font-medium mb-2 ${isLight ? 'text-gray-800' : 'text-white'}`}>
+              {t('editListing.locationLabel')}
+            </label>
+            <div
+              className={`flex min-h-[48px] w-full items-center rounded-xl border transition-shadow ${
+                isLight
+                  ? 'bg-white focus-within:border-[#3F5331] focus-within:ring-2 focus-within:ring-[#3F5331]/50'
+                  : 'bg-[#1C1C1C] focus-within:border-[#C8E6A0] focus-within:ring-2 focus-within:ring-[#C8E6A0]/35'
+              } ${errors.location ? 'border-red-500' : isLight ? 'border-gray-200' : 'border-white/20'}`}
+            >
+              <span
+                className={`flex h-[48px] shrink-0 items-center justify-center pl-4 pr-2.5 ${
+                  isLight ? 'text-gray-500' : 'text-white/70'
+                }`}
+                aria-hidden
+              >
+                <MapPin size={18} className="shrink-0" />
+              </span>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  setLocationQuery(e.target.value);
+                  setIsLocationOpen(true);
+                  if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === 'Search') {
+                    e.preventDefault();
+                    const input = e.target as HTMLInputElement;
+                    input.blur();
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }
+                }}
+                onFocus={() => setIsLocationOpen(true)}
+                placeholder={t('editListing.locationPlaceholder')}
+                className={`min-h-[48px] min-w-0 flex-1 border-0 bg-transparent py-3 pr-4 text-[16px] leading-normal outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 ${
+                  isLight
+                    ? 'text-gray-900 placeholder:text-gray-400'
+                    : 'text-white placeholder:text-white/50'
+                }`}
+              />
+            </div>
+            
+            {isLocationOpen && filteredCities.length > 0 && (
+              <div className={`absolute z-50 w-full mt-2 rounded-xl border shadow-lg max-h-60 overflow-y-auto ${isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white/20'}`} style={{ maxHeight: 'calc(15rem - env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+                {filteredCities.map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    onClick={() => {
+                      setLocation(city);
+                      setLocationQuery('');
+                      setIsLocationOpen(false);
+                      tg?.HapticFeedback.impactOccurred('light');
+                    }}
+                    className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2.5 ${isLight ? 'hover:bg-gray-50 text-gray-900' : 'hover:bg-white/10 text-white'}`}
+                  >
+                    <MapPin size={16} className={`flex-shrink-0 ${isLight ? 'text-gray-500' : 'text-white/70'}`} />
+                    <span>{city}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {errors.location && (
+              <p className="mt-1 text-sm text-red-400">{errors.location}</p>
+            )}
+          </div>
+
+          {/* Статус */}
+          <div>
+            <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
+              {t('editListing.status') || 'Статус'}
+            </label>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('active');
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  status === 'active'
+                    ? ac.formChipSelected
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <CheckCircle size={20} />
+                <span>{t('editListing.active')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const isPendingModeration = (listing.status as string) === 'pending_moderation';
+                  const isRejectedStatus = isRejected || (listing.status as string) === 'rejected';
+                  if (isPendingModeration) {
+                    showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+                    tg?.HapticFeedback.notificationOccurred('error');
+                    return;
+                  }
+                  if (isRejectedStatus) {
+                    showToast(t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення', 'error');
+                    tg?.HapticFeedback.notificationOccurred('error');
+                    return;
+                  }
+                  setShowSoldConfirm(true);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                disabled={(listing.status as string) === 'pending_moderation' || isRejected || (listing.status as string) === 'rejected'}
+                className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  (listing.status as string) === 'pending_moderation' || isRejected || (listing.status as string) === 'rejected'
+                    ? isLight
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-70'
+                      : 'border-white/10 bg-[#1C1C1C]/50 text-white/50 cursor-not-allowed opacity-50'
+                    : status === 'sold'
+                    ? isLight
+                      ? 'border-[#3F5331] bg-[#3F5331]/12 text-[#3F5331] shadow-sm'
+                      : ac.formChipSelected
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <Tag size={20} />
+                <span>{t('editListing.sold')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus('deactivated');
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={`w-full px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-semibold flex items-center justify-center gap-2 ${
+                  status === 'deactivated'
+                    ? isLight
+                      ? 'border-orange-400 bg-orange-50 text-orange-800 shadow-sm'
+                      : 'border-orange-500/70 bg-orange-500/20 text-orange-400 shadow-sm'
+                    : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
+                }`}
+              >
+                <EyeOff size={20} />
+                <span>{t('sales.deactivated')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Кнопки - фіксовані знизу (меню ховається через useHideBottomNav) */}
+        <div 
+          ref={buttonsRef}
+          className={`border-t px-4 pt-4 pb-4 flex gap-2 safe-area-bottom shadow-lg transition-transform duration-200 ease-in-out ${
+            isLight ? 'bg-white border-gray-200/90' : 'bg-[#000000] border-white/20'
+          }`} 
+          style={{ 
+            paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))', 
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 99999,
+            transform: isInputFocused ? 'translateY(100%)' : 'translateY(0)',
+            visibility: isInputFocused ? 'hidden' : 'visible',
+            opacity: isInputFocused ? 0 : 1,
+            pointerEvents: isInputFocused ? 'none' : 'auto',
+            // Додаткова фіксація для запобігання підтягуванню
+            willChange: 'transform'
+          } as React.CSSProperties}
+        >
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={loading}
+            className={`flex-1 px-4 py-3 bg-transparent border rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+              isLight
+                ? 'border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
+                : 'border-red-500/50 text-red-500 hover:bg-red-500/10 hover:border-red-500'
+            }`}
+          >
+            <Trash2 size={16} />
+            {t('common.delete')}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="flex-1 px-4 py-3 bg-[#3F5331] text-white rounded-xl text-sm font-medium hover:bg-[#344728] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className={`w-4 h-4 border-2 rounded-full animate-spin ${isLight ? 'border-gray-200 border-t-gray-700' : 'border-black/30 border-t-black'}`}></div>
+                <span>{isRejected ? t('editListing.savingAndSubmitting') : t('editListing.saving')}</span>
+              </>
+            ) : (
+              <>
+                <Check size={18} />
+                <span>{isRejected ? t('editListing.submitAgain') : t('common.save')}</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Backdrop для валюти */}
+        {isCurrencyOpen && (
+          <div 
+            className="fixed inset-0 z-[9999]"
+            onClick={() => setIsCurrencyOpen(false)}
+          />
+        )}
+
+        {/* Меню валюти */}
+        {isCurrencyOpen && (
+          <div 
+            data-currency-menu
+            className={`fixed rounded-xl border shadow-2xl z-[10000] min-w-[120px] ${isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white/20'}`}
+            style={{
+              top: `${currencyMenuPosition.top + 8}px`,
+              left: `${currencyMenuPosition.left}px`,
+              width: `${currencyMenuPosition.width || 120}px`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setCurrency('UAH');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
+                isLight ? 'border-gray-100 hover:bg-gray-50 text-gray-900' : 'border-white/10 hover:bg-white/10 text-white'
+              } ${currency === 'UAH' ? ac.formMenuRowSelected : ''}`}
+            >
+              <span>₴ UAH</span>
+              {currency === 'UAH' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
+            </button>
+                <button
+              type="button"
+              onClick={() => {
+                setCurrency('EUR');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 border-b ${
+                isLight ? 'border-gray-100 hover:bg-gray-50 text-gray-900' : 'border-white/10 hover:bg-white/10 text-white'
+              } ${currency === 'EUR' ? ac.formMenuRowSelected : ''}`}
+            >
+              <span>€ EUR</span>
+              {currency === 'EUR' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
+                </button>
+                <button
+              type="button"
+              onClick={() => {
+                setCurrency('USD');
+                setIsCurrencyOpen(false);
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-2 ${
+                isLight ? 'hover:bg-gray-50 text-gray-900' : 'hover:bg-white/10 text-white'
+              } ${currency === 'USD' ? ac.formMenuRowSelected : ''}`}
+            >
+              <span>$ USD</span>
+              {currency === 'USD' && <span className={`ml-auto ${ac.formAccentFg}`}>✓</span>}
+                </button>
+          </div>
+        )}
+
+        {/* Підтвердження видалення */}
+        <ConfirmModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
+          title={t('editListing.deleteConfirmTitle')}
+          message={t('editListing.confirmDelete')}
+          confirmText={t('common.delete')}
+          cancelText={t('common.cancel')}
+          confirmButtonClass="bg-red-500 hover:bg-red-600"
+          tg={tg}
+        />
+
+        {/* Підтвердження продажу */}
+        <ConfirmModal
+          isOpen={showSoldConfirm}
+          onClose={() => setShowSoldConfirm(false)}
+          onConfirm={() => {
+            const isPendingModeration = (listing.status as string) === 'pending_moderation';
+            const isRejectedStatus = isRejected || (listing.status as string) === 'rejected';
+            if (isPendingModeration) {
+              showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
+              setShowSoldConfirm(false);
+              return;
+            }
+            if (isRejectedStatus) {
+              showToast(t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення', 'error');
+              setShowSoldConfirm(false);
+              return;
+            }
+            setStatus('sold');
+            setShowSoldConfirm(false);
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          title={t('editListing.markAsSold')}
+          message={t('editListing.confirmMarkSold')}
+          confirmText={t('editListing.markAsSold')}
+          cancelText={t('common.cancel')}
+          confirmButtonClass="bg-green-500 hover:bg-green-600"
+          tg={tg}
+        />
+      </div>
+    </div>
+  );
+};
+

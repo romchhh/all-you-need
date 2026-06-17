@@ -325,7 +325,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Публікуємо в канал з урахуванням тарифу
-      const { publishListingToChannel } = await import('@/utils/publishToChannel');
+      const { publishListingToChannel } = await import('@/lib/moderation/publishToChannel');
       const channelMessageId = await publishListingToChannel(listing.id, {
         id: listing.id,
         title: listing.title,
@@ -343,7 +343,7 @@ export async function POST(request: NextRequest) {
 
       // Схвалюємо TelegramListing
       const { nowSQLite } = await import('@/utils/dateHelpers');
-      const { getPublicationTimestampsForApproval } = await import('@/utils/moderationHelpers');
+      const { getPublicationTimestampsForApproval } = await import('@/lib/moderation/moderationHelpers');
       const nowStr = nowSQLite();
       const { publishedAt: publishedAtStr } = getPublicationTimestampsForApproval({
         publishedAt: listing.publishedAt,
@@ -397,7 +397,7 @@ export async function POST(request: NextRequest) {
       
       // Надсилаємо повідомлення користувачу з посиланням на канал
       if (listing.telegramId) {
-        const { sendTelegramMessage } = await import('@/utils/telegramNotifications');
+        const { sendTelegramMessage } = await import('@/lib/telegram/telegramNotifications');
         
         // Визначаємо канал на основі регіону
         const region = (listing as any).region || 'hamburg';
@@ -472,7 +472,7 @@ export async function POST(request: NextRequest) {
       
       // Надсилаємо повідомлення користувачу
       if (listing.telegramId) {
-        const { sendTelegramMessage } = await import('@/utils/telegramNotifications');
+        const { sendTelegramMessage } = await import('@/lib/telegram/telegramNotifications');
         const message = `❌ <b>Оголошення відхилено</b>
 
 Ваше оголошення "<b>${listing.title}</b>" не пройшло модерацію.
