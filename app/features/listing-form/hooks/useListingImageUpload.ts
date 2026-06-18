@@ -4,6 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { compressImageOnClient } from '@/utils/imageUtils';
 import { LISTING_MAX_PHOTOS } from '@/features/listing-form/lib/constants';
 
+export type ListingImageItem = {
+  id: string;
+  preview: string;
+  file?: File;
+  /** Stored path/URL for photos already on the server */
+  existingUrl?: string;
+};
+
 type UseListingImageUploadOptions = {
   isOpen: boolean;
   maxPhotos?: number;
@@ -12,6 +20,30 @@ type UseListingImageUploadOptions = {
   initialFiles?: File[];
 };
 
+let nextItemId = 0;
+
+function createItemId(prefix: string) {
+  nextItemId += 1;
+  return `${prefix}-${nextItemId}`;
+}
+
+function buildItemsFromInitial(
+  initialPreviews: string[],
+  initialFiles: File[]
+): ListingImageItem[] {
+  let fileIdx = 0;
+  return initialPreviews.map((preview, index) => {
+    const isNewUpload = preview.startsWith('data:');
+    const file = isNewUpload ? initialFiles[fileIdx++] : undefined;
+    return {
+      id: createItemId(`init-${index}`),
+      preview,
+      file,
+      existingUrl: isNewUpload ? undefined : preview,
+    };
+  });
+}
+
 export function useListingImageUpload({
   isOpen,
   maxPhotos = LISTING_MAX_PHOTOS,
@@ -19,8 +51,9 @@ export function useListingImageUpload({
   initialPreviews = [],
   initialFiles = [],
 }: UseListingImageUploadOptions) {
-  const [images, setImages] = useState<File[]>(initialFiles);
-  const [imagePreviews, setImagePreviews] = useState<string[]>(initialPreviews);
+  const [items, setItems] = useState<ListingImageItem[]>(() =>
+    buildItemsFromInitial(initialPreviews, initialFiles)
+  );
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [touchStartIndex, setTouchStartIndex] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
@@ -29,22 +62,59 @@ export function useListingImageUpload({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const isDraggingRef = useRef(false);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (!isOpen) return;
-    setImages(initialFiles);
-    setImagePreviews(initialPreviews);
-  }, [isOpen, initialFiles, initialPreviews]);
+    if (isOpen && !wasOpenRef.current) {
+      nextItemId = 0;
+      setItems(buildItemsFromInitial(initialPreviews, initialFiles));
+      setDraggedIndex(null);
+      setTouchStartIndex(null);
+      setTouchStartY(null);
+      setTouchPosition(null);
+      setTouchElementRect(null);
+      setHoveredIndex(null);
+      setIsLocked(false);
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, initialPreviews, initialFiles]);
+
+  const imagePreviews = items.map((item) => item.preview);
+  const images = items.filter((item) => item.file).map((item) => item.file!);
+
+  const setImagePreviews = useCallback((value: string[] | ((prev: string[]) => string[])) => {
+    setItems((prev) => {
+      const nextPreviews = typeof value === 'function' ? value(prev.map((i) => i.preview)) : value;
+      return nextPreviews.map((preview, index) => {
+        const prevItem = prev[index];
+        if (prevItem && prevItem.preview === preview) return prevItem;
+        return {
+          id: createItemId('set'),
+          preview,
+          existingUrl: preview.startsWith('data:') ? undefined : preview,
+        };
+      });
+    });
+  }, []);
+
+  const setImages = useCallback((value: File[] | ((prev: File[]) => File[])) => {
+    setItems((prev) => {
+      const prevFiles = prev.filter((i) => i.file).map((i) => i.file!);
+      const nextFiles = typeof value === 'function' ? value(prevFiles) : value;
+      let fileIdx = 0;
+      return prev.map((item) => {
+        if (item.file) {
+          const nextFile = nextFiles[fileIdx++];
+          return nextFile ? { ...item, file: nextFile } : item;
+        }
+        return item;
+      });
+    });
+  }, []);
 
   const moveImage = useCallback((fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
-    setImages((prev) => {
-      const next = [...prev];
-      const [removed] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, removed);
-      return next;
-    });
-    setImagePreviews((prev) => {
+    setItems((prev) => {
       const next = [...prev];
       const [removed] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, removed);
@@ -53,20 +123,19 @@ export function useListingImageUpload({
   }, []);
 
   const removeImage = useCallback((index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    setItems((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const handleImageChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files || []);
-      if (images.length >= maxPhotos) {
+      if (items.length >= maxPhotos) {
         onMaxPhotos?.();
         e.target.value = '';
         return;
       }
 
-      const availableSlots = maxPhotos - images.length;
+      const availableSlots = maxPhotos - items.length;
       const filesToAdd = files.slice(0, availableSlots);
       if (files.length > filesToAdd.length) {
         onMaxPhotos?.();
@@ -89,7 +158,6 @@ export function useListingImageUpload({
         }
       }
 
-      setImages((prev) => [...prev, ...compressedFiles]);
       const previews = await Promise.all(
         compressedFiles.map(
           (file) =>
@@ -100,10 +168,18 @@ export function useListingImageUpload({
             })
         )
       );
-      setImagePreviews((prev) => [...prev, ...previews]);
+
+      setItems((prev) => [
+        ...prev,
+        ...compressedFiles.map((file, index) => ({
+          id: createItemId('new'),
+          preview: previews[index],
+          file,
+        })),
+      ]);
       e.target.value = '';
     },
-    [images.length, maxPhotos, onMaxPhotos]
+    [items.length, maxPhotos, onMaxPhotos]
   );
 
   const handleDragStart = useCallback((index: number) => {
@@ -127,14 +203,17 @@ export function useListingImageUpload({
   const handleTouchStart = useCallback((e: React.TouchEvent, index: number) => {
     const target = e.target as HTMLElement;
     if (target.closest('button')) return;
+
     e.preventDefault();
     e.stopPropagation();
     isDraggingRef.current = true;
     const element = e.currentTarget as HTMLElement;
     const rect = element.getBoundingClientRect();
     setTouchElementRect(rect);
+
     const preventSelection = (ev: Event) => ev.preventDefault();
     document.addEventListener('selectstart', preventSelection);
+
     const preventPullToClose = (ev: TouchEvent) => {
       if (isDraggingRef.current) {
         ev.preventDefault();
@@ -142,6 +221,7 @@ export function useListingImageUpload({
       }
     };
     document.addEventListener('touchmove', preventPullToClose, { passive: false });
+
     const cleanup = () => {
       isDraggingRef.current = false;
       document.removeEventListener('selectstart', preventSelection);
@@ -151,6 +231,7 @@ export function useListingImageUpload({
     };
     document.addEventListener('touchend', cleanup, { once: true });
     document.addEventListener('touchcancel', cleanup, { once: true });
+
     const touch = e.touches[0];
     setTouchStartIndex(index);
     setTouchStartY(touch.clientY);
@@ -163,8 +244,10 @@ export function useListingImageUpload({
       if (touchStartIndex === null || touchStartY === null || touchElementRect === null) return;
       e.preventDefault();
       e.stopPropagation();
+
       const touch = e.touches[0];
       setTouchPosition({ x: touch.clientX, y: touch.clientY });
+
       const allPhotoElements = document.querySelectorAll('[data-photo-index]');
       let targetIndex: number | null = null;
       for (const photoElement of allPhotoElements) {
@@ -173,14 +256,19 @@ export function useListingImageUpload({
         const elementIndex = parseInt(indexAttr, 10);
         if (elementIndex === touchStartIndex) continue;
         const rect = photoElement.getBoundingClientRect();
-        const distanceX = Math.abs(touch.clientX - (rect.left + rect.width / 2));
-        const distanceY = Math.abs(touch.clientY - (rect.top + rect.height / 2));
-        if (distanceX <= rect.width * 0.45 && distanceY <= rect.height * 0.45) {
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        if (
+          Math.abs(touch.clientX - centerX) <= rect.width * 0.5 &&
+          Math.abs(touch.clientY - centerY) <= rect.height * 0.5
+        ) {
           targetIndex = elementIndex;
           break;
         }
       }
+
       setHoveredIndex(targetIndex);
+
       if (targetIndex !== null && touchStartIndex !== targetIndex && !isLocked) {
         setIsLocked(true);
         moveImage(touchStartIndex, targetIndex);
@@ -199,7 +287,7 @@ export function useListingImageUpload({
             }
             setTouchStartIndex(targetIndex);
             setDraggedIndex(targetIndex);
-            setTimeout(() => setIsLocked(false), 250);
+            setTimeout(() => setIsLocked(false), 200);
           });
         });
       }
@@ -209,18 +297,17 @@ export function useListingImageUpload({
 
   const handleTouchEnd = useCallback(() => {
     isDraggingRef.current = false;
-    setTimeout(() => {
-      setTouchStartIndex(null);
-      setTouchStartY(null);
-      setDraggedIndex(null);
-      setTouchPosition(null);
-      setTouchElementRect(null);
-      setHoveredIndex(null);
-      setIsLocked(false);
-    }, 100);
+    setTouchStartIndex(null);
+    setTouchStartY(null);
+    setDraggedIndex(null);
+    setTouchPosition(null);
+    setTouchElementRect(null);
+    setHoveredIndex(null);
+    setIsLocked(false);
   }, []);
 
   return {
+    items,
     images,
     setImages,
     imagePreviews,

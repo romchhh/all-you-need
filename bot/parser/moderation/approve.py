@@ -70,7 +70,7 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
             await callback.answer("🤖 AI аналізує оголошення…", show_alert=False)
         except TelegramBadRequest:
             pass
-        enriched = await enrich_parsed_item_with_ai(item, images)
+        enriched = await enrich_parsed_item_with_ai(item)
         if enriched and enriched.applied:
             listing_item = merge_enrichment_into_item(item, enriched)
             ai_summary = enriched.summary

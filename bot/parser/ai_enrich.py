@@ -1,7 +1,7 @@
 """
 AI-збагачення парсованих оголошень при підтвердженні модератором (OpenAI).
 
-Аналізує текст + фото і повертає:
+Аналізує лише текст і повертає:
   - заголовок, опис
   - категорію / підкатегорію
   - ціну (або «Договірна»)
@@ -9,15 +9,13 @@ AI-збагачення парсованих оголошень при підт�
   - стан (new/used)
 
 .env:
-  OPENAI_API_KEY          — обовʼязково для AI
-  OPENAI_MODEL            — за замовч. gpt-4o-mini
-  PARSER_AI_ENABLED       — 1/0 (за замовч. 1 якщо є ключ)
-  PARSER_AI_MAX_IMAGES    — скільки фото надсилати в vision (за замовч. 3)
+  OPENAI_API_KEY    — обовʼязково для AI
+  OPENAI_MODEL      — за замовч. gpt-4o-mini
+  PARSER_AI_ENABLED — 1/0 (за замовч. 1 якщо є ключ)
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import os
@@ -32,13 +30,8 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-PHOTOS_DIR = BASE_DIR / "database" / "parsed_photos"
-PUBLIC_DIR = BASE_DIR / "app" / "public"
-
 OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
 OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
-PARSER_AI_MAX_IMAGES = max(0, min(5, int(os.getenv("PARSER_AI_MAX_IMAGES", "3"))))
 
 GERMAN_CITIES = [
     "Berlin", "Hamburg", "München", "Köln", "Frankfurt", "Stuttgart",
@@ -86,35 +79,6 @@ def _category_taxonomy() -> str:
         sub_ids = [s for s in subs.keys() if s and not s.startswith("other_")]
         lines.append(f"- {cat}: [{', '.join(sub_ids) or '—'}]")
     return "\n".join(lines)
-
-
-def _resolve_local_image_path(rel: str) -> Optional[Path]:
-    if not rel or not isinstance(rel, str):
-        return None
-    s = rel.strip().lstrip("/")
-    if s.startswith("http://") or s.startswith("https://"):
-        return None
-    candidates = [
-        BASE_DIR / s,
-        PHOTOS_DIR / Path(s).name,
-        PUBLIC_DIR / s.removeprefix("public/"),
-    ]
-    for p in candidates:
-        if p.is_file():
-            return p
-    return None
-
-
-def _image_to_data_url(path: Path) -> Optional[str]:
-    try:
-        raw = path.read_bytes()
-        if len(raw) > 4_500_000:
-            return None
-        b64 = base64.standard_b64encode(raw).decode("ascii")
-        return f"data:image/jpeg;base64,{b64}"
-    except Exception as e:
-        logger.warning("AI enrich: не вдалося прочитати фото %s: %s", path, e)
-        return None
 
 
 def _normalize_price_fields(
@@ -197,6 +161,7 @@ def _validate_condition(condition: Any, category: str) -> Optional[str]:
 def _build_prompt(item: dict) -> str:
     channel_city = item.get("source_city") or item.get("location") or ""
     return f"""Проаналізуй оголошення з Telegram-барахолки (Німеччина, UA/RU аудиторія).
+Використовуй ТІЛЬКИ текст нижче — фото немає.
 
 Поточні дані парсера (можуть бути неточними):
 - title: {item.get("title") or ""}
@@ -242,11 +207,8 @@ def _build_prompt(item: dict) -> str:
 }}"""
 
 
-async def enrich_parsed_item_with_ai(
-    item: dict,
-    local_image_paths: Optional[list[str]] = None,
-) -> Optional[AiEnrichmentResult]:
-    """Викликає OpenAI; при помилці повертає None (fallback на дані парсера)."""
+async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]:
+    """Викликає OpenAI (лише текст); при помилці повертає None (fallback на дані парсера)."""
     if not is_ai_enrich_enabled():
         return None
 
@@ -255,22 +217,6 @@ async def enrich_parsed_item_with_ai(
     except ImportError:
         logger.error("openai не встановлено. pip install openai")
         return None
-
-    user_content: list[dict[str, Any]] = [
-        {"type": "text", "text": _build_prompt(item)},
-    ]
-
-    added = 0
-    for rel in local_image_paths or []:
-        if added >= PARSER_AI_MAX_IMAGES:
-            break
-        p = _resolve_local_image_path(rel)
-        if not p:
-            continue
-        data_url = _image_to_data_url(p)
-        if data_url:
-            user_content.append({"type": "image_url", "image_url": {"url": data_url}})
-            added += 1
 
     client = AsyncOpenAI(api_key=OPENAI_API_KEY)
     try:
@@ -281,11 +227,11 @@ async def enrich_parsed_item_with_ai(
                     "role": "system",
                     "content": (
                         "Ти модератор маркетплейсу Trade Ground для українців/росіян у Німеччині. "
-                        "Покращуй оголошення з барахолок: точний заголовок, категорія, ціна, місто. "
+                        "Покращуй оголошення з барахолок за текстом: точний заголовок, категорія, ціна, місто. "
                         "Відповідай лише валідним JSON без markdown."
                     ),
                 },
-                {"role": "user", "content": user_content},
+                {"role": "user", "content": _build_prompt(item)},
             ],
             response_format={"type": "json_object"},
             temperature=0.2,

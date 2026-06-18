@@ -341,39 +341,205 @@ async def _run_with_window_delay(bot: Bot, day_of_week: str, window_hours: float
     await send_weekly_marketplace_broadcast(bot, day_of_week)
 
 
-def get_weekly_broadcast_stats_text(limit: int = 5) -> str:
+DAY_LABELS = {"wed": "Ср", "sat": "Сб"}
+BROADCAST_STATS_PAGE_SIZE = 8
+
+
+def _format_finished_at(iso_ts: str | None) -> str:
+    if not iso_ts:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=BERLIN_TZ)
+        else:
+            dt = dt.astimezone(BERLIN_TZ)
+        return dt.strftime("%d.%m.%Y %H:%M")
+    except ValueError:
+        return (iso_ts or "")[:16].replace("T", " ")
+
+
+def _delivery_rate(sent: int, total: int) -> float:
+    if total <= 0:
+        return 0.0
+    return sent / total * 100
+
+
+def get_weekly_broadcast_summary() -> dict:
     conn = get_connection()
     try:
         cur = conn.cursor()
         _ensure_tables(cur)
         cur.execute(
             """
-            SELECT slotKey, dayOfWeek, messageIndex, sentCount, failedCount,
-                   totalRecipients, finishedAt
+            SELECT
+                COUNT(*) AS runs,
+                COALESCE(SUM(sentCount), 0) AS total_sent,
+                COALESCE(SUM(failedCount), 0) AS total_failed,
+                COALESCE(SUM(totalRecipients), 0) AS total_attempts
+            FROM WeeklyBroadcastLog
+            WHERE finishedAt IS NOT NULL
+            """
+        )
+        row = cur.fetchone()
+        runs = int(row[0] or 0)
+        total_sent = int(row[1] or 0)
+        total_failed = int(row[2] or 0)
+        total_attempts = int(row[3] or 0)
+
+        cur.execute("SELECT nextMessageIndex FROM WeeklyBroadcastState WHERE id = 1")
+        state_row = cur.fetchone()
+        next_index = int(state_row[0]) if state_row else 0
+        if next_index < 0 or next_index >= len(WEEKLY_BROADCAST_MESSAGES):
+            next_index = 0
+    finally:
+        conn.close()
+
+    active_recipients = len(_get_active_recipient_ids())
+    wed_hour = int(os.getenv("WEEKLY_BROADCAST_WED_HOUR") or "18")
+    wed_minute = int(os.getenv("WEEKLY_BROADCAST_WED_MINUTE") or "0")
+    sat_hour = int(os.getenv("WEEKLY_BROADCAST_SAT_HOUR") or "11")
+    sat_minute = int(os.getenv("WEEKLY_BROADCAST_SAT_MINUTE") or "0")
+    enabled = is_weekly_broadcast_enabled()
+
+    return {
+        "runs": runs,
+        "total_sent": total_sent,
+        "total_failed": total_failed,
+        "total_attempts": total_attempts,
+        "avg_delivery_rate": _delivery_rate(total_sent, total_attempts),
+        "active_recipients": active_recipients,
+        "next_message_index": next_index,
+        "message_variants": len(WEEKLY_BROADCAST_MESSAGES),
+        "enabled": enabled,
+        "schedule": (
+            f"Ср {wed_hour:02d}:{wed_minute:02d}–{wed_hour + 2:02d}:{wed_minute:02d}, "
+            f"Сб {sat_hour:02d}:{sat_minute:02d}–{sat_hour + 2:02d}:{sat_minute:02d} "
+            f"(Europe/Berlin)"
+        ),
+    }
+
+
+def get_weekly_broadcast_logs(limit: int = 8, offset: int = 0) -> tuple[list[dict], int]:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_tables(cur)
+        cur.execute(
+            "SELECT COUNT(*) FROM WeeklyBroadcastLog WHERE finishedAt IS NOT NULL"
+        )
+        total = int(cur.fetchone()[0] or 0)
+        cur.execute(
+            """
+            SELECT slotKey, dayOfWeek, messageIndex, messagePreview,
+                   sentCount, failedCount, totalRecipients, startedAt, finishedAt
             FROM WeeklyBroadcastLog
             WHERE finishedAt IS NOT NULL
             ORDER BY finishedAt DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """,
-            (limit,),
+            (limit, offset),
         )
         rows = cur.fetchall()
     finally:
         conn.close()
 
-    if not rows:
+    logs: list[dict] = []
+    for row in rows:
+        slot_key, dow, msg_idx, preview, sent, failed, total, started, finished = row
+        logs.append(
+            {
+                "slot_key": slot_key,
+                "day_of_week": dow,
+                "day_label": DAY_LABELS.get(dow, dow),
+                "message_index": int(msg_idx),
+                "message_preview": preview or "",
+                "sent_count": int(sent or 0),
+                "failed_count": int(failed or 0),
+                "total_recipients": int(total or 0),
+                "started_at": started,
+                "finished_at": finished,
+                "delivery_rate": _delivery_rate(int(sent or 0), int(total or 0)),
+            }
+        )
+    return logs, total
+
+
+def format_broadcast_stats_message(page: int = 0, per_page: int = BROADCAST_STATS_PAGE_SIZE) -> str:
+    summary = get_weekly_broadcast_summary()
+    offset = max(0, page) * per_page
+    logs, total_logs = get_weekly_broadcast_logs(limit=per_page, offset=offset)
+    total_pages = max(1, (total_logs + per_page - 1) // per_page)
+    page = min(max(0, page), total_pages - 1)
+
+    status = "✅ увімкнено" if summary["enabled"] else "⏸ вимкнено"
+    lines = [
+        "<b>📬 СТАТИСТИКА АВТО-РОЗСИЛОК</b>",
+        "",
+        f"<b>⚙️ Розклад:</b> {summary['schedule']}",
+        f"<b>Статус:</b> {status}",
+        f"<b>👥 Активних одержувачів зараз:</b> {summary['active_recipients']}",
+        (
+            f"<b>📝 Варіантів тексту:</b> {summary['message_variants']} "
+            f"(наступний: №{summary['next_message_index'] + 1})"
+        ),
+        "",
+        "<b>📊 Загалом (за весь час)</b>",
+        f"• Розсилок проведено: <b>{summary['runs']}</b>",
+        f"• Доставлено: <b>{summary['total_sent']}</b>",
+        f"• Помилок: <b>{summary['total_failed']}</b>",
+        f"• Середня доставка: <b>{summary['avg_delivery_rate']:.1f}%</b>",
+        "",
+    ]
+
+    if not logs:
+        lines.append("<i>Ще не було жодної авто-розсилки.</i>")
+    else:
+        lines.append(f"<b>📋 Історія</b> (стор. {page + 1}/{total_pages})")
+        for idx, log in enumerate(logs, start=offset + 1):
+            preview = (log["message_preview"] or "").replace("\n", " ")
+            if len(preview) > 70:
+                preview = preview[:67] + "..."
+            lines.extend(
+                [
+                    "",
+                    (
+                        f"<b>{idx}.</b> {_format_finished_at(log['finished_at'])} "
+                        f"({log['day_label']}) — текст №{log['message_index'] + 1}"
+                    ),
+                    (
+                        f"   👥 {log['total_recipients']} → "
+                        f"✅ <b>{log['sent_count']}</b> | "
+                        f"❌ {log['failed_count']} "
+                        f"({log['delivery_rate']:.1f}%)"
+                    ),
+                    f"   <i>{preview}</i>",
+                ]
+            )
+
+    lines.append("")
+    lines.append(f"<i>📅 Оновлено: {datetime.now(BERLIN_TZ).strftime('%d.%m.%Y %H:%M')}</i>")
+    return "\n".join(lines)
+
+
+def get_broadcast_stats_total_pages(per_page: int = BROADCAST_STATS_PAGE_SIZE) -> int:
+    _, total = get_weekly_broadcast_logs(limit=1, offset=0)
+    return max(1, (total + per_page - 1) // per_page)
+
+
+def get_weekly_broadcast_stats_text(limit: int = 5) -> str:
+    logs, _ = get_weekly_broadcast_logs(limit=limit, offset=0)
+    if not logs:
         return "   Ще не було авто-розсилок\n"
 
     lines = []
-    day_names = {"wed": "Ср", "sat": "Сб"}
-    for row in rows:
-        slot_key, dow, msg_idx, sent, failed, total, finished = row
-        dow_label = day_names.get(dow, dow)
-        finished_short = (finished or "")[:16].replace("T", " ")
+    for log in logs:
+        finished_short = _format_finished_at(log["finished_at"])
         lines.append(
-            f"   • {finished_short} ({dow_label}) — "
-            f"текст №{int(msg_idx) + 1}: <b>{sent}</b>/{total} "
-            f"(помилок: {failed})"
+            f"   • {finished_short} ({log['day_label']}) — "
+            f"текст №{log['message_index'] + 1}: "
+            f"<b>{log['sent_count']}</b>/{log['total_recipients']} "
+            f"(помилок: {log['failed_count']})"
         )
     return "\n".join(lines) + "\n"
 

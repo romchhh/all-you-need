@@ -3,8 +3,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { loadProfileBundle } from '@/utils/loadProfileBundle';
+import ukTranslations from '@/locales/uk.json';
+import ruTranslations from '@/locales/ru.json';
 
 type Language = 'uk' | 'ru';
+
+const BUNDLED_TRANSLATIONS: Record<Language, Record<string, unknown>> = {
+  uk: ukTranslations,
+  ru: ruTranslations,
+};
 
 const LANG_COOKIE_NAME = 'lang';
 const LANG_COOKIE_MAX_AGE = 31536000; // 1 year
@@ -80,7 +87,9 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
   };
 
   const [language, setLanguageState] = useState<Language>(getInitialLanguage);
-  const [translations, setTranslations] = useState<Record<string, any>>({});
+  const [translations, setTranslations] = useState<Record<string, any>>(() =>
+    BUNDLED_TRANSLATIONS[getInitialLanguage()] ?? BUNDLED_TRANSLATIONS.uk
+  );
   const [isLoadingLanguage, setIsLoadingLanguage] = useState(false);
   // Не блокуємо рендер «через мову з БД»: на сервері window немає — початковий стан інакший би ламав гідратацію.
 
@@ -140,14 +149,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
   }, [userTelegramId, pathname, router]);
 
   useEffect(() => {
-    // Завантажуємо переклади
-    import(`@/locales/${language}.json`)
-      .then((module) => {
-        setTranslations(module.default);
-      })
-      .catch((err) => {
-        console.error('Failed to load translations:', err);
-      });
+    setTranslations(BUNDLED_TRANSLATIONS[language] ?? BUNDLED_TRANSLATIONS.uk);
   }, [language]);
 
   useEffect(() => {

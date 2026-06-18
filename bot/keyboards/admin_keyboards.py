@@ -6,8 +6,9 @@ from database_functions.links_db import get_all_links
 # MAIN KEYBOARD
 def admin_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
-        [KeyboardButton(text="Розсилка") ,KeyboardButton(text="Статистика")], 
-        [KeyboardButton(text="Посилання"), KeyboardButton(text="Адміністратори")],
+        [KeyboardButton(text="Розсилка"), KeyboardButton(text="Статистика")],
+        [KeyboardButton(text="Авто-розсилки"), KeyboardButton(text="Посилання")],
+        [KeyboardButton(text="Адміністратори")],
     ]
 
     keyboard = ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
@@ -24,8 +25,30 @@ def get_export_database_keyboard() -> InlineKeyboardMarkup:
 # BROADCAST KEYBOARD
 def get_broadcast_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
-        [InlineKeyboardButton(text="Зробити розсилку", callback_data="create_post")]
+        [InlineKeyboardButton(text="Зробити розсилку", callback_data="create_post")],
+        [InlineKeyboardButton(text="📊 Статистика авто-розсилок", callback_data="broadcast_stats:0")],
     ]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_broadcast_stats_keyboard(page: int = 0, total_pages: int = 1) -> InlineKeyboardMarkup:
+    page = max(0, min(page, max(total_pages - 1, 0)))
+    nav_row: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav_row.append(
+            InlineKeyboardButton(text="◀️ Назад", callback_data=f"broadcast_stats:{page - 1}")
+        )
+    if page < total_pages - 1:
+        nav_row.append(
+            InlineKeyboardButton(text="Далі ▶️", callback_data=f"broadcast_stats:{page + 1}")
+        )
+
+    keyboard: list[list[InlineKeyboardButton]] = []
+    if nav_row:
+        keyboard.append(nav_row)
+    keyboard.append(
+        [InlineKeyboardButton(text="🔄 Оновити", callback_data=f"broadcast_stats:{page}")]
+    )
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 

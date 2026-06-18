@@ -66,10 +66,9 @@ export const EditListingModal = ({
     initialPreviews: listingImagePreviews,
   });
   const {
+    items: imageItems,
     images,
     imagePreviews,
-    setImagePreviews,
-    setImages,
     draggedIndex,
     touchPosition,
     touchElementRect,
@@ -170,14 +169,10 @@ export const EditListingModal = ({
       setLocation(listing.location);
       setCondition(listing.condition === 'new' ? 'new' : (listing.condition ? 'used' : 'new'));
       setCurrency(listing.currency || 'UAH');
-      // Оновлюємо imagePreviews - фільтруємо null/undefined значення
-      const existingImages = (listing.images || (listing.image ? [listing.image] : [])).filter(Boolean);
-      setImagePreviews(existingImages);
-      setImages([]);
       setStatus(listing.status || 'active');
       setErrors({});
     }
-  }, [isOpen, listing, onClose, tg]);
+  }, [isOpen, listing, onClose, tg, t]);
 
   const [isInputFocused, setIsInputFocused] = useState(false);
 
@@ -508,13 +503,11 @@ export const EditListingModal = ({
     return null;
   }
 
-  const scrollBgStyle: CSSProperties = isLight
-    ? { background: 'linear-gradient(180deg, #fcfcfb 0%, #eef0eb 100%)' }
-    : { background: 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.20) 0%, transparent 40%), #000000' };
+  const scrollBgClass = isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]';
 
   return (
     <div 
-      className={`fixed inset-0 flex flex-col overflow-hidden ${isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]'}`}
+      className={`fixed inset-0 flex flex-col overflow-hidden ${scrollBgClass}`}
       style={{ 
         zIndex: 9999, 
         isolation: 'isolate',
@@ -532,13 +525,12 @@ export const EditListingModal = ({
         }
       }}
     >
-      <div className={`w-full h-full flex flex-col relative min-h-0 ${isLight ? 'bg-[#f3f4f0]' : 'bg-[#000000]'}`}>
+      <div className={`w-full h-full flex flex-col relative min-h-0 ${scrollBgClass}`}>
         <div
           ref={setFormScrollParent}
-          className="px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 lg:pt-6"
+          className={`px-4 space-y-4 overflow-y-auto flex-1 min-h-0 pb-32 lg:pt-6 ${scrollBgClass}`}
           style={{
             paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))',
-            ...scrollBgStyle,
           }}
         >
           <FixedLogoHeader
@@ -589,6 +581,7 @@ export const EditListingModal = ({
             {/* Прогрес-бар стиснення зображень */}
             <div className="grid grid-cols-3 gap-2 relative">
               {imagePreviews.map((preview, index) => {
+                const itemId = imageItems[index]?.id ?? index;
                 const isDragging = draggedIndex === index && touchPosition !== null && touchElementRect !== null && !isLocked;
                 const isHovered = hoveredIndex === index && draggedIndex !== index;
                 const isSnapping = isLocked && draggedIndex === index;
@@ -610,7 +603,7 @@ export const EditListingModal = ({
                 
                 return (
                   <div 
-                    key={`${index}-${typeof preview === 'string' ? preview.substring(0, 20) : index}`}
+                    key={itemId}
                     data-photo-index={index}
                     className={`relative aspect-square rounded-xl overflow-hidden border cursor-move select-none ${
                       isLight ? 'bg-gray-100' : 'bg-[#1C1C1C]'
@@ -660,7 +653,7 @@ export const EditListingModal = ({
                     })()}
                     alt={`Preview ${index + 1}`} 
                     className="w-full h-full object-cover pointer-events-none"
-                    loading="lazy"
+                    loading={index < 3 ? 'eager' : 'lazy'}
                     decoding="async"
                     draggable={false}
                     onError={(e) => {
@@ -674,11 +667,13 @@ export const EditListingModal = ({
                   />
                   <button
                     type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       removeImage(index);
                     }}
-                    className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors z-10 ${
+                    className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs transition-colors z-20 pointer-events-auto touch-manipulation ${
                       isLight ? 'bg-gray-800/75 text-white hover:bg-gray-800' : 'bg-black/50 text-white hover:bg-black/70'
                     }`}
                   >

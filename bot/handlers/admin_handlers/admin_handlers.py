@@ -3,8 +3,17 @@ from aiogram.types import FSInputFile
 from main import bot
 from utils.filters import IsAdmin
 from aiogram.fsm.context import FSMContext
-from keyboards.admin_keyboards import admin_keyboard, get_export_database_keyboard
+from keyboards.admin_keyboards import (
+    admin_keyboard,
+    get_broadcast_stats_keyboard,
+    get_export_database_keyboard,
+)
 from utils.admin_functions import generate_database_export, format_statistics_message
+from utils.weekly_marketplace_broadcast import (
+    BROADCAST_STATS_PAGE_SIZE,
+    format_broadcast_stats_message,
+    get_broadcast_stats_total_pages,
+)
 from datetime import datetime
 import os
 
@@ -27,8 +36,35 @@ async def admin_panel(message: types.Message):
 async def statistic_handler(message: types.Message):
     response_message = format_statistics_message()
     await message.answer(response_message, parse_mode="HTML", reply_markup=get_export_database_keyboard())
-  
-        
+
+
+async def _send_broadcast_stats(target: types.Message | types.CallbackQuery, page: int = 0) -> None:
+    total_pages = get_broadcast_stats_total_pages(BROADCAST_STATS_PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+    text = format_broadcast_stats_message(page=page)
+    keyboard = get_broadcast_stats_keyboard(page, total_pages)
+
+    if isinstance(target, types.CallbackQuery):
+        await target.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        await target.answer()
+    else:
+        await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+
+@router.message(IsAdmin(), F.text.in_(["Авто-розсилки"]))
+async def auto_broadcast_stats_handler(message: types.Message):
+    await _send_broadcast_stats(message, page=0)
+
+
+@router.callback_query(IsAdmin(), F.data.startswith("broadcast_stats:"))
+async def auto_broadcast_stats_callback(callback: types.CallbackQuery):
+    try:
+        page = int(callback.data.split(":", 1)[1])
+    except (IndexError, ValueError):
+        page = 0
+    await _send_broadcast_stats(callback, page=page)
+
+
 @router.callback_query(IsAdmin(), F.data == "export_database")
 async def export_database(callback: types.CallbackQuery):
     response_message = (
