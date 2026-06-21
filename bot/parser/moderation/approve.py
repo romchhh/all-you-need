@@ -15,6 +15,7 @@ from parser.ai_enrich import (
     merge_enrichment_into_item,
 )
 from parser.category_keywords import get_category_label
+from parser.marketplace_categories import apply_marketplace_categories_to_item
 from parser.moderation.author_notify import try_notify_author_via_pyrogram
 from parser.moderation.config import (
     PARSER_BOT_TELEGRAM_ID,
@@ -88,6 +89,8 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
         except TelegramBadRequest:
             pass
 
+    listing_item = apply_marketplace_categories_to_item(listing_item)
+
     item_category = (listing_item.get("category") or "").strip().lower()
     if item_category == "services_work":
         user_id = get_or_create_bot_user(
@@ -110,7 +113,7 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
             price=listing_item.get("price"),
             currency=listing_item.get("currency"),
             is_free=bool(listing_item.get("is_free")),
-            category=listing_item.get("category", "other"),
+            category=listing_item.get("category", "fashion"),
             subcategory=listing_item.get("subcategory"),
             condition=listing_item.get("condition"),
             location=listing_item.get("location", "Germany"),

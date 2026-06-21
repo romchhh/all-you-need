@@ -418,8 +418,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   if (loading) {
     return (
-      <div className="pb-24 flex items-center justify-center min-h-screen">
-        <div className="text-gray-400">{t('common.loading')}</div>
+      <div
+        className="pb-24 flex items-center justify-center min-h-screen"
+        style={{ background: ac.pageBackground }}
+      >
+        <div className={ac.mutedText}>{t('common.loading')}</div>
       </div>
     );
   }
@@ -428,7 +431,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     const botLink = getBotBaseUrl();
 
     return (
-      <div className="pb-24 flex flex-col h-screen overflow-hidden px-4">
+      <div
+        className="pb-24 flex flex-col h-screen overflow-hidden px-4 min-h-screen"
+        style={{ background: ac.pageBackground }}
+      >
         <h2 className={`text-2xl font-bold mb-2 pt-2 ${ac.pageHeading}`}>{t('navigation.profile')}</h2>
         <p className="text-sm text-gray-400 mb-8">{t('profileNotFound.subtitle')}</p>
 
@@ -519,20 +525,20 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   return (
     <>
-    <div className="pb-24 min-h-screen">
+    <div className="pb-24 min-h-screen" style={{ background: ac.pageBackground }}>
       {/* Профіль хедер */}
       <div className="px-4 pt-1 pb-4 max-lg:-mt-0.5">
         <div className="flex items-start gap-4">
           {/* Фото профілю */}
           <div 
-            className={`w-16 h-16 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 ${
-              isLight ? 'border-gray-200' : 'border-white'
+            className={`w-16 h-16 rounded-full overflow-hidden flex-shrink-0 relative cursor-pointer select-none border-2 ${
+              isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white'
             }`}
             {...avatarLongPress}
           >
             {profile.avatar ? (
               <>
-                <div className="absolute inset-0 animate-pulse bg-gray-200" />
+                <div className={`absolute inset-0 animate-pulse ${isLight ? 'bg-gray-200' : 'bg-[#2A2A2A]'}`} />
                 <img 
                   src={getResolvedImageUrl(profile.avatar)}
                   alt={displayName}

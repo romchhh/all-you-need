@@ -13,6 +13,7 @@ elif [ -d "../venv/bin" ]; then
 fi
 
 # Запуск бота
+pip install -q -r requirements.txt 2>/dev/null || pip3 install -q -r requirements.txt 2>/dev/null || true
 nohup python3 main.py > bot.log 2>&1 &
 echo "Bot started (PID: $!)"
 echo "Logs: $SCRIPT_DIR/bot.log"

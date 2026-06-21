@@ -213,7 +213,7 @@ export const UserProfilePage = ({
   }, [stats?.createdAt, t]);
 
   return (
-    <div className="pb-24 min-h-screen">
+    <div className="pb-24 min-h-screen" style={{ background: ac.pageBackground }}>
       {/* Хедер з заголовком */}
       <div className="px-4 pt-4 pb-6">
         <div className="flex items-center justify-between mb-4">
@@ -258,14 +258,14 @@ export const UserProfilePage = ({
         {/* Фото профілю по центру */}
         <div className="flex justify-center mb-4">
           <div 
-            className={`w-24 h-24 rounded-full overflow-hidden bg-white flex-shrink-0 relative cursor-pointer select-none border-2 ${
-              isLight ? 'border-gray-200' : 'border-white'
+            className={`w-24 h-24 rounded-full overflow-hidden flex-shrink-0 relative cursor-pointer select-none border-2 ${
+              isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white'
             }`}
             {...avatarLongPress}
           >
             {sellerAvatar && (sellerAvatar.startsWith('/') || sellerAvatar.startsWith('http')) ? (
               <>
-                <div className="absolute inset-0 animate-pulse bg-gray-200" />
+                <div className={`absolute inset-0 animate-pulse ${isLight ? 'bg-gray-200' : 'bg-[#2A2A2A]'}`} />
                 <img 
                   src={getResolvedImageUrl(sellerAvatar)}
                   alt={sellerName}
@@ -306,7 +306,7 @@ export const UserProfilePage = ({
           {/* Блок 1: Оголошень */}
           <div
             className={`rounded-2xl p-3 sm:p-4 border text-center ${
-              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white'
+              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white/20 bg-white/[0.04]'
             }`}
           >
             <div className={`text-xl sm:text-2xl font-bold mb-1 ${ac.pageHeading}`}>
@@ -318,7 +318,7 @@ export const UserProfilePage = ({
           {/* Блок 2: Продано */}
           <div
             className={`rounded-2xl p-3 sm:p-4 border text-center ${
-              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white'
+              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white/20 bg-white/[0.04]'
             }`}
           >
             <div className={`text-xl sm:text-2xl font-bold mb-1 ${ac.pageHeading}`}>
@@ -330,7 +330,7 @@ export const UserProfilePage = ({
           {/* Блок 3: На сервісі */}
           <div
             className={`rounded-2xl p-3 sm:p-4 border text-center ${
-              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white'
+              isLight ? 'border-gray-200 bg-white/80 shadow-sm' : 'border-white/20 bg-white/[0.04]'
             }`}
           >
             <div className={`text-xl sm:text-2xl font-bold mb-1 ${ac.pageHeading}`}>

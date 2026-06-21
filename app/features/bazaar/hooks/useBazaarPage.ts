@@ -108,6 +108,9 @@ export function useBazaarPage() {
   const listingHistoryStack = useRef<Listing[]>([]); // Стек історії переглянутих товарів для навігації назад
   const prevSelectedSeller = useRef<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const lastViewedListingIdRef = useRef<number | null>(null); // Зберігаємо ID останнього переглянутого товару
+  const savedScrollPositionRef = useRef<number>(0);
+  const scrollPositionKey = 'bazaarScrollPosition';
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipCatalogScrollRestoreRef = useRef(false); // Перехід у категорію з картки — не скролити до старого товару
   const forceListingsReloadRef = useRef(false);
   const previousFilterKey = useRef<string | null>(null);
@@ -165,7 +168,30 @@ export function useBazaarPage() {
     loadBazaarTabStateFromStorage()
   );
   
-  // ВИДАЛЕНО: Збереження скролу при скролі - не потрібно, зберігаємо тільки перед відкриттям
+  // Зберігаємо позицію скролу каталогу під час перегляду (fallback, якщо картку не знайдено в DOM)
+  useEffect(() => {
+    if (selectedListing || selectedSeller) return;
+
+    const handleScroll = () => {
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      savedScrollPositionRef.current = scrollY;
+      localStorage.setItem(scrollPositionKey, scrollY.toString());
+    };
+
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', throttledScroll, { passive: true });
+    return () => window.removeEventListener('scroll', throttledScroll);
+  }, [selectedListing, selectedSeller]);
 
   // Зберігаємо стан в localStorage (категорія — лише в памʼяті сесії)
   useEffect(() => {
@@ -343,9 +369,57 @@ export function useBazaarPage() {
   );
   const { toast, showToast, hideToast } = useToast();
   
-  // ВИДАЛЕНО: Вся складна логіка з isReturningFromListing, scrollToLastViewedListing, 
-  // isInitialMount, hasScrolledOnThisMount, sessionStorage, referrer
-  // Замість неї проста логіка нижче (рядки 650-687)
+  const saveCatalogScrollPosition = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const currentScroll = window.scrollY || document.documentElement.scrollTop;
+    savedScrollPositionRef.current = currentScroll;
+    localStorage.setItem(scrollPositionKey, currentScroll.toString());
+  }, []);
+
+  const restoreSavedScrollPosition = useCallback(() => {
+    const savedPosition =
+      savedScrollPositionRef.current > 0
+        ? savedScrollPositionRef.current
+        : parseInt(localStorage.getItem(scrollPositionKey) || '0', 10);
+    if (savedPosition > 0) {
+      window.scrollTo({ top: savedPosition, behavior: 'auto' });
+      document.documentElement.scrollTop = savedPosition;
+      document.body.scrollTop = savedPosition;
+    }
+  }, []);
+
+  const scrollToListing = useCallback(
+    (listingId: number) => {
+      if (typeof window === 'undefined' || viewModeRef.current !== 'catalog') return;
+
+      const scrollToElement = (attempt = 0) => {
+        if (viewModeRef.current !== 'catalog') return;
+
+        const element = document.querySelector(
+          `[data-listing-id="${listingId}"]`
+        ) as HTMLElement | null;
+
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'auto',
+            block: 'center',
+            inline: 'nearest',
+          });
+          return;
+        }
+
+        if (attempt < 10) {
+          setTimeout(() => scrollToElement(attempt + 1), 200);
+          return;
+        }
+
+        restoreSavedScrollPosition();
+      };
+
+      setTimeout(() => scrollToElement(), 300);
+    },
+    [restoreSavedScrollPosition]
+  );
 
   // Обробка параметрів з URL (для поділених товарів/профілів)
   useEffect(() => {
@@ -691,26 +765,55 @@ export function useBazaarPage() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [selectedListing, selectedSeller]);
 
-  // Режим каталогу / оверлею — скрол каталогу зберігається, бо BazaarTab лишається в DOM
+  // Режим каталогу / оверлею — після закриття картки повертаємо скрол до оголошення в списку
   const prevSelectedListing = useRef<Listing | null>(null);
 
   useEffect(() => {
-    const wasOpen = prevSelectedListing.current !== null || prevSelectedSeller.current !== null;
+    const wasOpen =
+      prevSelectedListing.current !== null || prevSelectedSeller.current !== null;
     const isNowClosed = selectedListing === null && selectedSeller === null;
+    const isNewListing =
+      prevSelectedListing.current !== null &&
+      selectedListing !== null &&
+      prevSelectedListing.current.id !== selectedListing.id;
+
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = null;
+    }
+
+    if (isNewListing) {
+      prevSelectedListing.current = selectedListing;
+      prevSelectedSeller.current = selectedSeller;
+      return;
+    }
 
     if (wasOpen && isNowClosed) {
       viewModeRef.current = 'catalog';
       if (skipCatalogScrollRestoreRef.current) {
         skipCatalogScrollRestoreRef.current = false;
+        savedScrollPositionRef.current = 0;
+        localStorage.setItem(scrollPositionKey, '0');
         if (typeof window !== 'undefined') {
           window.scrollTo(0, 0);
         }
+      } else if (lastViewedListingIdRef.current !== null) {
+        const listingId = lastViewedListingIdRef.current;
+        scrollTimeoutRef.current = setTimeout(() => {
+          scrollToListing(listingId);
+          scrollTimeoutRef.current = null;
+        }, 300);
+      } else {
+        scrollTimeoutRef.current = setTimeout(() => {
+          restoreSavedScrollPosition();
+          scrollTimeoutRef.current = null;
+        }, 300);
       }
     }
 
     prevSelectedListing.current = selectedListing;
     prevSelectedSeller.current = selectedSeller;
-  }, [selectedListing, selectedSeller]);
+  }, [selectedListing, selectedSeller, scrollToListing, restoreSavedScrollPosition]);
   
   // Мемоізуємо callbacks для запобігання непотрібних перерендерів (на верхньому рівні!)
   const handleSearchChange = useCallback((query: string) => {
@@ -730,11 +833,12 @@ export function useBazaarPage() {
   }, []);
 
   const handleSelectListingFromCatalog = useCallback((listing: Listing) => {
+    saveCatalogScrollPosition();
     listingHistoryStack.current = [];
     viewModeRef.current = 'listing';
     lastViewedListingIdRef.current = listing.id;
     setSelectedListing(listing);
-  }, []);
+  }, [saveCatalogScrollPosition]);
 
   const handleBazaarStateChange = useCallback((next: Partial<BazaarTabPersistedState>) => {
     setBazaarTabState((prev) => {

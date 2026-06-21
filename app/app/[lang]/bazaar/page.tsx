@@ -13,10 +13,14 @@ import { AppHeader } from '@/components/layout/AppHeader';
 import { useBazaarPage } from '@/features/bazaar/hooks/useBazaarPage';
 import { BazaarPullToRefreshIndicator } from '@/features/bazaar/components/BazaarPullToRefreshIndicator';
 import { invalidateCache } from '@/utils/cache';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 
 const BazaarPage = () => {
   const pathname = usePathname();
   useAutoPrefetch(pathname);
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
 
   const {
     showBlockedScreen,
@@ -125,7 +129,7 @@ const BazaarPage = () => {
         </div>
 
         {selectedListing && (
-          <div className="fixed inset-0 z-40 overflow-y-auto overscroll-contain bg-[var(--tg-theme-bg-color,#fff)]">
+          <div className={`fixed inset-0 z-40 overflow-y-auto overscroll-contain ${ac.overlayShell}`}>
             <ListingDetail
               key={selectedListing.id}
               listing={selectedListing}
@@ -144,7 +148,7 @@ const BazaarPage = () => {
         )}
 
         {selectedSeller && (
-          <div className="fixed inset-0 z-40 overflow-y-auto overscroll-contain bg-[var(--tg-theme-bg-color,#fff)]">
+          <div className={`fixed inset-0 z-40 overflow-y-auto overscroll-contain ${ac.overlayShell}`}>
             <UserProfilePage
               sellerTelegramId={selectedSeller.telegramId}
               sellerName={selectedSeller.name}

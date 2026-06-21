@@ -38,6 +38,10 @@ export type AppearanceClasses = {
   salesFilterChevron: string;
   salesEmptyHint: string;
   listRowHover: string;
+  /** CSS `background` для повноекранних сторінок / оверлеїв */
+  pageBackground: string;
+  /** Tailwind клас фону для fixed-оверлеїв (listing, профіль продавця) */
+  overlayShell: string;
 };
 
 export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
@@ -81,6 +85,9 @@ export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
       salesFilterChevron: 'text-gray-500',
       salesEmptyHint: 'text-gray-600',
       listRowHover: 'text-gray-900 hover:bg-gray-50/90',
+      pageBackground:
+        'radial-gradient(ellipse 90% 120% at 14% -8%, rgba(63, 83, 49, 0.1) 0%, transparent 52%), linear-gradient(180deg, #ffffff 0%, #f5f6f3 100%)',
+      overlayShell: 'bg-[#f3f4f0]',
     };
   }
   // Dark accents: BRAND_GREEN_ON_DARK (#C8E6A0) — same as primary CTA on listing page (ListingDetail listingPrimaryCtaClass).
@@ -124,5 +131,8 @@ export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
     salesFilterChevron: 'text-white/70',
     salesEmptyHint: 'text-white/70',
     listRowHover: 'text-white hover:bg-white/10',
+    pageBackground:
+      'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 88% 100%, rgba(200, 230, 160, 0.18) 0%, transparent 42%), #000000',
+    overlayShell: 'bg-[#000000]',
   };
 }

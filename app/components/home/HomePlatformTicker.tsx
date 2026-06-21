@@ -1,16 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
+import { Info } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getCategories } from '@/constants/categories';
+import { PlatformTickerInfoModal } from '@/components/home/PlatformTickerInfoModal';
 import {
   buildTickerMessages,
+  createEmptyTickerPools,
+  createEmptyTickerTypeCounts,
   groupTickerMessages,
   pickNextTickerMessage,
   randomTickerIntervalMs,
   WELCOME_TICKER_EMOJI,
   type TickerMessage,
-  type TickerMessageType,
 } from '@/utils/platformTickerMessages';
 import { fetchHomeActivity, onHomeActivityDayRollover } from '@/utils/homeActivityClient';
 
@@ -24,28 +27,21 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
   const { t } = useLanguage();
   const [current, setCurrent] = useState<TickerMessage | null>(null);
   const [animClass, setAnimClass] = useState<'animate-ticker-in' | 'animate-ticker-out'>('animate-ticker-in');
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const welcomeMessage = useMemo<TickerMessage>(
     () => ({
       id: WELCOME_ID,
       text: t('platformTicker.welcome'),
       emoji: WELCOME_TICKER_EMOJI,
-      type: 'system',
+      type: 'platform',
     }),
     [t]
   );
 
-  const poolsRef = useRef<Record<TickerMessageType, TickerMessage[]>>({
-    system: [],
-    activity: [],
-    tips: [],
-  });
+  const poolsRef = useRef(createEmptyTickerPools());
   const shownRef = useRef<Set<string>>(new Set());
-  const typeCountsRef = useRef<Record<TickerMessageType, number>>({
-    system: 0,
-    activity: 0,
-    tips: 0,
-  });
+  const typeCountsRef = useRef(createEmptyTickerTypeCounts());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -54,7 +50,7 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
 
     if (!next) {
       shownRef.current.clear();
-      typeCountsRef.current = { system: 0, activity: 0, tips: 0 };
+      typeCountsRef.current = createEmptyTickerTypeCounts();
       next = pickNextTickerMessage(poolsRef.current, shownRef.current, typeCountsRef.current);
     }
 
@@ -99,7 +95,7 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
       });
       poolsRef.current = groupTickerMessages(messages);
       shownRef.current.clear();
-      typeCountsRef.current = { system: 0, activity: 0, tips: 0 };
+      typeCountsRef.current = createEmptyTickerTypeCounts();
 
       if (initial && !started.value) {
         started.value = true;
@@ -166,18 +162,37 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
     : 'flex w-full items-center gap-2.5 rounded-xl bg-[#C8E6A0]/95 px-3 py-2 text-xs sm:text-sm';
 
   const textClass = isLight ? 'text-[#1e2e18] font-medium' : 'text-[#0f1408] font-medium';
+  const infoButtonClass = isLight
+    ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#3F5331]/25 bg-white/70 text-[#3F5331] transition-colors hover:bg-white'
+    : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#0f1408]/15 bg-[#0f1408]/5 text-[#0f1408] transition-colors hover:bg-[#0f1408]/10';
 
   return (
-    <div className={barClass} role="status" aria-live="polite">
-      <span className="shrink-0 text-lg leading-none" aria-hidden>
-        {displayMessage.emoji}
-      </span>
-      <p
-        key={displayMessage.id}
-        className={`min-w-0 flex-1 truncate leading-snug ${animClass} ${textClass}`}
-      >
-        {displayMessage.text}
-      </p>
-    </div>
+    <>
+      <div className={barClass} role="status" aria-live="polite">
+        <span className="shrink-0 text-lg leading-none" aria-hidden>
+          {displayMessage.emoji}
+        </span>
+        <p
+          key={displayMessage.id}
+          className={`min-w-0 flex-1 truncate leading-snug ${animClass} ${textClass}`}
+        >
+          {displayMessage.text}
+        </p>
+        <button
+          type="button"
+          onClick={() => setInfoOpen(true)}
+          className={infoButtonClass}
+          aria-label={t('platformTicker.info.ariaLabel')}
+        >
+          <Info size={15} strokeWidth={2.25} />
+        </button>
+      </div>
+
+      <PlatformTickerInfoModal
+        isOpen={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        highlightType={displayMessage.type}
+      />
+    </>
   );
 });
