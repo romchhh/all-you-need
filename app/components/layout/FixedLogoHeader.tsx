@@ -33,6 +33,10 @@ export const FIXED_LOGO_SPACER_CLASS =
 export const STICKY_BELOW_APP_HEADER_CLASS =
   'sticky z-[40] max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
 
+/** Фіксована кнопка «Назад» під лого в оверлеях (ListingDetail, профіль продавця). */
+export const OVERLAY_BACK_BUTTON_TOP_CLASS =
+  'max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)]';
+
 /** Safe area окремо — щоб не покладатися на вкладений max() у calc() у arbitrary-класах */
 const safeTopShellClass =
   'max-lg:pt-[max(env(safe-area-inset-top,0px),10px)] lg:pt-[max(env(safe-area-inset-top,0px),2px)]';

@@ -239,15 +239,15 @@ export default function SearchPage() {
           sellerUsername={selectedSeller.username}
           sellerPhone={selectedSeller.phone}
           onClose={closeOverlay}
-          onBackToPreviousListing={
-            previousListingRef.current
-              ? () => {
-                  setSelectedListing(previousListingRef.current);
-                  previousListingRef.current = null;
-                  setSelectedSeller(null);
-                }
-              : null
-          }
+          onBackToPreviousListing={() => {
+            if (previousListingRef.current) {
+              setSelectedListing(previousListingRef.current);
+              previousListingRef.current = null;
+              setSelectedSeller(null);
+              return;
+            }
+            closeOverlay();
+          }}
           onSelectListing={handleSelectListing}
           onToggleFavorite={toggleFavorite}
           favorites={favorites}

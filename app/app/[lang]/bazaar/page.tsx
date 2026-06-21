@@ -91,7 +91,7 @@ const BazaarPage = () => {
 
   return (
     <div className="min-h-screen overflow-x-hidden max-w-full pb-20 animate-content-crossfade">
-      {!selectedListing && <AppHeader />}
+      {!selectedListing && !selectedSeller && <AppHeader />}
       <BazaarPullToRefreshIndicator
         isPulling={isPulling}
         pullDistance={pullDistance}
@@ -156,9 +156,7 @@ const BazaarPage = () => {
               sellerUsername={selectedSeller.username}
               sellerPhone={selectedSeller.phone}
               onClose={handleCloseSeller}
-              onBackToPreviousListing={
-                previousListingRef.current ? handleBackToPreviousListing : null
-              }
+              onBackToPreviousListing={handleBackToPreviousListing}
               onSelectListing={handleSelectListingFromSeller}
               onToggleFavorite={toggleFavorite}
               favorites={favorites}

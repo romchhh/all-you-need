@@ -342,17 +342,16 @@ const ProfilePage = () => {
             previousListingRef.current = null; // Очищаємо збережену картку
             setSelectedSeller(null);
           }}
-          onBackToPreviousListing={
-            // Перевіряємо, чи є збережена картка товару
-            previousListingRef.current 
-              ? () => {
-                  // Відновлюємо картку товару
-                  setSelectedListing(previousListingRef.current);
-                  previousListingRef.current = null; // Очищаємо після використання
-                  setSelectedSeller(null);
-                }
-              : null
-          }
+          onBackToPreviousListing={() => {
+            if (previousListingRef.current) {
+              setSelectedListing(previousListingRef.current);
+              previousListingRef.current = null;
+              setSelectedSeller(null);
+              return;
+            }
+            previousListingRef.current = null;
+            setSelectedSeller(null);
+          }}
           onSelectListing={setSelectedListing}
           onToggleFavorite={toggleFavorite}
           favorites={favorites}
@@ -515,7 +514,7 @@ const ProfilePage = () => {
 
   return (
     <div className="min-h-screen overflow-x-hidden max-w-full pb-20 animate-content-crossfade">
-      {!selectedListing && <AppHeader />}
+      {!selectedListing && !selectedSeller && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 

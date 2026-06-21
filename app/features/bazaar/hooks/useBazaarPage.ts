@@ -931,8 +931,12 @@ export function useBazaarPage() {
   }, []);
 
   const handleBackToPreviousListing = useCallback(() => {
-    if (!previousListingRef.current) return;
-    setSelectedListing(previousListingRef.current);
+    if (previousListingRef.current) {
+      setSelectedListing(previousListingRef.current);
+      previousListingRef.current = null;
+      setSelectedSeller(null);
+      return;
+    }
     previousListingRef.current = null;
     setSelectedSeller(null);
   }, []);

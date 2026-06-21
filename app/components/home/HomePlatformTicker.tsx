@@ -44,6 +44,7 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
   const typeCountsRef = useRef(createEmptyTickerTypeCounts());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const barRef = useRef<HTMLDivElement>(null);
 
   const pickAndShow = useCallback((initial = false) => {
     let next = pickNextTickerMessage(poolsRef.current, shownRef.current, typeCountsRef.current);
@@ -168,7 +169,7 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
 
   return (
     <>
-      <div className={barClass} role="status" aria-live="polite">
+      <div ref={barRef} className={barClass} role="status" aria-live="polite">
         <span className="shrink-0 text-lg leading-none" aria-hidden>
           {displayMessage.emoji}
         </span>
@@ -180,9 +181,10 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
         </p>
         <button
           type="button"
-          onClick={() => setInfoOpen(true)}
-          className={infoButtonClass}
+          onClick={() => setInfoOpen((open) => !open)}
+          className={`${infoButtonClass}${infoOpen ? (isLight ? ' bg-white ring-1 ring-[#3F5331]/30' : ' bg-[#0f1408]/15') : ''}`}
           aria-label={t('platformTicker.info.ariaLabel')}
+          aria-expanded={infoOpen}
         >
           <Info size={15} strokeWidth={2.25} />
         </button>
@@ -191,6 +193,7 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
       <PlatformTickerInfoModal
         isOpen={infoOpen}
         onClose={() => setInfoOpen(false)}
+        anchorRef={barRef}
         highlightType={displayMessage.type}
       />
     </>

@@ -15,8 +15,13 @@ import { useSwipeBack } from '@/features/ui/hooks/useSwipeBack';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import {
+  FixedLogoHeader,
+  OVERLAY_BACK_BUTTON_TOP_CLASS,
+} from '@/components/layout/FixedLogoHeader';
 
 interface UserProfilePageProps {
   sellerTelegramId: string;
@@ -45,6 +50,8 @@ export const UserProfilePage = ({
   tg,
   onBackToPreviousListing
 }: UserProfilePageProps) => {
+  const params = useParams();
+  const lang = (params?.lang as string) || 'uk';
   const { t } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
   const [listings, setListings] = useState<Listing[]>([]);
@@ -177,16 +184,18 @@ export const UserProfilePage = ({
     }, 100);
   }, [sellerTelegramId]);
 
+  const handleBack = useCallback(() => {
+    tg?.HapticFeedback.impactOccurred('light');
+    if (onBackToPreviousListing) {
+      onBackToPreviousListing();
+      return;
+    }
+    onClose();
+  }, [onBackToPreviousListing, onClose, tg]);
+
   // Додаємо свайп зліва для повернення назад
   useSwipeBack({
-    onSwipeBack: () => {
-      // Якщо є функція повернення до попередньої картки товару, використовуємо її
-      if (onBackToPreviousListing) {
-        onBackToPreviousListing();
-      } else {
-        onClose();
-      }
-    },
+    onSwipeBack: handleBack,
     enabled: true,
     tg
   });
@@ -212,32 +221,42 @@ export const UserProfilePage = ({
     }
   }, [stats?.createdAt, t]);
 
+  const headerActionClass = isLight
+    ? 'border-gray-300 bg-white/90 text-gray-900 hover:bg-gray-100'
+    : 'border-white/25 bg-black/40 text-white hover:bg-white/10';
+
   return (
     <div className="pb-24 min-h-screen" style={{ background: ac.pageBackground }}>
+      <FixedLogoHeader
+        mode="window-fixed"
+        zClassName="z-[50]"
+        paddingX={false}
+        outerClassName="px-4 lg:px-6"
+        onClick={() => {
+          if (typeof window !== 'undefined') {
+            window.location.href = `/${lang}/bazaar`;
+          }
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={handleBack}
+        aria-label={t('common.back')}
+        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${OVERLAY_BACK_BUTTON_TOP_CLASS} ${headerActionClass}`}
+      >
+        <ArrowLeft size={20} />
+      </button>
+
       {/* Хедер з заголовком */}
-      <div className="px-4 pt-4 pb-6">
-        <div className="flex items-center justify-between mb-4">
-          {/* Кнопка назад */}
-          <button
-            onClick={() => {
-              if (onBackToPreviousListing) {
-                onBackToPreviousListing();
-              } else {
-                onClose();
-              }
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
-              isLight
-                ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
-                : 'border-white text-white hover:bg-white/10'
-            }`}
-          >
-            <ArrowLeft size={20} />
-          </button>
+      <div className="px-4 pt-2 pb-6">
+        <div className="mb-4 grid grid-cols-[2.5rem_1fr_2.5rem] items-center gap-2">
+          <span aria-hidden />
 
           {/* Текст "Профіль продавця" */}
-          <h2 className={`text-lg font-semibold ${ac.pageHeading}`}>{t('profile.sellerProfile')}</h2>
+          <h2 className={`text-center text-lg font-semibold ${ac.pageHeading}`}>
+            {t('profile.sellerProfile')}
+          </h2>
 
           {/* Кнопка поділу */}
           <button
