@@ -1,118 +1,89 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ArrowLeft } from 'lucide-react';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
+import { useTheme } from '@/contexts/ThemeContext';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
+
+const bodyTextClass =
+  'text-sm leading-relaxed [overflow-wrap:anywhere] [word-break:break-word]';
 
 export default function PrivacyPage() {
-  const params = useParams();
   const router = useRouter();
   const { t } = useLanguage();
   const { tg } = useTelegram();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
+
+  const stickyBar = isLight
+    ? 'border-gray-200/90 bg-white/90'
+    : 'border-white/15 bg-[#0a0a0a]/90';
+  const backBtn = isLight
+    ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+    : 'bg-white/10 hover:bg-white/15 text-white';
+  const sectionBorder = isLight ? 'border-gray-200/80' : 'border-white/10';
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="max-w-2xl mx-auto bg-white min-h-screen">
-        {/* Header */}
-        <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 px-4 pb-3 pt-[max(env(safe-area-inset-top,0px),10px)] backdrop-blur-md flex items-center gap-3">
+    <div
+      className="min-h-screen overflow-x-hidden pb-20"
+      style={{ background: ac.pageBackground }}
+    >
+      <AppHeader />
+      <div className="mx-auto w-full max-w-2xl overflow-x-hidden">
+        <div
+          className={`sticky ${STICKY_BELOW_APP_HEADER_CLASS} z-10 border-b px-4 py-3 backdrop-blur-md ${stickyBar}`}
+        >
           <button
+            type="button"
             onClick={() => {
               router.back();
               tg?.HapticFeedback.impactOccurred('light');
             }}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${backBtn}`}
+            aria-label={t('common.back') || 'Назад'}
           >
-            <ArrowLeft size={20} className="text-gray-900" />
+            <ArrowLeft size={20} />
           </button>
-          <h1 className="text-xl font-bold text-gray-900">{t('privacy.title')}</h1>
         </div>
 
-        {/* Content */}
-        <div className="p-4">
-          <div className="prose prose-sm max-w-none">
-            <p className="text-gray-500 text-sm mb-6">
-              {t('privacy.lastUpdated')}: {new Date().toLocaleDateString()}
-            </p>
-            
-            <div className="space-y-6 text-gray-700">
-              <p className="leading-relaxed">
-                {t('privacy.intro')}
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {t('privacy.dataCollection.title')}
-                  </h2>
-                  <p className="text-sm leading-relaxed">
-                    {t('privacy.dataCollection.content')}
-                  </p>
-                </div>
+        <div className="px-4 py-5">
+          <h1 className={`mb-2 text-2xl font-bold leading-tight ${ac.pageHeading}`}>
+            {t('privacy.title')}
+          </h1>
+          <p className={`mb-6 text-sm ${ac.mutedText}`}>
+            {t('privacy.lastUpdated')}: {new Date().toLocaleDateString()}
+          </p>
 
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {t('privacy.dataUsage.title')}
-                  </h2>
-                  <p className="text-sm leading-relaxed">
-                    {t('privacy.dataUsage.content')}
-                  </p>
-                </div>
+          <div className={`space-y-6 ${ac.mutedText}`}>
+            <p className={bodyTextClass}>{t('privacy.intro')}</p>
 
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {t('privacy.dataSharing.title')}
+            <div className="space-y-5">
+              {(
+                [
+                  'dataCollection',
+                  'dataUsage',
+                  'dataSharing',
+                  'dataSecurity',
+                  'userRights',
+                  'cookies',
+                  'changes',
+                  'contact',
+                ] as const
+              ).map((key) => (
+                <section
+                  key={key}
+                  className={`border-t pt-5 first:border-t-0 first:pt-0 ${sectionBorder}`}
+                >
+                  <h2 className={`mb-2 text-base font-semibold ${ac.pageHeading}`}>
+                    {t(`privacy.${key}.title`)}
                   </h2>
-                  <p className="text-sm leading-relaxed">
-                    {t('privacy.dataSharing.content')}
-                  </p>
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {t('privacy.dataSecurity.title')}
-                  </h2>
-                  <p className="text-sm leading-relaxed">
-                    {t('privacy.dataSecurity.content')}
-                  </p>
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {t('privacy.userRights.title')}
-                  </h2>
-                  <p className="text-sm leading-relaxed">
-                    {t('privacy.userRights.content')}
-                  </p>
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {t('privacy.cookies.title')}
-                  </h2>
-                  <p className="text-sm leading-relaxed">
-                    {t('privacy.cookies.content')}
-                  </p>
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {t('privacy.changes.title')}
-                  </h2>
-                  <p className="text-sm leading-relaxed">
-                    {t('privacy.changes.content')}
-                  </p>
-                </div>
-
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                    {t('privacy.contact.title')}
-                  </h2>
-                  <p className="text-sm leading-relaxed">
-                    {t('privacy.contact.content')}
-                  </p>
-                </div>
-              </div>
+                  <p className={bodyTextClass}>{t(`privacy.${key}.content`)}</p>
+                </section>
+              ))}
             </div>
           </div>
         </div>
@@ -120,4 +91,3 @@ export default function PrivacyPage() {
     </div>
   );
 }
-

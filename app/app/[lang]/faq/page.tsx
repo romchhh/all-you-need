@@ -5,6 +5,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
 
 export default function FAQPage() {
   const params = useParams();
@@ -140,9 +142,11 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="max-w-2xl mx-auto bg-white min-h-screen">
-        {/* Header */}
-        <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 px-4 pb-3 pt-[max(env(safe-area-inset-top,0px),10px)] backdrop-blur-md flex items-center gap-3">
+      <AppHeader />
+      <div className="mx-auto min-h-screen max-w-2xl bg-white">
+        <div
+          className={`sticky ${STICKY_BELOW_APP_HEADER_CLASS} z-10 flex items-center gap-3 border-b border-gray-200 bg-white/80 px-4 py-3 backdrop-blur-md`}
+        >
           <button
             onClick={() => {
               router.back();

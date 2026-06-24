@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface TopUpBalanceModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const TopUpBalanceModal = ({
   const [loading, setLoading] = useState(false);
   const { toast, showToast, hideToast } = useToast();
   const { t } = useLanguage();
+  const { isLight } = useTheme();
 
   // Блокуємо скрол body та html при відкритому модальному вікні
   useEffect(() => {
@@ -117,52 +119,82 @@ export const TopUpBalanceModal = ({
   // Попередньо визначені суми
   const quickAmounts = [5, 10, 20, 30, 50, 100, 200];
 
+  const sheet = isLight
+    ? 'bg-white rounded-3xl border-2 border-gray-200 shadow-2xl'
+    : 'bg-[#000000] rounded-3xl border-2 border-white shadow-2xl';
+  const headerBorder = isLight ? 'border-gray-200' : 'border-white/20';
+  const titleCls = isLight ? 'text-gray-900' : 'text-white';
+  const closeBtn = isLight
+    ? 'border-gray-200 text-gray-800 hover:bg-gray-100'
+    : 'border-white/20 text-white hover:bg-white/10';
+  const iconCircle = isLight
+    ? 'bg-gray-50 border-gray-200'
+    : 'bg-[#1C1C1C] border-white/20';
+  const iconAccent = isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]';
+  const balanceBox = isLight
+    ? 'bg-gray-50 border-gray-200'
+    : 'bg-[#1C1C1C] border-white/20';
+  const balanceLabel = isLight ? 'text-gray-600' : 'text-white/70';
+  const balanceValue = isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]';
+  const labelCls = isLight ? 'text-gray-900' : 'text-white';
+  const amountIdle = isLight
+    ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50'
+    : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/10';
+  const amountActive = 'border-[#3F5331] bg-[#3F5331] text-white shadow-lg';
+  const footerBorder = isLight ? 'border-gray-200' : 'border-white/20';
+  const cancelBtn = isLight
+    ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
+    : 'border-white/20 text-white hover:bg-white/10';
+  const submitDisabled = isLight
+    ? 'disabled:bg-gray-200 disabled:text-gray-400'
+    : 'disabled:bg-white/20';
+
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-[9998] backdrop-blur-sm" onClick={onClose} />
+      <div
+        className={`fixed inset-0 z-[9998] backdrop-blur-sm ${isLight ? 'bg-black/25' : 'bg-black/50'}`}
+        onClick={onClose}
+      />
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
-        <div 
-          className="bg-[#000000] rounded-3xl border-2 border-white shadow-2xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto"
+        <div
+          className={`${sheet} w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Заголовок */}
-          <div className="flex items-center justify-between p-6 border-b border-white/20">
+          <div className={`flex items-center justify-between p-6 border-b ${headerBorder}`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#1C1C1C] border border-white/20 flex items-center justify-center">
-                <Wallet size={20} className="text-[#C8E6A0]" />
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-full border ${iconCircle}`}
+              >
+                <Wallet size={20} className={iconAccent} />
               </div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className={`text-xl font-bold ${titleCls}`}>
                 {t('profile.topUpBalance') || 'Поповнити баланс'}
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-transparent border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors text-white"
+              className={`flex h-8 w-8 items-center justify-center rounded-full border bg-transparent transition-colors ${closeBtn}`}
               disabled={loading}
             >
               <X size={18} />
             </button>
           </div>
 
-          {/* Контент */}
-          <div className="p-6 space-y-6">
-            {/* Поточний баланс */}
-            <div className="bg-[#1C1C1C] rounded-2xl p-4 border border-white/20">
-              <p className="text-sm text-white/70 mb-1">
+          <div className="space-y-6 p-6">
+            <div className={`rounded-2xl border p-4 ${balanceBox}`}>
+              <p className={`mb-1 text-sm ${balanceLabel}`}>
                 {t('profile.balance') || 'Баланс'}
               </p>
-              <p className="text-2xl font-bold text-[#C8E6A0]">
+              <p className={`text-2xl font-bold ${balanceValue}`}>
                 {currentBalance.toFixed(2)} €
               </p>
             </div>
 
-            {/* Вибір суми */}
             <div>
-              <label className="block text-sm font-semibold text-white mb-3">
+              <label className={`mb-3 block text-sm font-semibold ${labelCls}`}>
                 {t('payments.amount') || 'Сума поповнення (EUR)'}
               </label>
-              
-              {/* Кнопки вибору суми */}
+
               <div className="grid grid-cols-3 gap-3">
                 {quickAmounts.map((quickAmount) => (
                   <button
@@ -172,10 +204,8 @@ export const TopUpBalanceModal = ({
                       setAmount(quickAmount.toString());
                       tg?.HapticFeedback.impactOccurred('light');
                     }}
-                    className={`px-4 py-2.5 rounded-xl border-2 font-bold text-base transition-all ${
-                      amount === quickAmount.toString()
-                        ? 'border-[#3F5331] bg-[#3F5331] text-white shadow-lg'
-                        : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/10'
+                    className={`rounded-xl border-2 px-4 py-2.5 text-base font-bold transition-all ${
+                      amount === quickAmount.toString() ? amountActive : amountIdle
                     }`}
                     disabled={loading}
                   >
@@ -184,14 +214,12 @@ export const TopUpBalanceModal = ({
                 ))}
               </div>
             </div>
-
           </div>
 
-          {/* Кнопки */}
-          <div className="p-6 border-t border-white/20 flex gap-3">
+          <div className={`flex gap-3 border-t p-6 ${footerBorder}`}>
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-3 bg-transparent border border-white/20 hover:bg-white/10 text-white font-semibold rounded-xl transition-colors"
+              className={`flex-1 rounded-xl border bg-transparent px-4 py-3 font-semibold transition-colors ${cancelBtn}`}
               disabled={loading}
             >
               {t('common.cancel') || 'Скасувати'}
@@ -199,7 +227,7 @@ export const TopUpBalanceModal = ({
             <button
               onClick={handleSubmit}
               disabled={loading || !amount || parseFloat(amount) <= 0}
-              className="flex-1 px-4 py-3 bg-[#3F5331] hover:bg-[#344728] disabled:bg-white/20 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#3F5331] px-4 py-3 font-semibold text-white transition-colors hover:bg-[#344728] disabled:cursor-not-allowed ${submitDisabled}`}
             >
               {loading ? (
                 <>
