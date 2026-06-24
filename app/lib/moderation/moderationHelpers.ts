@@ -4,9 +4,7 @@ import { enqueueCityDigestListing } from '@/lib/city/cityDigestQueue';
 import { getSystemSetting, createTransaction } from '@/utils/dbHelpers';
 import { toSQLiteDate, addDays, nowSQLite } from '@/utils/dateHelpers';
 import { parseDbDate } from '@/utils/parseDbDate';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { deleteSafePublicFile } from '@/lib/server/safePublicFs';
 
 interface ListingWithUser {
   id: number;
@@ -296,17 +294,11 @@ async function deleteListingImages(images: string | string[]): Promise<void> {
       return;
     }
 
-    const uploadsDir = join(process.cwd(), 'public');
-
     for (const imagePath of imageArray) {
       try {
-        // Видаляємо початковий слеш якщо є
-        const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-        const fullPath = join(uploadsDir, cleanPath);
-
-        if (existsSync(fullPath)) {
-          await unlink(fullPath);
-          console.log(`[deleteListingImages] Deleted image: ${fullPath}`);
+        const deleted = await deleteSafePublicFile(imagePath);
+        if (deleted) {
+          console.log(`[deleteListingImages] Deleted image: ${imagePath}`);
         }
       } catch (err) {
         console.error(`[deleteListingImages] Failed to delete image ${imagePath}:`, err);

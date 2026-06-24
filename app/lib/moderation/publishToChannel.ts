@@ -2,9 +2,7 @@
  * Утиліта для публікації оголошень в Telegram канал
  */
 
-import { readFile } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { readSafePublicFile } from '@/lib/server/safePublicFs';
 
 const TRADE_CHANNEL_ID = process.env.TRADE_CHANNEL_ID;
 const TRADE_GERMANY_CHANNEL_ID = process.env.TRADE_GERMANY_CHANNEL_ID;
@@ -153,10 +151,7 @@ export async function publishListingToChannel(
                 buffer = Buffer.from(await response.arrayBuffer());
               }
             } else if (imageUrl.startsWith('/')) {
-              const publicPath = join(process.cwd(), 'public', imageUrl);
-              if (existsSync(publicPath)) {
-                buffer = await readFile(publicPath);
-              }
+              buffer = await readSafePublicFile(imageUrl);
             }
           } catch (error) {
             console.error('[publishToChannel] Error loading image:', error);
@@ -270,10 +265,7 @@ export async function publishListingToChannel(
                 buffer = Buffer.from(await response.arrayBuffer());
               }
             } else if (imageUrl.startsWith('/')) {
-              const publicPath = join(process.cwd(), 'public', imageUrl);
-              if (existsSync(publicPath)) {
-                buffer = await readFile(publicPath);
-              }
+              buffer = await readSafePublicFile(imageUrl);
             }
           } catch (error) {
             console.error('[publishToChannel] Error loading image:', error);
