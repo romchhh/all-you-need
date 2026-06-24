@@ -352,3 +352,6 @@ export function randomTickerIntervalMs(): number {
 }
 
 export const WELCOME_TICKER_EMOJI = '✨';
+
+/** Тимчасово вимкнено — чекаємо фінальні тексти розшифровок від продукту. */
+export const TICKER_INFO_MENU_ENABLED = false;

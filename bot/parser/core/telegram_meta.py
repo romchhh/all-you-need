@@ -1,5 +1,6 @@
 """Метадані Telegram-повідомлень."""
 
+import re
 from typing import Optional
 
 from parser.config.channels import normalize_channel_key
@@ -22,6 +23,47 @@ def get_sender_username(msg) -> Optional[str]:
     if getattr(msg, "from_user", None) and getattr(msg.from_user, "username", None):
         return msg.from_user.username
     return None
+
+
+# Канали/боти — не плутати з автором оголошення при парсингу @ з тексту
+_IGNORE_MENTION_USERNAMES: frozenset[str] = frozenset({
+    "gamburg_baraxlanet",
+    "gamburg_baraholka",
+    "secondhand_hh",
+    "hamburggggggg",
+    "hamburgbeauty",
+    "baraholkaberlin",
+    "tradeground",
+    "tradeground_seller",
+    "tradeground_seller2",
+})
+
+
+def extract_username_from_text(text: str, channel: str = "") -> Optional[str]:
+    """Витягує @username автора з тексту поста (барахолки часто без from_user)."""
+    if not text:
+        return None
+
+    channel_key = normalize_channel_key(channel)
+    if channel_key.lower().startswith("t.me/"):
+        channel_slug = channel_key.rsplit("/", 1)[-1].lower()
+    else:
+        channel_slug = channel_key.lstrip("@").split("/")[0].lower()
+
+    ignore = _IGNORE_MENTION_USERNAMES | {channel_slug}
+
+    for match in re.finditer(r"@([a-zA-Z][a-zA-Z0-9_]{3,31})\b", text):
+        username = match.group(1)
+        if username.lower() in ignore:
+            continue
+        return username
+
+    return None
+
+
+def resolve_author_username(msg, text: str, channel: str = "") -> Optional[str]:
+    """Telegram meta → @ з тексту поста."""
+    return get_sender_username(msg) or extract_username_from_text(text, channel)
 
 
 def get_sender_id(msg) -> Optional[int]:

@@ -6,7 +6,7 @@ from parser.core.quality import (
     is_quality,
 )
 from parser.core.runner import parse_channel, run_all_channels
-from parser.core.telegram_meta import get_sender_id, get_sender_username, message_link
+from parser.core.telegram_meta import get_sender_id, get_sender_username, resolve_author_username, message_link
 from parser.core.text import (
     clean_channel_post_text,
     detect_condition,

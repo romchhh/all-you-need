@@ -13,6 +13,7 @@ import {
   pickNextTickerMessage,
   randomTickerIntervalMs,
   WELCOME_TICKER_EMOJI,
+  TICKER_INFO_MENU_ENABLED,
   type TickerMessage,
 } from '@/utils/platformTickerMessages';
 import { fetchHomeActivity, onHomeActivityDayRollover } from '@/utils/homeActivityClient';
@@ -185,17 +186,21 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
           className={`${infoButtonClass}${infoOpen ? (isLight ? ' bg-white ring-1 ring-[#3F5331]/30' : ' bg-[#0f1408]/15') : ''}`}
           aria-label={t('platformTicker.info.ariaLabel')}
           aria-expanded={infoOpen}
+          disabled={!TICKER_INFO_MENU_ENABLED}
+          style={TICKER_INFO_MENU_ENABLED ? undefined : { display: 'none' }}
         >
           <Info size={15} strokeWidth={2.25} />
         </button>
       </div>
 
-      <PlatformTickerInfoModal
-        isOpen={infoOpen}
-        onClose={() => setInfoOpen(false)}
-        anchorRef={barRef}
-        highlightType={displayMessage.type}
-      />
+      {TICKER_INFO_MENU_ENABLED && (
+        <PlatformTickerInfoModal
+          isOpen={infoOpen}
+          onClose={() => setInfoOpen(false)}
+          anchorRef={barRef}
+          highlightType={displayMessage.type}
+        />
+      )}
     </>
   );
 });

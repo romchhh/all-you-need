@@ -202,6 +202,175 @@ PARSER_TO_MARKETPLACE: dict[tuple[str, str | None], tuple[str, str | None]] = {
     ("other", None): ("fashion", "other"),
 }
 
+# Ключові слова → id підкатегорії маркетплейсу (для уточнення після AI / парсера)
+MARKETPLACE_SUB_KEYWORDS: dict[str, dict[str, list[str]]] = {
+    "electronics": {
+        "smartphones": [
+            "iphone", "айфон", "samsung", "xiaomi", "телефон", "смартфон", "phone",
+            "redmi", "huawei", "pixel",
+        ],
+        "computers_laptops": [
+            "ноутбук", "laptop", "macbook", "компьютер", "планшет", "ipad", "tablet", "pc",
+        ],
+        "tv_audio": [
+            "телевизор", "телевізор", "колонк", "наушник", "навушник", "airpods", "sony",
+            "jbl", "audio",
+        ],
+        "games_consoles": [
+            "playstation", "ps4", "ps5", "xbox", "nintendo", "switch", "приставк", "игр",
+        ],
+        "accessories": ["зарядк", "чехол", "кабель", "монитор", "монітор", "мыш", "миш"],
+    },
+    "fashion": {
+        "women_clothing": [
+            "женск", "жіноч", "платье", "сукн", "блуз", "юбк", "куртк", "пальто",
+        ],
+        "women_shoes": ["женск", "жіноч", "туфл", "ботин", "кроссовк", "кросівк"],
+        "men_clothing": ["мужск", "чоловіч", "рубашк", "костюм", "джинс"],
+        "men_shoes": ["мужск", "чоловіч", "ботин", "кроссовк", "кросівк"],
+        "accessories": ["сумк", "рюкзак", "ремень", "шарф", "очк"],
+        "hats": ["шапк", "кепк", "шляп"],
+    },
+    "furniture": {
+        "sofas_chairs": ["диван", "кресл", "крісл", "sofa"],
+        "wardrobes_chests": ["шкаф", "комод", "стеллаж", "гардероб"],
+        "tables_chairs": ["стол", "стіл", "стул", "стілець", "кухн"],
+        "beds_mattresses": ["кроват", "ліжк", "матрас", "матрац"],
+    },
+    "appliances": {
+        "large_appliances": [
+            "холодильник", "стиральн", "пральн", "сушил", "кондиционер", "кондиціонер",
+        ],
+        "small_appliances": ["пылесос", "пилосос", "утюг", "праск"],
+        "kitchen_appliances": [
+            "микроволнов", "мікрохвиль", "кофеварк", "кавовар", "блендер", "мультиварк",
+        ],
+    },
+    "kids": {
+        "toys": ["игруш", "іграш", "lego", "конструктор", "кукл", "ляльк"],
+        "strollers_car_seats": ["коляск", "автокресл", "автокрісл", "слинг", "слінг"],
+        "clothing": ["детск", "дитяч", "ребен", "дитин"],
+        "beds_furniture": ["кроватк", "ліжечк", "манеж"],
+    },
+    "services_work": {
+        "beauty_health": [
+            "маникюр", "манікюр", "педикюр", "косметолог", "массаж", "масаж", "бров",
+            "ресниц", "вії", "ногт",
+        ],
+        "repair_installation": [
+            "ремонт", "сантехник", "сантехнік", "электрик", "електрик", "монтаж", "установк",
+        ],
+        "cleaning": ["уборк", "клінінг", "чистк", "мийк"],
+        "transportation": ["перевоз", "перевез", "грузоперевоз", "ван", "грузчик"],
+        "it_design_websites": ["програм", "сайт", "it ", "компьютер", "ноутбук", "windows"],
+        "photo_video": ["фото", "видео", "оператор", "съемк", "зйомк"],
+        "education_tutors": ["репетитор", "репетит", "урок", "обучен", "навчан"],
+        "translations": ["перевод", "переклад", "translator"],
+        "auto_services": ["автосервис", "автосервіс", "шиномонтаж", "sto "],
+        "vacancies": ["ваканс", "ищу работ", "шукаю робот", "job"],
+        "part_time": ["подработ", "підробіт"],
+        "looking_for_work": ["ищу работ", "шукаю робот"],
+    },
+    "beauty_wellness": {
+        "cosmetics": ["косметик", "крем", "макияж", "мейкап"],
+        "perfumery": ["духи", "парфюм", "туалетн"],
+        "personal_care": ["фен", "эпилятор", "епілятор", "для волос"],
+    },
+    "auto": {
+        "cars": ["автомобил", "автомобіль", "машин", "bmw", "audi", "mercedes", "vw "],
+        "tires_wheels": ["шин", "диск", "колес", "коліс"],
+        "parts": ["запчаст", "запчастин", "детал"],
+    },
+    "hobby_sports": {
+        "sports_equipment": ["спорт", "фитнес", "фітнес", "тренаж", "гантел"],
+        "bikes_scooters": ["велосипед", "самокат", "bike", "scooter"],
+        "music_instruments": ["гитар", "гітар", "пианино", "фортеп", "синтез"],
+        "books_learning": ["книг", "книж", "учебник", "підручник"],
+    },
+    "pets": {
+        "sell_giveaway": ["щенок", "котен", "кошен", "щеня", "кот", "собак", "кошк"],
+        "pet_goods": ["корм", "поводок", "клетк", "клітк", "для собак", "для кішок"],
+    },
+    "realestate": {
+        "rent_apartments": ["аренд", "оренд", "сдам", "здам", "квартир"],
+        "sell_apartments": ["продам квартир", "продаю квартир"],
+        "rooms": ["комнат", "кімнат"],
+        "houses": ["дом", "будинок", "коттедж"],
+    },
+    "home": {
+        "dishes": ["посуд", "тарел", "таріл", "кастрюл"],
+        "textiles": ["постель", "плед", "ковер", "килим", "штор"],
+        "lighting": ["ламп", "люстр", "светильник", "світильник"],
+        "decor": ["декор", "картин", "ваз"],
+        "tools": ["дрель", "дриль", "перфоратор", "инструмент", "інструмент"],
+    },
+}
+
+_GENERIC_SUB_IDS = frozenset({
+    "other",
+    "other_services",
+    "services",
+    "other_clothing",
+    "other_electronics",
+    "other_furniture",
+    "other_appliances",
+    "other_kids",
+    "other_home",
+    "other_beauty",
+    "other_sports",
+    "other_work",
+})
+
+
+def detect_marketplace_subcategory(category: str, text: str) -> str | None:
+    """Підкатегорія маркетплейсу за ключовими словами в тексті."""
+    subs = MARKETPLACE_SUB_KEYWORDS.get(category)
+    if not subs:
+        return None
+
+    lower = (text or "").lower()
+    best_sub: str | None = None
+    best_score = 0
+
+    for sub_id, keywords in subs.items():
+        score = 0
+        for kw in keywords:
+            if kw in lower:
+                score += 1
+        if score > best_score:
+            best_score = score
+            best_sub = sub_id
+
+    return best_sub if best_score > 0 else None
+
+
+def _refine_subcategory(category: str, subcategory: str | None, text: str) -> str | None:
+    """Уточнює підкатегорію, якщо AI/парсер дав загальну."""
+    subs = MARKETPLACE_TAXONOMY.get(category)
+    if subs is None:
+        return None
+
+    sub = (subcategory or "").strip() or None
+    if sub and sub not in _GENERIC_SUB_IDS and sub in subs:
+        return sub
+
+    detected = detect_marketplace_subcategory(category, text)
+    if detected and detected in subs:
+        return detected
+
+    from parser.category_keywords import detect_category
+
+    p_cat, p_sub = detect_category(text, skip_free=True)
+    mapped = map_parser_to_marketplace(p_cat, p_sub)
+    if mapped[0] == category and mapped[1] and mapped[1] in subs:
+        return mapped[1]
+
+    if sub and sub in subs:
+        return sub
+    if "other" in subs:
+        return "other"
+    return next(iter(subs))
+
 
 def marketplace_taxonomy_for_ai() -> str:
     lines: list[str] = []
@@ -217,6 +386,7 @@ def marketplace_taxonomy_for_ai() -> str:
 def validate_marketplace_category(
     category: str,
     subcategory: str | None,
+    text: str = "",
 ) -> tuple[str, str | None]:
     cat = (category or "").strip().lower()
     if cat not in MARKETPLACE_TAXONOMY:
@@ -226,13 +396,7 @@ def validate_marketplace_category(
     if subs is None:
         return cat, None
 
-    sub = (subcategory or "").strip() or None
-    if sub and sub in subs:
-        return cat, sub
-    if sub:
-        sub = "other" if "other" in subs else next(iter(subs))
-    else:
-        sub = next(iter(subs))
+    sub = _refine_subcategory(cat, subcategory, text)
     return cat, sub
 
 
@@ -266,7 +430,12 @@ def resolve_marketplace_category(
     item: dict,
 ) -> tuple[str, str | None]:
     """AI id → marketplace id; fallback на парсер + keyword detect."""
-    cat, sub = validate_marketplace_category(ai_category, ai_subcategory)
+    text = "\n".join(
+        str(item.get(k) or "")
+        for k in ("raw_text", "title", "description")
+    )
+
+    cat, sub = validate_marketplace_category(ai_category, ai_subcategory, text)
     if cat:
         return cat, sub
 
@@ -274,20 +443,17 @@ def resolve_marketplace_category(
         str(ai_category or item.get("category") or ""),
         ai_subcategory or item.get("subcategory"),
     )
-    cat, sub = validate_marketplace_category(mapped[0], mapped[1])
+    cat, sub = validate_marketplace_category(mapped[0], mapped[1], text)
     if cat:
         return cat, sub
 
     from parser.category_keywords import detect_category
 
-    text = "\n".join(
-        str(item.get(k) or "")
-        for k in ("raw_text", "title", "description")
-    )
     skip_free = bool(re.search(r"\d+\s*€|\d+\s*eur|\d+\s*евро", text.lower()))
     p_cat, p_sub = detect_category(text, skip_free=skip_free)
     mapped = map_parser_to_marketplace(p_cat, p_sub)
-    return validate_marketplace_category(mapped[0], mapped[1]) or ("fashion", "other")
+    result = validate_marketplace_category(mapped[0], mapped[1], text)
+    return result if result[0] else ("fashion", "other")
 
 
 def clean_title(title: str, raw_text: str = "") -> str:

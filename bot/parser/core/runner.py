@@ -19,7 +19,7 @@ from parser.core.quality import (
     is_likely_service_ad,
     is_quality,
 )
-from parser.core.telegram_meta import get_sender_id, get_sender_username, message_link
+from parser.core.telegram_meta import get_sender_id, resolve_author_username, message_link
 from parser.core.text import (
     clean_channel_post_text,
     detect_condition,
@@ -130,7 +130,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
                 subcategory = detected_sub or "other_services"
         condition = detect_condition(text, category)
 
-        author_username = get_sender_username(msg_for_link)
+        author_username = resolve_author_username(msg_for_link, text, channel)
         author_id = get_sender_id(msg_for_link)
         media_group_id = getattr(msg, "media_group_id", None)
         if media_group_id:
