@@ -5,6 +5,7 @@ import { getSystemSetting, createTransaction } from '@/utils/dbHelpers';
 import { toSQLiteDate, addDays, nowSQLite } from '@/utils/dateHelpers';
 import { parseDbDate } from '@/utils/parseDbDate';
 import { deleteSafePublicFile } from '@/lib/server/safePublicFs';
+import { invalidateHomeActivityCache } from '@/lib/stats/homeActivityCache';
 
 interface ListingWithUser {
   id: number;
@@ -60,6 +61,9 @@ export function shouldResetPublicationDate(listing: {
     return true;
   }
   const published = listing.publishedAt ? parseDbDate(listing.publishedAt) : null;
+  if (status === 'pending_moderation' || mod === 'pending') {
+    return !published;
+  }
   if (published && published.getTime() < addDays(new Date(), -30).getTime()) {
     return true;
   }
@@ -133,6 +137,8 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
     nowStr,
     listing.id
   );
+
+  invalidateHomeActivityCache();
 
   // Активуємо куплену рекламу (перевіряємо статус 'pending' або 'paid')
   const promotionResult = await prisma.$queryRawUnsafe(

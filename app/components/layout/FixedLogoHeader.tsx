@@ -37,6 +37,12 @@ export const STICKY_BELOW_APP_HEADER_CLASS =
 export const OVERLAY_BACK_BUTTON_TOP_CLASS =
   'max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)]';
 
+/** Напівпрозорий стиль круглої кнопки «Назад» (як на сторінці товару). */
+export const overlayHeaderActionClass = (isLight: boolean) =>
+  isLight
+    ? 'border-gray-300/90 bg-white/95 text-gray-900 shadow-sm hover:bg-white'
+    : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
+
 /** Safe area окремо — щоб не покладатися на вкладений max() у calc() у arbitrary-класах */
 const safeTopShellClass =
   'max-lg:pt-[max(env(safe-area-inset-top,0px),10px)] lg:pt-[max(env(safe-area-inset-top,0px),2px)]';

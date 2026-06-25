@@ -1,7 +1,7 @@
 import { Heart, Image as ImageIcon, Eye } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { useState, useMemo, useEffect, useRef, memo } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
@@ -17,6 +17,8 @@ interface ListingCardProps {
   onSelect: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
   tg: TelegramWebApp | null;
+  /** Перші картки above-the-fold — eager + high fetch priority */
+  priority?: boolean;
   isSold?: boolean;
   isDeactivated?: boolean;
   /** `stacked` — завжди вертикальна картка як на мобільному (для горизонтальних каруселей на десктопі). */
@@ -32,6 +34,7 @@ const ListingCardComponent = ({
   isSold = false,
   isDeactivated = false,
   layout = 'responsive',
+  priority = false,
 }: ListingCardProps) => {
   const isStacked = layout === 'stacked';
   const { t, language } = useLanguage();
@@ -142,86 +145,25 @@ const ListingCardComponent = ({
     () => displayListingFavoritesCount(listing),
     [listing.favoritesCount, listing.createdAt, listing.publishedAt, listing.posted]
   );
-  const imageLoadedRef = useRef<Set<string>>(new Set());
-  
-  // Перевіряємо, чи зображення вже завантажене при ініціалізації
-  const checkIfImageLoaded = (url: string): boolean => {
-    if (!url) return false;
-    if (imageLoadedRef.current.has(url)) return true;
-    
-    // Перевіряємо кеш браузера
-    const img = new Image();
-    img.src = url;
-    if (img.complete && img.naturalWidth > 0) {
-      imageLoadedRef.current.add(url);
-      return true;
-    }
-    return false;
-  };
 
-  // Мемоізуємо URL зображення, щоб уникнути зайвих запитів
   const imageUrl = useMemo(() => {
     const image = listing.image || (listing.images && listing.images.length > 0 ? listing.images[0] : '');
     return buildListingImageUrl(image);
   }, [listing.image, listing.images]);
 
-  // Ініціалізуємо стан завантаження на основі того, чи зображення вже завантажене
-  const [imageLoading, setImageLoading] = useState(() => {
-    if (!imageUrl) return false;
-    return !checkIfImageLoaded(imageUrl);
-  });
-  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(Boolean(imageUrl));
+  const [imageError, setImageError] = useState(
+    !imageUrl && (!listing.image && (!listing.images || listing.images.length === 0))
+  );
 
-  // Скидаємо стан завантаження при зміні URL зображення
   useEffect(() => {
     if (!imageUrl) {
       setImageLoading(false);
       setImageError(true);
       return;
     }
-    
-    // Перевіряємо, чи це зображення вже було завантажене раніше
-    if (imageLoadedRef.current.has(imageUrl)) {
-      setImageLoading(false);
-      setImageError(false);
-      return;
-    }
-    
-    // Перевіряємо, чи зображення вже в кеші браузера
-    const img = new Image();
-    let isCancelled = false;
-    
-    img.onload = () => {
-      if (!isCancelled) {
-        imageLoadedRef.current.add(imageUrl);
-        setImageLoading(false);
-        setImageError(false);
-      }
-    };
-    img.onerror = () => {
-      if (!isCancelled) {
-        setImageLoading(false);
-        setImageError(true);
-      }
-    };
-    
-    // Встановлюємо src для перевірки кешу
-    img.src = imageUrl;
-    
-    // Якщо зображення вже в кеші, воно завантажиться миттєво
-    if (img.complete && img.naturalWidth > 0) {
-      imageLoadedRef.current.add(imageUrl);
-      setImageLoading(false);
-      setImageError(false);
-    } else {
-      // Зображення ще не завантажене
-      setImageLoading(true);
-      setImageError(false);
-    }
-    
-    return () => {
-      isCancelled = true;
-    };
+    setImageLoading(true);
+    setImageError(false);
   }, [imageUrl]);
 
   return (
@@ -267,12 +209,12 @@ const ListingCardComponent = ({
               imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
             } ${isSold || isDeactivated ? 'grayscale' : ''}`}
             style={{ width: '100%', height: '100%' }}
-            loading="lazy"
+            loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'auto'}
             decoding="async"
             sizes={isStacked ? '(max-width: 1023px) 50vw, 240px' : '(max-width: 1023px) 50vw, 25vw'}
             key={`${listing.image}-${listing.id}`}
             onLoad={() => {
-              imageLoadedRef.current.add(imageUrl);
               setImageLoading(false);
               setImageError(false);
             }}
@@ -495,6 +437,7 @@ export const ListingCard = memo(ListingCardComponent, (prevProps, nextProps) => 
     prevProps.isFavorite === nextProps.isFavorite &&
     prevProps.isSold === nextProps.isSold &&
     prevProps.isDeactivated === nextProps.isDeactivated &&
-    prevProps.layout === nextProps.layout
+    prevProps.layout === nextProps.layout &&
+    prevProps.priority === nextProps.priority
   );
 });

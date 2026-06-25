@@ -1,13 +1,10 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { ListingDetail } from '@/components/listing/ListingDetail';
-import { UserProfilePage } from '@/components/profile/UserProfilePage';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { BazaarTab } from '@/components/tabs/BazaarTab';
 import { Toast } from '@/components/ui/Toast';
-import CreateListingFlow from '@/components/listing/CreateListingFlow';
-import { CategoriesModal } from '@/components/modals/CategoriesModal';
 import { useAutoPrefetch } from '@/features/bazaar/hooks/usePrefetch';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { useBazaarPage } from '@/features/bazaar/hooks/useBazaarPage';
@@ -15,6 +12,20 @@ import { BazaarPullToRefreshIndicator } from '@/features/bazaar/components/Bazaa
 import { invalidateCache } from '@/utils/cache';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+
+const ListingDetail = dynamic(
+  () => import('@/components/listing/ListingDetail').then((m) => ({ default: m.ListingDetail })),
+  { ssr: false }
+);
+const UserProfilePage = dynamic(
+  () => import('@/components/profile/UserProfilePage').then((m) => ({ default: m.UserProfilePage })),
+  { ssr: false }
+);
+const CreateListingFlow = dynamic(() => import('@/components/listing/CreateListingFlow'), { ssr: false });
+const CategoriesModal = dynamic(
+  () => import('@/components/modals/CategoriesModal').then((m) => ({ default: m.CategoriesModal })),
+  { ssr: false }
+);
 
 const BazaarPage = () => {
   const pathname = usePathname();
@@ -207,16 +218,18 @@ const BazaarPage = () => {
         tg={tg}
       />
 
-      <CategoriesModal
-        isOpen={isCategoriesModalOpen}
-        onClose={() => setIsCategoriesModalOpen(false)}
-        onSelectCategory={(categoryId) => {
-          setSelectedCategoryFromModal(categoryId);
-        }}
-        tg={tg}
-      />
+      {isCategoriesModalOpen && (
+        <CategoriesModal
+          isOpen={isCategoriesModalOpen}
+          onClose={() => setIsCategoriesModalOpen(false)}
+          onSelectCategory={(categoryId) => {
+            setSelectedCategoryFromModal(categoryId);
+          }}
+          tg={tg}
+        />
+      )}
 
-      {profile && (
+      {profile && isCreateListingModalOpen && (
         <CreateListingFlow
           isOpen={isCreateListingModalOpen}
           onClose={() => setIsCreateListingModalOpen(false)}

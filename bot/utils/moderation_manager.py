@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, FSInputFile
 from dotenv import load_dotenv
@@ -23,6 +23,11 @@ load_dotenv()
 MODERATION_GROUP_ID = os.getenv('MODERATION_GROUP_ID')
 if MODERATION_GROUP_ID:
     MODERATION_GROUP_ID = int(MODERATION_GROUP_ID)
+
+
+def _now_sqlite_utc() -> str:
+    """UTC timestamp compatible with app/utils/dateHelpers.toSQLiteDate (YYYY-MM-DD HH:MM:SS)."""
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
 
 class ModerationManager:
@@ -310,6 +315,8 @@ class ModerationManager:
         if mod in ('expired', 'rejected'):
             return True
         published_at = listing.get('publishedAt')
+        if not published_at:
+            return True
         if published_at:
             try:
                 if isinstance(published_at, str):
@@ -441,10 +448,13 @@ class ModerationManager:
                 reset_publication = self._should_reset_publication_date(listing_snapshot)
                 
                 # При перепублікації завжди оновлюємо expiresAt на нові 30 днів
-                published_at = datetime.now() if reset_publication else (
-                    existing_published if existing_published else datetime.now()
+                published_at = _now_sqlite_utc() if reset_publication else (
+                    existing_published if existing_published else _now_sqlite_utc()
                 )
-                expires_at = datetime.now() + timedelta(days=30)
+                expires_at_dt = datetime.now(timezone.utc) + timedelta(days=30)
+                expires_at = expires_at_dt.strftime('%Y-%m-%d %H:%M:%S')
+                moderated_at = _now_sqlite_utc()
+                updated_at = _now_sqlite_utc()
 
                 cursor.execute("""
                     UPDATE Listing
@@ -456,7 +466,7 @@ class ModerationManager:
                         expiresAt = ?,
                         updatedAt = ?
                     WHERE id = ?
-                """, (published_at, datetime.now(), admin_id, expires_at, datetime.now(), listing_id))
+                """, (published_at, moderated_at, admin_id, expires_at, updated_at, listing_id))
                 
                 success = cursor.rowcount > 0
                 conn.commit()

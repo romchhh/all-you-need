@@ -105,6 +105,18 @@ const BazaarTabComponent = ({
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
   const ac = getAppearanceClasses(isLight);
+  const [showHomeWidgets, setShowHomeWidgets] = useState(false);
+
+  useEffect(() => {
+    const show = () => setShowHomeWidgets(true);
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(show, { timeout: 2500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = setTimeout(show, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
     if (savedState?.selectedCategory != null) {
       return savedState.selectedCategory;
@@ -562,7 +574,7 @@ const BazaarTabComponent = ({
         </div>
       </div>
 
-      {!searchQuery.trim() && (
+      {!searchQuery.trim() && showHomeWidgets && (
         <>
           <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
             <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
@@ -722,7 +734,7 @@ const BazaarTabComponent = ({
             {viewMode === 'grid' ? (
               <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
                 <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
-                  {filteredAndSortedListings.map((listing) => (
+                  {filteredAndSortedListings.map((listing, index) => (
                     <div
                       key={listing.id}
                       className={
@@ -735,6 +747,7 @@ const BazaarTabComponent = ({
                         onSelect={onSelectListing}
                         onToggleFavorite={onToggleFavorite}
                         tg={tg}
+                        priority={index < 4}
                       />
                     </div>
                   ))}

@@ -300,10 +300,13 @@ export async function ensureOptimizedImagesColumn(): Promise<boolean> {
   }
 }
 
+let listingApiRawColumnsReady = false;
+
 /**
  * Колонки для raw SQL у /api/listings (старі SQLite без міграцій Prisma).
  */
 export async function ensureListingApiRawColumns(): Promise<void> {
+  if (listingApiRawColumnsReady) return;
   try {
     const tableInfo = (await prisma.$queryRawUnsafe(
       `PRAGMA table_info(Listing)`
@@ -348,7 +351,10 @@ export async function ensureListingApiRawColumns(): Promise<void> {
       optimizedImagesColumnExists = true;
       optimizedImagesColumnChecked = true;
     }
+
+    listingApiRawColumnsReady = true;
   } catch (error: any) {
+    listingApiRawColumnsReady = true;
     if (process.env.NODE_ENV === 'development') {
       console.log('ensureListingApiRawColumns:', error.message);
     }

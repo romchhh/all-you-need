@@ -418,10 +418,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   if (loading) {
     return (
-      <div
-        className="pb-24 flex items-center justify-center min-h-screen"
-        style={{ background: ac.pageBackground }}
-      >
+      <div className="pb-24 flex min-h-screen items-center justify-center">
         <div className={ac.mutedText}>{t('common.loading')}</div>
       </div>
     );
@@ -431,10 +428,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     const botLink = getBotBaseUrl();
 
     return (
-      <div
-        className="pb-24 flex flex-col h-screen overflow-hidden px-4 min-h-screen"
-        style={{ background: ac.pageBackground }}
-      >
+      <div className="flex h-screen min-h-screen flex-col overflow-hidden px-4 pb-24">
         <h2 className={`text-2xl font-bold mb-2 pt-2 ${ac.pageHeading}`}>{t('navigation.profile')}</h2>
         <p className="text-sm text-gray-400 mb-8">{t('profileNotFound.subtitle')}</p>
 
@@ -525,7 +519,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   return (
     <>
-    <div className="pb-24 min-h-screen" style={{ background: ac.pageBackground }}>
+    <div className="min-h-screen pb-24">
       {/* Профіль хедер */}
       <div className="px-4 pt-1 pb-4 max-lg:-mt-0.5">
         <div className="flex items-start gap-4">

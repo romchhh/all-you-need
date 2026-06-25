@@ -6,6 +6,11 @@ import {
   kyivListingsWindowKey,
   startOfKyivListingsReportingWindow,
 } from '@/utils/kyivListingsDayWindow';
+import {
+  getHomeActivityServerCache,
+  setHomeActivityServerCache,
+} from '@/lib/stats/homeActivityCache';
+import { NEW_LISTINGS_IN_KYIV_WINDOW_SQL } from '@/lib/stats/homeActivitySql';
 
 const DISPLAY_ONLINE_MIN = 22;
 const DISPLAY_ONLINE_MAX = 58;
@@ -54,20 +59,6 @@ function displayOnlineSynced(now: Date): number {
   return DISPLAY_ONLINE_MIN + (seed % span);
 }
 
-/** In-memory кеш відповіді — зменшує навантаження на БД при кожному заході на головну. */
-const SERVER_CACHE_TTL_MS = 120_000;
-let serverCache: {
-  windowKey: string;
-  payload: Record<string, unknown>;
-  expiresAt: number;
-} | null = null;
-
-const NEW_LISTINGS_TODAY_SQL = `
-  status = 'active'
-  AND datetime(COALESCE(publishedAt, createdAt)) >= datetime(?)
-  AND datetime(COALESCE(publishedAt, createdAt)) <= datetime(?)
-`;
-
 const CITY_EXPR = `
   CASE
     WHEN location IS NULL OR TRIM(location) = '' THEN ''
@@ -80,7 +71,7 @@ const CITY_LISTINGS_SQL = `
     ${CITY_EXPR} AS city,
     COUNT(*) AS count
   FROM Listing
-  WHERE ${NEW_LISTINGS_TODAY_SQL}
+  WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}
   GROUP BY ${CITY_EXPR}
   HAVING COUNT(*) > 0
   ORDER BY count DESC, city ASC
@@ -90,7 +81,7 @@ const CITY_LISTINGS_SQL = `
 const CATEGORY_LISTINGS_SQL = `
   SELECT category, COUNT(*) AS count
   FROM Listing
-  WHERE ${NEW_LISTINGS_TODAY_SQL}
+  WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}
     AND category IS NOT NULL AND TRIM(category) != ''
   GROUP BY category
   HAVING COUNT(*) > 0
@@ -104,12 +95,9 @@ export async function GET() {
     const now = new Date();
     const windowKey = kyivListingsWindowKey(now);
 
-    if (
-      serverCache &&
-      serverCache.windowKey === windowKey &&
-      Date.now() < serverCache.expiresAt
-    ) {
-      return NextResponse.json(serverCache.payload, {
+    const cached = getHomeActivityServerCache(windowKey);
+    if (cached) {
+      return NextResponse.json(cached, {
         headers: {
           'Cache-Control': 'public, max-age=120, stale-while-revalidate=240',
         },
@@ -118,14 +106,12 @@ export async function GET() {
 
     const dayStart = startOfKyivListingsReportingWindow(now);
     const dayStartStr = toSQLiteDate(dayStart);
-    const nowStr = toSQLiteDate(now);
 
     const countRows = await executeWithRetry(
       () =>
         prisma.$queryRawUnsafe(
-          `SELECT COUNT(*) AS count FROM Listing WHERE ${NEW_LISTINGS_TODAY_SQL}`,
-          dayStartStr,
-          nowStr
+          `SELECT COUNT(*) AS count FROM Listing WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}`,
+          dayStartStr
         ) as Promise<Array<{ count: bigint | number }>>
     );
     const newListingsToday = Number(countRows[0]?.count ?? 0);
@@ -136,8 +122,7 @@ export async function GET() {
         () =>
           prisma.$queryRawUnsafe(
             CITY_LISTINGS_SQL,
-            dayStartStr,
-            nowStr
+            dayStartStr
           ) as Promise<Array<{ city: string; count: bigint | number }>>
       );
       newListingsByCity = cityRows.map((row) => ({
@@ -154,8 +139,7 @@ export async function GET() {
         () =>
           prisma.$queryRawUnsafe(
             CATEGORY_LISTINGS_SQL,
-            dayStartStr,
-            nowStr
+            dayStartStr
           ) as Promise<Array<{ category: string; count: bigint | number }>>
       );
       newListingsByCategory = categoryRows.map((row) => ({
@@ -176,11 +160,7 @@ export async function GET() {
       windowKey,
     };
 
-    serverCache = {
-      windowKey,
-      payload,
-      expiresAt: Date.now() + SERVER_CACHE_TTL_MS,
-    };
+    setHomeActivityServerCache(windowKey, payload);
 
     return NextResponse.json(payload, {
       headers: {

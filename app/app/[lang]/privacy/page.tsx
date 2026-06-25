@@ -5,9 +5,13 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ArrowLeft } from 'lucide-react';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { AppHeader } from '@/components/layout/AppHeader';
-import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
+import {
+  OVERLAY_BACK_BUTTON_TOP_CLASS,
+  overlayHeaderActionClass,
+} from '@/components/layout/FixedLogoHeader';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { useScrollToTopOnMount } from '@/features/ui/hooks/useScrollToTopOnMount';
 
 const bodyTextClass =
   'text-sm leading-relaxed [overflow-wrap:anywhere] [word-break:break-word]';
@@ -18,39 +22,28 @@ export default function PrivacyPage() {
   const { tg } = useTelegram();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
+  useScrollToTopOnMount();
 
-  const stickyBar = isLight
-    ? 'border-gray-200/90 bg-white/90'
-    : 'border-white/15 bg-[#0a0a0a]/90';
-  const backBtn = isLight
-    ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-    : 'bg-white/10 hover:bg-white/15 text-white';
   const sectionBorder = isLight ? 'border-gray-200/80' : 'border-white/10';
 
   return (
-    <div
-      className="min-h-screen overflow-x-hidden pb-20"
-      style={{ background: ac.pageBackground }}
-    >
+    <div className="min-h-screen overflow-x-hidden pb-20">
       <AppHeader />
-      <div className="mx-auto w-full max-w-2xl overflow-x-hidden">
-        <div
-          className={`sticky ${STICKY_BELOW_APP_HEADER_CLASS} z-10 border-b px-4 py-3 backdrop-blur-md ${stickyBar}`}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              router.back();
-              tg?.HapticFeedback.impactOccurred('light');
-            }}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${backBtn}`}
-            aria-label={t('common.back') || 'Назад'}
-          >
-            <ArrowLeft size={20} />
-          </button>
-        </div>
 
-        <div className="px-4 py-5">
+      <button
+        type="button"
+        onClick={() => {
+          router.back();
+          tg?.HapticFeedback.impactOccurred('light');
+        }}
+        aria-label={t('common.back') || 'Назад'}
+        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${OVERLAY_BACK_BUTTON_TOP_CLASS} ${overlayHeaderActionClass(isLight)}`}
+      >
+        <ArrowLeft size={20} />
+      </button>
+
+      <div className="mx-auto w-full max-w-2xl overflow-x-hidden">
+        <div className="px-4 pb-5 pt-14">
           <h1 className={`mb-2 text-2xl font-bold leading-tight ${ac.pageHeading}`}>
             {t('privacy.title')}
           </h1>

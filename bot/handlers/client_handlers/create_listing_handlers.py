@@ -5,6 +5,7 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 
+from utils.telegram_context import user_id_from_callback
 from utils.translations import t, get_user_lang
 from states.client_states import CreateListing
 from keyboards.client_keyboards import (
@@ -257,18 +258,12 @@ async def start_create_listing(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     
     if not check_user(user_id):
-        await message.answer("<b>⚠️ Будь ласка, спочатку зареєструйтесь:</b> /start", parse_mode="HTML")
+        await message.answer(t(user_id, 'create_listing.register_first'), parse_mode="HTML")
         return
 
-    lang = get_user_lang(user_id)
-    if lang == "ru":
-        prompt = "<b>Вы добавляете:</b>\n\nВыберите тип объявления:"
-        btn_services = "🧰 Услуги"
-        btn_goods = "🛍 Товары"
-    else:
-        prompt = "<b>Ви додаєте:</b>\n\nОберіть тип оголошення:"
-        btn_services = "🧰 Послуги"
-        btn_goods = "🛍 Товари"
+    prompt = t(user_id, 'create_listing.type_select_prompt')
+    btn_services = t(user_id, 'create_listing.type_services')
+    btn_goods = t(user_id, 'create_listing.type_goods')
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -279,9 +274,13 @@ async def start_create_listing(message: types.Message, state: FSMContext):
     await message.answer(prompt, parse_mode="HTML", reply_markup=kb)
 
 
-async def _start_services_listing_flow(message: types.Message, state: FSMContext) -> None:
+async def _start_services_listing_flow(
+    message: types.Message,
+    state: FSMContext,
+    *,
+    user_id: int,
+) -> None:
     """Старий flow створення оголошення в канали (послуги)."""
-    user_id = message.from_user.id
     await state.set_state(CreateListing.waiting_for_title)
 
     initial_message = await message.answer(
@@ -310,7 +309,11 @@ async def choose_listing_type_services(callback: types.CallbackQuery, state: FSM
         await callback.message.delete()
     except Exception:
         pass
-    await _start_services_listing_flow(callback.message, state)
+    await _start_services_listing_flow(
+        callback.message,
+        state,
+        user_id=user_id_from_callback(callback),
+    )
 
 
 @router.callback_query(F.data == "listing_type:goods")
@@ -718,7 +721,7 @@ async def skip_photos_handler(message: types.Message, state: FSMContext):
     except:
         pass
     # Можна пропустити фото - використовується дефолтне зображення
-    await message.answer("✅ <b>Фото пропущено.</b> Буде використано стандартне зображення.\n\nНатисніть кнопку 'Продовжити' для продовження.", parse_mode="HTML")
+    await message.answer(t(user_id, 'create_listing.photos_skipped'), parse_mode="HTML")
 
 
 @router.message(CreateListing.waiting_for_photos, F.text)
@@ -759,10 +762,6 @@ async def process_category_selection(message: types.Message, state: FSMContext, 
         except:
             pass
 
-    print(t(user_id, 'create_listing.category_prompt'))
-    print(user_id)
-    print(categories)
-    
     sent_message = await message.answer(
         t(user_id, 'create_listing.category_prompt'),
         parse_mode="HTML",
@@ -2169,7 +2168,8 @@ async def edit_rejected_listing(callback: types.CallbackQuery, state: FSMContext
 
 @router.callback_query(F.data == "refresh_not_available")
 async def refresh_not_available(callback: types.CallbackQuery):
-    await callback.answer("⏳ Оновлення доступне не раніше ніж через 1 годину після публікації", show_alert=True)
+    user_id = user_id_from_callback(callback)
+    await callback.answer(t(user_id, 'my_listings.refresh_not_available'), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("refresh_listing_"))

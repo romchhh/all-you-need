@@ -47,8 +47,8 @@ export function useActivityHeartbeat() {
       }
     };
 
-    // Оновлюємо активність одразу при завантаженні
-    updateActivity();
+    // Відкладаємо перший heartbeat, щоб не конкурувати з завантаженням каталогу
+    const initialTimer = setTimeout(updateActivity, 4000);
 
     intervalRef.current = setInterval(updateActivity, 60 * 1000);
 
@@ -64,6 +64,7 @@ export function useActivityHeartbeat() {
 
     // Cleanup
     return () => {
+      clearTimeout(initialTimer);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }

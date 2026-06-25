@@ -553,7 +553,6 @@ export async function GET(request: NextRequest) {
                l.id,
                l.userId,
                l.title,
-               l.description,
                l.price,
                ${currencyColumnExists ? 'l.currency,' : 'NULL as currency,'}
                l.isFree,
@@ -563,21 +562,16 @@ export async function GET(request: NextRequest) {
                l.location,
                l.views,
                l.status,
-               l.moderationStatus,
-               l.rejectionReason,
                l.promotionType,
                l.promotionEnds,
-               l.expiresAt,
-               COALESCE(l.autoRenew, 0) as autoRenew,
                l.images,
-               l.tags,
+               l.optimizedImages,
                l.createdAt,
                l.publishedAt,
                u.username as sellerUsername,
                u.firstName as sellerFirstName,
                u.lastName as sellerLastName,
                u.avatar as sellerAvatar,
-               u.phone as sellerPhone,
                CAST(u.telegramId AS INTEGER) as sellerTelegramId,
                ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
              FROM Listing l
@@ -761,7 +755,7 @@ export async function GET(request: NextRequest) {
                },
                category: listing.category,
                subcategory: listing.subcategory,
-               description: listing.description,
+               description: userId ? (listing.description ?? '') : '',
                location: listing.location,
                views: listing.views || 0,
                posted: timeFields.posted,
@@ -782,19 +776,31 @@ export async function GET(request: NextRequest) {
              };
     });
 
-    // Відключаємо кешування для завжди актуальних даних
+    // Кеш лише для «чистого» каталогу без фільтрів — інакше завжди свіжі дані
+    const isCacheableCatalog =
+      !userId &&
+      !search &&
+      !category &&
+      !subcategory &&
+      !isFree &&
+      cities.length === 0 &&
+      sortBy === 'newest';
+
     const response = NextResponse.json({
       listings: formattedListings,
       total,
       limit,
       offset,
     });
-    
-    // Додаємо заголовки для відключення кешування
-    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    response.headers.set('Pragma', 'no-cache');
-    response.headers.set('Expires', '0');
-    response.headers.set('Surrogate-Control', 'no-store');
+
+    if (isCacheableCatalog) {
+      response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+    } else {
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+      response.headers.set('Surrogate-Control', 'no-store');
+    }
     
     return response;
   } catch (error) {

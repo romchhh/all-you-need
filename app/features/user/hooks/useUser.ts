@@ -47,6 +47,8 @@ export const useUser = () => {
   const [isBlocked, setIsBlocked] = useState(false);
   const [currentTelegramId, setCurrentTelegramId] = useState<number | null>(null);
 
+  const isProfilePage = pathname?.includes('/profile') ?? false;
+
   useEffect(() => {
     const getTelegramId = (): number | null => {
       console.log('=== useUser: Getting telegramId ===');
@@ -101,16 +103,17 @@ export const useUser = () => {
       // Завантажуємо профіль
       if (currentTelegramId !== telegramId) {
         setCurrentTelegramId(telegramId);
-        fetchProfile(telegramId);
+        fetchProfile(telegramId, isProfilePage);
       }
     } else {
       setLoading(false);
     }
-  }, [telegramUser, currentTelegramId, pathname, searchParams]);
+  }, [telegramUser, currentTelegramId, pathname, searchParams, isProfilePage]);
 
-  const fetchProfile = async (telegramId: number) => {
+  const fetchProfile = async (telegramId: number, includeStats = false) => {
     try {
-      const { res, data } = await loadProfileBundle(telegramId);
+      const expand = includeStats ? 'language,stats' : 'language';
+      const { res, data } = await loadProfileBundle(telegramId, expand);
 
       if (res.ok) {
         const raw = data as unknown as UserProfile & {
@@ -142,7 +145,7 @@ export const useUser = () => {
     const telegramId = currentTelegramId || telegramUser?.id;
     if (telegramId) {
       setLoading(true);
-      await fetchProfile(telegramId);
+      await fetchProfile(telegramId, isProfilePage);
     }
   };
 
@@ -159,6 +162,11 @@ export const useUser = () => {
       /* ignore */
     }
   };
+
+  useEffect(() => {
+    if (!isProfilePage || !profile?.telegramId || dashboardStats) return;
+    void refetchStats();
+  }, [isProfilePage, profile?.telegramId, dashboardStats]);
 
   // Є контекст Telegram у міні-апі (після першого циклу effect — currentTelegramId виставлений)
   const hasTelegramIdentity = currentTelegramId != null;
