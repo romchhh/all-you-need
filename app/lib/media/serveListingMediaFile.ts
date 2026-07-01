@@ -1,6 +1,6 @@
-import { readFile, stat } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
-import { LISTING_MEDIA_CACHE_CONTROL } from '@/lib/media/listingMediaCache';
+import { LISTING_MEDIA_CACHE_CONTROL } from '@/lib/media/listingMediaConstants';
+import { readFileBuffer, statFile } from '@/lib/server/nodeFs';
 
 export async function serveListingMediaFile(
   request: NextRequest,
@@ -8,7 +8,7 @@ export async function serveListingMediaFile(
   etagKey: string,
   contentType: string
 ): Promise<NextResponse> {
-  const fileStat = await stat(fullPath);
+  const fileStat = await statFile(fullPath);
   const etag = `"${etagKey}-${fileStat.mtimeMs.toString(36)}-${fileStat.size.toString(36)}"`;
 
   if (request.headers.get('if-none-match') === etag) {
@@ -21,8 +21,8 @@ export async function serveListingMediaFile(
     });
   }
 
-  const fileBuffer = await readFile(fullPath);
-  return new NextResponse(fileBuffer, {
+  const fileBuffer = await readFileBuffer(fullPath);
+  return new NextResponse(new Uint8Array(fileBuffer), {
     headers: {
       'Content-Type': contentType,
       'Cache-Control': LISTING_MEDIA_CACHE_CONTROL,

@@ -1,9 +1,10 @@
-import { existsSync } from 'fs';
-import { extname, join, resolve } from 'path';
+import { extname, join, resolve, sep } from 'path';
 import { NextRequest, NextResponse } from 'next/server';
+import { pathExists } from '@/lib/server/nodeFs';
 import { serveListingMediaFile } from '@/lib/media/serveListingMediaFile';
 
-const parsedPhotosBaseDir = resolve(process.cwd(), '..', 'database', 'parsed_photos');
+const PARSED_PHOTOS_BASE = resolve(process.cwd(), '..', 'database', 'parsed_photos');
+const SAFE_FILENAME = /^[a-zA-Z0-9._-]+$/;
 
 function mimeByExt(ext: string): string {
   switch (ext.toLowerCase()) {
@@ -21,6 +22,28 @@ function mimeByExt(ext: string): string {
   }
 }
 
+function resolveParsedPhotoPath(imagePath: string): string | null {
+  const normalizedPath = imagePath
+    .replace(/^database\/parsed_photos\//, '')
+    .replace(/^parsed_photos\//, '');
+
+  const parts = normalizedPath.split('/').filter(Boolean);
+  if (!parts.length || parts.some((p) => !SAFE_FILENAME.test(p))) {
+    return null;
+  }
+
+  const fullPath = join(PARSED_PHOTOS_BASE, ...parts);
+  const baseWithSep = PARSED_PHOTOS_BASE.endsWith(sep)
+    ? PARSED_PHOTOS_BASE
+    : `${PARSED_PHOTOS_BASE}${sep}`;
+
+  if (!fullPath.startsWith(baseWithSep)) {
+    return null;
+  }
+
+  return fullPath;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -33,16 +56,16 @@ export async function GET(
       return new NextResponse('Not Found', { status: 404 });
     }
 
-    const normalizedPath = imagePath
-      .replace(/^database\/parsed_photos\//, '')
-      .replace(/^parsed_photos\//, '');
-    const fullPath = resolve(join(parsedPhotosBaseDir, normalizedPath));
-
-    if (!fullPath.startsWith(parsedPhotosBaseDir) || !existsSync(fullPath)) {
+    const fullPath = resolveParsedPhotoPath(imagePath);
+    if (!fullPath || !(await pathExists(fullPath))) {
       return new NextResponse('Not Found', { status: 404 });
     }
 
     const ext = extname(fullPath);
+    const normalizedPath = imagePath
+      .replace(/^database\/parsed_photos\//, '')
+      .replace(/^parsed_photos\//, '');
+
     return serveListingMediaFile(
       request,
       fullPath,

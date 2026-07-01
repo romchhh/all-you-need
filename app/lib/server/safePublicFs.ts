@@ -1,12 +1,12 @@
-import { readFile, unlink } from 'fs/promises';
-import { join, normalize, sep } from 'path';
+import { join, sep } from 'path';
+import { deleteUserAvatarFiles } from '@/lib/server/avatarFiles';
+import { readFileBuffer, unlinkFile } from '@/lib/server/nodeFs';
 
 const PUBLIC_ROOT = join(process.cwd(), 'public');
-
-const ALLOWED_PUBLIC_PREFIXES = ['listings/', 'avatars/'] as const;
+const SAFE_SEGMENT = /^[a-zA-Z0-9._-]+$/;
 
 /**
- * Безпечний абсолютний шлях лише під public/listings|avatars (без existsSync на dynamic public/*).
+ * Безпечний абсолютний шлях лише під public/listings|avatars.
  */
 export function resolveSafePublicPath(urlOrPath: string): string | null {
   const clean = urlOrPath.split('?')[0].trim().replace(/^\/+/, '');
@@ -14,12 +14,21 @@ export function resolveSafePublicPath(urlOrPath: string): string | null {
     return null;
   }
 
-  const allowed = ALLOWED_PUBLIC_PREFIXES.some((prefix) => clean.startsWith(prefix));
-  if (!allowed) {
+  const parts = clean.split('/').filter(Boolean);
+  if (parts.length < 2) {
     return null;
   }
 
-  const abs = normalize(join(PUBLIC_ROOT, clean));
+  const root = parts[0];
+  if (root !== 'listings' && root !== 'avatars') {
+    return null;
+  }
+
+  if (!parts.every((p) => SAFE_SEGMENT.test(p))) {
+    return null;
+  }
+
+  const abs = join(PUBLIC_ROOT, ...parts);
   const rootWithSep = PUBLIC_ROOT.endsWith(sep) ? PUBLIC_ROOT : `${PUBLIC_ROOT}${sep}`;
   if (!abs.startsWith(rootWithSep)) {
     return null;
@@ -35,7 +44,7 @@ export async function readSafePublicFile(urlOrPath: string): Promise<Buffer | nu
   }
 
   try {
-    return await readFile(abs);
+    return await readFileBuffer(abs);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
       return null;
@@ -51,7 +60,7 @@ export async function deleteSafePublicFile(urlOrPath: string): Promise<boolean> 
   }
 
   try {
-    await unlink(abs);
+    await unlinkFile(abs);
     return true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {

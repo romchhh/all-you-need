@@ -2,9 +2,7 @@
  * Утиліта для надсилання оголошень в групу модерації через Telegram Bot API
  */
 
-import { readFile } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { loadModerationImageBuffer } from '@/lib/server/moderationImageLoader';
 
 const MODERATION_GROUP_ID = process.env.MODERATION_GROUP_ID;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -132,35 +130,9 @@ export async function sendListingToModerationGroup(
         if (isUrl && source === 'marketplace') {
           // Завантажуємо зображення та надсилаємо через multipart/form-data
           try {
-            let buffer: Buffer | null = null;
-            
-            // Спочатку спробуємо прочитати з диска
-            // Витягуємо шлях з URL (наприклад, https://tradegrnd.com/listings/file.webp -> /listings/file.webp)
-            let localPath: string | null = null;
-            
-            if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-              // Витягуємо шлях з URL
-              try {
-                const urlObj = new URL(imageUrl);
-                const pathFromUrl = urlObj.pathname; // /listings/file.webp
-                localPath = join(process.cwd(), 'public', pathFromUrl);
-              } catch (e) {
-                // Якщо не вдалося розпарсити URL, спробуємо витягти шлях вручну
-                const pathMatch = imageUrl.match(/\/listings\/[^\/]+$/);
-                if (pathMatch) {
-                  localPath = join(process.cwd(), 'public', pathMatch[0]);
-                }
-              }
-            } else if (imageUrl.startsWith('/')) {
-              // Вже відносний шлях
-              localPath = join(process.cwd(), 'public', imageUrl);
-            }
-            
-            // Спробуємо прочитати з диска
-            if (localPath && existsSync(localPath)) {
-              console.log('[sendToModerationGroup] Reading image from disk:', localPath);
-              buffer = await readFile(localPath);
-            } else {
+            let buffer: Buffer | null = await loadModerationImageBuffer(imageUrl);
+
+            if (!buffer) {
               // Якщо не знайдено на диску, спробуємо завантажити через HTTP
               // Спочатку спробуємо через API route, якщо це listings
               let fetchUrl = imageUrl;
@@ -317,18 +289,10 @@ export async function sendListingToModerationGroup(
             // Якщо не вдалося завантажити зображення, спробуємо ще раз через локальний шлях
             // або відправимо без фото (тільки текст)
             try {
-              // Спробуємо знайти файл локально
-              let localPath: string | null = null;
-              if (imageUrl.includes('/listings/')) {
-                const pathMatch = imageUrl.match(/\/listings\/[^\/]+$/);
-                if (pathMatch) {
-                  localPath = join(process.cwd(), 'public', pathMatch[0]);
-                }
-              }
-              
-              if (localPath && existsSync(localPath)) {
-                console.log('[sendToModerationGroup] Retrying with local file:', localPath);
-                const localBuffer = await readFile(localPath);
+              const localBuffer = await loadModerationImageBuffer(imageUrl);
+
+              if (localBuffer) {
+                console.log('[sendToModerationGroup] Retrying with local file');
                 
                 const boundary = `----WebKitFormBoundary${Date.now()}${Math.random().toString(36).substring(7)}`;
                 const formDataParts: Buffer[] = [];
@@ -450,40 +414,10 @@ export async function sendListingToModerationGroup(
               const img = images[i];
               
               try {
-                let buffer: Buffer | null = null;
-                let localPath: string | null = null;
-                
-                // Спочатку спробуємо прочитати з диска
-                if (img.startsWith('http://') || img.startsWith('https://')) {
-                  // Витягуємо шлях з URL
-                  try {
-                    const urlObj = new URL(img);
-                    const pathFromUrl = urlObj.pathname; // /listings/file.webp або /api/images/listings/file.webp
-                    // Якщо це API route, витягаємо оригінальний шлях
-                    const actualPath = pathFromUrl.startsWith('/api/images/') 
-                      ? pathFromUrl.replace('/api/images/', '/') 
-                      : pathFromUrl;
-                    localPath = join(process.cwd(), 'public', actualPath);
-                  } catch (e) {
-                    // Якщо не вдалося розпарсити URL, спробуємо витягти шлях вручну
-                    const pathMatch = img.match(/\/listings\/[^\/]+$/);
-                    if (pathMatch) {
-                      localPath = join(process.cwd(), 'public', pathMatch[0]);
-                    }
-                  }
-                } else if (img.startsWith('/')) {
-                  // Вже відносний шлях з початковим слешем
-                  localPath = join(process.cwd(), 'public', img);
-                } else if (img.includes('listings/')) {
-                  // Шлях без початкового слеша (наприклад: listings/file.webp)
-                  const relativePath = img.startsWith('/') ? img.slice(1) : img;
-                  localPath = join(process.cwd(), 'public', relativePath);
-                }
-                
-                // Спробуємо прочитати з диска
-                if (localPath && existsSync(localPath)) {
-                  console.log(`[sendToModerationGroup] Reading image ${i} from disk:`, localPath);
-                  buffer = await readFile(localPath);
+                let buffer: Buffer | null = await loadModerationImageBuffer(img);
+
+                if (buffer) {
+                  console.log(`[sendToModerationGroup] Reading image ${i} from disk`);
                   imageBuffers.push({ buffer, fullUrl: img });
                 } else {
                   // Якщо не знайдено на диску, спробуємо завантажити через HTTP

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserIdAndActive } from '@/utils/userHelpers';
-import { writeFile, mkdir, readdir, unlink } from 'fs/promises';
+import { deleteUserAvatarFiles } from '@/lib/server/avatarFiles';
+import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
@@ -49,17 +50,7 @@ async function handleRequest(request: NextRequest) {
       }
 
       // Видаляємо всі старі аватари цього користувача (avatar_123.* та avatar_123_*)
-      const prefix = `avatar_${telegramId}`;
-      try {
-        const files = await readdir(uploadsDir);
-        for (const file of files) {
-          if (file.startsWith(`${prefix}.`) || file.startsWith(`${prefix}_`)) {
-            await unlink(join(uploadsDir, file));
-          }
-        }
-      } catch (e) {
-        // ігноруємо помилки читання/видалення
-      }
+      await deleteUserAvatarFiles(telegramId);
 
       // Визначаємо розширення файлу
       const originalName = avatarFile.name;
