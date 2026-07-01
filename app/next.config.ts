@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { LISTING_MEDIA_CACHE_CONTROL } from "./lib/media/listingMediaCache";
+import { LISTING_MEDIA_CACHE_CONTROL } from "./lib/media/listingMediaConstants";
 
 const listingMediaCacheHeader = {
   key: 'Cache-Control',

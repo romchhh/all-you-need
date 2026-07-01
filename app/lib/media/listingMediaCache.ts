@@ -1,15 +1,10 @@
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import {
+  LISTING_MEDIA_CACHE_CONTROL,
+  LISTING_MEDIA_URL_PATTERNS,
+} from '@/lib/media/listingMediaConstants';
 
-/** HTTP-кеш для незмінних файлів оголошень (CDN + браузер). */
-export const LISTING_MEDIA_CACHE_CONTROL =
-  'public, max-age=31536000, immutable, stale-while-revalidate=604800';
-
-export const LISTING_MEDIA_URL_PATTERNS = [
-  '/api/images/',
-  '/api/parsed-images/',
-  '/listings/',
-  '/avatars/',
-] as const;
+export { LISTING_MEDIA_CACHE_CONTROL, LISTING_MEDIA_URL_PATTERNS };
 
 export function isListingMediaUrl(pathname: string): boolean {
   return LISTING_MEDIA_URL_PATTERNS.some((p) => pathname.includes(p));
