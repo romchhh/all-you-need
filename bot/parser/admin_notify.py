@@ -81,6 +81,12 @@ CITY_FLAG = {
 
 
 def _format_admin_message(item: dict) -> str:
+    parser_type = (item.get("parser_type") or "default").strip()
+    if parser_type == "services_channel":
+        header = "НОВА ПОСЛУГА (AI → канал TradeGround)"
+    else:
+        header = "НОВЕ ОГОЛОШЕННЯ З ПАРСЕРА"
+
     category_label = get_category_label(item.get("category", "other"), item.get("subcategory"))
     cat_emoji = CATEGORY_EMOJI.get(item.get("category", "other"), "📦")
     city_display = CITY_FLAG.get(item.get("location", ""), item.get("location", "—"))
@@ -116,7 +122,7 @@ def _format_admin_message(item: dict) -> str:
     }.get(condition, condition or "—")
 
     lines = [
-        f"🆕 <b>НОВЕ ОГОЛОШЕННЯ З ПАРСЕРА</b>",
+        f"🆕 <b>{header}</b>",
         f"",
         f"📋 <b>{title}</b>",
         f"",

@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -151,18 +152,15 @@ const ListingCardComponent = ({
     return buildListingImageUrl(image);
   }, [listing.image, listing.images]);
 
-  const [imageLoading, setImageLoading] = useState(Boolean(imageUrl));
   const [imageError, setImageError] = useState(
     !imageUrl && (!listing.image && (!listing.images || listing.images.length === 0))
   );
 
   useEffect(() => {
     if (!imageUrl) {
-      setImageLoading(false);
       setImageError(true);
       return;
     }
-    setImageLoading(true);
     setImageError(false);
   }, [imageUrl]);
 
@@ -202,26 +200,18 @@ const ListingCardComponent = ({
             </div>
           </div>
         ) : (
-          <img 
+          <CachedListingImage
             src={imageUrl}
             alt={listing.title}
             className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
-              imageLoading ? 'opacity-0 transition-opacity duration-300' : 'opacity-100'
-            } ${isSold || isDeactivated ? 'grayscale' : ''}`}
+              isSold || isDeactivated ? 'grayscale' : ''
+            }`}
             style={{ width: '100%', height: '100%' }}
-            loading={priority ? 'eager' : 'lazy'}
-            fetchPriority={priority ? 'high' : 'auto'}
-            decoding="async"
+            priority={priority}
             sizes={isStacked ? '(max-width: 1023px) 50vw, 240px' : '(max-width: 1023px) 50vw, 25vw'}
             key={`${listing.image}-${listing.id}`}
-            onLoad={() => {
-              setImageLoading(false);
-              setImageError(false);
-            }}
-            onError={(e) => {
-              setImageLoading(false);
+            onError={() => {
               setImageError(true);
-              console.error('Error loading listing image:', listing.image);
             }}
           />
         )}

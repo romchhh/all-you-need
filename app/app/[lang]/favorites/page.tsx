@@ -13,6 +13,7 @@ import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
 import { getCachedData, setCachedData } from '@/utils/cache';
+import { prefetchListingsImages } from '@/lib/media/listingMediaCache';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePullToRefresh } from '@/features/ui/hooks/usePullToRefresh';
 import CreateListingFlow from '@/components/listing/CreateListingFlow';
@@ -152,6 +153,7 @@ const FavoritesPage = () => {
         });
         
         setListings(validListings);
+        prefetchListingsImages(validListings);
       } catch (error) {
         console.error('[Favorites] Error fetching favorite listings:', error);
         setListings([]);

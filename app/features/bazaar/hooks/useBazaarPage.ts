@@ -20,6 +20,7 @@ import {
   type BazaarTabPersistedState,
 } from '@/lib/bazaar/bazaarTabStateStorage';
 import { listingToSearchPreview, updateSearchHistoryListings } from '@/utils/searchHistory';
+import { prefetchListingsImages } from '@/lib/media/listingMediaCache';
 import {
   consumePendingListingCategory,
   resolveListingCategoryFilter,
@@ -510,6 +511,7 @@ export function useBazaarPage() {
             setListingsOffset(cached.offset ?? PAGE_SIZE);
             setInitialLoading(false);
             setIsListingsRefreshing(false);
+            prefetchListingsImages(cached.listings || []);
             return;
           }
         }
@@ -528,6 +530,7 @@ export function useBazaarPage() {
         setTotalListings(total);
         setHasMore(more);
         setListingsOffset(list.length);
+        prefetchListingsImages(list);
 
         if (useSearch && searchForRequest?.trim() && list.length > 0) {
           updateSearchHistoryListings(
@@ -589,6 +592,7 @@ export function useBazaarPage() {
       setInitialLoading(false);
       hasLoadedListings.current = true;
       previousFilterKey.current = filterKey;
+      prefetchListingsImages(cached.listings || []);
       return;
     }
 
@@ -675,6 +679,7 @@ export function useBazaarPage() {
         setListingsOffset(newOffset);
         setTotalListings(total);
         setHasMore(newHasMore);
+        prefetchListingsImages(appended, 16);
         tg?.HapticFeedback.impactOccurred('light');
         if (!hasActiveFilters && !hasSearchQuery && typeof window !== 'undefined') {
           setCachedData('bazaarListingsState', {

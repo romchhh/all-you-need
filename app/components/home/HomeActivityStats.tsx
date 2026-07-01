@@ -54,8 +54,23 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
   const locale = useMemo(() => (language === 'ru' ? 'ru-RU' : 'uk-UA'), [language]);
   const fmt = useCallback((n: number) => n.toLocaleString(locale), [locale]);
 
+  useLayoutEffect(() => {
+    const key = getHomeActivityWindowKey();
+    if (stats?.windowKey && stats.windowKey !== key) {
+      windowKeyRef.current = key;
+      setMenuOpen(false);
+      setStats({
+        online: stats.online,
+        newListingsToday: 0,
+        newListingsByCity: [],
+        newListingsByCategory: [],
+        windowKey: key,
+      });
+      void load(true);
+    }
+  }, [load, stats?.online, stats?.windowKey]);
+
   useEffect(() => {
-    void load(false);
     const id = setInterval(() => void load(false), HOME_ACTIVITY_CLIENT_TTL_MS);
     const onVis = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {

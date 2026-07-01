@@ -14,6 +14,7 @@ import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
 import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
+import { prefetchListingsImages } from '@/lib/media/listingMediaCache';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useUser } from '@/features/user/hooks/useUser';
 import { usePullToRefresh } from '@/features/ui/hooks/usePullToRefresh';
@@ -383,6 +384,7 @@ const CategoriesPage = () => {
             setHasMore((cached.listings?.length || 0) < (cached.total || 0));
             setListingsOffset(cached.offset ?? PAGE_SIZE);
             setLoading(false);
+            prefetchListingsImages(cached.listings || []);
             return;
           }
         }
@@ -396,6 +398,7 @@ const CategoriesPage = () => {
           setTotalListings(total);
           setHasMore(list.length < total);
           setListingsOffset(list.length);
+          prefetchListingsImages(list);
           setCachedData(cacheKey, {
             listings: list,
             total,

@@ -1,6 +1,6 @@
 """Формування опису оголошення для маркетплейсу."""
 
-from parser.core.telegram_meta import extract_username_from_text
+from parser.core.telegram_meta import extract_username_from_text, parsed_item_message_link
 from parser.core.text import detect_lang, enrich_description
 
 
@@ -22,10 +22,14 @@ def build_marketplace_description(item: dict) -> str:
 
     contact_line = ""
     if author_username:
-        if lang == "uk":
-            contact_line = f"👤 Автор: @{author_username}"
-        else:
-            contact_line = f"👤 Автор: @{author_username}"
+        contact_line = f"👤 Автор: @{author_username}"
+    else:
+        msg_link = parsed_item_message_link(item)
+        if msg_link:
+            if lang == "uk":
+                contact_line = f"🔗 Оригінальне оголошення: {msg_link}"
+            else:
+                contact_line = f"🔗 Оригинальное объявление: {msg_link}"
 
     parts = [base]
     if contact_line:

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile } from 'fs/promises';
 import { basename, extname, join, resolve } from 'path';
 import { existsSync } from 'fs';
+import { serveListingMediaFile } from '@/lib/media/serveListingMediaFile';
 
 function findReadableListingImage(imagePath: string): string | null {
   const publicDir = join(process.cwd(), 'public');
@@ -30,6 +30,22 @@ function findReadableListingImage(imagePath: string): string | null {
   return null;
 }
 
+function mimeByExt(ext: string | undefined): string {
+  switch (ext?.toLowerCase()) {
+    case 'webp':
+      return 'image/webp';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -40,41 +56,25 @@ export async function GET(
     if (imagePath.startsWith('api/images/')) {
       imagePath = imagePath.slice('api/images/'.length);
     }
-    
-    // Безпека: перевіряємо, що шлях не виходить за межі public
+
     if (!imagePath || imagePath.includes('..') || imagePath.startsWith('/')) {
       return new NextResponse('Not Found', { status: 404 });
     }
 
     const fullPath = findReadableListingImage(imagePath);
-    
     if (!fullPath) {
       return new NextResponse('Not Found', { status: 404 });
     }
 
-    // Читаємо файл
-    const fileBuffer = await readFile(fullPath);
-    
-    // Визначаємо content type
-    const ext = fullPath.split('.').pop()?.toLowerCase();
-    const contentType = 
-      ext === 'webp' ? 'image/webp' :
-      ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
-      ext === 'png' ? 'image/png' :
-      ext === 'gif' ? 'image/gif' :
-      'application/octet-stream';
-
-    // Повертаємо зображення з headers, що дозволяють кешування
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable', // Кешуємо на 1 рік
-        'ETag': `"${imagePath}-${fileBuffer.length}"`, // Додаємо ETag для перевірки змін
-      },
-    });
+    const ext = fullPath.split('.').pop();
+    return serveListingMediaFile(
+      request,
+      fullPath,
+      `img-${imagePath}`,
+      mimeByExt(ext)
+    );
   } catch (error) {
     console.error('Error serving image:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
-

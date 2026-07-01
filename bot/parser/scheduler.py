@@ -13,6 +13,11 @@
   PARSER_BOT_TELEGRAM_ID — telegram_id системного користувача-бота
   BOT_TOKEN           — токен основного aiogram-бота (для надсилання в групу)
   PARSER_EXTRA_CHANNELS — додаткові канали: userOrLink:Місто,... (див. parser.py)
+  PARSER_SERVICES_AI_CHANNELS — групи послуг для AI→канал: userOrLink:Місто,...
+  PARSER_SERVICES_AI_MODERATION_CHANNEL_ID — модерація (за замовч. -1003901841142)
+  PARSER_SERVICES_AI_INTERVAL_MIN — інтервал AI-парсера послуг (за замовч. = PARSER_INTERVAL_MIN)
+  TRADE_SERVICES_CHANNEL_ID — публічний канал TradeGround для послуг
+  OPENAI_API_KEY — AI при підтвердженні модератором
 """
 
 import asyncio
@@ -30,6 +35,9 @@ PARSER_API_ID: int = int(os.getenv("PARSER_API_ID", "0"))
 PARSER_API_HASH: str = os.getenv("PARSER_API_HASH", "")
 PARSER_PHONE: str = os.getenv("PARSER_PHONE", "")
 PARSER_INTERVAL_MIN: float = float(os.getenv("PARSER_INTERVAL_MIN", "30"))
+PARSER_SERVICES_AI_INTERVAL_MIN: float = float(
+    os.getenv("PARSER_SERVICES_AI_INTERVAL_MIN", os.getenv("PARSER_INTERVAL_MIN", "30"))
+)
 BOT_TOKEN: str = os.getenv("TOKEN", "")
 
 SESSION_PATH = Path(__file__).resolve().parent / "parser_session"
@@ -113,6 +121,87 @@ async def run_parser_cycle():
         await aiogram_bot.session.close()
 
 
+async def run_services_ai_parser_cycle():
+    """Цикл парсингу груп послуг → модерація → публікація лише в Telegram-канал."""
+    from parser.config.services_ai_channels import services_ai_parser_enabled
+
+    if not services_ai_parser_enabled():
+        logger.debug("Services AI parser вимкнено або немає SERVICE_CHANNELS у CHANNELS")
+        return
+
+    if not BOT_TOKEN:
+        logger.error("TOKEN не встановлено — services AI parser не може сповіщати модераторів")
+        return
+
+    from aiogram import Bot
+    from parser.admin_notify import (
+        notify_admin_group,
+        notify_parser_channel_errors,
+        notify_parser_error_admins,
+    )
+    from parser.session_lock import pyrogram_session_guard
+
+    aiogram_bot = Bot(token=BOT_TOKEN)
+
+    async def _notify_error(title: str, details: str) -> None:
+        try:
+            await notify_parser_error_admins(aiogram_bot, title, details)
+        except Exception as notify_err:
+            logger.warning("Не вдалося сповістити адмінів про помилку services AI parser: %s", notify_err)
+
+    try:
+        if not PARSER_API_ID or not PARSER_API_HASH or not PARSER_PHONE:
+            msg = "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
+            logger.error(msg)
+            await _notify_error("services AI — налаштування", msg)
+            return
+
+        try:
+            from pyrogram import Client
+        except ImportError:
+            msg = "Pyrogram не встановлено. Запусти: pip install pyrogram tgcrypto"
+            logger.error(msg)
+            await _notify_error("services AI — залежності", msg)
+            return
+
+        from parser.core.services_ai_runner import run_services_ai_channels
+
+        async def notify_callback(item_data: dict):
+            await notify_admin_group(aiogram_bot, item_data)
+
+        pyrogram_client = Client(
+            name=str(SESSION_PATH),
+            api_id=PARSER_API_ID,
+            api_hash=PARSER_API_HASH,
+            phone_number=PARSER_PHONE,
+        )
+
+        try:
+            async with pyrogram_session_guard(SESSION_PATH):
+                async with pyrogram_client:
+                    logger.info("🔍 Починаємо парсинг груп послуг (AI → канал)…")
+                    stats = await run_services_ai_channels(pyrogram_client, notify_callback)
+                    logger.info(
+                        "✅ Services AI parser: +%s нових, пропущено %s",
+                        stats["added"],
+                        stats["skipped"],
+                    )
+                    channel_errors = stats.get("errors") or []
+                    if channel_errors:
+                        await notify_parser_channel_errors(aiogram_bot, channel_errors)
+        except RuntimeError as e:
+            logger.error("Services AI parser — сесія зайнята: %s", e, exc_info=True)
+            await _notify_error("services AI — сесія зайнята", str(e))
+        except Exception as e:
+            logger.error("Критична помилка services AI parser: %s", e, exc_info=True)
+            await _notify_error(
+                "services AI — критична помилка",
+                f"{type(e).__name__}: {e}\n\n{traceback.format_exc()[-3000:]}",
+            )
+    finally:
+        await aiogram_bot.session.close()
+
+
 # ──────────────────────────────────────────────
 # Реєстрація задачі в apscheduler (для інтеграції з main.py)
 # ──────────────────────────────────────────────
@@ -136,6 +225,32 @@ def register_parser_job(scheduler):
         max_instances=1,
     )
     logger.info(f"✅ Parser scheduler зареєстровано (інтервал: {PARSER_INTERVAL_MIN} хв)")
+
+
+def register_services_ai_parser_job(scheduler):
+    """Реєструє парсер послуг (AI → канал TradeGround, без маркетплейсу)."""
+    from parser.config.services_ai_channels import services_ai_parser_enabled
+
+    if not services_ai_parser_enabled():
+        logger.info(
+            "Services AI parser не зареєстровано "
+            "(PARSER_SERVICES_AI_ENABLED=0 або порожній SERVICE_CHANNELS)"
+        )
+        return
+
+    scheduler.add_job(
+        run_services_ai_parser_cycle,
+        trigger="interval",
+        minutes=PARSER_SERVICES_AI_INTERVAL_MIN,
+        id="telegram_services_ai_parser",
+        replace_existing=True,
+        misfire_grace_time=max(60, int(PARSER_SERVICES_AI_INTERVAL_MIN * 60)),
+        max_instances=1,
+    )
+    logger.info(
+        "✅ Services AI parser scheduler зареєстровано (інтервал: %s хв)",
+        PARSER_SERVICES_AI_INTERVAL_MIN,
+    )
 
 
 # ──────────────────────────────────────────────

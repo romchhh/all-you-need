@@ -3,6 +3,7 @@
 import { Image as ImageIcon } from 'lucide-react';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface ImageGalleryProps {
@@ -81,13 +82,13 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
             onClick={() => onImageClick?.(index)}
           >
             {src ? (
-              <img
+              <CachedListingImage
                 src={src}
                 alt={`${title} ${index + 1}`}
                 className="block h-auto max-h-full w-full max-w-full select-none object-contain"
                 draggable={false}
-                loading={index === 0 ? 'eager' : 'lazy'}
-                decoding="async"
+                priority={index === 0}
+                fadeIn={false}
                 onError={(e) => {
                   console.error('Error loading image:', images[index], src);
                   const target = e.target as HTMLImageElement;

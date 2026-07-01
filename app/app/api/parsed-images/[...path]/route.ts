@@ -1,7 +1,7 @@
 import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
 import { extname, join, resolve } from 'path';
 import { NextRequest, NextResponse } from 'next/server';
+import { serveListingMediaFile } from '@/lib/media/serveListingMediaFile';
 
 const parsedPhotosBaseDir = resolve(process.cwd(), '..', 'database', 'parsed_photos');
 
@@ -42,20 +42,15 @@ export async function GET(
       return new NextResponse('Not Found', { status: 404 });
     }
 
-    const fileBuffer = await readFile(fullPath);
     const ext = extname(fullPath);
-    const contentType = mimeByExt(ext);
-
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        ETag: `"parsed-${normalizedPath}-${fileBuffer.length}"`,
-      },
-    });
+    return serveListingMediaFile(
+      request,
+      fullPath,
+      `parsed-${normalizedPath}`,
+      mimeByExt(ext)
+    );
   } catch (error) {
     console.error('[parsed-images] serve failed', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
-

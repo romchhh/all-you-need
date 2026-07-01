@@ -81,10 +81,12 @@ async def scheduler_jobs():
     import os as _os
     if _os.getenv("PARSER_API_ID"):
         try:
-            from parser.scheduler import register_parser_job
+            from parser.scheduler import register_parser_job, register_services_ai_parser_job
 
             register_parser_job(scheduler)
             print("✅ Scheduler job 'telegram_parser' додано (парсинг каналів)")
+            register_services_ai_parser_job(scheduler)
+            print("✅ Scheduler job 'telegram_services_ai_parser' додано (послуги → канал)")
         except Exception as e:
             print(f"❌ Помилка реєстрації parser job: {e}")
             import traceback

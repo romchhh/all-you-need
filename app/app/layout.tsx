@@ -8,6 +8,7 @@ import { MobileOptimizationScript } from "@/components/system/MobileOptimization
 import { TelegramAccessGuard } from "@/components/telegram/TelegramAccessGuard";
 import { RegistrationGate } from "@/components/telegram/RegistrationGate";
 import { AppProviders } from "@/components/layout/AppProviders";
+import { ListingMediaCacheScript } from "@/components/system/ListingMediaCacheScript";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,6 +59,7 @@ export default function RootLayout({
             <AppProviders>
               <PerformanceScript />
               <MobileOptimizationScript />
+              <ListingMediaCacheScript />
               <TelegramAccessGuard>
                 <RegistrationGate>
                   {children}

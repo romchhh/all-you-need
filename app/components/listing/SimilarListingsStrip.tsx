@@ -4,6 +4,7 @@ import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { CachedListingImage } from '@/components/listing/CachedListingImage';
 
 interface SimilarListingsStripProps {
   listings: Listing[];
@@ -60,12 +61,12 @@ export function SimilarListingsStrip({
               aria-label={item.title}
             >
               {imageSrc ? (
-                <img
+                <CachedListingImage
                   src={imageSrc}
                   alt=""
                   className="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
                   draggable={false}
+                  fadeIn={false}
                 />
               ) : (
                 <div

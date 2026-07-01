@@ -3,6 +3,7 @@
 import logging
 
 from parser.moderation.config import (
+    NOTIFY_AUTHOR_CHANNEL_TEXT_RU,
     NOTIFY_AUTHOR_TEXT_RU,
     PARSER_API_HASH,
     PARSER_API_ID,
@@ -42,6 +43,7 @@ async def try_notify_author_via_pyrogram(
     item: dict,
     listing_id: int,
     use_services_sender: bool = False,
+    channel_only: bool = False,
     _retried_main_fallback: bool = False,
     _flood_account_switch_done: bool = False,
 ):
@@ -84,10 +86,13 @@ async def try_notify_author_via_pyrogram(
 
     from parser.session_lock import pyrogram_session_guard
 
-    plain_text = NOTIFY_AUTHOR_TEXT_RU.format(
-        title=title,
-        listing_url=listing_miniapp_url(listing_id),
-    )
+    if channel_only:
+        plain_text = NOTIFY_AUTHOR_CHANNEL_TEXT_RU.format(title=title)
+    else:
+        plain_text = NOTIFY_AUTHOR_TEXT_RU.format(
+            title=title,
+            listing_url=listing_miniapp_url(listing_id),
+        )
 
     try:
         app = Client(
@@ -118,6 +123,7 @@ async def try_notify_author_via_pyrogram(
                 item,
                 listing_id,
                 use_services_sender=False,
+                channel_only=channel_only,
                 _retried_main_fallback=True,
                 _flood_account_switch_done=_flood_account_switch_done,
             )
@@ -132,6 +138,7 @@ async def try_notify_author_via_pyrogram(
                     item,
                     listing_id,
                     use_services_sender=False,
+                    channel_only=channel_only,
                     _retried_main_fallback=_retried_main_fallback,
                     _flood_account_switch_done=True,
                 )
@@ -144,6 +151,7 @@ async def try_notify_author_via_pyrogram(
                     item,
                     listing_id,
                     use_services_sender=True,
+                    channel_only=channel_only,
                     _retried_main_fallback=_retried_main_fallback,
                     _flood_account_switch_done=True,
                 )

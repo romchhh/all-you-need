@@ -15,6 +15,7 @@ from parser.ai_enrich import (
     merge_enrichment_into_item,
 )
 from parser.category_keywords import get_category_label
+from parser.config.services_ai_channels import PARSER_TYPE_SERVICES_CHANNEL
 from parser.marketplace_categories import apply_marketplace_categories_to_item
 from parser.moderation.author_notify import try_notify_author_via_pyrogram
 from parser.moderation.config import (
@@ -41,32 +42,17 @@ from utils.city_digest_notify import enqueue_city_digest_listing
 logger = logging.getLogger(__name__)
 
 
-async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
-    item_id = int(callback.data.split(":")[1])
-    moderator_id = callback.from_user.id
-
-    item = get_parsed_item_by_id(item_id)
-    if not item:
-        await callback.answer("❌ Оголошення не знайдено в БД", show_alert=True)
-        return
-
-    if item.get("status") == "approved":
-        await callback.answer("ℹ️ Оголошення вже підтверджено", show_alert=True)
-        return
-    if item.get("status") == "rejected":
-        await callback.answer("ℹ️ Оголошення вже відхилено", show_alert=True)
-        return
-
-    images_raw = item.get("images_json") or "[]"
-    try:
-        images: list[str] = json.loads(images_raw)
-    except Exception:
-        images = []
-
+async def _apply_ai_enrichment(
+    callback: CallbackQuery,
+    item: dict,
+    item_id: int,
+    force_ai: bool = False,
+) -> tuple[dict, str]:
     listing_item = dict(item)
     ai_summary = ""
 
-    if is_ai_enrich_enabled():
+    ai_enabled = is_ai_enrich_enabled() or force_ai
+    if ai_enabled:
         try:
             await callback.answer("🤖 AI аналізує оголошення…", show_alert=False)
         except TelegramBadRequest:
@@ -85,10 +71,94 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
             )
     else:
         try:
-            await callback.answer("⏳ Додаємо в маркетплейс…", show_alert=False)
+            await callback.answer("⏳ Обробляємо…", show_alert=False)
         except TelegramBadRequest:
             pass
 
+    return listing_item, ai_summary
+
+
+async def _approve_services_channel_only(
+    callback: CallbackQuery,
+    bot: Bot,
+    item_id: int,
+    item: dict,
+    moderator_id: int,
+):
+    """Послуги з AI-парсера: лише публікація в Telegram-канал, без маркетплейсу."""
+    images_raw = item.get("images_json") or "[]"
+    try:
+        images: list[str] = json.loads(images_raw)
+    except Exception:
+        images = []
+
+    listing_item, ai_summary = await _apply_ai_enrichment(
+        callback, item, item_id, force_ai=True
+    )
+    listing_item = apply_marketplace_categories_to_item(listing_item)
+
+    item_category = (listing_item.get("category") or "").strip().lower()
+    if item_category != "services_work":
+        await callback.answer("❌ AI не класифікував як послугу — відхиліть або перевірте текст", show_alert=True)
+        return
+
+    images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
+    description = build_marketplace_description(listing_item)
+    update_parsed_item_status(item_id, "approved", moderated_by=moderator_id)
+
+    group_id = callback.message.chat.id
+    msg_id = callback.message.message_id
+    if callback.from_user.username:
+        mod_mention = "@" + html.escape(callback.from_user.username)
+    else:
+        mod_mention = f"<code>{moderator_id}</code>"
+    status_text = (
+        f"✅ <b>Підтверджено</b> модератором {mod_mention}\n"
+        f"📣 Опубліковано в канал послуг TradeGround\n"
+        f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
+        f"📍 {html.escape(str(listing_item.get('location') or ''))}"
+    )
+    if ai_summary:
+        status_text += f"\n🤖 {html.escape(ai_summary[:220])}"
+
+    async def _followup():
+        await publish_services_listing_to_channel(
+            bot, listing_item, item_id, description, images_web
+        )
+        await edit_group_message(
+            bot,
+            group_id,
+            msg_id,
+            status_text,
+            parse_mode="HTML",
+        )
+
+    asyncio.create_task(_followup())
+    asyncio.create_task(
+        try_notify_author_via_pyrogram(
+            listing_item,
+            item_id,
+            use_services_sender=True,
+            channel_only=True,
+        )
+    )
+    logger.info("parsed_item %s → канал послуг (підтв. %s)", item_id, moderator_id)
+
+
+async def _approve_marketplace(
+    callback: CallbackQuery,
+    bot: Bot,
+    item_id: int,
+    item: dict,
+    moderator_id: int,
+):
+    images_raw = item.get("images_json") or "[]"
+    try:
+        images: list[str] = json.loads(images_raw)
+    except Exception:
+        images = []
+
+    listing_item, ai_summary = await _apply_ai_enrichment(callback, item, item_id)
     listing_item = apply_marketplace_categories_to_item(listing_item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
@@ -175,3 +245,26 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
     )
 
     logger.info("parsed_item %s → Listing %s (підтв. %s)", item_id, listing_id, moderator_id)
+
+
+async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
+    item_id = int(callback.data.split(":")[1])
+    moderator_id = callback.from_user.id
+
+    item = get_parsed_item_by_id(item_id)
+    if not item:
+        await callback.answer("❌ Оголошення не знайдено в БД", show_alert=True)
+        return
+
+    if item.get("status") == "approved":
+        await callback.answer("ℹ️ Оголошення вже підтверджено", show_alert=True)
+        return
+    if item.get("status") == "rejected":
+        await callback.answer("ℹ️ Оголошення вже відхилено", show_alert=True)
+        return
+
+    parser_type = (item.get("parser_type") or "default").strip()
+    if parser_type == PARSER_TYPE_SERVICES_CHANNEL:
+        await _approve_services_channel_only(callback, bot, item_id, item, moderator_id)
+    else:
+        await _approve_marketplace(callback, bot, item_id, item, moderator_id)

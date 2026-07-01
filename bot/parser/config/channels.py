@@ -121,3 +121,16 @@ def _channels_from_env() -> dict[str, str]:
 
 
 CHANNELS: dict[str, str] = dedupe_channels({**_BASE_CHANNELS, **_channels_from_env()})
+
+
+def service_channels_map() -> dict[str, str]:
+    """Канали послуг з загального CHANNELS (BEAUTY_SERVICE + SERVICE_ONLY)."""
+    out: dict[str, str] = {}
+    for key, city in CHANNELS.items():
+        nk = normalize_channel_key(key)
+        if nk in SERVICE_CHANNELS:
+            out[nk] = city
+    missing = SERVICE_CHANNELS - set(out.keys())
+    for svc in sorted(missing):
+        logger.warning("SERVICE_CHANNELS: %r не знайдено в CHANNELS — додайте в _BASE_CHANNELS", svc)
+    return out

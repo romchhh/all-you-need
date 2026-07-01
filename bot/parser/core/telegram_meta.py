@@ -14,6 +14,19 @@ def message_link(channel: str, message_id: int) -> str:
     return f"https://t.me/{clean}/{message_id}"
 
 
+def parsed_item_message_link(item: dict) -> Optional[str]:
+    """Посилання на оригінальний пост у групі/каналі (parsed_items)."""
+    source_channel = (item.get("source_channel") or "").strip()
+    message_id = item.get("message_id")
+    if source_channel and message_id is not None:
+        try:
+            return message_link(source_channel, int(message_id))
+        except (TypeError, ValueError):
+            pass
+    link = (item.get("msg_link") or "").strip()
+    return link or None
+
+
 def get_sender_username(msg) -> Optional[str]:
     origin = getattr(msg, "forward_origin", None)
     if origin is not None:

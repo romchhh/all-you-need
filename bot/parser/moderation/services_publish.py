@@ -11,6 +11,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 
 from parser.category_keywords import get_category_label
+from parser.core.telegram_meta import parsed_item_message_link
 from parser.core.text import detect_lang
 from parser.moderation.config import BOT_USERNAME, TRADE_SERVICES_CHANNEL_ID_RAW, WEBAPP_URL
 from utils.translations import t
@@ -135,11 +136,7 @@ async def publish_services_listing_to_channel(
     seller_label = t(user_id_for_lang, "listing.details.seller_channel")
     author_username = (item.get("author_username") or "").strip().lstrip("@")
     author_id = item.get("author_id")
-    source_channel = (item.get("source_channel") or "").strip()
-    message_id = item.get("message_id")
-    msg_link = (
-        f"https://t.me/{source_channel}/{message_id}" if source_channel and message_id else None
-    )
+    msg_link = parsed_item_message_link(item)
 
     seller_default_name = (
         t(user_id_for_lang, "listing.details.seller_channel")
@@ -156,6 +153,11 @@ async def publish_services_listing_to_channel(
             f"<a href=\"https://t.me/{html.escape(author_username, quote=True)}\">"
             f"{html.escape(seller_full_name)}</a>"
         )
+    elif msg_link:
+        lang = detect_lang(f"{item.get('title') or ''}\n{item.get('description') or ''}")
+        link_label = "Оригінал оголошення" if lang == "uk" else "Оригинал объявления"
+        safe_link = html.escape(msg_link, quote=True)
+        seller_text = f"{seller_label} <a href=\"{safe_link}\">{html.escape(link_label)}</a>"
     else:
         try:
             aid = int(author_id) if author_id is not None else 0
@@ -165,11 +167,6 @@ async def publish_services_listing_to_channel(
             seller_full_name = t(user_id_for_lang, "common.user")
             seller_link = f"tg://user?id={aid}"
             seller_text = f"{seller_label} <a href=\"{seller_link}\">{html.escape(seller_full_name)}</a>"
-        elif msg_link:
-            lang = detect_lang(f"{item.get('title') or ''}\n{item.get('description') or ''}")
-            link_label = "Оригінал оголошення" if lang == "uk" else "Оригинал объявления"
-            safe_link = html.escape(msg_link, quote=True)
-            seller_text = f"{seller_label} <a href=\"{safe_link}\">{html.escape(link_label)}</a>"
         else:
             seller_text = f"{seller_label} {html.escape(seller_default_name)}"
 

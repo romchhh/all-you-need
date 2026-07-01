@@ -1,4 +1,10 @@
 import type { NextConfig } from "next";
+import { LISTING_MEDIA_CACHE_CONTROL } from "./lib/media/listingMediaCache";
+
+const listingMediaCacheHeader = {
+  key: 'Cache-Control',
+  value: LISTING_MEDIA_CACHE_CONTROL,
+};
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -39,6 +45,22 @@ const nextConfig: NextConfig = {
   // Headers для Telegram WebApp та Ngrok сумісності
   async headers() {
     return [
+      {
+        source: '/api/images/:path*',
+        headers: [listingMediaCacheHeader],
+      },
+      {
+        source: '/api/parsed-images/:path*',
+        headers: [listingMediaCacheHeader],
+      },
+      {
+        source: '/listings/:path*',
+        headers: [listingMediaCacheHeader],
+      },
+      {
+        source: '/avatars/:path*',
+        headers: [listingMediaCacheHeader],
+      },
       {
         source: '/:path*',
         headers: [

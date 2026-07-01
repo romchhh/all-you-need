@@ -5,6 +5,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
 import { ListingAutoRenewSection } from '@/components/listing/ListingAutoRenewSection';
@@ -285,14 +286,13 @@ export const ProfileListingCard = ({
           }}
         >
           {imageUrl ? (
-            <img 
-              src={imageUrl} 
+            <CachedListingImage
+              src={imageUrl}
               alt={listing.title}
               className={`absolute inset-0 w-full h-full min-w-full min-h-full object-cover ${
                 isSold || isPendingModeration || isDeactivated ? 'grayscale opacity-50' : ''
               }`}
               style={{ width: '100%', height: '100%' }}
-              loading="lazy"
             />
           ) : (
             <div className={`absolute inset-0 w-full h-full flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-white/20'}`}>

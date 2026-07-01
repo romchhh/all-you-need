@@ -92,7 +92,7 @@ interface ListingDetailProps {
 }
 
 export const ListingDetail = ({ 
-  listing, 
+  listing: initialListing, 
   isFavorite, 
   onClose, 
   onToggleFavorite,
@@ -104,6 +104,12 @@ export const ListingDetail = ({
   onNavigateToCategory,
   onAutoRenewPersist,
 }: ListingDetailProps) => {
+  const [listing, setListing] = useState(initialListing);
+
+  useEffect(() => {
+    setListing(initialListing);
+  }, [initialListing]);
+
   const sellerUsername = listing.seller.username;
   const sellerPhone = listing.seller.phone;
   const images = listing.images || [listing.image];
@@ -333,28 +339,26 @@ export const ListingDetail = ({
     }
   }, [tg, listing.id]);
 
-  // Фіксуємо перегляд при відкритті оголошення
+  // Повні дані оголошення (опис тощо) + фіксація перегляду
   useEffect(() => {
-    const recordView = async () => {
+    const loadFullListing = async () => {
       try {
-        // Передаємо viewerId для відстеження унікальних переглядів
         const viewerId = currentUser?.id;
-        const url = viewerId 
+        const url = viewerId
           ? `/api/listings/${listing.id}?viewerId=${viewerId}`
           : `/api/listings/${listing.id}`;
-        
-        const response = await fetch(url, {
-          method: 'GET',
-        });
+
+        const response = await fetch(url, { method: 'GET' });
         if (response.ok) {
-          await response.json();
+          const data = (await response.json()) as Listing;
+          setListing((prev) => ({ ...prev, ...data }));
         }
       } catch (error) {
-        console.error('Error recording view:', error);
+        console.error('Error loading listing details:', error);
       }
     };
 
-    recordView();
+    void loadFullListing();
   }, [listing.id, currentUser?.id]);
 
   // Завантаження балансу користувача
@@ -423,9 +427,8 @@ export const ListingDetail = ({
             method: 'GET',
           });
           if (updatedResponse.ok) {
-            const updatedListing = await updatedResponse.json();
-            // Оновлюємо дані через router.refresh() або оновлюємо локальний стан
-            router.refresh();
+            const updatedListing = (await updatedResponse.json()) as Listing;
+            setListing((prev) => ({ ...prev, ...updatedListing }));
           }
         } catch (error) {
           console.error('Error fetching updated listing:', error);
@@ -549,7 +552,8 @@ export const ListingDetail = ({
         method: 'GET',
       });
       if (response.ok) {
-        await response.json();
+        const data = (await response.json()) as Listing;
+        setListing((prev) => ({ ...prev, ...data }));
       }
 
       // Оновлюємо пов'язані оголошення (тільки активні)

@@ -16,7 +16,7 @@ type CacheEnvelope = {
   fetchedAt: number;
 };
 
-const STORAGE_KEY = 'tradeground.homeActivity.v2';
+const STORAGE_KEY = 'tradeground.homeActivity.v3';
 /** Показуємо кеш одразу; фонове оновлення — не частіше ніж раз на 3 хв (зменшує навантаження). */
 export const HOME_ACTIVITY_CLIENT_TTL_MS = 180 * 1000;
 /** Якщо API недоступний — можна показувати застарілі дані до 15 хв. */
@@ -137,7 +137,7 @@ function ensureDayRolloverWatch(): void {
       notifyDayRollover();
       scheduleDayRolloverTimer();
     }
-  }, 60_000);
+  }, 30_000);
 }
 
 /** Підписка на скидання «+N сьогодні» о 06:00 Europe/Kyiv. */
@@ -174,9 +174,11 @@ export function readHomeActivityCache(): HomeActivityData | null {
   return null;
 }
 
-async function requestHomeActivity(): Promise<HomeActivityData | null> {
+async function requestHomeActivity(windowKey: string, force = false): Promise<HomeActivityData | null> {
   try {
-    const res = await fetch('/api/home-activity', { cache: 'default' });
+    const res = await fetch(`/api/home-activity?wk=${encodeURIComponent(windowKey)}`, {
+      cache: force ? 'no-store' : 'default',
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as HomeActivityData;
     if (!isValidPayload(data)) return null;
@@ -209,7 +211,7 @@ export async function fetchHomeActivity(options?: {
     return inflight;
   }
 
-  inflight = requestHomeActivity().finally(() => {
+  inflight = requestHomeActivity(windowKey, Boolean(options?.force)).finally(() => {
     inflight = null;
   });
 

@@ -25,5 +25,5 @@ export const NEW_LISTINGS_IN_KYIV_WINDOW_SQL = `
   status = 'active'
   AND ${LISTING_STATS_PUBLISHED_AT_SQL} IS NOT NULL
   AND ${LISTING_STATS_PUBLISHED_AT_SQL} >= datetime(?)
-  AND ${LISTING_STATS_PUBLISHED_AT_SQL} <= datetime('now')
+  AND ${LISTING_STATS_PUBLISHED_AT_SQL} <= datetime(?)
 `;

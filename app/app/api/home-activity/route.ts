@@ -106,12 +106,14 @@ export async function GET() {
 
     const dayStart = startOfKyivListingsReportingWindow(now);
     const dayStartStr = toSQLiteDate(dayStart);
+    const nowStr = toSQLiteDate(now);
 
     const countRows = await executeWithRetry(
       () =>
         prisma.$queryRawUnsafe(
           `SELECT COUNT(*) AS count FROM Listing WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}`,
-          dayStartStr
+          dayStartStr,
+          nowStr
         ) as Promise<Array<{ count: bigint | number }>>
     );
     const newListingsToday = Number(countRows[0]?.count ?? 0);
@@ -122,7 +124,8 @@ export async function GET() {
         () =>
           prisma.$queryRawUnsafe(
             CITY_LISTINGS_SQL,
-            dayStartStr
+            dayStartStr,
+            nowStr
           ) as Promise<Array<{ city: string; count: bigint | number }>>
       );
       newListingsByCity = cityRows.map((row) => ({
@@ -139,7 +142,8 @@ export async function GET() {
         () =>
           prisma.$queryRawUnsafe(
             CATEGORY_LISTINGS_SQL,
-            dayStartStr
+            dayStartStr,
+            nowStr
           ) as Promise<Array<{ category: string; count: bigint | number }>>
       );
       newListingsByCategory = categoryRows.map((row) => ({

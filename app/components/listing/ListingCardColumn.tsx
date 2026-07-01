@@ -7,6 +7,7 @@ import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCurrencySymbol } from '@/utils/currency';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingViews } from '@/lib/listings/displayStats';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -141,12 +142,11 @@ const ListingCardColumnComponent = ({
           </div>
           
           {imageUrl ? (
-            <img 
-              src={imageUrl} 
+            <CachedListingImage
+              src={imageUrl}
               alt={listing.title}
               className="absolute inset-0 w-full h-full min-w-full min-h-full object-cover"
               style={{ width: '100%', height: '100%' }}
-              loading="lazy"
             />
           ) : (
             <div

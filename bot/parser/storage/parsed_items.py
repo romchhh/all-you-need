@@ -59,6 +59,12 @@ def ensure_parsed_items_table():
         "CREATE INDEX IF NOT EXISTS idx_parsed_items_dedup_key "
         "ON parsed_items(dedup_key) WHERE dedup_key IS NOT NULL"
     )
+    cursor.execute("PRAGMA table_info(parsed_items)")
+    col_names3 = {row[1] for row in cursor.fetchall()}
+    if "parser_type" not in col_names3:
+        cursor.execute(
+            "ALTER TABLE parsed_items ADD COLUMN parser_type TEXT DEFAULT 'default'"
+        )
     conn.commit()
     conn.close()
 
@@ -175,6 +181,7 @@ def insert_parsed_item(
     raw_text: str,
     content_hash: Optional[str] = None,
     dedup_key: Optional[str] = None,
+    parser_type: str = "default",
 ) -> int:
     conn = get_connection()
     cursor = conn.cursor()
@@ -184,14 +191,14 @@ def insert_parsed_item(
             author_username, author_id,
             title, description, price, currency, is_free,
             category, subcategory, condition, location,
-            images_json, raw_text, content_hash, dedup_key, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            images_json, raw_text, content_hash, dedup_key, parser_type, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     """, (
         source_channel, source_city, message_id, media_group_id,
         author_username, author_id,
         title, description, price, currency, int(is_free),
         category, subcategory, condition, location,
-        json.dumps(images, ensure_ascii=False), raw_text, content_hash, dedup_key,
+        json.dumps(images, ensure_ascii=False), raw_text, content_hash, dedup_key, parser_type,
     ))
     conn.commit()
     item_id = cursor.lastrowid
