@@ -1,4 +1,5 @@
 import asyncio
+import html
 import logging
 import os
 
@@ -10,6 +11,53 @@ from parser.session_lock import PARSER_SESSION_LOCK
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+
+def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
+    if not stats:
+        return "❌ <b>Парсинг не виконано</b>\n\nПеревір логи бота або .env (PARSER_API_ID, TOKEN)."
+
+    added = int(stats.get("added") or 0)
+    skipped = int(stats.get("skipped") or 0)
+    channels = stats.get("channels")
+    errors = stats.get("errors") or []
+    reasons = stats.get("reasons") or {}
+
+    title = "✅ <b>Парсинг послуг завершено</b>" if services else "✅ <b>Парсинг завершено</b>"
+    lines = [
+        title,
+        "",
+        f"➕ Нових: <b>{added}</b>",
+        f"⏭ Пропущено: <b>{skipped}</b>",
+    ]
+    if channels is not None:
+        lines.append(f"📢 Каналів у черзі: <b>{channels}</b>")
+
+    if reasons:
+        lines.append("")
+        lines.append("<b>Причини пропуску:</b>")
+        for reason, count in sorted(reasons.items(), key=lambda x: -x[1])[:8]:
+            lines.append(f"• {html.escape(reason)}: {count}")
+
+    if errors:
+        lines.append("")
+        lines.append(f"⚠️ Помилок каналів: <b>{len(errors)}</b>")
+        for err in errors[:3]:
+            ch = html.escape(str(err.get("channel", "?")))
+            msg = html.escape(str(err.get("error", ""))[:120])
+            lines.append(f"• {ch}: <code>{msg}</code>")
+
+    if services:
+        lines.append("")
+        lines.append(
+            "Модерація: <code>PARSER_SERVICES_AI_MODERATION_CHANNEL_ID</code>\n"
+            "Після ✅ → публікація в <code>TRADE_SERVICES_CHANNEL_ID</code>"
+        )
+    elif added == 0:
+        lines.append("")
+        lines.append("Якщо очікували нові оголошення — можливо вони вже в БД або канал без нових постів.")
+
+    return "\n".join(lines)
 
 
 @router.message(IsAdmin(), Command("parse", "parser", "run_parser"))
@@ -32,8 +80,8 @@ async def manual_parser_run(message: types.Message):
         return
 
     status_msg = await message.answer(
-        "🔍 <b>Запускаю парсинг каналів…</b>\n\n"
-        "Це може зайняти кілька хвилин. Нові оголошення з’являться у групі модерації.",
+        "🔍 <b>Запускаю парсинг каналів (маркетплейс)…</b>\n\n"
+        "Канали послуг обробляє <code>/parse_services</code>.",
         parse_mode="HTML",
     )
 
@@ -41,17 +89,16 @@ async def manual_parser_run(message: types.Message):
         try:
             from parser.scheduler import run_parser_cycle
 
-            await run_parser_cycle()
+            stats = await run_parser_cycle()
             await status_msg.edit_text(
-                "✅ <b>Парсинг завершено</b>\n\n"
-                "Перевір групу модерації. При помилках адміни отримують окреме сповіщення.",
+                _format_parser_stats(stats, services=False),
                 parse_mode="HTML",
             )
         except Exception as e:
             logger.exception("Manual parser run failed: %s", e)
             try:
                 await status_msg.edit_text(
-                    f"❌ <b>Помилка парсера</b>\n\n<code>{type(e).__name__}: {e}</code>",
+                    f"❌ <b>Помилка парсера</b>\n\n<code>{type(e).__name__}: {html.escape(str(e))}</code>",
                     parse_mode="HTML",
                 )
             except Exception:
@@ -63,7 +110,10 @@ async def manual_parser_run(message: types.Message):
 @router.message(IsAdmin(), Command("parse_services", "parse_services_ai"))
 async def manual_services_ai_parser_run(message: types.Message):
     """Ручний запуск парсера послуг (AI → канал TradeGround)."""
-    from parser.config.services_ai_channels import services_ai_parser_enabled
+    from parser.config.services_ai_channels import (
+        SERVICES_AI_CHANNELS,
+        services_ai_parser_enabled,
+    )
 
     if not os.getenv("PARSER_API_ID"):
         await message.answer(
@@ -90,9 +140,10 @@ async def manual_services_ai_parser_run(message: types.Message):
         )
         return
 
+    channel_list = ", ".join(f"@{html.escape(k)}" for k in list(SERVICES_AI_CHANNELS.keys())[:6])
     status_msg = await message.answer(
         "🔍 <b>Запускаю парсинг послуг (AI → канал)…</b>\n\n"
-        "Нові оголошення з’являться у каналі модерації послуг.",
+        f"Канали: {channel_list}",
         parse_mode="HTML",
     )
 
@@ -100,17 +151,16 @@ async def manual_services_ai_parser_run(message: types.Message):
         try:
             from parser.scheduler import run_services_ai_parser_cycle
 
-            await run_services_ai_parser_cycle()
+            stats = await run_services_ai_parser_cycle()
             await status_msg.edit_text(
-                "✅ <b>Парсинг послуг завершено</b>\n\n"
-                "Перевір канал модерації. Після підтвердження оголошення з’являться в каналі TradeGround.",
+                _format_parser_stats(stats, services=True),
                 parse_mode="HTML",
             )
         except Exception as e:
             logger.exception("Manual services AI parser run failed: %s", e)
             try:
                 await status_msg.edit_text(
-                    f"❌ <b>Помилка парсера послуг</b>\n\n<code>{type(e).__name__}: {e}</code>",
+                    f"❌ <b>Помилка парсера послуг</b>\n\n<code>{type(e).__name__}: {html.escape(str(e))}</code>",
                     parse_mode="HTML",
                 )
             except Exception:

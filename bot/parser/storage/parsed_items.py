@@ -2,12 +2,15 @@
 
 import hashlib
 import json
+import logging
 import re
 import unicodedata
 from datetime import datetime, timezone
 from typing import Optional
 
 from parser.storage.connection import get_connection
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_parsed_items_table():
@@ -65,20 +68,82 @@ def ensure_parsed_items_table():
         cursor.execute(
             "ALTER TABLE parsed_items ADD COLUMN parser_type TEXT DEFAULT 'default'"
         )
+    _cleanup_pending_service_channel_defaults(cursor)
     conn.commit()
     conn.close()
 
 
-def parsed_item_exists(source_channel: str, message_id: int) -> bool:
+def _cleanup_pending_service_channel_defaults(cursor) -> None:
+    """Звільняє pending-записи послугових каналів від основного парсера для AI→канал."""
+    try:
+        from parser.config.channels import CHANNELS, SERVICE_CHANNELS, normalize_channel_key
+
+        norm_services = {normalize_channel_key(s) for s in SERVICE_CHANNELS}
+        service_sources = [
+            k for k in CHANNELS if normalize_channel_key(k) in norm_services
+        ]
+        if not service_sources:
+            return
+        placeholders = ",".join("?" * len(service_sources))
+        cursor.execute(
+            f"""
+            DELETE FROM parsed_items
+            WHERE source_channel IN ({placeholders})
+              AND status = 'pending'
+              AND COALESCE(parser_type, 'default') = 'default'
+            """,
+            service_sources,
+        )
+        if cursor.rowcount:
+            logger.info(
+                "parsed_items: видалено %s pending-записів послугових каналів (основний парсер)",
+                cursor.rowcount,
+            )
+    except Exception as e:
+        logger.warning("parsed_items cleanup skipped: %s", e)
+
+
+def parsed_item_exists(
+    source_channel: str,
+    message_id: int,
+    parser_type: str = "default",
+) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT 1 FROM parsed_items WHERE source_channel = ? AND message_id = ?",
-        (source_channel, message_id),
+        """
+        SELECT 1 FROM parsed_items
+        WHERE source_channel = ? AND message_id = ?
+          AND COALESCE(parser_type, 'default') = ?
+        """,
+        (source_channel, message_id, parser_type),
     )
     exists = cursor.fetchone() is not None
     conn.close()
     return exists
+
+
+def parsed_item_claimed_by_other_parser(
+    source_channel: str,
+    message_id: int,
+    parser_type: str,
+) -> bool:
+    """Чи є запис з іншого парсера (напр. основний вже забрав повідомлення)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT COALESCE(parser_type, 'default') FROM parsed_items
+        WHERE source_channel = ? AND message_id = ?
+        LIMIT 1
+        """,
+        (source_channel, message_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return False
+    return row[0] != parser_type
 
 
 def fingerprint_parsed_text(raw_text: str) -> str:
@@ -139,7 +204,10 @@ def parsed_item_is_raw_duplicate(content_hash: str) -> bool:
     return dup
 
 
-def parsed_item_is_semantic_duplicate(dedup_key: Optional[str]) -> bool:
+def parsed_item_is_semantic_duplicate(
+    dedup_key: Optional[str],
+    parser_type: str = "default",
+) -> bool:
     if not dedup_key:
         return False
     conn = get_connection()
@@ -148,9 +216,10 @@ def parsed_item_is_semantic_duplicate(dedup_key: Optional[str]) -> bool:
         """
         SELECT 1 FROM parsed_items
         WHERE dedup_key = ? AND status IN ('pending', 'approved')
+          AND COALESCE(parser_type, 'default') = ?
         LIMIT 1
         """,
-        (dedup_key,),
+        (dedup_key, parser_type),
     )
     dup = cursor.fetchone() is not None
     conn.close()

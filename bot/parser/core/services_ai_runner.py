@@ -5,6 +5,11 @@ import logging
 import re
 
 from parser.category_keywords import detect_category
+from parser.config.channels import (
+    BEAUTY_SERVICE_CHANNELS,
+    SERVICE_CHANNELS,
+    normalize_channel_key,
+)
 from parser.config.services_ai_channels import (
     PARSER_TYPE_SERVICES_CHANNEL,
     SERVICES_AI_CHANNELS,
@@ -33,6 +38,7 @@ from parser.storage.parsed_items import (
     fingerprint_parsed_text,
     fingerprint_title_desc,
     insert_parsed_item,
+    parsed_item_claimed_by_other_parser,
     parsed_item_exists,
     parsed_item_is_raw_duplicate,
     parsed_item_is_semantic_duplicate,
@@ -42,11 +48,13 @@ logger = logging.getLogger(__name__)
 
 
 async def parse_services_ai_channel(app, channel: str, city: str, notify_callback) -> dict:
-    """Парсить одне джерело; приймає лише оголошення про послуги."""
+    """Парсить одне джерело; на SERVICE_CHANNELS усі пости вважаються послугами."""
     ensure_parsed_items_table()
 
     stats = {"added": 0, "skipped": 0, "reasons": {}}
     processed_groups: set[str] = set()
+    channel_key = normalize_channel_key(channel)
+    force_service_channel = channel_key in SERVICE_CHANNELS
 
     logger.info(
         "Парсимо послуги (AI→канал) %s (місто: %s), ліміт: %s",
@@ -78,9 +86,18 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
 
         text = clean_channel_post_text(text, channel)
 
-        if parsed_item_exists(channel, effective_message_id):
+        if parsed_item_exists(channel, effective_message_id, PARSER_TYPE_SERVICES_CHANNEL):
             stats["skipped"] += 1
             stats["reasons"]["дублікат (бд)"] = stats["reasons"].get("дублікат (бд)", 0) + 1
+            continue
+
+        if parsed_item_claimed_by_other_parser(
+            channel, effective_message_id, PARSER_TYPE_SERVICES_CHANNEL
+        ):
+            stats["skipped"] += 1
+            stats["reasons"]["вже в основному парсері"] = stats["reasons"].get(
+                "вже в основному парсері", 0
+            ) + 1
             continue
 
         content_hash = fingerprint_parsed_text(text)
@@ -89,14 +106,19 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             stats["reasons"]["дублікат (текст)"] = stats["reasons"].get("дублікат (текст)", 0) + 1
             continue
 
-        pre_category, _ = detect_category(text, skip_free=False)
-        is_service = pre_category == "services_work" or is_likely_service_ad(text)
+        pre_category, pre_subcategory = detect_category(text, skip_free=False)
+        is_service = (
+            force_service_channel
+            or pre_category == "services_work"
+            or is_likely_service_ad(text)
+        )
         if not is_service:
             stats["skipped"] += 1
             stats["reasons"]["не послуга"] = stats["reasons"].get("не послуга", 0) + 1
             continue
 
-        ok, reason = is_quality(text, len(photos) > 0, relaxed=True)
+        relaxed_quality = force_service_channel or is_service
+        ok, reason = is_quality(text, len(photos) > 0, relaxed=relaxed_quality)
         if not ok:
             stats["skipped"] += 1
             stats["reasons"][reason] = stats["reasons"].get(reason, 0) + 1
@@ -106,27 +128,38 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         title = extract_title(text)
         description = enrich_description(title, extract_description(text, title))
 
-        if is_likely_not_listing(title, description):
+        if not force_service_channel and is_likely_not_listing(title, description):
             stats["skipped"] += 1
             stats["reasons"]["не оголошення"] = stats["reasons"].get("не оголошення", 0) + 1
             continue
 
-        if has_too_many_emojis(description):
+        if not force_service_channel and has_too_many_emojis(description):
             stats["skipped"] += 1
             stats["reasons"]["багато емоджі"] = stats["reasons"].get("багато емоджі", 0) + 1
             continue
 
         dedup_key = fingerprint_title_desc(title, description)
-        if parsed_item_is_semantic_duplicate(dedup_key):
+        if parsed_item_is_semantic_duplicate(dedup_key, PARSER_TYPE_SERVICES_CHANNEL):
             stats["skipped"] += 1
             stats["reasons"]["дублікат (оголошення)"] = stats["reasons"].get(
                 "дублікат (оголошення)", 0
             ) + 1
             continue
 
-        category, subcategory = detect_category(text, skip_free=(price_str is not None and not is_free))
-        category = "services_work"
-        subcategory = subcategory if subcategory else "other_services"
+        category, subcategory = detect_category(
+            text, skip_free=(price_str is not None and not is_free)
+        )
+        if force_service_channel:
+            detected_sub = subcategory if category == "services_work" else None
+            category = "services_work"
+            if channel_key in BEAUTY_SERVICE_CHANNELS:
+                subcategory = detected_sub or "beauty_services"
+            else:
+                subcategory = detected_sub or "other_services"
+        else:
+            category = "services_work"
+            subcategory = subcategory or "other_services"
+
         condition = detect_condition(text, category)
 
         author_username = resolve_author_username(msg_for_link, text, channel)
@@ -201,12 +234,20 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
 
 
 async def run_services_ai_channels(app, notify_callback) -> dict:
-    total: dict = {"added": 0, "skipped": 0, "errors": []}
+    total: dict = {"added": 0, "skipped": 0, "errors": [], "channels": len(SERVICES_AI_CHANNELS)}
+    if not SERVICES_AI_CHANNELS:
+        total["errors"].append({"channel": "—", "city": "—", "error": "немає каналів у SERVICES_AI_CHANNELS"})
+        return total
+
     for channel, city in SERVICES_AI_CHANNELS.items():
         try:
             stats = await parse_services_ai_channel(app, channel, city, notify_callback)
             total["added"] += stats["added"]
             total["skipped"] += stats["skipped"]
+            if stats.get("reasons"):
+                total.setdefault("reasons", {})
+                for reason, count in stats["reasons"].items():
+                    total["reasons"][reason] = total["reasons"].get(reason, 0) + count
             logger.info(
                 "Послуги (AI→канал) %s: +%s нових, пропущено %s",
                 channel,

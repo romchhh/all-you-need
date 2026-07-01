@@ -124,13 +124,13 @@ CHANNELS: dict[str, str] = dedupe_channels({**_BASE_CHANNELS, **_channels_from_e
 
 
 def service_channels_map() -> dict[str, str]:
-    """Канали послуг з загального CHANNELS (BEAUTY_SERVICE + SERVICE_ONLY)."""
+    """Канали послуг з загального CHANNELS (оригінальний ключ → місто)."""
     out: dict[str, str] = {}
+    norm_services = {normalize_channel_key(s) for s in SERVICE_CHANNELS}
     for key, city in CHANNELS.items():
-        nk = normalize_channel_key(key)
-        if nk in SERVICE_CHANNELS:
-            out[nk] = city
-    missing = SERVICE_CHANNELS - set(out.keys())
+        if normalize_channel_key(key) in norm_services:
+            out[key] = city
+    missing = norm_services - {normalize_channel_key(k) for k in out}
     for svc in sorted(missing):
         logger.warning("SERVICE_CHANNELS: %r не знайдено в CHANNELS — додайте в _BASE_CHANNELS", svc)
     return out

@@ -47,11 +47,11 @@ SESSION_PATH = Path(__file__).resolve().parent / "parser_session"
 # Основна функція одного циклу парсингу
 # ──────────────────────────────────────────────
 
-async def run_parser_cycle():
-    """Один повний цикл парсингу всіх каналів."""
+async def run_parser_cycle() -> dict | None:
+    """Один повний цикл парсингу всіх каналів. Повертає stats або None при помилці."""
     if not BOT_TOKEN:
         logger.error("TOKEN не встановлено в .env — парсер не може сповіщати адмінів")
-        return
+        return None
 
     from aiogram import Bot
     from parser.admin_notify import (
@@ -74,7 +74,7 @@ async def run_parser_cycle():
             msg = "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
             logger.error(msg)
             await _notify_error("налаштування", msg)
-            return
+            return None
 
         try:
             from pyrogram import Client
@@ -82,7 +82,7 @@ async def run_parser_cycle():
             msg = "Pyrogram не встановлено. Запусти: pip install pyrogram tgcrypto"
             logger.error(msg)
             await _notify_error("залежності", msg)
-            return
+            return None
 
         from parser.core.runner import run_all_channels
 
@@ -96,6 +96,7 @@ async def run_parser_cycle():
             phone_number=PARSER_PHONE,
         )
 
+        stats: dict | None = None
         try:
             async with pyrogram_session_guard(SESSION_PATH):
                 async with pyrogram_client:
@@ -117,21 +118,22 @@ async def run_parser_cycle():
                 "критична помилка циклу",
                 f"{type(e).__name__}: {e}\n\n{traceback.format_exc()[-3000:]}",
             )
+        return stats
     finally:
         await aiogram_bot.session.close()
 
 
-async def run_services_ai_parser_cycle():
+async def run_services_ai_parser_cycle() -> dict | None:
     """Цикл парсингу груп послуг → модерація → публікація лише в Telegram-канал."""
     from parser.config.services_ai_channels import services_ai_parser_enabled
 
     if not services_ai_parser_enabled():
         logger.debug("Services AI parser вимкнено або немає SERVICE_CHANNELS у CHANNELS")
-        return
+        return {"added": 0, "skipped": 0, "errors": [{"error": "parser disabled"}], "channels": 0}
 
     if not BOT_TOKEN:
         logger.error("TOKEN не встановлено — services AI parser не може сповіщати модераторів")
-        return
+        return None
 
     from aiogram import Bot
     from parser.admin_notify import (
@@ -154,7 +156,7 @@ async def run_services_ai_parser_cycle():
             msg = "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
             logger.error(msg)
             await _notify_error("services AI — налаштування", msg)
-            return
+            return None
 
         try:
             from pyrogram import Client
@@ -162,7 +164,7 @@ async def run_services_ai_parser_cycle():
             msg = "Pyrogram не встановлено. Запусти: pip install pyrogram tgcrypto"
             logger.error(msg)
             await _notify_error("services AI — залежності", msg)
-            return
+            return None
 
         from parser.core.services_ai_runner import run_services_ai_channels
 
@@ -176,6 +178,7 @@ async def run_services_ai_parser_cycle():
             phone_number=PARSER_PHONE,
         )
 
+        stats: dict | None = None
         try:
             async with pyrogram_session_guard(SESSION_PATH):
                 async with pyrogram_client:
@@ -198,6 +201,7 @@ async def run_services_ai_parser_cycle():
                 "services AI — критична помилка",
                 f"{type(e).__name__}: {e}\n\n{traceback.format_exc()[-3000:]}",
             )
+        return stats
     finally:
         await aiogram_bot.session.close()
 
