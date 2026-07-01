@@ -27,6 +27,58 @@ def parsed_item_message_link(item: dict) -> Optional[str]:
     return link or None
 
 
+_TME_URL_RE = re.compile(
+    r"https?://(?:www\.)?t\.me/[\w\d_+\/-]+(?:\s*\n\s*\d+)?",
+    re.IGNORECASE,
+)
+_ORIGINAL_POST_LINE_RE = re.compile(
+    r"^[•\-\*\u2022]?\s*(?:🔗\s*)?"
+    r"(?:Оригінальне|Оригинальное|Original)\s+(?:оголошення|объявление|post|announcement)?\s*:?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_SOURCE_CHANNEL_LINE_RE = re.compile(
+    r"^[📢🔗]?\s*(?:Оголошення знайдено з|Объявление найдено из|Канал:?)\s*@[\w\d_]+\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _source_channel_slug(source_channel: str) -> str:
+    channel_key = normalize_channel_key(source_channel or "")
+    if channel_key.lower().startswith("t.me/"):
+        return channel_key.rsplit("/", 1)[-1].lower()
+    return channel_key.lstrip("@").split("/")[0].lower()
+
+
+def sanitize_public_listing_text(text: str, source_channel: str = "") -> str:
+    """
+    Прибирає з публічного тексту посилання на чужі канали/групи та службові рядки
+    «Оригинальное объявление: https://t.me/…».
+    """
+    if not text:
+        return ""
+
+    cleaned = _TME_URL_RE.sub("", text)
+    cleaned = _ORIGINAL_POST_LINE_RE.sub("", cleaned)
+    cleaned = _SOURCE_CHANNEL_LINE_RE.sub("", cleaned)
+
+    slug = _source_channel_slug(source_channel)
+    if slug:
+        cleaned = re.sub(rf"@{re.escape(slug)}\b", "", cleaned, flags=re.IGNORECASE)
+
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def original_post_link_html(msg_link: str, lang: str = "ru") -> str:
+    """HTML-посилання без відображення URL каналу."""
+    import html as html_module
+
+    label = "Оригінал оголошення" if lang == "uk" else "Оригинал объявления"
+    safe = html_module.escape(msg_link, quote=True)
+    return f'<a href="{safe}">{html_module.escape(label)}</a>'
+
+
 def get_sender_username(msg) -> Optional[str]:
     origin = getattr(msg, "forward_origin", None)
     if origin is not None:
