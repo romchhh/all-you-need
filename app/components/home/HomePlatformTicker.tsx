@@ -16,7 +16,7 @@ import {
   TICKER_INFO_MENU_ENABLED,
   type TickerMessage,
 } from '@/utils/platformTickerMessages';
-import { fetchHomeActivity, onHomeActivityDayRollover } from '@/utils/homeActivityClient';
+import { fetchHomeActivity, onHomeActivityDayRollover, readHomeActivityCache } from '@/utils/homeActivityClient';
 
 type HomePlatformTickerProps = {
   isLight: boolean;
@@ -135,12 +135,21 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({ isLight }: 
     let cancelled = false;
     const started = { value: false };
 
+    const cached = readHomeActivityCache();
+    if (cached) {
+      applyTickerPools(true, started, {
+        newListingsToday: cached.newListingsToday ?? 0,
+        newListingsByCity: cached.newListingsByCity ?? [],
+        newListingsByCategory: cached.newListingsByCategory ?? [],
+      });
+    }
+
     const load = async (initial: boolean) => {
       if (cancelled) return;
       await reloadActivityPools(initial, started);
     };
 
-    void load(true);
+    void load(!cached);
 
     const refreshId = setInterval(() => void load(false), 10 * 60_000);
     const unsubscribeRollover = onHomeActivityDayRollover(() => {

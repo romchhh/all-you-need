@@ -1,180 +1,35 @@
 import { NextResponse } from 'next/server';
-import { prisma, executeWithRetry } from '@/lib/prisma';
-import { toSQLiteDate } from '@/utils/dateHelpers';
-import {
-  isKyivEveningOrNight,
-  kyivListingsWindowKey,
-  startOfKyivListingsReportingWindow,
-} from '@/utils/kyivListingsDayWindow';
-import {
-  getHomeActivityServerCache,
-  setHomeActivityServerCache,
-} from '@/lib/stats/homeActivityCache';
-import { NEW_LISTINGS_IN_KYIV_WINDOW_SQL } from '@/lib/stats/homeActivitySql';
+import { loadHomeActivityStats } from '@/lib/stats/loadHomeActivityStats';
+import { displayOnlineSynced } from '@/lib/stats/homeActivityOnline';
 
-const DISPLAY_ONLINE_MIN = 22;
-const DISPLAY_ONLINE_MAX = 58;
-const DISPLAY_ONLINE_NIGHT_MIN = 7;
-const DISPLAY_ONLINE_NIGHT_MAX = 18;
+export const revalidate = 300;
 
-function mix32(x: number): number {
-  let v = x | 0;
-  v = Math.imul(v ^ (v >>> 16), 0x7feb352d);
-  v = Math.imul(v ^ (v >>> 15), 0x846ca68b);
-  return (v ^ (v >>> 16)) >>> 0;
-}
-
-function displayOnlineSynced(now: Date): number {
-  const hour = parseInt(
-    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Kyiv', hour: '2-digit', hour12: false }).format(now),
-    10
-  );
-  const minute = parseInt(
-    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Kyiv', minute: '2-digit' }).format(now),
-    10
-  );
-  const second = now.getSeconds();
-  const weekdayChar = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Kyiv',
-    weekday: 'narrow',
-  }).format(now).charCodeAt(0);
-  const ymd = kyivListingsWindowKey(now).replace(/\D/g, '');
-
-  /** 90-секундні слоти + секунда — більше варіацій, рідше повторення числа. */
-  const slot = Math.floor(now.getTime() / (90 * 1000));
-  let seed =
-    slot * 0x9e3779b1 +
-    hour * 0x85ebca6b +
-    minute * 0x27d4eb2d +
-    second * 131 +
-    weekdayChar * 977 +
-    parseInt(ymd.slice(-6), 10) * 0x517cc1b7;
-  seed = mix32(seed ^ (slot >>> 7) ^ minute);
-
-  if (isKyivEveningOrNight(now)) {
-    const span = DISPLAY_ONLINE_NIGHT_MAX - DISPLAY_ONLINE_NIGHT_MIN + 1;
-    return DISPLAY_ONLINE_NIGHT_MIN + (seed % span);
-  }
-  const span = DISPLAY_ONLINE_MAX - DISPLAY_ONLINE_MIN + 1;
-  return DISPLAY_ONLINE_MIN + (seed % span);
-}
-
-const CITY_EXPR = `
-  CASE
-    WHEN location IS NULL OR TRIM(location) = '' THEN ''
-    ELSE TRIM(SUBSTR(location, 1, INSTR(location || ',', ',') - 1))
-  END
-`;
-
-const CITY_LISTINGS_SQL = `
-  SELECT
-    ${CITY_EXPR} AS city,
-    COUNT(*) AS count
-  FROM Listing
-  WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}
-  GROUP BY ${CITY_EXPR}
-  HAVING COUNT(*) > 0
-  ORDER BY count DESC, city ASC
-  LIMIT 10
-`;
-
-const CATEGORY_LISTINGS_SQL = `
-  SELECT category, COUNT(*) AS count
-  FROM Listing
-  WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}
-    AND category IS NOT NULL AND TRIM(category) != ''
-  GROUP BY category
-  HAVING COUNT(*) > 0
-  ORDER BY count DESC
-  LIMIT 8
-`;
+const CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+};
 
 // Публічна статистика для головної / базару (без аутентифікації)
 export async function GET() {
   try {
     const now = new Date();
-    const windowKey = kyivListingsWindowKey(now);
-
-    const cached = getHomeActivityServerCache(windowKey);
-    if (cached) {
-      return NextResponse.json(cached, {
-        headers: {
-          'Cache-Control': 'public, max-age=120, stale-while-revalidate=240',
-        },
-      });
-    }
-
-    const dayStart = startOfKyivListingsReportingWindow(now);
-    const dayStartStr = toSQLiteDate(dayStart);
-    const nowStr = toSQLiteDate(now);
-
-    const countRows = await executeWithRetry(
-      () =>
-        prisma.$queryRawUnsafe(
-          `SELECT COUNT(*) AS count FROM Listing WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}`,
-          dayStartStr,
-          nowStr
-        ) as Promise<Array<{ count: bigint | number }>>
-    );
-    const newListingsToday = Number(countRows[0]?.count ?? 0);
-
-    let newListingsByCity: Array<{ city: string; count: number }> = [];
-    try {
-      const cityRows = await executeWithRetry(
-        () =>
-          prisma.$queryRawUnsafe(
-            CITY_LISTINGS_SQL,
-            dayStartStr,
-            nowStr
-          ) as Promise<Array<{ city: string; count: bigint | number }>>
-      );
-      newListingsByCity = cityRows.map((row) => ({
-        city: (row.city || '').trim(),
-        count: Number(row.count ?? 0),
-      }));
-    } catch (cityErr) {
-      console.error('[home-activity] city breakdown failed:', cityErr);
-    }
-
-    let newListingsByCategory: Array<{ category: string; count: number }> = [];
-    try {
-      const categoryRows = await executeWithRetry(
-        () =>
-          prisma.$queryRawUnsafe(
-            CATEGORY_LISTINGS_SQL,
-            dayStartStr,
-            nowStr
-          ) as Promise<Array<{ category: string; count: bigint | number }>>
-      );
-      newListingsByCategory = categoryRows.map((row) => ({
-        category: (row.category || '').trim(),
-        count: Number(row.count ?? 0),
-      }));
-    } catch (catErr) {
-      console.error('[home-activity] category breakdown failed:', catErr);
-    }
-
-    const online = displayOnlineSynced(now);
-
+    const stats = await loadHomeActivityStats(now);
     const payload = {
-      online,
-      newListingsToday,
-      newListingsByCity,
-      newListingsByCategory,
-      windowKey,
+      ...stats,
+      online: displayOnlineSynced(now),
     };
 
-    setHomeActivityServerCache(windowKey, payload);
-
-    return NextResponse.json(payload, {
-      headers: {
-        'Cache-Control': 'public, max-age=120, stale-while-revalidate=240',
-      },
-    });
+    return NextResponse.json(payload, { headers: CACHE_HEADERS });
   } catch (error) {
     console.error('[home-activity]', error);
     return NextResponse.json(
-      { online: 0, newListingsToday: 0, newListingsByCity: [], newListingsByCategory: [], windowKey: '', error: 'unavailable' },
+      {
+        online: displayOnlineSynced(),
+        newListingsToday: 0,
+        newListingsByCity: [],
+        newListingsByCategory: [],
+        windowKey: '',
+        error: 'unavailable',
+      },
       { status: 503 }
     );
   }

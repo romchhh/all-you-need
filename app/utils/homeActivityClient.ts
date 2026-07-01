@@ -16,11 +16,11 @@ type CacheEnvelope = {
   fetchedAt: number;
 };
 
-const STORAGE_KEY = 'tradeground.homeActivity.v3';
-/** Показуємо кеш одразу; фонове оновлення — не частіше ніж раз на 3 хв (зменшує навантаження). */
-export const HOME_ACTIVITY_CLIENT_TTL_MS = 180 * 1000;
-/** Якщо API недоступний — можна показувати застарілі дані до 15 хв. */
-const STALE_FALLBACK_MS = 15 * 60 * 1000;
+const STORAGE_KEY = 'tradeground.homeActivity.v4';
+/** Показуємо кеш одразу; фонове оновлення — не частіше ніж раз на 5 хв. */
+export const HOME_ACTIVITY_CLIENT_TTL_MS = 300 * 1000;
+/** Якщо API недоступний — можна показувати застарілі дані до 30 хв. */
+const STALE_FALLBACK_MS = 30 * 60 * 1000;
 
 let memoryCache: CacheEnvelope | null = null;
 let inflight: Promise<HomeActivityData | null> | null = null;
@@ -194,7 +194,7 @@ async function requestHomeActivity(windowKey: string, force = false): Promise<Ho
 
 /**
  * Спільний запит для HomeActivityStats + HomePlatformTicker.
- * Показує кеш одразу; оновлює у фоні лише якщо TTL минув або force.
+ * Показує кеш одразу; оновлює у фоні якщо TTL минув (stale-while-revalidate).
  */
 export async function fetchHomeActivity(options?: {
   force?: boolean;
@@ -202,8 +202,15 @@ export async function fetchHomeActivity(options?: {
   const windowKey = currentWindowKey();
   const cached = memoryCache ?? readStorage();
 
-  if (cached && isUsable(cached, windowKey) && !options?.force && isFresh(cached, windowKey)) {
+  if (cached && isUsable(cached, windowKey) && !options?.force) {
     memoryCache = cached;
+    if (!isFresh(cached, windowKey)) {
+      if (!inflight) {
+        inflight = requestHomeActivity(windowKey, false).finally(() => {
+          inflight = null;
+        });
+      }
+    }
     return cached.data;
   }
 

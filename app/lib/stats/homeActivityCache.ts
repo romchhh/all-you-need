@@ -1,10 +1,12 @@
+import { revalidateTag } from 'next/cache';
+
 let serverCache: {
   windowKey: string;
   payload: Record<string, unknown>;
   expiresAt: number;
 } | null = null;
 
-export const HOME_ACTIVITY_SERVER_CACHE_TTL_MS = 120_000;
+export const HOME_ACTIVITY_SERVER_CACHE_TTL_MS = 300_000;
 
 export function getHomeActivityServerCache(windowKey: string): Record<string, unknown> | null {
   if (
@@ -27,4 +29,9 @@ export function setHomeActivityServerCache(windowKey: string, payload: Record<st
 
 export function invalidateHomeActivityCache() {
   serverCache = null;
+  try {
+    revalidateTag('home-activity', 'max');
+  } catch {
+    /* outside request context */
+  }
 }
