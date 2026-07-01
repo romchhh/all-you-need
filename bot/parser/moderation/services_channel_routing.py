@@ -54,6 +54,37 @@ _GERMANY_WIDE_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Виїзд / забір з адреси — аудиторія не лише одне місто.
+_NATIONWIDE_PICKUP_RE = re.compile(
+    r"забираем\s+с\s+адрес|заберем\s+с\s+адрес|"
+    r"з\s+адрес[иы]|з\s+вашего\s+адрес|"
+    r"abholung|pickup|"
+    r"выезд\s+по|виїзд\s+по|"
+    r"по\s+(?:всей|всій)\s+(?:германии|німеччини|deutschland)|"
+    r"туристическ\w+\s+сопровожден|"
+    r"сопровождени\w+\s+на\s+весь\s+период|"
+    r"reisebegleitung|abholservice",
+    re.IGNORECASE,
+)
+
+# Тури / поїздки / відпочинок (часто з Hamburg-каналу, але для всієї Німеччини).
+_TRAVEL_TOURISM_RE = re.compile(
+    r"поездк\w*|поїздк\w*|"
+    r"отдых\s+на\s+море|відпочинок\s+на\s+морі|"
+    r"туристическ\w*|туристичн\w*|"
+    r"(?:^|\s)тур(?:\s|$|ы\b)|"
+    r"курорт|"
+    r"\brimini\b|итали\w*|італі\w*|"
+    r"пляж|"
+    r"(?:отель|hotel).{0,40}(?:линия|linie|line)|"
+    r"проживани\w*|"
+    r"reise|urlaub|ferien|"
+    r"с\s+человека|с\s+особи|pro\s+person|"
+    r"venezia|venice|венеци|рим|rome|florenz|florence|милан|milan|"
+    r"санмарино|san\s*marino",
+    re.IGNORECASE,
+)
+
 
 def _item_text_blob(item: dict) -> str:
     parts = [
@@ -79,6 +110,31 @@ def _normalized_location_tokens(location: str) -> set[str]:
 
 def is_germany_wide_location(location: str) -> bool:
     return bool(_normalized_location_tokens(location) & _GERMANY_WIDE_LOCATION)
+
+
+def is_travel_or_mobile_nationwide_service(item: dict) -> bool:
+    """Тури, виїзди, забір з адреси — релевантно всій Німеччині (навіть якщо канал Hamburg)."""
+    blob = _item_text_blob(item)
+    if _NATIONWIDE_PICKUP_RE.search(blob):
+        return True
+    if _TRAVEL_TOURISM_RE.search(blob):
+        # Туристичний пакет: поїздка + проживання/ціна/супровід
+        package_hints = re.search(
+            r"проживани|отель|hotel|€|eur|с\s+человека|с\s+особи|"
+            r"апартамент|номер|завтрак|сопровожден|море|курорт",
+            blob,
+            re.IGNORECASE,
+        )
+        if package_hints:
+            return True
+    return False
+
+
+def is_dual_channel_service(item: dict) -> bool:
+    """Оголошення для аудиторії всієї Німеччини → Hamburg + Germany."""
+    return is_online_or_germany_wide_service(item) or is_travel_or_mobile_nationwide_service(
+        item
+    )
 
 
 def is_online_or_germany_wide_service(item: dict) -> bool:
@@ -130,11 +186,11 @@ def is_hamburg_service_item(item: dict) -> bool:
 
 def resolve_services_trade_channel_ids(item: dict) -> list[int]:
     """
-    Онлайн / вся Німеччина → обидва канали.
-    Hamburg → лише Hamburg.
+    Аудиторія вся Німеччина (онлайн, тури, забір з адреси) → обидва канали.
+    Локальний Hamburg → лише Hamburg.
     Інше → Germany.
     """
-    if is_online_or_germany_wide_service(item):
+    if is_dual_channel_service(item):
         return [TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID]
     if is_hamburg_service_item(item):
         return [TRADE_SERVICES_CHANNEL_HAMBURG_ID]

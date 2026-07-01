@@ -33,15 +33,12 @@ from parser.core.text import (
     parse_price,
     to_plain_str,
 )
+from parser.core.dedup_check import check_parser_duplicates
 from parser.storage.parsed_items import (
     ensure_parsed_items_table,
     fingerprint_parsed_text,
     fingerprint_title_desc,
     insert_parsed_item,
-    parsed_item_claimed_by_other_parser,
-    parsed_item_exists,
-    parsed_item_is_raw_duplicate,
-    parsed_item_is_semantic_duplicate,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,25 +83,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
 
         text = clean_channel_post_text(text, channel)
 
-        if parsed_item_exists(channel, effective_message_id, PARSER_TYPE_SERVICES_CHANNEL):
-            stats["skipped"] += 1
-            stats["reasons"]["дублікат (бд)"] = stats["reasons"].get("дублікат (бд)", 0) + 1
-            continue
-
-        if parsed_item_claimed_by_other_parser(
-            channel, effective_message_id, PARSER_TYPE_SERVICES_CHANNEL
-        ):
-            stats["skipped"] += 1
-            stats["reasons"]["вже в основному парсері"] = stats["reasons"].get(
-                "вже в основному парсері", 0
-            ) + 1
-            continue
-
         content_hash = fingerprint_parsed_text(text)
-        if parsed_item_is_raw_duplicate(content_hash):
-            stats["skipped"] += 1
-            stats["reasons"]["дублікат (текст)"] = stats["reasons"].get("дублікат (текст)", 0) + 1
-            continue
 
         pre_category, pre_subcategory = detect_category(text, skip_free=False)
         is_service = (
@@ -139,11 +118,18 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             continue
 
         dedup_key = fingerprint_title_desc(title, description)
-        if parsed_item_is_semantic_duplicate(dedup_key, PARSER_TYPE_SERVICES_CHANNEL):
+        is_dup, dup_reason, embedding_json = check_parser_duplicates(
+            source_channel=channel,
+            message_id=effective_message_id,
+            content_hash=content_hash,
+            dedup_key=dedup_key,
+            title=title,
+            description=description,
+            parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+        )
+        if is_dup:
             stats["skipped"] += 1
-            stats["reasons"]["дублікат (оголошення)"] = stats["reasons"].get(
-                "дублікат (оголошення)", 0
-            ) + 1
+            stats["reasons"][dup_reason] = stats["reasons"].get(dup_reason, 0) + 1
             continue
 
         category, subcategory = detect_category(
@@ -193,6 +179,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             content_hash=content_hash,
             dedup_key=dedup_key,
             parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            text_embedding=embedding_json,
         )
 
         if item_id:

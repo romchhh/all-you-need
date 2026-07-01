@@ -29,14 +29,12 @@ from parser.core.text import (
     parse_price,
     to_plain_str,
 )
+from parser.core.dedup_check import check_parser_duplicates
 from parser.storage.parsed_items import (
     ensure_parsed_items_table,
     fingerprint_parsed_text,
     fingerprint_title_desc,
     insert_parsed_item,
-    parsed_item_exists,
-    parsed_item_is_raw_duplicate,
-    parsed_item_is_semantic_duplicate,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,16 +71,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
         text = clean_channel_post_text(text, channel)
 
-        if parsed_item_exists(channel, effective_message_id):
-            stats["skipped"] += 1
-            stats["reasons"]["дублікат (бд)"] = stats["reasons"].get("дублікат (бд)", 0) + 1
-            continue
-
         content_hash = fingerprint_parsed_text(text)
-        if parsed_item_is_raw_duplicate(content_hash):
-            stats["skipped"] += 1
-            stats["reasons"]["дублікат (текст)"] = stats["reasons"].get("дублікат (текст)", 0) + 1
-            continue
 
         channel_key = normalize_channel_key(channel)
         pre_category, _ = detect_category(text, skip_free=False)
@@ -113,11 +102,18 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             continue
 
         dedup_key = fingerprint_title_desc(title, description)
-        if parsed_item_is_semantic_duplicate(dedup_key):
+        is_dup, dup_reason, embedding_json = check_parser_duplicates(
+            source_channel=channel,
+            message_id=effective_message_id,
+            content_hash=content_hash,
+            dedup_key=dedup_key,
+            title=title,
+            description=description,
+            parser_type="default",
+        )
+        if is_dup:
             stats["skipped"] += 1
-            stats["reasons"]["дублікат (оголошення)"] = stats["reasons"].get(
-                "дублікат (оголошення)", 0
-            ) + 1
+            stats["reasons"][dup_reason] = stats["reasons"].get(dup_reason, 0) + 1
             continue
 
         category, subcategory = detect_category(text, skip_free=(price_str is not None and not is_free))
@@ -160,6 +156,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             raw_text=text[:4000],
             content_hash=content_hash,
             dedup_key=dedup_key,
+            text_embedding=embedding_json,
         )
 
         if item_id:
