@@ -11,12 +11,9 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 
 from parser.category_keywords import get_category_label
+from parser.moderation.description import format_original_post_link_html
 from parser.moderation.hashtags import build_channel_hashtags
-from parser.core.telegram_meta import (
-    original_post_link_html,
-    parsed_item_message_link,
-    sanitize_public_listing_text,
-)
+from parser.core.telegram_meta import parsed_item_message_link
 from parser.core.text import detect_lang
 from parser.moderation.config import BOT_USERNAME, WEBAPP_URL
 from parser.moderation.services_channel_routing import (
@@ -181,11 +178,13 @@ async def publish_services_listing_to_channel(
 
     title = (item.get("title") or "").strip()
     title_style = f"<b>{html.escape(title)}</b>"
-    raw_description = (marketplace_description or "").strip()
-    raw_description = sanitize_public_listing_text(
-        raw_description, str(item.get("source_channel") or "")
-    )
-    description = html.escape(raw_description)
+    description_parts: list[str] = []
+    if (marketplace_description or "").strip():
+        description_parts.append(html.escape((marketplace_description or "").strip()))
+    original_link_html = format_original_post_link_html(item)
+    if original_link_html:
+        description_parts.append(original_link_html)
+    description = "\n\n".join(description_parts)
 
     category = (item.get("category") or "services_work").strip()
     subcategory = item.get("subcategory")
@@ -227,7 +226,9 @@ async def publish_services_listing_to_channel(
         )
     elif msg_link:
         lang = detect_lang(f"{item.get('title') or ''}\n{item.get('description') or ''}")
-        seller_text = f"{seller_label} {original_post_link_html(msg_link, lang)}"
+        link_label = "Оригінал оголошення" if lang == "uk" else "Оригинал объявления"
+        safe_link = html.escape(msg_link, quote=True)
+        seller_text = f"{seller_label} <a href=\"{safe_link}\">{html.escape(link_label)}</a>"
     else:
         try:
             aid = int(author_id) if author_id is not None else 0

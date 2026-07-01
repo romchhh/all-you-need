@@ -291,14 +291,9 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
 
 def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict:
     """Повертає копію item з полями після AI."""
-    from parser.core.telegram_meta import sanitize_public_listing_text
-
     out = dict(item)
     out["title"] = enriched.title
-    out["description"] = sanitize_public_listing_text(
-        enriched.description,
-        str(item.get("source_channel") or ""),
-    )
+    out["description"] = enriched.description
     out["category"] = enriched.category
     out["subcategory"] = enriched.subcategory
     out["price"] = enriched.price
