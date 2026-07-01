@@ -758,16 +758,19 @@ class ModerationManager:
             condition = listing.get('condition', '')
             location = listing.get('location', '')
             
-            # Формуємо хештег міста (видаляємо пробіли та спецсимволи)
-            city_hashtag = location.replace(' ', '').replace('ü', 'u').replace('ö', 'o').replace('ä', 'a').replace('ß', 'ss')
-            city_hashtag = ''.join(c for c in city_hashtag if c.isalnum() or c in ['_', '-'])
-            city_hashtag = f"#{city_hashtag}" if city_hashtag else ""
-
-            # Назва категорії та хештег — однією мовою (мова продавця)
             category_text = get_category_translation(user_id_for_lang, category)
             if subcategory:
-                category_text += f" / {subcategory}"
-            hashtag_category = get_category_translation(user_id_for_lang, category)
+                from parser.category_keywords import get_subcategory_label
+
+                sub_label = get_subcategory_label(category, subcategory)
+                if sub_label and sub_label != subcategory:
+                    category_text += f" / {sub_label}"
+                else:
+                    category_text += f" / {subcategory}"
+
+            from parser.moderation.hashtags import build_channel_hashtags
+
+            hashtags = build_channel_hashtags(category, subcategory, location)
             
             # Використовуємо переклади для condition
             condition_map = {
@@ -838,11 +841,6 @@ class ModerationManager:
             
             # Отримуємо мову користувача для перекладу (використовуємо user_id_for_lang, який вже встановлено)
             bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
-            
-            # Формуємо хештеги: категорія + місто
-            hashtags = f"#{hashtag_category.replace(' ', '').replace('/', '_')}"
-            if city_hashtag:
-                hashtags += f" {city_hashtag}"
             
             text = f"""{title_prefix}{title_style}
 

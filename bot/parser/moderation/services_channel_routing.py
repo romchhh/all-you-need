@@ -85,6 +85,28 @@ _TRAVEL_TOURISM_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Міста для визначення локації з тексту оголошення (не з каналу-джерела).
+_KNOWN_SERVICE_CITIES: tuple[str, ...] = (
+    "Berlin", "Hamburg", "München", "Köln", "Frankfurt", "Stuttgart",
+    "Düsseldorf", "Leipzig", "Dortmund", "Essen", "Bremen", "Dresden",
+    "Hannover", "Nürnberg", "Duisburg", "Bochum", "Wuppertal", "Bielefeld",
+    "Bonn", "Münster", "Karlsruhe", "Mannheim", "Augsburg", "Wiesbaden",
+    "Aachen", "Mönchengladbach", "Gelsenkirchen", "Braunschweig", "Kiel",
+    "Freiburg im Breisgau", "Lübeck", "Erfurt", "Rostock", "Mainz", "Kassel",
+    "Potsdam", "Heidelberg", "Darmstadt", "Regensburg", "Würzburg", "Ulm",
+    "Dülmen",
+)
+
+
+def _service_text_blob(item: dict) -> str:
+    """Текст оголошення (без source_city і location — їх може підставити парсер каналу)."""
+    parts = [
+        str(item.get("title") or ""),
+        str(item.get("description") or ""),
+        str(item.get("raw_text") or ""),
+    ]
+    return "\n".join(parts)
+
 
 def _item_text_blob(item: dict) -> str:
     parts = [
@@ -95,6 +117,69 @@ def _item_text_blob(item: dict) -> str:
         str(item.get("source_city") or ""),
     ]
     return "\n".join(parts)
+
+
+def _ascii_fold(text: str) -> str:
+    return (
+        text.replace("ü", "u")
+        .replace("ö", "o")
+        .replace("ä", "a")
+        .replace("ß", "ss")
+        .replace("Ü", "U")
+        .replace("Ö", "O")
+        .replace("Ä", "A")
+    )
+
+
+def _detect_cities_in_text(text: str) -> list[str]:
+    if not text:
+        return []
+    lower = text.lower()
+    lower_ascii = _ascii_fold(lower)
+    found: list[str] = []
+    for city in _KNOWN_SERVICE_CITIES:
+        c_lower = city.lower()
+        c_ascii = _ascii_fold(c_lower)
+        if re.search(rf"\b{re.escape(c_lower)}\b", lower) or re.search(
+            rf"\b{re.escape(c_ascii)}\b", lower_ascii
+        ):
+            canon = normalize_city_name(city) or city
+            if canon not in found:
+                found.append(canon)
+    return found
+
+
+def _effective_service_location(item: dict) -> str:
+    """
+    Місто надання послуги.
+    Канал-джерело (source_city) не має перевизначати Wuppertal, Berlin тощо з тексту.
+    """
+    location = (item.get("location") or "").strip()
+    source_city = (item.get("source_city") or "").strip()
+    text_cities = _detect_cities_in_text(_service_text_blob(item))
+
+    if len(text_cities) == 1:
+        return text_cities[0]
+
+    if len(text_cities) > 1:
+        src_key = normalize_city_name(source_city).lower() if source_city else ""
+        non_source = [c for c in text_cities if not src_key or c.lower() != src_key]
+        if len(non_source) == 1:
+            return non_source[0]
+        non_hamburg = [c for c in text_cities if c.lower() != "hamburg"]
+        if len(non_hamburg) == 1:
+            return non_hamburg[0]
+
+    if location and not is_germany_wide_location(location):
+        return normalize_city_name(location.split(",")[0].strip()) or location
+
+    if location and is_germany_wide_location(location):
+        return normalize_city_name(location.split(",")[0].strip()) or location
+
+    if source_city:
+        return normalize_city_name(source_city) or source_city
+
+    return "Germany"
 
 
 def _normalized_location_tokens(location: str) -> set[str]:
@@ -152,19 +237,20 @@ def is_online_or_germany_wide_service(item: dict) -> bool:
         ):
             return True
 
-    for loc in _location_candidates(item):
-        if is_germany_wide_location(loc):
+    for loc in (item.get("location"), _effective_service_location(item)):
+        val = (loc or "").strip()
+        if val and is_germany_wide_location(val):
             return True
 
     return False
 
 
 def _location_candidates(item: dict) -> list[str]:
+    """Застаріло для маршруту — лишено для сумісності."""
+    eff = _effective_service_location(item)
     out: list[str] = []
-    for key in ("location", "source_city"):
-        val = (item.get(key) or "").strip()
-        if val and val not in out:
-            out.append(val)
+    if eff:
+        out.append(eff)
     return out
 
 
@@ -181,15 +267,22 @@ def is_hamburg_location(location: str) -> bool:
 
 
 def is_hamburg_service_item(item: dict) -> bool:
-    return any(is_hamburg_location(loc) for loc in _location_candidates(item))
+    return is_hamburg_location(_effective_service_location(item))
 
 
 def resolve_services_trade_channel_ids(item: dict) -> list[int]:
     """
     Аудиторія вся Німеччина (онлайн, тури, забір з адреси) → обидва канали.
     Локальний Hamburg → лише Hamburg.
-    Інше → Germany.
+    Інше місто (Wuppertal, Berlin, …) → лише Germany.
     """
+    eff_loc = _effective_service_location(item)
+    logger.debug(
+        "services route: eff_loc=%r location=%r source_city=%r",
+        eff_loc,
+        item.get("location"),
+        item.get("source_city"),
+    )
     if is_dual_channel_service(item):
         return [TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID]
     if is_hamburg_service_item(item):

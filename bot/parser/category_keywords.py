@@ -413,7 +413,21 @@ def get_category_label(category: str, subcategory: str | None = None) -> str:
         "products": "Продукти",
         "repair": "Ремонт",
         "beauty_services": "Краса",
+        "beauty_health": "Краса та здоров'я",
         "it_services": "IT-послуги",
+        "it_design_websites": "IT та сайти",
+        "repair_installation": "Ремонт та монтаж",
+        "transportation": "Перевезення",
+        "photo_video": "Фото та відео",
+        "education_tutors": "Навчання",
+        "translations": "Переклади",
+        "auto_services": "Автосервіс",
+        "vacancies": "Вакансії",
+        "part_time": "Підробіток",
+        "looking_for_work": "Шукаю роботу",
+        "other_services": "Інші послуги",
+        "services": "Послуги",
+        "online_services": "Онлайн-послуги",
         "rent": "Оренда",
         "sell": "Продаж",
         "giveaway": "Безкоштовно",
@@ -424,3 +438,15 @@ def get_category_label(category: str, subcategory: str | None = None) -> str:
         sub_label = sub_labels.get(subcategory, subcategory)
         return f"{cat_label} › {sub_label}"
     return cat_label
+
+
+def get_subcategory_label(category: str, subcategory: str | None) -> str:
+    """Читабельна назва підкатегорії (для хештегів і UI)."""
+    if not subcategory:
+        return ""
+    full = get_category_label(category, subcategory)
+    if " › " in full:
+        return full.split(" › ", 1)[1]
+    if subcategory.startswith("other_"):
+        return "Інше"
+    return subcategory

@@ -11,10 +11,12 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 
 from parser.category_keywords import get_category_label
+from parser.moderation.hashtags import build_channel_hashtags
 from parser.core.telegram_meta import parsed_item_message_link
 from parser.core.text import detect_lang
 from parser.moderation.config import BOT_USERNAME, WEBAPP_URL
 from parser.moderation.services_channel_routing import (
+    _effective_service_location,
     format_services_channels_labels,
     resolve_services_trade_channel_ids,
     services_channel_label,
@@ -180,7 +182,6 @@ async def publish_services_listing_to_channel(
     category = (item.get("category") or "services_work").strip()
     subcategory = item.get("subcategory")
     category_text = html.escape(get_category_label(category, subcategory))
-    hashtag_category = get_category_label(category, subcategory) or "Послуги"
 
     condition = item.get("condition") or ""
     condition_map = {
@@ -189,18 +190,12 @@ async def publish_services_listing_to_channel(
     }
     condition_text = html.escape(str(condition_map.get(condition, condition or "—")))
 
-    location = (item.get("location") or "").strip()
+    location = _effective_service_location(item)
     location_esc = html.escape(location)
 
     price_text = _services_channel_price_text(user_id_for_lang, item)
 
-    city_hashtag = location.replace(" ", "").replace("ü", "u").replace("ö", "o").replace("ä", "a").replace("ß", "ss")
-    city_hashtag = "".join(c for c in city_hashtag if c.isalnum() or c in ["_", "-"])
-    city_hashtag = f"#{city_hashtag}" if city_hashtag else ""
-
-    hashtags = f"#{hashtag_category.replace(' ', '').replace('/', '_')}"
-    if city_hashtag:
-        hashtags += f" {city_hashtag}"
+    hashtags = build_channel_hashtags(category, subcategory, location)
 
     seller_label = t(user_id_for_lang, "listing.details.seller_channel")
     author_username = (item.get("author_username") or "").strip().lstrip("@")
