@@ -15,7 +15,11 @@ from parser.ai_enrich import (
     merge_enrichment_into_item,
 )
 from parser.category_keywords import get_category_label
-from parser.config.services_ai_channels import PARSER_TYPE_SERVICES_CHANNEL
+from parser.moderation.approve_routing import (
+    APPROVE_TARGET_SERVICES_CHANNEL,
+    resolve_parser_approve_target,
+    validate_parser_approve_context,
+)
 from parser.marketplace_categories import apply_marketplace_categories_to_item
 from parser.moderation.author_notify import try_notify_author_via_pyrogram
 from parser.moderation.config import (
@@ -228,10 +232,6 @@ async def _approve_marketplace(
                 listing_id,
                 notify_err,
             )
-        if item_category == "services_work":
-            await publish_services_listing_to_channel(
-                bot, listing_item, listing_id, description, images_web
-            )
         await edit_group_message(
             bot,
             group_id,
@@ -255,6 +255,7 @@ async def _approve_marketplace(
 async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
     item_id = int(callback.data.split(":")[1])
     moderator_id = callback.from_user.id
+    chat_id = callback.message.chat.id
 
     item = get_parsed_item_by_id(item_id)
     if not item:
@@ -268,8 +269,21 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
         await callback.answer("ℹ️ Оголошення вже відхилено", show_alert=True)
         return
 
-    parser_type = (item.get("parser_type") or "default").strip()
-    if parser_type == PARSER_TYPE_SERVICES_CHANNEL:
+    err = validate_parser_approve_context(chat_id, item)
+    if err:
+        await callback.answer(err, show_alert=True)
+        return
+
+    target = resolve_parser_approve_target(chat_id, item)
+    logger.info(
+        "parsed_item %s approve: chat_id=%s target=%s parser_type=%s",
+        item_id,
+        chat_id,
+        target,
+        item.get("parser_type"),
+    )
+
+    if target == APPROVE_TARGET_SERVICES_CHANNEL:
         await _approve_services_channel_only(callback, bot, item_id, item, moderator_id)
     else:
         await _approve_marketplace(callback, bot, item_id, item, moderator_id)

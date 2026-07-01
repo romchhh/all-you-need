@@ -20,6 +20,7 @@ from aiogram.types import (
 
 from parser.db import set_admin_message_id
 from parser.category_keywords import get_category_label
+from parser.config.settings import SERVICES_MODERATION_CHANNEL_ID
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +83,16 @@ CITY_FLAG = {
 
 def _format_admin_message(item: dict) -> str:
     parser_type = (item.get("parser_type") or "default").strip()
+    notify_chat = item.get("notify_chat_id")
     if parser_type == "services_channel":
         header = "НОВА ПОСЛУГА (AI → канал TradeGround)"
+        footer = "✅ → лише Telegram-канал послуг (без маркетплейсу)"
+    elif notify_chat == SERVICES_MODERATION_CHANNEL_ID:
+        header = "НОВА ПОСЛУГА (/parse → канал TradeGround)"
+        footer = "✅ → лише Telegram-канал послуг (без маркетплейсу)"
     else:
-        header = "НОВЕ ОГОЛОШЕННЯ З ПАРСЕРА"
+        header = "НОВЕ ОГОЛОШЕННЯ (маркетплейс)"
+        footer = "✅ → лише маркетплейс (без каналів послуг)"
 
     category_label = get_category_label(item.get("category", "other"), item.get("subcategory"))
     cat_emoji = CATEGORY_EMOJI.get(item.get("category", "other"), "📦")
@@ -137,6 +144,8 @@ def _format_admin_message(item: dict) -> str:
         f"",
         f"📝 <b>Опис:</b>",
         f"{description}",
+        f"",
+        f"<i>{footer}</i>",
     ]
     return "\n".join(lines)
 
@@ -260,8 +269,8 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
             )
             msg_id = sent_kb.message_id
 
-        # Зберігаємо admin_message_id
-        set_admin_message_id(item_id, msg_id)
+        # Зберігаємо admin_message_id та групу модерації
+        set_admin_message_id(item_id, msg_id, moderation_chat_id=group_id)
         logger.info(f"Надіслано оголошення {item_id} в групу, msg_id={msg_id}")
         return msg_id
 

@@ -1,14 +1,92 @@
 """Метадані Telegram-повідомлень."""
 
+import logging
 import re
-from typing import Optional
+from typing import Optional, Union
 
 from parser.config.channels import normalize_channel_key
 
+logger = logging.getLogger(__name__)
 
-def message_link(channel: str, message_id: int) -> str:
+PyrogramChatTarget = Union[str, int]
+
+
+def is_invite_link(channel: str) -> bool:
+    s = (channel or "").strip().lower()
+    return "/+" in s or "/joinchat/" in s or s.startswith("+") and len(s) > 8
+
+
+def resolve_pyrogram_chat_ref(channel: str) -> str:
+    """
+    Pyrogram chat id для get_chat_history / get_chat.
+    Invite-посилання t.me/+… — лише з https://, інакше USERNAME_INVALID.
+    """
+    raw = (channel or "").strip()
+    if not raw:
+        return raw
+
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return raw.rstrip("/")
+
+    key = normalize_channel_key(raw)
+    if not key:
+        return raw
+
+    lower = key.lower()
+    if lower.startswith("t.me/+") or lower.startswith("t.me/joinchat/"):
+        return f"https://{key}"
+
+    if lower.startswith("t.me/"):
+        username = key.split("/", 1)[1]
+        return f"@{username}"
+
+    if key.startswith("+"):
+        return f"https://t.me/{key}"
+
+    return f"@{key.lstrip('@')}"
+
+
+async def resolve_pyrogram_chat_target(app, channel: str) -> PyrogramChatTarget:
+    """
+    Резолвить канал/групу для Pyrogram. Invite — join/get_chat → numeric chat_id.
+    """
+    ref = resolve_pyrogram_chat_ref(channel)
+    if not is_invite_link(ref):
+        return ref
+
+    try:
+        chat = await app.get_chat(ref)
+        return chat.id
+    except Exception as get_err:
+        logger.info("get_chat(%r): %s — пробуємо join_chat", ref, get_err)
+
+    try:
+        chat = await app.join_chat(ref)
+        logger.info("join_chat(%r) → chat_id=%s", ref, chat.id)
+        return chat.id
+    except Exception as join_err:
+        err_text = str(join_err)
+        if "USER_ALREADY_PARTICIPANT" in err_text:
+            chat = await app.get_chat(ref)
+            return chat.id
+        raise
+
+
+def message_link(channel: str, message_id: int, chat_id: Optional[int] = None) -> str:
+    if chat_id is not None:
+        try:
+            cid = int(chat_id)
+            if cid < 0:
+                internal = str(cid).replace("-100", "", 1)
+                return f"https://t.me/c/{internal}/{message_id}"
+        except (TypeError, ValueError):
+            pass
+
     clean = normalize_channel_key(channel)
-    if clean.lower().startswith("t.me/"):
+    lower = clean.lower()
+    if lower.startswith("t.me/+") or lower.startswith("t.me/joinchat/"):
+        return f"https://{clean}/{message_id}"
+    if lower.startswith("t.me/"):
         clean = clean.split("/", 1)[1]
     clean = clean.lstrip("@").split("/")[0]
     return f"https://t.me/{clean}/{message_id}"

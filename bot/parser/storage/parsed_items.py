@@ -189,6 +189,10 @@ def ensure_parsed_items_table():
     col_names4 = {row[1] for row in cursor.fetchall()}
     if "text_embedding" not in col_names4:
         cursor.execute("ALTER TABLE parsed_items ADD COLUMN text_embedding TEXT")
+    cursor.execute("PRAGMA table_info(parsed_items)")
+    col_names5 = {row[1] for row in cursor.fetchall()}
+    if "moderation_chat_id" not in col_names5:
+        cursor.execute("ALTER TABLE parsed_items ADD COLUMN moderation_chat_id INTEGER")
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_parsed_items_created_at "
         "ON parsed_items(created_at)"
@@ -487,12 +491,26 @@ def update_parsed_item_status(item_id: int, status: str, moderated_by: Optional[
     conn.close()
 
 
-def set_admin_message_id(item_id: int, admin_message_id: int):
+def set_admin_message_id(
+    item_id: int,
+    admin_message_id: int,
+    moderation_chat_id: int | None = None,
+):
     conn = get_connection()
-    conn.execute(
-        "UPDATE parsed_items SET admin_message_id = ? WHERE id = ?",
-        (admin_message_id, item_id),
-    )
+    if moderation_chat_id is not None:
+        conn.execute(
+            """
+            UPDATE parsed_items
+            SET admin_message_id = ?, moderation_chat_id = ?
+            WHERE id = ?
+            """,
+            (admin_message_id, moderation_chat_id, item_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE parsed_items SET admin_message_id = ? WHERE id = ?",
+            (admin_message_id, item_id),
+        )
     conn.commit()
     conn.close()
 

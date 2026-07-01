@@ -19,7 +19,12 @@ from parser.core.quality import (
     is_likely_service_ad,
     is_quality,
 )
-from parser.core.telegram_meta import get_sender_id, resolve_author_username, message_link
+from parser.core.telegram_meta import (
+    get_sender_id,
+    message_link,
+    resolve_author_username,
+    resolve_pyrogram_chat_target,
+)
 from parser.core.text import (
     clean_channel_post_text,
     detect_condition,
@@ -48,7 +53,9 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
     logger.info("Парсимо канал %s (місто: %s), ліміт: %s", channel, city, FETCH_LIMIT)
 
-    async for msg in app.get_chat_history(channel, limit=FETCH_LIMIT):
+    chat_target = await resolve_pyrogram_chat_target(app, channel)
+
+    async for msg in app.get_chat_history(chat_target, limit=FETCH_LIMIT):
         if getattr(msg, "media_group_id", None):
             gid = str(msg.media_group_id)
             if gid in processed_groups:
@@ -178,7 +185,11 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
                 "location": city,
                 "images": images,
                 "raw_text": text[:4000],
-                "msg_link": message_link(channel, effective_message_id),
+                "msg_link": message_link(
+                    channel,
+                    effective_message_id,
+                    chat_id=chat_target if isinstance(chat_target, int) else None,
+                ),
                 "notify_chat_id": (
                     SERVICES_MODERATION_CHANNEL_ID
                     if category == "services_work"
