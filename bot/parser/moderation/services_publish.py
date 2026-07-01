@@ -13,7 +13,12 @@ from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarku
 from parser.category_keywords import get_category_label
 from parser.core.telegram_meta import parsed_item_message_link
 from parser.core.text import detect_lang
-from parser.moderation.config import BOT_USERNAME, TRADE_SERVICES_CHANNEL_ID_RAW, WEBAPP_URL
+from parser.moderation.config import BOT_USERNAME, WEBAPP_URL
+from parser.moderation.services_channel_routing import (
+    format_services_channels_labels,
+    resolve_services_trade_channel_ids,
+    services_channel_label,
+)
 from utils.translations import t
 
 logger = logging.getLogger(__name__)
@@ -80,24 +85,88 @@ def _services_channel_price_text(user_id_for_lang: int, item: dict) -> str:
     return negotiable_text
 
 
+async def _send_services_post(
+    bot: Bot,
+    chat_id: int,
+    *,
+    text_with_bot: str,
+    keyboard: InlineKeyboardMarkup,
+    photo_inputs: list,
+    listing_id: int,
+) -> bool:
+    try:
+        if len(photo_inputs) == 1:
+            await bot.send_photo(
+                chat_id=chat_id,
+                photo=photo_inputs[0],
+                caption=text_with_bot,
+                parse_mode="HTML",
+                reply_markup=keyboard,
+            )
+        elif len(photo_inputs) > 1:
+            media = []
+            for i, ph in enumerate(photo_inputs):
+                cap = text_with_bot if i == 0 else None
+                pmode = "HTML" if i == 0 else None
+                media.append(InputMediaPhoto(media=ph, caption=cap, parse_mode=pmode))
+            await bot.send_media_group(chat_id=chat_id, media=media)
+        else:
+            default_path = _default_channel_photo_path()
+            if default_path:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=FSInputFile(default_path),
+                    caption=text_with_bot,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+            else:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=text_with_bot,
+                    parse_mode="HTML",
+                    disable_web_page_preview=False,
+                )
+        logger.info(
+            "Listing %s опубліковано в %s (chat_id=%s)",
+            listing_id,
+            services_channel_label(chat_id),
+            chat_id,
+        )
+        return True
+    except TelegramBadRequest as e:
+        logger.warning(
+            "Telegram: не вдалося опублікувати listing %s у %s: %s",
+            listing_id,
+            chat_id,
+            e,
+        )
+    except Exception as e:
+        logger.warning(
+            "Помилка публікації listing %s у %s: %s",
+            listing_id,
+            chat_id,
+            e,
+            exc_info=True,
+        )
+    return False
+
+
 async def publish_services_listing_to_channel(
     bot: Bot,
     item: dict,
     listing_id: int,
     marketplace_description: str,
     images_web: list,
-) -> None:
-    if not TRADE_SERVICES_CHANNEL_ID_RAW:
-        logger.warning(
-            "TRADE_SERVICES_CHANNEL_ID не задано — пропускаємо публікацію в канал послуг (listing %s)",
-            listing_id,
-        )
-        return
-    try:
-        chat_id = int(TRADE_SERVICES_CHANNEL_ID_RAW)
-    except ValueError:
-        logger.error("TRADE_SERVICES_CHANNEL_ID некоректний: %r", TRADE_SERVICES_CHANNEL_ID_RAW)
-        return
+) -> list[int]:
+    channel_ids = resolve_services_trade_channel_ids(item)
+    logger.info(
+        "Listing %s → канали послуг %s (location=%r, source_city=%r)",
+        listing_id,
+        channel_ids,
+        item.get("location"),
+        item.get("source_city"),
+    )
 
     try:
         user_id_for_lang = int(item.get("author_id") or 0)
@@ -196,50 +265,22 @@ async def publish_services_listing_to_channel(
 
     photo_inputs = _channel_photo_inputs_from_images_web(list(images_web) if images_web else [])
 
-    try:
-        if len(photo_inputs) == 1:
-            await bot.send_photo(
-                chat_id=chat_id,
-                photo=photo_inputs[0],
-                caption=text_with_bot,
-                parse_mode="HTML",
-                reply_markup=keyboard,
-            )
-        elif len(photo_inputs) > 1:
-            media = []
-            for i, ph in enumerate(photo_inputs):
-                cap = text_with_bot if i == 0 else None
-                pmode = "HTML" if i == 0 else None
-                media.append(InputMediaPhoto(media=ph, caption=cap, parse_mode=pmode))
-            await bot.send_media_group(chat_id=chat_id, media=media)
-        else:
-            default_path = _default_channel_photo_path()
-            if default_path:
-                await bot.send_photo(
-                    chat_id=chat_id,
-                    photo=FSInputFile(default_path),
-                    caption=text_with_bot,
-                    parse_mode="HTML",
-                    reply_markup=keyboard,
-                )
-            else:
-                await bot.send_message(
-                    chat_id=chat_id,
-                    text=text_with_bot,
-                    parse_mode="HTML",
-                    disable_web_page_preview=False,
-                )
-        logger.info("Listing %s опубліковано в канал послуг chat_id=%s", listing_id, chat_id)
-    except TelegramBadRequest as e:
-        logger.warning(
-            "Telegram: не вдалося опублікувати listing %s у канал послуг: %s",
+    published: list[int] = []
+    for chat_id in channel_ids:
+        if await _send_services_post(
+            bot,
+            chat_id,
+            text_with_bot=text_with_bot,
+            keyboard=keyboard,
+            photo_inputs=photo_inputs,
+            listing_id=listing_id,
+        ):
+            published.append(chat_id)
+
+    if len(published) > 1:
+        logger.info(
+            "Listing %s опубліковано в обидва канали: %s",
             listing_id,
-            e,
+            format_services_channels_labels(published),
         )
-    except Exception as e:
-        logger.warning(
-            "Помилка публікації listing %s у канал послуг: %s",
-            listing_id,
-            e,
-            exc_info=True,
-        )
+    return published

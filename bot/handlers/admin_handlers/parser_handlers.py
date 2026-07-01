@@ -51,7 +51,8 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
         lines.append("")
         lines.append(
             "Модерація: <code>PARSER_SERVICES_AI_MODERATION_CHANNEL_ID</code>\n"
-            "Після ✅ → публікація в <code>TRADE_SERVICES_CHANNEL_ID</code>"
+            "Після ✅ → Hamburg: <code>TRADE_SERVICES_CHANNEL_HAMBURG_ID</code>, "
+            "інші міста: <code>TRADE_SERVICES_CHANNEL_GERMANY_ID</code>"
         )
     elif added == 0:
         lines.append("")

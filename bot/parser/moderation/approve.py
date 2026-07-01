@@ -25,6 +25,7 @@ from parser.moderation.config import (
 )
 from parser.moderation.description import build_marketplace_description
 from parser.moderation.group_message import edit_group_message
+from parser.moderation.services_channel_routing import format_services_channels_labels
 from parser.moderation.services_publish import publish_services_listing_to_channel
 from parser.moderation.urls import listing_miniapp_url
 from parser.storage.marketplace import (
@@ -112,24 +113,28 @@ async def _approve_services_channel_only(
         mod_mention = "@" + html.escape(callback.from_user.username)
     else:
         mod_mention = f"<code>{moderator_id}</code>"
+    location_label = html.escape(str(listing_item.get("location") or listing_item.get("source_city") or ""))
     status_text = (
         f"✅ <b>Підтверджено</b> модератором {mod_mention}\n"
-        f"📣 Опубліковано в канал послуг TradeGround\n"
+        f"📣 Буде опубліковано в канал послуг (за містом)\n"
         f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
-        f"📍 {html.escape(str(listing_item.get('location') or ''))}"
+        f"📍 {location_label}"
     )
     if ai_summary:
         status_text += f"\n🤖 {html.escape(ai_summary[:220])}"
 
     async def _followup():
-        await publish_services_listing_to_channel(
+        published_chats = await publish_services_listing_to_channel(
             bot, listing_item, item_id, description, images_web
         )
+        final_status = status_text
+        if published_chats:
+            final_status += f"\n📢 {html.escape(format_services_channels_labels(published_chats))}"
         await edit_group_message(
             bot,
             group_id,
             msg_id,
-            status_text,
+            final_status,
             parse_mode="HTML",
         )
 

@@ -16,7 +16,8 @@
   PARSER_SERVICES_AI_CHANNELS — групи послуг для AI→канал: userOrLink:Місто,...
   PARSER_SERVICES_AI_MODERATION_CHANNEL_ID — модерація (за замовч. -1003901841142)
   PARSER_SERVICES_AI_INTERVAL_MIN — інтервал AI-парсера послуг (за замовч. = PARSER_INTERVAL_MIN)
-  TRADE_SERVICES_CHANNEL_ID — публічний канал TradeGround для послуг
+  TRADE_SERVICES_CHANNEL_HAMBURG_ID — канал послуг Hamburg (за замовч. -1003627644062)
+  TRADE_SERVICES_CHANNEL_GERMANY_ID — канал послуг Germany (за замовч. -1003857694156)
   OPENAI_API_KEY — AI при підтвердженні модератором
 """
 
