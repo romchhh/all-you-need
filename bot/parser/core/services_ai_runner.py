@@ -15,7 +15,7 @@ from parser.config.services_ai_channels import (
     SERVICES_AI_CHANNELS,
     SERVICES_AI_MODERATION_CHANNEL_ID,
 )
-from parser.config.settings import FETCH_LIMIT
+from parser.core.channel_fetch import iter_new_channel_messages
 from parser.core.photos import download_photos
 from parser.core.quality import (
     has_too_many_emojis,
@@ -58,16 +58,16 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
     channel_key = normalize_channel_key(channel)
     force_service_channel = channel_key in SERVICE_CHANNELS
 
-    logger.info(
-        "Парсимо послуги (AI→канал) %s (місто: %s), ліміт: %s",
-        channel,
-        city,
-        FETCH_LIMIT,
-    )
+    logger.info("Парсимо послуги (AI→канал) %s (місто: %s)", channel, city)
 
     chat_target = await resolve_pyrogram_chat_target(app, channel)
 
-    async for msg in app.get_chat_history(chat_target, limit=FETCH_LIMIT):
+    async for msg in iter_new_channel_messages(
+        app,
+        chat_target,
+        source_channel=channel,
+        parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+    ):
         if getattr(msg, "media_group_id", None):
             gid = str(msg.media_group_id)
             if gid in processed_groups:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -52,12 +53,22 @@ def _main_account() -> PyrogramAccount:
     )
 
 
-def _services_account() -> PyrogramAccount:
+def _services_account() -> PyrogramAccount | None:
+    """Другий акаунт — лише якщо явно задано окремий PARSER_SERVICES_PHONE."""
+    if not (PARSER_SERVICES_API_ID and PARSER_SERVICES_API_HASH and PARSER_SERVICES_PHONE):
+        return None
+    main_phone = "".join(c for c in PARSER_PHONE if c.isdigit())
+    svc_phone = "".join(c for c in PARSER_SERVICES_PHONE if c.isdigit())
+    if main_phone and svc_phone and main_phone == svc_phone:
+        logger.warning(
+            "PARSER_SERVICES_PHONE збігається з PARSER_PHONE — другий акаунт не використовується"
+        )
+        return None
     return PyrogramAccount(
         label="services",
-        api_id=PARSER_SERVICES_API_ID or PARSER_API_ID,
-        api_hash=PARSER_SERVICES_API_HASH or PARSER_API_HASH,
-        phone=PARSER_SERVICES_PHONE or PARSER_PHONE,
+        api_id=PARSER_SERVICES_API_ID,
+        api_hash=PARSER_SERVICES_API_HASH,
+        phone=PARSER_SERVICES_PHONE,
         session_path=PARSER_SERVICES_SESSION_PATH,
     )
 
@@ -66,7 +77,11 @@ def list_parser_accounts() -> list[PyrogramAccount]:
     """Унікальні налаштовані акаунти (main + services, якщо другий відрізняється)."""
     seen: set[tuple[int, str]] = set()
     out: list[PyrogramAccount] = []
-    for acc in (_main_account(), _services_account()):
+    candidates: list[PyrogramAccount] = [_main_account()]
+    svc = _services_account()
+    if svc:
+        candidates.append(svc)
+    for acc in candidates:
         if not acc.is_configured():
             continue
         key = (acc.api_id, acc.phone.strip())
@@ -119,6 +134,13 @@ async def run_channels_with_accounts(
         len(items),
         len(accounts),
     )
+    if len(accounts) < 2:
+        logger.warning(
+            "%s: працює 1 акаунт (%s). Flood wait залишиться частим — "
+            "додайте PARSER_SERVICES_API_ID/HASH/PHONE (інший номер) і авторизуйте parser_services_session.",
+            log_prefix,
+            accounts[0].session_path.name,
+        )
 
     for acc, bucket in zip(accounts, buckets):
         if not bucket:
@@ -138,7 +160,7 @@ async def run_channels_with_accounts(
         )
         async with pyrogram_session_guard(acc.session_path):
             async with client:
-                for channel, city in bucket:
+                for idx, (channel, city) in enumerate(bucket):
                     try:
                         stats = await parse_fn(client, channel, city, notify_callback)
                         merge_channel_stats(total, stats, channel=channel, city=city)
@@ -162,5 +184,7 @@ async def run_channels_with_accounts(
                         total["errors"].append(
                             {"channel": channel, "city": city, "error": str(e)}
                         )
+                    if idx < len(bucket) - 1:
+                        await asyncio.sleep(2)
 
     return total
