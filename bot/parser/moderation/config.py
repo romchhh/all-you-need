@@ -25,8 +25,16 @@ PARSER_SERVICES_API_ID: int = int(os.getenv("PARSER_SERVICES_API_ID", "0"))
 PARSER_SERVICES_API_HASH: str = os.getenv("PARSER_SERVICES_API_HASH", "")
 PARSER_SERVICES_PHONE: str = os.getenv("PARSER_SERVICES_PHONE", "")
 
+# 3-й акаунт (резерв при FloodWait; зараз @opluger)
+PARSER_FALLBACK_API_ID: int = int(os.getenv("PARSER_FALLBACK_API_ID", "0"))
+PARSER_FALLBACK_API_HASH: str = os.getenv("PARSER_FALLBACK_API_HASH", "")
+PARSER_FALLBACK_PHONE: str = os.getenv("PARSER_FALLBACK_PHONE", "")
+PARSER_FALLBACK_BOT_TELEGRAM_ID: int = int(os.getenv("PARSER_FALLBACK_BOT_TELEGRAM_ID", "0"))
+PARSER_FALLBACK_BOT_USERNAME: str = (os.getenv("PARSER_FALLBACK_BOT_USERNAME") or "opluger").lstrip("@")
+
 PARSER_SESSION_PATH = Path(__file__).resolve().parent.parent / "parser_session"
 PARSER_SERVICES_SESSION_PATH = Path(__file__).resolve().parent.parent / "parser_services_session"
+PARSER_FALLBACK_SESSION_PATH = Path(__file__).resolve().parent.parent / "parser_fallback_session"
 
 NOTIFY_AUTHOR_TEXT_RU = (
     "Привет! 👋\n\n"

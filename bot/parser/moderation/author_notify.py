@@ -2,40 +2,49 @@
 
 import logging
 
+from parser.core.account_pool import PyrogramAccount, is_flood_limit_error, list_parser_accounts
 from parser.moderation.config import (
     NOTIFY_AUTHOR_CHANNEL_TEXT_RU,
     NOTIFY_AUTHOR_TEXT_RU,
-    PARSER_API_HASH,
-    PARSER_API_ID,
-    PARSER_PHONE,
-    PARSER_SERVICES_API_HASH,
-    PARSER_SERVICES_API_ID,
-    PARSER_SERVICES_PHONE,
-    PARSER_SERVICES_SESSION_PATH,
-    PARSER_SESSION_PATH,
 )
 from parser.moderation.urls import listing_miniapp_url
 
 logger = logging.getLogger(__name__)
 
 
-def _main_pyrogram_configured() -> bool:
-    return bool(PARSER_API_ID and PARSER_API_HASH and PARSER_PHONE)
+async def _send_author_dm(acc: PyrogramAccount, target, plain_text: str) -> None:
+    from pyrogram import Client
 
+    from parser.core.pyrogram_accounts import PYROGRAM_SLEEP_THRESHOLD
+    from parser.session_lock import pyrogram_session_guard
 
-def _services_pyrogram_configured() -> bool:
-    return bool(
-        PARSER_SERVICES_API_ID and PARSER_SERVICES_API_HASH and PARSER_SERVICES_PHONE
+    app = Client(
+        name=str(acc.session_path),
+        api_id=acc.api_id,
+        api_hash=acc.api_hash,
+        phone_number=acc.phone,
+        sleep_threshold=PYROGRAM_SLEEP_THRESHOLD,
     )
+    async with pyrogram_session_guard(acc.session_path, timeout=120):
+        async with app:
+            await app.send_message(target, plain_text)
+            logger.info(
+                "Pyrogram[%s …%s]: надіслано сповіщення автору %s",
+                acc.label,
+                acc.phone_tail,
+                target,
+            )
 
 
-def _is_peer_flood_error(err_s: str) -> bool:
-    low = err_s.lower()
-    return (
-        "PEER_FLOOD" in err_s
-        or "FLOOD_WAIT" in err_s
-        or ("flood" in low and "limited" in low)
-        or "currently limited" in low
+def _dm_account_order(*, use_services_sender: bool) -> list[PyrogramAccount]:
+    accounts = list_parser_accounts()
+    if not accounts:
+        return []
+    if not use_services_sender:
+        return accounts
+    return sorted(
+        accounts,
+        key=lambda a: (0 if a.label in ("services", "fallback") else 1, a.priority),
     )
 
 
@@ -44,8 +53,6 @@ async def try_notify_author_via_pyrogram(
     listing_id: int,
     use_services_sender: bool = False,
     channel_only: bool = False,
-    _retried_main_fallback: bool = False,
-    _flood_account_switch_done: bool = False,
 ):
     author_id = item.get("author_id")
     author_username = item.get("author_username")
@@ -55,36 +62,10 @@ async def try_notify_author_via_pyrogram(
         logger.info("Автор оголошення %s невідомий — пропускаємо сповіщення", item["id"])
         return
 
-    api_id = PARSER_API_ID
-    api_hash = PARSER_API_HASH
-    phone = PARSER_PHONE
-    session_path = PARSER_SESSION_PATH
-    sender_label = "main"
-
-    if use_services_sender:
-        if PARSER_SERVICES_API_ID and PARSER_SERVICES_API_HASH and PARSER_SERVICES_PHONE:
-            api_id = PARSER_SERVICES_API_ID
-            api_hash = PARSER_SERVICES_API_HASH
-            phone = PARSER_SERVICES_PHONE
-            session_path = PARSER_SERVICES_SESSION_PATH
-            sender_label = "services"
-        else:
-            logger.warning(
-                "PARSER_SERVICES_API_ID/HASH/PHONE не заповнені — "
-                "DM автору через основний parser-акаунт"
-            )
-
-    if not api_id or not api_hash or not phone:
+    order = _dm_account_order(use_services_sender=use_services_sender)
+    if not order:
         logger.info("Pyrogram не налаштовано — пропускаємо сповіщення автору")
         return
-
-    try:
-        from pyrogram import Client
-    except ImportError:
-        logger.warning("Pyrogram не встановлено — пропускаємо сповіщення автору")
-        return
-
-    from parser.session_lock import pyrogram_session_guard
 
     if channel_only:
         plain_text = NOTIFY_AUTHOR_CHANNEL_TEXT_RU.format(title=title)
@@ -94,64 +75,38 @@ async def try_notify_author_via_pyrogram(
             listing_url=listing_miniapp_url(listing_id),
         )
 
-    try:
-        app = Client(
-            name=str(session_path),
-            api_id=int(api_id),
-            api_hash=api_hash,
-            phone_number=phone,
-        )
-        async with pyrogram_session_guard(session_path, timeout=120):
-            async with app:
-                target = author_id or f"@{author_username}"
-                await app.send_message(target, plain_text)
-                logger.info("Pyrogram[%s]: надіслано сповіщення автору %s", sender_label, target)
-    except Exception as e:
-        err_s = str(e)
-        logger.warning(
-            "Pyrogram[%s]: не вдалося надіслати автору сповіщення: %s",
-            sender_label,
-            e,
-        )
-        if (
-            use_services_sender
-            and not _retried_main_fallback
-            and ("PEER_ID_INVALID" in err_s or "peer id" in err_s.lower())
-        ):
-            logger.info("Повтор DM автору через основний parser-акаунт (services peer невідомий)")
-            await try_notify_author_via_pyrogram(
-                item,
-                listing_id,
-                use_services_sender=False,
-                channel_only=channel_only,
-                _retried_main_fallback=True,
-                _flood_account_switch_done=_flood_account_switch_done,
-            )
-            return
+    target = author_id or f"@{author_username}"
+    last_error: Exception | None = None
 
-        if _is_peer_flood_error(err_s) and not _flood_account_switch_done:
-            if use_services_sender and _main_pyrogram_configured():
-                logger.info(
-                    "PEER_FLOOD/ліміт на акаунті послуг — пробуємо основний parser-акаунт"
+    for acc in order:
+        try:
+            await _send_author_dm(acc, target, plain_text)
+            return
+        except Exception as e:
+            last_error = e
+            err_s = str(e)
+            if is_flood_limit_error(e):
+                logger.warning(
+                    "Ліміт DM на %s (…%s) — пробуємо інший акаунт",
+                    acc.label,
+                    acc.phone_tail,
                 )
-                await try_notify_author_via_pyrogram(
-                    item,
-                    listing_id,
-                    use_services_sender=False,
-                    channel_only=channel_only,
-                    _retried_main_fallback=_retried_main_fallback,
-                    _flood_account_switch_done=True,
-                )
-                return
-            if not use_services_sender and _services_pyrogram_configured():
-                logger.info(
-                    "PEER_FLOOD/ліміт на основному parser — пробуємо акаунт послуг (Pyrogram)"
-                )
-                await try_notify_author_via_pyrogram(
-                    item,
-                    listing_id,
-                    use_services_sender=True,
-                    channel_only=channel_only,
-                    _retried_main_fallback=_retried_main_fallback,
-                    _flood_account_switch_done=True,
-                )
+                continue
+            if use_services_sender and (
+                "PEER_ID_INVALID" in err_s or "peer id" in err_s.lower()
+            ):
+                logger.info("Peer невідомий на %s — пробуємо інший акаунт", acc.label)
+                continue
+            logger.warning(
+                "Pyrogram[%s]: не вдалося надіслати автору сповіщення: %s",
+                acc.label,
+                e,
+            )
+            continue
+
+    if last_error:
+        logger.warning(
+            "DM автору item %s: не вдалося з жодного акаунта (%s)",
+            item.get("id"),
+            last_error,
+        )

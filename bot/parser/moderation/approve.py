@@ -24,6 +24,8 @@ from parser.marketplace_categories import apply_marketplace_categories_to_item
 from parser.moderation.author_notify import try_notify_author_via_pyrogram
 from parser.moderation.config import (
     PARSER_BOT_TELEGRAM_ID,
+    PARSER_FALLBACK_BOT_TELEGRAM_ID,
+    PARSER_FALLBACK_BOT_USERNAME,
     PARSER_SERVICES_BOT_TELEGRAM_ID,
     PARSER_SERVICES_BOT_USERNAME,
 )
@@ -172,10 +174,15 @@ async def _approve_marketplace(
 
     item_category = (listing_item.get("category") or "").strip().lower()
     if item_category == "services_work":
+        seller_tg_id = (
+            PARSER_FALLBACK_BOT_TELEGRAM_ID
+            or PARSER_SERVICES_BOT_TELEGRAM_ID
+        )
+        seller_username = PARSER_FALLBACK_BOT_USERNAME or PARSER_SERVICES_BOT_USERNAME
         user_id = get_or_create_bot_user(
-            PARSER_SERVICES_BOT_TELEGRAM_ID,
-            PARSER_SERVICES_BOT_USERNAME,
-            "TradeGround Seller 2",
+            seller_tg_id,
+            seller_username,
+            "TradeGround Seller",
         )
     else:
         bot_tg_id = PARSER_BOT_TELEGRAM_ID or 8590825131

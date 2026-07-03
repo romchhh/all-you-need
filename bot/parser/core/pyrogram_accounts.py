@@ -1,23 +1,17 @@
-"""Два Pyrogram-акаунти для парсингу каналів по черзі (round-robin)."""
+"""Розподіл каналів між Pyrogram-акаунтами + fallback при лімітах Telegram."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
-from parser.moderation.config import (
-    PARSER_API_HASH,
-    PARSER_API_ID,
-    PARSER_PHONE,
-    PARSER_SERVICES_API_HASH,
-    PARSER_SERVICES_API_ID,
-    PARSER_SERVICES_PHONE,
-    PARSER_SERVICES_SESSION_PATH,
-    PARSER_SESSION_PATH,
+from parser.core.account_pool import (
+    PyrogramAccount,
+    fallback_accounts_after,
+    is_flood_limit_error,
+    list_parser_accounts,
 )
 from parser.session_lock import pyrogram_session_guard
 
@@ -25,71 +19,8 @@ logger = logging.getLogger(__name__)
 
 ParseChannelFn = Callable[..., Awaitable[dict]]
 
-
-@dataclass(frozen=True)
-class PyrogramAccount:
-    label: str
-    api_id: int
-    api_hash: str
-    phone: str
-    session_path: Path
-
-    def is_configured(self) -> bool:
-        return bool(self.api_id and self.api_hash and self.phone)
-
-    @property
-    def phone_tail(self) -> str:
-        digits = "".join(c for c in self.phone if c.isdigit())
-        return digits[-4:] if len(digits) >= 4 else "????"
-
-
-def _main_account() -> PyrogramAccount:
-    return PyrogramAccount(
-        label="main",
-        api_id=PARSER_API_ID,
-        api_hash=PARSER_API_HASH,
-        phone=PARSER_PHONE,
-        session_path=PARSER_SESSION_PATH,
-    )
-
-
-def _services_account() -> PyrogramAccount | None:
-    """Другий акаунт — лише якщо явно задано окремий PARSER_SERVICES_PHONE."""
-    if not (PARSER_SERVICES_API_ID and PARSER_SERVICES_API_HASH and PARSER_SERVICES_PHONE):
-        return None
-    main_phone = "".join(c for c in PARSER_PHONE if c.isdigit())
-    svc_phone = "".join(c for c in PARSER_SERVICES_PHONE if c.isdigit())
-    if main_phone and svc_phone and main_phone == svc_phone:
-        logger.warning(
-            "PARSER_SERVICES_PHONE збігається з PARSER_PHONE — другий акаунт не використовується"
-        )
-        return None
-    return PyrogramAccount(
-        label="services",
-        api_id=PARSER_SERVICES_API_ID,
-        api_hash=PARSER_SERVICES_API_HASH,
-        phone=PARSER_SERVICES_PHONE,
-        session_path=PARSER_SERVICES_SESSION_PATH,
-    )
-
-
-def list_parser_accounts() -> list[PyrogramAccount]:
-    """Унікальні налаштовані акаунти (main + services, якщо другий відрізняється)."""
-    seen: set[tuple[int, str]] = set()
-    out: list[PyrogramAccount] = []
-    candidates: list[PyrogramAccount] = [_main_account()]
-    svc = _services_account()
-    if svc:
-        candidates.append(svc)
-    for acc in candidates:
-        if not acc.is_configured():
-            continue
-        key = (acc.api_id, acc.phone.strip())
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(acc)
-    return out
+# Не чекати flood wait — одразу перемикати акаунт
+PYROGRAM_SLEEP_THRESHOLD = 0
 
 
 def merge_channel_stats(total: dict, stats: dict, *, channel: str, city: str) -> None:
@@ -101,6 +32,69 @@ def merge_channel_stats(total: dict, stats: dict, *, channel: str, city: str) ->
             merged[reason] = merged.get(reason, 0) + count
 
 
+async def _run_parse_on_account(
+    acc: PyrogramAccount,
+    parse_fn: ParseChannelFn,
+    channel: str,
+    city: str,
+    notify_callback: Callable[..., Awaitable[Any]],
+) -> dict:
+    from pyrogram import Client
+
+    client = Client(
+        name=str(acc.session_path),
+        api_id=acc.api_id,
+        api_hash=acc.api_hash,
+        phone_number=acc.phone,
+        sleep_threshold=PYROGRAM_SLEEP_THRESHOLD,
+    )
+    async with pyrogram_session_guard(acc.session_path):
+        async with client:
+            return await parse_fn(client, channel, city, notify_callback)
+
+
+async def _parse_channel_with_fallback(
+    primary: PyrogramAccount,
+    parse_fn: ParseChannelFn,
+    channel: str,
+    city: str,
+    notify_callback: Callable[..., Awaitable[Any]],
+    *,
+    log_prefix: str,
+) -> tuple[dict | None, PyrogramAccount | None, str | None]:
+    chain = [primary, *fallback_accounts_after(primary)]
+    last_error: str | None = None
+
+    for acc in chain:
+        try:
+            stats = await _run_parse_on_account(acc, parse_fn, channel, city, notify_callback)
+            if acc.label != primary.label:
+                logger.info(
+                    "%s — %s: канал %s оброблено резервним акаунтом %s (…%s)",
+                    log_prefix,
+                    primary.label,
+                    channel,
+                    acc.label,
+                    acc.phone_tail,
+                )
+            return stats, acc, None
+        except Exception as e:
+            last_error = str(e)
+            if is_flood_limit_error(e):
+                logger.warning(
+                    "%s — ліміт Telegram на %s (…%s) для %s: %s — пробуємо інший акаунт",
+                    log_prefix,
+                    acc.label,
+                    acc.phone_tail,
+                    channel,
+                    e,
+                )
+                continue
+            raise
+
+    return None, None, last_error
+
+
 async def run_channels_with_accounts(
     channels: dict[str, str],
     parse_fn: ParseChannelFn,
@@ -109,17 +103,12 @@ async def run_channels_with_accounts(
     log_prefix: str = "Парсинг",
 ) -> dict:
     """
-    Розподіляє канали між акаунтами по черзі (0→acc0, 1→acc1, 2→acc0…).
-    Кожен акаунт — окрема Pyrogram-сесія та lock.
+    Канали розподіляються round-robin між акаунтами.
+    При FloodWait — той самий канал повторюється на іншому акаунті.
     """
     accounts = list_parser_accounts()
     if not accounts:
         raise ValueError("PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не налаштовано")
-
-    try:
-        from pyrogram import Client
-    except ImportError as e:
-        raise ImportError("Pyrogram не встановлено. pip install pyrogram tgcrypto") from e
 
     items = list(channels.items())
     buckets: list[list[tuple[str, str]]] = [[] for _ in accounts]
@@ -129,62 +118,74 @@ async def run_channels_with_accounts(
     total: dict = {"added": 0, "skipped": 0, "errors": []}
 
     logger.info(
-        "%s: %s канал(ів), %s Telegram-акаунт(ів)",
+        "%s: %s канал(ів), %s Telegram-акаунт(ів) [%s]",
         log_prefix,
         len(items),
         len(accounts),
+        ", ".join(f"{a.label}(…{a.phone_tail})" for a in accounts),
     )
     if len(accounts) < 2:
         logger.warning(
-            "%s: працює 1 акаунт (%s). Flood wait залишиться частим — "
-            "додайте PARSER_SERVICES_API_ID/HASH/PHONE (інший номер) і авторизуйте parser_services_session.",
+            "%s: лише 1 акаунт — при лімітах Telegram парсинг сповільниться. "
+            "Додайте PARSER_SERVICES_* та/або PARSER_FALLBACK_* (opluger).",
             log_prefix,
-            accounts[0].session_path.name,
         )
 
     for acc, bucket in zip(accounts, buckets):
         if not bucket:
             continue
         logger.info(
-            "%s — акаунт %s (…%s): %s канал(ів)",
+            "%s — основний акаунт %s (…%s): %s канал(ів)",
             log_prefix,
             acc.label,
             acc.phone_tail,
             len(bucket),
         )
-        client = Client(
-            name=str(acc.session_path),
-            api_id=acc.api_id,
-            api_hash=acc.api_hash,
-            phone_number=acc.phone,
-        )
-        async with pyrogram_session_guard(acc.session_path):
-            async with client:
-                for idx, (channel, city) in enumerate(bucket):
-                    try:
-                        stats = await parse_fn(client, channel, city, notify_callback)
-                        merge_channel_stats(total, stats, channel=channel, city=city)
-                        logger.info(
-                            "  [%s …%s] %s: +%s нових, пропущено %s",
-                            acc.label,
-                            acc.phone_tail,
-                            channel,
-                            stats.get("added", 0),
-                            stats.get("skipped", 0),
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "%s — помилка каналу %s (акаунт %s): %s",
-                            log_prefix,
-                            channel,
-                            acc.label,
-                            e,
-                            exc_info=True,
-                        )
-                        total["errors"].append(
-                            {"channel": channel, "city": city, "error": str(e)}
-                        )
-                    if idx < len(bucket) - 1:
-                        await asyncio.sleep(2)
+        for idx, (channel, city) in enumerate(bucket):
+            try:
+                stats, used_acc, flood_err = await _parse_channel_with_fallback(
+                    acc,
+                    parse_fn,
+                    channel,
+                    city,
+                    notify_callback,
+                    log_prefix=log_prefix,
+                )
+                if stats is None:
+                    total["errors"].append(
+                        {
+                            "channel": channel,
+                            "city": city,
+                            "error": flood_err or "ліміт на всіх акаунтах",
+                        }
+                    )
+                    logger.error(
+                        "%s — %s: ліміт на всіх акаунтах",
+                        log_prefix,
+                        channel,
+                    )
+                    continue
+                merge_channel_stats(total, stats, channel=channel, city=city)
+                used = used_acc or acc
+                logger.info(
+                    "  [%s …%s] %s: +%s нових, пропущено %s",
+                    used.label,
+                    used.phone_tail,
+                    channel,
+                    stats.get("added", 0),
+                    stats.get("skipped", 0),
+                )
+            except Exception as e:
+                logger.error(
+                    "%s — помилка каналу %s (акаунт %s): %s",
+                    log_prefix,
+                    channel,
+                    acc.label,
+                    e,
+                    exc_info=True,
+                )
+                total["errors"].append({"channel": channel, "city": city, "error": str(e)})
+            if idx < len(bucket) - 1:
+                await asyncio.sleep(2)
 
     return total

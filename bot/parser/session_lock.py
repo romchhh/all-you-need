@@ -13,10 +13,12 @@ GLOBAL_PARSER_RUN_LOCK = asyncio.Lock()
 
 PARSER_SESSION_LOCK = asyncio.Lock()
 SERVICES_SESSION_LOCK = asyncio.Lock()
+FALLBACK_SESSION_LOCK = asyncio.Lock()
 
 _SESSION_LOCKS: dict[str, asyncio.Lock] = {
     "parser_session": PARSER_SESSION_LOCK,
     "parser_services_session": SERVICES_SESSION_LOCK,
+    "parser_fallback_session": FALLBACK_SESSION_LOCK,
 }
 
 

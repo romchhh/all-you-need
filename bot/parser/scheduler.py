@@ -59,7 +59,7 @@ async def run_parser_cycle() -> dict | None:
         notify_parser_channel_errors,
         notify_parser_error_admins,
     )
-    from parser.core.pyrogram_accounts import list_parser_accounts
+    from parser.core.account_pool import list_parser_accounts
     from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
 
     aiogram_bot = Bot(token=BOT_TOKEN)
@@ -131,7 +131,7 @@ async def run_services_ai_parser_cycle() -> dict | None:
         notify_parser_channel_errors,
         notify_parser_error_admins,
     )
-    from parser.core.pyrogram_accounts import list_parser_accounts
+    from parser.core.account_pool import list_parser_accounts
     from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
 
     aiogram_bot = Bot(token=BOT_TOKEN)
