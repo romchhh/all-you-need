@@ -211,35 +211,34 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
     return stats
 
 
-async def run_all_channels(app, notify_callback) -> dict:
+async def run_all_channels(notify_callback) -> dict:
     from parser.config.services_ai_channels import (
         SERVICES_AI_CHANNELS,
         services_ai_parser_enabled,
     )
+    from parser.core.pyrogram_accounts import run_channels_with_accounts
 
     skip_service_channels: set[str] = set()
     if services_ai_parser_enabled():
         skip_service_channels = {normalize_channel_key(k) for k in SERVICES_AI_CHANNELS}
 
-    total: dict = {"added": 0, "skipped": 0, "errors": []}
-    for channel, city in CHANNELS.items():
+    channels = {
+        channel: city
+        for channel, city in CHANNELS.items()
+        if normalize_channel_key(channel) not in skip_service_channels
+    }
+
+    for channel in CHANNELS:
         if normalize_channel_key(channel) in skip_service_channels:
             logger.info(
                 "Пропускаємо %s — канал обробляє services AI parser (/parse_services)",
                 channel,
             )
-            continue
-        try:
-            stats = await parse_channel(app, channel, city, notify_callback)
-            total["added"] += stats["added"]
-            total["skipped"] += stats["skipped"]
-            logger.info(
-                "Канал %s: +%s нових, пропущено %s",
-                channel,
-                stats["added"],
-                stats["skipped"],
-            )
-        except Exception as e:
-            logger.error("Помилка парсингу каналу %s: %s", channel, e, exc_info=True)
-            total["errors"].append({"channel": channel, "city": city, "error": str(e)})
+
+    total = await run_channels_with_accounts(
+        channels,
+        parse_channel,
+        notify_callback,
+        log_prefix="Маркетплейс",
+    )
     return total

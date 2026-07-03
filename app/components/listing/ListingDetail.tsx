@@ -276,8 +276,10 @@ export const ListingDetail = ({
         listing.subcategory ?? null
       );
       if (resolved) {
-        const catalog = toBazaarHomeCategoryFilter(resolved);
-        params.set('category', catalog.categoryId);
+        params.set('category', resolved.categoryId);
+        if (resolved.subcategoryId) {
+          params.set('subcategory', resolved.subcategoryId);
+        }
       }
       return params;
     },

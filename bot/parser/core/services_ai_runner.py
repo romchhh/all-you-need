@@ -231,28 +231,22 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
     return stats
 
 
-async def run_services_ai_channels(app, notify_callback) -> dict:
-    total: dict = {"added": 0, "skipped": 0, "errors": [], "channels": len(SERVICES_AI_CHANNELS)}
-    if not SERVICES_AI_CHANNELS:
-        total["errors"].append({"channel": "—", "city": "—", "error": "немає каналів у SERVICES_AI_CHANNELS"})
-        return total
+async def run_services_ai_channels(notify_callback) -> dict:
+    from parser.core.pyrogram_accounts import run_channels_with_accounts
 
-    for channel, city in SERVICES_AI_CHANNELS.items():
-        try:
-            stats = await parse_services_ai_channel(app, channel, city, notify_callback)
-            total["added"] += stats["added"]
-            total["skipped"] += stats["skipped"]
-            if stats.get("reasons"):
-                total.setdefault("reasons", {})
-                for reason, count in stats["reasons"].items():
-                    total["reasons"][reason] = total["reasons"].get(reason, 0) + count
-            logger.info(
-                "Послуги (AI→канал) %s: +%s нових, пропущено %s",
-                channel,
-                stats["added"],
-                stats["skipped"],
-            )
-        except Exception as e:
-            logger.error("Помилка парсингу послуг %s: %s", channel, e, exc_info=True)
-            total["errors"].append({"channel": channel, "city": city, "error": str(e)})
+    if not SERVICES_AI_CHANNELS:
+        return {
+            "added": 0,
+            "skipped": 0,
+            "errors": [{"channel": "—", "city": "—", "error": "немає каналів у SERVICES_AI_CHANNELS"}],
+            "channels": 0,
+        }
+
+    total = await run_channels_with_accounts(
+        dict(SERVICES_AI_CHANNELS),
+        parse_services_ai_channel,
+        notify_callback,
+        log_prefix="Послуги (AI→канал)",
+    )
+    total["channels"] = len(SERVICES_AI_CHANNELS)
     return total

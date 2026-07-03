@@ -457,6 +457,17 @@ def insert_parsed_item(
     ))
     conn.commit()
     item_id = cursor.lastrowid
+    if not item_id:
+        cursor.execute(
+            """
+            SELECT id FROM parsed_items
+            WHERE source_channel = ? AND message_id = ?
+            LIMIT 1
+            """,
+            (source_channel, message_id),
+        )
+        row = cursor.fetchone()
+        item_id = int(row[0]) if row else 0
     conn.close()
     return item_id
 
@@ -476,6 +487,7 @@ def get_parsed_item_by_admin_msg(admin_message_id: int) -> Optional[dict]:
 def resolve_parsed_item_for_moderation(
     item_id: int,
     admin_message_id: int | None = None,
+    reply_to_message_id: int | None = None,
 ) -> Optional[dict]:
     """
     Знаходить parsed_item за id з callback або за message_id повідомлення модерації.
@@ -484,12 +496,14 @@ def resolve_parsed_item_for_moderation(
     item = get_parsed_item_by_id(item_id)
     if item:
         return item
-    if admin_message_id is not None:
-        by_msg = get_parsed_item_by_admin_msg(admin_message_id)
+    for msg_id in (admin_message_id, reply_to_message_id):
+        if msg_id is None:
+            continue
+        by_msg = get_parsed_item_by_admin_msg(msg_id)
         if by_msg:
             logger.info(
                 "parsed_items: fallback admin_message_id=%s → id=%s (callback id=%s)",
-                admin_message_id,
+                msg_id,
                 by_msg.get("id"),
                 item_id,
             )

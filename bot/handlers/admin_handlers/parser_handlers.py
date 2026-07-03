@@ -7,7 +7,7 @@ from aiogram import Router, types
 from aiogram.filters import Command
 
 from utils.filters import IsAdmin
-from parser.session_lock import PARSER_SESSION_LOCK
+from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ async def manual_parser_run(message: types.Message):
         )
         return
 
-    if PARSER_SESSION_LOCK.locked():
+    if GLOBAL_PARSER_RUN_LOCK.locked():
         await message.answer(
             "⏳ <b>Парсер вже працює</b>\n\n"
             "Зачекайте завершення поточного циклу.",
@@ -133,7 +133,7 @@ async def manual_services_ai_parser_run(message: types.Message):
         )
         return
 
-    if PARSER_SESSION_LOCK.locked():
+    if GLOBAL_PARSER_RUN_LOCK.locked():
         await message.answer(
             "⏳ <b>Парсер вже працює</b>\n\n"
             "Зачекайте завершення поточного циклу.",

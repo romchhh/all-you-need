@@ -19,6 +19,9 @@ async def handle_parser_reject(callback: CallbackQuery, bot: Bot):
     item = resolve_parsed_item_for_moderation(
         callback_item_id,
         callback.message.message_id,
+        callback.message.reply_to_message.message_id
+        if callback.message.reply_to_message
+        else None,
     )
     if not item:
         await callback.answer(

@@ -2,12 +2,13 @@
 Шедулер для автоматичного парсингу Telegram-каналів через Pyrogram.
 
 Запускається як окремий процес поряд з основним aiogram-ботом.
-Сесія Pyrogram зберігається у bot/parser/parser_session.
+Сесії Pyrogram: bot/parser/parser_session та bot/parser/parser_services_session.
 
 Налаштування в .env:
-  PARSER_API_ID       — api_id з my.telegram.org
-  PARSER_API_HASH     — api_hash з my.telegram.org
-  PARSER_PHONE        — номер телефону аккаунту-парсера
+  PARSER_API_ID       — api_id з my.telegram.org (акаунт 1)
+  PARSER_API_HASH     — api_hash акаунта 1
+  PARSER_PHONE        — телефон акаунта 1
+  PARSER_SERVICES_API_ID / PARSER_SERVICES_API_HASH / PARSER_SERVICES_PHONE — акаунт 2 (опційно)
   PARSER_GROUP_ID     — ID групи куди надсилаються оголошення для модерації
   PARSER_INTERVAL_MIN — інтервал перевірки в хвилинах (за замовч. 30)
   PARSER_BOT_TELEGRAM_ID — telegram_id системного користувача-бота
@@ -17,7 +18,7 @@
   PARSER_SERVICES_AI_MODERATION_CHANNEL_ID — модерація (за замовч. -1003901841142)
   PARSER_SERVICES_AI_INTERVAL_MIN — інтервал AI-парсера послуг (за замовч. = PARSER_INTERVAL_MIN)
   TRADE_SERVICES_CHANNEL_HAMBURG_ID — канал послуг Hamburg (за замовч. -1003627644062)
-  TRADE_SERVICES_CHANNEL_GERMANY_ID — канал послуг Germany (за замовч. -1003857694156)
+  TRADE_SERVICES_CHANNEL_GERMANY_ID — канал послуг Germany (за замovch. -1003857694156)
   OPENAI_API_KEY — AI при підтвердженні модератором
 """
 
@@ -41,8 +42,6 @@ PARSER_SERVICES_AI_INTERVAL_MIN: float = float(
 )
 BOT_TOKEN: str = os.getenv("TOKEN", "")
 
-SESSION_PATH = Path(__file__).resolve().parent / "parser_session"
-
 
 # ──────────────────────────────────────────────
 # Основна функція одного циклу парсингу
@@ -60,7 +59,8 @@ async def run_parser_cycle() -> dict | None:
         notify_parser_channel_errors,
         notify_parser_error_admins,
     )
-    from parser.session_lock import pyrogram_session_guard
+    from parser.core.pyrogram_accounts import list_parser_accounts
+    from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
 
     aiogram_bot = Bot(token=BOT_TOKEN)
 
@@ -71,18 +71,11 @@ async def run_parser_cycle() -> dict | None:
             logger.warning("Не вдалося сповістити адмінів про помилку парсера: %s", notify_err)
 
     try:
-        if not PARSER_API_ID or not PARSER_API_HASH or not PARSER_PHONE:
+        accounts = list_parser_accounts()
+        if not accounts:
             msg = "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
             logger.error(msg)
             await _notify_error("налаштування", msg)
-            return None
-
-        try:
-            from pyrogram import Client
-        except ImportError:
-            msg = "Pyrogram не встановлено. Запусти: pip install pyrogram tgcrypto"
-            logger.error(msg)
-            await _notify_error("залежності", msg)
             return None
 
         from parser.core.runner import run_all_channels
@@ -90,31 +83,27 @@ async def run_parser_cycle() -> dict | None:
         async def notify_callback(item_data: dict):
             await notify_admin_group(aiogram_bot, item_data)
 
-        pyrogram_client = Client(
-            name=str(SESSION_PATH),
-            api_id=PARSER_API_ID,
-            api_hash=PARSER_API_HASH,
-            phone_number=PARSER_PHONE,
-        )
-
         stats: dict | None = None
         try:
-            async with pyrogram_session_guard(SESSION_PATH):
-                async with pyrogram_client:
-                    logger.info("🔍 Починаємо парсинг каналів...")
-                    stats = await run_all_channels(pyrogram_client, notify_callback)
-                    logger.info(
-                        f"✅ Парсинг завершено: +{stats['added']} нових, "
-                        f"пропущено {stats['skipped']}"
-                    )
-                    channel_errors = stats.get("errors") or []
-                    if channel_errors:
-                        await notify_parser_channel_errors(aiogram_bot, channel_errors)
+            async with GLOBAL_PARSER_RUN_LOCK:
+                logger.info(
+                    "🔍 Починаємо парсинг каналів (%s Telegram-акаунт(ів))…",
+                    len(accounts),
+                )
+                stats = await run_all_channels(notify_callback)
+                logger.info(
+                    "✅ Парсинг завершено: +%s нових, пропущено %s",
+                    stats["added"],
+                    stats["skipped"],
+                )
+                channel_errors = stats.get("errors") or []
+                if channel_errors:
+                    await notify_parser_channel_errors(aiogram_bot, channel_errors)
         except RuntimeError as e:
             logger.error("Сесія парсера зайнята: %s", e, exc_info=True)
             await _notify_error("сесія зайнята", str(e))
         except Exception as e:
-            logger.error(f"Критична помилка в циклі парсингу: {e}", exc_info=True)
+            logger.error("Критична помилка в циклі парсингу: %s", e, exc_info=True)
             await _notify_error(
                 "критична помилка циклу",
                 f"{type(e).__name__}: {e}\n\n{traceback.format_exc()[-3000:]}",
@@ -142,7 +131,8 @@ async def run_services_ai_parser_cycle() -> dict | None:
         notify_parser_channel_errors,
         notify_parser_error_admins,
     )
-    from parser.session_lock import pyrogram_session_guard
+    from parser.core.pyrogram_accounts import list_parser_accounts
+    from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
 
     aiogram_bot = Bot(token=BOT_TOKEN)
 
@@ -153,18 +143,11 @@ async def run_services_ai_parser_cycle() -> dict | None:
             logger.warning("Не вдалося сповістити адмінів про помилку services AI parser: %s", notify_err)
 
     try:
-        if not PARSER_API_ID or not PARSER_API_HASH or not PARSER_PHONE:
+        accounts = list_parser_accounts()
+        if not accounts:
             msg = "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
             logger.error(msg)
             await _notify_error("services AI — налаштування", msg)
-            return None
-
-        try:
-            from pyrogram import Client
-        except ImportError:
-            msg = "Pyrogram не встановлено. Запусти: pip install pyrogram tgcrypto"
-            logger.error(msg)
-            await _notify_error("services AI — залежності", msg)
             return None
 
         from parser.core.services_ai_runner import run_services_ai_channels
@@ -172,27 +155,22 @@ async def run_services_ai_parser_cycle() -> dict | None:
         async def notify_callback(item_data: dict):
             await notify_admin_group(aiogram_bot, item_data)
 
-        pyrogram_client = Client(
-            name=str(SESSION_PATH),
-            api_id=PARSER_API_ID,
-            api_hash=PARSER_API_HASH,
-            phone_number=PARSER_PHONE,
-        )
-
         stats: dict | None = None
         try:
-            async with pyrogram_session_guard(SESSION_PATH):
-                async with pyrogram_client:
-                    logger.info("🔍 Починаємо парсинг груп послуг (AI → канал)…")
-                    stats = await run_services_ai_channels(pyrogram_client, notify_callback)
-                    logger.info(
-                        "✅ Services AI parser: +%s нових, пропущено %s",
-                        stats["added"],
-                        stats["skipped"],
-                    )
-                    channel_errors = stats.get("errors") or []
-                    if channel_errors:
-                        await notify_parser_channel_errors(aiogram_bot, channel_errors)
+            async with GLOBAL_PARSER_RUN_LOCK:
+                logger.info(
+                    "🔍 Починаємо парсинг груп послуг (AI → канал, %s акаунт(ів))…",
+                    len(accounts),
+                )
+                stats = await run_services_ai_channels(notify_callback)
+                logger.info(
+                    "✅ Services AI parser: +%s нових, пропущено %s",
+                    stats["added"],
+                    stats["skipped"],
+                )
+                channel_errors = stats.get("errors") or []
+                if channel_errors:
+                    await notify_parser_channel_errors(aiogram_bot, channel_errors)
         except RuntimeError as e:
             logger.error("Services AI parser — сесія зайнята: %s", e, exc_info=True)
             await _notify_error("services AI — сесія зайнята", str(e))

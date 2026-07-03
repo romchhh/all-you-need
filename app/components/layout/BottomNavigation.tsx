@@ -4,6 +4,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useParams, usePathname } from 'next/navigation';
 import { NavIcon } from '@/components/layout/NavIcon';
+import { dispatchBazaarRestoreListingScroll } from '@/lib/bazaar/bazaarScrollStorage';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -159,7 +160,7 @@ export const BottomNavigation = ({
     if (tab === currentActiveTab) {
       if (tab === 'bazaar' && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('tradeground-home-refresh'));
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        dispatchBazaarRestoreListingScroll();
       }
       return;
     }

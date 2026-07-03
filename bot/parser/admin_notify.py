@@ -88,8 +88,8 @@ def _format_admin_message(item: dict) -> str:
         header = "НОВА ПОСЛУГА (AI → канал TradeGround)"
         footer = "✅ → лише Telegram-канал послуг (без маркетплейсу)"
     elif notify_chat == SERVICES_MODERATION_CHANNEL_ID:
-        header = "НОВА ПОСЛУГА (/parse → канал TradeGround)"
-        footer = "✅ → лише Telegram-канал послуг (без маркетплейсу)"
+        header = "НОВА ПОСЛУГА (/parse → маркетплейс)"
+        footer = "✅ → маркетплейс TradeGround"
     else:
         header = "НОВЕ ОГОЛОШЕННЯ (маркетплейс)"
         footer = "✅ → лише маркетплейс (без каналів послуг)"

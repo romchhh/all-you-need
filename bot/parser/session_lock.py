@@ -9,6 +9,8 @@ import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+GLOBAL_PARSER_RUN_LOCK = asyncio.Lock()
+
 PARSER_SESSION_LOCK = asyncio.Lock()
 SERVICES_SESSION_LOCK = asyncio.Lock()
 

@@ -260,6 +260,9 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
     item = resolve_parsed_item_for_moderation(
         callback_item_id,
         callback.message.message_id,
+        callback.message.reply_to_message.message_id
+        if callback.message.reply_to_message
+        else None,
     )
     if not item:
         await callback.answer(
@@ -296,3 +299,8 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
         await _approve_services_channel_only(callback, bot, item_id, item, moderator_id)
     else:
         await _approve_marketplace(callback, bot, item_id, item, moderator_id)
+
+    try:
+        await callback.answer("✅ Підтверджено", show_alert=False)
+    except TelegramBadRequest:
+        pass

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue, startTransition } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Listing } from '@/types';
 import { getCategories } from '@/constants/categories';
@@ -27,6 +27,11 @@ import {
   toBazaarHomeCategoryFilter,
   type ListingCategoryFilter,
 } from '@/lib/listings/categoryFilter';
+import {
+  persistBazaarReturnListingId,
+  readBazaarReturnListingId,
+  BAZAAR_RESTORE_LISTING_EVENT,
+} from '@/lib/bazaar/bazaarScrollStorage';
 
 export type BazaarSellerPreview = {
   telegramId: string;
@@ -109,6 +114,12 @@ export function useBazaarPage() {
   const listingHistoryStack = useRef<Listing[]>([]); // Стек історії переглянутих товарів для навігації назад
   const prevSelectedSeller = useRef<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const lastViewedListingIdRef = useRef<number | null>(null); // Зберігаємо ID останнього переглянутого товару
+  /** Оголошення в стрічці, з якого відкрили картку (не змінюється при переході на «схожі») */
+  const catalogOriginListingIdRef = useRef<number | null>(null);
+  const pendingMountScrollListingIdRef = useRef<number | null>(
+    typeof window !== 'undefined' ? readBazaarReturnListingId() : null
+  );
+  const mountScrollRestoreDoneRef = useRef(false);
   const savedScrollPositionRef = useRef<number>(0);
   const scrollPositionKey = 'bazaarScrollPosition';
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -310,13 +321,34 @@ export function useBazaarPage() {
 
   const PAGE_SIZE = 20;
 
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [listings, setListings] = useState<Listing[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const cached = getCachedData('bazaarListingsState');
+    return cached?.listings?.length ? (cached.listings as Listing[]) : [];
+  });
+  const [initialLoading, setInitialLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const cached = getCachedData('bazaarListingsState');
+    return !(cached?.listings?.length);
+  });
   const [isListingsRefreshing, setIsListingsRefreshing] = useState(false);
   const [listingsLoadError, setListingsLoadError] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [totalListings, setTotalListings] = useState(0);
-  const [listingsOffset, setListingsOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const cached = getCachedData('bazaarListingsState');
+    if (!cached?.listings?.length) return false;
+    return (cached.listings.length ?? 0) < (cached.total ?? 0);
+  });
+  const [totalListings, setTotalListings] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const cached = getCachedData('bazaarListingsState');
+    return cached?.total ?? 0;
+  });
+  const [listingsOffset, setListingsOffset] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const cached = getCachedData('bazaarListingsState');
+    return cached?.offset ?? (cached?.listings?.length ? cached.listings.length : 0);
+  });
   const { tg } = useTelegram();
 
   useEffect(() => {
@@ -410,18 +442,38 @@ export function useBazaarPage() {
           return;
         }
 
-        if (attempt < 10) {
-          setTimeout(() => scrollToElement(attempt + 1), 200);
+        if (attempt < 20) {
+          setTimeout(() => scrollToElement(attempt + 1), 150);
           return;
         }
 
         restoreSavedScrollPosition();
       };
 
-      setTimeout(() => scrollToElement(), 300);
+      setTimeout(() => scrollToElement(), 100);
     },
     [restoreSavedScrollPosition]
   );
+
+  const restoreCatalogListingScroll = useCallback(() => {
+    const targetId =
+      catalogOriginListingIdRef.current ?? readBazaarReturnListingId();
+    if (targetId == null) {
+      restoreSavedScrollPosition();
+      return;
+    }
+    catalogOriginListingIdRef.current = targetId;
+    scrollToListing(targetId);
+  }, [scrollToListing, restoreSavedScrollPosition]);
+
+  useEffect(() => {
+    const onRestore = () => {
+      if (selectedListing || selectedSeller) return;
+      restoreCatalogListingScroll();
+    };
+    window.addEventListener(BAZAAR_RESTORE_LISTING_EVENT, onRestore);
+    return () => window.removeEventListener(BAZAAR_RESTORE_LISTING_EVENT, onRestore);
+  }, [selectedListing, selectedSeller, restoreCatalogListingScroll]);
 
   // Обробка параметрів з URL (для поділених товарів/профілів)
   useEffect(() => {
@@ -481,6 +533,20 @@ export function useBazaarPage() {
   const hasActiveFilters = hasActiveFiltersForState(bazaarTabState);
   const hasSearchQuery = Boolean((debouncedSearchQuery ?? '').trim());
 
+  const hasLoadedListings = useRef(
+    typeof window !== 'undefined' && Boolean(getCachedData('bazaarListingsState')?.listings?.length)
+  );
+
+  const schedulePrefetchListingsImages = useCallback((items: Listing[]) => {
+    if (typeof window === 'undefined' || items.length === 0) return;
+    const run = () => prefetchListingsImages(items);
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(run, { timeout: 4000 });
+    } else {
+      setTimeout(run, 300);
+    }
+  }, []);
+
   // Функція завантаження оголошень (з фільтрами та пошуком)
   const fetchListings = useCallback(async (
     forceRefresh: boolean = false,
@@ -510,13 +576,15 @@ export function useBazaarPage() {
         if (cached?.listings?.length) {
           const cacheAge = Date.now() - (cached.timestamp || 0);
           if (cacheAge < 5 * 60 * 1000) {
-            setListings(cached.listings || []);
-            setTotalListings(cached.total || 0);
-            setHasMore((cached.listings?.length ?? 0) < (cached.total ?? 0));
-            setListingsOffset(cached.offset ?? PAGE_SIZE);
+            startTransition(() => {
+              setListings(cached.listings || []);
+              setTotalListings(cached.total || 0);
+              setHasMore((cached.listings?.length ?? 0) < (cached.total ?? 0));
+              setListingsOffset(cached.offset ?? PAGE_SIZE);
+            });
             setInitialLoading(false);
             setIsListingsRefreshing(false);
-            prefetchListingsImages(cached.listings || []);
+            schedulePrefetchListingsImages(cached.listings || []);
             return;
           }
         }
@@ -533,11 +601,13 @@ export function useBazaarPage() {
         const list = data.listings || [];
         const total = data.total ?? 0;
         const more = list.length < total;
-        setListings(list);
-        setTotalListings(total);
-        setHasMore(more);
-        setListingsOffset(list.length);
-        prefetchListingsImages(list);
+        startTransition(() => {
+          setListings(list);
+          setTotalListings(total);
+          setHasMore(more);
+          setListingsOffset(list.length);
+        });
+        schedulePrefetchListingsImages(list);
 
         if (useSearch && searchForRequest?.trim() && list.length > 0) {
           updateSearchHistoryListings(
@@ -583,9 +653,7 @@ export function useBazaarPage() {
         setIsListingsRefreshing(false);
       }
     }
-  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE]);
-
-  const hasLoadedListings = useRef(false);
+  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages]);
 
   // Ключ фільтрів (категорія, міста, пошук тощо) — однаковий формат для першого завантаження та рефетчу
   const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${(debouncedSearchQuery ?? '').trim()}`;
@@ -604,7 +672,7 @@ export function useBazaarPage() {
       setInitialLoading(false);
       hasLoadedListings.current = true;
       previousFilterKey.current = filterKey;
-      prefetchListingsImages(cached.listings || []);
+      schedulePrefetchListingsImages(cached.listings || []);
       return;
     }
 
@@ -615,7 +683,24 @@ export function useBazaarPage() {
       // Якщо в полі пошуку вже є текст (наприклад з localStorage) — одразу завантажуємо з пошуком
       fetchListings(false, searchTrimmed || undefined);
     }
-  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery]);
+  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery, schedulePrefetchListingsImages]);
+
+  // Після перезавантаження / лого — повернутися до товару в стрічці
+  useEffect(() => {
+    if (mountScrollRestoreDoneRef.current) return;
+    if (selectedListing || selectedSeller) return;
+    if (listings.length === 0) return;
+    const targetId =
+      pendingMountScrollListingIdRef.current ?? catalogOriginListingIdRef.current;
+    if (targetId == null) return;
+    mountScrollRestoreDoneRef.current = true;
+    pendingMountScrollListingIdRef.current = null;
+    catalogOriginListingIdRef.current = targetId;
+    scrollTimeoutRef.current = setTimeout(() => {
+      scrollToListing(targetId);
+      scrollTimeoutRef.current = null;
+    }, 200);
+  }, [listings.length, selectedListing, selectedSeller, scrollToListing]);
 
   // При зміні фільтрів (включно з містами) або пошуку — перезавантажити з offset 0
   useEffect(() => {
@@ -811,6 +896,12 @@ export function useBazaarPage() {
         if (typeof window !== 'undefined') {
           window.scrollTo(0, 0);
         }
+      } else if (catalogOriginListingIdRef.current !== null) {
+        const listingId = catalogOriginListingIdRef.current;
+        scrollTimeoutRef.current = setTimeout(() => {
+          scrollToListing(listingId);
+          scrollTimeoutRef.current = null;
+        }, 300);
       } else if (lastViewedListingIdRef.current !== null) {
         const listingId = lastViewedListingIdRef.current;
         scrollTimeoutRef.current = setTimeout(() => {
@@ -850,27 +941,31 @@ export function useBazaarPage() {
     saveCatalogScrollPosition();
     listingHistoryStack.current = [];
     viewModeRef.current = 'listing';
+    catalogOriginListingIdRef.current = listing.id;
     lastViewedListingIdRef.current = listing.id;
+    persistBazaarReturnListingId(listing.id);
     setSelectedListing(listing);
   }, [saveCatalogScrollPosition]);
 
   const handleBazaarStateChange = useCallback((next: Partial<BazaarTabPersistedState>) => {
-    setBazaarTabState((prev) => {
-      const merged = { ...prev, ...next };
-      if (
-        prev.selectedCategory === merged.selectedCategory &&
-        prev.selectedSubcategory === merged.selectedSubcategory &&
-        prev.showFreeOnly === merged.showFreeOnly &&
-        prev.sortBy === merged.sortBy &&
-        prev.minPrice === merged.minPrice &&
-        prev.maxPrice === merged.maxPrice &&
-        prev.selectedCondition === merged.selectedCondition &&
-        prev.selectedCurrency === merged.selectedCurrency &&
-        JSON.stringify(prev.selectedCities) === JSON.stringify(merged.selectedCities)
-      ) {
-        return prev;
-      }
-      return merged;
+    startTransition(() => {
+      setBazaarTabState((prev) => {
+        const merged = { ...prev, ...next };
+        if (
+          prev.selectedCategory === merged.selectedCategory &&
+          prev.selectedSubcategory === merged.selectedSubcategory &&
+          prev.showFreeOnly === merged.showFreeOnly &&
+          prev.sortBy === merged.sortBy &&
+          prev.minPrice === merged.minPrice &&
+          prev.maxPrice === merged.maxPrice &&
+          prev.selectedCondition === merged.selectedCondition &&
+          prev.selectedCurrency === merged.selectedCurrency &&
+          JSON.stringify(prev.selectedCities) === JSON.stringify(merged.selectedCities)
+        ) {
+          return prev;
+        }
+        return merged;
+      });
     });
   }, []);
 

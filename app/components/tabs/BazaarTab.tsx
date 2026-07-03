@@ -18,7 +18,7 @@ import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
-import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, memo, useDeferredValue } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { pickBazaarTabField } from '@/lib/bazaar/bazaarTabStateStorage';
 import { Currency } from '@/utils/currency';
@@ -108,14 +108,25 @@ const BazaarTabComponent = ({
   const [showHomeWidgets, setShowHomeWidgets] = useState(false);
 
   useEffect(() => {
-    const show = () => setShowHomeWidgets(true);
+    let cancelled = false;
+    const show = () => {
+      if (!cancelled) setShowHomeWidgets(true);
+    };
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      const id = window.requestIdleCallback(show, { timeout: 2500 });
-      return () => window.cancelIdleCallback(id);
+      const id = window.requestIdleCallback(show, { timeout: 1200 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback(id);
+      };
     }
-    const timer = setTimeout(show, 400);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(show, 800);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, []);
+
+  const deferredListings = useDeferredValue(listings);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
     if (savedState?.selectedCategory != null) {
@@ -383,9 +394,9 @@ const BazaarTabComponent = ({
 
   const filteredAndSortedListings = useMemo(() => {
     // Early return для порожнього списку
-    if (listings.length === 0) return [];
+    if (deferredListings.length === 0) return [];
     
-    let filtered = listings;
+    let filtered = deferredListings;
 
     // Пошук — на сервері (після debounce). Локальну фільтрацію прибрано: вона дублювала роботу
     // і гальмувала UI при кожному символі в полі пошуку.
@@ -457,7 +468,7 @@ const BazaarTabComponent = ({
     }
 
     return filtered;
-  }, [listings, showFreeOnly, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
+  }, [deferredListings, showFreeOnly, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
 
   // Автопідвантаження при прокрутці до кінця списку
   useEffect(() => {
@@ -633,24 +644,9 @@ const BazaarTabComponent = ({
         </div>
       </div>
 
-      {!searchQuery.trim() && showHomeWidgets && (
-        <>
-          <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
-            <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
-              <HomePlatformTicker isLight={isLight} />
-            </div>
-          </div>
-          <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
-            <div className="w-full max-w-full overflow-visible lg:max-w-xl xl:max-w-2xl">
-              <HomeActivityStats isLight={isLight} />
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Розділи - показуємо тільки якщо не вибрана категорія та немає пошуку */}
+      {/* Розділи — одразу під пошуком, до важких віджетів */}
       {categories.length > 0 && !selectedCategory && !searchQuery.trim() && (
-        <div className="mx-auto w-full max-w-full pb-3 pt-2 lg:max-w-5xl xl:max-w-6xl">
+        <div className="relative z-[15] mx-auto w-full max-w-full touch-manipulation pb-3 pt-2 lg:max-w-5xl xl:max-w-6xl">
           <div className="mb-3 flex items-center justify-between px-4 lg:px-6">
             <h2 className={`text-lg font-semibold ${ac.pageHeading}`}>{t('navigation.categories')}</h2>
             {renderCatalogToolbar(true)}
@@ -719,6 +715,21 @@ const BazaarTabComponent = ({
         </div>
       )}
 
+      {!searchQuery.trim() && showHomeWidgets && (
+        <>
+          <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
+            <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
+              <HomePlatformTicker isLight={isLight} />
+            </div>
+          </div>
+          <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
+            <div className="w-full max-w-full overflow-visible lg:max-w-xl xl:max-w-2xl">
+              <HomeActivityStats isLight={isLight} />
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Заголовок категорії */}
       {(selectedCategory || selectedSubcategory) && (
         <div className="px-4 pt-2">
@@ -734,9 +745,11 @@ const BazaarTabComponent = ({
             <div className="flex items-center justify-end mt-3 mb-3">
               <button
                 onClick={() => {
-                  setSelectedCategory(null);
-                  setSelectedSubcategory(null);
-                  setShowFreeOnly(false);
+                  commitCatalogState({
+                    selectedCategory: null,
+                    selectedSubcategory: null,
+                    showFreeOnly: false,
+                  });
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
                 className={ac.outlineButton}
@@ -752,9 +765,11 @@ const BazaarTabComponent = ({
               <h3 className={`text-base font-semibold ${ac.pageHeading}`}>Підкатегорії</h3>
               <button
                 onClick={() => {
-                  setSelectedCategory(null);
-                  setSelectedSubcategory(null);
-                  setShowFreeOnly(false);
+                  commitCatalogState({
+                    selectedCategory: null,
+                    selectedSubcategory: null,
+                    showFreeOnly: false,
+                  });
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
                 className={ac.outlineButton}
@@ -773,7 +788,7 @@ const BazaarTabComponent = ({
             subcategories={selectedCategoryData.subcategories}
             selectedSubcategory={selectedSubcategory}
             onSelect={(subcategoryId) => {
-              setSelectedSubcategory(subcategoryId);
+              commitCatalogState({ selectedSubcategory: subcategoryId });
               tg?.HapticFeedback.impactOccurred('light');
             }}
             tg={tg}

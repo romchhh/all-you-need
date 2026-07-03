@@ -19,13 +19,13 @@ def services_moderation_chat_ids() -> frozenset[int]:
 
 def resolve_parser_approve_target(chat_id: int, item: dict) -> str:
     """
-    marketplace — лише маркетплейс (група PARSER_GROUP_ID).
-    services_channel — лише Telegram-канали послуг (2 групи послуг).
+    marketplace — маркетплейс (PARSER_GROUP_ID та PARSER_SERVICES_MODERATION для /parse).
+    services_channel — лише Telegram-канали послуг (/parse_services, parser_type=services_channel).
     """
     parser_type = (item.get("parser_type") or "default").strip()
     if parser_type == PARSER_TYPE_SERVICES_CHANNEL:
         return APPROVE_TARGET_SERVICES_CHANNEL
-    if chat_id in services_moderation_chat_ids():
+    if chat_id == SERVICES_AI_MODERATION_CHANNEL_ID:
         return APPROVE_TARGET_SERVICES_CHANNEL
     return APPROVE_TARGET_MARKETPLACE
 
@@ -48,6 +48,15 @@ def validate_parser_approve_context(chat_id: int, item: dict) -> str | None:
         return (
             "❌ Оголошення з /parse_services — "
             "підтверджуйте в групі PARSER_SERVICES_AI_MODERATION"
+        )
+
+    if (
+        chat_id == SERVICES_MODERATION_CHANNEL_ID
+        and parser_type == PARSER_TYPE_SERVICES_CHANNEL
+    ):
+        return (
+            "❌ Це оголошення з /parse_services — "
+            "підтверджуйте в AI-групі модерації"
         )
 
     parser_group = get_parser_group_id()
