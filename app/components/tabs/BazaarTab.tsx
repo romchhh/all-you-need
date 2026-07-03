@@ -18,7 +18,7 @@ import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
-import { useState, useMemo, useRef, useEffect, memo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { pickBazaarTabField } from '@/lib/bazaar/bazaarTabStateStorage';
 import { Currency } from '@/utils/currency';
@@ -251,6 +251,65 @@ const BazaarTabComponent = ({
   useEffect(() => {
     skipParentStateEchoRef.current = false;
   }, []);
+
+  type CatalogFilterState = {
+    selectedCategory: string | null;
+    selectedSubcategory: string | null;
+    selectedCities: string[];
+    minPrice: number | null;
+    maxPrice: number | null;
+    selectedCondition: 'new' | 'used' | null;
+    selectedCurrency: string | null;
+    sortBy: SortOption;
+    showFreeOnly: boolean;
+  };
+
+  const buildCatalogState = useCallback(
+    (patch: Partial<CatalogFilterState>): CatalogFilterState => ({
+      selectedCategory:
+        patch.selectedCategory !== undefined ? patch.selectedCategory : selectedCategory,
+      selectedSubcategory:
+        patch.selectedSubcategory !== undefined ? patch.selectedSubcategory : selectedSubcategory,
+      selectedCities: patch.selectedCities !== undefined ? patch.selectedCities : selectedCities,
+      minPrice: patch.minPrice !== undefined ? patch.minPrice : minPrice,
+      maxPrice: patch.maxPrice !== undefined ? patch.maxPrice : maxPrice,
+      selectedCondition:
+        patch.selectedCondition !== undefined ? patch.selectedCondition : selectedCondition,
+      selectedCurrency:
+        patch.selectedCurrency !== undefined ? patch.selectedCurrency : selectedCurrency,
+      sortBy: patch.sortBy !== undefined ? patch.sortBy : sortBy,
+      showFreeOnly: patch.showFreeOnly !== undefined ? patch.showFreeOnly : showFreeOnly,
+    }),
+    [
+      selectedCategory,
+      selectedSubcategory,
+      selectedCities,
+      minPrice,
+      maxPrice,
+      selectedCondition,
+      selectedCurrency,
+      sortBy,
+      showFreeOnly,
+    ]
+  );
+
+  const commitCatalogState = useCallback(
+    (patch: Partial<CatalogFilterState>) => {
+      if (patch.selectedCategory !== undefined) setSelectedCategory(patch.selectedCategory);
+      if (patch.selectedSubcategory !== undefined) setSelectedSubcategory(patch.selectedSubcategory);
+      if (patch.selectedCities !== undefined) setSelectedCities(patch.selectedCities);
+      if (patch.minPrice !== undefined) setMinPrice(patch.minPrice);
+      if (patch.maxPrice !== undefined) setMaxPrice(patch.maxPrice);
+      if (patch.selectedCondition !== undefined) setSelectedCondition(patch.selectedCondition);
+      if (patch.selectedCurrency !== undefined) {
+        setSelectedCurrency(patch.selectedCurrency as Currency | null);
+      }
+      if (patch.sortBy !== undefined) setSortBy(patch.sortBy);
+      if (patch.showFreeOnly !== undefined) setShowFreeOnly(patch.showFreeOnly);
+      onStateChange?.(buildCatalogState(patch));
+    },
+    [buildCatalogState, onStateChange]
+  );
 
   // Зберігаємо стан при зміні (лише після ініціалізації, лише коли щось змінилось локально)
   useEffect(() => {
@@ -606,8 +665,9 @@ const BazaarTabComponent = ({
           >
             <div className="mx-auto flex w-max gap-2 px-4 pb-2 lg:px-0" style={{ minWidth: 'max-content' }}>
               {/* Кнопка "Всі категорії" */}
-              <div 
-                className="flex flex-col items-center min-w-[80px] max-w-[90px] cursor-pointer flex-shrink-0"
+              <button
+                type="button"
+                className="flex flex-col items-center min-w-[80px] max-w-[90px] cursor-pointer flex-shrink-0 touch-manipulation select-none bg-transparent border-0 p-0"
                 onClick={() => {
                   if (onOpenCategoriesModal) {
                     onOpenCategoriesModal();
@@ -616,8 +676,10 @@ const BazaarTabComponent = ({
                     onNavigateToCategories();
                     tg?.HapticFeedback.impactOccurred('light');
                   } else {
-                    setSelectedCategory(null);
-                    setSelectedSubcategory(null);
+                    commitCatalogState({
+                      selectedCategory: null,
+                      selectedSubcategory: null,
+                    });
                     tg?.HapticFeedback.impactOccurred('light');
                   }
                 }}
@@ -634,7 +696,7 @@ const BazaarTabComponent = ({
                 >
                   {t('bazaar.allCategories')}
                 </span>
-              </div>
+              </button>
               
               {categories.map(category => (
                 <CategoryChip
@@ -642,8 +704,10 @@ const BazaarTabComponent = ({
                   category={category}
                   isActive={false}
                   onClick={() => {
-                    setSelectedCategory(category.id);
-                    setSelectedSubcategory(null);
+                    commitCatalogState({
+                      selectedCategory: category.id,
+                      selectedSubcategory: null,
+                    });
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
                 />

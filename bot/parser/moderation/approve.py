@@ -38,7 +38,7 @@ from parser.storage.marketplace import (
     get_or_create_bot_user,
 )
 from parser.storage.parsed_items import (
-    get_parsed_item_by_id,
+    resolve_parsed_item_for_moderation,
     set_marketplace_listing_id,
     update_parsed_item_status,
 )
@@ -253,14 +253,23 @@ async def _approve_marketplace(
 
 
 async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
-    item_id = int(callback.data.split(":")[1])
+    callback_item_id = int(callback.data.split(":")[1])
     moderator_id = callback.from_user.id
     chat_id = callback.message.chat.id
 
-    item = get_parsed_item_by_id(item_id)
+    item = resolve_parsed_item_for_moderation(
+        callback_item_id,
+        callback.message.message_id,
+    )
     if not item:
-        await callback.answer("❌ Оголошення не знайдено в БД", show_alert=True)
+        await callback.answer(
+            "❌ Запис не знайдено в БД. "
+            "Можливо, оголошення вже оброблено або видалено після перезапуску парсера.",
+            show_alert=True,
+        )
         return
+
+    item_id = int(item["id"])
 
     if item.get("status") == "approved":
         await callback.answer("ℹ️ Оголошення вже підтверджено", show_alert=True)

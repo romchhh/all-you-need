@@ -14,8 +14,9 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
   const { isLight } = useTheme();
 
   return (
-    <div
-      className="flex flex-col items-center min-w-[80px] max-w-[90px] cursor-pointer flex-shrink-0"
+    <button
+      type="button"
+      className="flex flex-col items-center min-w-[80px] max-w-[90px] cursor-pointer flex-shrink-0 touch-manipulation select-none bg-transparent border-0 p-0"
       onClick={onClick}
     >
       <div
@@ -38,7 +39,7 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
       >
         {category.name}
       </span>
-    </div>
+    </button>
   );
 };
 

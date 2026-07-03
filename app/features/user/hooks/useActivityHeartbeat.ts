@@ -1,23 +1,20 @@
 import { useEffect, useRef } from 'react';
-import { useUser } from './useUser';
 
 /**
  * Hook для періодичного оновлення активності користувача (heartbeat)
  * Оновлює активність кожну хвилину + при подіях, щоб «онлайн» на головній відповідав реальності
  */
-export function useActivityHeartbeat() {
-  const { profile } = useUser();
+export function useActivityHeartbeat(telegramIdRaw?: string | number | null) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!profile?.telegramId) {
+    if (telegramIdRaw == null || telegramIdRaw === '') {
       return;
     }
 
-    const telegramId = typeof profile.telegramId === 'string' 
-      ? parseInt(profile.telegramId, 10) 
-      : profile.telegramId;
+    const telegramId =
+      typeof telegramIdRaw === 'string' ? parseInt(telegramIdRaw, 10) : telegramIdRaw;
 
     if (isNaN(telegramId)) {
       return;
@@ -72,5 +69,5 @@ export function useActivityHeartbeat() {
         document.removeEventListener(event, handleUserActivity);
       });
     };
-  }, [profile?.telegramId]);
+  }, [telegramIdRaw]);
 }

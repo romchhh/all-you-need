@@ -51,24 +51,32 @@ export const useUser = () => {
 
   useEffect(() => {
     const getTelegramId = (): number | null => {
-      console.log('=== useUser: Getting telegramId ===');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('=== useUser: Getting telegramId ===');
+      }
       
       // 1. useTelegram hook (пріоритет - дані з Telegram WebApp)
       if (telegramUser?.id) {
-        console.log('✅ telegramId from useTelegram hook:', telegramUser.id);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ telegramId from useTelegram hook:', telegramUser.id);
+        }
         return telegramUser.id;
       }
       
       // 2. initData (прямий доступ до Telegram WebApp)
       if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
         const id = window.Telegram.WebApp.initDataUnsafe.user.id;
-        console.log('✅ telegramId from initDataUnsafe:', id);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ telegramId from initDataUnsafe:', id);
+        }
         return id;
       }
       
       // 3. sessionStorage (збережений з попереднього відкриття)
       if (globalTelegramId) {
-        console.log('✅ telegramId from sessionStorage:', globalTelegramId);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ telegramId from sessionStorage:', globalTelegramId);
+        }
         return globalTelegramId;
       }
       
@@ -79,13 +87,17 @@ export const useUser = () => {
         if (telegramIdFromUrl) {
           const id = parseInt(telegramIdFromUrl, 10);
           if (!isNaN(id)) {
-            console.log('✅ telegramId from URL parameter:', id);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ telegramId from URL parameter:', id);
+            }
             return id;
           }
         }
       }
       
-      console.warn('❌ No telegramId found in any source');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('❌ No telegramId found in any source');
+      }
       return null;
     };
     

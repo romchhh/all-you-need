@@ -6,6 +6,11 @@ import { executeInClause } from '@/utils/dbHelpers';
 import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
+import {
+  buildBazaarCatalogCacheKey,
+  getBazaarCatalogServerCache,
+  setBazaarCatalogServerCache,
+} from '@/lib/listings/bazaarCatalogServerCache';
 
 // Відключаємо кешування для API route
 export const dynamic = 'force-dynamic';
@@ -85,8 +90,8 @@ let favoriteTableInitPromise: Promise<void> | null = null;
 
 export async function GET(request: NextRequest) {
   try {
-    // Відстежуємо активність користувача
-    await trackUserActivity(request);
+    // Відстежуємо активність користувача (не блокуємо відповідь)
+    void trackUserActivity(request);
     
     // Перевіряємо колонку currency (з кешуванням)
     const { ensureCurrencyColumn, ensureFavoriteTable, ensureListingApiRawColumns } = await import('@/lib/prisma');
@@ -434,6 +439,32 @@ export async function GET(request: NextRequest) {
       });
       total = Number(totalCount[0]?.count || 0);
     } else {
+      const isServerCacheable = !search && cities.length === 0 && offset === 0;
+      const serverCacheKey = isServerCacheable
+        ? buildBazaarCatalogCacheKey({
+            category,
+            subcategory,
+            isFree,
+            cities,
+            search,
+            sortBy,
+            limit,
+            offset,
+          })
+        : null;
+
+      if (serverCacheKey) {
+        const cachedPayload = getBazaarCatalogServerCache(serverCacheKey);
+        if (cachedPayload) {
+          const cachedResponse = NextResponse.json(cachedPayload);
+          cachedResponse.headers.set(
+            'Cache-Control',
+            'public, s-maxage=30, stale-while-revalidate=60'
+          );
+          return cachedResponse;
+        }
+      }
+
       // Для загальних запитів використовуємо raw query для обходу проблем з Prisma та SQLite
       let whereClause = "WHERE l.status = 'active'";
       const params: any[] = [];
@@ -795,6 +826,26 @@ export async function GET(request: NextRequest) {
 
     if (isCacheableCatalog) {
       response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+      if (!userId && !search && cities.length === 0 && offset === 0) {
+        setBazaarCatalogServerCache(
+          buildBazaarCatalogCacheKey({
+            category,
+            subcategory,
+            isFree,
+            cities,
+            search,
+            sortBy,
+            limit,
+            offset,
+          }),
+          {
+            listings: formattedListings,
+            total,
+            limit,
+            offset,
+          }
+        );
+      }
     } else {
       response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       response.headers.set('Pragma', 'no-cache');

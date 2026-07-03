@@ -7,19 +7,28 @@ from aiogram import Bot
 from aiogram.types import CallbackQuery
 
 from parser.moderation.group_message import edit_group_message
-from parser.storage.parsed_items import get_parsed_item_by_id, update_parsed_item_status
+from parser.storage.parsed_items import resolve_parsed_item_for_moderation, update_parsed_item_status
 
 logger = logging.getLogger(__name__)
 
 
 async def handle_parser_reject(callback: CallbackQuery, bot: Bot):
-    item_id = int(callback.data.split(":")[1])
+    callback_item_id = int(callback.data.split(":")[1])
     moderator_id = callback.from_user.id
 
-    item = get_parsed_item_by_id(item_id)
+    item = resolve_parsed_item_for_moderation(
+        callback_item_id,
+        callback.message.message_id,
+    )
     if not item:
-        await callback.answer("❌ Оголошення не знайдено в БД", show_alert=True)
+        await callback.answer(
+            "❌ Запис не знайдено в БД. "
+            "Можливо, оголошення вже оброблено або видалено після перезапуску парсера.",
+            show_alert=True,
+        )
         return
+
+    item_id = int(item["id"])
 
     if item.get("status") in ("approved", "rejected"):
         await callback.answer(f"ℹ️ Оголошення вже {item['status']}", show_alert=True)

@@ -47,8 +47,8 @@ export function useBazaarPage() {
 
   const showBlockedScreen = isBlocked && !profile;
 
-  // Підключаємо heartbeat для оновлення активності
-  useActivityHeartbeat();
+  // Підключаємо heartbeat для оновлення активності (без другого useUser)
+  useActivityHeartbeat(profile?.telegramId);
   
   // Зберігаємо telegramId при першому завантаженні
   useEffect(() => {
@@ -117,6 +117,7 @@ export function useBazaarPage() {
   const previousFilterKey = useRef<string | null>(null);
   const appliedDeepLinkCategoryRef = useRef<string | null>(null);
   const listingsCountRef = useRef(0);
+  const listingsFetchAbortRef = useRef<AbortController | null>(null);
   const viewModeRef = useRef<'catalog' | 'listing'>('catalog'); // Явний режим перегляду
   
   // КРИТИЧНО: Вимикаємо автоматичне відновлення scroll браузером
@@ -495,6 +496,10 @@ export function useBazaarPage() {
       setInitialLoading(true);
     }
 
+    listingsFetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    listingsFetchAbortRef.current = controller;
+
     try {
       const searchForRequest = (initialSearch ?? debouncedSearchQuery ?? '').trim();
       const useSearch = Boolean(searchForRequest);
@@ -518,8 +523,10 @@ export function useBazaarPage() {
       }
 
       const response = await fetch(
-        buildListingsUrl(PAGE_SIZE, 0, searchForRequest || undefined, requestState)
+        buildListingsUrl(PAGE_SIZE, 0, searchForRequest || undefined, requestState),
+        { signal: controller.signal }
       );
+      if (controller.signal.aborted) return;
       if (response.ok) {
         setListingsLoadError(false);
         const data = await response.json();
@@ -559,6 +566,9 @@ export function useBazaarPage() {
         setListingsLoadError(true);
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
       if (process.env.NODE_ENV === 'development') {
         console.error('Error fetching listings:', error);
       }
@@ -568,8 +578,10 @@ export function useBazaarPage() {
       setListingsOffset(0);
       setListingsLoadError(true);
     } finally {
-      setInitialLoading(false);
-      setIsListingsRefreshing(false);
+      if (listingsFetchAbortRef.current === controller) {
+        setInitialLoading(false);
+        setIsListingsRefreshing(false);
+      }
     }
   }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE]);
 
@@ -630,10 +642,7 @@ export function useBazaarPage() {
     if (typeof window !== 'undefined') {
       invalidateCache('bazaarListingsState');
     }
-    setListings([]);
-    setHasMore(false);
     setListingsOffset(0);
-    setInitialLoading(true);
     fetchListings(true);
   }, [bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, bazaarTabState.selectedCities, debouncedSearchQuery, fetchListings]);
 

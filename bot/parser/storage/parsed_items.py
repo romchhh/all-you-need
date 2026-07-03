@@ -220,6 +220,7 @@ def _cleanup_pending_service_channel_defaults(cursor) -> None:
             WHERE source_channel IN ({placeholders})
               AND status = 'pending'
               AND COALESCE(parser_type, 'default') = 'default'
+              AND admin_message_id IS NULL
             """,
             service_sources,
         )
@@ -470,6 +471,30 @@ def get_parsed_item_by_admin_msg(admin_message_id: int) -> Optional[dict]:
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def resolve_parsed_item_for_moderation(
+    item_id: int,
+    admin_message_id: int | None = None,
+) -> Optional[dict]:
+    """
+    Знаходить parsed_item за id з callback або за message_id повідомлення модерації.
+    Другий варіант потрібен, якщо запис у БД пересоздали (інший id), а кнопки лишились старі.
+    """
+    item = get_parsed_item_by_id(item_id)
+    if item:
+        return item
+    if admin_message_id is not None:
+        by_msg = get_parsed_item_by_admin_msg(admin_message_id)
+        if by_msg:
+            logger.info(
+                "parsed_items: fallback admin_message_id=%s → id=%s (callback id=%s)",
+                admin_message_id,
+                by_msg.get("id"),
+                item_id,
+            )
+            return by_msg
+    return None
 
 
 def get_parsed_item_by_id(item_id: int) -> Optional[dict]:
