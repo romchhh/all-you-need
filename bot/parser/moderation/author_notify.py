@@ -44,7 +44,7 @@ def _dm_account_order(*, use_services_sender: bool) -> list[PyrogramAccount]:
         return accounts
     return sorted(
         accounts,
-        key=lambda a: (0 if a.label in ("services", "fallback") else 1, a.priority),
+        key=lambda a: (0 if a.label == "fallback" else 1, a.priority),
     )
 
 

@@ -43,13 +43,10 @@ def _session_file(session_path: Path) -> Path:
 
 def _resolve_account(which: str) -> tuple[str, int, str, str, Path]:
     if which == "services":
-        label = "services (parser_services_session)"
-        api_id = PARSER_SERVICES_API_ID
-        api_hash = PARSER_SERVICES_API_HASH
-        phone = PARSER_SERVICES_PHONE
-        session_path = PARSER_SERVICES_SESSION_PATH
-        env_hint = "PARSER_SERVICES_API_ID, PARSER_SERVICES_API_HASH, PARSER_SERVICES_PHONE"
-    elif which == "fallback":
+        print("ℹ️  PARSER_SERVICES застарів — авторизуємо fallback (@opluger)…")
+        which = "fallback"
+
+    if which == "fallback":
         label = "fallback (parser_fallback_session, @opluger)"
         api_id = PARSER_FALLBACK_API_ID
         api_hash = PARSER_FALLBACK_API_HASH

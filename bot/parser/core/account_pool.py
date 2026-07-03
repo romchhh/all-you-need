@@ -74,8 +74,7 @@ def _account_from_env(
 
 def list_parser_accounts() -> list[PyrogramAccount]:
     """
-    До 3 акаунтів: main, services (2-й), fallback (3-й резерв при лімітах).
-    Один фізичний номер не дублюється.
+    main + fallback (@opluger). Слот PARSER_SERVICES_* застарів — не використовується.
     """
     candidates: list[PyrogramAccount] = []
     for acc in (
@@ -88,26 +87,12 @@ def list_parser_accounts() -> list[PyrogramAccount]:
             session_path=PARSER_SESSION_PATH,
         ),
         _account_from_env(
-            label="services",
-            priority=1,
-            api_id=PARSER_SERVICES_API_ID,
-            api_hash=PARSER_SERVICES_API_HASH,
-            phone=PARSER_SERVICES_PHONE,
-            session_path=PARSER_SERVICES_SESSION_PATH,
-        ),
-        _account_from_env(
             label="fallback",
-            priority=2,
+            priority=1,
             api_id=PARSER_FALLBACK_API_ID,
             api_hash=PARSER_FALLBACK_API_HASH,
             phone=PARSER_FALLBACK_PHONE,
-            session_path=(
-                PARSER_SERVICES_SESSION_PATH
-                if _normalize_phone(PARSER_FALLBACK_PHONE)
-                == _normalize_phone(PARSER_SERVICES_PHONE)
-                and PARSER_SERVICES_PHONE
-                else PARSER_FALLBACK_SESSION_PATH
-            ),
+            session_path=PARSER_FALLBACK_SESSION_PATH,
         ),
     ):
         if acc:
@@ -118,8 +103,8 @@ def list_parser_accounts() -> list[PyrogramAccount]:
     for acc in sorted(candidates, key=lambda a: a.priority):
         if acc.dedupe_key in seen:
             continue
-        if acc.label == "services" and _normalize_phone(acc.phone) == _normalize_phone(PARSER_PHONE):
-            logger.warning("PARSER_SERVICES_PHONE збігається з main — пропускаємо services")
+        if acc.label == "fallback" and _normalize_phone(acc.phone) == _normalize_phone(PARSER_PHONE):
+            logger.warning("PARSER_FALLBACK_PHONE збігається з main — пропускаємо fallback")
             continue
         seen.add(acc.dedupe_key)
         out.append(acc)
