@@ -85,8 +85,8 @@ def _format_admin_message(item: dict) -> str:
     parser_type = (item.get("parser_type") or "default").strip()
     notify_chat = item.get("notify_chat_id")
     if parser_type == "services_channel":
-        header = "НОВА ПОСЛУГА (AI → канал TradeGround)"
-        footer = "✅ → лише Telegram-канал послуг (без маркетплейсу)"
+        header = "НОВА ПОСЛУГА (/parse_services)"
+        footer = "✅ → маркетплейс + Telegram-канал послуг"
     elif notify_chat == SERVICES_MODERATION_CHANNEL_ID:
         header = "НОВА ПОСЛУГА (/parse → маркетплейс)"
         footer = "✅ → маркетплейс TradeGround"

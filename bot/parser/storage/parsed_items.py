@@ -258,12 +258,12 @@ def parsed_item_claimed_by_other_parser(
     message_id: int,
     parser_type: str,
 ) -> bool:
-    """Чи є запис з іншого парсера (напр. основний вже забрав повідомлення)."""
+    """Чи інший парсер уже тримає це повідомлення і запис ще блокує повтор."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT COALESCE(parser_type, 'default') FROM parsed_items
+        SELECT * FROM parsed_items
         WHERE source_channel = ? AND message_id = ?
         LIMIT 1
         """,
@@ -273,7 +273,11 @@ def parsed_item_claimed_by_other_parser(
     conn.close()
     if not row:
         return False
-    return row[0] != parser_type
+    item = dict(row)
+    other_type = item.get("parser_type") or "default"
+    if other_type == parser_type:
+        return False
+    return parsed_item_row_blocks_duplicate(item)
 
 
 def fingerprint_parsed_text(raw_text: str) -> str:

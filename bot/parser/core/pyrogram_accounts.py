@@ -179,6 +179,14 @@ async def run_channels_with_accounts(
                     stats.get("added", 0),
                     stats.get("skipped", 0),
                 )
+                if stats.get("reasons"):
+                    parts = ", ".join(
+                        f"{reason}={count}"
+                        for reason, count in sorted(
+                            stats["reasons"].items(), key=lambda x: -x[1]
+                        )
+                    )
+                    logger.info("  %s — причини пропуску: %s", channel, parts)
             except Exception as e:
                 logger.error(
                     "%s — помилка каналу %s (акаунт %s): %s",

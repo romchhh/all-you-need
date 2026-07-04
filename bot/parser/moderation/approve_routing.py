@@ -20,7 +20,7 @@ def services_moderation_chat_ids() -> frozenset[int]:
 def resolve_parser_approve_target(chat_id: int, item: dict) -> str:
     """
     marketplace — маркетплейс (PARSER_GROUP_ID та PARSER_SERVICES_MODERATION для /parse).
-    services_channel — лише Telegram-канали послуг (/parse_services, parser_type=services_channel).
+    services_channel — маркетплейс + Telegram-канали послуг (/parse_services).
     """
     parser_type = (item.get("parser_type") or "default").strip()
     if parser_type == PARSER_TYPE_SERVICES_CHANNEL:
