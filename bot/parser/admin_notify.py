@@ -18,9 +18,10 @@ from aiogram.types import (
     FSInputFile,
 )
 
-from parser.db import set_admin_message_id
+from parser.storage.parsed_items import record_moderation_message
 from parser.category_keywords import get_category_label
 from parser.config.settings import SERVICES_MODERATION_CHANNEL_ID
+from parser.config.services_ai_channels import SERVICES_AI_MODERATION_CHANNEL_ID
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +85,16 @@ CITY_FLAG = {
 def _format_admin_message(item: dict) -> str:
     parser_type = (item.get("parser_type") or "default").strip()
     notify_chat = item.get("notify_chat_id")
+    mod_target = (item.get("moderation_target") or "").strip().lower()
+
     if parser_type == "services_channel":
         header = "НОВА ПОСЛУГА (/parse_services)"
-        footer = "✅ → маркетплейс + Telegram-канал послуг"
+        if mod_target == "marketplace" or notify_chat == SERVICES_MODERATION_CHANNEL_ID:
+            footer = "✅ → маркетплейс TradeGround (модерація послуг)"
+        elif mod_target == "channel" or notify_chat == SERVICES_AI_MODERATION_CHANNEL_ID:
+            footer = "✅ → Telegram-канал послуг (Hamburg / Germany)"
+        else:
+            footer = "✅ → модерація послуг"
     elif notify_chat == SERVICES_MODERATION_CHANNEL_ID:
         header = "НОВА ПОСЛУГА (/parse → маркетплейс)"
         footer = "✅ → маркетплейс TradeGround"
@@ -269,9 +277,16 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
             )
             msg_id = sent_kb.message_id
 
-        # Зберігаємо admin_message_id та групу модерації
-        set_admin_message_id(item_id, msg_id, moderation_chat_id=group_id)
-        logger.info(f"Надіслано оголошення {item_id} в групу, msg_id={msg_id}")
+        # Зберігаємо admin_message_id для відповідної модерації
+        mod_target = (item.get("moderation_target") or "marketplace").strip().lower()
+        record_moderation_message(item_id, msg_id, group_id, target=mod_target)
+        logger.info(
+            "Надіслано оголошення %s в групу %s (%s), msg_id=%s",
+            item_id,
+            group_id,
+            mod_target,
+            msg_id,
+        )
         return msg_id
 
     except Exception as e:

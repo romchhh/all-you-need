@@ -8,6 +8,7 @@ from parser.config.services_ai_channels import (
     SERVICES_AI_MODERATION_CHANNEL_ID,
 )
 from parser.config.settings import SERVICES_MODERATION_CHANNEL_ID
+from parser.storage.parsed_items import get_mod_path_status
 
 APPROVE_TARGET_MARKETPLACE = "marketplace"
 APPROVE_TARGET_SERVICES_CHANNEL = "services_channel"
@@ -17,14 +18,30 @@ def services_moderation_chat_ids() -> frozenset[int]:
     return frozenset({SERVICES_MODERATION_CHANNEL_ID, SERVICES_AI_MODERATION_CHANNEL_ID})
 
 
+def moderation_path_for_chat(chat_id: int, item: dict) -> str | None:
+    """Для /parse_services: marketplace або channel модерація."""
+    parser_type = (item.get("parser_type") or "default").strip()
+    if parser_type != PARSER_TYPE_SERVICES_CHANNEL:
+        return None
+    if chat_id == SERVICES_MODERATION_CHANNEL_ID:
+        return "marketplace"
+    if chat_id == SERVICES_AI_MODERATION_CHANNEL_ID:
+        return "channel"
+    return None
+
+
 def resolve_parser_approve_target(chat_id: int, item: dict) -> str:
     """
-    marketplace — маркетплейс (PARSER_GROUP_ID та PARSER_SERVICES_MODERATION для /parse).
-    services_channel — маркетплейс + Telegram-канали послуг (/parse_services).
+    marketplace — маркетплейс (PARSER_GROUP_ID, PARSER_SERVICES_MODERATION для послуг).
+    services_channel — Telegram-канал послуг (PARSER_SERVICES_AI_MODERATION).
     """
-    parser_type = (item.get("parser_type") or "default").strip()
-    if parser_type == PARSER_TYPE_SERVICES_CHANNEL:
+    path = moderation_path_for_chat(chat_id, item)
+    if path == "marketplace":
+        return APPROVE_TARGET_MARKETPLACE
+    if path == "channel":
         return APPROVE_TARGET_SERVICES_CHANNEL
+
+    parser_type = (item.get("parser_type") or "default").strip()
     if chat_id == SERVICES_AI_MODERATION_CHANNEL_ID:
         return APPROVE_TARGET_SERVICES_CHANNEL
     return APPROVE_TARGET_MARKETPLACE
@@ -33,8 +50,19 @@ def resolve_parser_approve_target(chat_id: int, item: dict) -> str:
 def validate_parser_approve_context(chat_id: int, item: dict) -> str | None:
     """None — OK; інакше текст помилки для модератора."""
     parser_type = (item.get("parser_type") or "default").strip()
+    path = moderation_path_for_chat(chat_id, item)
+
+    if path:
+        path_status = get_mod_path_status(item, path)
+        if path_status == "approved":
+            label = "маркетплейс" if path == "marketplace" else "Telegram-канал"
+            return f"ℹ️ Вже підтверджено для {label}"
+        if path_status == "rejected":
+            return "ℹ️ Цей напрямок уже відхилено"
+        return None
+
     stored = item.get("moderation_chat_id")
-    if stored is not None:
+    if stored is not None and parser_type != PARSER_TYPE_SERVICES_CHANNEL:
         try:
             if int(stored) != chat_id:
                 return (
@@ -43,21 +71,6 @@ def validate_parser_approve_context(chat_id: int, item: dict) -> str | None:
                 )
         except (TypeError, ValueError):
             pass
-
-    if parser_type == PARSER_TYPE_SERVICES_CHANNEL and chat_id != SERVICES_AI_MODERATION_CHANNEL_ID:
-        return (
-            "❌ Оголошення з /parse_services — "
-            "підтверджуйте в групі PARSER_SERVICES_AI_MODERATION"
-        )
-
-    if (
-        chat_id == SERVICES_MODERATION_CHANNEL_ID
-        and parser_type == PARSER_TYPE_SERVICES_CHANNEL
-    ):
-        return (
-            "❌ Це оголошення з /parse_services — "
-            "підтверджуйте в AI-групі модерації"
-        )
 
     parser_group = get_parser_group_id()
     target = resolve_parser_approve_target(chat_id, item)

@@ -1,4 +1,4 @@
-"""Парсинг груп/каналів послуг з AI-модерацією → публікація лише в Telegram-канал."""
+"""Парсинг груп/каналів послуг: один раз парсимо → дві окремі модерації (маркетплейс + канал)."""
 
 import asyncio
 import logging
@@ -20,6 +20,7 @@ from parser.config.services_ai_channels import (
 from parser.config.settings import (
     PARSER_SERVICES_FETCH_LIMIT,
     PARSER_SERVICES_IGNORE_CURSOR,
+    SERVICES_MODERATION_CHANNEL_ID,
 )
 from parser.core.channel_fetch import iter_new_channel_messages
 from parser.core.photos import download_photos
@@ -227,7 +228,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         )
 
         if item_id:
-            item_data = {
+            base_item_data = {
                 "id": item_id,
                 "source_channel": channel,
                 "source_city": city,
@@ -251,13 +252,26 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
                     chat_id=chat_target if isinstance(chat_target, int) else None,
                 ),
                 "parser_type": PARSER_TYPE_SERVICES_CHANNEL,
-                "notify_chat_id": SERVICES_AI_MODERATION_CHANNEL_ID,
             }
+            moderation_targets = (
+                ("marketplace", SERVICES_MODERATION_CHANNEL_ID),
+                ("channel", SERVICES_AI_MODERATION_CHANNEL_ID),
+            )
             try:
-                await notify_callback(item_data)
-                await asyncio.sleep(3)
+                for mod_target, notify_chat_id in moderation_targets:
+                    item_data = {
+                        **base_item_data,
+                        "moderation_target": mod_target,
+                        "notify_chat_id": notify_chat_id,
+                    }
+                    await notify_callback(item_data)
+                    await asyncio.sleep(3)
             except Exception as e:
-                logger.error("Помилка сповіщення модерації (services AI) item %s: %s", item_id, e)
+                logger.error(
+                    "Помилка сповіщення модерації (services AI) item %s: %s",
+                    item_id,
+                    e,
+                )
 
             stats["added"] += 1
             logger.info("  ✅ [services→канал] [%s/%s] %s", channel, effective_message_id, title[:50])

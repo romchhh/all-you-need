@@ -118,7 +118,7 @@ async def run_services_ai_parser_cycle(
     fetch_limit: int | None = None,
     ignore_cursor: bool = False,
 ) -> dict | None:
-    """Цикл парсингу груп послуг → модерація → маркетплейс + Telegram-канал."""
+    """Цикл парсингу груп послуг → дві модерації (маркетплейс + Telegram-канал)."""
     from parser.config.services_ai_channels import services_ai_parser_enabled
     from parser.core.services_ai_runner import ServicesParseRunConfig, services_parse_run
 

@@ -56,6 +56,24 @@ def parsed_item_row_blocks_duplicate(item: dict) -> bool:
     Чи старий запис parsed_items ще блокує повторне додавання.
     Після деактивації на маркетплейсі (30 днів) — ні.
     """
+    parser_type = item.get("parser_type") or "default"
+    if parser_type == "services_channel":
+        mp = (item.get("marketplace_mod_status") or item.get("status") or "pending").lower()
+        ch = (item.get("channel_mod_status") or item.get("status") or "pending").lower()
+        if mp == "rejected" and ch == "rejected":
+            return False
+        if mp == "pending" or ch == "pending":
+            return True
+        if mp == "approved":
+            listing_id = item.get("marketplace_listing_id")
+            if listing_id and marketplace_listing_is_live(int(listing_id)):
+                return True
+            if _is_within_dedup_window(item.get("created_at")):
+                return True
+        if ch == "approved" and _is_within_dedup_window(item.get("created_at")):
+            return True
+        return False
+
     status = (item.get("status") or "").strip().lower()
     if status == "rejected":
         return False
@@ -193,6 +211,24 @@ def ensure_parsed_items_table():
     col_names5 = {row[1] for row in cursor.fetchall()}
     if "moderation_chat_id" not in col_names5:
         cursor.execute("ALTER TABLE parsed_items ADD COLUMN moderation_chat_id INTEGER")
+    cursor.execute("PRAGMA table_info(parsed_items)")
+    col_names6 = {row[1] for row in cursor.fetchall()}
+    if "admin_message_id_channel" not in col_names6:
+        cursor.execute("ALTER TABLE parsed_items ADD COLUMN admin_message_id_channel INTEGER")
+    if "moderation_chat_id_channel" not in col_names6:
+        cursor.execute("ALTER TABLE parsed_items ADD COLUMN moderation_chat_id_channel INTEGER")
+    if "marketplace_mod_status" not in col_names6:
+        cursor.execute(
+            "ALTER TABLE parsed_items ADD COLUMN marketplace_mod_status TEXT DEFAULT 'pending'"
+        )
+    if "channel_mod_status" not in col_names6:
+        cursor.execute(
+            "ALTER TABLE parsed_items ADD COLUMN channel_mod_status TEXT DEFAULT 'pending'"
+        )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_parsed_items_admin_msg_channel "
+        "ON parsed_items(admin_message_id_channel) WHERE admin_message_id_channel IS NOT NULL"
+    )
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_parsed_items_created_at "
         "ON parsed_items(created_at)"
@@ -489,12 +525,65 @@ def get_parsed_item_by_admin_msg(admin_message_id: int) -> Optional[dict]:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT * FROM parsed_items WHERE admin_message_id = ?",
-        (admin_message_id,),
+        """
+        SELECT * FROM parsed_items
+        WHERE admin_message_id = ? OR admin_message_id_channel = ?
+        LIMIT 1
+        """,
+        (admin_message_id, admin_message_id),
     )
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def get_mod_path_status(item: dict, path: str) -> str:
+    """path: marketplace | channel"""
+    if (item.get("parser_type") or "default") == "services_channel":
+        if path == "marketplace":
+            return (item.get("marketplace_mod_status") or item.get("status") or "pending").lower()
+        return (item.get("channel_mod_status") or item.get("status") or "pending").lower()
+    return (item.get("status") or "pending").lower()
+
+
+def update_mod_path_status(
+    item_id: int,
+    path: str,
+    status: str,
+    moderated_by: Optional[int] = None,
+) -> None:
+    col = "marketplace_mod_status" if path == "marketplace" else "channel_mod_status"
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_connection()
+    conn.execute(
+        f"UPDATE parsed_items SET {col} = ?, moderated_at = ?, moderated_by = ? WHERE id = ?",
+        (status, now, moderated_by, item_id),
+    )
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT marketplace_mod_status, channel_mod_status, parser_type
+        FROM parsed_items WHERE id = ?
+        """,
+        (item_id,),
+    )
+    row = cursor.fetchone()
+    if row:
+        data = dict(row)
+        if (data.get("parser_type") or "default") == "services_channel":
+            mp = (data.get("marketplace_mod_status") or "pending").lower()
+            ch = (data.get("channel_mod_status") or "pending").lower()
+            if mp == "rejected" and ch == "rejected":
+                overall = "rejected"
+            elif mp == "approved" and ch == "approved":
+                overall = "approved"
+            else:
+                overall = "pending"
+        else:
+            overall = status
+        conn.execute("UPDATE parsed_items SET status = ? WHERE id = ?", (overall, item_id))
+    conn.commit()
+    conn.close()
 
 
 def resolve_parsed_item_for_moderation(
@@ -547,9 +636,36 @@ def set_admin_message_id(
     item_id: int,
     admin_message_id: int,
     moderation_chat_id: int | None = None,
+    *,
+    target: str = "marketplace",
 ):
+    record_moderation_message(
+        item_id,
+        admin_message_id,
+        moderation_chat_id or 0,
+        target=target,
+    )
+
+
+def record_moderation_message(
+    item_id: int,
+    admin_message_id: int,
+    moderation_chat_id: int,
+    *,
+    target: str = "marketplace",
+) -> None:
+    """Зберігає message_id модерації: marketplace або channel."""
     conn = get_connection()
-    if moderation_chat_id is not None:
+    if target == "channel":
+        conn.execute(
+            """
+            UPDATE parsed_items
+            SET admin_message_id_channel = ?, moderation_chat_id_channel = ?
+            WHERE id = ?
+            """,
+            (admin_message_id, moderation_chat_id, item_id),
+        )
+    else:
         conn.execute(
             """
             UPDATE parsed_items
@@ -558,20 +674,16 @@ def set_admin_message_id(
             """,
             (admin_message_id, moderation_chat_id, item_id),
         )
-    else:
-        conn.execute(
-            "UPDATE parsed_items SET admin_message_id = ? WHERE id = ?",
-            (admin_message_id, item_id),
-        )
     conn.commit()
     conn.close()
 
 
-def set_marketplace_listing_id(item_id: int, listing_id: int):
+def set_marketplace_listing_id(item_id: int, listing_id: int, moderated_by: Optional[int] = None):
     conn = get_connection()
     conn.execute(
-        "UPDATE parsed_items SET marketplace_listing_id = ?, status = 'approved' WHERE id = ?",
+        "UPDATE parsed_items SET marketplace_listing_id = ? WHERE id = ?",
         (listing_id, item_id),
     )
     conn.commit()
     conn.close()
+    update_mod_path_status(item_id, "marketplace", "approved", moderated_by=moderated_by)

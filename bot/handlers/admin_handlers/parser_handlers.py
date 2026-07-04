@@ -84,9 +84,11 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
     if services:
         lines.append("")
         lines.append(
-            "Модерація: <code>PARSER_SERVICES_AI_MODERATION_CHANNEL_ID</code>\n"
-            "Після ✅ → маркетплейс + Hamburg: <code>TRADE_SERVICES_CHANNEL_HAMBURG_ID</code>, "
-            "інші міста: <code>TRADE_SERVICES_CHANNEL_GERMANY_ID</code>\n\n"
+            "Модерація (два окремі чати на кожен пост):\n"
+            "• <code>PARSER_SERVICES_MODERATION_CHANNEL_ID</code> → ✅ лише маркетплейс\n"
+            "• <code>PARSER_SERVICES_AI_MODERATION_CHANNEL_ID</code> → ✅ лише Telegram-канал\n"
+            "Канали публікації: Hamburg — <code>TRADE_SERVICES_CHANNEL_HAMBURG_ID</code>, "
+            "інші — <code>TRADE_SERVICES_CHANNEL_GERMANY_ID</code>\n\n"
             "💡 <code>/parse_services100</code> — останні 100 постів без cursor"
         )
     elif added == 0:
