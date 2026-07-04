@@ -22,6 +22,8 @@ ParseChannelFn = Callable[..., Awaitable[dict]]
 # Не чекати flood wait — одразу перемикати акаунт
 PYROGRAM_SLEEP_THRESHOLD = 0
 
+_DB_LOCKED_RETRIES = 4
+
 
 def merge_channel_stats(total: dict, stats: dict, *, channel: str, city: str) -> None:
     total["added"] = int(total.get("added") or 0) + int(stats.get("added") or 0)
@@ -30,6 +32,133 @@ def merge_channel_stats(total: dict, stats: dict, *, channel: str, city: str) ->
         merged = total.setdefault("reasons", {})
         for reason, count in stats["reasons"].items():
             merged[reason] = merged.get(reason, 0) + count
+
+
+def _is_sqlite_locked(err: BaseException) -> bool:
+    return "database is locked" in str(err).lower()
+
+
+async def _parse_with_retries(
+    parse_fn: ParseChannelFn,
+    client,
+    channel: str,
+    city: str,
+    notify_callback: Callable[..., Awaitable[Any]],
+) -> dict:
+    last_err: BaseException | None = None
+    for attempt in range(_DB_LOCKED_RETRIES):
+        try:
+            return await parse_fn(client, channel, city, notify_callback)
+        except Exception as e:
+            last_err = e
+            if _is_sqlite_locked(e) and attempt < _DB_LOCKED_RETRIES - 1:
+                wait = min(0.4 * (2**attempt), 3.0)
+                logger.warning(
+                    "SQLite locked для %s (спроба %s/%s), чекаємо %.1fs",
+                    channel,
+                    attempt + 1,
+                    _DB_LOCKED_RETRIES,
+                    wait,
+                )
+                await asyncio.sleep(wait)
+                continue
+            raise
+    if last_err:
+        raise last_err
+    raise RuntimeError(f"parse failed for {channel}")
+
+
+async def _run_bucket_on_account(
+    acc: PyrogramAccount,
+    bucket: list[tuple[str, str]],
+    parse_fn: ParseChannelFn,
+    notify_callback: Callable[..., Awaitable[Any]],
+    *,
+    log_prefix: str,
+) -> tuple[dict, list[dict]]:
+    """Один Pyrogram Client на всі канали акаунта — менше lock на .session."""
+    from pyrogram import Client
+
+    local: dict = {"added": 0, "skipped": 0, "reasons": {}}
+    errors: list[dict] = []
+    if not bucket:
+        return local, errors
+
+    client = Client(
+        name=str(acc.session_path),
+        api_id=acc.api_id,
+        api_hash=acc.api_hash,
+        phone_number=acc.phone,
+        sleep_threshold=PYROGRAM_SLEEP_THRESHOLD,
+    )
+
+    async with pyrogram_session_guard(acc.session_path):
+        async with client:
+            for idx, (channel, city) in enumerate(bucket):
+                try:
+                    stats = await _parse_with_retries(
+                        parse_fn, client, channel, city, notify_callback
+                    )
+                    merge_channel_stats(local, stats, channel=channel, city=city)
+                    logger.info(
+                        "  [%s …%s] %s: +%s нових, пропущено %s",
+                        acc.label,
+                        acc.phone_tail,
+                        channel,
+                        stats.get("added", 0),
+                        stats.get("skipped", 0),
+                    )
+                    if stats.get("reasons"):
+                        parts = ", ".join(
+                            f"{reason}={count}"
+                            for reason, count in sorted(
+                                stats["reasons"].items(), key=lambda x: -x[1]
+                            )
+                        )
+                        logger.info("  %s — причини пропуску: %s", channel, parts)
+                except Exception as e:
+                    if is_flood_limit_error(e):
+                        stats, used_acc, flood_err = await _parse_channel_with_fallback(
+                            acc,
+                            parse_fn,
+                            channel,
+                            city,
+                            notify_callback,
+                            log_prefix=log_prefix,
+                        )
+                        if stats is None:
+                            errors.append(
+                                {
+                                    "channel": channel,
+                                    "city": city,
+                                    "error": flood_err or "ліміт на всіх акаунтах",
+                                }
+                            )
+                        else:
+                            merge_channel_stats(local, stats, channel=channel, city=city)
+                            used = used_acc or acc
+                            logger.info(
+                                "  [%s …%s] %s (fallback): +%s, пропущено %s",
+                                used.label,
+                                used.phone_tail,
+                                channel,
+                                stats.get("added", 0),
+                                stats.get("skipped", 0),
+                            )
+                    else:
+                        logger.error(
+                            "%s — помилка каналу %s (акаунт %s): %s",
+                            log_prefix,
+                            channel,
+                            acc.label,
+                            e,
+                            exc_info=True,
+                        )
+                        errors.append({"channel": channel, "city": city, "error": str(e)})
+                if idx < len(bucket) - 1:
+                    await asyncio.sleep(2)
+
+    return local, errors
 
 
 async def _run_parse_on_account(
@@ -50,7 +179,9 @@ async def _run_parse_on_account(
     )
     async with pyrogram_session_guard(acc.session_path):
         async with client:
-            return await parse_fn(client, channel, city, notify_callback)
+            return await _parse_with_retries(
+                parse_fn, client, channel, city, notify_callback
+            )
 
 
 async def _parse_channel_with_fallback(
@@ -145,59 +276,14 @@ async def run_channels_with_accounts(
             acc.phone_tail,
             len(bucket),
         )
-        for idx, (channel, city) in enumerate(bucket):
-            try:
-                stats, used_acc, flood_err = await _parse_channel_with_fallback(
-                    acc,
-                    parse_fn,
-                    channel,
-                    city,
-                    notify_callback,
-                    log_prefix=log_prefix,
-                )
-                if stats is None:
-                    total["errors"].append(
-                        {
-                            "channel": channel,
-                            "city": city,
-                            "error": flood_err or "ліміт на всіх акаунтах",
-                        }
-                    )
-                    logger.error(
-                        "%s — %s: ліміт на всіх акаунтах",
-                        log_prefix,
-                        channel,
-                    )
-                    continue
-                merge_channel_stats(total, stats, channel=channel, city=city)
-                used = used_acc or acc
-                logger.info(
-                    "  [%s …%s] %s: +%s нових, пропущено %s",
-                    used.label,
-                    used.phone_tail,
-                    channel,
-                    stats.get("added", 0),
-                    stats.get("skipped", 0),
-                )
-                if stats.get("reasons"):
-                    parts = ", ".join(
-                        f"{reason}={count}"
-                        for reason, count in sorted(
-                            stats["reasons"].items(), key=lambda x: -x[1]
-                        )
-                    )
-                    logger.info("  %s — причини пропуску: %s", channel, parts)
-            except Exception as e:
-                logger.error(
-                    "%s — помилка каналу %s (акаунт %s): %s",
-                    log_prefix,
-                    channel,
-                    acc.label,
-                    e,
-                    exc_info=True,
-                )
-                total["errors"].append({"channel": channel, "city": city, "error": str(e)})
-            if idx < len(bucket) - 1:
-                await asyncio.sleep(2)
+        local, errors = await _run_bucket_on_account(
+            acc,
+            bucket,
+            parse_fn,
+            notify_callback,
+            log_prefix=log_prefix,
+        )
+        merge_channel_stats(total, local, channel="", city="")
+        total["errors"].extend(errors)
 
     return total

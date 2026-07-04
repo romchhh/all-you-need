@@ -14,6 +14,7 @@ from parser.storage.connection import get_connection
 logger = logging.getLogger(__name__)
 
 _DEDUP_WINDOW = f"-{PARSER_DEDUP_DAYS} days"
+_schema_ready = False
 
 
 def marketplace_listing_is_live(listing_id: int) -> bool:
@@ -149,6 +150,9 @@ def clear_repostable_parsed_item(source_channel: str, message_id: int) -> bool:
 
 
 def ensure_parsed_items_table():
+    global _schema_ready
+    if _schema_ready:
+        return
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -236,6 +240,7 @@ def ensure_parsed_items_table():
     _cleanup_pending_service_channel_defaults(cursor)
     conn.commit()
     conn.close()
+    _schema_ready = True
 
 
 def _cleanup_pending_service_channel_defaults(cursor) -> None:

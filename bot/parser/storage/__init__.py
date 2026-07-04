@@ -1,4 +1,4 @@
-from parser.storage.connection import BASE_DIR, DB_PATH, get_connection
+from parser.storage.connection import BASE_DIR, DB_PATH, ensure_parser_storage, get_connection
 from parser.storage.marketplace import (
     copy_parser_images_to_public,
     create_marketplace_listing,
@@ -30,6 +30,7 @@ __all__ = [
     "ensure_parsed_items_table",
     "fingerprint_parsed_text",
     "fingerprint_title_desc",
+    "ensure_parser_storage",
     "get_connection",
     "get_or_create_bot_user",
     "get_parsed_item_by_admin_msg",

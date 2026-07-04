@@ -8,8 +8,13 @@ from parser.storage.connection import get_connection
 
 logger = logging.getLogger(__name__)
 
+_cursors_table_ready = False
+
 
 def ensure_parser_cursors_table() -> None:
+    global _cursors_table_ready
+    if _cursors_table_ready:
+        return
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -23,6 +28,7 @@ def ensure_parser_cursors_table() -> None:
     """)
     conn.commit()
     conn.close()
+    _cursors_table_ready = True
 
 
 def get_channel_cursor(source_channel: str, parser_type: str = "default") -> int:
