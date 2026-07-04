@@ -3,6 +3,8 @@
 import asyncio
 import logging
 import re
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
 from parser.category_keywords import detect_category
 from parser.config.channels import (
@@ -53,6 +55,34 @@ from parser.storage.parsed_items import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ServicesParseRunConfig:
+    fetch_limit: int | None = None
+    ignore_cursor: bool = False
+
+
+_default_run_config = ServicesParseRunConfig()
+_run_config = _default_run_config
+
+
+@asynccontextmanager
+async def services_parse_run(config: ServicesParseRunConfig | None = None):
+    """Тимчасові параметри парсингу (ручна команда /parse_services100)."""
+    global _run_config
+    prev = _run_config
+    _run_config = config or _default_run_config
+    try:
+        yield
+    finally:
+        _run_config = prev
+
+
+def _active_fetch_options() -> tuple[int, bool]:
+    if _run_config.fetch_limit is not None:
+        return max(1, _run_config.fetch_limit), True
+    return PARSER_SERVICES_FETCH_LIMIT, PARSER_SERVICES_IGNORE_CURSOR
+
+
 async def parse_services_ai_channel(app, channel: str, city: str, notify_callback) -> dict:
     """Парсить одне джерело; на SERVICE_CHANNELS усі пости вважаються послугами."""
     ensure_parsed_items_table()
@@ -66,13 +96,14 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
 
     chat_target = await resolve_pyrogram_chat_target(app, channel)
 
+    fetch_limit, ignore_cursor = _active_fetch_options()
     async for msg in iter_new_channel_messages(
         app,
         chat_target,
         source_channel=channel,
         parser_type=PARSER_TYPE_SERVICES_CHANNEL,
-        fetch_limit=PARSER_SERVICES_FETCH_LIMIT,
-        ignore_cursor=PARSER_SERVICES_IGNORE_CURSOR,
+        fetch_limit=fetch_limit,
+        ignore_cursor=ignore_cursor,
     ):
         if getattr(msg, "media_group_id", None):
             gid = str(msg.media_group_id)
@@ -248,6 +279,7 @@ async def run_services_ai_channels(notify_callback) -> dict:
             "channels": 0,
         }
 
+    fetch_limit, ignore_cursor = _active_fetch_options()
     total = await run_channels_with_accounts(
         dict(SERVICES_AI_CHANNELS),
         parse_services_ai_channel,
@@ -255,4 +287,6 @@ async def run_services_ai_channels(notify_callback) -> dict:
         log_prefix="Послуги (AI→канал)",
     )
     total["channels"] = len(SERVICES_AI_CHANNELS)
+    if ignore_cursor and fetch_limit:
+        total["lookback"] = fetch_limit
     return total

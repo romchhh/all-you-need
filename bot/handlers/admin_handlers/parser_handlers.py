@@ -2,8 +2,9 @@ import asyncio
 import html
 import logging
 import os
+import re
 
-from aiogram import Router, types
+from aiogram import F, Router, types
 from aiogram.filters import Command
 
 from utils.filters import IsAdmin
@@ -11,6 +12,36 @@ from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+_PARSE_SERVICES_CMD = re.compile(
+    r"^/parse_services(?:_ai)?(?P<limit>\d+)?(?:@\w+)?$",
+    re.IGNORECASE,
+)
+
+
+def _parse_services_lookback(message: types.Message) -> int | None:
+    """
+    /parse_services — інкрементально (cursor).
+    /parse_services100 або /parse_services 100 — останні N постів без cursor.
+    """
+    text = (message.text or "").strip()
+    if not text:
+        return None
+    head = text.split()[0]
+    m = _PARSE_SERVICES_CMD.match(head)
+    if not m:
+        return None
+    if m.group("limit"):
+        return max(1, min(500, int(m.group("limit"))))
+    parts = text.split()
+    if len(parts) >= 2 and parts[1].isdigit():
+        return max(1, min(500, int(parts[1])))
+    return None
+
+
+def _is_parse_services_message(message: types.Message) -> bool:
+    head = (message.text or "").strip().split()[0] if message.text else ""
+    return bool(_PARSE_SERVICES_CMD.match(head))
 
 
 def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
@@ -22,6 +53,7 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
     channels = stats.get("channels")
     errors = stats.get("errors") or []
     reasons = stats.get("reasons") or {}
+    lookback = stats.get("lookback")
 
     title = "✅ <b>Парсинг послуг завершено</b>" if services else "✅ <b>Парсинг завершено</b>"
     lines = [
@@ -30,6 +62,8 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
         f"➕ Нових: <b>{added}</b>",
         f"⏭ Пропущено: <b>{skipped}</b>",
     ]
+    if lookback:
+        lines.append(f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано)")
     if channels is not None:
         lines.append(f"📢 Каналів у черзі: <b>{channels}</b>")
 
@@ -52,7 +86,8 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
         lines.append(
             "Модерація: <code>PARSER_SERVICES_AI_MODERATION_CHANNEL_ID</code>\n"
             "Після ✅ → маркетплейс + Hamburg: <code>TRADE_SERVICES_CHANNEL_HAMBURG_ID</code>, "
-            "інші міста: <code>TRADE_SERVICES_CHANNEL_GERMANY_ID</code>"
+            "інші міста: <code>TRADE_SERVICES_CHANNEL_GERMANY_ID</code>\n\n"
+            "💡 <code>/parse_services100</code> — останні 100 постів без cursor"
         )
     elif added == 0:
         lines.append("")
@@ -108,9 +143,9 @@ async def manual_parser_run(message: types.Message):
     asyncio.create_task(_run())
 
 
-@router.message(IsAdmin(), Command("parse_services", "parse_services_ai"))
+@router.message(IsAdmin(), F.func(_is_parse_services_message))
 async def manual_services_ai_parser_run(message: types.Message):
-    """Ручний запуск парсера послуг (AI → канал TradeGround)."""
+    """Ручний запуск: /parse_services або /parse_services100."""
     from parser.config.services_ai_channels import (
         SERVICES_AI_CHANNELS,
         services_ai_parser_enabled,
@@ -141,18 +176,27 @@ async def manual_services_ai_parser_run(message: types.Message):
         )
         return
 
+    lookback = _parse_services_lookback(message)
     channel_list = ", ".join(f"@{html.escape(k)}" for k in list(SERVICES_AI_CHANNELS.keys())[:6])
-    status_msg = await message.answer(
-        "🔍 <b>Запускаю парсинг послуг (AI → канал)…</b>\n\n"
-        f"Канали: {channel_list}",
-        parse_mode="HTML",
-    )
+
+    if lookback:
+        status_text = (
+            f"🔍 <b>Парсинг послуг: останні {lookback} постів</b>\n\n"
+            f"Cursor ігноровано. Канали: {channel_list}"
+        )
+    else:
+        status_text = (
+            "🔍 <b>Запускаю парсинг послуг (інкрементально)…</b>\n\n"
+            f"Канали: {channel_list}\n"
+            "💡 <code>/parse_services100</code> — примусово останні 100 постів"
+        )
+    status_msg = await message.answer(status_text, parse_mode="HTML")
 
     async def _run():
         try:
             from parser.scheduler import run_services_ai_parser_cycle
 
-            stats = await run_services_ai_parser_cycle()
+            stats = await run_services_ai_parser_cycle(fetch_limit=lookback)
             await status_msg.edit_text(
                 _format_parser_stats(stats, services=True),
                 parse_mode="HTML",

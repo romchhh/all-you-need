@@ -113,9 +113,14 @@ async def run_parser_cycle() -> dict | None:
         await aiogram_bot.session.close()
 
 
-async def run_services_ai_parser_cycle() -> dict | None:
-    """Цикл парсингу груп послуг → модерація → публікація лише в Telegram-канал."""
+async def run_services_ai_parser_cycle(
+    *,
+    fetch_limit: int | None = None,
+    ignore_cursor: bool = False,
+) -> dict | None:
+    """Цикл парсингу груп послуг → модерація → маркетплейс + Telegram-канал."""
     from parser.config.services_ai_channels import services_ai_parser_enabled
+    from parser.core.services_ai_runner import ServicesParseRunConfig, services_parse_run
 
     if not services_ai_parser_enabled():
         logger.debug("Services AI parser вимкнено або немає SERVICE_CHANNELS у CHANNELS")
@@ -156,13 +161,24 @@ async def run_services_ai_parser_cycle() -> dict | None:
             await notify_admin_group(aiogram_bot, item_data)
 
         stats: dict | None = None
+        run_cfg = None
+        if fetch_limit is not None:
+            run_cfg = ServicesParseRunConfig(fetch_limit=fetch_limit, ignore_cursor=True)
+        elif ignore_cursor:
+            run_cfg = ServicesParseRunConfig(ignore_cursor=True)
         try:
             async with GLOBAL_PARSER_RUN_LOCK:
                 logger.info(
                     "🔍 Починаємо парсинг груп послуг (AI → канал, %s акаунт(ів))…",
                     len(accounts),
                 )
-                stats = await run_services_ai_channels(notify_callback)
+                async with services_parse_run(run_cfg):
+                    stats = await run_services_ai_channels(notify_callback)
+                if run_cfg and run_cfg.fetch_limit:
+                    logger.info(
+                        "Services AI parser (lookback %s постів, cursor ігноровано)",
+                        run_cfg.fetch_limit,
+                    )
                 logger.info(
                     "✅ Services AI parser: +%s нових, пропущено %s",
                     stats["added"],
