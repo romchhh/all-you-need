@@ -1,4 +1,4 @@
-"""Спільний пул Pyrogram-акаунтів парсера (main → services → fallback)."""
+"""Спільний пул Pyrogram-акаунтів: один main на товари + послуги, опційно fallback."""
 
 from __future__ import annotations
 
@@ -12,13 +12,10 @@ from parser.moderation.config import (
     PARSER_API_ID,
     PARSER_FALLBACK_API_HASH,
     PARSER_FALLBACK_API_ID,
+    PARSER_FALLBACK_ENABLED,
     PARSER_FALLBACK_PHONE,
     PARSER_FALLBACK_SESSION_PATH,
     PARSER_PHONE,
-    PARSER_SERVICES_API_HASH,
-    PARSER_SERVICES_API_ID,
-    PARSER_SERVICES_PHONE,
-    PARSER_SERVICES_SESSION_PATH,
     PARSER_SESSION_PATH,
 )
 
@@ -74,29 +71,32 @@ def _account_from_env(
 
 def list_parser_accounts() -> list[PyrogramAccount]:
     """
-    main + fallback (@opluger). Слот PARSER_SERVICES_* застарів — не використовується.
+    За замовчуванням лише main (parser_session) — і /parse товари, і /parse_services послуги.
+    Другий акаунт лише якщо PARSER_FALLBACK_ENABLED=1.
     """
     candidates: list[PyrogramAccount] = []
-    for acc in (
-        _account_from_env(
-            label="main",
-            priority=0,
-            api_id=PARSER_API_ID,
-            api_hash=PARSER_API_HASH,
-            phone=PARSER_PHONE,
-            session_path=PARSER_SESSION_PATH,
-        ),
-        _account_from_env(
+    main = _account_from_env(
+        label="main",
+        priority=0,
+        api_id=PARSER_API_ID,
+        api_hash=PARSER_API_HASH,
+        phone=PARSER_PHONE,
+        session_path=PARSER_SESSION_PATH,
+    )
+    if main:
+        candidates.append(main)
+
+    if PARSER_FALLBACK_ENABLED:
+        fallback = _account_from_env(
             label="fallback",
             priority=1,
             api_id=PARSER_FALLBACK_API_ID,
             api_hash=PARSER_FALLBACK_API_HASH,
             phone=PARSER_FALLBACK_PHONE,
             session_path=PARSER_FALLBACK_SESSION_PATH,
-        ),
-    ):
-        if acc:
-            candidates.append(acc)
+        )
+        if fallback:
+            candidates.append(fallback)
 
     seen: set[tuple[int, str]] = set()
     out: list[PyrogramAccount] = []
@@ -111,8 +111,15 @@ def list_parser_accounts() -> list[PyrogramAccount]:
     return out
 
 
+def primary_parser_account() -> PyrogramAccount | None:
+    accounts = list_parser_accounts()
+    return accounts[0] if accounts else None
+
+
 def fallback_accounts_after(primary: PyrogramAccount) -> list[PyrogramAccount]:
-    """Інші акаунти для retry після FloodWait (спочатку fallback, потім решта)."""
+    """Інші акаунти для retry після FloodWait."""
+    if not PARSER_FALLBACK_ENABLED:
+        return []
     accounts = list_parser_accounts()
     rest = [a for a in accounts if a.dedupe_key != primary.dedupe_key]
     rest.sort(key=lambda a: (0 if a.label == "fallback" else 1, a.priority))

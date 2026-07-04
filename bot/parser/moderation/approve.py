@@ -26,6 +26,7 @@ from parser.moderation.config import (
     PARSER_BOT_TELEGRAM_ID,
     PARSER_FALLBACK_BOT_TELEGRAM_ID,
     PARSER_FALLBACK_BOT_USERNAME,
+    PARSER_FALLBACK_ENABLED,
     PARSER_SERVICES_BOT_TELEGRAM_ID,
     PARSER_SERVICES_BOT_USERNAME,
 )
@@ -173,11 +174,10 @@ async def _approve_marketplace(
     listing_item = apply_marketplace_categories_to_item(listing_item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
-    if item_category == "services_work":
-        seller_tg_id = (
-            PARSER_FALLBACK_BOT_TELEGRAM_ID
-            or PARSER_SERVICES_BOT_TELEGRAM_ID
-        )
+    if item_category == "services_work" and PARSER_FALLBACK_ENABLED and (
+        PARSER_FALLBACK_BOT_TELEGRAM_ID or PARSER_SERVICES_BOT_TELEGRAM_ID
+    ):
+        seller_tg_id = PARSER_FALLBACK_BOT_TELEGRAM_ID or PARSER_SERVICES_BOT_TELEGRAM_ID
         seller_username = PARSER_FALLBACK_BOT_USERNAME or PARSER_SERVICES_BOT_USERNAME
         user_id = get_or_create_bot_user(
             seller_tg_id,

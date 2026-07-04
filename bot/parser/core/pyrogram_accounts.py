@@ -124,10 +124,14 @@ async def run_channels_with_accounts(
         len(accounts),
         ", ".join(f"{a.label}(…{a.phone_tail})" for a in accounts),
     )
-    if len(accounts) < 2:
+    if len(accounts) == 1:
+        logger.info(
+            "%s: один Telegram-акаунт (parser_session) — товари і послуги",
+            log_prefix,
+        )
+    elif len(accounts) < 2:
         logger.warning(
-            "%s: лише 1 акаунт — при лімітах Telegram парсинг сповільниться. "
-            "Додайте PARSER_SERVICES_* та/або PARSER_FALLBACK_* (opluger).",
+            "%s: лише 1 акаунт — при лімітах Telegram парсинг сповільниться.",
             log_prefix,
         )
 

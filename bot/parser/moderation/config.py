@@ -25,7 +25,12 @@ PARSER_SERVICES_API_ID: int = int(os.getenv("PARSER_SERVICES_API_ID", "0"))
 PARSER_SERVICES_API_HASH: str = os.getenv("PARSER_SERVICES_API_HASH", "")
 PARSER_SERVICES_PHONE: str = os.getenv("PARSER_SERVICES_PHONE", "")
 
-# 3-й акаунт (резерв при FloodWait; зараз @opluger)
+# Резервний 2-й акаунт (0 = один PARSER_* на товари і послуги)
+PARSER_FALLBACK_ENABLED: bool = (
+    os.getenv("PARSER_FALLBACK_ENABLED", "0").strip().lower() in ("1", "true", "yes", "on")
+)
+
+# Опційний резерв при FloodWait (@opluger тощо)
 PARSER_FALLBACK_API_ID: int = int(os.getenv("PARSER_FALLBACK_API_ID", "0"))
 PARSER_FALLBACK_API_HASH: str = os.getenv("PARSER_FALLBACK_API_HASH", "")
 PARSER_FALLBACK_PHONE: str = os.getenv("PARSER_FALLBACK_PHONE", "")
