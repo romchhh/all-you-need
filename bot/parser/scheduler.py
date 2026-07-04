@@ -47,7 +47,11 @@ BOT_TOKEN: str = os.getenv("TOKEN", "")
 # Основна функція одного циклу парсингу
 # ──────────────────────────────────────────────
 
-async def run_parser_cycle() -> dict | None:
+async def run_parser_cycle(
+    *,
+    fetch_limit: int | None = None,
+    ignore_cursor: bool = False,
+) -> dict | None:
     """Один повний цикл парсингу всіх каналів. Повертає stats або None при помилці."""
     if not BOT_TOKEN:
         logger.error("TOKEN не встановлено в .env — парсер не може сповіщати адмінів")
@@ -78,19 +82,40 @@ async def run_parser_cycle() -> dict | None:
             await _notify_error("налаштування", msg)
             return None
 
-        from parser.core.runner import run_all_channels
+        from parser.core.dedup_check import parser_dedup_override
+        from parser.core.runner import ParseRunConfig, parse_run, run_all_channels
 
         async def notify_callback(item_data: dict):
             await notify_admin_group(aiogram_bot, item_data)
 
         stats: dict | None = None
+        run_cfg = None
+        dedup_enabled = True
+        if fetch_limit is not None:
+            run_cfg = ParseRunConfig(
+                fetch_limit=fetch_limit,
+                ignore_cursor=True,
+                dedup_enabled=False,
+            )
+            dedup_enabled = False
+        elif ignore_cursor:
+            run_cfg = ParseRunConfig(ignore_cursor=True, dedup_enabled=False)
+            dedup_enabled = False
         try:
             async with GLOBAL_PARSER_RUN_LOCK:
-                logger.info(
-                    "🔍 Починаємо парсинг каналів (%s Telegram-акаунт(ів))…",
-                    len(accounts),
-                )
-                stats = await run_all_channels(notify_callback)
+                if fetch_limit:
+                    logger.info(
+                        "🔍 Парсинг каналів (lookback %s постів, cursor ігноровано, dedup вимк.)…",
+                        fetch_limit,
+                    )
+                else:
+                    logger.info(
+                        "🔍 Починаємо парсинг каналів (%s Telegram-акаунт(ів))…",
+                        len(accounts),
+                    )
+                with parser_dedup_override(None if dedup_enabled else False):
+                    async with parse_run(run_cfg):
+                        stats = await run_all_channels(notify_callback)
                 logger.info(
                     "✅ Парсинг завершено: +%s нових, пропущено %s",
                     stats["added"],

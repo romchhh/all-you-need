@@ -13,10 +13,36 @@ from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
 router = Router()
 logger = logging.getLogger(__name__)
 
+_PARSE_CMD = re.compile(r"^/parse(?P<limit>\d+)?(?:@\w+)?$", re.IGNORECASE)
 _PARSE_SERVICES_CMD = re.compile(
     r"^/parse_services(?:_ai)?(?P<limit>\d+)?(?:@\w+)?$",
     re.IGNORECASE,
 )
+
+
+def _parse_lookback(message: types.Message) -> int | None:
+    """
+    /parse — інкрементально (cursor).
+    /parse10 або /parse 10 — останні N постів без cursor, dedup вимк.
+    """
+    text = (message.text or "").strip()
+    if not text:
+        return None
+    head = text.split()[0]
+    m = _PARSE_CMD.match(head)
+    if not m:
+        return None
+    if m.group("limit"):
+        return max(1, min(500, int(m.group("limit"))))
+    parts = text.split()
+    if len(parts) >= 2 and parts[1].isdigit():
+        return max(1, min(500, int(parts[1])))
+    return None
+
+
+def _is_parse_message(message: types.Message) -> bool:
+    head = (message.text or "").strip().split()[0] if message.text else ""
+    return bool(_PARSE_CMD.match(head))
 
 
 def _parse_services_lookback(message: types.Message) -> int | None:
@@ -63,7 +89,12 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
         f"⏭ Пропущено: <b>{skipped}</b>",
     ]
     if lookback:
-        lines.append(f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано)")
+        if services:
+            lines.append(f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано)")
+        else:
+            lines.append(
+                f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано, dedup вимк.)"
+            )
     if channels is not None:
         lines.append(f"📢 Каналів у черзі: <b>{channels}</b>")
 
@@ -94,13 +125,14 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
     elif added == 0:
         lines.append("")
         lines.append("Якщо очікували нові оголошення — можливо вони вже в БД або канал без нових постів.")
+    else:
+        lines.append("")
+        lines.append("💡 <code>/parse10</code> — останні 10 постів без cursor (dedup вимк.)")
 
     return "\n".join(lines)
 
 
-@router.message(IsAdmin(), Command("parse", "parser", "run_parser"))
-async def manual_parser_run(message: types.Message):
-    """Ручний запуск циклу парсера (лише для адмінів)."""
+async def _run_marketplace_parser(message: types.Message, *, lookback: int | None):
     if not os.getenv("PARSER_API_ID"):
         await message.answer(
             "❌ <b>Парсер не налаштовано</b>\n\n"
@@ -117,17 +149,25 @@ async def manual_parser_run(message: types.Message):
         )
         return
 
-    status_msg = await message.answer(
-        "🔍 <b>Запускаю парсинг каналів (маркетплейс)…</b>\n\n"
-        "Канали послуг обробляє <code>/parse_services</code>.",
-        parse_mode="HTML",
-    )
+    if lookback:
+        status_text = (
+            f"🔍 <b>Парсинг маркетплейсу: останні {lookback} постів</b>\n\n"
+            "Cursor ігноровано, текстові дублі вимкнено.\n"
+            "Канали послуг — <code>/parse_services</code>."
+        )
+    else:
+        status_text = (
+            "🔍 <b>Запускаю парсинг каналів (маркетплейс)…</b>\n\n"
+            "Канали послуг обробляє <code>/parse_services</code>.\n"
+            "💡 <code>/parse10</code> — примусово останні 10 постів"
+        )
+    status_msg = await message.answer(status_text, parse_mode="HTML")
 
     async def _run():
         try:
             from parser.scheduler import run_parser_cycle
 
-            stats = await run_parser_cycle()
+            stats = await run_parser_cycle(fetch_limit=lookback)
             await status_msg.edit_text(
                 _format_parser_stats(stats, services=False),
                 parse_mode="HTML",
@@ -143,6 +183,18 @@ async def manual_parser_run(message: types.Message):
                 pass
 
     asyncio.create_task(_run())
+
+
+@router.message(IsAdmin(), F.func(_is_parse_message))
+async def manual_parser_run(message: types.Message):
+    """Ручний запуск: /parse або /parse10."""
+    await _run_marketplace_parser(message, lookback=_parse_lookback(message))
+
+
+@router.message(IsAdmin(), Command("parser", "run_parser"))
+async def manual_parser_run_aliases(message: types.Message):
+    """Аліаси /parser та /run_parser — інкрементальний парсинг."""
+    await _run_marketplace_parser(message, lookback=None)
 
 
 @router.message(IsAdmin(), F.func(_is_parse_services_message))

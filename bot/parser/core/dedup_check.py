@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import Optional
 
 from parser.config.services_ai_channels import PARSER_TYPE_SERVICES_CHANNEL
@@ -20,8 +21,24 @@ from parser.storage.parsed_items import (
     parsed_item_is_semantic_duplicate,
 )
 
+_dedup_override: bool | None = None
+
+
+@contextmanager
+def parser_dedup_override(enabled: bool | None):
+    """Тимчасово вимикає/вмикає текстову дедуплікацію (напр. /parse10)."""
+    global _dedup_override
+    prev = _dedup_override
+    _dedup_override = enabled
+    try:
+        yield
+    finally:
+        _dedup_override = prev
+
 
 def _text_dedup_enabled(parser_type: str) -> bool:
+    if _dedup_override is not None:
+        return _dedup_override
     if parser_type == PARSER_TYPE_SERVICES_CHANNEL:
         return PARSER_SERVICES_DEDUP_ENABLED
     return PARSER_DEDUP_ENABLED

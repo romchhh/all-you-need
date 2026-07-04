@@ -3,6 +3,8 @@
 import asyncio
 import logging
 import re
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
 from parser.category_keywords import detect_category
 from parser.config.channels import (
@@ -47,6 +49,35 @@ from parser.storage.parsed_items import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ParseRunConfig:
+    fetch_limit: int | None = None
+    ignore_cursor: bool = False
+    dedup_enabled: bool = True
+
+
+_default_run_config = ParseRunConfig()
+_run_config = _default_run_config
+
+
+@asynccontextmanager
+async def parse_run(config: ParseRunConfig | None = None):
+    """Тимчасові параметри парсингу (ручна команда /parse10)."""
+    global _run_config
+    prev = _run_config
+    _run_config = config or _default_run_config
+    try:
+        yield
+    finally:
+        _run_config = prev
+
+
+def _active_fetch_options() -> tuple[int, bool]:
+    if _run_config.fetch_limit is not None:
+        return max(1, _run_config.fetch_limit), True
+    return FETCH_LIMIT, False
+
+
 async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
     ensure_parsed_items_table()
 
@@ -57,12 +88,14 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
     chat_target = await resolve_pyrogram_chat_target(app, channel)
 
+    fetch_limit, ignore_cursor = _active_fetch_options()
     async for msg in iter_new_channel_messages(
         app,
         chat_target,
         source_channel=channel,
         parser_type="default",
-        fetch_limit=FETCH_LIMIT,
+        fetch_limit=fetch_limit,
+        ignore_cursor=ignore_cursor,
     ):
         if getattr(msg, "media_group_id", None):
             gid = str(msg.media_group_id)
@@ -249,4 +282,7 @@ async def run_all_channels(notify_callback) -> dict:
         notify_callback,
         log_prefix="Маркетплейс",
     )
+    fetch_limit, ignore_cursor = _active_fetch_options()
+    if ignore_cursor and fetch_limit:
+        total["lookback"] = fetch_limit
     return total
