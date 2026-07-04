@@ -12,6 +12,7 @@ from parser.config.channels import (
     normalize_channel_key,
 )
 from parser.config.settings import SERVICES_MODERATION_CHANNEL_ID
+from parser.config.settings import FETCH_LIMIT
 from parser.core.channel_fetch import iter_new_channel_messages
 from parser.core.photos import download_photos
 from parser.core.quality import (
@@ -61,6 +62,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
         chat_target,
         source_channel=channel,
         parser_type="default",
+        fetch_limit=FETCH_LIMIT,
     ):
         if getattr(msg, "media_group_id", None):
             gid = str(msg.media_group_id)

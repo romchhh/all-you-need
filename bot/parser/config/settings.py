@@ -7,7 +7,23 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
-FETCH_LIMIT: int = int(os.getenv("PARSER_FETCH_LIMIT", "100"))
+FETCH_LIMIT: int = max(1, int(os.getenv("PARSER_FETCH_LIMIT", "100")))
+PARSER_SERVICES_FETCH_LIMIT: int = max(
+    1,
+    int(os.getenv("PARSER_SERVICES_FETCH_LIMIT", os.getenv("PARSER_FETCH_LIMIT", "100"))),
+)
+# 1 = завжди перечитувати останні N постів (PARSER_SERVICES_FETCH_LIMIT), ігноруючи cursor
+PARSER_SERVICES_IGNORE_CURSOR: bool = (
+    os.getenv("PARSER_SERVICES_IGNORE_CURSOR", "0").strip().lower() in ("1", "true", "yes", "on")
+)
+
+# Дедуплікація за текстом / title+desc / AI (не стосується перевірки message_id у БД)
+PARSER_DEDUP_ENABLED: bool = (
+    os.getenv("PARSER_DEDUP_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
+)
+PARSER_SERVICES_DEDUP_ENABLED: bool = (
+    os.getenv("PARSER_SERVICES_DEDUP_ENABLED", "0").strip().lower() in ("1", "true", "yes", "on")
+)
 
 # Не пропускати дублікат, поки оголошення активне на платформі або в черзі модерації (N днів).
 PARSER_DEDUP_DAYS: int = max(1, int(os.getenv("PARSER_DEDUP_DAYS", "30")))

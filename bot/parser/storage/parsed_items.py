@@ -324,20 +324,29 @@ def fingerprint_title_desc(title: str, description: str) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def parsed_item_is_raw_duplicate(content_hash: str) -> bool:
+def parsed_item_is_raw_duplicate(
+    content_hash: str,
+    parser_type: str | None = None,
+) -> bool:
     if not content_hash:
         return False
     conn = get_connection()
     cursor = conn.cursor()
     blocking = _sql_parsed_item_blocks_duplicates("pi")
+    type_clause = ""
+    params: list = [content_hash, _DEDUP_WINDOW, _DEDUP_WINDOW]
+    if parser_type:
+        type_clause = " AND COALESCE(pi.parser_type, 'default') = ?"
+        params.append(parser_type)
     cursor.execute(
         f"""
         SELECT 1 FROM parsed_items pi
         WHERE pi.content_hash = ?
           AND {blocking}
+          {type_clause}
         LIMIT 1
         """,
-        (content_hash, _DEDUP_WINDOW, _DEDUP_WINDOW),
+        params,
     )
     dup = cursor.fetchone() is not None
     conn.close()

@@ -15,6 +15,10 @@ from parser.config.services_ai_channels import (
     SERVICES_AI_CHANNELS,
     SERVICES_AI_MODERATION_CHANNEL_ID,
 )
+from parser.config.settings import (
+    PARSER_SERVICES_FETCH_LIMIT,
+    PARSER_SERVICES_IGNORE_CURSOR,
+)
 from parser.core.channel_fetch import iter_new_channel_messages
 from parser.core.photos import download_photos
 from parser.core.quality import (
@@ -67,6 +71,8 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         chat_target,
         source_channel=channel,
         parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+        fetch_limit=PARSER_SERVICES_FETCH_LIMIT,
+        ignore_cursor=PARSER_SERVICES_IGNORE_CURSOR,
     ):
         if getattr(msg, "media_group_id", None):
             gid = str(msg.media_group_id)

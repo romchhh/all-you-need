@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from parser.config.services_ai_channels import PARSER_TYPE_SERVICES_CHANNEL
+from parser.config.settings import PARSER_DEDUP_ENABLED, PARSER_SERVICES_DEDUP_ENABLED
 from parser.embedding_dedup import (
     compute_listing_embedding,
     embedding_to_json,
@@ -19,6 +21,12 @@ from parser.storage.parsed_items import (
 )
 
 
+def _text_dedup_enabled(parser_type: str) -> bool:
+    if parser_type == PARSER_TYPE_SERVICES_CHANNEL:
+        return PARSER_SERVICES_DEDUP_ENABLED
+    return PARSER_DEDUP_ENABLED
+
+
 def check_parser_duplicates(
     *,
     source_channel: str,
@@ -32,6 +40,9 @@ def check_parser_duplicates(
     """
     Повертає (is_duplicate, reason, embedding_json_for_insert).
     reason — ключ для stats['reasons'].
+
+    Завжди: той самий message_id у цьому парсері / активний запис іншого парсера.
+    Опційно (PARSER_*_DEDUP_ENABLED): hash тексту, title+desc, fuzzy AI.
     """
     clear_repostable_parsed_item(source_channel, message_id)
 
@@ -41,10 +52,15 @@ def check_parser_duplicates(
     if parsed_item_claimed_by_other_parser(source_channel, message_id, parser_type):
         return True, "вже в іншому парсері", None
 
-    if parsed_item_is_raw_duplicate(content_hash):
+    if not _text_dedup_enabled(parser_type):
+        return False, "", None
+
+    scope = parser_type if parser_type == PARSER_TYPE_SERVICES_CHANNEL else None
+
+    if parsed_item_is_raw_duplicate(content_hash, parser_type=scope):
         return True, "дублікат (текст)", None
 
-    if parsed_item_is_semantic_duplicate(dedup_key):
+    if parsed_item_is_semantic_duplicate(dedup_key, parser_type=scope):
         return True, "дублікат (оголошення)", None
 
     embedding_json: Optional[str] = None
