@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from typing import Any
@@ -29,7 +30,11 @@ async def iter_new_channel_messages(
     Інакше — лише новіші за збережений cursor (інкрементально).
     """
     limit = max(1, int(fetch_limit or FETCH_LIMIT))
-    last_cursor = 0 if ignore_cursor else get_channel_cursor(source_channel, parser_type)
+    last_cursor = (
+        0
+        if ignore_cursor
+        else await asyncio.to_thread(get_channel_cursor, source_channel, parser_type)
+    )
     head_id: int | None = None
     new_count = 0
 
@@ -66,7 +71,7 @@ async def iter_new_channel_messages(
         yield msg
 
     if head_id is not None:
-        set_channel_cursor(source_channel, parser_type, head_id)
+        await asyncio.to_thread(set_channel_cursor, source_channel, parser_type, head_id)
 
     if ignore_cursor or last_cursor:
         logger.info("  %s: повідомлень для перевірки: %s", source_channel, new_count)

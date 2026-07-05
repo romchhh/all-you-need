@@ -644,7 +644,22 @@ const BazaarTabComponent = ({
         </div>
       </div>
 
-      {/* Розділи — одразу під пошуком, до важких віджетів */}
+      {!searchQuery.trim() && showHomeWidgets && (
+        <>
+          <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
+            <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
+              <HomePlatformTicker isLight={isLight} />
+            </div>
+          </div>
+          <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
+            <div className="w-full max-w-full overflow-visible lg:max-w-xl xl:max-w-2xl">
+              <HomeActivityStats isLight={isLight} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Розділи — під статистикою, якщо не вибрана категорія */}
       {categories.length > 0 && !selectedCategory && !searchQuery.trim() && (
         <div className="relative z-[15] mx-auto w-full max-w-full touch-manipulation pb-3 pt-2 lg:max-w-5xl xl:max-w-6xl">
           <div className="mb-3 flex items-center justify-between px-4 lg:px-6">
@@ -713,21 +728,6 @@ const BazaarTabComponent = ({
             </div>
           </div>
         </div>
-      )}
-
-      {!searchQuery.trim() && showHomeWidgets && (
-        <>
-          <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
-            <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
-              <HomePlatformTicker isLight={isLight} />
-            </div>
-          </div>
-          <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
-            <div className="w-full max-w-full overflow-visible lg:max-w-xl xl:max-w-2xl">
-              <HomeActivityStats isLight={isLight} />
-            </div>
-          </div>
-        </>
       )}
 
       {/* Заголовок категорії */}

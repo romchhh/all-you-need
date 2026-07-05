@@ -84,7 +84,7 @@ async def run_parser_cycle(
 
         from parser.core.dedup_check import parser_dedup_override
         from parser.core.runner import ParseRunConfig, parse_run, run_all_channels
-        from parser.storage.connection import ensure_parser_storage
+        from parser.storage.connection import ensure_parser_storage, parser_db_cycle
 
         async def notify_callback(item_data: dict):
             await notify_admin_group(aiogram_bot, item_data)
@@ -104,20 +104,21 @@ async def run_parser_cycle(
             dedup_enabled = False
         try:
             async with GLOBAL_PARSER_RUN_LOCK:
-                await asyncio.to_thread(ensure_parser_storage)
-                if fetch_limit:
-                    logger.info(
-                        "🔍 Парсинг каналів (lookback %s постів, cursor ігноровано, dedup вимк.)…",
-                        fetch_limit,
-                    )
-                else:
-                    logger.info(
-                        "🔍 Починаємо парсинг каналів (%s Telegram-акаунт(ів))…",
-                        len(accounts),
-                    )
-                with parser_dedup_override(None if dedup_enabled else False):
-                    async with parse_run(run_cfg):
-                        stats = await run_all_channels(notify_callback)
+                with parser_db_cycle():
+                    await asyncio.to_thread(ensure_parser_storage)
+                    if fetch_limit:
+                        logger.info(
+                            "🔍 Парсинг каналів (lookback %s постів, cursor ігноровано, dedup вимк.)…",
+                            fetch_limit,
+                        )
+                    else:
+                        logger.info(
+                            "🔍 Починаємо парсинг каналів (%s Telegram-акаунт(ів))…",
+                            len(accounts),
+                        )
+                    with parser_dedup_override(None if dedup_enabled else False):
+                        async with parse_run(run_cfg):
+                            stats = await run_all_channels(notify_callback)
                 logger.info(
                     "✅ Парсинг завершено: +%s нових, пропущено %s",
                     stats["added"],
@@ -183,7 +184,7 @@ async def run_services_ai_parser_cycle(
             return None
 
         from parser.core.services_ai_runner import run_services_ai_channels
-        from parser.storage.connection import ensure_parser_storage
+        from parser.storage.connection import ensure_parser_storage, parser_db_cycle
 
         async def notify_callback(item_data: dict):
             await notify_admin_group(aiogram_bot, item_data)
@@ -196,13 +197,14 @@ async def run_services_ai_parser_cycle(
             run_cfg = ServicesParseRunConfig(ignore_cursor=True)
         try:
             async with GLOBAL_PARSER_RUN_LOCK:
-                await asyncio.to_thread(ensure_parser_storage)
-                logger.info(
-                    "🔍 Починаємо парсинг груп послуг (AI → канал, %s акаунт(ів))…",
-                    len(accounts),
-                )
-                async with services_parse_run(run_cfg):
-                    stats = await run_services_ai_channels(notify_callback)
+                with parser_db_cycle():
+                    await asyncio.to_thread(ensure_parser_storage)
+                    logger.info(
+                        "🔍 Починаємо парсинг груп послуг (AI → канал, %s акаунт(ів))…",
+                        len(accounts),
+                    )
+                    async with services_parse_run(run_cfg):
+                        stats = await run_services_ai_channels(notify_callback)
                 if run_cfg and run_cfg.fetch_limit:
                     logger.info(
                         "Services AI parser (lookback %s постів, cursor ігноровано)",
