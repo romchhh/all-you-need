@@ -60,3 +60,11 @@ export const getListingShareLink = (listingId: number): string => {
   return getBotStartLink(`listing_${listingId}`);
 };
 
+/**
+ * Deep link для відкриття оголошення в Mini App (t.me/bot?startapp=listing_ID)
+ */
+export const getListingMiniAppLink = (listingId: number): string => {
+  const baseUrl = getBotBaseUrl();
+  return `${baseUrl}?startapp=listing_${listingId}`;
+};
+

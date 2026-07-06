@@ -82,7 +82,6 @@ async def run_parser_cycle(
             await _notify_error("налаштування", msg)
             return None
 
-        from parser.core.dedup_check import parser_dedup_override
         from parser.core.runner import ParseRunConfig, parse_run, run_all_channels
         from parser.storage.connection import ensure_parser_storage, parser_db_cycle
 
@@ -91,24 +90,17 @@ async def run_parser_cycle(
 
         stats: dict | None = None
         run_cfg = None
-        dedup_enabled = True
         if fetch_limit is not None:
-            run_cfg = ParseRunConfig(
-                fetch_limit=fetch_limit,
-                ignore_cursor=True,
-                dedup_enabled=False,
-            )
-            dedup_enabled = False
+            run_cfg = ParseRunConfig(fetch_limit=fetch_limit, ignore_cursor=True)
         elif ignore_cursor:
-            run_cfg = ParseRunConfig(ignore_cursor=True, dedup_enabled=False)
-            dedup_enabled = False
+            run_cfg = ParseRunConfig(ignore_cursor=True)
         try:
             async with GLOBAL_PARSER_RUN_LOCK:
                 with parser_db_cycle():
                     await asyncio.to_thread(ensure_parser_storage)
                     if fetch_limit:
                         logger.info(
-                            "🔍 Парсинг каналів (lookback %s постів, cursor ігноровано, dedup вимк.)…",
+                            "🔍 Парсинг каналів (lookback %s постів, cursor ігноровано)…",
                             fetch_limit,
                         )
                     else:
@@ -116,9 +108,8 @@ async def run_parser_cycle(
                             "🔍 Починаємо парсинг каналів (%s Telegram-акаунт(ів))…",
                             len(accounts),
                         )
-                    with parser_dedup_override(None if dedup_enabled else False):
-                        async with parse_run(run_cfg):
-                            stats = await run_all_channels(notify_callback)
+                    async with parse_run(run_cfg):
+                        stats = await run_all_channels(notify_callback)
                 logger.info(
                     "✅ Парсинг завершено: +%s нових, пропущено %s",
                     stats["added"],

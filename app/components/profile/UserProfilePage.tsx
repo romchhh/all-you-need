@@ -9,6 +9,11 @@ import { useLongPress } from '@/features/ui/hooks/useLongPress';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { getProfileShareLink } from '@/utils/botLinks';
+import {
+  buildSellerProfileContactMessage,
+  openSellerTelegramChat,
+  resolveSellerContactLang,
+} from '@/utils/sellerContact';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSwipeBack } from '@/features/ui/hooks/useSwipeBack';
@@ -52,7 +57,7 @@ export const UserProfilePage = ({
 }: UserProfilePageProps) => {
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,6 +157,27 @@ export const UserProfilePage = ({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleContactSeller = useCallback(() => {
+    const username = userData?.username || sellerUsername;
+    const phone = userData?.phone || sellerPhone;
+
+    if (!username?.trim()) {
+      if (phone?.trim()) {
+        setShowPhoneModal(true);
+        tg?.HapticFeedback?.impactOccurred('light');
+        return;
+      }
+      showToast(t('listingDetail.telegramIdNotFound'), 'error');
+      return;
+    }
+
+    const message = buildSellerProfileContactMessage(
+      getProfileShareLink(sellerTelegramId),
+      resolveSellerContactLang(language),
+    );
+    openSellerTelegramChat(username, message, tg ?? undefined);
+  }, [userData?.username, userData?.phone, sellerUsername, sellerPhone, sellerTelegramId, language, tg, showToast, t]);
 
   const loadMoreListings = async () => {
     try {
@@ -372,34 +398,7 @@ export const UserProfilePage = ({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            const username = userData?.username || sellerUsername;
-            const phone = userData?.phone || sellerPhone;
-            
-            // Якщо немає username - показуємо телефон
-            if (!username || username.trim() === '') {
-              if (phone && phone.trim() !== '') {
-                // Відкриваємо модальне вікно телефону
-                setShowPhoneModal(true);
-                tg?.HapticFeedback?.impactOccurred('light');
-                return;
-              } else {
-                // Немає ні username, ні телефону
-                showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                return;
-              }
-            }
-            
-            // Якщо є username - відкриваємо Telegram
-            const link = `https://t.me/${username.replace('@', '')}`;
-            
-            // Якщо Telegram WebApp доступний, використовуємо його
-            if (tg && tg.openTelegramLink) {
-              tg.openTelegramLink(link);
-              tg.HapticFeedback?.impactOccurred('medium');
-            } else {
-              // Якщо ні, відкриваємо посилання через звичайний браузер
-              window.location.href = link;
-            }
+            handleContactSeller();
           }}
           className="w-full bg-[#3F5331] hover:bg-[#344728] text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
         >

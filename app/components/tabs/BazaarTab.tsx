@@ -12,6 +12,7 @@ import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHead
 import { TopBar } from '@/components/layout/TopBar';
 import { HomeActivityStats } from '@/components/home/HomeActivityStats';
 import { HomePlatformTicker } from '@/components/home/HomePlatformTicker';
+import type { PlatformOnboardingActionId } from '@/utils/platformTickerMessages';
 import { ListingsRefreshOverlay } from '@/components/ui/ListingsRefreshOverlay';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
@@ -220,6 +221,7 @@ const BazaarTabComponent = ({
   );
   
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
+  const [cityModalOpenSubscriptions, setCityModalOpenSubscriptions] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const seenListingIdsRef = useRef<Set<number>>(new Set());
   const listingsInitializedRef = useRef(false);
@@ -320,6 +322,36 @@ const BazaarTabComponent = ({
       onStateChange?.(buildCatalogState(patch));
     },
     [buildCatalogState, onStateChange]
+  );
+
+  const handleOnboardingAction = useCallback(
+    (action: PlatformOnboardingActionId) => {
+      tg?.HapticFeedback?.impactOccurred('light');
+
+      switch (action) {
+        case 'createListing':
+          onCreateListing?.();
+          break;
+        case 'selectCity':
+          setCityModalOpenSubscriptions(false);
+          setIsCityModalOpen(true);
+          break;
+        case 'notifications':
+          setCityModalOpenSubscriptions(true);
+          setIsCityModalOpen(true);
+          break;
+        case 'favorites':
+          router.push(`/${lang}/favorites`);
+          break;
+        case 'promotion':
+          router.push(`/${lang}/ads-rules`);
+          break;
+        case 'referral':
+          router.push(`/${lang}/referral`);
+          break;
+      }
+    },
+    [tg, onCreateListing, router, lang]
   );
 
   // Зберігаємо стан при зміні (лише після ініціалізації, лише коли щось змінилось локально)
@@ -648,7 +680,7 @@ const BazaarTabComponent = ({
         <>
           <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
             <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
-              <HomePlatformTicker isLight={isLight} />
+              <HomePlatformTicker isLight={isLight} onOnboardingAction={handleOnboardingAction} />
             </div>
           </div>
           <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
@@ -940,11 +972,15 @@ const BazaarTabComponent = ({
       <CityModal
         isOpen={isCityModalOpen}
         selectedCities={selectedCities}
-        onClose={() => setIsCityModalOpen(false)}
+        onClose={() => {
+          setIsCityModalOpen(false);
+          setCityModalOpenSubscriptions(false);
+        }}
         onSelect={(cities) => setSelectedCities(cities)}
         tg={tg}
         profileTelegramId={profileTelegramId}
         onToast={onToast}
+        openSubscriptionsSection={cityModalOpenSubscriptions}
       />
     </div>
   );

@@ -22,7 +22,7 @@ PARSER_DEDUP_ENABLED: bool = (
     os.getenv("PARSER_DEDUP_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 )
 PARSER_SERVICES_DEDUP_ENABLED: bool = (
-    os.getenv("PARSER_SERVICES_DEDUP_ENABLED", "0").strip().lower() in ("1", "true", "yes", "on")
+    os.getenv("PARSER_SERVICES_DEDUP_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 )
 
 # Не пропускати дублікат, поки оголошення активне на платформі або в черзі модерації (N днів).
@@ -32,7 +32,7 @@ PARSER_DEDUP_DAYS: int = max(1, int(os.getenv("PARSER_DEDUP_DAYS", "30")))
 PARSER_FUZZY_DEDUP_ENABLED: bool = (
     os.getenv("PARSER_FUZZY_DEDUP", "1").strip().lower() not in ("0", "false", "no", "off")
 )
-PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.86"))
+PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.82"))
 PARSER_EMBEDDING_MODEL: str = (os.getenv("PARSER_EMBEDDING_MODEL") or "text-embedding-3-small").strip()
 
 SERVICES_MODERATION_CHANNEL_ID: int = int(

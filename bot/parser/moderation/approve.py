@@ -42,11 +42,13 @@ from parser.storage.marketplace import (
     get_or_create_bot_user,
 )
 from parser.storage.parsed_items import (
+    fingerprint_title_desc,
     get_mod_path_status,
     resolve_parsed_item_for_moderation,
     set_marketplace_listing_id,
     update_mod_path_status,
 )
+from parser.storage.listing_dedup import active_listing_duplicate
 from utils.city_digest_notify import enqueue_city_digest_listing
 
 logger = logging.getLogger(__name__)
@@ -184,7 +186,9 @@ async def _approve_marketplace(
     except Exception:
         images = []
 
-    listing_item, ai_summary = await _apply_ai_enrichment(callback, item, item_id)
+    listing_item, ai_summary = await _apply_ai_enrichment(
+        callback, item, item_id, force_ai=True
+    )
     listing_item = apply_marketplace_categories_to_item(listing_item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
@@ -204,6 +208,21 @@ async def _approve_marketplace(
 
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
     description = build_marketplace_description(listing_item)
+
+    dedup_key = fingerprint_title_desc(
+        str(listing_item.get("title") or ""),
+        str(listing_item.get("description") or ""),
+    )
+    if active_listing_duplicate(
+        dedup_key,
+        str(listing_item.get("title") or ""),
+        description,
+    ):
+        await callback.answer(
+            "❌ Таке оголошення вже є на маркетплейсі (дублікат)",
+            show_alert=True,
+        )
+        return
 
     try:
         listing_id = create_marketplace_listing(

@@ -22,6 +22,7 @@ from parser.storage.parsed_items import record_moderation_message
 from parser.category_keywords import get_category_label
 from parser.config.settings import SERVICES_MODERATION_CHANNEL_ID
 from parser.config.services_ai_channels import SERVICES_AI_MODERATION_CHANNEL_ID
+from parser.ai_screen import is_ai_screen_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,8 @@ def _format_admin_message(item: dict) -> str:
         f"",
         f"<i>{footer}</i>",
     ]
+    if is_ai_screen_enabled():
+        lines.append("<i>🤖 AI попередньо відфільтровано та відформатовано</i>")
     return "\n".join(lines)
 
 

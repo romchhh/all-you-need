@@ -18,14 +18,17 @@ def is_quality(text: str, has_photo: bool, relaxed: bool = False) -> tuple[bool,
     if relaxed:
         if len(t) < 25:
             return False, "замало тексту"
-        if not has_photo and len(t) < 80:
-            return False, "немає фото"
+        if not has_photo and len(t) < 50:
+            return False, "замало тексту без фото"
         if SPAM_RE.search(t):
             return False, "спам"
         return True, ""
     if not has_photo:
-        return False, "немає фото"
-    if len(t) < 20:
+        if len(t) < 60:
+            return False, "немає фото"
+    elif len(t) < 20:
+        return False, "замало тексту"
+    if len(t) < 15:
         return False, "замало тексту"
     if SPAM_RE.search(t):
         return False, "спам"

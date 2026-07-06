@@ -38,7 +38,7 @@ from parser.core.text import (
     parse_price,
     to_plain_str,
 )
-from parser.core.dedup_check import check_parser_duplicates
+from parser.core.parse_pipeline import run_ai_screen_and_dedup
 from parser.storage.parsed_items import (
     ensure_parsed_items_table,
     fingerprint_parsed_text,
@@ -150,20 +150,6 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             continue
 
         dedup_key = fingerprint_title_desc(title, description)
-        is_dup, dup_reason, embedding_json = check_parser_duplicates(
-            source_channel=channel,
-            message_id=effective_message_id,
-            content_hash=content_hash,
-            dedup_key=dedup_key,
-            title=title,
-            description=description,
-            parser_type="default",
-        )
-        if is_dup:
-            stats["skipped"] += 1
-            stats["reasons"][dup_reason] = stats["reasons"].get(dup_reason, 0) + 1
-            continue
-
         category, subcategory = detect_category(text, skip_free=(price_str is not None and not is_free))
         if channel_key in SERVICE_CHANNELS:
             detected_sub = subcategory if category == "services_work" else None
@@ -173,6 +159,39 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             else:
                 subcategory = detected_sub or "other_services"
         condition = detect_condition(text, category)
+
+        ok, skip_reason, embedding_json, ai_fields = await run_ai_screen_and_dedup(
+            source_channel=channel,
+            message_id=effective_message_id,
+            content_hash=content_hash,
+            dedup_key=dedup_key,
+            title=title,
+            description=description,
+            parser_type="default",
+            raw_text=text[:4000],
+            source_city=city,
+            category=category,
+            subcategory=subcategory,
+            price=price_str,
+            currency=currency,
+            is_free=is_free,
+            condition=condition,
+        )
+        if not ok:
+            stats["skipped"] += 1
+            stats["reasons"][skip_reason] = stats["reasons"].get(skip_reason, 0) + 1
+            continue
+
+        if ai_fields:
+            title = ai_fields.get("title", title)
+            description = ai_fields.get("description", description)
+            category = ai_fields.get("category", category)
+            subcategory = ai_fields.get("subcategory", subcategory)
+            price_str = ai_fields.get("price", price_str)
+            currency = ai_fields.get("currency", currency)
+            is_free = bool(ai_fields.get("is_free", is_free))
+            condition = ai_fields.get("condition", condition)
+            city = ai_fields.get("location", city)
 
         author_username = resolve_author_username(msg_for_link, text, channel)
         author_id = get_sender_id(msg_for_link)

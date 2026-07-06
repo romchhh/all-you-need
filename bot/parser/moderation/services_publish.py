@@ -22,7 +22,9 @@ from parser.moderation.services_channel_routing import (
     resolve_services_trade_channel_ids,
     services_channel_label,
 )
-from utils.translations import t
+from parser.moderation.urls import listing_miniapp_url
+from utils.seller_contact import build_seller_telegram_url
+from utils.translations import t, get_user_lang
 
 logger = logging.getLogger(__name__)
 
@@ -219,9 +221,21 @@ async def publish_services_listing_to_channel(
 
     if author_username:
         seller_full_name = f"@{author_username}"
+        seller_lang = get_user_lang(user_id_for_lang) if user_id_for_lang else detect_lang(
+            f"{item.get('title') or ''}\n{item.get('description') or ''}"
+        )
+        seller_href = html.escape(
+            build_seller_telegram_url(
+                author_username,
+                title,
+                listing_miniapp_url(listing_id),
+                lang=seller_lang,
+            ),
+            quote=True,
+        )
         seller_text = (
             f"{seller_label} "
-            f"<a href=\"https://t.me/{html.escape(author_username, quote=True)}\">"
+            f"<a href=\"{seller_href}\">"
             f"{html.escape(seller_full_name)}</a>"
         )
     elif msg_link:

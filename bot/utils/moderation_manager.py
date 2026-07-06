@@ -16,7 +16,9 @@ from database_functions.telegram_listing_db import (
     get_connection as get_db_connection
 )
 from keyboards.client_keyboards import get_category_translation
-from utils.translations import t
+from parser.moderation.urls import listing_miniapp_url
+from utils.seller_contact import build_seller_telegram_url
+from utils.translations import t, get_user_lang
 
 load_dotenv()
 
@@ -827,8 +829,14 @@ class ModerationManager:
             # Формуємо посилання на продавця (без емодзі для каналу)
             seller_label = t(user_id_for_lang, 'listing.details.seller_channel')
             if seller_username:
-                seller_link = f"@{seller_username}"
-                seller_text = f"{seller_label} <a href=\"https://t.me/{seller_username}\">{seller_full_name}</a>"
+                seller_lang = get_user_lang(int(seller_telegram_id)) if seller_telegram_id else "ru"
+                seller_href = build_seller_telegram_url(
+                    seller_username,
+                    title,
+                    listing_miniapp_url(listing_id),
+                    lang=seller_lang,
+                )
+                seller_text = f"{seller_label} <a href=\"{seller_href}\">{seller_full_name}</a>"
             elif seller_telegram_id:
                 seller_link = f"tg://user?id={seller_telegram_id}"
                 seller_text = f"{seller_label} <a href=\"{seller_link}\">{seller_full_name}</a>"

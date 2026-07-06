@@ -93,7 +93,7 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
             lines.append(f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано)")
         else:
             lines.append(
-                f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано, dedup вимк.)"
+                f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано, AI+dedup)"
             )
     if channels is not None:
         lines.append(f"📢 Каналів у черзі: <b>{channels}</b>")
@@ -115,6 +115,7 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
     if services:
         lines.append("")
         lines.append(
+            "AI-фільтр: мусор і дублі відсікаються на парсингу.\n"
             "Модерація (два окремі чати на кожен пост):\n"
             "• <code>PARSER_SERVICES_MODERATION_CHANNEL_ID</code> → ✅ лише маркетплейс\n"
             "• <code>PARSER_SERVICES_AI_MODERATION_CHANNEL_ID</code> → ✅ лише Telegram-канал\n"
@@ -127,7 +128,7 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
         lines.append("Якщо очікували нові оголошення — можливо вони вже в БД або канал без нових постів.")
     else:
         lines.append("")
-        lines.append("💡 <code>/parse10</code> — останні 10 постів без cursor (dedup вимк.)")
+        lines.append("💡 <code>/parse10</code> — останні 10 постів без cursor")
 
     return "\n".join(lines)
 
@@ -152,7 +153,7 @@ async def _run_marketplace_parser(message: types.Message, *, lookback: int | Non
     if lookback:
         status_text = (
             f"🔍 <b>Парсинг маркетплейсу: останні {lookback} постів</b>\n\n"
-            "Cursor ігноровано, текстові дублі вимкнено.\n"
+            "Cursor ігноровано, AI-фільтр + dedup увімкнено.\n"
             "Канали послуг — <code>/parse_services</code>."
         )
     else:

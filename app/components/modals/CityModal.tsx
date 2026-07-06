@@ -88,6 +88,8 @@ interface CityModalProps {
   tg: TelegramWebApp | null;
   profileTelegramId?: string | null;
   onToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
+  /** Відкрити блок підписок на місто (онбординг «Настроить») */
+  openSubscriptionsSection?: boolean;
 }
 
 export const CityModal = ({ 
@@ -97,7 +99,8 @@ export const CityModal = ({
   onSelect,
   tg,
   profileTelegramId,
-  onToast
+  onToast,
+  openSubscriptionsSection = false,
 }: CityModalProps) => {
   const { t } = useLanguage();
   const { isLight } = useTheme();
@@ -131,6 +134,12 @@ export const CityModal = ({
     onCloseRef.current = onClose;
     onSelectRef.current = onSelect;
   }, [onClose, onSelect]);
+
+  useEffect(() => {
+    if (isOpen && openSubscriptionsSection) {
+      setSubsDropdownOpen(true);
+    }
+  }, [isOpen, openSubscriptionsSection]);
 
   useEffect(() => {
     if (isOpen) {

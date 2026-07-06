@@ -5,6 +5,7 @@ import logging
 import shutil
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from parser.storage.connection import BASE_DIR, get_connection
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -> list[str]:
     if not rel_paths:
-        return []
+        return _copy_default_listing_photo(prefix)
     dest_dir = BASE_DIR / "app" / "public" / "listings" / "originals"
     dest_dir.mkdir(parents=True, exist_ok=True)
     out: list[str] = []
@@ -47,7 +48,38 @@ def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -
             out.append(f"/listings/originals/{name}")
         except OSError as e:
             logger.error("Не вдалося скопіювати фото %s → %s: %s", src, dest, e)
+    if not out:
+        return _copy_default_listing_photo(prefix)
     return out
+
+
+def _default_listing_photo_src() -> Path | None:
+    for candidate in (
+        BASE_DIR / "bot" / "Content" / "tgground.jpg",
+        BASE_DIR / "Content" / "tgground.jpg",
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _copy_default_listing_photo(prefix: str) -> list[str]:
+    src = _default_listing_photo_src()
+    if not src:
+        logger.warning("Дефолтне фото tgground.jpg не знайдено")
+        return []
+    dest_dir = BASE_DIR / "app" / "public" / "listings" / "originals"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    token = uuid.uuid4().hex[:12]
+    name = f"{prefix}_{token}_default.jpg"
+    dest = dest_dir / name
+    try:
+        shutil.copy2(src, dest)
+        logger.info("Використано дефолтне фото для %s", prefix)
+        return [f"/listings/originals/{name}"]
+    except OSError as e:
+        logger.error("Не вдалося скопіювати дефолтне фото: %s", e)
+        return []
 
 
 def get_or_create_bot_user(

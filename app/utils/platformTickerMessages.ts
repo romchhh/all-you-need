@@ -353,5 +353,72 @@ export function randomTickerIntervalMs(): number {
 
 export const WELCOME_TICKER_EMOJI = '✨';
 
-/** Тимчасово вимкнено — чекаємо фінальні тексти розшифровок від продукту. */
-export const TICKER_INFO_MENU_ENABLED = false;
+export type PlatformOnboardingActionId =
+  | 'createListing'
+  | 'selectCity'
+  | 'notifications'
+  | 'favorites'
+  | 'promotion'
+  | 'referral';
+
+export type OnboardingSection = {
+  id: PlatformOnboardingActionId;
+  emoji: string;
+  titleKey: string;
+  descriptionKey: string;
+  buttonKey: string;
+  highlightTypes: TickerMessageType[];
+};
+
+export const ONBOARDING_SECTIONS: OnboardingSection[] = [
+  {
+    id: 'createListing',
+    emoji: '➕',
+    titleKey: 'platformTicker.onboarding.sections.listing.title',
+    descriptionKey: 'platformTicker.onboarding.sections.listing.description',
+    buttonKey: 'platformTicker.onboarding.sections.listing.button',
+    highlightTypes: ['listing'],
+  },
+  {
+    id: 'selectCity',
+    emoji: '📍',
+    titleKey: 'platformTicker.onboarding.sections.city.title',
+    descriptionKey: 'platformTicker.onboarding.sections.city.description',
+    buttonKey: 'platformTicker.onboarding.sections.city.button',
+    highlightTypes: ['navigation', 'platform'],
+  },
+  {
+    id: 'notifications',
+    emoji: '🔔',
+    titleKey: 'platformTicker.onboarding.sections.notifications.title',
+    descriptionKey: 'platformTicker.onboarding.sections.notifications.description',
+    buttonKey: 'platformTicker.onboarding.sections.notifications.button',
+    highlightTypes: ['subscriptions'],
+  },
+  {
+    id: 'favorites',
+    emoji: '❤️',
+    titleKey: 'platformTicker.onboarding.sections.favorites.title',
+    descriptionKey: 'platformTicker.onboarding.sections.favorites.description',
+    buttonKey: 'platformTicker.onboarding.sections.favorites.button',
+    highlightTypes: ['favorites'],
+  },
+  {
+    id: 'promotion',
+    emoji: '🚀',
+    titleKey: 'platformTicker.onboarding.sections.promotion.title',
+    descriptionKey: 'platformTicker.onboarding.sections.promotion.description',
+    buttonKey: 'platformTicker.onboarding.sections.promotion.button',
+    highlightTypes: ['ads'],
+  },
+  {
+    id: 'referral',
+    emoji: '🎁',
+    titleKey: 'platformTicker.onboarding.sections.referral.title',
+    descriptionKey: 'platformTicker.onboarding.sections.referral.description',
+    buttonKey: 'platformTicker.onboarding.sections.referral.button',
+    highlightTypes: ['referral'],
+  },
+];
+
+export const TICKER_INFO_MENU_ENABLED = true;

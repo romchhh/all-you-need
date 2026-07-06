@@ -10,6 +10,12 @@ import { PhoneModal } from '@/components/modals/PhoneModal';
 import dynamic from 'next/dynamic';
 import { getAvatarColor } from '@/utils/avatarColors';
 import { getListingShareLink } from '@/utils/botLinks';
+import {
+  buildSellerContactMessage,
+  getListingContactUrl,
+  openSellerTelegramChat,
+  resolveSellerContactLang,
+} from '@/utils/sellerContact';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { useUser } from '@/features/user/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -219,6 +225,34 @@ export const ListingDetail = ({
     const sellerIdStr = String(sellerTelegramId);
     return currentIdStr === sellerIdStr;
   }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
+
+  const handleContactSeller = useCallback(() => {
+    if (isOwnListing) {
+      setShowPromotionModal(true);
+      tg?.HapticFeedback?.impactOccurred('light');
+      return;
+    }
+
+    const username = listing.seller.username;
+    const phone = listing.seller.phone;
+
+    if (!username?.trim()) {
+      if (phone?.trim()) {
+        setShowPhoneModal(true);
+        tg?.HapticFeedback?.impactOccurred('light');
+        return;
+      }
+      showToast(t('listingDetail.telegramIdNotFound'), 'error');
+      return;
+    }
+
+    const message = buildSellerContactMessage(
+      listing.title,
+      getListingContactUrl(listing.id),
+      resolveSellerContactLang(language),
+    );
+    openSellerTelegramChat(username, message, tg ?? undefined);
+  }, [isOwnListing, listing.id, listing.title, listing.seller.username, listing.seller.phone, language, tg, showToast, t]);
 
   const viewerTelegramIdStr = String(currentUser?.id || profile?.telegramId || '');
 
@@ -1066,7 +1100,20 @@ export const ListingDetail = ({
             <div className="flex-1">
               <p className={`font-semibold text-lg mb-1 ${isLight ? 'text-gray-900' : 'text-white'}`}>{listing.seller.name}</p>
               {listing.seller.username && (
-                <p className={`text-sm mb-1 ${ac.mutedText}`}>@{listing.seller.username}</p>
+                isOwnListing ? (
+                  <p className={`text-sm mb-1 ${ac.mutedText}`}>@{listing.seller.username}</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleContactSeller();
+                    }}
+                    className={`text-sm mb-1 text-left underline-offset-2 hover:underline ${ac.mutedText}`}
+                  >
+                    @{listing.seller.username}
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -1206,43 +1253,7 @@ export const ListingDetail = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              
-              if (isOwnListing) {
-                // Якщо це власне оголошення - відкриваємо модальне вікно реклами
-                setShowPromotionModal(true);
-                tg?.HapticFeedback.impactOccurred('light');
-                return;
-              }
-              
-              const telegramId = listing.seller.telegramId;
-              const username = listing.seller.username;
-              const phone = listing.seller.phone;
-              
-              // Якщо немає username - показуємо телефон
-              if (!username || username.trim() === '') {
-                if (phone && phone.trim() !== '') {
-                  // Відкриваємо модальне вікно телефону
-                  setShowPhoneModal(true);
-                  tg?.HapticFeedback?.impactOccurred('light');
-                  return;
-                } else {
-                  // Немає ні username, ні телефону
-                  showToast(t('listingDetail.telegramIdNotFound'), 'error');
-                  return;
-                }
-              }
-              
-              // Якщо є username - відкриваємо Telegram
-              const link = `https://t.me/${username.replace('@', '')}`;
-              
-              // Якщо Telegram WebApp доступний, використовуємо його
-              if (tg && tg.openTelegramLink) {
-                tg.openTelegramLink(link);
-                tg.HapticFeedback?.impactOccurred('medium');
-              } else {
-                // Якщо ні, відкриваємо посилання через звичайний браузер
-                window.location.href = link;
-              }
+              handleContactSeller();
             }}
             className={`w-full rounded-2xl py-4 font-montserrat text-xl font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 ${listingPrimaryCtaClass}`}
           >
