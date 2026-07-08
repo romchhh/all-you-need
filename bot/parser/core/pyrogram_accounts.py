@@ -25,6 +25,12 @@ _DB_LOCKED_RETRIES = 8
 _CLIENT_START_RETRIES = 5
 
 
+def _ensure_pyrogram_patched() -> None:
+    from parser.core.pyrogram_photo_patch import apply_pyrogram_photo_size_patch
+
+    apply_pyrogram_photo_size_patch()
+
+
 def merge_channel_stats(total: dict, stats: dict, *, channel: str, city: str) -> None:
     total["added"] = int(total.get("added") or 0) + int(stats.get("added") or 0)
     total["skipped"] = int(total.get("skipped") or 0) + int(stats.get("skipped") or 0)
@@ -74,6 +80,8 @@ async def _run_bucket_on_account(
 ) -> tuple[dict, list[dict]]:
     """Один Pyrogram Client на всі канали акаунта."""
     from pyrogram import Client
+
+    _ensure_pyrogram_patched()
 
     local: dict = {"added": 0, "skipped": 0, "reasons": {}}
     errors: list[dict] = []
@@ -184,6 +192,8 @@ async def _run_parse_on_account(
     notify_callback: Callable[..., Awaitable[Any]],
 ) -> dict:
     from pyrogram import Client
+
+    _ensure_pyrogram_patched()
 
     last_err: BaseException | None = None
     for start_attempt in range(_CLIENT_START_RETRIES):

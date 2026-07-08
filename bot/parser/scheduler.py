@@ -91,9 +91,15 @@ async def run_parser_cycle(
         stats: dict | None = None
         run_cfg = None
         if fetch_limit is not None:
-            run_cfg = ParseRunConfig(fetch_limit=fetch_limit, ignore_cursor=True)
+            # Lookback: не блокувати текст-дедупом старі pending з інших постів —
+            # message_id / live marketplace лишаються.
+            run_cfg = ParseRunConfig(
+                fetch_limit=fetch_limit,
+                ignore_cursor=True,
+                dedup_enabled=False,
+            )
         elif ignore_cursor:
-            run_cfg = ParseRunConfig(ignore_cursor=True)
+            run_cfg = ParseRunConfig(ignore_cursor=True, dedup_enabled=False)
         try:
             async with GLOBAL_PARSER_RUN_LOCK:
                 with parser_db_cycle():

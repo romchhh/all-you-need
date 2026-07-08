@@ -39,6 +39,7 @@ from parser.core.text import (
     to_plain_str,
 )
 from parser.core.parse_pipeline import run_ai_screen_and_dedup
+from parser.core.dedup_check import parser_dedup_override
 from parser.storage.parsed_items import (
     ensure_parsed_items_table,
     fingerprint_parsed_text,
@@ -53,6 +54,7 @@ logger = logging.getLogger(__name__)
 class ParseRunConfig:
     fetch_limit: int | None = None
     ignore_cursor: bool = False
+    # False на lookback (/parse50): не різати за текстом інших постів — лише message_id / marketplace.
     dedup_enabled: bool = True
 
 
@@ -65,9 +67,11 @@ async def parse_run(config: ParseRunConfig | None = None):
     """Тимчасові параметри парсингу (ручна команда /parse10)."""
     global _run_config
     prev = _run_config
-    _run_config = config or _default_run_config
+    cfg = config or _default_run_config
+    _run_config = cfg
     try:
-        yield
+        with parser_dedup_override(cfg.dedup_enabled):
+            yield
     finally:
         _run_config = prev
 

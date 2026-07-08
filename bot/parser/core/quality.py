@@ -16,19 +16,20 @@ def is_likely_service_ad(text: str) -> bool:
 def is_quality(text: str, has_photo: bool, relaxed: bool = False) -> tuple[bool, str]:
     t = text.strip()
     if relaxed:
-        if len(t) < 25:
+        if len(t) < 20:
             return False, "замало тексту"
-        if not has_photo and len(t) < 50:
+        if not has_photo and len(t) < 40:
             return False, "замало тексту без фото"
         if SPAM_RE.search(t):
             return False, "спам"
         return True, ""
     if not has_photo:
-        if len(t) < 60:
+        # Без фото пропускаємо, якщо є нормальний опис (раніше <60 → «немає фото»).
+        if len(t) < 45:
             return False, "немає фото"
-    elif len(t) < 20:
+    elif len(t) < 15:
         return False, "замало тексту"
-    if len(t) < 15:
+    if len(t) < 12:
         return False, "замало тексту"
     if SPAM_RE.search(t):
         return False, "спам"
@@ -38,7 +39,8 @@ def is_quality(text: str, has_photo: bool, relaxed: bool = False) -> tuple[bool,
 def has_too_many_emojis(description: str) -> bool:
     if TOO_MANY_EMOJI_RE.search(description or ""):
         return True
-    return len(ONE_EMOJI_RE.findall(description or "")) > 4
+    # Було >4 — відсікало нормальні оголошення з кількома емодзі в прайсі.
+    return len(ONE_EMOJI_RE.findall(description or "")) > 10
 
 
 def is_likely_not_listing(title: str, description: str) -> bool:

@@ -322,17 +322,26 @@ def parsed_item_claimed_by_other_parser(
 
 
 def fingerprint_parsed_text(raw_text: str) -> str:
+    """
+    Hash для дедупу в межах каналу.
+    Не викидаємо цифри/ціни — інакше різні оголошення зливаються в один hash.
+    """
     t = (raw_text or "").lower()
     t = re.sub(r"https?://t\.me/\S+", " ", t, flags=re.IGNORECASE)
     t = re.sub(r"https?://(?:www\.)?instagram\.com/\S+", " ", t, flags=re.IGNORECASE)
     t = re.sub(r"https?://\S+", " ", t)
+    # Прибираємо лише емодзі, не чіпаючи латиницю/кирилицю/цифри
     t = re.sub(
         r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F600-\U0001F64F"
         r"\U0001F680-\U0001F6FF\U0001F900-\U0001F9FF]+",
         " ",
         t,
     )
+    t = re.sub(r"[^\w\s\u0400-\u04FF€$£.,:/+-]", " ", t)
     t = re.sub(r"\s+", " ", t).strip()
+    if len(t) < 24:
+        # Короткий текст — не дедупимо агресивно (порожній hash → skip check)
+        return ""
     return hashlib.sha256(t.encode("utf-8")).hexdigest()
 
 
@@ -368,23 +377,31 @@ def fingerprint_title_desc(title: str, description: str) -> str:
 def parsed_item_is_raw_duplicate(
     content_hash: str,
     parser_type: str | None = None,
+    source_channel: str | None = None,
 ) -> bool:
+    """
+    Дублікат за hash тексту.
+    За замовчуванням — лише в межах того самого source_channel
+    (крос-канальні репости різним продавцям не ріжемо тут;
+    глобально ловить active_listing_duplicate / fuzzy).
+    """
     if not content_hash:
         return False
     conn = get_connection()
     cursor = conn.cursor()
     blocking = _sql_parsed_item_blocks_duplicates("pi")
-    type_clause = ""
+    clauses = ["pi.content_hash = ?", blocking]
     params: list = [content_hash, _DEDUP_WINDOW, _DEDUP_WINDOW]
     if parser_type:
-        type_clause = " AND COALESCE(pi.parser_type, 'default') = ?"
+        clauses.append("COALESCE(pi.parser_type, 'default') = ?")
         params.append(parser_type)
+    if source_channel:
+        clauses.append("pi.source_channel = ?")
+        params.append(source_channel)
     cursor.execute(
         f"""
         SELECT 1 FROM parsed_items pi
-        WHERE pi.content_hash = ?
-          AND {blocking}
-          {type_clause}
+        WHERE {" AND ".join(clauses)}
         LIMIT 1
         """,
         params,
@@ -397,33 +414,30 @@ def parsed_item_is_raw_duplicate(
 def parsed_item_is_semantic_duplicate(
     dedup_key: Optional[str],
     parser_type: str | None = None,
+    source_channel: str | None = None,
 ) -> bool:
+    """Дублікат за title+desc fingerprint — зазвичай у межах одного каналу."""
     if not dedup_key:
         return False
     conn = get_connection()
     cursor = conn.cursor()
     blocking = _sql_parsed_item_blocks_duplicates("pi")
+    clauses = ["pi.dedup_key = ?", blocking]
+    params: list = [dedup_key, _DEDUP_WINDOW, _DEDUP_WINDOW]
     if parser_type:
-        cursor.execute(
-            f"""
-            SELECT 1 FROM parsed_items pi
-            WHERE pi.dedup_key = ?
-              AND COALESCE(pi.parser_type, 'default') = ?
-              AND {blocking}
-            LIMIT 1
-            """,
-            (dedup_key, parser_type, _DEDUP_WINDOW, _DEDUP_WINDOW),
-        )
-    else:
-        cursor.execute(
-            f"""
-            SELECT 1 FROM parsed_items pi
-            WHERE pi.dedup_key = ?
-              AND {blocking}
-            LIMIT 1
-            """,
-            (dedup_key, _DEDUP_WINDOW, _DEDUP_WINDOW),
-        )
+        clauses.append("COALESCE(pi.parser_type, 'default') = ?")
+        params.append(parser_type)
+    if source_channel:
+        clauses.append("pi.source_channel = ?")
+        params.append(source_channel)
+    cursor.execute(
+        f"""
+        SELECT 1 FROM parsed_items pi
+        WHERE {" AND ".join(clauses)}
+        LIMIT 1
+        """,
+        params,
+    )
     dup = cursor.fetchone() is not None
     conn.close()
     return dup

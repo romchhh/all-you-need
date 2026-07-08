@@ -74,10 +74,20 @@ def check_parser_duplicates(
 
     scope = parser_type if parser_type == PARSER_TYPE_SERVICES_CHANNEL else None
 
-    if parsed_item_is_raw_duplicate(content_hash, parser_type=scope):
+    # Текстовий / semantic дедуп — лише в межах того самого каналу.
+    # Крос-канальні збіги відсікає marketplace / fuzzy далі.
+    if parsed_item_is_raw_duplicate(
+        content_hash,
+        parser_type=scope,
+        source_channel=source_channel,
+    ):
         return True, "дублікат (текст)", None
 
-    if parsed_item_is_semantic_duplicate(dedup_key, parser_type=scope):
+    if parsed_item_is_semantic_duplicate(
+        dedup_key,
+        parser_type=scope,
+        source_channel=source_channel,
+    ):
         return True, "дублікат (оголошення)", None
 
     embedding_json: Optional[str] = None

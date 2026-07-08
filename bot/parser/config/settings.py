@@ -26,13 +26,13 @@ PARSER_SERVICES_DEDUP_ENABLED: bool = (
 )
 
 # Не пропускати дублікат, поки оголошення активне на платформі або в черзі модерації (N днів).
-PARSER_DEDUP_DAYS: int = max(1, int(os.getenv("PARSER_DEDUP_DAYS", "30")))
+PARSER_DEDUP_DAYS: int = max(1, int(os.getenv("PARSER_DEDUP_DAYS", "14")))
 
 # Fuzzy-дедуп через OpenAI embeddings (text-embedding-3-small, ~копійки на оголошення).
 PARSER_FUZZY_DEDUP_ENABLED: bool = (
     os.getenv("PARSER_FUZZY_DEDUP", "1").strip().lower() not in ("0", "false", "no", "off")
 )
-PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.82"))
+PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.90"))
 PARSER_EMBEDDING_MODEL: str = (os.getenv("PARSER_EMBEDDING_MODEL") or "text-embedding-3-small").strip()
 
 SERVICES_MODERATION_CHANNEL_ID: int = int(
