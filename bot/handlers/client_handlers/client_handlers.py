@@ -139,7 +139,7 @@ async def scheduler_jobs():
     try:
         from utils.weekly_marketplace_broadcast import register_weekly_broadcast_jobs
 
-        register_weekly_broadcast_jobs(scheduler, bot)
+        # register_weekly_broadcast_jobs(scheduler, bot)
     except Exception as e:
         print(f"❌ Помилка реєстрації weekly marketplace broadcast: {e}")
         import traceback
