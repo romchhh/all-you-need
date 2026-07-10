@@ -105,7 +105,7 @@ const ListingCardColumnComponent = ({
 
   const imageUrl = useMemo(() => {
     return resolveListingCardImageUrl(listing);
-  }, [listing.thumbUrl, listing.image, listing.images, listing.category]);
+  }, [listing.image, listing.images, listing.category]);
 
   const formattedTime = useMemo(() => {
     const d = getListingDisplayDate(listing);

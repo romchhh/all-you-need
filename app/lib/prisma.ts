@@ -358,11 +358,6 @@ export async function ensureListingApiRawColumns(): Promise<void> {
     );
     await addColumn('previousPrice', 'ALTER TABLE Listing ADD COLUMN previousPrice TEXT');
     await addColumn('priceChangedAt', 'ALTER TABLE Listing ADD COLUMN priceChangedAt DATETIME');
-    await addColumn(
-      'favoritesCount',
-      'ALTER TABLE Listing ADD COLUMN favoritesCount INTEGER NOT NULL DEFAULT 0'
-    );
-    await addColumn('thumbUrl', 'ALTER TABLE Listing ADD COLUMN thumbUrl TEXT');
 
     if (names.has('optimizedImages')) {
       optimizedImagesColumnExists = true;

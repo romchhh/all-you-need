@@ -63,10 +63,6 @@ model Listing {
   views             Int      @default(0)
   /** Додано до COUNT(Favorite) у публічному API (накрутка «обраного»). */
   favoriteBoost     Int      @default(0)
-  /** Денормалізований COUNT(Favorite) для feed без JOIN. */
-  favoritesCount    Int      @default(0)
-  /** Шлях першого thumb для карток каталогу. */
-  thumbUrl          String?
   status            String   @default("pending_moderation") // draft, pending_moderation, approved, active, sold, expired, deactivated, hidden
   moderationStatus  String   @default("pending") // pending, approved (rejected listings are deleted)
   rejectionReason   String?  // DEPRECATED: Причина відхилення модератором (rejected listings are now deleted)

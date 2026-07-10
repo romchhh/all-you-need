@@ -34,14 +34,13 @@ function isServicesWork(category?: string | null): boolean {
   return (category || '').trim().toLowerCase() === 'services_work';
 }
 
-/** URL обкладинки картки: thumbUrl → image → images[0]; services без фото — tgground. */
+/** URL обкладинки картки: для services_work без фото — tgground. */
 export function resolveListingCardImageUrl(listing: {
-  thumbUrl?: string | null;
   image?: string | null;
   images?: string[] | null;
   category?: string | null;
 }): string {
-  const raw = listing.thumbUrl || listing.image || listing.images?.[0] || '';
+  const raw = listing.image || listing.images?.[0] || '';
   const built = buildListingImageUrl(raw);
   if (built) return built;
   if (isServicesWork(listing.category)) return DEFAULT_SERVICES_LISTING_IMAGE;

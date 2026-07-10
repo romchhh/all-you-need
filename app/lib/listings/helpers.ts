@@ -245,40 +245,6 @@ export async function optimizeImages(
 }
 
 /**
- * Картковий thumb ~480px WebP для стрічки (легший за full optimized 1200).
- */
-export async function writeListingCardThumb(
-  sourcePublicPath: string
-): Promise<string | null> {
-  try {
-    const clean = sourcePublicPath.replace(/^\/+/, '');
-    const sourcePath = join(process.cwd(), 'public', clean);
-    if (!existsSync(sourcePath)) return sourcePublicPath.startsWith('/')
-      ? sourcePublicPath
-      : `/${sourcePublicPath}`;
-
-    const thumbsDir = join(process.cwd(), 'public', 'listings', 'thumbs');
-    if (!existsSync(thumbsDir)) {
-      await mkdir(thumbsDir, { recursive: true });
-    }
-
-    const buffer = await import('fs/promises').then((fs) => fs.readFile(sourcePath));
-    const out = await sharp(buffer)
-      .rotate()
-      .resize(480, 480, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 70, effort: 4 })
-      .toBuffer();
-
-    const filename = `thumb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.webp`;
-    await writeFile(join(thumbsDir, filename), out);
-    return `/listings/thumbs/${filename}`;
-  } catch (e) {
-    console.error('[writeListingCardThumb]', e);
-    return sourcePublicPath || null;
-  }
-}
-
-/**
  * DEPRECATED: Стара функція - використовуйте saveOriginalImages + optimizeImages
  * Обробляє та завантажує зображення
  * Оптимізовано для швидкої паралельної обробки
@@ -718,15 +684,6 @@ export async function updateListingData(
       }
     }
   }
-
-  void import('@/lib/listings/listingFts').then(({ upsertListingFts }) =>
-    upsertListingFts({
-      id: listingId,
-      title: data.title,
-      description: data.description,
-      location: data.location,
-    })
-  );
 
   return {
     priceChanged,

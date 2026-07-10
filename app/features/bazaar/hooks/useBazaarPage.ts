@@ -349,8 +349,6 @@ export function useBazaarPage() {
     const cached = getCachedData('bazaarListingsState');
     return cached?.offset ?? (cached?.listings?.length ? cached.listings.length : 0);
   });
-  const [feedCursor, setFeedCursor] = useState<string | null>(null);
-  const feedCursorRef = useRef<string | null>(null);
   const { tg } = useTelegram();
 
   useEffect(() => {
@@ -379,21 +377,13 @@ export function useBazaarPage() {
       limit: number,
       offset: number,
       searchQueryForApi?: string,
-      stateOverride?: BazaarTabPersistedState,
-      cursor?: string | null
+      stateOverride?: BazaarTabPersistedState
     ) => {
       const state = stateOverride ?? bazaarTabState;
       const params = new URLSearchParams();
       params.set('limit', String(limit));
+      params.set('offset', String(offset));
       params.set('sortBy', state.sortBy || 'newest');
-      const useCursor =
-        (state.sortBy || 'newest') === 'newest' &&
-        !(searchQueryForApi ?? debouncedSearchQuery ?? '').trim();
-      if (useCursor && cursor) {
-        params.set('cursor', cursor);
-      } else {
-        params.set('offset', String(offset));
-      }
       if (state.selectedCategory) params.set('category', state.selectedCategory);
       if (state.selectedSubcategory) params.set('subcategory', state.selectedSubcategory);
       if (state.showFreeOnly) params.set('isFree', 'true');
@@ -557,7 +547,7 @@ export function useBazaarPage() {
 
   const schedulePrefetchListingsImages = useCallback((items: Listing[]) => {
     if (typeof window === 'undefined' || items.length === 0) return;
-    const run = () => prefetchListingsImages(items, 4);
+    const run = () => prefetchListingsImages(items, 8);
     if ('requestIdleCallback' in window) {
       window.requestIdleCallback(run, { timeout: 4000 });
     } else {
@@ -618,15 +608,12 @@ export function useBazaarPage() {
         const data = await response.json();
         const list = data.listings || [];
         const total = data.total ?? 0;
-        const more = Boolean(data.hasMore ?? list.length < total);
-        const nextCur = (data.nextCursor as string | null) || null;
+        const more = list.length < total;
         startTransition(() => {
           setListings(list);
           setTotalListings(total);
           setHasMore(more);
           setListingsOffset(list.length);
-          setFeedCursor(nextCur);
-          feedCursorRef.current = nextCur;
         });
         schedulePrefetchListingsImages(list);
 
@@ -735,8 +722,6 @@ export function useBazaarPage() {
       setListings([]);
       setHasMore(false);
       setListingsOffset(0);
-      setFeedCursor(null);
-      feedCursorRef.current = null;
       setInitialLoading(true);
       fetchListings(true);
       return;
@@ -751,8 +736,6 @@ export function useBazaarPage() {
       invalidateCache('bazaarListingsState');
     }
     setListingsOffset(0);
-    setFeedCursor(null);
-    feedCursorRef.current = null;
     fetchListings(true);
   }, [
     filterKey,
@@ -798,18 +781,13 @@ export function useBazaarPage() {
     if (loadingMore || !hasMore) return;
     try {
       setLoadingMore(true);
-      const response = await fetch(
-        buildListingsUrl(PAGE_SIZE, listingsOffset, undefined, undefined, feedCursorRef.current)
-      );
+      const response = await fetch(buildListingsUrl(PAGE_SIZE, listingsOffset));
       if (response.ok) {
         const data = await response.json();
         const appended = data.listings || [];
         const total = data.total ?? 0;
         const newOffset = listingsOffset + appended.length;
-        const nextCur = (data.nextCursor as string | null) || null;
-        const newHasMore = Boolean(
-          data.hasMore ?? (nextCur ? true : newOffset < total)
-        );
+        const newHasMore = newOffset < total;
         setListings((prev) => {
           const merged = [...prev, ...appended];
           if (!hasActiveFilters && !hasSearchQuery && typeof window !== 'undefined') {
@@ -826,9 +804,7 @@ export function useBazaarPage() {
         setListingsOffset(newOffset);
         setTotalListings(total);
         setHasMore(newHasMore);
-        setFeedCursor(nextCur);
-        feedCursorRef.current = nextCur;
-        prefetchListingsImages(appended, 4);
+        prefetchListingsImages(appended, 8);
         tg?.HapticFeedback.impactOccurred('light');
       } else {
         showToast(t('common.loadingError'), 'error');

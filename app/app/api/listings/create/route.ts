@@ -215,28 +215,15 @@ export async function POST(request: NextRequest) {
       if (optimizedUrls.length > 0) {
         try {
           const { prisma, ensurePromotionPurchaseTable } = await import('@/lib/prisma');
-          const { writeListingCardThumb } = await import('@/lib/listings/helpers');
-          const { setListingThumbUrl } = await import('@/lib/listings/feedDenorm');
-          const { upsertListingFts } = await import('@/lib/listings/listingFts');
           await ensurePromotionPurchaseTable();
 
           // Зберігаємо оптимізовані версії в окремому полі
           // Оригінали залишаються в images для fallback
-          const thumb =
-            (await writeListingCardThumb(optimizedUrls[0])) || optimizedUrls[0];
           await prisma.$executeRawUnsafe(
-            `UPDATE Listing SET optimizedImages = ?, thumbUrl = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+            `UPDATE Listing SET optimizedImages = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
             JSON.stringify(optimizedUrls),
-            thumb,
             listingId
           );
-          await setListingThumbUrl(listingId, thumb);
-          void upsertListingFts({
-            id: listingId,
-            title: title || '',
-            description: description || '',
-            location: normalizedLocation || location || '',
-          });
           console.log('[Create Listing] Optimized images saved for listing:', listingId, 'count:', optimizedUrls.length);
           
           // Перевіряємо статус оголошення та чи немає очікуваної оплати картою

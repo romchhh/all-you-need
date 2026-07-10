@@ -150,7 +150,7 @@ const ListingCardComponent = ({
 
   const imageUrl = useMemo(() => {
     return resolveListingCardImageUrl(listing);
-  }, [listing.thumbUrl, listing.image, listing.images, listing.category]);
+  }, [listing.image, listing.images, listing.category]);
 
   const [imageError, setImageError] = useState(!imageUrl);
 

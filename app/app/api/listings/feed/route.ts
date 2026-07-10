@@ -3,7 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
-import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import {
+  LISTING_FAVORITES_JOIN_SQL,
+  LISTING_FAVORITES_COUNT_FROM_JOIN_SQL,
+} from '@/lib/listingFavoritesCountSql';
+import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
 import {
   buildBazaarCatalogCacheKey,
   getBazaarCatalogServerCache,
@@ -16,14 +20,11 @@ import {
   parseOptionalInt,
   type CatalogFilterParams,
 } from '@/lib/listings/catalogFilters';
-import { generateSearchVariantsWithCities } from '@/lib/listings/searchVariants';
 import {
-  backfillFeedDenormIfNeeded,
-  ensureFeedDenormColumns,
-  FEED_FAVORITES_DISPLAY_SQL,
-  pickThumbFromJson,
-} from '@/lib/listings/feedDenorm';
-import { ensureListingFts, searchListingIdsViaFts } from '@/lib/listings/listingFts';
+  generateSearchVariantsWithCities,
+  normalizeCyrillicToLower,
+  generateSearchVariants,
+} from '@/lib/listings/searchVariants';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -42,38 +43,18 @@ function normalizeFavoritesCount(value: number | bigint | string | undefined): n
   return Number.isNaN(n) ? 0 : n;
 }
 
-function encodeCursor(createdAt: string, id: number): string {
-  return Buffer.from(`${createdAt}|${id}`, 'utf8').toString('base64url');
-}
-
-function decodeCursor(raw: string | null): { createdAt: string; id: number } | null {
-  if (!raw) return null;
-  try {
-    const text = Buffer.from(raw, 'base64url').toString('utf8');
-    const [createdAt, idStr] = text.split('|');
-    const id = Number.parseInt(idStr || '', 10);
-    if (!createdAt || !Number.isFinite(id)) return null;
-    return { createdAt, id };
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Легкий каталог: без User/Favorite JOIN, cursor для newest, FTS для search.
+ * Легкий каталог для стрічки базару: без description/tags/phone/повних images.
  */
 export async function GET(request: NextRequest) {
   try {
-    void trackUserActivity(request);
+    await trackUserActivity(request);
 
     const { ensureCurrencyColumn, ensureFavoriteTable, ensureListingApiRawColumns } =
       await import('@/lib/prisma');
     const currencyColumnExists = await ensureCurrencyColumn();
     await ensureListingApiRawColumns();
     await ensureFavoriteTable();
-    await ensureFeedDenormColumns();
-    void backfillFeedDenormIfNeeded();
-    void ensureListingFts();
 
     const sp = request.nextUrl.searchParams;
     const category = sp.get('category');
@@ -83,9 +64,6 @@ export async function GET(request: NextRequest) {
     const sortBy = sp.get('sortBy') || 'newest';
     const limit = Math.min(Math.max(parseInt(sp.get('limit') || '20', 10) || 20, 1), 50);
     const offset = Math.max(parseInt(sp.get('offset') || '0', 10) || 0, 0);
-    const cursor = decodeCursor(sp.get('cursor'));
-    const useCursor = sortBy === 'newest' && !search;
-
     const citiesRaw = (sp.get('cities')?.trim() || '')
       .split(',')
       .map((c) => c.trim())
@@ -110,8 +88,7 @@ export async function GET(request: NextRequest) {
       currencyColumnExists,
     };
 
-    const isServerCacheable =
-      !search && cities.length === 0 && offset === 0 && !cursor && sortBy === 'newest';
+    const isServerCacheable = !search && cities.length === 0 && offset === 0;
     const serverCacheKey = isServerCacheable
       ? buildBazaarCatalogCacheKey({
           category,
@@ -142,48 +119,22 @@ export async function GET(request: NextRequest) {
     let whereClause = "WHERE l.status = 'active'";
     const params: unknown[] = [];
     whereClause = appendCatalogFiltersToWhere(whereClause, params, filters);
+
+    if (search && search.trim().length <= 30) {
+      const searchVariants = generateSearchVariantsWithCities(search.trim());
+      const titleConditions = searchVariants.map(() => 'l.title LIKE ?').join(' OR ');
+      const descConditions = searchVariants.map(() => 'l.description LIKE ?').join(' OR ');
+      const locationConditions = searchVariants.map(() => 'l.location LIKE ?').join(' OR ');
+      whereClause += ` AND ((${titleConditions}) OR (${descConditions}) OR (${locationConditions}))`;
+      searchVariants.forEach((v) => params.push(`%${v}%`));
+      searchVariants.forEach((v) => params.push(`%${v}%`));
+      searchVariants.forEach((v) => params.push(`%${v}%`));
+    }
+
     whereClause +=
       " AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))";
 
-    // Пошук: FTS → id IN (...); fallback LIKE
-    if (search) {
-      const ftsIds = await searchListingIdsViaFts(search);
-      if (ftsIds && ftsIds.length > 0) {
-        whereClause += ` AND l.id IN (${ftsIds.map(() => '?').join(',')})`;
-        params.push(...ftsIds);
-      } else if (ftsIds && ftsIds.length === 0) {
-        const empty = {
-          listings: [],
-          total: 0,
-          limit,
-          offset: 0,
-          hasMore: false,
-          nextCursor: null as string | null,
-        };
-        return NextResponse.json(empty);
-      } else if (search.trim().length <= 30) {
-        const searchVariants = generateSearchVariantsWithCities(search.trim());
-        const titleConditions = searchVariants.map(() => 'l.title LIKE ?').join(' OR ');
-        const descConditions = searchVariants.map(() => 'l.description LIKE ?').join(' OR ');
-        const locationConditions = searchVariants.map(() => 'l.location LIKE ?').join(' OR ');
-        whereClause += ` AND ((${titleConditions}) OR (${descConditions}) OR (${locationConditions}))`;
-        searchVariants.forEach((v) => params.push(`%${v}%`));
-        searchVariants.forEach((v) => params.push(`%${v}%`));
-        searchVariants.forEach((v) => params.push(`%${v}%`));
-      }
-    }
-
-    if (useCursor && cursor) {
-      whereClause +=
-        ' AND (datetime(COALESCE(l.publishedAt, l.createdAt)) < datetime(?) OR (datetime(COALESCE(l.publishedAt, l.createdAt)) = datetime(?) AND l.id < ?))';
-      params.push(cursor.createdAt, cursor.createdAt, cursor.id);
-    }
-
-    const orderByClause = useCursor
-      ? 'ORDER BY datetime(COALESCE(l.publishedAt, l.createdAt)) DESC, l.id DESC'
-      : catalogOrderByClause(sortBy);
-
-    const fetchLimit = useCursor ? limit + 1 : limit;
+    const orderByClause = catalogOrderByClause(sortBy);
 
     const listingsQuery = `
       SELECT
@@ -202,65 +153,71 @@ export async function GET(request: NextRequest) {
         l.status,
         l.promotionType,
         l.promotionEnds,
-        l.thumbUrl,
         l.images,
         l.optimizedImages,
         l.createdAt,
         l.publishedAt,
-        ${FEED_FAVORITES_DISPLAY_SQL} as favoritesCount
+        u.username as sellerUsername,
+        u.firstName as sellerFirstName,
+        u.lastName as sellerLastName,
+        u.avatar as sellerAvatar,
+        CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+        ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount
       FROM Listing l
+      JOIN User u ON l.userId = u.id
+      ${LISTING_FAVORITES_JOIN_SQL}
       ${whereClause}
       ${orderByClause}
-      LIMIT ?${useCursor ? '' : ' OFFSET ?'}
+      LIMIT ? OFFSET ?
     `;
 
-    const queryParams = useCursor
-      ? [...params, fetchLimit]
-      : [...params, limit, offset];
+    const countQuery = `
+      SELECT COUNT(*) as count
+      FROM Listing l
+      JOIN User u ON l.userId = u.id
+      ${whereClause}
+    `;
 
     let listingsData: any[] = [];
-    try {
-      listingsData = (await prisma.$queryRawUnsafe(
-        listingsQuery,
-        ...queryParams
-      )) as any[];
-    } catch (error: any) {
-      // Стара БД без thumbUrl/favoritesCount — ensure вже мав додати; retry без thumbUrl
-      const msg = String(error?.message || '');
-      if (msg.includes('thumbUrl') || msg.includes('favoritesCount')) {
-        await ensureFeedDenormColumns();
-        listingsData = (await prisma.$queryRawUnsafe(
-          listingsQuery,
-          ...queryParams
-        )) as any[];
-      } else {
-        throw error;
-      }
-    }
-
-    let hasMore = false;
-    let nextCursor: string | null = null;
     let total = 0;
 
-    if (useCursor) {
-      hasMore = listingsData.length > limit;
-      if (hasMore) listingsData = listingsData.slice(0, limit);
-      const last = listingsData[listingsData.length - 1];
-      if (hasMore && last) {
-        const ts = last.publishedAt || last.createdAt;
-        nextCursor = encodeCursor(String(ts), Number(last.id));
-      }
-      total = hasMore ? offset + listingsData.length + 1 : offset + listingsData.length;
-    } else {
-      const countQuery = `SELECT COUNT(*) as count FROM Listing l ${whereClause}`;
-      const countRows = (await prisma.$queryRawUnsafe(
-        countQuery,
-        ...params
-      )) as Array<{ count: bigint }>;
+    try {
+      const [data, countRows] = await Promise.all([
+        prisma.$queryRawUnsafe(listingsQuery, ...params, limit, offset) as Promise<any[]>,
+        prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>,
+      ]);
+      listingsData = data;
       total = Number(countRows[0]?.count || 0);
-      hasMore = offset + listingsData.length < total;
+    } catch (error: any) {
+      const msg = String(error?.message || '');
+      const favBroken =
+        msg.includes('no such table: Favorite') ||
+        (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
+      if (!favBroken) throw error;
+      const fallback = listingsQuery
+        .replace(`, ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount`, '')
+        .replace(LISTING_FAVORITES_JOIN_SQL, '');
+      const [data, countRows] = await Promise.all([
+        prisma.$queryRawUnsafe(fallback, ...params, limit, offset) as Promise<any[]>,
+        prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>,
+      ]);
+      listingsData = data.map((l) => ({ ...l, favoritesCount: 0 }));
+      total = Number(countRows[0]?.count || 0);
     }
 
+    if (search && search.trim().length > 30) {
+      const searchLower = normalizeCyrillicToLower(search.trim());
+      const variants = generateSearchVariants(search.trim());
+      listingsData = listingsData.filter((listing) => {
+        const blob = normalizeCyrillicToLower(
+          `${listing.title || ''} ${listing.location || ''}`
+        );
+        return variants.some((v) => blob.includes(normalizeCyrillicToLower(v))) ||
+          blob.includes(searchLower);
+      });
+    }
+
+    // Легке сортування по ціні в JS (price — string)
     if (sortBy === 'price_low' || sortBy === 'price_high') {
       listingsData = [...listingsData].sort((a, b) => {
         const pa = a.isFree ? 0 : parseFloat(String(a.price).replace(/[^\d.]/g, '')) || 0;
@@ -275,11 +232,21 @@ export async function GET(request: NextRequest) {
     }
 
     const formatted = listingsData.map((listing) => {
-      const thumbRaw =
-        (listing.thumbUrl && String(listing.thumbUrl).trim()) ||
-        pickThumbFromJson(listing.optimizedImages, listing.images);
-      const thumb = buildListingImageUrl(thumbRaw) || thumbRaw || '';
+      const originalImages =
+        typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+      const optimizedImages = listing.optimizedImages
+        ? typeof listing.optimizedImages === 'string'
+          ? JSON.parse(listing.optimizedImages)
+          : listing.optimizedImages
+        : null;
+      const source =
+        optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
+      const images = resolveStoredListingImages(source);
+      const thumb = images[0] || '';
       const timeFields = listingTimeFieldsForApi(listing);
+      const sellerName = listing.sellerFirstName
+        ? `${listing.sellerFirstName} ${listing.sellerLastName || ''}`.trim()
+        : listing.sellerUsername || 'Користувач';
 
       return {
         id: listing.id,
@@ -290,13 +257,12 @@ export async function GET(request: NextRequest) {
         currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
         image: thumb,
         images: thumb ? [thumb] : [],
-        thumbUrl: thumb || null,
         seller: {
-          name: '',
-          avatar: '👤',
+          name: sellerName,
+          avatar: listing.sellerAvatar || '👤',
           phone: '',
-          telegramId: '',
-          username: null,
+          telegramId: listing.sellerTelegramId?.toString() || '',
+          username: listing.sellerUsername || null,
         },
         category: listing.category,
         subcategory: listing.subcategory,
@@ -316,14 +282,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const payload = {
-      listings: formatted,
-      total,
-      limit,
-      offset: useCursor ? 0 : offset,
-      hasMore,
-      nextCursor,
-    };
+    const payload = { listings: formatted, total, limit, offset };
     const response = NextResponse.json(payload);
 
     if (isServerCacheable && serverCacheKey) {

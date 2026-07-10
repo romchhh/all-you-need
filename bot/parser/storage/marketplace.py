@@ -143,48 +143,26 @@ def create_marketplace_listing(
     images_json = json.dumps(images, ensure_ascii=False)
     expires_at_sql = "datetime('now', '+30 days')"
     default_condition = "new" if cat == "services_work" else "used"
-    thumb_url = images[0] if images else None
 
-    try:
-        cursor.execute(f"""
-            INSERT INTO Listing (
-                userId, title, description, price, currency, isFree,
-                category, subcategory, condition, location,
-                status, moderationStatus,
-                images, optimizedImages, thumbUrl,
-                createdAt, updatedAt, publishedAt, expiresAt
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                'active', 'approved',
-                ?, NULL, ?,
-                datetime('now'), datetime('now'), datetime('now'), {expires_at_sql}
-            )
-        """, (
-            user_id, title, description, price_str, currency, int(is_free),
-            category, subcategory, condition or default_condition, loc,
-            images_json, thumb_url,
-        ))
-    except Exception:
-        cursor.execute(f"""
-            INSERT INTO Listing (
-                userId, title, description, price, currency, isFree,
-                category, subcategory, condition, location,
-                status, moderationStatus,
-                images, optimizedImages,
-                createdAt, updatedAt, publishedAt, expiresAt
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                'active', 'approved',
-                ?, NULL,
-                datetime('now'), datetime('now'), datetime('now'), {expires_at_sql}
-            )
-        """, (
-            user_id, title, description, price_str, currency, int(is_free),
-            category, subcategory, condition or default_condition, loc,
-            images_json,
-        ))
+    cursor.execute(f"""
+        INSERT INTO Listing (
+            userId, title, description, price, currency, isFree,
+            category, subcategory, condition, location,
+            status, moderationStatus,
+            images, optimizedImages,
+            createdAt, updatedAt, publishedAt, expiresAt
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            'active', 'approved',
+            ?, NULL,
+            datetime('now'), datetime('now'), datetime('now'), {expires_at_sql}
+        )
+    """, (
+        user_id, title, description, price_str, currency, int(is_free),
+        category, subcategory, condition or default_condition, loc,
+        images_json,
+    ))
     conn.commit()
     listing_id = cursor.lastrowid
     conn.close()

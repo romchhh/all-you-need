@@ -14,8 +14,6 @@ export interface Listing {
   previousPrice?: string | null;
   priceChangedAt?: string | null;
   currency?: 'UAH' | 'EUR' | 'USD';
-  /** Готовий thumb для картки (денормалізований). */
-  thumbUrl?: string | null;
   image: string;
   images?: string[];
   seller: Seller;
