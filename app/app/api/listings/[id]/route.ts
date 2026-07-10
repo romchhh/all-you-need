@@ -40,6 +40,8 @@ export async function GET(
         l.title,
         l.description,
         l.price,
+        l.previousPrice,
+        l.priceChangedAt,
         ${currencyColumnExists ? 'l.currency,' : 'NULL as currency,'}
         l.isFree,
         l.category,
@@ -189,6 +191,8 @@ export async function GET(
         id: listing.id,
         title: listing.title,
         price: listing.price,
+        previousPrice: listing.previousPrice || null,
+        priceChangedAt: listing.priceChangedAt || null,
         currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
         image: (() => {
           const resolved = resolveStoredListingImages(

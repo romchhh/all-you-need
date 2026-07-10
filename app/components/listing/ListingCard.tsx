@@ -6,7 +6,8 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
-import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
+import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
@@ -148,13 +149,10 @@ const ListingCardComponent = ({
   );
 
   const imageUrl = useMemo(() => {
-    const image = listing.image || (listing.images && listing.images.length > 0 ? listing.images[0] : '');
-    return buildListingImageUrl(image);
-  }, [listing.image, listing.images]);
+    return resolveListingCardImageUrl(listing);
+  }, [listing.thumbUrl, listing.image, listing.images, listing.category]);
 
-  const [imageError, setImageError] = useState(
-    !imageUrl && (!listing.image && (!listing.images || listing.images.length === 0))
-  );
+  const [imageError, setImageError] = useState(!imageUrl);
 
   useEffect(() => {
     if (!imageUrl) {
@@ -193,7 +191,7 @@ const ListingCardComponent = ({
         </div>
         
         {/* Placeholder або зображення */}
-        {imageError || (!listing.image && (!listing.images || listing.images.length === 0)) ? (
+        {imageError || !imageUrl ? (
           <div className={`absolute inset-0 flex items-center justify-center w-full h-full ${isLight ? 'bg-gray-100' : 'bg-[#1A1A1A]'}`}>
             <div className="text-center">
               <ImageIcon size={48} className={`mx-auto ${isLight ? 'text-gray-300' : 'text-white/10'}`} />
@@ -209,7 +207,7 @@ const ListingCardComponent = ({
             style={{ width: '100%', height: '100%' }}
             priority={priority}
             sizes={isStacked ? '(max-width: 1023px) 50vw, 240px' : '(max-width: 1023px) 50vw, 25vw'}
-            key={`${listing.image}-${listing.id}`}
+            key={`${imageUrl}-${listing.id}`}
             onError={() => {
               setImageError(true);
             }}
@@ -336,8 +334,28 @@ const ListingCardComponent = ({
             const fluidSize = isStacked
               ? 'text-[clamp(0.6875rem,4vw,1.5rem)] sm:max-w-full'
               : 'text-[clamp(0.6875rem,4vw,1.5rem)] sm:max-w-full lg:text-xl xl:text-2xl';
+            const showPrev =
+              !!listing.previousPrice &&
+              isPriceChangeFresh(listing.priceChangedAt) &&
+              listing.previousPrice !== listing.price;
+            const prevEl = showPrev ? (
+              <span
+                className={`mr-1.5 text-[0.7em] font-medium line-through opacity-60 ${
+                  isLight ? 'text-gray-500' : 'text-white/50'
+                }`}
+              >
+                {listing.previousPrice === 'Free' || listing.previousPrice === t('common.free')
+                  ? t('common.free')
+                  : `${listing.previousPrice}${getCurrencySymbol(listing.currency)}`}
+              </span>
+            ) : null;
             if (isFree) {
-              return <span className={`${priceClass} ${fluidSize}`}>{t('common.free')}</span>;
+              return (
+                <span className={`${priceClass} ${fluidSize}`}>
+                  {prevEl}
+                  {t('common.free')}
+                </span>
+              );
             }
             if (isNegotiable) {
               return (
@@ -347,12 +365,14 @@ const ListingCardComponent = ({
                   }`}
                   title={t('common.negotiable')}
                 >
+                  {prevEl}
                   {t('common.negotiableShort')}
                 </span>
               );
             }
             return (
               <span className={`${priceClass} ${fluidSize}`}>
+                {prevEl}
                 {`${listing.price}${getCurrencySymbol(listing.currency)}`}
               </span>
             );
@@ -420,6 +440,8 @@ export const ListingCard = memo(ListingCardComponent, (prevProps, nextProps) => 
     prevProps.listing.id === nextProps.listing.id &&
     prevProps.listing.image === nextProps.listing.image &&
     prevProps.listing.price === nextProps.listing.price &&
+    prevProps.listing.previousPrice === nextProps.listing.previousPrice &&
+    prevProps.listing.priceChangedAt === nextProps.listing.priceChangedAt &&
     prevProps.listing.title === nextProps.listing.title &&
     prevProps.listing.promotionType === nextProps.listing.promotionType &&
     prevProps.listing.promotionEnds === nextProps.listing.promotionEnds &&

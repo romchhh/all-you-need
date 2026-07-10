@@ -1,12 +1,12 @@
 /**
- * Кеш медіа оголошень для всіх користувачів (cache-first).
+ * Кеш медіа оголошень для всіх користувачів (cache-first + stale-while-revalidate).
  * Працює разом із Cache-Control на /api/images та /api/parsed-images.
  */
-const CACHE_NAME = 'listing-media-v2';
-const MAX_ENTRIES = 400;
+const CACHE_NAME = 'listing-media-v3';
+const MAX_ENTRIES = 800;
 
 const MEDIA_PATH_RE =
-  /^\/(api\/images\/|api\/parsed-images\/|listings\/|avatars\/)/;
+  /^\/(api\/images\/|api\/parsed-images\/|listings\/|avatars\/|images\/)/;
 
 function shouldCache(request) {
   if (request.method !== 'GET') return false;
@@ -50,18 +50,25 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cached = await cache.match(request);
-      if (cached) return cached;
 
-      try {
-        const response = await fetch(request);
-        if (response.ok && response.type === 'basic') {
-          void cache.put(request, response.clone()).then(() => trimCache(cache));
-        }
-        return response;
-      } catch (err) {
-        if (cached) return cached;
-        throw err;
+      const networkFetch = fetch(request)
+        .then((response) => {
+          if (response.ok && (response.type === 'basic' || response.type === 'cors')) {
+            void cache.put(request, response.clone()).then(() => trimCache(cache));
+          }
+          return response;
+        })
+        .catch((err) => {
+          if (cached) return cached;
+          throw err;
+        });
+
+      // Cache-first: миттєво з кешу, у фоні оновлюємо (SWR)
+      if (cached) {
+        void networkFetch;
+        return cached;
       }
+      return networkFetch;
     })
   );
 });

@@ -111,7 +111,9 @@ def enrich_description(title: str, description: str) -> str:
 
 
 def detect_condition(text: str, category: str) -> Optional[str]:
-    if category in ("services_work", "realestate"):
+    if category == "services_work":
+        return "new"
+    if category == "realestate":
         return None
     lower = text.lower()
     if re.search(r"\bнов(ий|ая|ое|і)\b|brand.?new|у коробці|в упаковке|запечатан", lower):

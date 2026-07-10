@@ -60,6 +60,11 @@ def format_original_post_link_html(item: dict, lang: str | None = None) -> str:
 
 
 def build_marketplace_description(item: dict) -> str:
+    """
+    Опис для Listing на маркетплейсі:
+    - якщо є username автора → «👤 Автор: @…»
+    - інакше → посилання на оригінальний пост у групі/каналі
+    """
     base = enrich_description(item["title"], item["description"])
     base = strip_original_post_link_block(base)
     lang = detect_lang(
@@ -79,6 +84,15 @@ def build_marketplace_description(item: dict) -> str:
     contact_line = ""
     if author_username:
         contact_line = f"👤 Автор: @{author_username}"
+    else:
+        msg_link = parsed_item_message_link(item)
+        if msg_link:
+            label = (
+                "Оригінальне оголошення"
+                if lang == "uk"
+                else "Оригинальное объявление"
+            )
+            contact_line = f"🔗 {label}: {msg_link}"
 
     parts = [base]
     if contact_line:

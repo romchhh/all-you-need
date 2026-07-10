@@ -245,6 +245,40 @@ export async function optimizeImages(
 }
 
 /**
+ * Картковий thumb ~480px WebP для стрічки (легший за full optimized 1200).
+ */
+export async function writeListingCardThumb(
+  sourcePublicPath: string
+): Promise<string | null> {
+  try {
+    const clean = sourcePublicPath.replace(/^\/+/, '');
+    const sourcePath = join(process.cwd(), 'public', clean);
+    if (!existsSync(sourcePath)) return sourcePublicPath.startsWith('/')
+      ? sourcePublicPath
+      : `/${sourcePublicPath}`;
+
+    const thumbsDir = join(process.cwd(), 'public', 'listings', 'thumbs');
+    if (!existsSync(thumbsDir)) {
+      await mkdir(thumbsDir, { recursive: true });
+    }
+
+    const buffer = await import('fs/promises').then((fs) => fs.readFile(sourcePath));
+    const out = await sharp(buffer)
+      .rotate()
+      .resize(480, 480, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 70, effort: 4 })
+      .toBuffer();
+
+    const filename = `thumb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.webp`;
+    await writeFile(join(thumbsDir, filename), out);
+    return `/listings/thumbs/${filename}`;
+  } catch (e) {
+    console.error('[writeListingCardThumb]', e);
+    return sourcePublicPath || null;
+  }
+}
+
+/**
  * DEPRECATED: Стара функція - використовуйте saveOriginalImages + optimizeImages
  * Обробляє та завантажує зображення
  * Оптимізовано для швидкої паралельної обробки
@@ -517,15 +551,37 @@ export async function updateListingToDraft(
 }
 
 /**
- * Звичайне оновлення оголошення (з можливістю зміни статусу)
+ * Звичайне оновлення оголошення (з можливістю зміни статусу).
+ * Повертає info про зміну ціни для notify обраних.
  */
 export async function updateListingData(
   listingId: number,
   data: ListingFormData,
   imageUrls: string[],
   status?: string | null
-): Promise<void> {
+): Promise<{ priceChanged: boolean; oldPrice: string | null; newPrice: string }> {
   const updateTime = nowSQLite();
+
+  const currentRows = (await prisma.$queryRawUnsafe(
+    `SELECT price, isFree, status, userId FROM Listing WHERE id = ?`,
+    listingId
+  )) as Array<{ price: string; isFree: number; status: string; userId: number }>;
+  const current = currentRows[0];
+  const oldPriceRaw = current
+    ? current.isFree
+      ? 'Free'
+      : String(current.price || '')
+    : '';
+  const newPriceRaw = data.isFree ? 'Free' : String(data.price || '');
+  const priceChanged =
+    !!current &&
+    current.status === 'active' &&
+    oldPriceRaw.trim() !== newPriceRaw.trim();
+
+  const priceExtraCols = priceChanged
+    ? `, previousPrice = ?, priceChangedAt = ?`
+    : '';
+  const priceExtraVals = priceChanged ? [oldPriceRaw, updateTime] : [];
   
   // Якщо статус передано, оновлюємо його
   if (status) {
@@ -552,7 +608,7 @@ export async function updateListingData(
             title = ?, description = ?, price = ?, currency = ?, isFree = ?,
             category = ?, subcategory = ?, condition = ?, location = ?,
             images = ?, status = ?, moderationStatus = NULL, updatedAt = ?,
-            publishedAt = ?, expiresAt = ?
+            publishedAt = ?, expiresAt = ?${priceExtraCols}
           WHERE id = ?`,
           data.title,
           data.description,
@@ -568,6 +624,7 @@ export async function updateListingData(
           updateTime,
           publishedAt,
           expiresAt,
+          ...priceExtraVals,
           listingId
         )
       );
@@ -588,7 +645,7 @@ export async function updateListingData(
           `UPDATE Listing SET
             title = ?, description = ?, price = ?, currency = ?, isFree = ?,
             category = ?, subcategory = ?, condition = ?, location = ?,
-            images = ?, status = ?, updatedAt = ?
+            images = ?, status = ?, updatedAt = ?${priceExtraCols}
           WHERE id = ?`,
           data.title,
           data.description,
@@ -602,6 +659,7 @@ export async function updateListingData(
           JSON.stringify(imageUrls),
           status,
           updateTime,
+          ...priceExtraVals,
           listingId
         )
       );
@@ -626,7 +684,7 @@ export async function updateListingData(
         `UPDATE Listing SET
           title = ?, description = ?, price = ?, currency = ?, isFree = ?,
           category = ?, subcategory = ?, condition = ?, location = ?,
-          images = ?, updatedAt = ?
+          images = ?, updatedAt = ?${priceExtraCols}
         WHERE id = ?`,
         data.title,
         data.description,
@@ -639,6 +697,7 @@ export async function updateListingData(
         data.location,
         imagesJson,
         updateTime,
+        ...priceExtraVals,
         listingId
       )
     );
@@ -659,6 +718,21 @@ export async function updateListingData(
       }
     }
   }
+
+  void import('@/lib/listings/listingFts').then(({ upsertListingFts }) =>
+    upsertListingFts({
+      id: listingId,
+      title: data.title,
+      description: data.description,
+      location: data.location,
+    })
+  );
+
+  return {
+    priceChanged,
+    oldPrice: priceChanged ? oldPriceRaw : null,
+    newPrice: newPriceRaw,
+  };
 }
 
 /**

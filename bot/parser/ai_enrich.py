@@ -82,24 +82,37 @@ def _normalize_price_fields(
     currency_raw: Any,
     is_free_raw: Any,
     text_hint: str,
+    *,
+    category: str | None = None,
 ) -> tuple[Optional[str], Optional[str], bool]:
-    is_free = bool(is_free_raw)
-    if is_free:
-        return "Free", None, True
-
+    """
+    Free — лише при явних маркерах у тексті.
+    Для services_work без числової ціни — завжди «Договорная».
+    """
     price_s = str(price_raw or "").strip()
     currency = (str(currency_raw or "").strip().upper() or None)
     if currency not in ("EUR", "USD", "UAH"):
         currency = "EUR" if price_s else None
 
     lower = (text_hint or "").lower()
-    if not price_s or price_s.lower() in NEGOTIABLE_PRICES:
-        if re.search(r"\b(безкоштовно|бесплатно|віддам|отдам|free)\b", lower):
-            return "Free", None, True
+    explicit_free = bool(
+        re.search(r"\b(безкоштовно|бесплатно|віддам|отдам|даром|free)\b", lower)
+    )
+    is_services = (category or "").strip().lower() == "services_work"
+
+    # Не довіряємо голому is_free від AI без текстових маркерів (особливо для послуг).
+    if bool(is_free_raw) and explicit_free:
+        return "Free", None, True
+    if explicit_free and (not price_s or price_s.lower() in NEGOTIABLE_PRICES or "free" in price_s.lower()):
+        return "Free", None, True
+
+    if not price_s or price_s.lower() in NEGOTIABLE_PRICES or price_s.lower() in ("free", "0"):
+        if is_services or not explicit_free:
+            return "Договорная", None, False
         return "Договорная", None, False
 
     cleaned = price_s.replace(" ", "").replace(",", ".")
-    if cleaned.lower() in NEGOTIABLE_PRICES:
+    if cleaned.lower() in NEGOTIABLE_PRICES or cleaned.lower() == "free":
         return "Договорная", None, False
 
     m = re.search(r"(\d+(?:[.,]\d+)?)", cleaned)
@@ -107,6 +120,11 @@ def _normalize_price_fields(
         return "Договорная", None, False
 
     num = m.group(1).replace(",", ".")
+    try:
+        if float(num) <= 0:
+            return "Договорная", None, False
+    except ValueError:
+        return "Договорная", None, False
     return num, currency or "EUR", False
 
 
@@ -119,17 +137,20 @@ def _validate_location(location: str, channel_city: str, text: str) -> str:
         if normalized:
             return normalized
     if channel_city:
-        return channel_city
+        return normalize_city_name(channel_city) or channel_city
     combined = f"{text}\n{channel_city}"
     lower = combined.lower()
     for city in GERMAN_CITIES:
         if city.lower() in lower or city.replace("ü", "u").replace("ö", "o").lower() in lower:
             return city
-    return channel_city or "Germany"
+    return normalize_city_name(channel_city) or channel_city or "Germany"
 
 
 def _validate_condition(condition: Any, category: str) -> Optional[str]:
-    if category in ("services_work", "realestate", "free"):
+    cat = (category or "").strip().lower()
+    if cat == "services_work":
+        return "new"
+    if cat in ("realestate", "free"):
         return None
     c = str(condition or "").strip().lower()
     if c in ("new", "used"):
@@ -174,10 +195,10 @@ def _build_prompt(item: dict) -> str:
    Услуги (маникюр, ремонт, репетитор) → services_work + нужная подкатегория.
    Товары → соответствующий раздел (electronics, fashion, kids, furniture и т.д.) + подкатегория.
 4. price — число строкой ("25" или "25.50"); если цены нет → null (договорная).
-5. is_free — true только если отдают бесплатно.
+5. is_free — true ТОЛЬКО если в тексте явно «бесплатно/віддам/даром/free». Для услуг без цены is_free=false.
 6. currency — EUR по умолчанию; UAH только если явно грн.
-7. location — город из текста или {channel_city}.
-8. condition — "new" или "used" для товаров; null для services_work, realestate, free.
+7. location — город НЕМЕЦКИМ оригиналом (Hamburg, München, Köln…), не перевод.
+8. condition — "new" или "used" для товаров; для services_work ВСЕГДА "new".
 
 Верни ТОЛЬКО JSON:
 {{
@@ -270,6 +291,7 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
         data.get("currency"),
         data.get("is_free"),
         f"{description}\n{raw_text}",
+        category=category,
     )
     condition = _validate_condition(data.get("condition"), category)
     summary = str(data.get("changes_summary") or "").strip()

@@ -87,7 +87,8 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
    (другой пост, но тот же iPhone/диван/маникюр — дубль).
 3. accept=true только для нормального объявления.
 4. Если accept=true — улучши title (рус, до 80 симв), description (рус, чистый текст),
-   category/subcategory, price, location, condition.
+   category/subcategory, price, location (немецкий оригинал города), condition.
+   Услуги без цены → price=null, is_free=false; condition для услуг всегда "new".
 
 JSON:
 {{
@@ -187,6 +188,7 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
         data.get("currency"),
         data.get("is_free"),
         f"{description}\n{raw_text}",
+        category=category,
     )
     condition = _validate_condition(data.get("condition"), category)
 

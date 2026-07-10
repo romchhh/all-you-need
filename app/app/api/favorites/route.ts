@@ -131,6 +131,13 @@ export async function POST(request: NextRequest) {
       )
     );
 
+    try {
+      const { bumpListingFavoritesCount } = await import('@/lib/listings/feedDenorm');
+      await bumpListingFavoritesCount(listingIdNum, 1);
+    } catch {
+      /* non-fatal */
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     const err = error as any;
@@ -190,13 +197,22 @@ export async function DELETE(request: NextRequest) {
     const userId = users[0].id;
 
     // Видаляємо favorite
-    await executeWithRetry(() =>
+    const deleted = await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
         `DELETE FROM Favorite WHERE userId = ? AND listingId = ?`,
         userId,
         listingIdNum
       )
     );
+
+    if (Number(deleted) > 0) {
+      try {
+        const { bumpListingFavoritesCount } = await import('@/lib/listings/feedDenorm');
+        await bumpListingFavoritesCount(listingIdNum, -1);
+      } catch {
+        /* non-fatal */
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

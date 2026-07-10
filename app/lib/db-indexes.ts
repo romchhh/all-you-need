@@ -71,6 +71,26 @@ export async function createDatabaseIndexes(): Promise<void> {
       ON Listing(status, category, createdAt DESC)
     `);
 
+    await executeDDLSafely(`
+      CREATE INDEX IF NOT EXISTS idx_listing_status_createdAt_desc
+      ON Listing(status, createdAt DESC)
+    `);
+
+    await executeDDLSafely(`
+      CREATE INDEX IF NOT EXISTS idx_listing_category_status
+      ON Listing(category, status)
+    `);
+
+    await executeDDLSafely(`
+      CREATE INDEX IF NOT EXISTS idx_listing_status_condition
+      ON Listing(status, condition)
+    `);
+
+    await executeDDLSafely(`
+      CREATE INDEX IF NOT EXISTS idx_favorite_listingId_userId
+      ON Favorite(listingId, userId)
+    `);
+
     indexesCreated = true;
     if (process.env.NODE_ENV === 'development') {
       console.log('Database indexes created successfully');

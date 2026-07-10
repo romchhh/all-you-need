@@ -12,6 +12,8 @@ import {
   submitListingToModeration,
 } from '@/lib/listings/helpers';
 import { getUserIdAndActive } from '@/utils/userHelpers';
+import { notifyFavoritesPriceChanged } from '@/lib/listings/notifyPriceChange';
+import { ensureListingApiRawColumns } from '@/lib/prisma';
 
 interface Listing {
   userId: number;
@@ -20,11 +22,28 @@ interface Listing {
   moderationStatus: string;
 }
 
+function firePriceChangeNotify(
+  listingId: number,
+  title: string,
+  sellerUserId: number,
+  result: { priceChanged: boolean; oldPrice: string | null; newPrice: string }
+) {
+  if (!result.priceChanged || !result.oldPrice) return;
+  void notifyFavoritesPriceChanged({
+    listingId,
+    title,
+    oldPrice: result.oldPrice,
+    newPrice: result.newPrice,
+    sellerUserId,
+  }).catch((err) => console.error('[Update Listing] price notify failed:', err));
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await ensureListingApiRawColumns();
     const { id } = await params;
     const listingId = parseInt(id);
     const formData = await request.formData();
@@ -165,7 +184,8 @@ export async function PUT(
       const hasNewImages = imageFiles.length > 0 && imageFiles[0].size > 0;
       
       // Оновлюємо оголошення з новим статусом
-      await updateListingData(listingId, listingData, imageUrls, requestedStatus);
+      const priceResult = await updateListingData(listingId, listingData, imageUrls, requestedStatus);
+      firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult);
       
       // Обробляємо нові зображення асинхронно (якщо є)
       if (hasNewImages) {
@@ -450,7 +470,8 @@ export async function PUT(
     if (requestedStatus === 'sold' || requestedStatus === 'deactivated' || requestedStatus === 'hidden') {
       console.log('[Update Listing] Status change to', requestedStatus, '- skipping moderation check');
       // Цей випадок вже має бути оброблений раніше, але на всяк випадок перевіряємо тут
-      await updateListingData(listingId, listingData, imageUrls, requestedStatus);
+      const priceResult = await updateListingData(listingId, listingData, imageUrls, requestedStatus);
+      firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult);
       
       // Обробляємо нові зображення асинхронно (якщо є)
       if (hasNewImages) {
@@ -614,7 +635,8 @@ export async function PUT(
       // Для активних та інших оголошень - відправляємо на модерацію одразу (як раніше)
       console.log('[Update Listing] Active/other listing edited, updating and sending to moderation');
       
-      await updateListingData(listingId, listingData, imageUrls, 'pending_moderation');
+      const priceResult = await updateListingData(listingId, listingData, imageUrls, 'pending_moderation');
+      firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult);
       
       console.log('[Update Listing] Listing updated, processing images and sending to moderation asynchronously');
 
@@ -702,7 +724,8 @@ export async function PUT(
     }
 
     // Звичайне оновлення без реактивації (для draft або якщо вказано конкретний статус)
-    await updateListingData(listingId, listingData, imageUrls, requestedStatus || undefined);
+    const priceResult = await updateListingData(listingId, listingData, imageUrls, requestedStatus || undefined);
+    firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult);
 
     // Швидко зберігаємо нові зображення асинхронно (якщо є)
     if (hasNewImages) {

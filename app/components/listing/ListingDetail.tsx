@@ -38,7 +38,8 @@ import {
   toBazaarHomeCategoryFilter,
 } from '@/lib/listings/categoryFilter';
 import { navigateToListingCategoryResolved } from '@/lib/listings/navigation';
-import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { buildListingImageUrl, resolveListingGalleryImages } from '@/lib/listings/imageUrl';
+import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { ListingAutoRenewSection } from '@/components/listing/ListingAutoRenewSection';
@@ -118,7 +119,7 @@ export const ListingDetail = ({
 
   const sellerUsername = listing.seller.username;
   const sellerPhone = listing.seller.phone;
-  const images = listing.images || [listing.image];
+  const images = resolveListingGalleryImages(listing);
   const [sellerListings, setSellerListings] = useState<Listing[]>([]);
   const [categoryListings, setCategoryListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -826,11 +827,27 @@ export const ListingDetail = ({
                 {(() => {
                   const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
                   const isFree = listing.isFree;
+                  const showPrev =
+                    !!listing.previousPrice &&
+                    isPriceChangeFresh(listing.priceChangedAt) &&
+                    listing.previousPrice !== listing.price;
+                  const prevEl = showPrev ? (
+                    <span
+                      className={`mr-2 text-lg font-medium line-through opacity-60 ${
+                        isLight ? 'text-gray-500' : 'text-white/50'
+                      }`}
+                    >
+                      {listing.previousPrice === 'Free' || listing.previousPrice === t('common.free')
+                        ? t('common.free')
+                        : `${listing.previousPrice}${getCurrencySymbol(listing.currency)}`}
+                    </span>
+                  ) : null;
                   
                   const priceColor = isLight ? BRAND_GREEN_PRICE_ON_LIGHT : BRAND_GREEN_ON_DARK;
                   if (isFree) {
                     return (
                       <div className="text-3xl font-bold mb-1" style={{ color: priceColor }}>
+                        {prevEl}
                         {t('common.free')}
                       </div>
                     );
@@ -839,6 +856,7 @@ export const ListingDetail = ({
                   if (isNegotiable) {
                     return (
                       <div className="text-3xl font-bold mb-1" style={{ color: priceColor }}>
+                        {prevEl}
                         {t('common.negotiable')}
                       </div>
                     );
@@ -846,6 +864,7 @@ export const ListingDetail = ({
                   
                   return (
                     <>
+                      {prevEl}
                       <div className="text-3xl font-bold mb-1" style={{ color: priceColor }}>
                         {listing.price}
                       </div>

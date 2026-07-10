@@ -50,6 +50,10 @@ model Listing {
   title             String
   description       String
   price             String
+  /** Попередня ціна після зміни (для відображення на картці). */
+  previousPrice     String?
+  /** Коли востаннє змінили ціну. */
+  priceChangedAt    DateTime?
   currency          String?  // UAH, EUR, USD
   isFree            Boolean  @default(false)
   category          String
@@ -59,6 +63,10 @@ model Listing {
   views             Int      @default(0)
   /** Додано до COUNT(Favorite) у публічному API (накрутка «обраного»). */
   favoriteBoost     Int      @default(0)
+  /** Денормалізований COUNT(Favorite) для feed без JOIN. */
+  favoritesCount    Int      @default(0)
+  /** Шлях першого thumb для карток каталогу. */
+  thumbUrl          String?
   status            String   @default("pending_moderation") // draft, pending_moderation, approved, active, sold, expired, deactivated, hidden
   moderationStatus  String   @default("pending") // pending, approved (rejected listings are deleted)
   rejectionReason   String?  // DEPRECATED: Причина відхилення модератором (rejected listings are now deleted)
@@ -100,6 +108,10 @@ model Listing {
   @@index([moderationStatus, createdAt])
   @@index([expiresAt])
   @@index([status, expiresAt])
+  @@index([condition])
+  @@index([status, condition])
+  @@index([status, currency])
+  @@index([category, status])
 }
 
 // Оголошення з Telegram-бота (TelegramListing таблиця, яку створює бот)

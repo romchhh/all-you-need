@@ -10,7 +10,12 @@ export interface Listing {
   id: number;
   title: string;
   price: string;
+  /** Попередня ціна (якщо нещодавно змінили). */
+  previousPrice?: string | null;
+  priceChangedAt?: string | null;
   currency?: 'UAH' | 'EUR' | 'USD';
+  /** Готовий thumb для картки (денормалізований). */
+  thumbUrl?: string | null;
   image: string;
   images?: string[];
   seller: Seller;

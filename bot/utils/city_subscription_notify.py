@@ -13,9 +13,10 @@ import sqlite3
 from typing import List
 
 from aiogram import Bot
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database_functions.telegram_listing_db import get_connection
+from parser.moderation.urls import listing_miniapp_url
 
 # Синхронізовано з app/utils/cityNormalization.ts (CITY_ALIASES)
 CITY_ALIASES = {
@@ -215,9 +216,7 @@ async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None
 
         for tid in recipients:
             lang = _user_language(cursor, tid)
-            listing_url = (
-                f"{webapp_url}/{lang}/bazaar?listing={listing_id}&telegramId={tid}"
-            )
+            miniapp_url = listing_miniapp_url(listing_id)
             if lang == "ru":
                 text = (
                     f"🔔 <b>Новое объявление в {safe_city}</b>\n\n"
@@ -228,9 +227,9 @@ async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None
                         if safe_photo_link
                         else ""
                     )
-                    + "Откройте витрину, чтобы посмотреть детали."
+                    + "Откройте объявление, чтобы посмотреть детали."
                 )
-                btn = "🔗 Открыть"
+                btn = "🔗 Открыть объявление"
             else:
                 text = (
                     f"🔔 <b>Нове оголошення у {safe_city}</b>\n\n"
@@ -241,18 +240,13 @@ async def notify_city_subscribers_marketplace(bot: Bot, listing_id: int) -> None
                         if safe_photo_link
                         else ""
                     )
-                    + "Відкрийте вітрину, щоб переглянути деталі."
+                    + "Відкрийте оголошення, щоб переглянути деталі."
                 )
-                btn = "🔗 Відкрити"
+                btn = "🔗 Відкрити оголошення"
 
             kb = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=btn,
-                            web_app=WebAppInfo(url=listing_url),
-                        )
-                    ]
+                    [InlineKeyboardButton(text=btn, url=miniapp_url)]
                 ]
             )
             try:

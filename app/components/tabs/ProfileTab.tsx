@@ -6,7 +6,6 @@ import { useUser } from '@/features/user/hooks/useUser';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { ProfileListingCard } from '@/components/listing/ProfileListingCard';
 import { EditProfileModal } from '@/components/modals/EditProfileModal';
-import { EditListingModal } from '@/components/modals/EditListingModal';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { ReferralModal } from '@/components/modals/ReferralModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -30,6 +29,10 @@ import { useRouter, useParams } from 'next/navigation';
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 
+const EditListingModal = dynamic(
+  () => import('@/components/modals/EditListingModal').then((m) => ({ default: m.EditListingModal })),
+  { ssr: false }
+);
 // Динамічний імпорт PromotionModal, PaymentSummaryModal та ReactivateListingFlow
 const PromotionModal = dynamic(() => import('@/components/modals/PromotionModal'), {
   ssr: false,

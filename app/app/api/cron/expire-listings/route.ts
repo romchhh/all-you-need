@@ -61,14 +61,26 @@ export async function POST(request: NextRequest) {
       renewed += 1;
     }
 
-    // 2) Решта прострочених — у статус expired + старе повідомлення
+    // 2) Решта прострочених: platform/parser → sold; user → expired + notify
     const expiredListings = (await prisma.$queryRawUnsafe(
-      `SELECT l.id, l.title, l.userId FROM Listing l
+      `SELECT l.id, l.title, l.userId,
+              CAST(u.telegramId AS INTEGER) as telegramId,
+              u.username,
+              EXISTS(SELECT 1 FROM parsed_items pi WHERE pi.marketplace_listing_id = l.id) as fromParser
+       FROM Listing l
+       JOIN User u ON u.id = l.userId
        WHERE l.status = 'active'
          AND datetime(l.expiresAt) <= datetime(?)
          AND l.expiresAt IS NOT NULL`,
       now
-    )) as Array<{ id: number; title: string; userId: number }>;
+    )) as Array<{
+      id: number;
+      title: string;
+      userId: number;
+      telegramId: number | null;
+      username: string | null;
+      fromParser: number;
+    }>;
 
     if (expiredListings.length === 0) {
       return NextResponse.json({
@@ -76,27 +88,51 @@ export async function POST(request: NextRequest) {
         message: renewed > 0 ? 'Only auto-renewals processed' : 'No expired listings found',
         renewed,
         deactivated: 0,
+        sold: 0,
       });
     }
 
-    const listingIds = expiredListings.map((l) => l.id);
-    await executeInClause(
-      `UPDATE Listing
-       SET status = 'expired',
-           updatedAt = datetime('now')
-       WHERE id IN (?)`,
-      listingIds
+    const parserBotIds = new Set(
+      [
+        process.env.PARSER_BOT_TELEGRAM_ID,
+        process.env.PARSER_SERVICES_BOT_TELEGRAM_ID,
+        process.env.PARSER_FALLBACK_BOT_TELEGRAM_ID,
+        '8590825131',
+      ]
+        .map((v) => parseInt(String(v || ''), 10))
+        .filter((n) => n > 0)
     );
 
-    const notificationPromises = expiredListings.map(async (listing) => {
-      try {
-        const users = (await prisma.$queryRawUnsafe(
-          `SELECT CAST(telegramId AS INTEGER) as telegramId FROM User WHERE id = ?`,
-          listing.userId
-        )) as Array<{ telegramId: number }>;
+    const soldListings: typeof expiredListings = [];
+    const userExpiredListings: typeof expiredListings = [];
+    for (const row of expiredListings) {
+      const isParser =
+        Number(row.fromParser) === 1 ||
+        (row.telegramId != null && parserBotIds.has(Number(row.telegramId))) ||
+        ['parser_bot', 'tradeground_seller', 'tradeground_seller2'].includes(
+          (row.username || '').toLowerCase()
+        );
+      if (isParser) soldListings.push(row);
+      else userExpiredListings.push(row);
+    }
 
-        if (users[0]) {
-          await sendListingExpiredNotification(users[0].telegramId, listing.title, listing.id);
+    if (soldListings.length) {
+      await executeInClause(
+        `UPDATE Listing SET status = 'sold', updatedAt = datetime('now') WHERE id IN (?)`,
+        soldListings.map((l) => l.id)
+      );
+    }
+    if (userExpiredListings.length) {
+      await executeInClause(
+        `UPDATE Listing SET status = 'expired', updatedAt = datetime('now') WHERE id IN (?)`,
+        userExpiredListings.map((l) => l.id)
+      );
+    }
+
+    const notificationPromises = userExpiredListings.map(async (listing) => {
+      try {
+        if (listing.telegramId) {
+          await sendListingExpiredNotification(listing.telegramId, listing.title, listing.id);
         }
       } catch (error) {
         console.error(`Error notifying user for listing ${listing.id}:`, error);
@@ -105,13 +141,16 @@ export async function POST(request: NextRequest) {
 
     await Promise.allSettled(notificationPromises);
 
-    console.log(`[expire-listings] renewed: ${renewed}, deactivated: ${expiredListings.length}`);
+    console.log(
+      `[expire-listings] renewed: ${renewed}, sold: ${soldListings.length}, expired: ${userExpiredListings.length}`
+    );
 
     return NextResponse.json({
       success: true,
-      message: `Renewed ${renewed}, deactivated ${expiredListings.length} expired listings`,
+      message: `Renewed ${renewed}, sold ${soldListings.length}, expired ${userExpiredListings.length}`,
       renewed,
-      deactivated: expiredListings.length,
+      sold: soldListings.length,
+      deactivated: userExpiredListings.length,
       listings: expiredListings.map((l) => ({ id: l.id, title: l.title })),
     });
   } catch (error) {

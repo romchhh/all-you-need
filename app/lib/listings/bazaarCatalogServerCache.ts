@@ -35,14 +35,24 @@ export function buildBazaarCatalogCacheKey(params: {
   sortBy: string;
   limit: number;
   offset: number;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  condition?: string | null;
+  currency?: string | null;
+  feed?: boolean;
 }): string {
   return [
+    params.feed ? 'feed' : 'full',
     params.category ?? '',
     params.subcategory ?? '',
     params.isFree ? '1' : '0',
     params.cities.join(','),
     params.search ?? '',
     params.sortBy,
+    String(params.minPrice ?? ''),
+    String(params.maxPrice ?? ''),
+    params.condition ?? '',
+    params.currency ?? '',
     String(params.limit),
     String(params.offset),
   ].join('|');

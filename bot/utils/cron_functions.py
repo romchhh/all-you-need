@@ -13,6 +13,11 @@ from utils.moderation_manager import ModerationManager
 
 
 async def deactivate_old_listings(bot: Bot = None):
+    """
+    active старше 30 днів:
+    - платформенні (parser bot / parsed_items) → sold
+    - користувацькі → expired (+ notify)
+    """
     conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
     cursor = conn.cursor()
 
@@ -20,8 +25,21 @@ async def deactivate_old_listings(bot: Bot = None):
         thirty_days_ago = datetime.now() - timedelta(days=30)
         thirty_days_ago_str = thirty_days_ago.strftime('%Y-%m-%d %H:%M:%S')
 
+        parser_bot_ids = []
+        for env_key in (
+            "PARSER_BOT_TELEGRAM_ID",
+            "PARSER_SERVICES_BOT_TELEGRAM_ID",
+            "PARSER_FALLBACK_BOT_TELEGRAM_ID",
+        ):
+            raw = (os.getenv(env_key) or "").strip()
+            if raw.isdigit() and int(raw) > 0:
+                parser_bot_ids.append(int(raw))
+        if 8590825131 not in parser_bot_ids:
+            parser_bot_ids.append(8590825131)
+
         cursor.execute('''
-            SELECT l.id, l.userId, l.title, l.createdAt, l.publishedAt, u.telegramId
+            SELECT l.id, l.userId, l.title, l.createdAt, l.publishedAt,
+                   u.telegramId, u.username
             FROM Listing l
             JOIN User u ON l.userId = u.id
             WHERE l.status = 'active'
@@ -37,21 +55,64 @@ async def deactivate_old_listings(bot: Bot = None):
             conn.close()
             return
 
-        listing_ids = [listing[0] for listing in old_listings]
-        placeholders = ','.join(['?'] * len(listing_ids))
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        sold_ids: List[int] = []
+        expired_rows: List = []
 
-        cursor.execute(f'''
-            UPDATE Listing
-            SET status = 'expired', updatedAt = ?
-            WHERE id IN ({placeholders})
-        ''', [datetime.now().strftime('%Y-%m-%d %H:%M:%S')] + listing_ids)
+        for row in old_listings:
+            listing_id, user_id, title, created_at, published_at, telegram_id, username = row
+            is_parser = False
+            try:
+                tid = int(telegram_id) if telegram_id is not None else 0
+            except (TypeError, ValueError):
+                tid = 0
+            if tid in parser_bot_ids or (username or "").lower() in (
+                "parser_bot",
+                "tradeground_seller",
+                "tradeground_seller2",
+            ):
+                is_parser = True
+            else:
+                try:
+                    cursor.execute(
+                        "SELECT 1 FROM parsed_items WHERE marketplace_listing_id = ? LIMIT 1",
+                        (listing_id,),
+                    )
+                    if cursor.fetchone():
+                        is_parser = True
+                except sqlite3.OperationalError:
+                    pass
+
+            if is_parser:
+                sold_ids.append(listing_id)
+            else:
+                expired_rows.append(row)
+
+        if sold_ids:
+            placeholders = ','.join(['?'] * len(sold_ids))
+            cursor.execute(f'''
+                UPDATE Listing
+                SET status = 'sold', updatedAt = ?
+                WHERE id IN ({placeholders})
+            ''', [now_str] + sold_ids)
+            print(f"[deactivate_old_listings] platform → sold: {len(sold_ids)}")
+
+        if expired_rows:
+            expired_ids = [r[0] for r in expired_rows]
+            placeholders = ','.join(['?'] * len(expired_ids))
+            cursor.execute(f'''
+                UPDATE Listing
+                SET status = 'expired', updatedAt = ?
+                WHERE id IN ({placeholders})
+            ''', [now_str] + expired_ids)
+            print(f"[deactivate_old_listings] user → expired: {len(expired_ids)}")
 
         conn.commit()
         conn.close()
 
-        if bot:
-            for row in old_listings:
-                listing_id, user_id, title, created_at, published_at, telegram_id = row
+        if bot and expired_rows:
+            for row in expired_rows:
+                listing_id, user_id, title, created_at, published_at, telegram_id, username = row
                 if not telegram_id:
                     continue
                 try:

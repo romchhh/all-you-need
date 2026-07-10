@@ -253,6 +253,20 @@ def init_prisma_tables():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_userId_category ON Listing(userId, category)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_status_isFree_createdAt ON Listing(status, isFree, createdAt)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_category_subcategory_status ON Listing(category, subcategory, status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_category_status ON Listing(category, status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_status_condition ON Listing(status, condition)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_status_currency ON Listing(status, currency)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_listing_condition ON Listing(condition)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_listingId ON Favorite(listingId)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_listingId_userId ON Favorite(listingId, userId)')
+        try:
+            cursor.execute('ALTER TABLE Listing ADD COLUMN favoritesCount INTEGER NOT NULL DEFAULT 0')
+        except Exception:
+            pass
+        try:
+            cursor.execute('ALTER TABLE Listing ADD COLUMN thumbUrl TEXT')
+        except Exception:
+            pass
         
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_userId ON Favorite(userId)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorite_listingId ON Favorite(listingId)')

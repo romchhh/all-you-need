@@ -846,6 +846,13 @@ class ModerationManager:
             # Отримуємо username бота з .env
             bot_username = os.getenv('BOT_USERNAME', 'TradeGroundBot')
             bot_link = f"https://t.me/{bot_username}"
+            listing_open_url = listing_miniapp_url(listing_id)
+            view_btn = t(user_id_for_lang, 'my_listings.view_listing_button')
+            submit_btn = t(user_id_for_lang, 'listing.submit_ad_button')
+            channel_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=view_btn, url=listing_open_url)],
+                [InlineKeyboardButton(text=submit_btn, url=bot_link)],
+            ])
             
             # Отримуємо мову користувача для перекладу (використовуємо user_id_for_lang, який вже встановлено)
             bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
@@ -870,10 +877,7 @@ class ModerationManager:
             
             if images and len(images) > 0:
                 first_id, first_type = self._media_item_file_id_and_type(images[0])
-                button_text = t(user_id_for_lang, 'listing.submit_ad_button')
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=button_text, url=bot_link)]
-                ])
+                keyboard = channel_keyboard
                 text_with_bot = text + bot_text
 
                 if len(images) == 1:
@@ -990,16 +994,7 @@ class ModerationManager:
                 if default_photo_path:
                     # Використовуємо дефолтне фото з кнопкою посилання на бота
                     text_with_bot = text + bot_text
-                    
-                    # Отримуємо текст кнопки залежно від мови користувача
-                    button_text = t(user_id_for_lang, 'listing.submit_ad_button')
-                    
-                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(
-                            text=button_text,
-                            url=bot_link
-                        )]
-                    ])
+                    keyboard = channel_keyboard
                     
                     photo_file = FSInputFile(default_photo_path)
                     message = await self.bot.send_photo(

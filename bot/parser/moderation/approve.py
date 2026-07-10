@@ -140,7 +140,12 @@ async def _approve_services_channel_only(
 
     async def _followup():
         published_chats = await publish_services_listing_to_channel(
-            bot, listing_item, item_id, description, images_web
+            bot,
+            listing_item,
+            item_id,
+            description,
+            images_web,
+            marketplace_listing_id=None,
         )
         update_mod_path_status(item_id, "channel", "approved", moderated_by=moderator_id)
         final_status = status_text

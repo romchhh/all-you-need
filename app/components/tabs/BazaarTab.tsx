@@ -3,15 +3,11 @@ import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
-import { ListingCard } from '@/components/listing/ListingCard';
-import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
-import { SortModal } from '@/components/modals/SortModal';
-import { CityModal } from '@/components/modals/CityModal';
+import { BazaarListingsVirtualFeed } from '@/components/listing/BazaarListingsVirtualFeed';
+import dynamic from 'next/dynamic';
 import { SubcategoryList } from '@/components/listing/SubcategoryList';
 import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
 import { TopBar } from '@/components/layout/TopBar';
-import { HomeActivityStats } from '@/components/home/HomeActivityStats';
-import { HomePlatformTicker } from '@/components/home/HomePlatformTicker';
 import type { PlatformOnboardingActionId } from '@/utils/platformTickerMessages';
 import { ListingsRefreshOverlay } from '@/components/ui/ListingsRefreshOverlay';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
@@ -23,6 +19,29 @@ import { useState, useMemo, useRef, useEffect, useCallback, memo, useDeferredVal
 import { useParams, useRouter } from 'next/navigation';
 import { pickBazaarTabField } from '@/lib/bazaar/bazaarTabStateStorage';
 import { Currency } from '@/utils/currency';
+
+const SortModal = dynamic(
+  () => import('@/components/modals/SortModal').then((m) => ({ default: m.SortModal })),
+  { ssr: false }
+);
+const CityModal = dynamic(
+  () => import('@/components/modals/CityModal').then((m) => ({ default: m.CityModal })),
+  { ssr: false }
+);
+const HomePlatformTicker = dynamic(
+  () =>
+    import('@/components/home/HomePlatformTicker').then((m) => ({
+      default: m.HomePlatformTicker,
+    })),
+  { ssr: false }
+);
+const HomeActivityStats = dynamic(
+  () =>
+    import('@/components/home/HomeActivityStats').then((m) => ({
+      default: m.HomeActivityStats,
+    })),
+  { ssr: false }
+);
 
 interface BazaarTabProps {
   categories: Category[];
@@ -222,11 +241,7 @@ const BazaarTabComponent = ({
   
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [cityModalOpenSubscriptions, setCityModalOpenSubscriptions] = useState(false);
-  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
-  const seenListingIdsRef = useRef<Set<number>>(new Set());
-  const listingsInitializedRef = useRef(false);
-  const [appearingListingIds, setAppearingListingIds] = useState<Set<number>>(new Set());
-  
+
   const [minPrice, setMinPrice] = useState<number | null>(() =>
     pickBazaarTabField(savedState, 'minPrice')
   );
@@ -401,124 +416,10 @@ const BazaarTabComponent = ({
     return Array.from(suggestionsSet).slice(0, 5);
   }, [searchQuery, listings, searchHistory]);
 
-  // Плавна поява нових оголошень при підвантаженні
-  useEffect(() => {
-    if (!listingsInitializedRef.current) {
-      listings.forEach((l) => seenListingIdsRef.current.add(l.id));
-      listingsInitializedRef.current = true;
-      return;
-    }
+  // Фільтри price/condition/currency — на сервері через /api/listings/feed
+  const filteredAndSortedListings = deferredListings;
 
-    const fresh = new Set<number>();
-    listings.forEach((l) => {
-      if (!seenListingIdsRef.current.has(l.id)) {
-        fresh.add(l.id);
-        seenListingIdsRef.current.add(l.id);
-      }
-    });
-
-    if (fresh.size > 0) {
-      setAppearingListingIds(fresh);
-      const timer = setTimeout(() => setAppearingListingIds(new Set()), 600);
-      return () => clearTimeout(timer);
-    }
-  }, [listings]);
-
-  const filteredAndSortedListings = useMemo(() => {
-    // Early return для порожнього списку
-    if (deferredListings.length === 0) return [];
-    
-    let filtered = deferredListings;
-
-    // Пошук — на сервері (після debounce). Локальну фільтрацію прибрано: вона дублювала роботу
-    // і гальмувала UI при кожному символі в полі пошуку.
-
-    // Фільтр безкоштовних (швидка перевірка)
-    if (showFreeOnly) {
-      filtered = filtered.filter(listing => listing.isFree);
-    }
-
-    // Фільтр по містам (оптимізовано)
-    if (selectedCities.length > 0) {
-      const lowerCities = selectedCities.map(c => c.toLowerCase());
-      filtered = filtered.filter(listing => {
-        const lowerLocation = listing.location.toLowerCase();
-        return lowerCities.some(city => lowerLocation.includes(city));
-      });
-    }
-
-    // Фільтр по стану товару (швидка перевірка)
-    if (selectedCondition) {
-      filtered = filtered.filter(listing => listing.condition === selectedCondition);
-    }
-
-    // Фільтр по валюті (швидка перевірка)
-    if (selectedCurrency) {
-      filtered = filtered.filter(listing => listing.currency === selectedCurrency);
-    }
-
-    // Фільтр по діапазону цін
-    if (minPrice !== null || maxPrice !== null) {
-      filtered = filtered.filter(listing => {
-        if (listing.isFree) {
-          return minPrice === null || minPrice === 0;
-        }
-        const price = parseInt(listing.price.replace(/\s/g, '').replace(/[₴€$]/g, '')) || 0;
-        return (minPrice === null || price >= minPrice) && (maxPrice === null || price <= maxPrice);
-      });
-    }
-
-    // Сортування (оптимізовано - не сортуємо якщо newest і немає ціни)
-    if (sortBy === 'newest') {
-      return filtered; // Не треба сортувати, оголошення вже відсортовані за датою
-    }
-    
-    // Для сортувань по ціні - кешуємо ціни
-    if (sortBy === 'price_low' || sortBy === 'price_high') {
-      const withPrices = filtered.map(listing => ({
-        listing,
-        price: listing.isFree ? 0 : parseInt(listing.price.replace(/\D/g, '')) || 0,
-        isFree: listing.isFree
-      }));
-      
-      withPrices.sort((a, b) => {
-        if (sortBy === 'price_low') {
-          if (a.isFree !== b.isFree) return a.isFree ? -1 : 1;
-          return a.price - b.price;
-        } else {
-          if (a.isFree !== b.isFree) return a.isFree ? 1 : -1;
-          return b.price - a.price;
-        }
-      });
-      
-      return withPrices.map(item => item.listing);
-    }
-    
-    // Сортування по популярності
-    if (sortBy === 'popular') {
-      return [...filtered].sort((a, b) => b.views - a.views);
-    }
-
-    return filtered;
-  }, [deferredListings, showFreeOnly, sortBy, selectedCities, minPrice, maxPrice, selectedCondition, selectedCurrency]);
-
-  // Автопідвантаження при прокрутці до кінця списку
-  useEffect(() => {
-    const sentinel = loadMoreSentinelRef.current;
-    if (!sentinel || !onLoadMore || !hasMore) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && !loadingMore) {
-          onLoadMore();
-        }
-      },
-      { rootMargin: '320px 0px' }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, onLoadMore, filteredAndSortedListings.length]);
+  // loadMore — через Virtuoso endReached
 
   const getSortLabel = () => {
     switch (sortBy) {
@@ -842,62 +743,19 @@ const BazaarTabComponent = ({
             }`}
           >
             {isRefreshing && <ListingsRefreshOverlay />}
-            {viewMode === 'grid' ? (
-              <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
-                  {filteredAndSortedListings.map((listing, index) => (
-                    <div
-                      key={listing.id}
-                      className={
-                        appearingListingIds.has(listing.id) ? 'animate-listing-appear' : undefined
-                      }
-                    >
-                      <ListingCard
-                        listing={listing}
-                        isFavorite={favorites.has(listing.id)}
-                        onSelect={onSelectListing}
-                        onToggleFavorite={onToggleFavorite}
-                        tg={tg}
-                        priority={index < 4}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 px-4 pb-4">
-                {filteredAndSortedListings.map((listing) => (
-                  <div
-                    key={listing.id}
-                    className={
-                      appearingListingIds.has(listing.id) ? 'animate-listing-appear' : undefined
-                    }
-                  >
-                    <ListingCardColumn
-                      listing={listing}
-                      isFavorite={favorites.has(listing.id)}
-                      onSelect={onSelectListing}
-                      onToggleFavorite={onToggleFavorite}
-                      tg={tg}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+            <BazaarListingsVirtualFeed
+              listings={filteredAndSortedListings}
+              viewMode={viewMode}
+              favorites={favorites}
+              onSelectListing={onSelectListing}
+              onToggleFavorite={onToggleFavorite}
+              tg={tg}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={onLoadMore}
+              isLight={isLight}
+            />
           </div>
-
-          {/* Автопідвантаження — sentinel + індикатор */}
-          {(hasMore || loadingMore) && (
-            <div ref={loadMoreSentinelRef} className="flex justify-center px-4 py-6 pb-24">
-              {loadingMore && (
-                <div
-                  className={`h-6 w-6 animate-spin rounded-full border-2 border-t-transparent ${
-                    isLight ? 'border-[#3F5331]/30 border-t-[#3F5331]' : 'border-white/20 border-t-[#C8E6A0]'
-                  }`}
-                />
-              )}
-            </div>
-          )}
         </>
       ) : isRefreshing ? (
         <div className="relative min-h-[40vh] px-4 py-16">

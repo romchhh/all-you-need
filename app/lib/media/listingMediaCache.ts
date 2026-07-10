@@ -22,7 +22,7 @@ export function isListingImageLoaded(url: string): boolean {
 }
 
 /** Прогрів HTTP/SW-кешу без дублювання запитів у сесії. */
-export function prefetchListingImageUrls(urls: string[], limit = 32): void {
+export function prefetchListingImageUrls(urls: string[], limit = 8): void {
   if (typeof window === 'undefined') return;
 
   const unique = [...new Set(urls.filter(Boolean))].slice(0, limit);
@@ -45,7 +45,7 @@ export function prefetchListingImageUrls(urls: string[], limit = 32): void {
 
 export function collectListingImageUrls(
   listings: Array<{ image?: string; images?: string[] }>,
-  limit = 32
+  limit = 8
 ): string[] {
   const urls: string[] = [];
   const seen = new Set<string>();
@@ -61,7 +61,7 @@ export function collectListingImageUrls(
 
 export function prefetchListingsImages(
   listings: Array<{ image?: string; images?: string[] }>,
-  limit = 32
+  limit = 8
 ): void {
   prefetchListingImageUrls(collectListingImageUrls(listings, limit), limit);
 }

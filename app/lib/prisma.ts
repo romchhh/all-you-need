@@ -47,13 +47,23 @@ async function createAdditionalIndexes(): Promise<void> {
   await createIndexSafely('idx_listing_publishedAt', `CREATE INDEX IF NOT EXISTS idx_listing_publishedAt ON Listing(publishedAt)`);
   await createIndexSafely('idx_listing_currency', `CREATE INDEX IF NOT EXISTS idx_listing_currency ON Listing(currency)`);
   await createIndexSafely('idx_listing_views', `CREATE INDEX IF NOT EXISTS idx_listing_views ON Listing(views)`);
+  await createIndexSafely('idx_listing_condition', `CREATE INDEX IF NOT EXISTS idx_listing_condition ON Listing(condition)`);
   
   // Composite індекси для Listing
   await createIndexSafely('idx_listing_status_createdAt', `CREATE INDEX IF NOT EXISTS idx_listing_status_createdAt ON Listing(status, createdAt)`);
+  await createIndexSafely('idx_listing_status_createdAt_desc', `CREATE INDEX IF NOT EXISTS idx_listing_status_createdAt_desc ON Listing(status, createdAt DESC)`);
+  await createIndexSafely('idx_listing_category_status', `CREATE INDEX IF NOT EXISTS idx_listing_category_status ON Listing(category, status)`);
+  await createIndexSafely('idx_listing_status_category', `CREATE INDEX IF NOT EXISTS idx_listing_status_category ON Listing(status, category)`);
+  await createIndexSafely('idx_listing_status_condition', `CREATE INDEX IF NOT EXISTS idx_listing_status_condition ON Listing(status, condition)`);
+  await createIndexSafely('idx_listing_status_currency', `CREATE INDEX IF NOT EXISTS idx_listing_status_currency ON Listing(status, currency)`);
   await createIndexSafely('idx_listing_status_views', `CREATE INDEX IF NOT EXISTS idx_listing_status_views ON Listing(status, views)`);
   await createIndexSafely('idx_listing_userId_status', `CREATE INDEX IF NOT EXISTS idx_listing_userId_status ON Listing(userId, status)`);
   await createIndexSafely('idx_listing_userId_category', `CREATE INDEX IF NOT EXISTS idx_listing_userId_category ON Listing(userId, category)`);
   await createIndexSafely('idx_listing_status_isFree_createdAt', `CREATE INDEX IF NOT EXISTS idx_listing_status_isFree_createdAt ON Listing(status, isFree, createdAt)`);
+
+  // Favorite
+  await createIndexSafely('idx_favorite_listingId', `CREATE INDEX IF NOT EXISTS idx_favorite_listingId ON Favorite(listingId)`);
+  await createIndexSafely('idx_favorite_listingId_userId', `CREATE INDEX IF NOT EXISTS idx_favorite_listingId_userId ON Favorite(listingId, userId)`);
   
   // ViewHistory індекси
   await createIndexSafely('idx_viewhistory_viewerTelegramId', `CREATE INDEX IF NOT EXISTS idx_viewhistory_viewerTelegramId ON ViewHistory(viewerTelegramId)`);
@@ -346,6 +356,13 @@ export async function ensureListingApiRawColumns(): Promise<void> {
       'autoRenew',
       'ALTER TABLE Listing ADD COLUMN autoRenew INTEGER NOT NULL DEFAULT 0'
     );
+    await addColumn('previousPrice', 'ALTER TABLE Listing ADD COLUMN previousPrice TEXT');
+    await addColumn('priceChangedAt', 'ALTER TABLE Listing ADD COLUMN priceChangedAt DATETIME');
+    await addColumn(
+      'favoritesCount',
+      'ALTER TABLE Listing ADD COLUMN favoritesCount INTEGER NOT NULL DEFAULT 0'
+    );
+    await addColumn('thumbUrl', 'ALTER TABLE Listing ADD COLUMN thumbUrl TEXT');
 
     if (names.has('optimizedImages')) {
       optimizedImagesColumnExists = true;

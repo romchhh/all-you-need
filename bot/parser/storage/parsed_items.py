@@ -505,6 +505,11 @@ def insert_parsed_item(
     parser_type: str = "default",
     text_embedding: Optional[str] = None,
 ) -> int:
+    from utils.location_normalization import normalize_city_name
+
+    source_city = normalize_city_name(source_city) or (source_city or "").strip() or "Germany"
+    location = normalize_city_name(location) or (location or "").strip() or source_city
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""

@@ -163,7 +163,13 @@ async def publish_services_listing_to_channel(
     listing_id: int,
     marketplace_description: str,
     images_web: list,
+    *,
+    marketplace_listing_id: int | None = None,
 ) -> list[int]:
+    """
+    listing_id — id parsed_items (для логів).
+    marketplace_listing_id — id Listing на маркетплейсі (deep link); якщо None — channel-only.
+    """
     channel_ids = resolve_services_trade_channel_ids(item)
     logger.info(
         "Listing %s → канали послуг %s (location=%r, source_city=%r)",
@@ -219,6 +225,13 @@ async def publish_services_listing_to_channel(
         .strip()
     )
 
+    bot_username = (os.getenv("BOT_USERNAME") or BOT_USERNAME or "TradeGroundBot").lstrip("@")
+    bot_link = f"https://t.me/{bot_username}"
+    listing_open_url = (
+        listing_miniapp_url(marketplace_listing_id) if marketplace_listing_id else None
+    )
+    contact_listing_url = listing_open_url or msg_link or bot_link
+
     if author_username:
         seller_full_name = f"@{author_username}"
         seller_lang = get_user_lang(user_id_for_lang) if user_id_for_lang else detect_lang(
@@ -228,7 +241,7 @@ async def publish_services_listing_to_channel(
             build_seller_telegram_url(
                 author_username,
                 title,
-                listing_miniapp_url(listing_id),
+                contact_listing_url,
                 lang=seller_lang,
             ),
             quote=True,
@@ -255,8 +268,6 @@ async def publish_services_listing_to_channel(
         else:
             seller_text = f"{seller_label} {html.escape(seller_default_name)}"
 
-    bot_username = (os.getenv("BOT_USERNAME") or BOT_USERNAME or "TradeGroundBot").lstrip("@")
-    bot_link = f"https://t.me/{bot_username}"
     bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
 
     text = f"""{title_style}
@@ -274,10 +285,16 @@ async def publish_services_listing_to_channel(
     if len(text_with_bot) > 1024:
         text_with_bot = text_with_bot[:1023] + "…"
 
-    button_text = t(user_id_for_lang, "listing.submit_ad_button")
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=button_text, url=bot_link)]]
-    )
+    submit_btn = t(user_id_for_lang, "listing.submit_ad_button")
+    keyboard_rows: list[list[InlineKeyboardButton]] = []
+    if listing_open_url:
+        view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
+        keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=listing_open_url)])
+    elif msg_link:
+        view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
+        keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=msg_link)])
+    keyboard_rows.append([InlineKeyboardButton(text=submit_btn, url=bot_link)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
 
     photo_inputs = _channel_photo_inputs_from_images_web(list(images_web) if images_web else [])
 

@@ -4,15 +4,29 @@ import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
 import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
-import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
+import {
+  LISTING_FAVORITES_COUNT_SQL,
+  LISTING_FAVORITES_JOIN_SQL,
+  LISTING_FAVORITES_COUNT_FROM_JOIN_SQL,
+} from '@/lib/listingFavoritesCountSql';
 import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
 import {
   buildBazaarCatalogCacheKey,
   getBazaarCatalogServerCache,
   setBazaarCatalogServerCache,
 } from '@/lib/listings/bazaarCatalogServerCache';
+import {
+  appendCatalogFiltersToWhere,
+  parseConditionParam,
+  parseOptionalInt,
+} from '@/lib/listings/catalogFilters';
+import {
+  generateSearchVariants,
+  generateSearchVariantsWithCities,
+  normalizeCyrillicToLower,
+} from '@/lib/listings/searchVariants';
 
-// Відключаємо кешування для API route
+// force-dynamic: Next route cache off; каталог прискорюємо in-memory bazaarCatalogServerCache
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -31,58 +45,6 @@ function normalizeFavoritesCount(value: number | bigint | string | undefined): n
   if (typeof value === 'bigint') return Number(value);
   if (typeof value === 'string') return parseInt(value, 10) || 0;
   return 0;
-}
-
-// Функція для нормалізації кирилиці до lowercase
-// JavaScript's toLowerCase() правильно працює з кирилицею
-function normalizeCyrillicToLower(text: string): string {
-  return text.toLowerCase();
-}
-
-// Функція для генерації всіх можливих варіантів регістру для пошуку
-// Генерує варіанти: оригінальний, всі малі, перша велика решта малі
-function generateSearchVariants(searchText: string): string[] {
-  const variants = new Set<string>();
-  const normalized = normalizeCyrillicToLower(searchText);
-  
-  // Додаємо оригінальний варіант
-  variants.add(searchText);
-  
-  // Додаємо lowercase варіант
-  variants.add(normalized);
-  
-  // Додаємо варіант з першою великою літерою
-  if (searchText.length > 0) {
-    const firstUpper = normalized.charAt(0).toUpperCase() + normalized.slice(1);
-    variants.add(firstUpper);
-  }
-  
-  // Додаємо варіант з усіма великими літерами
-  variants.add(searchText.toUpperCase());
-  
-  return Array.from(variants);
-}
-
-// Розширюємо варіанти пошуку з урахуванням синонімів міст.
-// Якщо запит — одне слово і воно збігається з відомим містом (РУ/EN),
-// додаємо варіанти для канонічної назви (наприклад, "Гамбург"/"Hamburg" → "Hamburg").
-function generateSearchVariantsWithCities(searchText: string): string[] {
-  const baseVariants = generateSearchVariants(searchText);
-  const trimmed = searchText.trim();
-  if (!trimmed) return baseVariants;
-  
-  // Працюємо тільки з одиничними словами, щоб не ламати складні запити
-  if (/\s/.test(trimmed)) {
-    return baseVariants;
-  }
-
-  const normalizedCity = normalizeCityInput(trimmed);
-  if (normalizedCity === trimmed) {
-    return baseVariants;
-  }
-
-  const cityVariants = generateSearchVariants(normalizedCity);
-  return Array.from(new Set([...baseVariants, ...cityVariants]));
 }
 
 // Глобальна змінна для відстеження ініціалізації таблиці Favorite
@@ -120,6 +82,12 @@ export async function GET(request: NextRequest) {
       ? citiesParam.split(',').map(c => c.trim()).filter(Boolean)
       : [];
     const cities = citiesRaw.map(c => normalizeCityInput(c));
+    const minPrice = parseOptionalInt(searchParams.get('minPrice'));
+    const maxPrice = parseOptionalInt(searchParams.get('maxPrice'));
+    const conditionFilter = parseConditionParam(searchParams.get('condition'));
+    const currencyRaw = searchParams.get('currency')?.trim().toUpperCase() || null;
+    const currencyFilter =
+      currencyRaw && ['EUR', 'USD', 'UAH'].includes(currencyRaw) ? currencyRaw : null;
 
     // Якщо це запит для профілю користувача (userId), показуємо всі його оголошення
     // Інакше показуємо тільки активні оголошення для каталогу
@@ -252,6 +220,8 @@ export async function GET(request: NextRequest) {
           l.title,
           l.description,
           l.price,
+          l.previousPrice,
+          l.priceChangedAt,
           ${currencyColumnExists ? 'l.currency,' : 'NULL as currency,'}
           l.isFree,
           l.category,
@@ -364,9 +334,10 @@ export async function GET(request: NextRequest) {
         ...countParams
       ) as Array<{ count: bigint }>;
 
-      // Оголошення з минулим expiresAt — оновлюємо статус в БД на expired і повертаємо як expired
+      // Оголошення з минулим expiresAt — platform → sold, user → expired
       const now = Date.now();
       const expiredIds: number[] = [];
+      const soldIdSet = new Set<number>();
       for (const listing of userListings) {
         const s = listing.status ?? 'active';
         if (s !== 'active' || !listing.expiresAt) continue;
@@ -377,10 +348,56 @@ export async function GET(request: NextRequest) {
       }
       if (expiredIds.length > 0) {
         try {
-          await executeInClause(
-            `UPDATE Listing SET status = 'expired', updatedAt = datetime('now') WHERE id IN (?)`,
-            expiredIds
+          const parserRows = (await prisma.$queryRawUnsafe(
+            `SELECT l.id,
+                    CAST(u.telegramId AS INTEGER) as telegramId,
+                    u.username,
+                    EXISTS(SELECT 1 FROM parsed_items pi WHERE pi.marketplace_listing_id = l.id) as fromParser
+             FROM Listing l
+             JOIN User u ON u.id = l.userId
+             WHERE l.id IN (${expiredIds.map(() => '?').join(',')})`,
+            ...expiredIds
+          )) as Array<{
+            id: number;
+            telegramId: number | null;
+            username: string | null;
+            fromParser: number;
+          }>;
+          const parserBotIds = new Set(
+            [
+              process.env.PARSER_BOT_TELEGRAM_ID,
+              process.env.PARSER_SERVICES_BOT_TELEGRAM_ID,
+              process.env.PARSER_FALLBACK_BOT_TELEGRAM_ID,
+              '8590825131',
+            ]
+              .map((v) => parseInt(String(v || ''), 10))
+              .filter((n) => n > 0)
           );
+          const soldIds: number[] = [];
+          const userExpiredIds: number[] = [];
+          for (const row of parserRows) {
+            const isParser =
+              Number(row.fromParser) === 1 ||
+              (row.telegramId != null && parserBotIds.has(Number(row.telegramId))) ||
+              ['parser_bot', 'tradeground_seller', 'tradeground_seller2'].includes(
+                (row.username || '').toLowerCase()
+              );
+            if (isParser) soldIds.push(row.id);
+            else userExpiredIds.push(row.id);
+          }
+          for (const id of soldIds) soldIdSet.add(id);
+          if (soldIds.length) {
+            await executeInClause(
+              `UPDATE Listing SET status = 'sold', updatedAt = datetime('now') WHERE id IN (?)`,
+              soldIds
+            );
+          }
+          if (userExpiredIds.length) {
+            await executeInClause(
+              `UPDATE Listing SET status = 'expired', updatedAt = datetime('now') WHERE id IN (?)`,
+              userExpiredIds
+            );
+          }
         } catch (e) {
           console.error('[Listings API] Error updating expired listings:', e);
         }
@@ -396,13 +413,17 @@ export async function GET(request: NextRequest) {
         if (status === 'active' && listing.expiresAt) {
           try {
             const expTime = new Date(listing.expiresAt).getTime();
-            if (!Number.isNaN(expTime) && expTime <= now) status = 'expired';
+            if (!Number.isNaN(expTime) && expTime <= now) {
+              status = soldIdSet.has(listing.id) ? 'sold' : 'expired';
+            }
           } catch (_) {}
         }
         return {
           id: listing.id,
           title: listing.title,
           price: listing.isFree ? 'Free' : listing.price,
+          previousPrice: listing.previousPrice || null,
+          priceChangedAt: listing.priceChangedAt || null,
           currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
           image: images[0] || '',
           images: images,
@@ -450,6 +471,10 @@ export async function GET(request: NextRequest) {
             sortBy,
             limit,
             offset,
+            minPrice,
+            maxPrice,
+            condition: conditionFilter,
+            currency: currencyFilter,
           })
         : null;
 
@@ -468,27 +493,19 @@ export async function GET(request: NextRequest) {
       // Для загальних запитів використовуємо raw query для обходу проблем з Prisma та SQLite
       let whereClause = "WHERE l.status = 'active'";
       const params: any[] = [];
-      
-      if (category) {
-        whereClause += " AND l.category = ?";
-        params.push(category);
-      }
-      
-      if (subcategory) {
-        whereClause += " AND l.subcategory = ?";
-        params.push(subcategory);
-      }
-      
-      if (isFree) {
-        whereClause += " AND l.isFree = 1";
-      }
-
-      // Фільтр по містах: location містить хоча б одне з обраних міст (на всіх оголошеннях, до LIMIT)
-      if (cities.length > 0) {
-        const placeholders = cities.map(() => 'l.location LIKE ?').join(' OR ');
-        whereClause += ` AND (${placeholders})`;
-        cities.forEach(city => params.push(`%${city}%`));
-      }
+      whereClause = appendCatalogFiltersToWhere(whereClause, params, {
+        category,
+        subcategory,
+        isFree,
+        cities,
+        search,
+        sortBy,
+        minPrice,
+        maxPrice,
+        condition: conditionFilter,
+        currency: currencyFilter,
+        currencyColumnExists,
+      });
       
       if (search) {
         const searchTrimmed = search.trim();
@@ -538,10 +555,6 @@ export async function GET(request: NextRequest) {
         }
       }
       
-      // Додаємо фільтр для активних рекламних оголошень (promotionEnds > NOW)
-      // Якщо реклама закінчилась, оголошення все одно показується (якщо воно активне)
-      // whereClause += " AND (l.promotionEnds IS NULL OR datetime(l.promotionEnds) > datetime('now'))";
-      
       // Фільтруємо тільки активні оголошення (не закінчені)
       whereClause += " AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))";
       
@@ -585,6 +598,8 @@ export async function GET(request: NextRequest) {
                l.userId,
                l.title,
                l.price,
+               l.previousPrice,
+               l.priceChangedAt,
                ${currencyColumnExists ? 'l.currency,' : 'NULL as currency,'}
                l.isFree,
                l.category,
@@ -604,9 +619,10 @@ export async function GET(request: NextRequest) {
                u.lastName as sellerLastName,
                u.avatar as sellerAvatar,
                CAST(u.telegramId AS INTEGER) as sellerTelegramId,
-               ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
+               ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount
              FROM Listing l
              JOIN User u ON l.userId = u.id
+             ${LISTING_FAVORITES_JOIN_SQL}
              ${whereClause}
              ${orderByClause}
              LIMIT ? OFFSET ?
@@ -652,7 +668,9 @@ export async function GET(request: NextRequest) {
         }
         let queryFallback = listingsQuery;
         if (favBroken) {
-          queryFallback = queryFallback.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+          queryFallback = queryFallback
+            .replace(`, ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount`, '')
+            .replace(LISTING_FAVORITES_JOIN_SQL, '');
         }
         if (arBroken) {
           queryFallback = queryFallback.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
@@ -774,9 +792,12 @@ export async function GET(request: NextRequest) {
                id: listing.id,
                title: listing.title,
                price: listing.isFree ? 'Free' : listing.price,
+               previousPrice: (listing as any).previousPrice || null,
+               priceChangedAt: (listing as any).priceChangedAt || null,
                currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
                image: images[0] || '',
-               images: images,
+               // Каталог: лише перший thumb; повний масив — для профілю (userId)
+               images: userId ? images : images[0] ? [images[0]] : [],
                seller: {
                  name: sellerName,
                  avatar: sellerAvatar,
@@ -793,7 +814,7 @@ export async function GET(request: NextRequest) {
                publishedAt: timeFields.publishedAt,
                createdAt: timeFields.createdAt,
                condition: normalizeCondition(listing.condition),
-               tags: tags,
+               tags: userId ? tags : [],
                isFree: listing.isFree === 1 || listing.isFree === true,
                status: listing.status ?? 'active',
                moderationStatus: listing.moderationStatus || null,
@@ -807,15 +828,9 @@ export async function GET(request: NextRequest) {
              };
     });
 
-    // Кеш лише для «чистого» каталогу без фільтрів — інакше завжди свіжі дані
+    // In-memory cache: first page без search/cities (включно з category/isFree/sort)
     const isCacheableCatalog =
-      !userId &&
-      !search &&
-      !category &&
-      !subcategory &&
-      !isFree &&
-      cities.length === 0 &&
-      sortBy === 'newest';
+      !userId && !search && cities.length === 0 && offset === 0;
 
     const response = NextResponse.json({
       listings: formattedListings,
@@ -826,26 +841,28 @@ export async function GET(request: NextRequest) {
 
     if (isCacheableCatalog) {
       response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
-      if (!userId && !search && cities.length === 0 && offset === 0) {
-        setBazaarCatalogServerCache(
-          buildBazaarCatalogCacheKey({
-            category,
-            subcategory,
-            isFree,
-            cities,
-            search,
-            sortBy,
-            limit,
-            offset,
-          }),
-          {
-            listings: formattedListings,
-            total,
-            limit,
-            offset,
-          }
-        );
-      }
+      setBazaarCatalogServerCache(
+        buildBazaarCatalogCacheKey({
+          category,
+          subcategory,
+          isFree,
+          cities,
+          search,
+          sortBy,
+          limit,
+          offset,
+          minPrice,
+          maxPrice,
+          condition: conditionFilter,
+          currency: currencyFilter,
+        }),
+        {
+          listings: formattedListings,
+          total,
+          limit,
+          offset,
+        }
+      );
     } else {
       response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       response.headers.set('Pragma', 'no-cache');

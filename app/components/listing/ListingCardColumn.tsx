@@ -6,7 +6,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { getCurrencySymbol } from '@/utils/currency';
-import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
+import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingViews } from '@/lib/listings/displayStats';
@@ -103,9 +104,8 @@ const ListingCardColumnComponent = ({
   };
 
   const imageUrl = useMemo(() => {
-    const raw = listing.image || (listing.images && listing.images.length > 0 ? listing.images[0] : '');
-    return buildListingImageUrl(raw);
-  }, [listing.image, listing.images]);
+    return resolveListingCardImageUrl(listing);
+  }, [listing.thumbUrl, listing.image, listing.images, listing.category]);
 
   const formattedTime = useMemo(() => {
     const d = getListingDisplayDate(listing);
@@ -247,11 +247,27 @@ const ListingCardColumnComponent = ({
                 const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
                 const isFree = listing.isFree;
                 const fluidSize = 'text-[clamp(0.6875rem,4vw,1.125rem)]';
+                const showPrev =
+                  !!listing.previousPrice &&
+                  isPriceChangeFresh(listing.priceChangedAt) &&
+                  listing.previousPrice !== listing.price;
+                const prevEl = showPrev ? (
+                  <span
+                    className={`mr-1.5 text-[0.7em] font-medium line-through opacity-60 ${
+                      isLight ? 'text-gray-500' : 'text-white/50'
+                    }`}
+                  >
+                    {listing.previousPrice === 'Free' || listing.previousPrice === t('common.free')
+                      ? t('common.free')
+                      : `${listing.previousPrice}${getCurrencySymbol(listing.currency || 'UAH')}`}
+                  </span>
+                ) : null;
                 if (isFree) {
                   return (
                     <span
                       className={`min-w-0 font-bold ${fluidSize} ${isLight ? 'text-[#152A12]' : 'text-white'}`}
                     >
+                      {prevEl}
                       {t('common.free')}
                     </span>
                   );
@@ -264,6 +280,7 @@ const ListingCardColumnComponent = ({
                       }`}
                       title={t('common.negotiable')}
                     >
+                      {prevEl}
                       {t('common.negotiableShort')}
                     </span>
                   );
@@ -274,6 +291,7 @@ const ListingCardColumnComponent = ({
                       isLight ? 'text-[#152A12]' : 'text-white'
                     }`}
                   >
+                    {prevEl}
                     {`${listing.price}${getCurrencySymbol(listing.currency || 'UAH')}`}
                   </span>
                 );
@@ -330,6 +348,10 @@ export const ListingCardColumn = memo(ListingCardColumnComponent, (prevProps, ne
   return (
     prevProps.listing.id === nextProps.listing.id &&
     prevProps.isFavorite === nextProps.isFavorite &&
-    prevProps.listing.views === nextProps.listing.views
+    prevProps.listing.views === nextProps.listing.views &&
+    prevProps.listing.price === nextProps.listing.price &&
+    prevProps.listing.previousPrice === nextProps.listing.previousPrice &&
+    prevProps.listing.priceChangedAt === nextProps.listing.priceChangedAt &&
+    prevProps.listing.image === nextProps.listing.image
   );
 });

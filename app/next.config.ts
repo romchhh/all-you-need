@@ -62,6 +62,10 @@ const nextConfig: NextConfig = {
         headers: [listingMediaCacheHeader],
       },
       {
+        source: '/images/:path*',
+        headers: [listingMediaCacheHeader],
+      },
+      {
         source: '/:path*',
         headers: [
           {
