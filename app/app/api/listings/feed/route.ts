@@ -282,7 +282,8 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const payload = { listings: formatted, total, limit, offset };
+    const hasMore = offset + formatted.length < total;
+    const payload = { listings: formatted, total, limit, offset, hasMore };
     const response = NextResponse.json(payload);
 
     if (isServerCacheable && serverCacheKey) {

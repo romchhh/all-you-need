@@ -608,7 +608,10 @@ export function useBazaarPage() {
         const data = await response.json();
         const list = data.listings || [];
         const total = data.total ?? 0;
-        const more = list.length < total;
+        const more =
+          typeof data.hasMore === 'boolean'
+            ? data.hasMore
+            : list.length > 0 && (total > 0 ? list.length < total : list.length >= PAGE_SIZE);
         startTransition(() => {
           setListings(list);
           setTotalListings(total);
@@ -787,7 +790,11 @@ export function useBazaarPage() {
         const appended = data.listings || [];
         const total = data.total ?? 0;
         const newOffset = listingsOffset + appended.length;
-        const newHasMore = newOffset < total;
+        const newHasMore =
+          typeof data.hasMore === 'boolean'
+            ? data.hasMore
+            : appended.length > 0 &&
+              (total > 0 ? newOffset < total : appended.length >= PAGE_SIZE);
         setListings((prev) => {
           const merged = [...prev, ...appended];
           if (!hasActiveFilters && !hasSearchQuery && typeof window !== 'undefined') {

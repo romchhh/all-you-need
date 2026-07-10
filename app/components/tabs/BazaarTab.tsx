@@ -3,7 +3,8 @@ import { Category, Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
-import { BazaarListingsVirtualFeed } from '@/components/listing/BazaarListingsVirtualFeed';
+import { ListingCard } from '@/components/listing/ListingCard';
+import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
 import dynamic from 'next/dynamic';
 import { SubcategoryList } from '@/components/listing/SubcategoryList';
 import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
@@ -241,6 +242,7 @@ const BazaarTabComponent = ({
   
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [cityModalOpenSubscriptions, setCityModalOpenSubscriptions] = useState(false);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
   const [minPrice, setMinPrice] = useState<number | null>(() =>
     pickBazaarTabField(savedState, 'minPrice')
@@ -419,7 +421,23 @@ const BazaarTabComponent = ({
   // Фільтри price/condition/currency — на сервері через /api/listings/feed
   const filteredAndSortedListings = deferredListings;
 
-  // loadMore — через Virtuoso endReached
+  // Автопідвантаження при прокрутці до кінця списку (нативний window scroll)
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || !onLoadMore || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loadingMore) {
+          onLoadMore();
+        }
+      },
+      { root: null, rootMargin: '400px 0px', threshold: 0 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, onLoadMore, filteredAndSortedListings.length]);
 
   const getSortLabel = () => {
     switch (sortBy) {
@@ -743,19 +761,55 @@ const BazaarTabComponent = ({
             }`}
           >
             {isRefreshing && <ListingsRefreshOverlay />}
-            <BazaarListingsVirtualFeed
-              listings={filteredAndSortedListings}
-              viewMode={viewMode}
-              favorites={favorites}
-              onSelectListing={onSelectListing}
-              onToggleFavorite={onToggleFavorite}
-              tg={tg}
-              hasMore={hasMore}
-              loadingMore={loadingMore}
-              onLoadMore={onLoadMore}
-              isLight={isLight}
-            />
+            {viewMode === 'grid' ? (
+              <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
+                  {filteredAndSortedListings.map((listing, index) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      isFavorite={favorites.has(listing.id)}
+                      onSelect={onSelectListing}
+                      onToggleFavorite={onToggleFavorite}
+                      tg={tg}
+                      priority={index < 4}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 px-4 pb-4">
+                {filteredAndSortedListings.map((listing) => (
+                  <ListingCardColumn
+                    key={listing.id}
+                    listing={listing}
+                    isFavorite={favorites.has(listing.id)}
+                    onSelect={onSelectListing}
+                    onToggleFavorite={onToggleFavorite}
+                    tg={tg}
+                  />
+                ))}
+              </div>
+            )}
           </div>
+
+          {(hasMore || loadingMore) && (
+            <div
+              ref={loadMoreSentinelRef}
+              className="flex min-h-8 justify-center px-4 py-6 pb-24"
+              aria-hidden={!loadingMore}
+            >
+              {loadingMore && (
+                <div
+                  className={`h-6 w-6 animate-spin rounded-full border-2 border-t-transparent ${
+                    isLight
+                      ? 'border-[#3F5331]/30 border-t-[#3F5331]'
+                      : 'border-white/20 border-t-[#C8E6A0]'
+                  }`}
+                />
+              )}
+            </div>
+          )}
         </>
       ) : isRefreshing ? (
         <div className="relative min-h-[40vh] px-4 py-16">

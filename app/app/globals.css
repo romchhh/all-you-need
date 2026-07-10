@@ -94,12 +94,10 @@ html[data-theme="dark"] .app-header-shell .app-header-scroll-veil {
 }
 
 html {
-  height: 100%;
-  height: 100dvh; /* Dynamic viewport height для мобільних */
-  overflow-x: hidden; /* Запобігаємо горизонтальному скролу */
-  max-width: 100vw; /* Обмежуємо ширину */
-  /* Дозволяємо вертикальний скрол */
+  /* Один скрол-контейнер (document) — без вкладеного overflow на body */
+  overflow-x: hidden;
   overflow-y: auto;
+  max-width: 100vw;
   -webkit-overflow-scrolling: touch;
   font-family: var(--font-montserrat), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
@@ -112,14 +110,11 @@ body {
   font-family: var(--font-montserrat), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  height: 100%;
-  height: 100dvh; /* Dynamic viewport height для мобільних */
-  overflow-y: auto; /* Дозволяємо скрол тільки на body */
-  overflow-x: hidden; /* Запобігаємо горизонтальному скролу */
-  -webkit-overflow-scrolling: touch; /* Плавний скрол на iOS */
-  max-width: 100vw; /* Обмежуємо ширину */
-  width: 100%; /* Фіксуємо ширину */
-  /* Використовуємо viewport height від Telegram, якщо доступно */
+  /* Не фіксуємо height/overflow — інакше подвійний скрол і стрибки у WebView */
+  overflow-x: hidden;
+  overflow-y: visible;
+  max-width: 100vw;
+  width: 100%;
   min-height: var(--tg-viewport-height, 100vh);
   min-height: var(--tg-viewport-height, 100dvh);
 }
