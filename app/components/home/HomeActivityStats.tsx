@@ -71,6 +71,7 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
   }, [load, stats?.online, stats?.windowKey]);
 
   useEffect(() => {
+    void load(false);
     const id = setInterval(() => void load(false), HOME_ACTIVITY_CLIENT_TTL_MS);
     const onVis = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {

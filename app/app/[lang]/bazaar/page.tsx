@@ -101,7 +101,7 @@ const BazaarPage = () => {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden max-w-full pb-20 animate-content-crossfade">
+    <div className="min-h-screen max-w-full overflow-x-clip pb-20 animate-content-crossfade">
       {!selectedListing && !selectedSeller && <AppHeader />}
       <BazaarPullToRefreshIndicator
         isPulling={isPulling}
@@ -110,7 +110,7 @@ const BazaarPage = () => {
         isRefreshing={isRefreshing}
         t={t}
       />
-      <div className="mx-auto w-full max-w-2xl overflow-x-hidden lg:max-w-5xl xl:max-w-6xl">
+      <div className="mx-auto w-full max-w-2xl overflow-x-clip lg:max-w-5xl xl:max-w-6xl">
         <div className={overlayOpen ? 'hidden' : undefined} aria-hidden={overlayOpen}>
           <BazaarTab
             categories={categories}

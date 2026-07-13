@@ -5,9 +5,10 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useParams, usePathname } from 'next/navigation';
 import { NavIcon } from '@/components/layout/NavIcon';
 import { dispatchBazaarRestoreListingScroll } from '@/lib/bazaar/bazaarScrollStorage';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '@/contexts/ThemeContext';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 
 interface BottomNavigationProps {
   activeTab?: string;
@@ -27,6 +28,7 @@ export const BottomNavigation = ({
 }: BottomNavigationProps) => {
   const { t } = useLanguage();
   const { isLight } = useTheme();
+  const { show: showPageLoader, hide: hidePageLoader } = usePageTransition();
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
@@ -35,11 +37,18 @@ export const BottomNavigation = ({
   const [hiddenByOverlay, setHiddenByOverlay] = useState(false);
   const [hiddenByKeyboard, setHiddenByKeyboard] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const pendingTabNavRef = useRef(false);
   const isSearchPage = Boolean(pathname?.includes('/search'));
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!pendingTabNavRef.current) return;
+    pendingTabNavRef.current = false;
+    void hidePageLoader({ minMs: 350 });
+  }, [pathname, hidePageLoader]);
 
   useEffect(() => {
     const syncHiddenState = () => {
@@ -166,6 +175,8 @@ export const BottomNavigation = ({
     }
 
     tg?.HapticFeedback.impactOccurred('light');
+    pendingTabNavRef.current = true;
+    showPageLoader({ minMs: 350 });
 
     if (typeof window !== 'undefined') {
       const currentScrollKey = `${currentActiveTab}ScrollPosition`;
@@ -179,17 +190,23 @@ export const BottomNavigation = ({
 
     if (onTabChange) {
       onTabChange(tab);
-      return;
+    } else {
+      const routeMap: Record<string, string> = {
+        bazaar: 'bazaar',
+        categories: 'categories',
+        favorites: 'favorites',
+        profile: 'profile',
+      };
+      const route = routeMap[tab] || 'bazaar';
+      router.push(`/${lang}/${route}`);
     }
 
-    const routeMap: Record<string, string> = {
-      bazaar: 'bazaar',
-      categories: 'categories',
-      favorites: 'favorites',
-      profile: 'profile',
-    };
-    const route = routeMap[tab] || 'bazaar';
-    router.push(`/${lang}/${route}`);
+    // Якщо pathname не зміниться (напр. закрили оверлей на тому ж табі) — ховаємо лоадер самі
+    window.setTimeout(() => {
+      if (!pendingTabNavRef.current) return;
+      pendingTabNavRef.current = false;
+      void hidePageLoader();
+    }, 450);
   };
 
   if (!mounted || hiddenByOverlay || (!isSearchPage && hiddenByKeyboard) || typeof document === 'undefined') {

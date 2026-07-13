@@ -23,6 +23,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
+import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import {
   FixedLogoHeader,
   OVERLAY_BACK_BUTTON_TOP_CLASS,
@@ -78,6 +80,7 @@ export const UserProfilePage = ({
   const { user: currentUser } = useTelegram();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
+  const { hide: hidePageLoader } = usePageTransition();
 
   const avatarLongPress = useLongPress({
     onLongPress: () => {
@@ -157,6 +160,12 @@ export const UserProfilePage = ({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!loading) {
+      void hidePageLoader();
+    }
+  }, [loading, hidePageLoader]);
 
   const handleContactSeller = useCallback(() => {
     const username = userData?.username || sellerUsername;
@@ -425,7 +434,7 @@ export const UserProfilePage = ({
       <div className="px-4">
         <h3 className={`text-lg font-semibold mb-3 ${ac.pageHeading}`}>{t('listing.sellerListings')}</h3>
         {loading ? (
-          <div className={`text-center py-8 ${ac.mutedText}`}>{t('common.loading')}</div>
+          <ListingGridSkeleton count={4} compact />
         ) : listings.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
@@ -435,11 +444,7 @@ export const UserProfilePage = ({
                   listing={listing}
                   isFavorite={favorites.has(listing.id)}
                   onSelect={(selectedListing) => {
-                    // Оновлюємо дані перед закриттям профілю
-                    fetchData();
                     onSelectListing(selectedListing);
-                    // Закриваємо профіль продавця при виборі оголошення
-                    onClose();
                   }}
                   onToggleFavorite={(id) => {
                     const isFavorite = favorites.has(id);
