@@ -5,6 +5,7 @@ import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAutoPrefetch } from '@/features/bazaar/hooks/usePrefetch';
 import { Listing } from '@/types';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { expandTelegramViewportIfMobile } from '@/lib/telegram/telegramViewport';
 import { ListingDetail } from '@/components/listing/ListingDetail';
 import { UserProfilePage } from '@/components/profile/UserProfilePage';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
@@ -494,10 +495,10 @@ const ProfilePage = () => {
     tg
   });
 
-  // Забезпечуємо розгортання вікна при завантаженні та запобігаємо згортанню
+  // На мобільних — розгортаємо; на десктопі лишаємо вікно Telegram
   useEffect(() => {
     if (tg && !selectedListing && !selectedSeller) {
-      tg.expand();
+      expandTelegramViewportIfMobile(tg);
       // Увімкнення підтвердження закриття для запобігання випадковому згортанню
       if (tg.enableClosingConfirmation) {
         tg.enableClosingConfirmation();

@@ -2,11 +2,15 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { ensureTelegramViewportFullscreen } from '@/lib/telegram/telegramViewport';
+import {
+  ensureTelegramViewportFullscreen,
+  expandTelegramViewportIfMobile,
+  isTelegramDesktopClient,
+} from '@/lib/telegram/telegramViewport';
 
 /**
- * Гарантує ready + expand (+ fullscreen / swipe lock) на кожній сторінці навігації,
- * навіть якщо сторінка не викликає useTelegram().
+ * Готовність Mini App + viewport на кожній сторінці.
+ * На десктопі не форсує expand/fullscreen.
  */
 export function TelegramMiniAppViewport() {
   const pathname = usePathname();
@@ -20,13 +24,19 @@ export function TelegramMiniAppViewport() {
     if (!tg?.onEvent) return;
 
     const onViewport = () => {
-      if (tg.isExpanded === false) {
-        try {
-          tg.expand();
-        } catch {
-          /* ignore */
+      if (isTelegramDesktopClient(tg)) {
+        if (tg.isFullscreen && typeof tg.exitFullscreen === 'function') {
+          try {
+            tg.exitFullscreen();
+          } catch {
+            /* ignore */
+          }
         }
+        return;
       }
+
+      expandTelegramViewportIfMobile(tg);
+
       if (typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('8.0')) {
         if (tg.isFullscreen === false && typeof tg.requestFullscreen === 'function') {
           try {

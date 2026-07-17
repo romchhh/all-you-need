@@ -57,6 +57,10 @@ async def run_parser_cycle(
         logger.error("TOKEN не встановлено в .env — парсер не може сповіщати адмінів")
         return None
 
+    from parser.core.pyrogram_photo_patch import apply_pyrogram_photo_size_patch
+
+    apply_pyrogram_photo_size_patch()
+
     from aiogram import Bot
     from parser.admin_notify import (
         notify_admin_group,
@@ -154,6 +158,10 @@ async def run_services_ai_parser_cycle(
     if not BOT_TOKEN:
         logger.error("TOKEN не встановлено — services AI parser не може сповіщати модераторів")
         return None
+
+    from parser.core.pyrogram_photo_patch import apply_pyrogram_photo_size_patch
+
+    apply_pyrogram_photo_size_patch()
 
     from aiogram import Bot
     from parser.admin_notify import (

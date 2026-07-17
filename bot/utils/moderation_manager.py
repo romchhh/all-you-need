@@ -18,6 +18,7 @@ from database_functions.telegram_listing_db import (
 from keyboards.client_keyboards import get_category_translation
 from parser.moderation.urls import listing_miniapp_url
 from utils.seller_contact import build_seller_telegram_url
+from utils.telegram_listing_marketplace_sync import ensure_marketplace_listing_from_telegram
 from utils.translations import t, get_user_lang
 
 load_dotenv()
@@ -826,14 +827,27 @@ class ModerationManager:
             seller_default_name = t(user_id_for_lang, 'listing.details.seller_channel').replace('<b>', '').replace('</b>', '').replace(':', '').strip()
             seller_full_name = ' '.join(seller_name_parts).strip() if seller_name_parts else seller_default_name
             
+            # Deep-link лише на Listing маркетплейсу (не на TelegramListing.id!)
+            marketplace_listing_id = await ensure_marketplace_listing_from_telegram(
+                self.bot, listing
+            )
+            bot_username = os.getenv('BOT_USERNAME', 'TradeGroundBot')
+            bot_link = f"https://t.me/{bot_username}"
+            listing_open_url = (
+                listing_miniapp_url(marketplace_listing_id)
+                if marketplace_listing_id
+                else None
+            )
+
             # Формуємо посилання на продавця (без емодзі для каналу)
             seller_label = t(user_id_for_lang, 'listing.details.seller_channel')
+            contact_listing_url = listing_open_url or bot_link
             if seller_username:
                 seller_lang = get_user_lang(int(seller_telegram_id)) if seller_telegram_id else "ru"
                 seller_href = build_seller_telegram_url(
                     seller_username,
                     title,
-                    listing_miniapp_url(listing_id),
+                    contact_listing_url,
                     lang=seller_lang,
                 )
                 seller_text = f"{seller_label} <a href=\"{seller_href}\">{seller_full_name}</a>"
@@ -842,17 +856,14 @@ class ModerationManager:
                 seller_text = f"{seller_label} <a href=\"{seller_link}\">{seller_full_name}</a>"
             else:
                 seller_text = f"{seller_label} {seller_full_name}"
-            
-            # Отримуємо username бота з .env
-            bot_username = os.getenv('BOT_USERNAME', 'TradeGroundBot')
-            bot_link = f"https://t.me/{bot_username}"
-            listing_open_url = listing_miniapp_url(listing_id)
+
             view_btn = t(user_id_for_lang, 'my_listings.view_listing_button')
             submit_btn = t(user_id_for_lang, 'listing.submit_ad_button')
-            channel_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=view_btn, url=listing_open_url)],
-                [InlineKeyboardButton(text=submit_btn, url=bot_link)],
-            ])
+            keyboard_rows = []
+            if listing_open_url:
+                keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=listing_open_url)])
+            keyboard_rows.append([InlineKeyboardButton(text=submit_btn, url=bot_link)])
+            channel_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
             
             # Отримуємо мову користувача для перекладу (використовуємо user_id_for_lang, який вже встановлено)
             bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"

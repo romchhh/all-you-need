@@ -17,6 +17,7 @@ import {
   resolveSellerContactLang,
 } from '@/utils/sellerContact';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { expandTelegramViewportIfMobile } from '@/lib/telegram/telegramViewport';
 import { useUser } from '@/features/user/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSwipeBack } from '@/features/ui/hooks/useSwipeBack';
@@ -363,13 +364,12 @@ export const ListingDetail = ({
     setTimeout(checkAndFixScroll, 100);
   }, [listing.id]);
 
-  // Заборона згортання міні-додатку на сторінці товару (як на головній сторінці)
+  // На мобільних — розгортаємо; на десктопі лишаємо вікно Telegram
   useEffect(() => {
     if (!tg) return;
 
-    // Розгортаємо додаток на весь екран
-    tg.expand();
-    
+    expandTelegramViewportIfMobile(tg);
+
     // Увімкнення підтвердження закриття для запобігання випадковому згортанню
     if (tg.enableClosingConfirmation) {
       tg.enableClosingConfirmation();
