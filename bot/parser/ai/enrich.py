@@ -32,7 +32,7 @@ from parser.marketplace_categories import (
     resolve_marketplace_category,
 )
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 

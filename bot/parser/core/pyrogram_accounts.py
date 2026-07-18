@@ -9,11 +9,13 @@ from typing import Any
 
 from parser.core.account_pool import (
     PyrogramAccount,
+    extract_flood_wait_seconds,
     fallback_accounts_after,
     is_flood_limit_error,
-    list_parser_accounts,
+    list_accounts_round_robin,
 )
-from parser.session_lock import pyrogram_session_guard
+from parser.core.session_lock import pyrogram_session_guard
+from parser.storage import parser_accounts_db as accounts_db
 from parser.storage.connection import is_sqlite_locked_error
 
 logger = logging.getLogger(__name__)
@@ -270,9 +272,11 @@ async def run_channels_with_accounts(
     *,
     log_prefix: str = "Парсинг",
 ) -> dict:
-    accounts = list_parser_accounts()
+    accounts = list_accounts_round_robin(for_dm=False)
     if not accounts:
-        raise ValueError("PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не налаштовано")
+        raise ValueError(
+            "Немає активних акаунтів парсера. Додайте їх у адмін-панелі: «Парсер акаунти»."
+        )
 
     items = list(channels.items())
     buckets: list[list[tuple[str, str]]] = [[] for _ in accounts]
@@ -299,14 +303,27 @@ async def run_channels_with_accounts(
             acc.phone_tail,
             len(bucket),
         )
-        local, errors = await _run_bucket_on_account(
-            acc,
-            bucket,
-            parse_fn,
-            notify_callback,
-            log_prefix=log_prefix,
-        )
-        merge_channel_stats(total, local, channel="", city="")
-        total["errors"].extend(errors)
+        try:
+            local, errors = await _run_bucket_on_account(
+                acc,
+                bucket,
+                parse_fn,
+                notify_callback,
+                log_prefix=log_prefix,
+            )
+            merge_channel_stats(total, local, channel="", city="")
+            total["errors"].extend(errors)
+            accounts_db.mark_parse_result(acc.id, ok=True)
+        except Exception as e:
+            logger.exception("%s — збій акаунта %s: %s", log_prefix, acc.label, e)
+            accounts_db.mark_parse_result(acc.id, ok=False, error=str(e))
+            wait_sec = extract_flood_wait_seconds(e)
+            if wait_sec > 0:
+                import time as _time
+
+                accounts_db.set_flood_until(acc.id, _time.time() + wait_sec)
+            total["errors"].append(
+                {"channel": "—", "city": "—", "error": f"{acc.label}: {e}"}
+            )
 
     return total

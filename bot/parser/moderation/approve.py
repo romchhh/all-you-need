@@ -9,44 +9,40 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
-from parser.ai_enrich import (
+from parser.ai.enrich import (
     enrich_parsed_item_with_ai,
     is_ai_enrich_enabled,
     merge_enrichment_into_item,
 )
 from parser.category_keywords import get_category_label
 from parser.moderation.approve_routing import (
-    APPROVE_TARGET_SERVICES_CHANNEL,
-    moderation_path_for_chat,
+    APPROVE_TARGET_SERVICES_BOTH,
+    force_services_channel_ids_for_mod_chat,
     resolve_parser_approve_target,
     validate_parser_approve_context,
 )
 from parser.marketplace_categories import apply_marketplace_categories_to_item
 from parser.moderation.author_notify import try_notify_author_via_pyrogram
-from parser.moderation.config import (
-    PARSER_BOT_TELEGRAM_ID,
-    PARSER_FALLBACK_BOT_TELEGRAM_ID,
-    PARSER_FALLBACK_BOT_USERNAME,
-    PARSER_FALLBACK_ENABLED,
-    PARSER_SERVICES_BOT_TELEGRAM_ID,
-    PARSER_SERVICES_BOT_USERNAME,
+from parser.core.account_pool import list_parser_accounts
+from parser.moderation.formatting import (
+    build_marketplace_description,
+    edit_group_message,
+    listing_miniapp_url,
 )
-from parser.moderation.description import build_marketplace_description
-from parser.moderation.group_message import edit_group_message
-from parser.moderation.services_channel_routing import format_services_channels_labels
-from parser.moderation.services_publish import publish_services_listing_to_channel
-from parser.moderation.urls import listing_miniapp_url
+from parser.moderation.services_publish import (
+    format_services_channels_labels,
+    publish_services_listing_to_channel,
+)
 from parser.storage.marketplace import (
     copy_parser_images_to_public,
     create_marketplace_listing,
     get_or_create_bot_user,
 )
+from utils.location_normalization import normalize_city_name
 from parser.storage.parsed_items import (
     fingerprint_title_desc,
-    get_mod_path_status,
     resolve_parsed_item_for_moderation,
     set_marketplace_listing_id,
-    update_mod_path_status,
 )
 from parser.storage.listing_dedup import active_listing_duplicate
 from utils.city_digest_notify import enqueue_city_digest_listing
@@ -90,14 +86,14 @@ async def _apply_ai_enrichment(
     return listing_item, ai_summary
 
 
-async def _approve_services_channel_only(
+async def _approve_services_both(
     callback: CallbackQuery,
     bot: Bot,
     item_id: int,
     item: dict,
     moderator_id: int,
 ):
-    """Послуги з /parse_services: лише Telegram-канал послуг (окрема модерація)."""
+    """Послуги: маркетплейс + відповідний Telegram-канал (Hamburg / Germany)."""
     images_raw = item.get("images_json") or "[]"
     try:
         images: list[str] = json.loads(images_raw)
@@ -111,26 +107,77 @@ async def _approve_services_channel_only(
 
     item_category = (listing_item.get("category") or "").strip().lower()
     if item_category != "services_work":
-        await callback.answer(
-            "❌ AI не класифікував як послугу — відхиліть або перевірте текст",
-            show_alert=True,
+        listing_item["category"] = "services_work"
+
+    pool = list_parser_accounts()
+    seller = pool[1] if len(pool) > 1 else (pool[0] if pool else None)
+    if seller and seller.telegram_id:
+        user_id = get_or_create_bot_user(
+            seller.telegram_id,
+            seller.username or "parser_bot",
+            "TradeGround Seller",
         )
-        return
+    else:
+        user_id = get_or_create_bot_user(8590825131, "parser_bot", "Parser Bot")
 
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
     description = build_marketplace_description(listing_item)
 
+    dedup_key = fingerprint_title_desc(
+        str(listing_item.get("title") or ""),
+        str(listing_item.get("description") or ""),
+    )
+    if active_listing_duplicate(
+        dedup_key,
+        str(listing_item.get("title") or ""),
+        description,
+    ):
+        await callback.answer(
+            "❌ Таке оголошення вже є на маркетплейсі (дублікат)",
+            show_alert=True,
+        )
+        return
+
+    try:
+        listing_id = create_marketplace_listing(
+            user_id=user_id,
+            title=listing_item["title"],
+            description=description,
+            price=listing_item.get("price"),
+            currency=listing_item.get("currency"),
+            is_free=bool(listing_item.get("is_free")),
+            category=listing_item.get("category", "services_work"),
+            subcategory=listing_item.get("subcategory"),
+            condition=listing_item.get("condition"),
+            location=listing_item.get("location", "Germany"),
+            images=images_web,
+        )
+    except Exception as e:
+        logger.error(
+            "Помилка створення Listing для parsed_item %s: %s",
+            item_id,
+            e,
+            exc_info=True,
+        )
+        await callback.answer("❌ Помилка при додаванні в маркетплейс", show_alert=True)
+        return
+
+    set_marketplace_listing_id(item_id, listing_id, moderated_by=moderator_id)
+
     group_id = callback.message.chat.id
     msg_id = callback.message.message_id
+    mini_url = html.escape(listing_miniapp_url(listing_id))
     if callback.from_user.username:
         mod_mention = "@" + html.escape(callback.from_user.username)
     else:
         mod_mention = f"<code>{moderator_id}</code>"
-    location_label = html.escape(
-        str(listing_item.get("location") or listing_item.get("source_city") or "")
-    )
+    loc_raw = str(listing_item.get("location") or listing_item.get("source_city") or "")
+    location_label = html.escape(normalize_city_name(loc_raw) or loc_raw)
+    force_channels = force_services_channel_ids_for_mod_chat(group_id, listing_item)
     status_text = (
         f"✅ <b>Підтверджено</b> модератором {mod_mention}\n"
+        f"📌 Listing #{listing_id}: "
+        f'<a href="{mini_url}">відкрити в міні-додатку</a>\n'
         f"📣 Публікуємо в Telegram-канал послуг\n"
         f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
         f"📍 {location_label}"
@@ -139,18 +186,28 @@ async def _approve_services_channel_only(
         status_text += f"\n🤖 {html.escape(ai_summary[:220])}"
 
     async def _followup():
+        try:
+            enqueue_city_digest_listing(listing_id)
+        except Exception as notify_err:
+            logger.warning(
+                "Не вдалося поставити Listing %s в city-digest чергу: %s",
+                listing_id,
+                notify_err,
+            )
         published_chats = await publish_services_listing_to_channel(
             bot,
             listing_item,
             item_id,
             description,
             images_web,
-            marketplace_listing_id=None,
+            marketplace_listing_id=listing_id,
+            force_channel_ids=force_channels,
         )
-        update_mod_path_status(item_id, "channel", "approved", moderated_by=moderator_id)
         final_status = status_text
         if published_chats:
-            final_status += f"\n📢 {html.escape(format_services_channels_labels(published_chats))}"
+            final_status += (
+                f"\n📢 {html.escape(format_services_channels_labels(published_chats))}"
+            )
         else:
             final_status += "\n⚠️ Не вдалося опублікувати в канал"
         await edit_group_message(
@@ -166,14 +223,15 @@ async def _approve_services_channel_only(
     asyncio.create_task(
         try_notify_author_via_pyrogram(
             listing_item,
-            item_id,
+            listing_id,
             use_services_sender=True,
-            channel_only=True,
+            channel_only=False,
         )
     )
     logger.info(
-        "parsed_item %s → канал послуг (підтв. %s)",
+        "parsed_item %s → Listing %s + канал послуг (підтв. %s)",
         item_id,
+        listing_id,
         moderator_id,
     )
 
@@ -197,19 +255,18 @@ async def _approve_marketplace(
     listing_item = apply_marketplace_categories_to_item(listing_item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
-    if item_category == "services_work" and PARSER_FALLBACK_ENABLED and (
-        PARSER_FALLBACK_BOT_TELEGRAM_ID or PARSER_SERVICES_BOT_TELEGRAM_ID
-    ):
-        seller_tg_id = PARSER_FALLBACK_BOT_TELEGRAM_ID or PARSER_SERVICES_BOT_TELEGRAM_ID
-        seller_username = PARSER_FALLBACK_BOT_USERNAME or PARSER_SERVICES_BOT_USERNAME
+    pool = list_parser_accounts()
+    seller = pool[0] if pool else None
+    if item_category == "services_work" and len(pool) > 1:
+        seller = pool[1]
+    if seller and seller.telegram_id:
         user_id = get_or_create_bot_user(
-            seller_tg_id,
-            seller_username,
-            "TradeGround Seller",
+            seller.telegram_id,
+            seller.username or "parser_bot",
+            "TradeGround Seller" if item_category == "services_work" else "Parser Bot",
         )
     else:
-        bot_tg_id = PARSER_BOT_TELEGRAM_ID or 8590825131
-        user_id = get_or_create_bot_user(bot_tg_id, "parser_bot", "Parser Bot")
+        user_id = get_or_create_bot_user(8590825131, "parser_bot", "Parser Bot")
 
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
     description = build_marketplace_description(listing_item)
@@ -319,20 +376,10 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
 
     item_id = int(item["id"])
 
-    mod_path = moderation_path_for_chat(chat_id, item)
-    if mod_path:
-        path_status = get_mod_path_status(item, mod_path)
-        if path_status == "approved":
-            label = "маркетплейс" if mod_path == "marketplace" else "Telegram-канал"
-            await callback.answer(f"ℹ️ Вже підтверджено для {label}", show_alert=True)
-            return
-        if path_status == "rejected":
-            await callback.answer("ℹ️ Цей напрямок уже відхилено", show_alert=True)
-            return
-    elif item.get("status") == "approved":
+    if item.get("status") == "approved":
         await callback.answer("ℹ️ Оголошення вже підтверджено", show_alert=True)
         return
-    elif item.get("status") == "rejected":
+    if item.get("status") == "rejected":
         await callback.answer("ℹ️ Оголошення вже відхилено", show_alert=True)
         return
 
@@ -350,8 +397,8 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
         item.get("parser_type"),
     )
 
-    if target == APPROVE_TARGET_SERVICES_CHANNEL:
-        await _approve_services_channel_only(callback, bot, item_id, item, moderator_id)
+    if target == APPROVE_TARGET_SERVICES_BOTH:
+        await _approve_services_both(callback, bot, item_id, item, moderator_id)
     else:
         await _approve_marketplace(callback, bot, item_id, item, moderator_id)
 

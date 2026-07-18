@@ -26,10 +26,18 @@ async def deactivate_old_listings(bot: Bot = None):
         thirty_days_ago_str = thirty_days_ago.strftime('%Y-%m-%d %H:%M:%S')
 
         parser_bot_ids = []
+        try:
+            from parser.storage.parser_accounts_db import list_accounts
+
+            for row in list_accounts(enabled_only=True):
+                tid = int(row.get("telegram_id") or 0)
+                if tid > 0:
+                    parser_bot_ids.append(tid)
+        except Exception:
+            pass
         for env_key in (
+            "PARSER_ACCOUNT_1_TELEGRAM_ID",
             "PARSER_BOT_TELEGRAM_ID",
-            "PARSER_SERVICES_BOT_TELEGRAM_ID",
-            "PARSER_FALLBACK_BOT_TELEGRAM_ID",
         ):
             raw = (os.getenv(env_key) or "").strip()
             if raw.isdigit() and int(raw) > 0:

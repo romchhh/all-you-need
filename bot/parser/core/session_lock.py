@@ -1,9 +1,10 @@
 """
 Глобальні asyncio-локи для Pyrogram-сесій.
 
-Один .session — це SQLite; паралельний доступ (парсер + DM автору при approve)
-дає OperationalError: database is locked.
+Один .session — це SQLite; паралельний доступ дає database is locked.
 """
+
+from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
@@ -11,14 +12,13 @@ from pathlib import Path
 
 GLOBAL_PARSER_RUN_LOCK = asyncio.Lock()
 
-PARSER_SESSION_LOCK = asyncio.Lock()
-SERVICES_SESSION_LOCK = asyncio.Lock()
-FALLBACK_SESSION_LOCK = asyncio.Lock()
-
 _SESSION_LOCKS: dict[str, asyncio.Lock] = {
-    "parser_session": PARSER_SESSION_LOCK,
-    "parser_services_session": SERVICES_SESSION_LOCK,
-    "parser_fallback_session": FALLBACK_SESSION_LOCK,
+    "parser_account_1": asyncio.Lock(),
+    "parser_account_2": asyncio.Lock(),
+    "parser_account_3": asyncio.Lock(),
+    "parser_session": asyncio.Lock(),
+    "parser_services_session": asyncio.Lock(),
+    "parser_fallback_session": asyncio.Lock(),
 }
 
 
@@ -26,14 +26,17 @@ def lock_for_session(session_path: Path | str) -> asyncio.Lock:
     name = Path(session_path).name
     if name.endswith(".session"):
         name = name[: -len(".session")]
-    return _SESSION_LOCKS.get(name, PARSER_SESSION_LOCK)
+    lock = _SESSION_LOCKS.get(name)
+    if lock is None:
+        lock = asyncio.Lock()
+        _SESSION_LOCKS[name] = lock
+    return lock
 
 
 @asynccontextmanager
 async def pyrogram_session_guard(session_path: Path | str, timeout: float = 600):
     """
     Ексклюзивний доступ до Pyrogram-сесії в межах одного event loop.
-    timeout — макс. очікування (сек); для approve зазвичай достатньо дочекатись циклу парсера.
     """
     lock = lock_for_session(session_path)
     try:

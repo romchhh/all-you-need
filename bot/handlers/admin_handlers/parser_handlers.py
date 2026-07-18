@@ -8,7 +8,7 @@ from aiogram import F, Router, types
 from aiogram.filters import Command
 
 from utils.filters import IsAdmin
-from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
+from parser.core.session_lock import GLOBAL_PARSER_RUN_LOCK
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -18,6 +18,15 @@ _PARSE_SERVICES_CMD = re.compile(
     r"^/parse_services(?:_ai)?(?P<limit>\d+)?(?:@\w+)?$",
     re.IGNORECASE,
 )
+
+
+def _has_parser_accounts() -> bool:
+    try:
+        from parser.core.account_pool import list_parser_accounts
+
+        return bool(list_parser_accounts())
+    except Exception:
+        return False
 
 
 def _parse_lookback(message: types.Message) -> int | None:
@@ -72,7 +81,7 @@ def _is_parse_services_message(message: types.Message) -> bool:
 
 def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
     if not stats:
-        return "❌ <b>Парсинг не виконано</b>\n\nПеревір логи бота або .env (PARSER_API_ID, TOKEN)."
+        return "❌ <b>Парсинг не виконано</b>\n\nПеревір логи бота або .env (PARSER_ACCOUNT_1_*, TOKEN)."
 
     added = int(stats.get("added") or 0)
     skipped = int(stats.get("skipped") or 0)
@@ -117,9 +126,10 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
         lines.append("")
         lines.append(
             "AI-фільтр: мусор і дублі відсікаються на парсингу.\n"
-            "Модерація (два окремі чати на кожен пост):\n"
-            "• <code>PARSER_SERVICES_MODERATION_CHANNEL_ID</code> → ✅ лише маркетплейс\n"
-            "• <code>PARSER_SERVICES_AI_MODERATION_CHANNEL_ID</code> → ✅ лише Telegram-канал\n"
+            "Модерація (3 групи):\n"
+            "• <code>PARSER_MOD_SERVICES_HAMBURG_ID</code> → ✅ Hamburg-канал + маркетплейс\n"
+            "• <code>PARSER_MOD_SERVICES_GERMANY_ID</code> → ✅ Germany-канал + маркетплейс\n"
+            "• <code>PARSER_MOD_GOODS_ID</code> → ✅ лише маркетплейс (товари)\n"
             "Канали публікації: Hamburg — <code>TRADE_SERVICES_CHANNEL_HAMBURG_ID</code>, "
             "інші — <code>TRADE_SERVICES_CHANNEL_GERMANY_ID</code>\n\n"
             "💡 <code>/parse_services100</code> — останні 100 постів без cursor"
@@ -135,10 +145,10 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
 
 
 async def _run_marketplace_parser(message: types.Message, *, lookback: int | None):
-    if not os.getenv("PARSER_API_ID"):
+    if not _has_parser_accounts():
         await message.answer(
             "❌ <b>Парсер не налаштовано</b>\n\n"
-            "У <code>.env</code> немає <code>PARSER_API_ID</code>.",
+            "Додайте акаунт у адмін-панелі: <b>Парсер акаунти</b>.",
             parse_mode="HTML",
         )
         return
@@ -202,15 +212,15 @@ async def manual_parser_run_aliases(message: types.Message):
 @router.message(IsAdmin(), F.func(_is_parse_services_message))
 async def manual_services_ai_parser_run(message: types.Message):
     """Ручний запуск: /parse_services або /parse_services100."""
-    from parser.config.services_ai_channels import (
+    from parser.config.channels import (
         SERVICES_AI_CHANNELS,
         services_ai_parser_enabled,
     )
 
-    if not os.getenv("PARSER_API_ID"):
+    if not _has_parser_accounts():
         await message.answer(
             "❌ <b>Парсер не налаштовано</b>\n\n"
-            "У <code>.env</code> немає <code>PARSER_API_ID</code>.",
+            "Додайте акаунт у адмін-панелі: <b>Парсер акаунти</b>.",
             parse_mode="HTML",
         )
         return

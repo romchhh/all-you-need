@@ -13,7 +13,7 @@ from parser.config.channels import (
     SERVICE_CHANNELS,
     normalize_channel_key,
 )
-from parser.config.settings import SERVICES_MODERATION_CHANNEL_ID
+from parser.moderation.approve_routing import notify_chat_for_parsed_item
 from parser.config.settings import FETCH_LIMIT
 from parser.core.channel_fetch import iter_new_channel_messages
 from parser.core.photos import download_photos
@@ -39,7 +39,7 @@ from parser.core.text import (
     to_plain_str,
 )
 from parser.core.parse_pipeline import run_ai_screen_and_dedup
-from parser.core.dedup_check import parser_dedup_override
+from parser.core.dedup import parser_dedup_override
 from parser.storage.parsed_items import (
     ensure_parsed_items_table,
     fingerprint_parsed_text,
@@ -254,10 +254,16 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
                     effective_message_id,
                     chat_id=chat_target if isinstance(chat_target, int) else None,
                 ),
-                "notify_chat_id": (
-                    SERVICES_MODERATION_CHANNEL_ID
-                    if category == "services_work"
-                    else None
+                "notify_chat_id": notify_chat_for_parsed_item(
+                    {
+                        "category": category,
+                        "location": city,
+                        "source_city": city,
+                        "title": title,
+                        "description": description,
+                        "raw_text": text[:4000],
+                        "subcategory": subcategory,
+                    }
                 ),
             }
             try:
@@ -276,7 +282,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
 
 async def run_all_channels(notify_callback) -> dict:
-    from parser.config.services_ai_channels import (
+    from parser.config.channels import (
         SERVICES_AI_CHANNELS,
         services_ai_parser_enabled,
     )

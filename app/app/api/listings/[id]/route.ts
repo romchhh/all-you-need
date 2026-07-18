@@ -192,7 +192,9 @@ export async function GET(
         title: listing.title,
         price: listing.price,
         previousPrice: listing.previousPrice || null,
-        priceChangedAt: listing.priceChangedAt || null,
+        priceChangedAt: listing.priceChangedAt
+          ? parseDbDate(listing.priceChangedAt)?.toISOString() ?? listing.priceChangedAt
+          : null,
         currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
         image: (() => {
           const resolved = resolveStoredListingImages(

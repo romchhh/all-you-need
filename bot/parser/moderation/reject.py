@@ -6,12 +6,10 @@ import logging
 from aiogram import Bot
 from aiogram.types import CallbackQuery
 
-from parser.moderation.approve_routing import moderation_path_for_chat
-from parser.moderation.group_message import edit_group_message
+from parser.moderation.approve_routing import is_services_moderation_chat
+from parser.moderation.formatting import edit_group_message
 from parser.storage.parsed_items import (
-    get_mod_path_status,
     resolve_parsed_item_for_moderation,
-    update_mod_path_status,
     update_parsed_item_status,
 )
 
@@ -39,23 +37,12 @@ async def handle_parser_reject(callback: CallbackQuery, bot: Bot):
         return
 
     item_id = int(item["id"])
-    mod_path = moderation_path_for_chat(chat_id, item)
 
-    if mod_path:
-        path_status = get_mod_path_status(item, mod_path)
-        if path_status == "approved":
-            label = "маркетплейс" if mod_path == "marketplace" else "Telegram-канал"
-            await callback.answer(f"ℹ️ Вже підтверджено для {label}", show_alert=True)
-            return
-        if path_status == "rejected":
-            await callback.answer("ℹ️ Цей напрямок уже відхилено", show_alert=True)
-            return
-        update_mod_path_status(item_id, mod_path, "rejected", moderated_by=moderator_id)
-    else:
-        if item.get("status") in ("approved", "rejected"):
-            await callback.answer(f"ℹ️ Оголошення вже {item['status']}", show_alert=True)
-            return
-        update_parsed_item_status(item_id, "rejected", moderated_by=moderator_id)
+    if item.get("status") in ("approved", "rejected"):
+        await callback.answer(f"ℹ️ Оголошення вже {item['status']}", show_alert=True)
+        return
+
+    update_parsed_item_status(item_id, "rejected", moderated_by=moderator_id)
 
     group_id = callback.message.chat.id
     msg_id = callback.message.message_id
@@ -63,24 +50,16 @@ async def handle_parser_reject(callback: CallbackQuery, bot: Bot):
         mod_mention = "@" + html.escape(callback.from_user.username)
     else:
         mod_mention = f"<code>{moderator_id}</code>"
-    path_note = ""
-    if mod_path == "marketplace":
-        path_note = " (маркетплейс)"
-    elif mod_path == "channel":
-        path_note = " (Telegram-канал)"
+
+    stream = " (послуги)" if is_services_moderation_chat(chat_id) else " (товари)"
     await edit_group_message(
         bot,
         group_id,
         msg_id,
-        f"❌ <b>Відхилено</b>{path_note} модератором {mod_mention}",
+        f"❌ <b>Відхилено</b>{stream} модератором {mod_mention}",
         parse_mode="HTML",
         message=callback.message,
     )
 
     await callback.answer("❌ Оголошення відхилено", show_alert=False)
-    logger.info(
-        "parsed_item %s відхилено модератором %s (path=%s)",
-        item_id,
-        moderator_id,
-        mod_path or "default",
-    )
+    logger.info("parsed_item %s відхилено модератором %s", item_id, moderator_id)

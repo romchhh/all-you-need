@@ -2,16 +2,23 @@
 Пакет парсера Telegram-каналів.
 
 Структура:
-  config/     — канали, .env
-  core/       — парсинг тексту та каналів
-  storage/    — SQLite parsed_items + маркетплейс
-  moderation/ — підтвердження модератором
-  ai_enrich/  — AI-покращення при approve (ai_enrich.py)
+  config/     — .env, канали, акаунти
+  core/       — fetch, pipeline, runners, accounts, dedup, session locks
+  ai/         — AI screen + enrich
+  notify/     — сповіщення груп модерації
+  moderation/ — approve / reject / publish
+  storage/    — SQLite + marketplace
+  scripts/    — CLI (authorize_session, cleanup)
 """
 
 from parser.core.runner import parse_channel, run_all_channels
 from parser.moderation.router import router as confirm_router
-from parser.scheduler import register_parser_job, register_services_ai_parser_job, run_parser_cycle, run_services_ai_parser_cycle
+from parser.scheduler import (
+    register_parser_job,
+    register_services_ai_parser_job,
+    run_parser_cycle,
+    run_services_ai_parser_cycle,
+)
 
 __all__ = [
     "confirm_router",

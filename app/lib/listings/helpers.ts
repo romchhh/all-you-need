@@ -529,9 +529,15 @@ export async function updateListingData(
   const updateTime = nowSQLite();
 
   const currentRows = (await prisma.$queryRawUnsafe(
-    `SELECT price, isFree, status, userId FROM Listing WHERE id = ?`,
+    `SELECT price, isFree, status, userId, currency FROM Listing WHERE id = ?`,
     listingId
-  )) as Array<{ price: string; isFree: number; status: string; userId: number }>;
+  )) as Array<{
+    price: string;
+    isFree: number;
+    status: string;
+    userId: number;
+    currency: string | null;
+  }>;
   const current = currentRows[0];
   const oldPriceRaw = current
     ? current.isFree
@@ -539,15 +545,20 @@ export async function updateListingData(
       : String(current.price || '')
     : '';
   const newPriceRaw = data.isFree ? 'Free' : String(data.price || '');
+  const amountChanged =
+    !!current && oldPriceRaw.trim() !== newPriceRaw.trim();
+  const currencyChanged =
+    !!current &&
+    String(current.currency || '').trim() !== String(data.currency || '').trim();
   const priceChanged =
     !!current &&
     current.status === 'active' &&
-    oldPriceRaw.trim() !== newPriceRaw.trim();
+    (amountChanged || currencyChanged);
 
-  const priceExtraCols = priceChanged
+  const priceExtraCols = amountChanged
     ? `, previousPrice = ?, priceChangedAt = ?`
     : '';
-  const priceExtraVals = priceChanged ? [oldPriceRaw, updateTime] : [];
+  const priceExtraVals = amountChanged ? [oldPriceRaw, updateTime] : [];
   
   // Якщо статус передано, оновлюємо його
   if (status) {

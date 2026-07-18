@@ -7,6 +7,9 @@ CITY_SYNONYMS = {
     # Мюнхен
     "мюнхен": "München",
     "munich": "München",
+    "muenchen": "München",
+    "munchen": "München",
+    "münchen": "München",
     # Берлин
     "берлин": "Berlin",
     "berlin": "Berlin",
@@ -14,10 +17,13 @@ CITY_SYNONYMS = {
     "кёльн": "Köln",
     "кельн": "Köln",
     "koln": "Köln",
+    "koeln": "Köln",
     "cologne": "Köln",
+    "köln": "Köln",
     # Дюссельдорф
     "дюссельдорф": "Düsseldorf",
     "dusseldorf": "Düsseldorf",
+    "duesseldorf": "Düsseldorf",
     "düsseldorf": "Düsseldorf",
     "dusseldrof": "Düsseldorf",
     "duseldorf": "Düsseldorf",
@@ -35,6 +41,15 @@ CITY_SYNONYMS = {
     # Лейпциг
     "лейпциг": "Leipzig",
     "leipzig": "Leipzig",
+    # Магдебург
+    "магдебург": "Magdeburg",
+    "magdeburg": "Magdeburg",
+    # Регенсбург
+    "регенсбург": "Regensburg",
+    "regensburg": "Regensburg",
+    # Марль
+    "марль": "Marl",
+    "marl": "Marl",
     # Дрезден
     "дрезден": "Dresden",
     "dresden": "Dresden",
@@ -43,6 +58,7 @@ CITY_SYNONYMS = {
     "dortmund": "Dortmund",
     # Эссен
     "эссен": "Essen",
+    "ессен": "Essen",
     "essen": "Essen",
     # Дуйсбург
     "дуйсбург": "Duisburg",
@@ -53,18 +69,53 @@ CITY_SYNONYMS = {
     # Карлсруэ
     "карлсруэ": "Karlsruhe",
     "karlsruhe": "Karlsruhe",
-    # Мангейм / Маннхайм
+    # Мангейм
     "маннгейм": "Mannheim",
     "манхайм": "Mannheim",
     "mannheim": "Mannheim",
     # Нюрнберг
     "нюрнберг": "Nürnberg",
+    "нюрберг": "Nürnberg",
     "nuremberg": "Nürnberg",
     "nürnberg": "Nürnberg",
-    # Франкфурт (узагальнений ввід користувача)
+    "nuernberg": "Nürnberg",
+    "nurnberg": "Nürnberg",
+    # Франкфурт
     "франкфурт": "Frankfurt",
     "frankfurt": "Frankfurt",
     "frankfurt am main": "Frankfurt",
+    # Вупперталь
+    "вупперталь": "Wuppertal",
+    "wuppertal": "Wuppertal",
+    # Бохум
+    "бохум": "Bochum",
+    "bochum": "Bochum",
+    # Мюнстер
+    "мюнстер": "Münster",
+    "munster": "Münster",
+    "muenster": "Münster",
+    "münster": "Münster",
+    # Аахен
+    "аахен": "Aachen",
+    "aachen": "Aachen",
+    # Дюльмен
+    "дюльмен": "Dülmen",
+    "дульмен": "Dülmen",
+    "dulmen": "Dülmen",
+    "dülmen": "Dülmen",
+    # Білефельд
+    "білефельд": "Bielefeld",
+    "билефельд": "Bielefeld",
+    "bielefeld": "Bielefeld",
+    # Кельн-регіон / NRW
+    "nrw": "NRW",
+    "нрв": "NRW",
+    # Німеччина
+    "germany": "Germany",
+    "deutschland": "Germany",
+    "німеччина": "Germany",
+    "немеччина": "Germany",
+    "германия": "Germany",
 }
 
 

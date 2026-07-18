@@ -16,7 +16,7 @@ from database_functions.telegram_listing_db import (
     get_connection as get_db_connection
 )
 from keyboards.client_keyboards import get_category_translation
-from parser.moderation.urls import listing_miniapp_url
+from parser.moderation.formatting import listing_miniapp_url
 from utils.seller_contact import build_seller_telegram_url
 from utils.telegram_listing_marketplace_sync import ensure_marketplace_listing_from_telegram
 from utils.translations import t, get_user_lang
@@ -771,7 +771,7 @@ class ModerationManager:
                 else:
                     category_text += f" / {subcategory}"
 
-            from parser.moderation.hashtags import build_channel_hashtags
+            from parser.moderation.formatting import build_channel_hashtags
 
             hashtags = build_channel_hashtags(category, subcategory, location)
             

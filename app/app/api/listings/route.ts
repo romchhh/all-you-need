@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
-import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
+import { listingTimeFieldsForApi, parseDbDate } from '@/utils/parseDbDate';
 import {
   LISTING_FAVORITES_COUNT_SQL,
   LISTING_FAVORITES_JOIN_SQL,
@@ -423,7 +423,9 @@ export async function GET(request: NextRequest) {
           title: listing.title,
           price: listing.isFree ? 'Free' : listing.price,
           previousPrice: listing.previousPrice || null,
-          priceChangedAt: listing.priceChangedAt || null,
+          priceChangedAt: listing.priceChangedAt
+            ? parseDbDate(listing.priceChangedAt)?.toISOString() ?? listing.priceChangedAt
+            : null,
           currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
           image: images[0] || '',
           images: images,
@@ -793,7 +795,10 @@ export async function GET(request: NextRequest) {
                title: listing.title,
                price: listing.isFree ? 'Free' : listing.price,
                previousPrice: (listing as any).previousPrice || null,
-               priceChangedAt: (listing as any).priceChangedAt || null,
+               priceChangedAt: (listing as any).priceChangedAt
+                 ? parseDbDate((listing as any).priceChangedAt)?.toISOString() ??
+                   (listing as any).priceChangedAt
+                 : null,
                currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
                image: images[0] || '',
                // Каталог: лише перший thumb; повний масив — для профілю (userId)

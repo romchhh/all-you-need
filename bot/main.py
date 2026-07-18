@@ -38,13 +38,18 @@ async def main():
     from handlers.client_handlers.create_listing_handlers import router as create_listing_router
     from handlers.admin_handlers.admin_handlers import router as admin_router
     from handlers.admin_handlers.parser_handlers import router as parser_admin_router
+    from handlers.admin_handlers.parser_accounts_handlers import router as parser_accounts_router
     from handlers.admin_handlers.mailing_handlers import router as mailing_router
     from handlers.admin_handlers.links_handlers import router as links_router
     from handlers.admin_handlers.admin_management_handlers import router as admin_management_router
     from handlers.admin_handlers.moderation_group_handlers import router as moderation_group_router
     from database_functions.migrations import ensure_categories_exist
-    from parser.confirm_handler import router as parser_confirm_router
-    from parser.db import ensure_parsed_items_table
+    from parser.moderation.router import router as parser_confirm_router
+    from parser.storage import ensure_parsed_items_table
+    from parser.storage.parser_accounts_db import (
+        ensure_parser_accounts_table,
+        migrate_env_accounts_if_empty,
+    )
     
     # Виконуємо міграцію категорій при запуску
     try:
@@ -57,6 +62,14 @@ async def main():
         ensure_parsed_items_table()
     except Exception as e:
         logging.warning(f"parsed_items table init warning: {e}")
+
+    try:
+        ensure_parser_accounts_table()
+        n = migrate_env_accounts_if_empty()
+        if n:
+            logging.info("Imported %s parser account(s) from .env into DB", n)
+    except Exception as e:
+        logging.warning(f"parser_accounts init warning: {e}")
     
     dp.include_router(agreement_router)
     dp.include_router(client_router)
@@ -64,6 +77,7 @@ async def main():
     dp.include_router(create_listing_router)
     dp.include_router(admin_router)
     dp.include_router(parser_admin_router)
+    dp.include_router(parser_accounts_router)
     dp.include_router(mailing_router)
     dp.include_router(links_router)
     dp.include_router(admin_management_router)

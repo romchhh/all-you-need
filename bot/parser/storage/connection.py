@@ -176,6 +176,12 @@ def ensure_parser_storage() -> None:
     """Один раз на цикл парсингу: таблиці + міграції."""
     from parser.storage.channel_cursors import ensure_parser_cursors_table
     from parser.storage.parsed_items import ensure_parsed_items_table
+    from parser.storage.parser_accounts_db import (
+        ensure_parser_accounts_table,
+        migrate_env_accounts_if_empty,
+    )
 
     ensure_parsed_items_table()
     ensure_parser_cursors_table()
+    ensure_parser_accounts_table()
+    migrate_env_accounts_if_empty()

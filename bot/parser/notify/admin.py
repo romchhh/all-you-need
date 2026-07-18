@@ -20,24 +20,50 @@ from aiogram.types import (
 
 from parser.storage.parsed_items import record_moderation_message
 from parser.category_keywords import get_category_label
-from parser.config.settings import SERVICES_MODERATION_CHANNEL_ID
-from parser.config.services_ai_channels import SERVICES_AI_MODERATION_CHANNEL_ID
-from parser.ai_screen import is_ai_screen_enabled
+from parser.config.settings import (
+    PARSER_MOD_GOODS_ID,
+    PARSER_MOD_SERVICES_GERMANY_ID,
+    PARSER_MOD_SERVICES_HAMBURG_ID,
+)
+from parser.ai.screen import is_ai_screen_enabled
+from parser.core.telegram_meta import parsed_item_message_link
+from parser.moderation.approve_routing import (
+    is_services_moderation_chat,
+    services_moderation_chat_ids,
+)
+from utils.location_normalization import normalize_city_name
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-
-PARSER_GROUP_ID: Optional[int] = None
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def get_parser_group_id() -> Optional[int]:
-    global PARSER_GROUP_ID
-    if PARSER_GROUP_ID is None:
-        raw = os.getenv("PARSER_GROUP_ID")
-        if raw:
-            PARSER_GROUP_ID = int(raw)
-    return PARSER_GROUP_ID
+    """Fallback для товарів, якщо notify_chat_id не задано."""
+    return PARSER_MOD_GOODS_ID
+
+
+def _tgground_logo_path() -> Optional[str]:
+    candidates = (
+        BASE_DIR / "bot" / "Content" / "tgground.jpg",
+        BASE_DIR / "Content" / "tgground.jpg",
+    )
+    for p in candidates:
+        if p.is_file():
+            return str(p)
+    return None
+
+
+def _is_services_item(item: dict) -> bool:
+    if (item.get("parser_type") or "").strip() == "services_channel":
+        return True
+    if (item.get("category") or "").strip().lower() == "services_work":
+        return True
+    try:
+        notify_chat = int(item.get("notify_chat_id"))
+    except (TypeError, ValueError):
+        return False
+    return notify_chat in services_moderation_chat_ids()
 
 
 # ──────────────────────────────────────────────
@@ -85,27 +111,29 @@ CITY_FLAG = {
 
 def _format_admin_message(item: dict) -> str:
     parser_type = (item.get("parser_type") or "default").strip()
-    notify_chat = item.get("notify_chat_id")
-    mod_target = (item.get("moderation_target") or "").strip().lower()
+    try:
+        notify_chat = int(item.get("notify_chat_id")) if item.get("notify_chat_id") is not None else None
+    except (TypeError, ValueError):
+        notify_chat = None
 
-    if parser_type == "services_channel":
-        header = "НОВА ПОСЛУГА (/parse_services)"
-        if mod_target == "marketplace" or notify_chat == SERVICES_MODERATION_CHANNEL_ID:
-            footer = "✅ → маркетплейс TradeGround (модерація послуг)"
-        elif mod_target == "channel" or notify_chat == SERVICES_AI_MODERATION_CHANNEL_ID:
-            footer = "✅ → Telegram-канал послуг (Hamburg / Germany)"
-        else:
-            footer = "✅ → модерація послуг"
-    elif notify_chat == SERVICES_MODERATION_CHANNEL_ID:
-        header = "НОВА ПОСЛУГА (/parse → маркетплейс)"
-        footer = "✅ → маркетплейс TradeGround"
+    if notify_chat == PARSER_MOD_SERVICES_HAMBURG_ID:
+        header = "НОВА ПОСЛУГА (Hamburg)"
+        footer = "✅ → канал Hamburg + маркетплейс"
+    elif notify_chat == PARSER_MOD_SERVICES_GERMANY_ID:
+        header = "НОВА ПОСЛУГА (Germany)"
+        footer = "✅ → канал Germany (+ Hamburg якщо dual) + маркетплейс"
+    elif parser_type == "services_channel" or _is_services_item(item):
+        header = "НОВА ПОСЛУГА"
+        footer = "✅ → Telegram-канал послуг + маркетплейс"
     else:
-        header = "НОВЕ ОГОЛОШЕННЯ (маркетплейс)"
-        footer = "✅ → лише маркетплейс (без каналів послуг)"
+        header = "НОВЕ ОГОЛОШЕННЯ (товари)"
+        footer = "✅ → лише маркетплейс"
 
     category_label = get_category_label(item.get("category", "other"), item.get("subcategory"))
     cat_emoji = CATEGORY_EMOJI.get(item.get("category", "other"), "📦")
-    city_display = CITY_FLAG.get(item.get("location", ""), item.get("location", "—"))
+    raw_city = (item.get("location") or item.get("source_city") or "").strip()
+    city_de = normalize_city_name(raw_city) if raw_city else ""
+    city_display = CITY_FLAG.get(city_de, f"🇩🇪 {city_de}" if city_de else "—")
 
     price_str = item.get("price")
     currency = item.get("currency") or ""
@@ -119,16 +147,28 @@ def _format_admin_message(item: dict) -> str:
     else:
         price_display = "❓ Не вказана"
 
-    author = item.get("author_username")
-    author_display = f"@{author}" if author else "невідомий"
+    author = (item.get("author_username") or "").strip().lstrip("@")
+    author_id = item.get("author_id")
+    if author:
+        author_display = f'<a href="https://t.me/{html.escape(author)}">@{html.escape(author)}</a>'
+    elif author_id:
+        author_display = f'<a href="tg://user?id={int(author_id)}">автор</a>'
+    else:
+        author_display = "невідомий"
 
     channel = item.get("source_channel", "")
-    msg_link = item.get("msg_link", f"https://t.me/{channel}")
+    msg_link = (
+        item.get("msg_link")
+        or parsed_item_message_link(item)
+        or (f"https://t.me/{channel}" if channel else "")
+    )
+    msg_link_safe = html.escape(msg_link, quote=True) if msg_link else ""
 
-    title = item.get("title", "—")
-    description = item.get("description", "")
+    title = html.escape(str(item.get("title") or "—"))
+    description = str(item.get("description") or "")
     if len(description) > 800:
         description = description[:800] + "…"
+    description = html.escape(description)
 
     condition = item.get("condition")
     condition_display = {
@@ -142,20 +182,25 @@ def _format_admin_message(item: dict) -> str:
         f"",
         f"📋 <b>{title}</b>",
         f"",
-        f"{cat_emoji} Категорія: <b>{category_label}</b>",
-        f"📍 Місто: <b>{city_display}</b>",
+        f"{cat_emoji} Категорія: <b>{html.escape(category_label)}</b>",
+        f"📍 Місто: <b>{html.escape(city_display)}</b>",
         f"{price_display}",
         f"📦 Стан: {condition_display}",
         f"",
         f"👤 Автор: {author_display}",
-        f"📢 Канал: @{channel}",
-        f"🔗 <a href='{msg_link}'>Оригінальне повідомлення</a>",
-        f"",
-        f"📝 <b>Опис:</b>",
-        f"{description}",
-        f"",
-        f"<i>{footer}</i>",
+        f"📢 Канал: @{html.escape(str(channel))}",
     ]
+    if msg_link_safe:
+        lines.append(f'🔗 <a href="{msg_link_safe}">Оригінальне повідомлення</a>')
+    lines.extend(
+        [
+            f"",
+            f"📝 <b>Опис:</b>",
+            f"{description}",
+            f"",
+            f"<i>{footer}</i>",
+        ]
+    )
     if is_ai_screen_enabled():
         lines.append("<i>🤖 AI попередньо відфільтровано та відформатовано</i>")
     return "\n".join(lines)
@@ -213,7 +258,7 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
     else:
         group_id = get_parser_group_id()
     if not group_id:
-        logger.warning("PARSER_GROUP_ID / notify_chat_id не встановлено — пропускаємо надсилання адміну")
+        logger.warning("notify_chat_id / PARSER_MOD_GOODS_ID не встановлено — пропускаємо надсилання адміну")
         return None
 
     item_id = item["id"]
@@ -227,6 +272,12 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
         p = BASE_DIR / img
         if p.exists():
             abs_images.append(str(p))
+
+    # Послуги без фото — лого TradeGround (як у каналах)
+    if not abs_images and _is_services_item(item):
+        logo = _tgground_logo_path()
+        if logo:
+            abs_images = [logo]
 
     try:
         if len(abs_images) == 0:
@@ -280,9 +331,15 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
             )
             msg_id = sent_kb.message_id
 
-        # Зберігаємо admin_message_id для відповідної модерації
-        mod_target = (item.get("moderation_target") or "marketplace").strip().lower()
-        record_moderation_message(item_id, msg_id, group_id, target=mod_target)
+        # Одна картка на оголошення — зберігаємо в основних полях модерації
+        mod_target = (item.get("moderation_target") or "").strip().lower()
+        if not mod_target:
+            mod_target = (
+                "services_both"
+                if is_services_moderation_chat(group_id)
+                else "marketplace"
+            )
+        record_moderation_message(item_id, msg_id, group_id, target="marketplace")
         logger.info(
             "Надіслано оголошення %s в групу %s (%s), msg_id=%s",
             item_id,

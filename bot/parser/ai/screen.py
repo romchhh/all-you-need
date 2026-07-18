@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-from parser.ai_enrich import (
+from parser.ai.enrich import (
     AiEnrichmentResult,
     _normalize_price_fields,
     _validate_condition,
@@ -26,7 +26,7 @@ from parser.ai_enrich import (
 from parser.marketplace_categories import clean_title, resolve_marketplace_category
 from parser.storage.listing_dedup import recent_listings_for_ai_context
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 
@@ -81,20 +81,26 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
 {marketplace_taxonomy_for_ai()}
 
 ЗАДАЧА:
-1. accept=false если: реклама канала, правила, поздравления, вакансии без товара,
-   спам, пустой пост, не объявление о продаже/услуге, мусор.
+1. accept=false если пост НЕ является объявлением о ТОВАРЕ или УСЛУГЕ. Отсекай:
+   - новости, обсуждения, опросы, мемы, чат без оффера
+   - рекламу канала/бота, правила группы, поздравления, репосты без продажи
+   - вакансии / поиск работы / подработка без конкретного товара или платной услуги
+   - «куплю / шукаю / ищу» без предложения своего товара или услуги на продажу
+   - спам, пустые посты, мусор, несвязанный контент
 2. accept=false, is_duplicate=true если тот же товар/услуга уже в списках выше
    (другой пост, но тот же iPhone/диван/маникюр — дубль).
-3. accept=true только для нормального объявления.
+3. accept=true ТОЛЬКО если есть конкретное предложение:
+   - товар (продажа / отдам / обмен) ИЛИ
+   - услуга (красота, ремонт, обучение, работа мастера и т.п. с оффером)
 4. Если accept=true — улучши title (рус, до 80 симв), description (рус, чистый текст),
-   category/subcategory, price, location (немецкий оригинал города), condition.
-   Услуги без цены → price=null, is_free=false; condition для услуг всегда "new".
+   category/subcategory, price, location (город НЕМЕЦКИМ оригиналом: München, Köln, Düsseldorf…),
+   condition. Услуги без цены → price=null, is_free=false; condition для услуг всегда "new".
 
 JSON:
 {{
   "accept": true,
   "is_duplicate": false,
-  "reject_reason": "junk|duplicate|not_listing|spam|empty или null",
+  "reject_reason": "junk|duplicate|not_listing|spam|empty|job|wanted|news|chat или null",
   "title": "...",
   "description": "...",
   "category": "...",
@@ -159,6 +165,12 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
             return AiScreenResult(accept=False, reason="дублікат (ai)")
         if "spam" in reason:
             return AiScreenResult(accept=False, reason="спам (ai)")
+        if any(k in reason for k in ("job", "ваканс", "подработ", "підробіт")):
+            return AiScreenResult(accept=False, reason="вакансія (ai)")
+        if any(k in reason for k in ("wanted", "куплю", "ищу", "шукаю")):
+            return AiScreenResult(accept=False, reason="пошук/куплю (ai)")
+        if any(k in reason for k in ("news", "chat", "мем", "опрос", "опит")):
+            return AiScreenResult(accept=False, reason="не товар/послуга (ai)")
         if "not_listing" in reason or "не оголош" in reason:
             return AiScreenResult(accept=False, reason="не оголошення (ai)")
         return AiScreenResult(accept=False, reason="мусор (ai)")

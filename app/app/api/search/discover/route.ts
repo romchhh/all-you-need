@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, executeWithRetry } from '@/lib/prisma';
-import { getListingDisplayDate } from '@/utils/parseDbDate';
+import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 
@@ -23,6 +23,10 @@ function formatListingRow(listing: Record<string, unknown>) {
     id: listing.id as number,
     title: listing.title as string,
     price: listing.isFree ? 'Free' : (listing.price as string),
+    previousPrice: (listing.previousPrice as string) || null,
+    priceChangedAt: listing.priceChangedAt
+      ? parseDbDate(listing.priceChangedAt as string)?.toISOString() ?? (listing.priceChangedAt as string)
+      : null,
     currency: (listing.currency as string) || undefined,
     image: images[0] || '',
     images,
@@ -50,6 +54,8 @@ const LISTING_SELECT = `
   l.title,
   l.description,
   l.price,
+  l.previousPrice,
+  l.priceChangedAt,
   l.currency,
   l.isFree,
   l.category,

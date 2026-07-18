@@ -17,4 +17,11 @@ class AdminManagement(StatesGroup):
     waiting_for_admin_username = State()
     waiting_for_admin_id = State()
     waiting_for_admin_removal = State()
-    
+
+
+class ParserAccountStates(StatesGroup):
+    waiting_api_id = State()
+    waiting_api_hash = State()
+    waiting_phone = State()
+    waiting_code = State()
+    waiting_2fa = State()

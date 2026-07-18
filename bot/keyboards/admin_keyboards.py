@@ -8,7 +8,7 @@ def admin_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         [KeyboardButton(text="Розсилка"), KeyboardButton(text="Статистика")],
         [KeyboardButton(text="Авто-розсилки"), KeyboardButton(text="Посилання")],
-        [KeyboardButton(text="Адміністратори")],
+        [KeyboardButton(text="Адміністратори"), KeyboardButton(text="Парсер акаунти")],
     ]
 
     keyboard = ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
@@ -214,3 +214,77 @@ def get_cancel_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="❌ Скасувати", callback_data="admin_cancel")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+# PARSER ACCOUNTS
+def get_parser_accounts_keyboard(accounts: list[dict] | None = None) -> InlineKeyboardMarkup:
+    from parser.storage.parser_accounts_db import list_accounts
+
+    if accounts is None:
+        accounts = list_accounts()
+
+    rows: list[list[InlineKeyboardButton]] = []
+    for acc in accounts:
+        status = (acc.get("status") or "active").lower()
+        icon = {
+            "active": "✅",
+            "pending": "⏳",
+            "flood": "⚠️",
+            "error": "❌",
+            "disabled": "⏸",
+        }.get(status, "•")
+        phone = str(acc.get("phone") or "")
+        tail = "".join(c for c in phone if c.isdigit())[-4:] or "????"
+        uname = (acc.get("username") or "").lstrip("@")
+        label = f"@{uname}" if uname else f"…{tail}"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{icon} #{acc['id']} {label}",
+                    callback_data=f"parser_acc_info_{acc['id']}",
+                )
+            ]
+        )
+    rows.append(
+        [InlineKeyboardButton(text="➕ Додати акаунт", callback_data="parser_acc_add")]
+    )
+    rows.append(
+        [InlineKeyboardButton(text="🔄 Оновити", callback_data="parser_acc_list")]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def get_parser_account_detail_keyboard(account_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Видалити",
+                    callback_data=f"pacc_delask_{account_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="◀️ До списку",
+                    callback_data="parser_acc_list",
+                )
+            ],
+        ]
+    )
+
+
+def get_parser_account_delete_confirm_keyboard(account_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Так, видалити",
+                    callback_data=f"pacc_delok_{account_id}",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Ні",
+                    callback_data=f"parser_acc_info_{account_id}",
+                ),
+            ]
+        ]
+    )

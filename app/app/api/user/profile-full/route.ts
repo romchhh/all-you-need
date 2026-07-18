@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureCurrencyColumn, ensureListingApiRawColumns } from '@/lib/prisma';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
-import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
+import { listingTimeFieldsForApi, parseDbDate } from '@/utils/parseDbDate';
 
 // SQLite може повертати COUNT як number, bigint або string
 function normalizeFavoritesCount(value: number | bigint | string | undefined): number {
@@ -125,6 +125,8 @@ export async function GET(request: NextRequest) {
         l.title,
         l.description,
         l.price,
+        l.previousPrice,
+        l.priceChangedAt,
         ${currencyColumnExists ? 'l.currency,' : 'NULL as currency,'}
         l.isFree,
         l.category,
@@ -225,6 +227,10 @@ export async function GET(request: NextRequest) {
         id: listing.id,
         title: listing.title,
         price: listing.isFree ? 'Free' : listing.price,
+        previousPrice: listing.previousPrice || null,
+        priceChangedAt: listing.priceChangedAt
+          ? parseDbDate(listing.priceChangedAt)?.toISOString() ?? listing.priceChangedAt
+          : null,
         currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
         image: images[0] || '',
         images: images,

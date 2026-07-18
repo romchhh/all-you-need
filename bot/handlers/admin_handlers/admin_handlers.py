@@ -27,7 +27,8 @@ async def admin_panel(message: types.Message):
         "<b>💻 Вітаю в адмін панелі</b>\n\n"
         "Ось ваші доступні опції.\n\n"
         "🔍 Маркетплейс: <code>/parse</code>\n"
-        "💼 Послуги → канал: <code>/parse_services</code>",
+        "💼 Послуги → канал: <code>/parse_services</code>\n"
+        "👤 Акаунти парсера: кнопка <b>Парсер акаунти</b>",
         reply_markup=admin_keyboard(),
         parse_mode="HTML",
     )

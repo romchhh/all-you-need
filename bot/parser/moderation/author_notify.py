@@ -1,22 +1,40 @@
-"""Сповіщення автора оголошення через Pyrogram."""
+"""Сповіщення автора оголошення через Pyrogram (round-robin акаунтів)."""
 
 import logging
+import time
 
-from parser.core.account_pool import PyrogramAccount, is_flood_limit_error, list_parser_accounts
-from parser.moderation.config import (
-    NOTIFY_AUTHOR_CHANNEL_TEXT_RU,
-    NOTIFY_AUTHOR_TEXT_RU,
+from parser.core.account_pool import (
+    PyrogramAccount,
+    extract_flood_wait_seconds,
+    is_flood_limit_error,
+    list_accounts_round_robin,
 )
-from parser.moderation.urls import listing_miniapp_url
+from parser.moderation.formatting import listing_miniapp_url
+from parser.storage import parser_accounts_db as accounts_db
 
 logger = logging.getLogger(__name__)
+
+NOTIFY_AUTHOR_TEXT_RU = (
+    "Привет! 👋\n\n"
+    "Мы нашли ваше объявление «{title}» и добавили его на наш маркетплейс "
+    "<b>Trade Ground</b> — площадку для украино- и русскоязычных в Германии.\n\n"
+    "🔗 Ваше объявление: <a href=\"{listing_url}\">открыть в мини-приложении бота</a>\n\n"
+    "Если хотите внести изменения или удалить объявление — напишите нам."
+)
+
+NOTIFY_AUTHOR_CHANNEL_TEXT_RU = (
+    "Привет! 👋\n\n"
+    "Мы нашли ваше объявление «{title}» и опубликовали его в нашем канале "
+    "<b>Trade Ground — услуги</b> для украино- и русскоязычных в Германии.\n\n"
+    "Если хотите внести изменения — напишите нам."
+)
 
 
 async def _send_author_dm(acc: PyrogramAccount, target, plain_text: str) -> None:
     from pyrogram import Client
 
     from parser.core.pyrogram_accounts import PYROGRAM_SLEEP_THRESHOLD
-    from parser.session_lock import pyrogram_session_guard
+    from parser.core.session_lock import pyrogram_session_guard
 
     app = Client(
         name=str(acc.session_path),
@@ -36,18 +54,6 @@ async def _send_author_dm(acc: PyrogramAccount, target, plain_text: str) -> None
             )
 
 
-def _dm_account_order(*, use_services_sender: bool) -> list[PyrogramAccount]:
-    accounts = list_parser_accounts()
-    if not accounts:
-        return []
-    if not use_services_sender:
-        return accounts
-    return sorted(
-        accounts,
-        key=lambda a: (0 if a.label == "fallback" else 1, a.priority),
-    )
-
-
 async def try_notify_author_via_pyrogram(
     item: dict,
     listing_id: int,
@@ -62,7 +68,7 @@ async def try_notify_author_via_pyrogram(
         logger.info("Автор оголошення %s невідомий — пропускаємо сповіщення", item["id"])
         return
 
-    order = _dm_account_order(use_services_sender=use_services_sender)
+    order = list_accounts_round_robin(for_dm=True)
     if not order:
         logger.info("Pyrogram не налаштовано — пропускаємо сповіщення автору")
         return
@@ -81,11 +87,15 @@ async def try_notify_author_via_pyrogram(
     for acc in order:
         try:
             await _send_author_dm(acc, target, plain_text)
+            accounts_db.mark_dm_result(acc.id, ok=True)
             return
         except Exception as e:
             last_error = e
+            accounts_db.mark_dm_result(acc.id, ok=False, error=str(e))
             err_s = str(e)
             if is_flood_limit_error(e):
+                wait_sec = extract_flood_wait_seconds(e) or 3600
+                accounts_db.set_flood_until(acc.id, time.time() + wait_sec)
                 logger.warning(
                     "Ліміт DM на %s (…%s) — пробуємо інший акаунт",
                     acc.label,

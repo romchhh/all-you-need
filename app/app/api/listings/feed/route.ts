@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
-import { listingTimeFieldsForApi } from '@/utils/parseDbDate';
+import { listingTimeFieldsForApi, parseDbDate } from '@/utils/parseDbDate';
 import {
   LISTING_FAVORITES_JOIN_SQL,
   LISTING_FAVORITES_COUNT_FROM_JOIN_SQL,
@@ -253,7 +253,9 @@ export async function GET(request: NextRequest) {
         title: listing.title,
         price: listing.isFree ? 'Free' : listing.price,
         previousPrice: listing.previousPrice || null,
-        priceChangedAt: listing.priceChangedAt || null,
+        priceChangedAt: listing.priceChangedAt
+          ? parseDbDate(listing.priceChangedAt)?.toISOString() ?? listing.priceChangedAt
+          : null,
         currency: (listing.currency as 'UAH' | 'EUR' | 'USD' | undefined) || undefined,
         image: thumb,
         images: thumb ? [thumb] : [],

@@ -9,6 +9,8 @@ import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
 import { ListingAutoRenewSection } from '@/components/listing/ListingAutoRenewSection';
+import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
+import { getCurrencySymbol } from '@/utils/currency';
 
 interface ProfileListingCardProps {
   listing: Listing;
@@ -423,17 +425,42 @@ export const ProfileListingCard = ({
               {(() => {
                 const isNegotiable = listing.price === t('common.negotiable') || listing.price === 'Договірна' || listing.price === 'Договорная';
                 const isFree = listing.isFree;
+                const showPrev =
+                  !isSold &&
+                  !isPendingModeration &&
+                  !isDeactivated &&
+                  !!listing.previousPrice &&
+                  isPriceChangeFresh(listing.priceChangedAt) &&
+                  listing.previousPrice !== listing.price;
+                const prevEl = showPrev ? (
+                  <span className="mr-1.5 text-[0.75em] font-medium line-through opacity-60">
+                    {listing.previousPrice === 'Free' || listing.previousPrice === t('common.free')
+                      ? t('common.free')
+                      : `${listing.previousPrice}${getCurrencySymbol(listing.currency)}`}
+                  </span>
+                ) : null;
                 if (isFree) {
-                  return t('common.free');
+                  return (
+                    <>
+                      {prevEl}
+                      {t('common.free')}
+                    </>
+                  );
                 }
                 if (isNegotiable) {
                   return (
                     <span className="whitespace-nowrap font-bold text-[clamp(0.6875rem,4vw,1rem)]" title={t('common.negotiable')}>
+                      {prevEl}
                       {t('common.negotiableShort')}
                     </span>
                   );
                 }
-                return `${listing.price} ${listing.currency || '$'}`;
+                return (
+                  <>
+                    {prevEl}
+                    {`${listing.price}${getCurrencySymbol(listing.currency || 'EUR')}`}
+                  </>
+                );
               })()}
             </div>
 

@@ -20,22 +20,102 @@ interface Listing {
   images: string;
   status: string;
   moderationStatus: string;
+  title?: string;
+  description?: string;
+  price?: string;
+  currency?: string | null;
+  isFree?: number | boolean;
+  category?: string;
+  subcategory?: string | null;
+  condition?: string | null;
+  location?: string;
 }
 
 function firePriceChangeNotify(
   listingId: number,
   title: string,
   sellerUserId: number,
-  result: { priceChanged: boolean; oldPrice: string | null; newPrice: string }
+  result: { priceChanged: boolean; oldPrice: string | null; newPrice: string },
+  currency?: string | null
 ) {
-  if (!result.priceChanged || !result.oldPrice) return;
+  if (!result.priceChanged) return;
   void notifyFavoritesPriceChanged({
     listingId,
     title,
-    oldPrice: result.oldPrice,
+    oldPrice: result.oldPrice ?? '',
     newPrice: result.newPrice,
+    currency,
     sellerUserId,
   }).catch((err) => console.error('[Update Listing] price notify failed:', err));
+}
+
+function normField(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function normalizeImagePath(url: string): string {
+  let u = String(url || '').trim();
+  if (!u) return '';
+  if (u.startsWith('/api/images/')) u = u.replace('/api/images/', '');
+  if (u.startsWith('http://') || u.startsWith('https://')) {
+    try {
+      const pathname = new URL(u).pathname;
+      u = pathname.startsWith('/api/images/')
+        ? pathname.replace('/api/images/', '')
+        : pathname.replace(/^\//, '');
+    } catch {
+      /* keep u */
+    }
+  }
+  if (u.startsWith('/')) u = u.substring(1);
+  return u;
+}
+
+/** Лише ціна/валюта/isFree — без модерації, щоб одразу показати зміну на картці. */
+function isPriceOnlyEdit(
+  current: Listing,
+  data: {
+    title: string;
+    description: string;
+    category: string;
+    subcategory: string | null;
+    condition: string | null;
+    location: string;
+    price: string;
+    currency: string;
+    isFree: boolean;
+  },
+  hasNewImages: boolean,
+  imageUrls: string[]
+): boolean {
+  if (current.status !== 'active') return false;
+  if (hasNewImages) return false;
+
+  const currentImages = (() => {
+    try {
+      const parsed = typeof current.images === 'string' ? JSON.parse(current.images) : current.images;
+      return Array.isArray(parsed) ? parsed.map((p) => normalizeImagePath(String(p))) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const nextImages = imageUrls.map(normalizeImagePath);
+  if (JSON.stringify(currentImages) !== JSON.stringify(nextImages)) return false;
+
+  if (normField(current.title) !== normField(data.title)) return false;
+  if (normField(current.description) !== normField(data.description)) return false;
+  if (normField(current.category) !== normField(data.category)) return false;
+  if (normField(current.subcategory) !== normField(data.subcategory)) return false;
+  if (normField(current.condition) !== normField(data.condition)) return false;
+  if (normField(current.location) !== normField(data.location)) return false;
+
+  const oldFree = current.isFree === 1 || current.isFree === true;
+  const oldPrice = oldFree ? 'Free' : normField(current.price);
+  const newPrice = data.isFree ? 'Free' : normField(data.price);
+  const oldCurrency = normField(current.currency || 'UAH');
+  const newCurrency = normField(data.currency || 'UAH');
+
+  return oldPrice !== newPrice || oldFree !== data.isFree || oldCurrency !== newCurrency;
 }
 
 export async function PUT(
@@ -81,7 +161,10 @@ export async function PUT(
 
     // Отримуємо оголошення
     const listings = await prisma.$queryRawUnsafe(
-      `SELECT userId, images, status, moderationStatus FROM Listing WHERE id = ?`,
+      `SELECT userId, images, status, moderationStatus,
+              title, description, price, currency, isFree,
+              category, subcategory, condition, location
+       FROM Listing WHERE id = ?`,
       listingId
     ) as Listing[];
 
@@ -185,7 +268,13 @@ export async function PUT(
       
       // Оновлюємо оголошення з новим статусом
       const priceResult = await updateListingData(listingId, listingData, imageUrls, requestedStatus);
-      firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult);
+      firePriceChangeNotify(
+        listingId,
+        listingData.title,
+        listing.userId,
+        priceResult,
+        listingData.currency
+      );
       
       // Обробляємо нові зображення асинхронно (якщо є)
       if (hasNewImages) {
@@ -344,6 +433,27 @@ export async function PUT(
     // Якщо немає нових зображень, використовуємо тільки існуючі
     const imageUrls = existingImages;
 
+    // Зміна лише ціни на активному оголошенні — без модерації (картка одразу показує old→new)
+    if (
+      isPriceOnlyEdit(listing, listingData, hasNewImages, imageUrls) &&
+      (!requestedStatus || requestedStatus === 'active')
+    ) {
+      console.log('[Update Listing] Price-only edit on active listing — skip moderation');
+      const priceResult = await updateListingData(listingId, listingData, imageUrls);
+      firePriceChangeNotify(
+        listingId,
+        listingData.title,
+        listing.userId,
+        priceResult,
+        listingData.currency
+      );
+      return NextResponse.json({
+        success: true,
+        priceUpdated: true,
+        message: 'Price updated',
+      });
+    }
+
     // Перевіряємо чи потрібна реактивація (зміна статусу на 'active' з будь-якого іншого статусу)
     if (needsReactivation(listing.status, requestedStatus || '')) {
       console.log('[Update Listing] Reactivating listing from status:', listing.status, 'to:', requestedStatus);
@@ -471,7 +581,7 @@ export async function PUT(
       console.log('[Update Listing] Status change to', requestedStatus, '- skipping moderation check');
       // Цей випадок вже має бути оброблений раніше, але на всяк випадок перевіряємо тут
       const priceResult = await updateListingData(listingId, listingData, imageUrls, requestedStatus);
-      firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult);
+      firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult, listingData.currency);
       
       // Обробляємо нові зображення асинхронно (якщо є)
       if (hasNewImages) {
@@ -636,7 +746,7 @@ export async function PUT(
       console.log('[Update Listing] Active/other listing edited, updating and sending to moderation');
       
       const priceResult = await updateListingData(listingId, listingData, imageUrls, 'pending_moderation');
-      firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult);
+      firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult, listingData.currency);
       
       console.log('[Update Listing] Listing updated, processing images and sending to moderation asynchronously');
 
@@ -725,7 +835,7 @@ export async function PUT(
 
     // Звичайне оновлення без реактивації (для draft або якщо вказано конкретний статус)
     const priceResult = await updateListingData(listingId, listingData, imageUrls, requestedStatus || undefined);
-    firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult);
+    firePriceChangeNotify(listingId, listingData.title, listing.userId, priceResult, listingData.currency);
 
     // Швидко зберігаємо нові зображення асинхронно (якщо є)
     if (hasNewImages) {

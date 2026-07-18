@@ -9,19 +9,16 @@ from dataclasses import dataclass
 from parser.category_keywords import detect_category
 from parser.config.channels import (
     BEAUTY_SERVICE_CHANNELS,
-    SERVICE_CHANNELS,
-    normalize_channel_key,
-)
-from parser.config.services_ai_channels import (
     PARSER_TYPE_SERVICES_CHANNEL,
+    SERVICE_CHANNELS,
     SERVICES_AI_CHANNELS,
-    SERVICES_AI_MODERATION_CHANNEL_ID,
+    normalize_channel_key,
 )
 from parser.config.settings import (
     PARSER_SERVICES_FETCH_LIMIT,
     PARSER_SERVICES_IGNORE_CURSOR,
-    SERVICES_MODERATION_CHANNEL_ID,
 )
+from parser.moderation.approve_routing import notify_chat_for_parsed_item
 from parser.core.channel_fetch import iter_new_channel_messages
 from parser.core.photos import download_photos
 from parser.core.quality import (
@@ -272,19 +269,14 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
                 ),
                 "parser_type": PARSER_TYPE_SERVICES_CHANNEL,
             }
-            moderation_targets = (
-                ("marketplace", SERVICES_MODERATION_CHANNEL_ID),
-                ("channel", SERVICES_AI_MODERATION_CHANNEL_ID),
-            )
             try:
-                for mod_target, notify_chat_id in moderation_targets:
-                    item_data = {
-                        **base_item_data,
-                        "moderation_target": mod_target,
-                        "notify_chat_id": notify_chat_id,
-                    }
-                    await notify_callback(item_data)
-                    await asyncio.sleep(3)
+                item_data = {
+                    **base_item_data,
+                    "moderation_target": "services_both",
+                    "notify_chat_id": notify_chat_for_parsed_item(base_item_data),
+                }
+                await notify_callback(item_data)
+                await asyncio.sleep(3)
             except Exception as e:
                 logger.error(
                     "Помилка сповіщення модерації (services AI) item %s: %s",

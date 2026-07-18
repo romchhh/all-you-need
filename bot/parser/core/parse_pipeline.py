@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from parser.ai_screen import ai_screen_parsed_listing, apply_screen_enrichment
-from parser.core.dedup_check import check_parser_duplicates
+from parser.ai.screen import ai_screen_parsed_listing, apply_screen_enrichment
+from parser.core.dedup import check_parser_duplicates
 from parser.storage.listing_dedup import active_listing_duplicate
 
 logger = logging.getLogger(__name__)

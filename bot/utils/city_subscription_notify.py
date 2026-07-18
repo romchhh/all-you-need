@@ -16,7 +16,7 @@ from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from database_functions.telegram_listing_db import get_connection
-from parser.moderation.urls import listing_miniapp_url
+from parser.moderation.formatting import listing_miniapp_url
 
 # Синхронізовано з app/utils/cityNormalization.ts (CITY_ALIASES)
 CITY_ALIASES = {

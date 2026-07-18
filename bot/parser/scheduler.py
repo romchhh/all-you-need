@@ -2,24 +2,12 @@
 Шедулер для автоматичного парсингу Telegram-каналів через Pyrogram.
 
 Запускається як окремий процес поряд з основним aiogram-ботом.
-Сесії Pyrogram: bot/parser/parser_session та bot/parser/parser_services_session.
+Сесії: bot/parser/parser_account_1.session … parser_account_3.session
 
 Налаштування в .env:
-  PARSER_API_ID       — api_id з my.telegram.org (акаунт 1)
-  PARSER_API_HASH     — api_hash акаунта 1
-  PARSER_PHONE        — телефон акаунта 1
-  PARSER_SERVICES_API_ID / PARSER_SERVICES_API_HASH / PARSER_SERVICES_PHONE — акаунт 2 (опційно)
-  PARSER_GROUP_ID     — ID групи куди надсилаються оголошення для модерації
-  PARSER_INTERVAL_MIN — інтервал перевірки в хвилинах (за замовч. 30)
-  PARSER_BOT_TELEGRAM_ID — telegram_id системного користувача-бота
-  BOT_TOKEN           — токен основного aiogram-бота (для надсилання в групу)
-  PARSER_EXTRA_CHANNELS — додаткові канали: userOrLink:Місто,... (див. parser.py)
-  PARSER_SERVICES_AI_CHANNELS — групи послуг для AI→канал: userOrLink:Місто,...
-  PARSER_SERVICES_AI_MODERATION_CHANNEL_ID — модерація (за замовч. -1003901841142)
-  PARSER_SERVICES_AI_INTERVAL_MIN — інтервал AI-парсера послуг (за замовч. = PARSER_INTERVAL_MIN)
-  TRADE_SERVICES_CHANNEL_HAMBURG_ID — канал послуг Hamburg (за замовч. -1003627644062)
-  TRADE_SERVICES_CHANNEL_GERMANY_ID — канал послуг Germany (за замovch. -1003857694156)
-  OPENAI_API_KEY — AI при підтвердженні модератором
+  PARSER_MOD_SERVICES_HAMBURG_ID / PARSER_MOD_SERVICES_GERMANY_ID / PARSER_MOD_GOODS_ID
+  PARSER_INTERVAL_MIN, TOKEN, OPENAI_API_KEY
+  TRADE_SERVICES_CHANNEL_HAMBURG_ID / TRADE_SERVICES_CHANNEL_GERMANY_ID
 """
 
 import asyncio
@@ -27,19 +15,18 @@ import logging
 import os
 import traceback
 from pathlib import Path
+
 from dotenv import load_dotenv
+
+from parser.config.settings import (
+    PARSER_INTERVAL_MIN,
+    PARSER_SERVICES_AI_INTERVAL_MIN,
+)
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 
-PARSER_API_ID: int = int(os.getenv("PARSER_API_ID", "0"))
-PARSER_API_HASH: str = os.getenv("PARSER_API_HASH", "")
-PARSER_PHONE: str = os.getenv("PARSER_PHONE", "")
-PARSER_INTERVAL_MIN: float = float(os.getenv("PARSER_INTERVAL_MIN", "30"))
-PARSER_SERVICES_AI_INTERVAL_MIN: float = float(
-    os.getenv("PARSER_SERVICES_AI_INTERVAL_MIN", os.getenv("PARSER_INTERVAL_MIN", "30"))
-)
 BOT_TOKEN: str = os.getenv("TOKEN", "")
 
 
@@ -62,13 +49,13 @@ async def run_parser_cycle(
     apply_pyrogram_photo_size_patch()
 
     from aiogram import Bot
-    from parser.admin_notify import (
+    from parser.notify.admin import (
         notify_admin_group,
         notify_parser_channel_errors,
         notify_parser_error_admins,
     )
     from parser.core.account_pool import list_parser_accounts
-    from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
+    from parser.core.session_lock import GLOBAL_PARSER_RUN_LOCK
 
     aiogram_bot = Bot(token=BOT_TOKEN)
 
@@ -81,7 +68,7 @@ async def run_parser_cycle(
     try:
         accounts = list_parser_accounts()
         if not accounts:
-            msg = "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
+            msg = "Немає активних акаунтів парсера (Адмін → Парсер акаунти)"
             logger.error(msg)
             await _notify_error("налаштування", msg)
             return None
@@ -148,7 +135,7 @@ async def run_services_ai_parser_cycle(
     ignore_cursor: bool = False,
 ) -> dict | None:
     """Цикл парсингу груп послуг → дві модерації (маркетплейс + Telegram-канал)."""
-    from parser.config.services_ai_channels import services_ai_parser_enabled
+    from parser.config.channels import services_ai_parser_enabled
     from parser.core.services_ai_runner import ServicesParseRunConfig, services_parse_run
 
     if not services_ai_parser_enabled():
@@ -164,13 +151,13 @@ async def run_services_ai_parser_cycle(
     apply_pyrogram_photo_size_patch()
 
     from aiogram import Bot
-    from parser.admin_notify import (
+    from parser.notify.admin import (
         notify_admin_group,
         notify_parser_channel_errors,
         notify_parser_error_admins,
     )
     from parser.core.account_pool import list_parser_accounts
-    from parser.session_lock import GLOBAL_PARSER_RUN_LOCK
+    from parser.core.session_lock import GLOBAL_PARSER_RUN_LOCK
 
     aiogram_bot = Bot(token=BOT_TOKEN)
 
@@ -183,7 +170,7 @@ async def run_services_ai_parser_cycle(
     try:
         accounts = list_parser_accounts()
         if not accounts:
-            msg = "PARSER_API_ID / PARSER_API_HASH / PARSER_PHONE не встановлено в .env"
+            msg = "Немає активних акаунтів парсера (Адмін → Парсер акаунти)"
             logger.error(msg)
             await _notify_error("services AI — налаштування", msg)
             return None
@@ -264,7 +251,7 @@ def register_parser_job(scheduler):
 
 def register_services_ai_parser_job(scheduler):
     """Реєструє парсер послуг (AI → канал TradeGround, без маркетплейсу)."""
-    from parser.config.services_ai_channels import services_ai_parser_enabled
+    from parser.config.channels import services_ai_parser_enabled
 
     if not services_ai_parser_enabled():
         logger.info(

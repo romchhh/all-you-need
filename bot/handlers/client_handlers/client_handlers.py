@@ -78,19 +78,28 @@ async def scheduler_jobs():
         traceback.print_exc()
 
     # Job для парсера оголошень з Telegram-каналів
-    import os as _os
-    if _os.getenv("PARSER_API_ID"):
-        try:
+    try:
+        from parser.core.account_pool import list_parser_accounts
+        from parser.storage.parser_accounts_db import (
+            ensure_parser_accounts_table,
+            migrate_env_accounts_if_empty,
+        )
+
+        ensure_parser_accounts_table()
+        migrate_env_accounts_if_empty()
+        if list_parser_accounts():
             from parser.scheduler import register_parser_job, register_services_ai_parser_job
 
             register_parser_job(scheduler)
             print("✅ Scheduler job 'telegram_parser' додано (парсинг каналів)")
             register_services_ai_parser_job(scheduler)
             print("✅ Scheduler job 'telegram_services_ai_parser' додано (послуги → канал)")
-        except Exception as e:
-            print(f"❌ Помилка реєстрації parser job: {e}")
-            import traceback
-            traceback.print_exc()
+        else:
+            print("ℹ️ Parser jobs не додано — немає акаунтів (Адмін → Парсер акаунти)")
+    except Exception as e:
+        print(f"❌ Помилка реєстрації parser job: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Мікросервіс плавного накручування переглядів (окремий пакет view_boost, як parser)
     try:
