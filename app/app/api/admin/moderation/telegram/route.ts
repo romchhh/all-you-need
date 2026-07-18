@@ -427,7 +427,7 @@ export async function POST(request: NextRequest) {
         const replyMarkup = channelLink ? {
           inline_keyboard: [[
             {
-              text: '🔗 Переглянути оголошення',
+              text: '🛒 Відкрити в Marketplace',
               url: channelLink,
             }
           ]]

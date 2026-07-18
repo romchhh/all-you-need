@@ -139,7 +139,7 @@ export async function sendListingApprovedNotification(
       inline_keyboard: [
         [
           {
-            text: '🔗 Переглянути оголошення',
+            text: '🛒 Відкрити в Marketplace',
             web_app: { url: listingUrl }
           }
         ]

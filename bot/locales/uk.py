@@ -111,7 +111,7 @@ TEXTS = {
             "price": "Ціна: {price}",
             "location": "Місце: {location}",
             "seller": "Продавець: {seller}",
-            "button": "Переглянути оголошення",
+            "button": "Відкрити в Marketplace",
             "instruction": "Натисніть кнопку нижче, щоб переглянути деталі:"
         },
         "user": {
@@ -520,7 +520,7 @@ TEXTS = {
         "approval_platform_soon": "⏱ Оголошення з'явиться на платформі (маркетплейсі) найближчим часом — оновіть сторінку каталогу через кілька хвилин.",
         "approval_expires_marketplace": "\n\n📅 Термін дії: до {date}",
         "approval_active_days": "Ваше оголошення буде активним протягом 30 днів.",
-        "view_listing_button": "🔗 Переглянути оголошення",
+        "view_listing_button": "🛒 Відкрити в Marketplace",
         "view_profile_button": "🔗 Переглянути профіль"
     },
     "tariffs": {
