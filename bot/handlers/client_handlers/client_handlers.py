@@ -120,8 +120,8 @@ async def scheduler_jobs():
         if existing_digest_job:
             scheduler.remove_job(digest_job_id)
 
-        digest_hours = (_os.getenv("CITY_DIGEST_HOURS") or "9,14,20").strip()
-        digest_minute = int((_os.getenv("CITY_DIGEST_MINUTE") or "0").strip() or "0")
+        digest_hours = (os.getenv("CITY_DIGEST_HOURS") or "9,14,20").strip()
+        digest_minute = int((os.getenv("CITY_DIGEST_MINUTE") or "0").strip() or "0")
 
         from utils.city_digest_notify import send_city_digest_notifications
 
