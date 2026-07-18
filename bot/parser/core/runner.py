@@ -282,36 +282,23 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
 
 async def run_all_channels(notify_callback) -> dict:
-    from parser.config.channels import (
-        SERVICES_AI_CHANNELS,
-        services_ai_parser_enabled,
-    )
+    from parser.config.channels import CHANNELS, group_kind_for_channel
     from parser.core.pyrogram_accounts import run_channels_with_accounts
+    from parser.core.services_ai_runner import parse_services_ai_channel
 
-    skip_service_channels: set[str] = set()
-    if services_ai_parser_enabled():
-        skip_service_channels = {normalize_channel_key(k) for k in SERVICES_AI_CHANNELS}
-
-    channels = {
-        channel: city
-        for channel, city in CHANNELS.items()
-        if normalize_channel_key(channel) not in skip_service_channels
-    }
-
-    for channel in CHANNELS:
-        if normalize_channel_key(channel) in skip_service_channels:
-            logger.info(
-                "Пропускаємо %s — канал обробляє services AI parser (/parse_services)",
-                channel,
-            )
+    async def parse_one(app, channel: str, city: str, notify_cb):
+        if group_kind_for_channel(channel) == "services":
+            return await parse_services_ai_channel(app, channel, city, notify_cb)
+        return await parse_channel(app, channel, city, notify_cb)
 
     total = await run_channels_with_accounts(
-        channels,
-        parse_channel,
+        dict(CHANNELS),
+        parse_one,
         notify_callback,
-        log_prefix="Маркетплейс",
+        log_prefix="Парсер",
     )
     fetch_limit, ignore_cursor = _active_fetch_options()
     if ignore_cursor and fetch_limit:
         total["lookback"] = fetch_limit
+    total["channels"] = len(CHANNELS)
     return total

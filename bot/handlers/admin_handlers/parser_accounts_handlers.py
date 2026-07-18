@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from aiogram import F, Router, types
 from aiogram.exceptions import TelegramBadRequest
@@ -24,6 +26,69 @@ from utils.filters import IsAdmin
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+# Живий Pyrogram-клієнт між кроками FSM (send_code → sign_in).
+# phone_code_hash привʼязаний до зʼєднання; reconnect = PhoneCodeExpired.
+_auth_by_admin: dict[int, "AuthSession"] = {}
+
+
+@dataclass
+class AuthSession:
+    client: Any
+    account_id: int
+    phone: str
+    api_id: int
+    api_hash: str
+    session_path: str
+    phone_code_hash: str = ""
+
+
+async def _cleanup_auth(admin_id: int) -> None:
+    entry = _auth_by_admin.pop(admin_id, None)
+    if not entry:
+        return
+    try:
+        if entry.client.is_connected:
+            await entry.client.disconnect()
+    except Exception:
+        pass
+
+
+def _build_client(session_path: str, api_id: int, api_hash: str, phone: str):
+    from pyrogram import Client
+
+    return Client(
+        name=str(session_path),
+        api_id=api_id,
+        api_hash=api_hash,
+        phone_number=phone,
+        in_memory=False,
+    )
+
+
+async def _ensure_connected(entry: AuthSession):
+    if not entry.client.is_connected:
+        await entry.client.connect()
+
+
+async def _send_fresh_code(entry: AuthSession) -> str:
+    await _ensure_connected(entry)
+    sent = await entry.client.send_code(entry.phone)
+    entry.phone_code_hash = sent.phone_code_hash
+    return entry.phone_code_hash
+
+
+async def _resend_or_fresh_code(entry: AuthSession) -> str:
+    """Новий код після PhoneCodeExpired або resend_code."""
+    await _ensure_connected(entry)
+    try:
+        if entry.phone_code_hash:
+            sent = await entry.client.resend_code(entry.phone, entry.phone_code_hash)
+            entry.phone_code_hash = sent.phone_code_hash
+            return entry.phone_code_hash
+    except Exception as e:
+        logger.info("resend_code failed (%s), send_code again", e)
+    return await _send_fresh_code(entry)
 
 
 def _fmt_ts(ts: float) -> str:
@@ -150,6 +215,7 @@ async def parser_account_delete_confirm(callback: types.CallbackQuery):
 
 @router.callback_query(IsAdmin(), F.data == "parser_acc_add")
 async def parser_account_add_start(callback: types.CallbackQuery, state: FSMContext):
+    await _cleanup_auth(callback.from_user.id)
     await state.clear()
     await state.set_state(ParserAccountStates.waiting_api_id)
     await callback.message.answer(
@@ -165,6 +231,7 @@ async def parser_account_add_start(callback: types.CallbackQuery, state: FSMCont
 @router.message(IsAdmin(), ParserAccountStates.waiting_api_id)
 async def parser_acc_api_id(message: types.Message, state: FSMContext):
     if message.text == "Скасувати":
+        await _cleanup_auth(message.from_user.id)
         await state.clear()
         await message.answer("Скасовано", reply_markup=admin_keyboard())
         await _show_accounts_list(message)
@@ -181,6 +248,7 @@ async def parser_acc_api_id(message: types.Message, state: FSMContext):
 @router.message(IsAdmin(), ParserAccountStates.waiting_api_hash)
 async def parser_acc_api_hash(message: types.Message, state: FSMContext):
     if message.text == "Скасувати":
+        await _cleanup_auth(message.from_user.id)
         await state.clear()
         await message.answer("Скасовано", reply_markup=admin_keyboard())
         await _show_accounts_list(message)
@@ -201,6 +269,7 @@ async def parser_acc_api_hash(message: types.Message, state: FSMContext):
 @router.message(IsAdmin(), ParserAccountStates.waiting_phone)
 async def parser_acc_phone(message: types.Message, state: FSMContext):
     if message.text == "Скасувати":
+        await _cleanup_auth(message.from_user.id)
         await state.clear()
         await message.answer("Скасовано", reply_markup=admin_keyboard())
         await _show_accounts_list(message)
@@ -214,6 +283,9 @@ async def parser_acc_phone(message: types.Message, state: FSMContext):
     data = await state.get_data()
     api_id = int(data["api_id"])
     api_hash = str(data["api_hash"])
+    admin_id = message.from_user.id
+
+    await _cleanup_auth(admin_id)
 
     account_id = accounts_db.create_account(
         api_id=api_id,
@@ -229,7 +301,18 @@ async def parser_acc_phone(message: types.Message, state: FSMContext):
     await message.answer("⏳ Надсилаю код авторизації в Telegram…")
 
     try:
-        from pyrogram import Client
+        client = _build_client(str(session_path), api_id, api_hash, phone)
+        await client.connect()
+        entry = AuthSession(
+            client=client,
+            account_id=account_id,
+            phone=phone,
+            api_id=api_id,
+            api_hash=api_hash,
+            session_path=str(session_path),
+        )
+        phone_code_hash = await _send_fresh_code(entry)
+        _auth_by_admin[admin_id] = entry
     except ImportError:
         accounts_db.delete_account(account_id)
         await state.clear()
@@ -238,25 +321,9 @@ async def parser_acc_phone(message: types.Message, state: FSMContext):
             reply_markup=admin_keyboard(),
         )
         return
-
-    client = Client(
-        name=str(session_path),
-        api_id=api_id,
-        api_hash=api_hash,
-        phone_number=phone,
-        in_memory=False,
-    )
-    try:
-        await client.connect()
-        sent = await client.send_code(phone)
-        phone_code_hash = sent.phone_code_hash
-        await client.disconnect()
     except Exception as e:
         logger.exception("send_code failed: %s", e)
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
+        await _cleanup_auth(admin_id)
         accounts_db.delete_account(account_id)
         await state.clear()
         await message.answer(
@@ -274,74 +341,95 @@ async def parser_acc_phone(message: types.Message, state: FSMContext):
     )
     await state.set_state(ParserAccountStates.waiting_code)
     await message.answer(
-        "4/4. Введіть <b>код</b> з Telegram / SMS для цього номера:",
+        "4/4. Введіть <b>код</b> з Telegram (додаток «Telegram», не SMS від бота).\n\n"
+        "Якщо код не приймається — надішлю новий автоматично.",
         parse_mode="HTML",
     )
 
 
 @router.message(IsAdmin(), ParserAccountStates.waiting_code)
 async def parser_acc_code(message: types.Message, state: FSMContext):
+    admin_id = message.from_user.id
     if message.text == "Скасувати":
         data = await state.get_data()
         if data.get("account_id"):
             accounts_db.delete_account(int(data["account_id"]))
+        await _cleanup_auth(admin_id)
         await state.clear()
         await message.answer("Скасовано", reply_markup=admin_keyboard())
         await _show_accounts_list(message)
         return
 
     code = (message.text or "").strip().replace(" ", "")
+    if not code.isdigit():
+        await message.answer("❌ Код має містити лише цифри. Спробуйте ще:")
+        return
+
     data = await state.get_data()
     account_id = int(data["account_id"])
-    phone = data["phone"]
-    phone_code_hash = data["phone_code_hash"]
-    api_id = int(data["api_id"])
-    api_hash = str(data["api_hash"])
-    session_path = Path(data["session_path"])
+    entry = _auth_by_admin.get(admin_id)
 
-    from pyrogram import Client
     from pyrogram.errors import (
         PhoneCodeExpired,
         PhoneCodeInvalid,
         SessionPasswordNeeded,
     )
 
-    client = Client(
-        name=str(session_path),
-        api_id=api_id,
-        api_hash=api_hash,
-        phone_number=phone,
-    )
+    if not entry:
+        await message.answer(
+            "❌ Сесію авторизації втрачено (перезапуск бота?). "
+            "Почніть додавання акаунта заново.",
+            reply_markup=admin_keyboard(),
+        )
+        accounts_db.delete_account(account_id)
+        await state.clear()
+        return
+
     try:
-        await client.connect()
+        await _ensure_connected(entry)
         try:
-            await client.sign_in(phone, phone_code_hash, code)
+            await entry.client.sign_in(entry.phone, entry.phone_code_hash, code)
         except SessionPasswordNeeded:
-            await client.disconnect()
             await state.set_state(ParserAccountStates.waiting_2fa)
             await message.answer(
                 "🔐 Увімкнено 2FA. Введіть <b>пароль хмарної двофакторки</b>:",
                 parse_mode="HTML",
             )
             return
-        me = await client.get_me()
-        await client.disconnect()
-    except (PhoneCodeInvalid, PhoneCodeExpired) as e:
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
+        me = await entry.client.get_me()
+        await _cleanup_auth(admin_id)
+    except PhoneCodeInvalid:
         await message.answer(
-            f"❌ Код невірний або протермінований ({type(e).__name__}). "
-            "Введіть ще раз або натисніть «Скасувати»."
+            "❌ Невірний код. Перевірте повідомлення від <b>Telegram</b> "
+            "(не SMS від бота) і введіть ще раз:",
+            parse_mode="HTML",
         )
+        return
+    except PhoneCodeExpired:
+        logger.info("PhoneCodeExpired for %s — resending code", entry.phone)
+        try:
+            new_hash = await _resend_or_fresh_code(entry)
+            await state.update_data(phone_code_hash=new_hash)
+            await message.answer(
+                "⏳ Попередній код прострочено.\n"
+                "Надіслав <b>новий код</b> у Telegram — введіть його:",
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.exception("resend code failed: %s", e)
+            await _cleanup_auth(admin_id)
+            accounts_db.delete_account(account_id)
+            await state.clear()
+            await message.answer(
+                f"❌ Не вдалося надіслати новий код: <code>{type(e).__name__}: {e}</code>\n"
+                "Спробуйте додати акаунт заново.",
+                parse_mode="HTML",
+                reply_markup=admin_keyboard(),
+            )
         return
     except Exception as e:
         logger.exception("sign_in failed: %s", e)
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
+        await _cleanup_auth(admin_id)
         accounts_db.delete_account(account_id)
         await state.clear()
         await message.answer(
@@ -356,10 +444,12 @@ async def parser_acc_code(message: types.Message, state: FSMContext):
 
 @router.message(IsAdmin(), ParserAccountStates.waiting_2fa)
 async def parser_acc_2fa(message: types.Message, state: FSMContext):
+    admin_id = message.from_user.id
     if message.text == "Скасувати":
         data = await state.get_data()
         if data.get("account_id"):
             accounts_db.delete_account(int(data["account_id"]))
+        await _cleanup_auth(admin_id)
         await state.clear()
         await message.answer("Скасовано", reply_markup=admin_keyboard())
         await _show_accounts_list(message)
@@ -368,38 +458,30 @@ async def parser_acc_2fa(message: types.Message, state: FSMContext):
     password = message.text or ""
     data = await state.get_data()
     account_id = int(data["account_id"])
-    phone = data["phone"]
-    api_id = int(data["api_id"])
-    api_hash = str(data["api_hash"])
-    session_path = Path(data["session_path"])
+    entry = _auth_by_admin.get(admin_id)
 
-    from pyrogram import Client
     from pyrogram.errors import PasswordHashInvalid
 
-    client = Client(
-        name=str(session_path),
-        api_id=api_id,
-        api_hash=api_hash,
-        phone_number=phone,
-    )
+    if not entry:
+        await message.answer(
+            "❌ Сесію авторизації втрачено. Почніть заново.",
+            reply_markup=admin_keyboard(),
+        )
+        accounts_db.delete_account(account_id)
+        await state.clear()
+        return
+
     try:
-        await client.connect()
-        await client.check_password(password)
-        me = await client.get_me()
-        await client.disconnect()
+        await _ensure_connected(entry)
+        await entry.client.check_password(password)
+        me = await entry.client.get_me()
+        await _cleanup_auth(admin_id)
     except PasswordHashInvalid:
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
         await message.answer("❌ Невірний пароль 2FA. Спробуйте ще:")
         return
     except Exception as e:
         logger.exception("2fa failed: %s", e)
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
+        await _cleanup_auth(admin_id)
         accounts_db.delete_account(account_id)
         await state.clear()
         await message.answer(
@@ -413,6 +495,7 @@ async def parser_acc_2fa(message: types.Message, state: FSMContext):
 
 
 async def _finalize_account(message: types.Message, state: FSMContext, account_id: int, me) -> None:
+    await _cleanup_auth(message.from_user.id)
     username = (me.username or "") if me else ""
     telegram_id = int(me.id) if me else 0
     accounts_db.update_account(

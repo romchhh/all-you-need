@@ -88,12 +88,14 @@ async def scheduler_jobs():
         ensure_parser_accounts_table()
         migrate_env_accounts_if_empty()
         if list_parser_accounts():
-            from parser.scheduler import register_parser_job, register_services_ai_parser_job
+            from parser.scheduler import register_parser_job
 
             register_parser_job(scheduler)
-            print("✅ Scheduler job 'telegram_parser' додано (парсинг каналів)")
-            register_services_ai_parser_job(scheduler)
-            print("✅ Scheduler job 'telegram_services_ai_parser' додано (послуги → канал)")
+            # Прибрати старий окремий job послуг (тепер один telegram_parser)
+            stale = scheduler.get_job("telegram_services_ai_parser")
+            if stale:
+                scheduler.remove_job("telegram_services_ai_parser")
+            print("✅ Scheduler job 'telegram_parser' додано (усі групи → модерація)")
         else:
             print("ℹ️ Parser jobs не додано — немає акаунтів (Адмін → Парсер акаунти)")
     except Exception as e:

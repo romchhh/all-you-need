@@ -1,7 +1,6 @@
 import asyncio
 import html
 import logging
-import os
 import re
 
 from aiogram import F, Router, types
@@ -55,10 +54,7 @@ def _is_parse_message(message: types.Message) -> bool:
 
 
 def _parse_services_lookback(message: types.Message) -> int | None:
-    """
-    /parse_services — інкрементально (cursor).
-    /parse_services100 або /parse_services 100 — останні N постів без cursor.
-    """
+    """Аліас /parse_services → той самий єдиний парсинг."""
     text = (message.text or "").strip()
     if not text:
         return None
@@ -79,9 +75,9 @@ def _is_parse_services_message(message: types.Message) -> bool:
     return bool(_PARSE_SERVICES_CMD.match(head))
 
 
-def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
+def _format_parser_stats(stats: dict | None) -> str:
     if not stats:
-        return "❌ <b>Парсинг не виконано</b>\n\nПеревір логи бота або .env (PARSER_ACCOUNT_1_*, TOKEN)."
+        return "❌ <b>Парсинг не виконано</b>\n\nПеревір логи бота або акаунти в «Парсер акаунти»."
 
     added = int(stats.get("added") or 0)
     skipped = int(stats.get("skipped") or 0)
@@ -90,23 +86,16 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
     reasons = stats.get("reasons") or {}
     lookback = stats.get("lookback")
 
-    title = "✅ <b>Парсинг послуг завершено</b>" if services else "✅ <b>Парсинг завершено</b>"
     lines = [
-        title,
+        "✅ <b>Парсинг завершено</b>",
         "",
         f"➕ Нових: <b>{added}</b>",
         f"⏭ Пропущено: <b>{skipped}</b>",
     ]
     if lookback:
-        if services:
-            lines.append(f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано)")
-        else:
-            lines.append(
-                f"📥 Останні <b>{lookback}</b> постів на канал "
-                f"(cursor ігноровано, текст-дедуп вимк., AI+message_id)"
-            )
+        lines.append(f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано)")
     if channels is not None:
-        lines.append(f"📢 Каналів у черзі: <b>{channels}</b>")
+        lines.append(f"📢 Груп/каналів: <b>{channels}</b>")
 
     if reasons:
         lines.append("")
@@ -122,29 +111,22 @@ def _format_parser_stats(stats: dict | None, *, services: bool = False) -> str:
             msg = html.escape(str(err.get("error", ""))[:120])
             lines.append(f"• {ch}: <code>{msg}</code>")
 
-    if services:
-        lines.append("")
-        lines.append(
-            "AI-фільтр: мусор і дублі відсікаються на парсингу.\n"
-            "Модерація (3 групи):\n"
-            "• <code>PARSER_MOD_SERVICES_HAMBURG_ID</code> → ✅ Hamburg-канал + маркетплейс\n"
-            "• <code>PARSER_MOD_SERVICES_GERMANY_ID</code> → ✅ Germany-канал + маркетплейс\n"
-            "• <code>PARSER_MOD_GOODS_ID</code> → ✅ лише маркетплейс (товари)\n"
-            "Канали публікації: Hamburg — <code>TRADE_SERVICES_CHANNEL_HAMBURG_ID</code>, "
-            "інші — <code>TRADE_SERVICES_CHANNEL_GERMANY_ID</code>\n\n"
-            "💡 <code>/parse_services100</code> — останні 100 постів без cursor"
-        )
-    elif added == 0:
+    lines.append("")
+    lines.append(
+        "Модерація (3 групи):\n"
+        "• Hamburg послуги → канал Hamburg + маркетплейс\n"
+        "• Germany послуги → канал Germany + маркетплейс\n"
+        "• Товари → лише маркетплейс\n\n"
+        "💡 <code>/parse10</code> — примусово останні 10 постів з кожної групи"
+    )
+    if added == 0:
         lines.append("")
         lines.append("Якщо очікували нові оголошення — можливо вони вже в БД або канал без нових постів.")
-    else:
-        lines.append("")
-        lines.append("💡 <code>/parse10</code> — останні 10 постів без cursor")
 
     return "\n".join(lines)
 
 
-async def _run_marketplace_parser(message: types.Message, *, lookback: int | None):
+async def _run_unified_parser(message: types.Message, *, lookback: int | None):
     if not _has_parser_accounts():
         await message.answer(
             "❌ <b>Парсер не налаштовано</b>\n\n"
@@ -163,14 +145,13 @@ async def _run_marketplace_parser(message: types.Message, *, lookback: int | Non
 
     if lookback:
         status_text = (
-            f"🔍 <b>Парсинг маркетплейсу: останні {lookback} постів</b>\n\n"
-            "Cursor ігноровано; текст-дедуп вимкнено (лишаються message_id + AI).\n"
-            "Канали послуг — <code>/parse_services</code>."
+            f"🔍 <b>Парсинг усіх груп: останні {lookback} постів</b>\n\n"
+            "Cursor ігноровано. Оголошення розкидаються по групах модерації автоматично."
         )
     else:
         status_text = (
-            "🔍 <b>Запускаю парсинг каналів (маркетплейс)…</b>\n\n"
-            "Канали послуг обробляє <code>/parse_services</code>.\n"
+            "🔍 <b>Запускаю парсинг усіх груп…</b>\n\n"
+            "Товари + послуги → відповідні групи модерації.\n"
             "💡 <code>/parse10</code> — примусово останні 10 постів"
         )
     status_msg = await message.answer(status_text, parse_mode="HTML")
@@ -181,7 +162,7 @@ async def _run_marketplace_parser(message: types.Message, *, lookback: int | Non
 
             stats = await run_parser_cycle(fetch_limit=lookback)
             await status_msg.edit_text(
-                _format_parser_stats(stats, services=False),
+                _format_parser_stats(stats),
                 parse_mode="HTML",
             )
         except Exception as e:
@@ -199,82 +180,17 @@ async def _run_marketplace_parser(message: types.Message, *, lookback: int | Non
 
 @router.message(IsAdmin(), F.func(_is_parse_message))
 async def manual_parser_run(message: types.Message):
-    """Ручний запуск: /parse або /parse10."""
-    await _run_marketplace_parser(message, lookback=_parse_lookback(message))
+    """Ручний запуск: /parse або /parse10 — усі групи."""
+    await _run_unified_parser(message, lookback=_parse_lookback(message))
 
 
 @router.message(IsAdmin(), Command("parser", "run_parser"))
 async def manual_parser_run_aliases(message: types.Message):
-    """Аліаси /parser та /run_parser — інкрементальний парсинг."""
-    await _run_marketplace_parser(message, lookback=None)
+    """Аліаси /parser та /run_parser — інкрементальний парсинг усіх груп."""
+    await _run_unified_parser(message, lookback=None)
 
 
 @router.message(IsAdmin(), F.func(_is_parse_services_message))
-async def manual_services_ai_parser_run(message: types.Message):
-    """Ручний запуск: /parse_services або /parse_services100."""
-    from parser.config.channels import (
-        SERVICES_AI_CHANNELS,
-        services_ai_parser_enabled,
-    )
-
-    if not _has_parser_accounts():
-        await message.answer(
-            "❌ <b>Парсер не налаштовано</b>\n\n"
-            "Додайте акаунт у адмін-панелі: <b>Парсер акаунти</b>.",
-            parse_mode="HTML",
-        )
-        return
-
-    if not services_ai_parser_enabled():
-        await message.answer(
-            "❌ <b>Services AI parser не налаштовано</b>\n\n"
-            "Перевірте <code>SERVICE_CHANNELS</code> у <code>parser/config/channels.py</code> "
-            "або <code>PARSER_SERVICES_AI_ENABLED=1</code>.",
-            parse_mode="HTML",
-        )
-        return
-
-    if GLOBAL_PARSER_RUN_LOCK.locked():
-        await message.answer(
-            "⏳ <b>Парсер вже працює</b>\n\n"
-            "Зачекайте завершення поточного циклу.",
-            parse_mode="HTML",
-        )
-        return
-
-    lookback = _parse_services_lookback(message)
-    channel_list = ", ".join(f"@{html.escape(k)}" for k in list(SERVICES_AI_CHANNELS.keys())[:6])
-
-    if lookback:
-        status_text = (
-            f"🔍 <b>Парсинг послуг: останні {lookback} постів</b>\n\n"
-            f"Cursor ігноровано. Канали: {channel_list}"
-        )
-    else:
-        status_text = (
-            "🔍 <b>Запускаю парсинг послуг (інкрементально)…</b>\n\n"
-            f"Канали: {channel_list}\n"
-            "💡 <code>/parse_services100</code> — примусово останні 100 постів"
-        )
-    status_msg = await message.answer(status_text, parse_mode="HTML")
-
-    async def _run():
-        try:
-            from parser.scheduler import run_services_ai_parser_cycle
-
-            stats = await run_services_ai_parser_cycle(fetch_limit=lookback)
-            await status_msg.edit_text(
-                _format_parser_stats(stats, services=True),
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            logger.exception("Manual services AI parser run failed: %s", e)
-            try:
-                await status_msg.edit_text(
-                    f"❌ <b>Помилка парсера послуг</b>\n\n<code>{type(e).__name__}: {html.escape(str(e))}</code>",
-                    parse_mode="HTML",
-                )
-            except Exception:
-                pass
-
-    asyncio.create_task(_run())
+async def manual_services_parser_run_alias(message: types.Message):
+    """Аліас /parse_services → той самий єдиний парсинг."""
+    await _run_unified_parser(message, lookback=_parse_services_lookback(message))

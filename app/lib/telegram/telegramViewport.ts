@@ -1,20 +1,10 @@
 /**
  * Viewport Telegram Mini App:
- * - мобільні: expand + fullscreen (як раніше);
- * - десктоп / веб Telegram: без expand/fullscreen — залишається у вікні клієнта.
+ * - мобільні (ios / android / android_x): expand + fullscreen;
+ * - десктоп / веб / macOS / будь-що інше: без expand/fullscreen.
  */
 
-const MOBILE_PLATFORMS = new Set(['ios', 'android']);
-const DESKTOP_PLATFORMS = new Set([
-  'tdesktop',
-  'macos',
-  'windows',
-  'linux',
-  'weba',
-  'webk',
-  'web',
-  'unigram',
-]);
+const MOBILE_PLATFORMS = new Set(['ios', 'android', 'android_x']);
 
 type TgLike = {
   platform?: string;
@@ -29,21 +19,37 @@ type TgLike = {
   enableVerticalSwipes?: () => void;
 };
 
-/** Telegram Desktop / Web / macOS — не розгортати на весь екран. */
+/** Чи це мобільний клієнт Telegram (єдиний випадок для fullscreen). */
+export function isTelegramMobileClient(tg?: TgLike | null): boolean {
+  const platform = (tg?.platform || '').toLowerCase().trim();
+  return MOBILE_PLATFORMS.has(platform);
+}
+
+/** Telegram Desktop / Web / macOS / unknown — не розгортати на весь екран. */
 export function isTelegramDesktopClient(tg?: TgLike | null): boolean {
-  const platform = (tg?.platform || '').toLowerCase();
-  if (MOBILE_PLATFORMS.has(platform)) return false;
-  if (DESKTOP_PLATFORMS.has(platform)) return true;
-  // unknown / порожній platform: на широкому екрані не форсуємо fullscreen
-  if (typeof window !== 'undefined') {
-    return window.matchMedia('(min-width: 900px)').matches;
+  return !isTelegramMobileClient(tg);
+}
+
+function exitDesktopFullscreen(tg: TgLike): void {
+  if (tg.isFullscreen && typeof tg.exitFullscreen === 'function') {
+    try {
+      tg.exitFullscreen();
+    } catch {
+      /* ignore */
+    }
   }
-  return false;
+  if (typeof tg.enableVerticalSwipes === 'function') {
+    try {
+      tg.enableVerticalSwipes();
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /** Expand лише на мобільних (картка товару, таби тощо). */
 export function expandTelegramViewportIfMobile(tg?: TgLike | null): void {
-  if (!tg || isTelegramDesktopClient(tg)) return;
+  if (!tg || !isTelegramMobileClient(tg)) return;
   try {
     tg.expand?.();
   } catch {
@@ -64,22 +70,9 @@ export function ensureTelegramViewportFullscreen(): void {
   try {
     tg.ready?.();
 
-    if (isTelegramDesktopClient(tg)) {
-      // Комп-версія: виходимо з fullscreen, якщо вже увімкнений, і не expand-имо
-      if (tg.isFullscreen && typeof tg.exitFullscreen === 'function') {
-        try {
-          tg.exitFullscreen();
-        } catch {
-          /* ignore */
-        }
-      }
-      if (typeof tg.enableVerticalSwipes === 'function') {
-        try {
-          tg.enableVerticalSwipes();
-        } catch {
-          /* ignore */
-        }
-      }
+    // Комп / веб: ніколи не expand і не requestFullscreen
+    if (!isTelegramMobileClient(tg)) {
+      exitDesktopFullscreen(tg);
       return;
     }
 

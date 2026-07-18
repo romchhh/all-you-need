@@ -5,12 +5,12 @@ import { usePathname } from 'next/navigation';
 import {
   ensureTelegramViewportFullscreen,
   expandTelegramViewportIfMobile,
-  isTelegramDesktopClient,
+  isTelegramMobileClient,
 } from '@/lib/telegram/telegramViewport';
 
 /**
  * Готовність Mini App + viewport на кожній сторінці.
- * На десктопі не форсує expand/fullscreen.
+ * Fullscreen лише на мобільних (ios/android); на десктопі — ні.
  */
 export function TelegramMiniAppViewport() {
   const pathname = usePathname();
@@ -24,7 +24,8 @@ export function TelegramMiniAppViewport() {
     if (!tg?.onEvent) return;
 
     const onViewport = () => {
-      if (isTelegramDesktopClient(tg)) {
+      // Десктоп: якщо клієнт сам увімкнув fullscreen — виходимо
+      if (!isTelegramMobileClient(tg)) {
         if (tg.isFullscreen && typeof tg.exitFullscreen === 'function') {
           try {
             tg.exitFullscreen();
