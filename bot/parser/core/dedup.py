@@ -12,17 +12,17 @@ from typing import Optional
 from parser.config.channels import PARSER_TYPE_SERVICES_CHANNEL
 from parser.config.settings import (
     PARSER_DEDUP_DAYS,
-    PARSER_DEDUP_ENABLED,
     PARSER_EMBEDDING_MODEL,
     PARSER_FUZZY_DEDUP_ENABLED,
+    PARSER_FUZZY_DEDUP_SAME_CHANNEL,
     PARSER_FUZZY_DEDUP_THRESHOLD,
+    PARSER_DEDUP_ENABLED,
     PARSER_SERVICES_DEDUP_ENABLED,
 )
 from parser.storage.parsed_items import (
     clear_repostable_parsed_item,
     parsed_item_claimed_by_other_parser,
     parsed_item_exists,
-    parsed_item_is_raw_duplicate,
     parsed_item_is_semantic_duplicate,
 )
 
@@ -83,6 +83,8 @@ def is_fuzzy_semantic_duplicate(
     title: str,
     description: str,
     embedding: Optional[list[float]] = None,
+    *,
+    source_channel: str | None = None,
 ) -> bool:
     """Порівнює з оголошеннями, що ще активні на платформі або в черзі модерації."""
     if not is_fuzzy_dedup_enabled():
@@ -94,7 +96,8 @@ def is_fuzzy_semantic_duplicate(
 
     from parser.storage.parsed_items import get_recent_parsed_embeddings
 
-    for row in get_recent_parsed_embeddings(PARSER_DEDUP_DAYS):
+    channel_filter = source_channel if PARSER_FUZZY_DEDUP_SAME_CHANNEL else None
+    for row in get_recent_parsed_embeddings(PARSER_DEDUP_DAYS, source_channel=channel_filter):
         stored = row.get("embedding")
         if not stored:
             continue
@@ -166,7 +169,7 @@ def check_parser_duplicates(
     reason — ключ для stats['reasons'].
 
     Завжди: той самий message_id у цьому парсері / активний запис іншого парсера.
-    Опційно (PARSER_*_DEDUP_ENABLED): hash тексту, title+desc, fuzzy AI.
+    Опційно (PARSER_*_DEDUP_ENABLED): dedup_key (title+desc+price), fuzzy AI.
     """
     clear_repostable_parsed_item(source_channel, message_id)
 
@@ -181,13 +184,7 @@ def check_parser_duplicates(
 
     scope = parser_type if parser_type == PARSER_TYPE_SERVICES_CHANNEL else None
 
-    if parsed_item_is_raw_duplicate(
-        content_hash,
-        parser_type=scope,
-        source_channel=source_channel,
-    ):
-        return True, "дублікат (текст)", None
-
+    # Лише dedup_key (title+desc+price), без content_hash — менше хибних «дублікат (текст)».
     if parsed_item_is_semantic_duplicate(
         dedup_key,
         parser_type=scope,
@@ -198,7 +195,12 @@ def check_parser_duplicates(
     embedding_json: Optional[str] = None
     if is_fuzzy_dedup_enabled():
         vec = compute_listing_embedding(title, description)
-        if vec and is_fuzzy_semantic_duplicate(title, description, vec):
+        if vec and is_fuzzy_semantic_duplicate(
+            title,
+            description,
+            vec,
+            source_channel=source_channel,
+        ):
             return True, "дублікат (схожий текст)", None
         embedding_json = embedding_to_json(vec)
 

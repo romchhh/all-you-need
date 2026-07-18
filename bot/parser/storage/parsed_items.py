@@ -8,12 +8,18 @@ import unicodedata
 from datetime import datetime, timezone
 from typing import Optional
 
-from parser.config.settings import PARSER_DEDUP_DAYS
+from parser.config.settings import (
+    PARSER_DEDUP_DAYS,
+    PARSER_PENDING_DEDUP_HOURS,
+    PARSER_TEXT_DEDUP_DAYS,
+)
 from parser.storage.connection import get_connection
 
 logger = logging.getLogger(__name__)
 
 _DEDUP_WINDOW = f"-{PARSER_DEDUP_DAYS} days"
+_TEXT_DEDUP_WINDOW = f"-{PARSER_TEXT_DEDUP_DAYS} days"
+_PENDING_DEDUP_WINDOW = f"-{PARSER_PENDING_DEDUP_HOURS} hours"
 _schema_ready = False
 
 
@@ -95,7 +101,36 @@ def parsed_item_row_blocks_duplicate(item: dict) -> bool:
 
 
 def _sql_parsed_item_blocks_duplicates(alias: str = "pi") -> str:
-    """SQL-фрагмент: запис ще блокує дедуп."""
+    """SQL-фрагмент: запис ще блокує повтор (clear_repostable, cross-parser)."""
+    return f"""(
+        {alias}.marketplace_listing_id IS NOT NULL
+        AND EXISTS (
+            SELECT 1 FROM Listing l
+            WHERE l.id = {alias}.marketplace_listing_id
+              AND l.status = 'active'
+              AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))
+        )
+    )
+    OR (
+        {alias}.marketplace_listing_id IS NULL
+        AND {alias}.status = 'pending'
+        AND datetime({alias}.created_at) >= datetime('now', ?)
+    )
+    OR (
+        {alias}.marketplace_listing_id IS NULL
+        AND {alias}.status = 'approved'
+        AND COALESCE({alias}.parser_type, 'default') = 'services_channel'
+        AND datetime({alias}.created_at) >= datetime('now', ?)
+    )"""
+
+
+def _sql_semantic_dedup_blocks(alias: str = "pi") -> str:
+    """
+    М'якший дедуп за dedup_key:
+    - активне оголошення на MP — завжди блокує;
+    - pending — лише коротке вікно (repost з новим message_id не висить днями);
+    - services approved без MP — коротке вікно TEXT_DEDUP.
+    """
     return f"""(
         {alias}.marketplace_listing_id IS NOT NULL
         AND EXISTS (
@@ -345,7 +380,13 @@ def fingerprint_parsed_text(raw_text: str) -> str:
     return hashlib.sha256(t.encode("utf-8")).hexdigest()
 
 
-def fingerprint_title_desc(title: str, description: str) -> str:
+def fingerprint_title_desc(
+    title: str,
+    description: str,
+    *,
+    price: str | None = None,
+    is_free: bool = False,
+) -> str:
     emoji_re = re.compile(
         r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F600-\U0001F64F"
         r"\U0001F680-\U0001F6FF\U0001F900-\U0001F9FF]+",
@@ -368,47 +409,26 @@ def fingerprint_title_desc(title: str, description: str) -> str:
 
     t = norm(title)[:220]
     d = norm(description)[:700]
+    if is_free:
+        price_part = "free"
+    elif price and str(price).strip():
+        price_part = re.sub(r"\s+", "", str(price).lower())[:40]
+    else:
+        price_part = ""
     if len(t) + len(d) < 14:
         return ""
-    blob = f"{t}|{d}"
+    blob = f"{t}|{d}|p:{price_part}"
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
 def parsed_item_is_raw_duplicate(
     content_hash: str,
+    dedup_key: Optional[str] = None,
     parser_type: str | None = None,
     source_channel: str | None = None,
 ) -> bool:
-    """
-    Дублікат за hash тексту.
-    За замовчуванням — лише в межах того самого source_channel
-    (крос-канальні репости різним продавцям не ріжемо тут;
-    глобально ловить active_listing_duplicate / fuzzy).
-    """
-    if not content_hash:
-        return False
-    conn = get_connection()
-    cursor = conn.cursor()
-    blocking = _sql_parsed_item_blocks_duplicates("pi")
-    clauses = ["pi.content_hash = ?", blocking]
-    params: list = [content_hash, _DEDUP_WINDOW, _DEDUP_WINDOW]
-    if parser_type:
-        clauses.append("COALESCE(pi.parser_type, 'default') = ?")
-        params.append(parser_type)
-    if source_channel:
-        clauses.append("pi.source_channel = ?")
-        params.append(source_channel)
-    cursor.execute(
-        f"""
-        SELECT 1 FROM parsed_items pi
-        WHERE {" AND ".join(clauses)}
-        LIMIT 1
-        """,
-        params,
-    )
-    dup = cursor.fetchone() is not None
-    conn.close()
-    return dup
+    """Застаріло: raw hash не використовується в check_parser_duplicates."""
+    return False
 
 
 def parsed_item_is_semantic_duplicate(
@@ -416,14 +436,14 @@ def parsed_item_is_semantic_duplicate(
     parser_type: str | None = None,
     source_channel: str | None = None,
 ) -> bool:
-    """Дублікат за title+desc fingerprint — зазвичай у межах одного каналу."""
+    """Дублікат за title+desc+price — у межах каналу, м'яке вікно для pending."""
     if not dedup_key:
         return False
     conn = get_connection()
     cursor = conn.cursor()
-    blocking = _sql_parsed_item_blocks_duplicates("pi")
+    blocking = _sql_semantic_dedup_blocks("pi")
     clauses = ["pi.dedup_key = ?", blocking]
-    params: list = [dedup_key, _DEDUP_WINDOW, _DEDUP_WINDOW]
+    params: list = [dedup_key, _PENDING_DEDUP_WINDOW, _TEXT_DEDUP_WINDOW]
     if parser_type:
         clauses.append("COALESCE(pi.parser_type, 'default') = ?")
         params.append(parser_type)
@@ -443,12 +463,21 @@ def parsed_item_is_semantic_duplicate(
     return dup
 
 
-def get_recent_parsed_embeddings(days: int | None = None) -> list[dict]:
+def get_recent_parsed_embeddings(
+    days: int | None = None,
+    *,
+    source_channel: str | None = None,
+) -> list[dict]:
     """Embedding лише для записів, що ще блокують дедуп."""
     window = f"-{days or PARSER_DEDUP_DAYS} days"
     conn = get_connection()
     cursor = conn.cursor()
     blocking = _sql_parsed_item_blocks_duplicates("pi")
+    channel_clause = ""
+    params: list = [window, window]
+    if source_channel:
+        channel_clause = " AND pi.source_channel = ?"
+        params.append(source_channel)
     cursor.execute(
         f"""
         SELECT pi.id, pi.text_embedding
@@ -456,10 +485,11 @@ def get_recent_parsed_embeddings(days: int | None = None) -> list[dict]:
         WHERE pi.text_embedding IS NOT NULL
           AND TRIM(pi.text_embedding) != ''
           AND {blocking}
+          {channel_clause}
         ORDER BY pi.id DESC
         LIMIT 2500
         """,
-        (window, window),
+        params,
     )
     rows = cursor.fetchall()
     conn.close()

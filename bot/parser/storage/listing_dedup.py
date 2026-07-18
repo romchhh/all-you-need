@@ -27,7 +27,7 @@ def active_listing_duplicate(dedup_key: Optional[str], title: str, description: 
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT id, title, description
+        SELECT id, title, description, price, isFree
         FROM Listing
         WHERE status = 'active'
           AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
@@ -41,9 +41,12 @@ def active_listing_duplicate(dedup_key: Optional[str], title: str, description: 
     conn.close()
     for row in rows:
         data = dict(row)
+        row_free = data.get("isFree") in (1, True, "1")
         existing = fingerprint_title_desc(
             str(data.get("title") or ""),
             str(data.get("description") or ""),
+            price=str(data.get("price") or ""),
+            is_free=row_free,
         )
         if existing and existing == dedup_key:
             logger.info(

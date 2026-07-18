@@ -159,7 +159,12 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             stats["reasons"]["багато емоджі"] = stats["reasons"].get("багато емоджі", 0) + 1
             continue
 
-        dedup_key = fingerprint_title_desc(title, description)
+        dedup_key = fingerprint_title_desc(
+            title,
+            description,
+            price=price_str,
+            is_free=is_free,
+        )
         category, subcategory = detect_category(
             text, skip_free=(price_str is not None and not is_free)
         )

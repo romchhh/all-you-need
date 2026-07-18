@@ -59,9 +59,20 @@ PARSER_SERVICES_IGNORE_CURSOR: bool = _env_bool("PARSER_SERVICES_IGNORE_CURSOR",
 PARSER_DEDUP_ENABLED: bool = _env_bool("PARSER_DEDUP_ENABLED", True)
 PARSER_SERVICES_DEDUP_ENABLED: bool = _env_bool("PARSER_SERVICES_DEDUP_ENABLED", True)
 PARSER_DEDUP_DAYS: int = max(1, _env_int("PARSER_DEDUP_DAYS", 14))
+# Вікно dedup_key (title+desc+price) для services_channel approved без MP
+PARSER_TEXT_DEDUP_DAYS: int = max(
+    1,
+    _env_int("PARSER_TEXT_DEDUP_DAYS", min(2, PARSER_DEDUP_DAYS)),
+)
+# Pending у модерації блокує повтор лише N годин (repost з новим message_id проходить швидше)
+PARSER_PENDING_DEDUP_HOURS: int = max(
+    1,
+    _env_int("PARSER_PENDING_DEDUP_HOURS", 36),
+)
 
 PARSER_FUZZY_DEDUP_ENABLED: bool = _env_bool("PARSER_FUZZY_DEDUP", True)
-PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.90"))
+PARSER_FUZZY_DEDUP_SAME_CHANNEL: bool = _env_bool("PARSER_FUZZY_DEDUP_SAME_CHANNEL", True)
+PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.94"))
 PARSER_EMBEDDING_MODEL: str = (_env_str("PARSER_EMBEDDING_MODEL") or "text-embedding-3-small")
 
 # ── Групи модерації парсера (3 потоки) ─────────

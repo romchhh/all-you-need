@@ -126,6 +126,8 @@ async def _approve_services_both(
     dedup_key = fingerprint_title_desc(
         str(listing_item.get("title") or ""),
         str(listing_item.get("description") or ""),
+        price=str(listing_item.get("price") or ""),
+        is_free=bool(listing_item.get("is_free")),
     )
     if active_listing_duplicate(
         dedup_key,
@@ -274,6 +276,8 @@ async def _approve_marketplace(
     dedup_key = fingerprint_title_desc(
         str(listing_item.get("title") or ""),
         str(listing_item.get("description") or ""),
+        price=str(listing_item.get("price") or ""),
+        is_free=bool(listing_item.get("is_free")),
     )
     if active_listing_duplicate(
         dedup_key,
