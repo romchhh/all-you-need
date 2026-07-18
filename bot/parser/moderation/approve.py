@@ -22,7 +22,7 @@ from parser.moderation.approve_routing import (
     validate_parser_approve_context,
 )
 from parser.marketplace_categories import apply_marketplace_categories_to_item
-from parser.moderation.author_notify import try_notify_author_via_pyrogram
+from parser.moderation.author_notify import schedule_author_notify
 from parser.core.account_pool import list_parser_accounts
 from parser.moderation.formatting import (
     build_marketplace_description,
@@ -222,13 +222,11 @@ async def _approve_services_both(
         )
 
     asyncio.create_task(_followup())
-    asyncio.create_task(
-        try_notify_author_via_pyrogram(
-            listing_item,
-            listing_id,
-            use_services_sender=True,
-            channel_only=False,
-        )
+    schedule_author_notify(
+        listing_item,
+        listing_id,
+        use_services_sender=True,
+        channel_only=False,
     )
     logger.info(
         "parsed_item %s → Listing %s + канал послуг (підтв. %s)",
@@ -347,12 +345,10 @@ async def _approve_marketplace(
         )
 
     asyncio.create_task(_approve_followup())
-    asyncio.create_task(
-        try_notify_author_via_pyrogram(
-            listing_item,
-            listing_id,
-            use_services_sender=(item_category == "services_work"),
-        )
+    schedule_author_notify(
+        listing_item,
+        listing_id,
+        use_services_sender=(item_category == "services_work"),
     )
 
     logger.info("parsed_item %s → Listing %s (підтв. %s)", item_id, listing_id, moderator_id)

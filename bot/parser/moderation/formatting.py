@@ -265,3 +265,110 @@ def build_channel_hashtags(
         seen.add(key)
         out.append(f"#{token}")
     return " ".join(out)
+
+
+# ── Telegram HTML caption ─────────────────────
+
+_TELEGRAM_HTML_TAG_RE = re.compile(
+    r"<(/?)(b|strong|i|em|u|ins|s|strike|del|code|pre|a|blockquote|span|tg-spoiler)"
+    r"(\s[^>]*)?>",
+    re.IGNORECASE,
+)
+
+
+def _telegram_html_open_tags(text: str) -> list[str]:
+    stack: list[str] = []
+    for m in _TELEGRAM_HTML_TAG_RE.finditer(text):
+        closing, tag = m.group(1), m.group(2).lower()
+        if closing:
+            if stack and stack[-1] == tag:
+                stack.pop()
+        else:
+            stack.append(tag)
+    return stack
+
+
+def truncate_plain_text(text: str, max_len: int) -> str:
+    if max_len <= 0:
+        return ""
+    if len(text) <= max_len:
+        return text
+    if max_len == 1:
+        return "…"
+    return text[: max_len - 1] + "…"
+
+
+def truncate_telegram_html(text: str, max_len: int = 1024) -> str:
+    """Обрізає HTML-підпис Telegram без «Unclosed start tag»."""
+    text = text or ""
+    if len(text) <= max_len:
+        return text
+
+    ellipsis = "…"
+    limit = max_len - len(ellipsis)
+    if limit <= 0:
+        return ellipsis[:max_len]
+
+    cut = text[:limit]
+    cut = re.sub(r"<[^>\n]*$", "", cut)
+
+    if "a" in _telegram_html_open_tags(cut):
+        for marker in ("<a ", "<a>"):
+            pos = cut.rfind(marker)
+            if pos != -1:
+                cut = cut[:pos].rstrip()
+                break
+
+    for tag in reversed(_telegram_html_open_tags(cut)):
+        closing = f"</{tag}>"
+        if len(cut) + len(closing) + len(ellipsis) <= max_len:
+            cut += closing
+        else:
+            break
+
+    return cut + ellipsis
+
+
+def assemble_telegram_caption(
+    *,
+    title_html: str,
+    description_html: str,
+    footer_html: str,
+    max_len: int = 1024,
+) -> str:
+    """
+    Збирає caption: спочатку фіксований footer, опис обрізається під ліміт.
+    description_html — уже безпечний HTML (escape + <a>).
+    """
+    title_html = title_html or ""
+    footer_html = footer_html or ""
+    sep = "\n\n"
+
+    if description_html:
+        fixed = f"{title_html}{sep}{sep}{footer_html}"
+        budget = max_len - len(fixed)
+        if budget <= 0:
+            description_html = ""
+        elif len(description_html) > budget:
+            if "<a " in description_html or "<a>" in description_html:
+                plain, _, link_part = description_html.partition("\n\n")
+                link_reserve = len(sep) + len(link_part) if link_part else 0
+                plain_budget = max(0, budget - link_reserve)
+                plain = truncate_plain_text(plain, plain_budget)
+                if plain and link_part and len(plain) + link_reserve <= budget:
+                    description_html = f"{plain}{sep}{link_part}"
+                elif plain:
+                    description_html = plain
+                elif link_part and len(link_part) <= budget:
+                    description_html = link_part
+                else:
+                    description_html = truncate_telegram_html(description_html, budget)
+            else:
+                description_html = truncate_plain_text(description_html, budget)
+
+    if description_html:
+        body = f"{title_html}{sep}{description_html}{sep}{footer_html}"
+    else:
+        body = f"{title_html}{sep}{footer_html}"
+
+    return truncate_telegram_html(body, max_len)

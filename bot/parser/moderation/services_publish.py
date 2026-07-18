@@ -19,14 +19,15 @@ from parser.config.settings import BOT_USERNAME, WEBAPP_URL
 from parser.core.telegram_meta import parsed_item_message_link
 from parser.core.text import detect_lang
 from parser.moderation.formatting import (
+    assemble_telegram_caption,
     build_channel_hashtags,
     format_original_post_link_html,
     listing_miniapp_url,
     strip_original_post_link_block,
+    truncate_telegram_html,
 )
 from utils.location_normalization import normalize_city_name
-from utils.seller_contact import build_seller_telegram_url
-from utils.translations import get_user_lang, t
+from utils.translations import t
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
@@ -454,6 +455,62 @@ async def _send_services_post(
         )
         return True
     except TelegramBadRequest as e:
+        err = str(e).lower()
+        if "can't parse entities" in err or "unclosed start tag" in err:
+            safe_text = truncate_telegram_html(text_with_bot, 1024)
+            if safe_text != text_with_bot:
+                logger.warning(
+                    "Telegram HTML caption invalid for listing %s — retry safe truncate",
+                    listing_id,
+                )
+                try:
+                    if len(photo_inputs) == 1:
+                        await bot.send_photo(
+                            chat_id=chat_id,
+                            photo=photo_inputs[0],
+                            caption=safe_text,
+                            parse_mode="HTML",
+                            reply_markup=keyboard,
+                        )
+                    elif len(photo_inputs) > 1:
+                        media = []
+                        for i, ph in enumerate(photo_inputs):
+                            cap = safe_text if i == 0 else None
+                            pmode = "HTML" if i == 0 else None
+                            media.append(
+                                InputMediaPhoto(media=ph, caption=cap, parse_mode=pmode)
+                            )
+                        await bot.send_media_group(chat_id=chat_id, media=media)
+                    else:
+                        default_path = _default_channel_photo_path()
+                        if default_path:
+                            await bot.send_photo(
+                                chat_id=chat_id,
+                                photo=FSInputFile(default_path),
+                                caption=safe_text,
+                                parse_mode="HTML",
+                                reply_markup=keyboard,
+                            )
+                        else:
+                            await bot.send_message(
+                                chat_id=chat_id,
+                                text=safe_text,
+                                parse_mode="HTML",
+                                disable_web_page_preview=False,
+                            )
+                    logger.info(
+                        "Listing %s опубліковано в %s після safe truncate",
+                        listing_id,
+                        services_channel_label(chat_id),
+                    )
+                    return True
+                except Exception as retry_err:
+                    logger.warning(
+                        "Retry publish listing %s у %s failed: %s",
+                        listing_id,
+                        chat_id,
+                        retry_err,
+                    )
         logger.warning(
             "Telegram: не вдалося опублікувати listing %s у %s: %s",
             listing_id,
@@ -502,9 +559,7 @@ async def publish_services_listing_to_channel(
 
     title = (item.get("title") or "").strip()
     title_style = f"<b>{html.escape(title)}</b>"
-    description_parts: list[str] = []
     raw_desc = strip_original_post_link_block((marketplace_description or "").strip())
-    # Прибираємо рядки автора/оригіналу — канал додає їх окремо (HTML)
     raw_desc = re.sub(r"(?:^|\n)\s*👤\s*Автор:.*", "", raw_desc)
     raw_desc = re.sub(
         r"(?:^|\n)\s*🔗\s*(?:Оригінальне|Оригинальное|Original).*",
@@ -513,12 +568,14 @@ async def publish_services_listing_to_channel(
         flags=re.IGNORECASE,
     )
     raw_desc = re.sub(r"\n{3,}", "\n\n", raw_desc).strip()
+
+    description_parts: list[str] = []
     if raw_desc:
         description_parts.append(html.escape(raw_desc))
     original_link_html = format_original_post_link_html(item)
     if original_link_html:
         description_parts.append(original_link_html)
-    description = "\n\n".join(description_parts)
+    description_html = "\n\n".join(description_parts)
 
     category = (item.get("category") or "services_work").strip()
     subcategory = item.get("subcategory")
@@ -559,22 +616,10 @@ async def publish_services_listing_to_channel(
     listing_open_url = (
         listing_miniapp_url(marketplace_listing_id) if marketplace_listing_id else None
     )
-    contact_listing_url = listing_open_url or msg_link or bot_link
 
     if author_username:
         seller_full_name = f"@{author_username}"
-        seller_lang = get_user_lang(user_id_for_lang) if user_id_for_lang else detect_lang(
-            f"{item.get('title') or ''}\n{item.get('description') or ''}"
-        )
-        seller_href = html.escape(
-            build_seller_telegram_url(
-                author_username,
-                title,
-                contact_listing_url,
-                lang=seller_lang,
-            ),
-            quote=True,
-        )
+        seller_href = html.escape(f"https://t.me/{author_username}", quote=True)
         seller_text = (
             f"{seller_label} "
             f"<a href=\"{seller_href}\">"
@@ -597,22 +642,22 @@ async def publish_services_listing_to_channel(
         else:
             seller_text = f"{seller_label} {html.escape(seller_default_name)}"
 
-    bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
+    safe_bot_link = html.escape(bot_link, quote=True)
+    bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=safe_bot_link)}"
 
-    text = f"""{title_style}
-
-{description}
-
-{t(user_id_for_lang, 'listing.details.price_channel')} {price_text}
+    footer = f"""{t(user_id_for_lang, 'listing.details.price_channel')} {price_text}
 {t(user_id_for_lang, 'listing.details.category_channel')} {category_text}
 {t(user_id_for_lang, 'listing.details.location_channel')} {location_esc}
 {seller_text}
 
-{t(user_id_for_lang, 'listing.details.hashtag')} {hashtags}"""
+{t(user_id_for_lang, 'listing.details.hashtag')} {hashtags}{bot_text}"""
 
-    text_with_bot = text + bot_text
-    if len(text_with_bot) > 1024:
-        text_with_bot = text_with_bot[:1023] + "…"
+    text_with_bot = assemble_telegram_caption(
+        title_html=title_style,
+        description_html=description_html,
+        footer_html=footer,
+        max_len=1024,
+    )
 
     submit_btn = t(user_id_for_lang, "listing.submit_ad_button")
     keyboard_rows: list[list[InlineKeyboardButton]] = []
