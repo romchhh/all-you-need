@@ -202,6 +202,9 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             stats["reasons"][skip_reason] = stats["reasons"].get(skip_reason, 0) + 1
             continue
 
+        source_city = city
+        location = source_city
+
         if ai_fields:
             title = ai_fields.get("title", title)
             description = ai_fields.get("description", description)
@@ -211,7 +214,20 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             currency = ai_fields.get("currency", currency)
             is_free = bool(ai_fields.get("is_free", is_free))
             condition = ai_fields.get("condition", condition)
-            city = ai_fields.get("location", city)
+            from parser.core.location import resolve_parsed_location
+
+            location = resolve_parsed_location(
+                channel_city=source_city,
+                suggested=ai_fields.get("location"),
+                text=f"{title}\n{description}\n{text}",
+            )
+        else:
+            from parser.core.location import resolve_parsed_location
+
+            location = resolve_parsed_location(
+                channel_city=source_city,
+                text=f"{title}\n{description}\n{text}",
+            )
 
         author_username, author_id = resolve_author_contact(msg_for_link, text, channel)
         media_group_id = getattr(msg, "media_group_id", None)
@@ -224,7 +240,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
 
         item_id = insert_parsed_item(
             source_channel=channel,
-            source_city=city,
+            source_city=source_city,
             message_id=effective_message_id,
             media_group_id=media_group_id,
             author_username=author_username,
@@ -237,7 +253,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             category=category,
             subcategory=subcategory,
             condition=condition,
-            location=city,
+            location=location,
             images=images,
             raw_text=text[:4000],
             content_hash=content_hash,
@@ -250,7 +266,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             base_item_data = {
                 "id": item_id,
                 "source_channel": channel,
-                "source_city": city,
+                "source_city": source_city,
                 "message_id": effective_message_id,
                 "author_username": author_username,
                 "author_id": author_id,
@@ -262,7 +278,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
                 "category": category,
                 "subcategory": subcategory,
                 "condition": condition,
-                "location": city,
+                "location": location,
                 "images": images,
                 "raw_text": text[:4000],
                 "msg_link": message_link(

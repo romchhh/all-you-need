@@ -129,21 +129,13 @@ def _normalize_price_fields(
 
 
 def _validate_location(location: str, channel_city: str, text: str) -> str:
-    from utils.location_normalization import normalize_city_name
+    from parser.core.location import is_local_source_city, resolve_parsed_location
 
-    loc = (location or "").strip()
-    if loc:
-        normalized = normalize_city_name(loc)
-        if normalized:
-            return normalized
-    if channel_city:
-        return normalize_city_name(channel_city) or channel_city
-    combined = f"{text}\n{channel_city}"
-    lower = combined.lower()
-    for city in GERMAN_CITIES:
-        if city.lower() in lower or city.replace("ü", "u").replace("ö", "o").lower() in lower:
-            return city
-    return normalize_city_name(channel_city) or channel_city or "Germany"
+    return resolve_parsed_location(
+        channel_city=channel_city,
+        suggested=location,
+        text=text,
+    )
 
 
 def _validate_condition(condition: Any, category: str) -> Optional[str]:
@@ -159,10 +151,25 @@ def _validate_condition(condition: Any, category: str) -> Optional[str]:
 
 
 def _build_prompt(item: dict) -> str:
+    from parser.core.location import is_local_source_city
+
     channel_city = item.get("source_city") or item.get("location") or ""
     raw_text = (item.get("raw_text") or "")[:2500]
     parser_cat = item.get("category") or ""
     parser_sub = item.get("subcategory") or ""
+    local_channel = is_local_source_city(str(channel_city))
+
+    if local_channel:
+        location_rule = (
+            f"7. location — ОБЯЗАТЕЛЬНО ровно «{channel_city}» "
+            f"(локальный канал барахолки). Не меняй город по тексту поста."
+        )
+    else:
+        location_rule = (
+            "7. location — найди город продажи/услуги В ТЕКСТЕ "
+            "(«в Гамбурге», «Berlin», «Кёльн»…) и верни НЕМЕЦКИМ оригиналом "
+            "(Hamburg, München, Köln…). Если города в тексте нет — «Germany»."
+        )
 
     return f"""Проанализируй объявление с Telegram-барахолки (Германия, рус/укр аудитория).
 Используй ТОЛЬКО текст ниже — фото нет.
@@ -176,7 +183,7 @@ def _build_prompt(item: dict) -> str:
 - category/sub (парсер): {parser_cat}/{parser_sub}
 - price: {item.get("price") or ""} {item.get("currency") or ""}
 - is_free: {bool(item.get("is_free"))}
-- город канала: {channel_city}
+- город канала: {channel_city} ({"ЛОКАЛЬНЫЙ канал" if local_channel else "ОБЩИЙ канал по Германии"})
 - condition: {item.get("condition") or ""}
 - канал: {item.get("source_channel") or ""}
 
@@ -197,7 +204,7 @@ def _build_prompt(item: dict) -> str:
 4. price — число строкой ("25" или "25.50"); если цены нет → null (договорная).
 5. is_free — true ТОЛЬКО если в тексте явно «бесплатно/віддам/даром/free». Для услуг без цены is_free=false.
 6. currency — EUR по умолчанию; UAH только если явно грн.
-7. location — город НЕМЕЦКИМ оригиналом (Hamburg, München, Köln…), не перевод.
+{location_rule}
 8. condition — "new" или "used" для товаров; для services_work ВСЕГДА "new".
 
 Верни ТОЛЬКО JSON:

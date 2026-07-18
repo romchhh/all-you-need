@@ -48,17 +48,30 @@ def is_ai_screen_enabled() -> bool:
 
 
 def _build_screen_prompt(item: dict, context: dict) -> str:
+    from parser.core.location import is_local_source_city
     from parser.marketplace_categories import marketplace_taxonomy_for_ai
 
     raw_text = (item.get("raw_text") or "")[:2800]
     pending = context.get("pending_titles") or []
     active = context.get("active_listings") or []
+    channel_city = str(item.get("source_city") or "")
+    local_channel = is_local_source_city(channel_city)
 
     pending_block = "\n".join(f"- {t}" for t in pending[:12]) or "(немає)"
     active_block = "\n".join(
         f"- #{row.get('id')} {row.get('title')} ({row.get('location') or '?'})"
         for row in active[:15]
     ) or "(немає)"
+
+    if local_channel:
+        location_hint = (
+            f"location ОБЯЗАТЕЛЬНО «{channel_city}» (локальный канал), не меняй по тексту."
+        )
+    else:
+        location_hint = (
+            "location — город из ТЕКСТА поста (Hamburg/München/Köln…); "
+            "если в тексте нет города — Germany."
+        )
 
     return f"""Проанализируй пост с Telegram-барахолки (Германия, рус/укр).
 
@@ -69,7 +82,7 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
 - title: {item.get("title") or ""}
 - description: {(item.get("description") or "")[:400]}
 - category: {item.get("category")}/{item.get("subcategory")}
-- канал: {item.get("source_channel")}, город: {item.get("source_city")}
+- канал: {item.get("source_channel")}, город: {channel_city} ({"ЛОКАЛЬНЫЙ" if local_channel else "ОБЩИЙ по Германии"})
 
 УЖЕ В ОЧЕРЕДИ МОДЕРАЦИИ (не дублируй):
 {pending_block}
@@ -93,8 +106,9 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
    - товар (продажа / отдам / обмен) ИЛИ
    - услуга (красота, ремонт, обучение, работа мастера и т.п. с оффером)
 4. Если accept=true — улучши title (рус, до 80 симв), description (рус, чистый текст),
-   category/subcategory, price, location (город НЕМЕЦКИМ оригиналом: München, Köln, Düsseldorf…),
-   condition. Услуги без цены → price=null, is_free=false; condition для услуг всегда "new".
+   category/subcategory, price, location, condition.
+   {location_hint}
+   Услуги без цены → price=null, is_free=false; condition для услуг всегда "new".
 
 JSON:
 {{

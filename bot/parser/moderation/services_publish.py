@@ -175,35 +175,20 @@ def _detect_cities_in_text(text: str) -> list[str]:
 
 def _effective_service_location(item: dict) -> str:
     """
-    Місто надання послуги.
-    Канал-джерело (source_city) не має перевизначати Wuppertal, Berlin тощо з тексту.
+    Локальний канал (source_city=Hamburg/Berlin/…) → завжди місто каналу.
+    Загальний канал (Germany) → місто з location/тексту, інакше Germany.
     """
-    location = (item.get("location") or "").strip()
+    from parser.core.location import is_local_source_city, resolve_parsed_location
+
     source_city = (item.get("source_city") or "").strip()
-    text_cities = _detect_cities_in_text(_service_text_blob(item))
-
-    if len(text_cities) == 1:
-        return text_cities[0]
-
-    if len(text_cities) > 1:
-        src_key = normalize_city_name(source_city).lower() if source_city else ""
-        non_source = [c for c in text_cities if not src_key or c.lower() != src_key]
-        if len(non_source) == 1:
-            return non_source[0]
-        non_hamburg = [c for c in text_cities if c.lower() != "hamburg"]
-        if len(non_hamburg) == 1:
-            return non_hamburg[0]
-
-    if location and not is_germany_wide_location(location):
-        return normalize_city_name(location.split(",")[0].strip()) or location
-
-    if location and is_germany_wide_location(location):
-        return normalize_city_name(location.split(",")[0].strip()) or location
-
-    if source_city:
+    if source_city and is_local_source_city(source_city):
         return normalize_city_name(source_city) or source_city
 
-    return "Germany"
+    return resolve_parsed_location(
+        channel_city=source_city or "Germany",
+        suggested=str(item.get("location") or ""),
+        text=_service_text_blob(item),
+    )
 
 
 def _normalized_location_tokens(location: str) -> set[str]:
