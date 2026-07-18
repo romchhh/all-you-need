@@ -6,6 +6,7 @@ import asyncio
 import html
 import logging
 import time
+from typing import Any
 
 from parser.core.account_pool import (
     PyrogramAccount,
@@ -13,6 +14,7 @@ from parser.core.account_pool import (
     is_flood_limit_error,
     list_accounts_round_robin,
 )
+from parser.core.telegram_meta import resolve_pyrogram_chat_ref
 from parser.moderation.formatting import listing_miniapp_url
 from parser.storage import parser_accounts_db as accounts_db
 
@@ -57,21 +59,93 @@ def _is_session_busy(err: BaseException) -> bool:
     return isinstance(err, RuntimeError) and "зайнята" in str(err).lower()
 
 
-def _dm_targets(item: dict) -> list[str | int]:
-    """Username першим — надійніше для cold DM; потім numeric id."""
-    targets: list[str | int] = []
+def _username_target(item: dict) -> str | None:
     username = (item.get("author_username") or "").strip().lstrip("@")
-    author_id = item.get("author_id")
     if username:
-        targets.append(f"@{username}")
-    if author_id is not None:
-        try:
-            uid = int(author_id)
-            if uid > 0 and uid not in targets:
-                targets.append(uid)
-        except (TypeError, ValueError):
-            pass
-    return targets
+        return f"@{username}"
+    return None
+
+
+async def _peer_from_source_message(app: Any, item: dict) -> str | int | None:
+    """Резолв автора через оригінальний пост у групі (parser уже в чаті)."""
+    source_channel = (item.get("source_channel") or "").strip()
+    message_id = item.get("message_id")
+    if not source_channel or message_id is None:
+        return None
+    try:
+        ref = resolve_pyrogram_chat_ref(source_channel)
+        chat = await app.get_chat(ref)
+        msg = await app.get_messages(chat.id, int(message_id))
+        if not msg:
+            return None
+        user = getattr(msg, "from_user", None)
+        if user is None or getattr(user, "is_bot", False):
+            return None
+        if getattr(user, "username", None):
+            return f"@{user.username}"
+        return int(user.id)
+    except Exception as e:
+        logger.info(
+            "resolve author via %s/%s: %s",
+            source_channel,
+            message_id,
+            e,
+        )
+        return None
+
+
+async def _warm_peer_via_source_chat(app: Any, item: dict, user_id: int) -> None:
+    """Завантажує peer через групу-джерело (спільний чат з автором)."""
+    source_channel = (item.get("source_channel") or "").strip()
+    message_id = item.get("message_id")
+    if not source_channel:
+        return
+    ref = resolve_pyrogram_chat_ref(source_channel)
+    chat = await app.get_chat(ref)
+    if message_id is not None:
+        await app.get_messages(chat.id, int(message_id))
+        return
+    await app.get_chat_member(chat.id, user_id)
+
+
+async def _resolve_dm_target(app: Any, item: dict) -> str | int | None:
+    """
+    Ціль для DM:
+    1) @username з parsed_items (найнадійніше)
+    2) from_user оригінального поста в групі
+    3) author_id лише після warm через source chat
+    """
+    username = _username_target(item)
+    if username:
+        return username
+
+    from_message = await _peer_from_source_message(app, item)
+    if from_message:
+        return from_message
+
+    author_id = item.get("author_id")
+    if author_id is None:
+        return None
+    try:
+        uid = int(author_id)
+    except (TypeError, ValueError):
+        return None
+    if uid <= 0:
+        return None
+
+    try:
+        await _warm_peer_via_source_chat(app, item, uid)
+    except Exception as e:
+        logger.info("warm peer %s via source chat: %s", uid, e)
+
+    try:
+        user = await app.get_users(uid)
+        if getattr(user, "username", None):
+            return f"@{user.username}"
+        return uid
+    except Exception as e:
+        logger.info("get_users(%s) failed: %s", uid, e)
+        return None
 
 
 def _build_notify_text(item: dict, listing_id: int, *, channel_only: bool) -> str:
@@ -86,9 +160,9 @@ def _build_notify_text(item: dict, listing_id: int, *, channel_only: bool) -> st
 
 async def _send_author_dm(
     acc: PyrogramAccount,
-    targets: list[str | int],
+    item: dict,
     plain_text: str,
-) -> None:
+) -> str | int:
     from pyrogram import Client
     from pyrogram.enums import ParseMode
 
@@ -104,37 +178,30 @@ async def _send_author_dm(
     )
     async with pyrogram_session_guard(acc.session_path, timeout=_DM_SESSION_TIMEOUT):
         async with app:
-            last_error: Exception | None = None
-            for target in targets:
+            target = await _resolve_dm_target(app, item)
+            if target is None:
+                raise ValueError("author peer not resolved")
+
+            if isinstance(target, int):
                 try:
-                    if isinstance(target, int):
-                        await app.get_users(target)
-                    await app.send_message(
-                        target,
-                        plain_text,
-                        parse_mode=ParseMode.HTML,
-                        disable_web_page_preview=False,
-                    )
-                    logger.info(
-                        "Pyrogram[%s …%s]: DM надіслано автору (target=%s)",
-                        acc.label,
-                        acc.phone_tail,
-                        target,
-                    )
-                    return
+                    await _warm_peer_via_source_chat(app, item, target)
                 except Exception as e:
-                    last_error = e
-                    if _is_peer_or_privacy_error(e):
-                        logger.info(
-                            "Pyrogram[%s]: peer %s недоступний (%s) — інший target",
-                            acc.label,
-                            target,
-                            type(e).__name__,
-                        )
-                        continue
-                    raise
-            if last_error:
-                raise last_error
+                    logger.debug("warm peer before send %s: %s", target, e)
+
+            await app.send_message(
+                target,
+                plain_text,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=False,
+            )
+            logger.info(
+                "Pyrogram[%s …%s]: DM надіслано автору (target=%s, item=%s)",
+                acc.label,
+                acc.phone_tail,
+                target,
+                item.get("id"),
+            )
+            return target
 
 
 async def try_notify_author_via_pyrogram(
@@ -144,11 +211,13 @@ async def try_notify_author_via_pyrogram(
     channel_only: bool = False,
 ):
     item_id = item.get("id")
-    targets = _dm_targets(item)
+    has_username = bool(_username_target(item))
+    has_source = bool(item.get("source_channel")) and item.get("message_id") is not None
+    has_author_id = bool(item.get("author_id"))
 
-    if not targets:
+    if not has_username and not has_source and not has_author_id:
         logger.info(
-            "Автор оголошення %s невідомий — пропускаємо DM (author_id/username порожні)",
+            "Автор оголошення %s невідомий — пропускаємо DM",
             item_id,
         )
         return
@@ -165,17 +234,30 @@ async def try_notify_author_via_pyrogram(
     last_error: Exception | None = None
 
     logger.info(
-        "DM автору item %s listing %s: targets=%s accounts=%s",
+        "DM автору item %s listing %s: username=%r author_id=%r source=%s/%s accounts=%s",
         item_id,
         listing_id,
-        targets,
+        item.get("author_username"),
+        item.get("author_id"),
+        item.get("source_channel"),
+        item.get("message_id"),
         [a.label for a in order],
     )
 
     for acc in order:
         try:
-            await _send_author_dm(acc, targets, plain_text)
+            target = await _send_author_dm(acc, item, plain_text)
             accounts_db.mark_dm_result(acc.id, ok=True)
+            logger.info(
+                "DM автору item %s успішно через %s → %s",
+                item_id,
+                acc.label,
+                target,
+            )
+            return
+        except ValueError as e:
+            last_error = e
+            logger.info("DM item %s: %s", item_id, e)
             return
         except Exception as e:
             last_error = e
@@ -197,8 +279,9 @@ async def try_notify_author_via_pyrogram(
                 continue
             if _is_peer_or_privacy_error(e):
                 logger.info(
-                    "Peer недоступний через %s — пробуємо інший акаунт",
+                    "Peer недоступний через %s (%s) — пробуємо інший акаунт",
                     acc.label,
+                    type(e).__name__,
                 )
                 continue
             logger.warning(

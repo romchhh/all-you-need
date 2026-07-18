@@ -105,14 +105,42 @@ def parsed_item_message_link(item: dict) -> Optional[str]:
     return link or None
 
 
+def _is_real_telegram_user(user) -> bool:
+    if user is None:
+        return False
+    if getattr(user, "is_bot", False):
+        return False
+    if getattr(user, "is_deleted", False):
+        return False
+    uid = getattr(user, "id", None)
+    try:
+        if uid is None or int(uid) <= 0:
+            return False
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _sender_user_from_message(msg):
+    origin = getattr(msg, "forward_origin", None)
+    if origin is not None:
+        sender = getattr(origin, "sender_user", None)
+        if _is_real_telegram_user(sender):
+            return sender
+    user = getattr(msg, "from_user", None)
+    if _is_real_telegram_user(user):
+        return user
+    return None
+
+
 def get_sender_username(msg) -> Optional[str]:
     origin = getattr(msg, "forward_origin", None)
     if origin is not None:
         sender = getattr(origin, "sender_user", None)
         if sender is not None and getattr(sender, "username", None):
-            return sender.username
+            return str(sender.username).lstrip("@")
     if getattr(msg, "from_user", None) and getattr(msg.from_user, "username", None):
-        return msg.from_user.username
+        return str(msg.from_user.username).lstrip("@")
     return None
 
 
@@ -157,12 +185,45 @@ def resolve_author_username(msg, text: str, channel: str = "") -> Optional[str]:
     return get_sender_username(msg) or extract_username_from_text(text, channel)
 
 
+def resolve_author_contact(
+    msg,
+    text: str,
+    channel: str = "",
+) -> tuple[Optional[str], Optional[int]]:
+    """
+    (username, user_id) автора оголошення для DM / модерації.
+
+    @ з тексту — пріоритет. user_id зберігаємо лише якщо from_user збігається
+    з цим @ (інакше id часто належить адміну групи, а не автору).
+    """
+    text_username = extract_username_from_text(text, channel)
+    meta_username = get_sender_username(msg)
+    username = text_username or meta_username
+
+    sender = _sender_user_from_message(msg)
+    user_id: Optional[int] = None
+    if not sender:
+        return username, None
+
+    sender_un = (getattr(sender, "username", None) or "").strip().lstrip("@").lower()
+
+    if text_username:
+        if sender_un and sender_un == text_username.lower():
+            user_id = int(sender.id)
+    elif meta_username:
+        if sender_un == meta_username.lower():
+            user_id = int(sender.id)
+    elif not username:
+        user_id = int(sender.id)
+        if not username and sender_un:
+            username = sender_un
+
+    return username, user_id
+
+
 def get_sender_id(msg) -> Optional[int]:
-    origin = getattr(msg, "forward_origin", None)
-    if origin is not None:
-        sender = getattr(origin, "sender_user", None)
-        if sender is not None:
-            return getattr(sender, "id", None)
-    if getattr(msg, "from_user", None):
-        return getattr(msg.from_user, "id", None)
-    return None
+    """Зворотна сумісність — id лише для «реального» from_user."""
+    sender = _sender_user_from_message(msg)
+    if sender is None:
+        return None
+    return int(sender.id)
