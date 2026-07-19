@@ -1,9 +1,9 @@
-"""Обхід багів Pyrogram: PhotoSize / Progressive з None → TypeError при sort/max."""
+"""Обхід багів Pyrogram: PhotoSize / VideoSize з None → TypeError при sort/max."""
 
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +12,12 @@ _patched = False
 
 def apply_pyrogram_photo_size_patch() -> None:
     """
-    Telegram інколи віддає PhotoSize.size / PhotoSizeProgressive.sizes як None
+    Telegram інколи віддає PhotoSize.size / Progressive.sizes / VideoSize.size як None
     (часто invite/приватні канали). Stock Pyrogram: max()/sort →
     TypeError: '<' not supported between instances of 'NoneType' and 'int'.
+
+    Також ловимо збої парсингу окремих повідомлень, щоб один битий пост
+    не валив увесь канал.
     """
     global _patched
     if _patched:
@@ -28,13 +31,14 @@ def apply_pyrogram_photo_size_patch() -> None:
         FileUniqueType,
         ThumbnailSource,
     )
+    from pyrogram.types.messages_and_media.animation import Animation
     from pyrogram.types.messages_and_media.photo import Photo
     from pyrogram.types.messages_and_media.thumbnail import Thumbnail
 
-    def _int_or_zero(value) -> int:
+    def _int_or_zero(value: Any) -> int:
         return value if isinstance(value, int) else 0
 
-    def _safe_progressive_size(progressive) -> int | None:
+    def _safe_progressive_size(progressive: Any) -> int | None:
         safe_sizes = [
             s for s in (getattr(progressive, "sizes", None) or []) if isinstance(s, int)
         ]
@@ -42,12 +46,19 @@ def apply_pyrogram_photo_size_patch() -> None:
             return None
         return max(safe_sizes)
 
-    @staticmethod
+    def _is_media_sort_typeerror(exc: BaseException) -> bool:
+        err = str(exc)
+        return (
+            "NoneType" in err
+            or "not supported between" in err
+            or "takes" in err and "positional" in err
+        )
+
     def _safe_photo_parse(client, photo, ttl_seconds=None):
         if not isinstance(photo, raw.types.Photo):
             return None
 
-        photos = []
+        photos: list = []
 
         for p in photo.sizes or []:
             if isinstance(p, raw.types.PhotoSize):
@@ -118,7 +129,6 @@ def apply_pyrogram_photo_size_patch() -> None:
             client=client,
         )
 
-    @staticmethod
     def _safe_thumbnail_parse(
         client, media: Union["raw.types.Photo", "raw.types.Document"]
     ) -> Optional[List["Thumbnail"]]:
@@ -175,29 +185,73 @@ def apply_pyrogram_photo_size_patch() -> None:
 
         return parsed_thumbs or None
 
-    Photo._parse = _safe_photo_parse  # type: ignore[method-assign]
-    Thumbnail._parse = _safe_thumbnail_parse  # type: ignore[method-assign]
+    Photo._parse = staticmethod(_safe_photo_parse)  # type: ignore[method-assign]
+    Thumbnail._parse = staticmethod(_safe_thumbnail_parse)  # type: ignore[method-assign]
 
-    # Animation також сортує по size (може бути None)
-    try:
-        from pyrogram.types.messages_and_media.animation import Animation
+    # Animation._parse: сигнатура залежить від версії Pyrogram (3 або 4 args).
+    _orig_anim = Animation._parse
 
-        _orig_anim = Animation._parse
+    def _safe_anim_parse(*args, **kwargs):
+        try:
+            return _orig_anim(*args, **kwargs)
+        except TypeError as e:
+            if _is_media_sort_typeerror(e):
+                logger.warning("Animation._parse skipped: %s", e)
+                return None
+            raise
 
-        def _safe_anim_parse(client, animation, file_name):
-            try:
-                return _orig_anim(client, animation, file_name)
-            except TypeError as e:
-                if "NoneType" in str(e) or "not supported between" in str(e):
-                    logger.warning("Animation._parse skipped: %s", e)
-                    return None
-                raise
+    Animation._parse = staticmethod(_safe_anim_parse)  # type: ignore[method-assign]
 
-        Animation._parse = staticmethod(_safe_anim_parse)  # type: ignore[method-assign]
-    except Exception as e:
-        logger.debug("Animation patch skipped: %s", e)
+    # Chat animation (video_sizes) — окремий код-шлях з videos.sort(key=size).
+    _orig_chat_anim = Animation._parse_chat_animation
 
-    # Якщо одне повідомлення в batch все одно падає — парсимо по одному
+    def _safe_chat_anim_parse(client, video, file_name):
+        try:
+            if isinstance(video, raw.types.Photo) and getattr(video, "video_sizes", None):
+                safe_sizes = []
+                for v in video.video_sizes or []:
+                    if not isinstance(v, raw.types.VideoSize):
+                        continue
+                    try:
+                        safe_sizes.append(
+                            raw.types.VideoSize(
+                                type=getattr(v, "type", "") or "",
+                                w=_int_or_zero(getattr(v, "w", None)),
+                                h=_int_or_zero(getattr(v, "h", None)),
+                                size=_int_or_zero(getattr(v, "size", None)),
+                                video_start_ts=getattr(v, "video_start_ts", None),
+                            )
+                        )
+                    except TypeError:
+                        safe_sizes.append(
+                            raw.types.VideoSize(
+                                type=getattr(v, "type", "") or "",
+                                w=_int_or_zero(getattr(v, "w", None)),
+                                h=_int_or_zero(getattr(v, "h", None)),
+                                size=_int_or_zero(getattr(v, "size", None)),
+                            )
+                        )
+                # Підміняємо на копію з валідними size, щоб stock-код не падав.
+                video = raw.types.Photo(
+                    id=video.id,
+                    access_hash=video.access_hash,
+                    file_reference=video.file_reference,
+                    date=video.date,
+                    sizes=video.sizes or [],
+                    dc_id=video.dc_id,
+                    has_stickers=getattr(video, "has_stickers", None),
+                    video_sizes=safe_sizes or None,
+                )
+            return _orig_chat_anim(client, video, file_name)
+        except TypeError as e:
+            if _is_media_sort_typeerror(e):
+                logger.warning("Animation._parse_chat_animation skipped: %s", e)
+                return None
+            raise
+
+    Animation._parse_chat_animation = staticmethod(_safe_chat_anim_parse)  # type: ignore[method-assign]
+
+    # Якщо одне повідомлення в batch падає — парсимо по одному.
     _orig_parse_messages = utils.parse_messages
 
     async def _safe_parse_messages(client, messages, replies=1, business_connection_id=None):
@@ -209,8 +263,7 @@ def apply_pyrogram_photo_size_patch() -> None:
                 business_connection_id=business_connection_id,
             )
         except TypeError as e:
-            err = str(e)
-            if "NoneType" not in err and "not supported between" not in err:
+            if not _is_media_sort_typeerror(e):
                 raise
 
             logger.warning(
@@ -250,5 +303,53 @@ def apply_pyrogram_photo_size_patch() -> None:
 
     utils.parse_messages = _safe_parse_messages  # type: ignore[assignment]
 
+    # Invite preview: get_chat(t.me/+…) → Chat._parse_preview → Photo._parse.
+    try:
+        from pyrogram import enums
+        from pyrogram.types.user_and_chats.chat import Chat
+
+        _orig_preview = Chat._parse_preview
+
+        def _safe_parse_preview(client, chat_invite):
+            try:
+                return _orig_preview(client, chat_invite)
+            except TypeError as e:
+                if not _is_media_sort_typeerror(e):
+                    raise
+                logger.warning(
+                    "Chat._parse_preview failed (%s) — retry без photo",
+                    e,
+                )
+                return Chat(
+                    type=(
+                        enums.ChatType.SUPERGROUP
+                        if getattr(chat_invite, "megagroup", None)
+                        else enums.ChatType.CHANNEL
+                        if getattr(chat_invite, "broadcast", None)
+                        else enums.ChatType.GROUP
+                    ),
+                    is_verified=getattr(chat_invite, "verified", None),
+                    is_scam=getattr(chat_invite, "scam", None),
+                    is_fake=getattr(chat_invite, "fake", None),
+                    is_public=getattr(chat_invite, "public", None),
+                    is_preview=True,
+                    title=chat_invite.title,
+                    photo=None,
+                    members_count=getattr(chat_invite, "participants_count", None),
+                    members=[
+                        types.User._parse(client, user)
+                        for user in getattr(chat_invite, "participants", []) or []
+                    ]
+                    or None,
+                    description=getattr(chat_invite, "about", None),
+                    join_by_request=getattr(chat_invite, "request_needed", None),
+                    raw=chat_invite,
+                    client=client,
+                )
+
+        Chat._parse_preview = staticmethod(_safe_parse_preview)  # type: ignore[method-assign]
+    except Exception as e:
+        logger.debug("Chat._parse_preview patch skipped: %s", e)
+
     _patched = True
-    logger.info("Applied Pyrogram Photo/Thumbnail/parse_messages None-safe patch")
+    logger.info("Applied Pyrogram Photo/Thumbnail/Animation/parse_messages None-safe patch")
