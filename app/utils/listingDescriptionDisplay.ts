@@ -19,7 +19,7 @@ export function shouldShowOriginalPostInDescription(
 ): boolean {
   if ((sellerUsername || '').trim()) return false;
   if (hasAuthorUsernameInDescription(description)) return false;
-  if (/🔗\s*(?:Оригінальне|Оригинальное|Original)/iu.test(description)) return true;
+  return /🔗\s*(?:Оригінальне|Оригинальное|Original)/iu.test(description);
 }
 
 /** Текст опису для UI: прибираємо дубль автора; лінк на оригінал — лише без username. */
