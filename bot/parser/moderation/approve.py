@@ -24,6 +24,7 @@ from parser.moderation.approve_routing import (
 from parser.marketplace_categories import apply_marketplace_categories_to_item
 from parser.moderation.author_notify import schedule_author_notify
 from parser.core.account_pool import list_parser_accounts
+from parser.core.location import resolve_parsed_location
 from parser.moderation.formatting import (
     build_marketplace_description,
     edit_group_message,
@@ -86,6 +87,22 @@ async def _apply_ai_enrichment(
     return listing_item, ai_summary
 
 
+def _force_listing_location(item: dict) -> dict:
+    """Локальний канал → місто каналу; Germany → лише відомі міста."""
+    out = dict(item)
+    out["location"] = resolve_parsed_location(
+        channel_city=str(item.get("source_city") or ""),
+        source_channel=str(item.get("source_channel") or "") or None,
+        suggested=str(item.get("location") or ""),
+        text=(
+            f"{item.get('title') or ''}\n"
+            f"{item.get('description') or ''}\n"
+            f"{item.get('raw_text') or ''}"
+        ),
+    )
+    return out
+
+
 async def _approve_services_both(
     callback: CallbackQuery,
     bot: Bot,
@@ -104,6 +121,7 @@ async def _approve_services_both(
         callback, item, item_id, force_ai=True
     )
     listing_item = apply_marketplace_categories_to_item(listing_item)
+    listing_item = _force_listing_location(listing_item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
     if item_category != "services_work":
@@ -253,6 +271,7 @@ async def _approve_marketplace(
         callback, item, item_id, force_ai=True
     )
     listing_item = apply_marketplace_categories_to_item(listing_item)
+    listing_item = _force_listing_location(listing_item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
     pool = list_parser_accounts()

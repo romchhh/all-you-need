@@ -208,6 +208,7 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
         str(data.get("location") or ""),
         channel_city,
         f"{title}\n{description}\n{raw_text}",
+        source_channel=str(item.get("source_channel") or "") or None,
     )
     price, currency, is_free = _normalize_price_fields(
         data.get("price"),

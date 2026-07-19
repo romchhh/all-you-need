@@ -55,6 +55,8 @@ PARSER_SERVICES_FETCH_LIMIT: int = max(
     _env_int("PARSER_SERVICES_FETCH_LIMIT", _env_int("PARSER_FETCH_LIMIT", 100)),
 )
 PARSER_SERVICES_IGNORE_CURSOR: bool = _env_bool("PARSER_SERVICES_IGNORE_CURSOR", False)
+# Скільки останніх message_id перечитати поверх cursor (пропущені через збій / гонки).
+PARSER_CURSOR_OVERLAP: int = max(0, _env_int("PARSER_CURSOR_OVERLAP", 25))
 
 PARSER_DEDUP_ENABLED: bool = _env_bool("PARSER_DEDUP_ENABLED", True)
 PARSER_SERVICES_DEDUP_ENABLED: bool = _env_bool("PARSER_SERVICES_DEDUP_ENABLED", True)

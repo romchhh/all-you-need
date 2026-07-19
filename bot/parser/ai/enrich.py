@@ -128,11 +128,18 @@ def _normalize_price_fields(
     return num, currency or "EUR", False
 
 
-def _validate_location(location: str, channel_city: str, text: str) -> str:
-    from parser.core.location import is_local_source_city, resolve_parsed_location
+def _validate_location(
+    location: str,
+    channel_city: str,
+    text: str,
+    *,
+    source_channel: str | None = None,
+) -> str:
+    from parser.core.location import resolve_parsed_location
 
     return resolve_parsed_location(
         channel_city=channel_city,
+        source_channel=source_channel,
         suggested=location,
         text=text,
     )
@@ -292,6 +299,7 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
         str(data.get("location") or ""),
         channel_city,
         f"{title}\n{description}\n{raw_text}",
+        source_channel=str(item.get("source_channel") or "") or None,
     )
     price, currency, is_free = _normalize_price_fields(
         data.get("price"),
@@ -320,6 +328,8 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
 
 def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict:
     """Повертає копію item з полями після AI."""
+    from parser.core.location import resolve_parsed_location
+
     out = dict(item)
     out["title"] = enriched.title
     out["description"] = enriched.description
@@ -328,6 +338,11 @@ def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict
     out["price"] = enriched.price
     out["currency"] = enriched.currency
     out["is_free"] = enriched.is_free
-    out["location"] = enriched.location
+    out["location"] = resolve_parsed_location(
+        channel_city=str(item.get("source_city") or ""),
+        source_channel=str(item.get("source_channel") or "") or None,
+        suggested=enriched.location,
+        text=f"{enriched.title}\n{enriched.description}\n{item.get('raw_text') or ''}",
+    )
     out["condition"] = enriched.condition
     return out

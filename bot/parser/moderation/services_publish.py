@@ -91,6 +91,25 @@ _NATIONWIDE_PICKUP_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Перевезення / логістика по Німеччині — аудиторія ширша за одне місто.
+_TRANSPORT_NATIONWIDE_RE = re.compile(
+    r"перевозк\w*|перевезенн\w*|грузоперевоз\w*|вантажоперевез\w*|"
+    r"\bumzug\w*|\bumzüge\b|переезд\w*|переїзд\w*|"
+    r"доставк\w+\s+по\s+(?:германии|німеччин|deutschland)|"
+    r"доставк\w+\s+по\s+(?:всей|всій)|"
+    r"транспорт\w*\s+по\s+(?:германии|німеччин)|"
+    r"фура|газель|sprinter|"
+    r"грузоперев|грузотакси|вантажне\s+таксі|"
+    r"\blogistik\b|\blogistics\b|\bfracht\b",
+    re.IGNORECASE,
+)
+
+_DUAL_SERVICE_SUBCATEGORIES = frozenset({
+    "transportation",
+    "online_services",
+    "it_services",
+})
+
 # Тури / поїздки / відпочинок (часто з Hamburg-каналу, але для всієї Німеччини).
 _TRAVEL_TOURISM_RE = re.compile(
     r"поездк\w*|поїздк\w*|"
@@ -224,15 +243,29 @@ def is_travel_or_mobile_nationwide_service(item: dict) -> bool:
     return False
 
 
+def is_nationwide_transport_service(item: dict) -> bool:
+    """Перевезення / Umzug / логістика — публікуємо в Hamburg + Germany."""
+    subcategory = (item.get("subcategory") or "").strip().lower()
+    if subcategory == "transportation":
+        return True
+    blob = _item_text_blob(item)
+    return bool(_TRANSPORT_NATIONWIDE_RE.search(blob))
+
+
 def is_dual_channel_service(item: dict) -> bool:
-    """Оголошення для аудиторії всієї Німеччини → Hamburg + Germany."""
-    return is_online_or_germany_wide_service(item) or is_travel_or_mobile_nationwide_service(
-        item
+    """Оголошення для аудиторії всієї Німеччини → Hamburg + Germany (+ маркетплейс)."""
+    subcategory = (item.get("subcategory") or "").strip().lower()
+    if subcategory in _DUAL_SERVICE_SUBCATEGORIES:
+        return True
+    return (
+        is_online_or_germany_wide_service(item)
+        or is_travel_or_mobile_nationwide_service(item)
+        or is_nationwide_transport_service(item)
     )
 
 
 def is_online_or_germany_wide_service(item: dict) -> bool:
-    """Онлайн- послуги або оголошення на всю Німеччину → обидва канали."""
+    """Онлайн-послуги або оголошення на всю Німеччину → обидва канали."""
     blob = _item_text_blob(item)
     if _ONLINE_OR_REMOTE_RE.search(blob):
         return True
@@ -241,16 +274,15 @@ def is_online_or_germany_wide_service(item: dict) -> bool:
 
     subcategory = (item.get("subcategory") or "").strip().lower()
     if subcategory in {"it_services", "online_services"}:
-        if _ONLINE_OR_REMOTE_RE.search(blob) or is_germany_wide_location(
-            str(item.get("location") or "")
-        ):
-            return True
+        return True
 
-    for loc in (item.get("location"), _effective_service_location(item)):
+    for loc in (item.get("location"), item.get("source_city")):
         val = (loc or "").strip()
         if val and is_germany_wide_location(val):
             return True
 
+    # Не викликаємо _effective_service_location тут — для Hamburg-каналу
+    # воно завжди поверне Hamburg і зламає dual для онлайн/перевезень.
     return False
 
 
@@ -281,17 +313,12 @@ def is_hamburg_service_item(item: dict) -> bool:
 
 def resolve_services_trade_channel_ids(item: dict) -> list[int]:
     """
-    Аудиторія вся Німеччина (онлайн, тури, забір з адреси) → обидва канали.
+    Аудиторія вся Німеччина (онлайн, тури, перевезення) → обидва канали.
     Локальний Hamburg → лише Hamburg.
     Інше місто (Wuppertal, Berlin, …) → лише Germany.
     """
-    eff_loc = _effective_service_location(item)
-    logger.debug(
-        "services route: eff_loc=%r location=%r source_city=%r",
-        eff_loc,
-        item.get("location"),
-        item.get("source_city"),
-    )
+    # Dual перевіряємо ПЕРЕД pin на local Hamburg — інакше онлайн з HamburgBeauty
+    # ніколи не потрапить у Germany-канал.
     if is_dual_channel_service(item):
         return [TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID]
     if is_hamburg_service_item(item):

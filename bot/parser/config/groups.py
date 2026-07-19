@@ -238,7 +238,15 @@ GROUPS: tuple[ParserGroup, ...] = (
         "goods",
         label="Nürnberg Ukraine",
     ),
-    ParserGroup("nurnberg_ua", "Nürnberg", "goods", label="Nürnberg UA"),
+    # nurnberg_ua — USERNAME_NOT_OCCUPIED (канал видалено / username зайнятий іншим)
+    ParserGroup(
+        "nurnberg_ua",
+        "Nürnberg",
+        "goods",
+        label="Nürnberg UA",
+        enabled=False,
+        notes="USERNAME_NOT_OCCUPIED — вимкнено",
+    ),
     ParserGroup(
         "NASH_NURNBERG_INFO",
         "Nürnberg",

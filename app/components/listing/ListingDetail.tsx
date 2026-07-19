@@ -155,7 +155,7 @@ export const ListingDetail = ({
     ? 'bg-[#3F5331] text-white hover:bg-[#344728] [&_svg]:text-white'
     : 'border-none bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_22px_rgba(200,230,160,0.48)] hover:bg-[#dff5c0] hover:shadow-[0_0_28px_rgba(200,230,160,0.58)] [&_svg]:text-[#0f1408]';
   const isGuestBrowserView = isSeoListingRoute || !isTelegramEnv;
-  const guestTelegramCtaClass = `w-full rounded-2xl border-none px-5 py-4 font-montserrat font-semibold flex cursor-pointer flex-col items-center justify-center gap-2.5 text-center transition-colors ${listingPrimaryCtaClass}`;
+  const guestTelegramCtaClass = `w-full rounded-xl border-none px-4 py-2.5 font-montserrat text-sm font-semibold flex cursor-pointer flex-row items-center justify-center gap-2 text-center transition-colors ${listingPrimaryCtaClass}`;
 
   const categoryLabel = useMemo(
     () => getListingCategoryLabel(categories, listing.category, listing.subcategory, t),
@@ -1261,8 +1261,8 @@ export const ListingDetail = ({
             target="_blank"
             rel="noopener noreferrer"
           >
-            <MessageCircle size={24} className="shrink-0" />
-            <span className="block w-full whitespace-pre-line text-center text-lg leading-tight sm:text-xl">
+            <MessageCircle size={18} className="shrink-0" aria-hidden />
+            <span className="leading-none">
               {guestListingCopy.openInTelegramBot}
             </span>
           </a>

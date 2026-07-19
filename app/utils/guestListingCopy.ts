@@ -6,7 +6,7 @@ export const guestListingCopy = {
     ru.listingDetail?.guestViewHint ??
     'Полный просмотр товара, актуальный статус и связь с продавцом доступны в Telegram-боте Trade Ground Marketplace.',
   openInTelegramBot:
-    ru.listingDetail?.openInTelegramBot ?? 'Открыть товар в\nTelegram-боте',
+    ru.listingDetail?.openInTelegramBot ?? 'Открыть товар в Telegram-боте',
   loading: ru.listingDetail?.guestLoading ?? 'Загрузка товара...',
   notFound: ru.listingDetail?.guestNotFound ?? 'Товар не найден или уже неактивен.',
   notFoundHint:

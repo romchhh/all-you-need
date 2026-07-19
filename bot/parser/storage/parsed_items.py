@@ -535,10 +535,16 @@ def insert_parsed_item(
     parser_type: str = "default",
     text_embedding: Optional[str] = None,
 ) -> int:
-    from utils.location_normalization import normalize_city_name
+    from parser.core.location import channel_city_from_source, resolve_parsed_location
 
-    source_city = normalize_city_name(source_city) or (source_city or "").strip() or "Germany"
-    location = normalize_city_name(location) or (location or "").strip() or source_city
+    # source_city — завжди з реєстру каналу; location — за правилами local/Germany
+    source_city = channel_city_from_source(source_channel, source_city)
+    location = resolve_parsed_location(
+        channel_city=source_city,
+        source_channel=source_channel,
+        suggested=location,
+        text=f"{title or ''}\n{description or ''}\n{raw_text or ''}",
+    )
 
     conn = get_connection()
     cursor = conn.cursor()

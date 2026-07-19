@@ -47,6 +47,7 @@ from parser.storage.parsed_items import (
     fingerprint_parsed_text,
     fingerprint_title_desc,
     insert_parsed_item,
+    parsed_item_exists,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,6 +122,11 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             photos = [msg] if msg.photo else []
             msg_for_link = msg
             effective_message_id = msg.id
+
+        if parsed_item_exists(channel, effective_message_id, PARSER_TYPE_SERVICES_CHANNEL):
+            stats["skipped"] += 1
+            stats["reasons"]["дублікат (бд)"] = stats["reasons"].get("дублікат (бд)", 0) + 1
+            continue
 
         text = clean_channel_post_text(text, channel)
 
@@ -218,6 +224,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
 
             location = resolve_parsed_location(
                 channel_city=source_city,
+                source_channel=channel,
                 suggested=ai_fields.get("location"),
                 text=f"{title}\n{description}\n{text}",
             )
@@ -226,6 +233,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
 
             location = resolve_parsed_location(
                 channel_city=source_city,
+                source_channel=channel,
                 text=f"{title}\n{description}\n{text}",
             )
 
@@ -237,6 +245,13 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         chan_slug = re.sub(r"[^a-z0-9]+", "_", channel.lower()).strip("_")[:24] or "ch"
         base_name = f"{chan_slug}_{effective_message_id}"
         images = await download_photos(app, photos, base_name, max_photos=3)
+
+        # AI міг визначити товар у послуговому каналі — не лишаємо services_channel
+        final_parser_type = (
+            PARSER_TYPE_SERVICES_CHANNEL
+            if (category or "").strip().lower() == "services_work"
+            else "default"
+        )
 
         item_id = insert_parsed_item(
             source_channel=channel,
@@ -258,7 +273,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             raw_text=text[:4000],
             content_hash=content_hash,
             dedup_key=dedup_key,
-            parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            parser_type=final_parser_type,
             text_embedding=embedding_json,
         )
 

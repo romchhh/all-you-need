@@ -44,6 +44,7 @@ from parser.storage.parsed_items import (
     fingerprint_parsed_text,
     fingerprint_title_desc,
     insert_parsed_item,
+    parsed_item_exists,
 )
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,12 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             photos = [msg] if msg.photo else []
             msg_for_link = msg
             effective_message_id = msg.id
+
+        # Overlap / повторний прохід: уже збережені message_id — без quality/AI.
+        if parsed_item_exists(channel, effective_message_id, "default"):
+            stats["skipped"] += 1
+            stats["reasons"]["дублікат (бд)"] = stats["reasons"].get("дублікат (бд)", 0) + 1
+            continue
 
         text = clean_channel_post_text(text, channel)
 
@@ -206,6 +213,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
             location = resolve_parsed_location(
                 channel_city=source_city,
+                source_channel=channel,
                 suggested=ai_fields.get("location"),
                 text=f"{title}\n{description}\n{text}",
             )
@@ -214,6 +222,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
             location = resolve_parsed_location(
                 channel_city=source_city,
+                source_channel=channel,
                 text=f"{title}\n{description}\n{text}",
             )
 

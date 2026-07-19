@@ -94,6 +94,8 @@ def _format_parser_stats(stats: dict | None) -> str:
     ]
     if lookback:
         lines.append(f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано)")
+    else:
+        lines.append("📍 Інкрементально (cursor + overlap)")
     if channels is not None:
         lines.append(f"📢 Груп/каналів: <b>{channels}</b>")
 
@@ -117,7 +119,8 @@ def _format_parser_stats(stats: dict | None) -> str:
         "• Hamburg послуги → канал Hamburg + маркетплейс\n"
         "• Germany послуги → канал Germany + маркетплейс\n"
         "• Товари → лише маркетплейс\n\n"
-        "💡 <code>/parse10</code> — примусово останні 10 постів з кожної групи"
+        "💡 <code>/parse</code> — лише нові після cursor (+overlap)\n"
+        "💡 <code>/parse50</code> — catch-up: останні 50 без cursor"
     )
     if added == 0:
         lines.append("")

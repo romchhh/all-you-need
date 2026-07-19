@@ -118,6 +118,7 @@ def create_marketplace_listing(
     location: str,
     images: list[str],
 ) -> int:
+    from parser.core.location import canonicalize_known_city
     from utils.location_normalization import normalize_city_name
 
     conn = get_connection()
@@ -135,7 +136,10 @@ def create_marketplace_listing(
             is_free = False
             price = "Договорная"
 
-    loc = normalize_city_name(location) or (location or "").strip() or "Germany"
+    # Невідомі «села» від AI не пишемо в Listing
+    loc = canonicalize_known_city(location) or normalize_city_name(location) or "Germany"
+    if not canonicalize_known_city(loc) and loc.lower() not in ("germany", "nrw"):
+        loc = "Germany"
     price_str = price if price else ("Договорная" if cat == "services_work" else "0")
     if cat == "services_work" and is_free:
         # ще раз: послуги майже ніколи не Free без явного маркера (вже знято вище)

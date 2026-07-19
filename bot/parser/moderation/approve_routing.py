@@ -58,8 +58,7 @@ def validate_parser_approve_context(chat_id: int, item: dict) -> str | None:
     if is_goods_moderation_chat(chat_id) and category == "services_work":
         return "❌ Це послуга — підтверджуйте в групі послуг (Hamburg / Germany)"
     if is_services_moderation_chat(chat_id) and category and category != "services_work":
-        # Дозволяємо, якщо AI ще не проставив — але парсер послуг майже завжди services_work
-        pass
+        return "❌ Це товар — підтверджуйте в групі товарів (маркетплейс)"
 
     return None
 
@@ -72,10 +71,10 @@ def notify_chat_for_parsed_item(item: dict) -> int:
     Послуги Germany / dual → група Germany.
     """
     category = (item.get("category") or "").strip().lower()
-    parser_type = (item.get("parser_type") or "").strip()
 
-    is_service = category == "services_work" or parser_type == "services_channel"
-    if not is_service:
+    # Лише реальна категорія послуги — не parser_type.
+    # Інакше товари з HamburgBeauty/Hamburggggggg йдуть у модерацію послуг.
+    if category != "services_work":
         return PARSER_MOD_GOODS_ID
 
     try:
@@ -84,6 +83,7 @@ def notify_chat_for_parsed_item(item: dict) -> int:
             is_hamburg_service_item,
         )
 
+        # Онлайн / перевезення / Germany-wide → Germany-мод (approve публікує в обидва канали)
         if is_dual_channel_service(item):
             return PARSER_MOD_SERVICES_GERMANY_ID
         if is_hamburg_service_item(item):

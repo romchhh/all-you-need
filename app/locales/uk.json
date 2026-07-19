@@ -433,7 +433,7 @@
   "listingDetail": {
     "telegramIdNotFound": "Telegram ID не знайдено",
     "guestViewHint": "Повний перегляд товару, актуальний статус та зв'язок з продавцем доступні у Telegram-боті Trade Ground Marketplace.",
-    "openInTelegramBot": "Відкрити товар у\nTelegram-боті",
+    "openInTelegramBot": "Відкрити товар у Telegram-боті",
     "guestLoading": "Завантаження товару...",
     "guestNotFound": "Товар не знайдено або вже неактивний.",
     "guestNotFoundHint": "Актуальний стан оголошення можна перевірити у нашому Telegram-боті Trade Ground Marketplace.",

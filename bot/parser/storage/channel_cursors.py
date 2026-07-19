@@ -32,6 +32,11 @@ def ensure_parser_cursors_table() -> None:
 
 
 def get_channel_cursor(source_channel: str, parser_type: str = "default") -> int:
+    """
+    Повертає збережений cursor.
+    НЕ bootstrap з MAX(message_id) — це стрибало вперед і пропускало
+    непрочитані пости (інкрементальний /parse тоді завжди +0).
+    """
     ensure_parser_cursors_table()
     conn = get_connection()
     cursor = conn.cursor()
@@ -43,29 +48,10 @@ def get_channel_cursor(source_channel: str, parser_type: str = "default") -> int
         (source_channel, parser_type),
     )
     row = cursor.fetchone()
-    if row:
-        conn.close()
-        return int(row[0] or 0)
-
-    cursor.execute(
-        """
-        SELECT MAX(message_id) FROM parsed_items
-        WHERE source_channel = ? AND COALESCE(parser_type, 'default') = ?
-        """,
-        (source_channel, parser_type),
-    )
-    boot = cursor.fetchone()
     conn.close()
-    boot_id = int(boot[0] or 0) if boot else 0
-    if boot_id:
-        set_channel_cursor(source_channel, parser_type, boot_id)
-        logger.info(
-            "parser cursor bootstrap %s (%s) → message_id=%s",
-            source_channel,
-            parser_type,
-            boot_id,
-        )
-    return boot_id
+    if not row:
+        return 0
+    return int(row[0] or 0)
 
 
 def set_channel_cursor(source_channel: str, parser_type: str, last_message_id: int) -> None:
@@ -92,6 +78,20 @@ def set_channel_cursor(source_channel: str, parser_type: str, last_message_id: i
             updated_at = datetime('now')
         """,
         (source_channel, parser_type, merged),
+    )
+    conn.commit()
+    conn.close()
+
+
+def reset_channel_cursor(source_channel: str, parser_type: str = "default") -> None:
+    ensure_parser_cursors_table()
+    conn = get_connection()
+    conn.execute(
+        """
+        DELETE FROM parser_channel_cursors
+        WHERE source_channel = ? AND parser_type = ?
+        """,
+        (source_channel, parser_type),
     )
     conn.commit()
     conn.close()
