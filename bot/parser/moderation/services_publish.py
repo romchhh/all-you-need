@@ -23,6 +23,7 @@ from parser.moderation.formatting import (
     build_channel_hashtags,
     format_original_post_link_html,
     listing_miniapp_url,
+    resolved_author_username,
     strip_original_post_link_block,
     truncate_telegram_html,
 )
@@ -611,7 +612,7 @@ async def publish_services_listing_to_channel(
     hashtags = build_channel_hashtags(category, subcategory, location)
 
     seller_label = t(user_id_for_lang, "listing.details.seller_channel")
-    author_username = (item.get("author_username") or "").strip().lstrip("@")
+    author_username = resolved_author_username(item)
     author_id = item.get("author_id")
     msg_link = parsed_item_message_link(item)
 
@@ -676,7 +677,7 @@ async def publish_services_listing_to_channel(
     if listing_open_url:
         view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
         keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=listing_open_url)])
-    elif msg_link:
+    elif msg_link and not author_username:
         view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
         keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=msg_link)])
     keyboard_rows.append([InlineKeyboardButton(text=submit_btn, url=bot_link)])

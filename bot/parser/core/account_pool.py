@@ -12,6 +12,101 @@ from parser.storage import parser_accounts_db as accounts_db
 
 logger = logging.getLogger(__name__)
 
+_PARSER_DIR = Path(__file__).resolve().parent.parent
+
+
+def resolve_session_stem(acc: PyrogramAccount) -> Path | None:
+    """
+    Шлях сесії Pyrogram (без .session), де файл реально існує.
+    Підтримує sessions/ та legacy bot/parser/parser_account_N.session.
+    """
+    candidates: list[Path] = [acc.session_path]
+    sn = acc.session_path.name
+
+    m = re.match(r"^parser_account_(\d+)$", sn)
+    if m:
+        candidates.append(_PARSER_DIR / f"parser_account_{m.group(1)}")
+
+    m_mig = re.match(r"^parser_account_migrated_(\d+)$", sn)
+    if m_mig:
+        try:
+            from parser.config.accounts import load_parser_account_configs
+
+            for cfg in load_parser_account_configs(3):
+                if cfg.index == int(m_mig.group(1)):
+                    candidates.append(cfg.session_path)
+                    break
+        except Exception:
+            pass
+
+    candidates.append(_PARSER_DIR / sn)
+
+    seen: set[str] = set()
+    for stem in candidates:
+        key = str(stem)
+        if key in seen:
+            continue
+        seen.add(key)
+        if Path(f"{stem}.session").is_file():
+            return stem
+    return None
+
+
+def _with_resolved_session(acc: PyrogramAccount) -> PyrogramAccount | None:
+    stem = resolve_session_stem(acc)
+    if stem is None:
+        return None
+    if stem == acc.session_path:
+        return acc
+    return PyrogramAccount(
+        id=acc.id,
+        label=acc.label,
+        api_id=acc.api_id,
+        api_hash=acc.api_hash,
+        phone=acc.phone,
+        session_path=stem,
+        priority=acc.priority,
+        telegram_id=acc.telegram_id,
+        username=acc.username,
+    )
+
+
+def diagnose_parser_accounts() -> dict[str, int]:
+    """Чому list_parser_accounts() може бути порожнім (для логів / сповіщень)."""
+    accounts_db.ensure_parser_accounts_table()
+    now = time.time()
+    rows = accounts_db.list_accounts(enabled_only=True)
+    out = {
+        "enabled": len(rows),
+        "active": 0,
+        "flooded": 0,
+        "pending": 0,
+        "disabled": 0,
+        "missing_session": 0,
+        "incomplete": 0,
+    }
+    for row in rows:
+        status = (row.get("status") or "active").strip().lower()
+        if status == "pending":
+            out["pending"] += 1
+            continue
+        if status == "disabled":
+            out["disabled"] += 1
+            continue
+        flood_until = float(row.get("flood_until") or 0)
+        if flood_until > now:
+            out["flooded"] += 1
+            continue
+        acc = _row_to_account(row, 0)
+        if not acc:
+            out["incomplete"] += 1
+            continue
+        if resolve_session_stem(acc) is None:
+            out["missing_session"] += 1
+            continue
+        out["active"] += 1
+    return out
+
 
 @dataclass(frozen=True)
 class PyrogramAccount:
@@ -85,16 +180,15 @@ def list_parser_accounts(*, include_flooded: bool = False) -> list[PyrogramAccou
             logger.warning("Дубль акаунта id=%s — пропуск", acc.id)
             continue
         seen.add(acc.dedupe_key)
-        # Сесія має існувати для парсингу
-        session_file = Path(f"{acc.session_path}.session")
-        if not session_file.is_file() and status != "pending":
+        resolved = _with_resolved_session(acc)
+        if not resolved:
             logger.warning(
-                "Немає файлу сесії для %s (%s) — пропуск",
+                "Немає файлу сесії для %s (очікувалось %s.session або legacy у bot/parser/) — пропуск",
                 acc.label,
-                session_file,
+                acc.session_path,
             )
             continue
-        out.append(acc)
+        out.append(resolved)
     return out
 
 

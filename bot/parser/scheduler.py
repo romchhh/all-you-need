@@ -13,6 +13,7 @@
 import asyncio
 import logging
 import os
+import time
 import traceback
 from pathlib import Path
 
@@ -40,6 +41,7 @@ async def run_parser_cycle(
     *,
     fetch_limit: int | None = None,
     ignore_cursor: bool = False,
+    scheduled: bool = False,
 ) -> dict | None:
     """Один повний цикл парсингу всіх каналів. Повертає stats або None при помилці."""
     if not BOT_TOKEN:
@@ -55,9 +57,26 @@ async def run_parser_cycle(
         notify_admin_group,
         notify_parser_channel_errors,
         notify_parser_error_admins,
+        notify_parser_scheduled_report,
     )
-    from parser.core.account_pool import list_parser_accounts
+    from parser.core.account_pool import diagnose_parser_accounts, list_parser_accounts
     from parser.core.session_lock import GLOBAL_PARSER_RUN_LOCK
+    from parser.storage.connection import ensure_parser_storage
+    from parser.storage.parser_accounts_db import get_meta, set_meta
+
+    _NO_ACCOUNTS_NOTIFY_COOLDOWN_SEC = 6 * 3600
+
+    async def _maybe_notify_no_accounts(details: str) -> None:
+        now = time.time()
+        try:
+            last = float(get_meta("parser_no_accounts_notify_at", "0") or "0")
+        except ValueError:
+            last = 0.0
+        if now - last < _NO_ACCOUNTS_NOTIFY_COOLDOWN_SEC:
+            logger.warning("Parser: %s (сповіщення адмінів пропущено — cooldown)", details)
+            return
+        set_meta("parser_no_accounts_notify_at", str(now))
+        await _notify_error("налаштування", details)
 
     aiogram_bot = Bot(token=BOT_TOKEN)
 
@@ -67,22 +86,51 @@ async def run_parser_cycle(
         except Exception as notify_err:
             logger.warning("Не вдалося сповістити адмінів про помилку парсера: %s", notify_err)
 
+    stats: dict | None = None
+    effective_limit: int | None = None
+    scheduled_skip_note: str | None = None
+
     try:
+        await asyncio.to_thread(ensure_parser_storage)
         accounts = list_parser_accounts()
         if not accounts:
-            msg = "Немає активних акаунтів парсера (Адмін → Парсер акаунти)"
-            logger.error(msg)
-            await _notify_error("налаштування", msg)
+            diag = diagnose_parser_accounts()
+            usable = diag["enabled"] - diag["pending"] - diag["disabled"]
+            if usable > 0 and diag["flooded"] >= usable:
+                scheduled_skip_note = (
+                    f"Усі {diag['flooded']} акаунт(ів) тимчасово на FLOOD_WAIT — цикл пропущено."
+                )
+                logger.info(
+                    "Плановий парсинг пропущено: усі %s акаунт(ів) на FLOOD_WAIT",
+                    diag["flooded"],
+                )
+                return None
+            if diag["enabled"] == 0:
+                msg = "Немає увімкнених акаунтів парсера (Адмін → Парсер акаунти)"
+            elif diag["missing_session"]:
+                msg = (
+                    f"У {diag['missing_session']} акаунт(ів) немає файлу .session "
+                    "(bot/parser/sessions/ або legacy bot/parser/parser_account_N.session). "
+                    "Адмін → Парсер акаунти"
+                )
+            elif diag["pending"]:
+                msg = (
+                    f"{diag['pending']} акаунт(ів) очікують завершення авторизації "
+                    "(Адмін → Парсер акаунти)"
+                )
+            else:
+                msg = "Немає активних акаунтів парсера (Адмін → Парсер акаунти)"
+            logger.error("%s (diag=%s)", msg, diag)
+            await _maybe_notify_no_accounts(msg)
             return None
 
         from parser.core.runner import ParseRunConfig, parse_run, run_all_channels
         from parser.core.services_ai_runner import ServicesParseRunConfig, services_parse_run
-        from parser.storage.connection import ensure_parser_storage, parser_db_cycle
+        from parser.storage.connection import parser_db_cycle
 
         async def notify_callback(item_data: dict):
             await notify_admin_group(aiogram_bot, item_data)
 
-        stats: dict | None = None
         run_cfg = None
         services_cfg = None
 
@@ -128,7 +176,7 @@ async def run_parser_cycle(
                     stats.get("channels", "?"),
                 )
                 channel_errors = stats.get("errors") or []
-                if channel_errors:
+                if channel_errors and not scheduled:
                     await notify_parser_channel_errors(aiogram_bot, channel_errors)
         except RuntimeError as e:
             logger.error("Сесія парсера зайнята: %s", e, exc_info=True)
@@ -141,6 +189,16 @@ async def run_parser_cycle(
             )
         return stats
     finally:
+        if scheduled:
+            try:
+                await notify_parser_scheduled_report(
+                    aiogram_bot,
+                    stats,
+                    lookback=effective_limit,
+                    skip_note=scheduled_skip_note,
+                )
+            except Exception as report_err:
+                logger.warning("Не вдалося надіслати звіт планового парсингу: %s", report_err)
         await aiogram_bot.session.close()
 
 
@@ -174,6 +232,7 @@ def register_parser_job(scheduler):
         replace_existing=True,
         misfire_grace_time=max(60, int(PARSER_INTERVAL_MIN * 60)),
         max_instances=1,
+        kwargs={"scheduled": True},
     )
     logger.info(f"✅ Parser scheduler зареєстровано (усі групи, інтервал: {PARSER_INTERVAL_MIN} хв)")
 
@@ -194,7 +253,7 @@ async def _standalone_loop():
         f"🚀 Парсер запущено в standalone-режимі. Інтервал: {PARSER_INTERVAL_MIN} хв."
     )
     while True:
-        await run_parser_cycle()
+        await run_parser_cycle(scheduled=True)
         logger.info(f"⏳ Наступний запуск через {PARSER_INTERVAL_MIN} хвилин...")
         await asyncio.sleep(interval_sec)
 

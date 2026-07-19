@@ -139,8 +139,24 @@ def strip_original_post_link_block(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
 
+def resolved_author_username(item: dict) -> str:
+    """@username автора з item або з тексту поста."""
+    author_username = (item.get("author_username") or "").strip().lstrip("@")
+    if not author_username:
+        author_username = (
+            extract_username_from_text(
+                str(item.get("raw_text") or ""),
+                str(item.get("source_channel") or ""),
+            )
+            or ""
+        ).lstrip("@")
+    return author_username
+
+
 def format_original_post_link_html(item: dict, lang: str | None = None) -> str:
-    """Приховане посилання на оригінал — текст з <a href>, без голого URL."""
+    """Посилання на оригінал — лише якщо немає @username автора."""
+    if resolved_author_username(item):
+        return ""
     msg_link = parsed_item_message_link(item)
     if not msg_link:
         return ""
@@ -157,8 +173,8 @@ def format_original_post_link_html(item: dict, lang: str | None = None) -> str:
 def build_marketplace_description(item: dict) -> str:
     """
     Опис для Listing на маркетплейсі:
-    - автор (@username), якщо відомий
-    - посилання на оригінальний пост (завжди, якщо є)
+    - @username автора, якщо відомий
+    - інакше посилання на оригінальний пост у каналі (якщо є)
     """
     base = enrich_description(item["title"], item["description"])
     base = strip_original_post_link_block(base)
@@ -166,22 +182,13 @@ def build_marketplace_description(item: dict) -> str:
         f"{item.get('title') or ''}\n{item.get('description') or ''}"
     )
 
-    author_username = (item.get("author_username") or "").strip().lstrip("@")
-    if not author_username:
-        author_username = (
-            extract_username_from_text(
-                str(item.get("raw_text") or ""),
-                str(item.get("source_channel") or ""),
-            )
-            or ""
-        ).lstrip("@")
+    author_username = resolved_author_username(item)
 
     extras: list[str] = []
+    msg_link = parsed_item_message_link(item)
     if author_username:
         extras.append(f"👤 Автор: @{author_username}")
-
-    msg_link = parsed_item_message_link(item)
-    if msg_link:
+    elif msg_link:
         label = (
             "Оригінальне оголошення"
             if lang == "uk"

@@ -24,18 +24,18 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readStoredTheme(): AppAppearance {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return 'dark';
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     if (v === 'light' || v === 'dark') return v;
   } catch {
     /* ignore */
   }
-  return 'light';
+  return 'dark';
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<AppAppearance>('light');
+  const [theme, setThemeState] = useState<AppAppearance>('dark');
 
   useLayoutEffect(() => {
     const stored = readStoredTheme();

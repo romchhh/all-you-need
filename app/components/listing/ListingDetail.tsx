@@ -30,6 +30,7 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { descriptionWithLinks } from '@/utils/descriptionLinks';
+import { formatListingDescriptionForDisplay } from '@/utils/listingDescriptionDisplay';
 import { useRouter, useParams } from 'next/navigation';
 import { FixedLogoHeader } from '@/components/layout/FixedLogoHeader';
 import { getCategories } from '@/constants/categories';
@@ -178,8 +179,12 @@ export const ListingDetail = ({
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
     return new URL(rawUrl, publicBaseUrl).toString();
   }, [listing.image, listing.images]);
+  const displayDescription = useMemo(
+    () => formatListingDescriptionForDisplay(listing.description || '', listing.seller.username),
+    [listing.description, listing.seller.username]
+  );
   const telegramShareDescription = useMemo(() => {
-    const raw = listing.description || '';
+    const raw = displayDescription;
     // Прибираємо службовий хвіст парсера (лінк на оригінал + канал-джерело)
     const cleaned = raw
       .replace(/🔗\s*Оригінальне оголошення:[\s\S]*$/i, '')
@@ -187,7 +192,7 @@ export const ListingDetail = ({
       .replace(/📢\s*Оголошення знайдено з\s*@[\w\d_]+[\s\S]*$/i, '')
       .replace(/📢\s*Объявление найдено из\s*@[\w\d_]+[\s\S]*$/i, '');
     return cleaned.replace(/\s+/g, ' ').trim().slice(0, 180);
-  }, [listing.description]);
+  }, [displayDescription]);
   
   // Визначення мобільної версії (безпечно для SSR)
   const [isMobile, setIsMobile] = useState(false);
@@ -994,7 +999,7 @@ export const ListingDetail = ({
               isLight ? 'text-gray-800' : 'text-white/95'
             }`}
           >
-            {descriptionWithLinks(listing.description || '')}
+            {descriptionWithLinks(displayDescription)}
           </div>
         </div>
 

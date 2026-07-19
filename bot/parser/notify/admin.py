@@ -27,6 +27,7 @@ from parser.config.settings import (
 )
 from parser.ai.screen import is_ai_screen_enabled
 from parser.core.telegram_meta import parsed_item_message_link
+from parser.moderation.formatting import resolved_author_username
 from parser.moderation.approve_routing import (
     is_services_moderation_chat,
     services_moderation_chat_ids,
@@ -147,15 +148,8 @@ def _format_admin_message(item: dict) -> str:
     else:
         price_display = "❓ Не вказана"
 
-    author = (item.get("author_username") or "").strip().lstrip("@")
+    author = resolved_author_username(item)
     author_id = item.get("author_id")
-    if author:
-        author_display = f'<a href="https://t.me/{html.escape(author)}">@{html.escape(author)}</a>'
-    elif author_id:
-        author_display = f'<a href="tg://user?id={int(author_id)}">автор</a>'
-    else:
-        author_display = "невідомий"
-
     channel = item.get("source_channel", "")
     msg_link = (
         item.get("msg_link")
@@ -163,6 +157,17 @@ def _format_admin_message(item: dict) -> str:
         or (f"https://t.me/{channel}" if channel else "")
     )
     msg_link_safe = html.escape(msg_link, quote=True) if msg_link else ""
+
+    if author:
+        author_display = f'<a href="https://t.me/{html.escape(author)}">@{html.escape(author)}</a>'
+    elif msg_link_safe:
+        author_display = (
+            f'<a href="{msg_link_safe}">Оригінальне повідомлення</a>'
+        )
+    elif author_id:
+        author_display = f'<a href="tg://user?id={int(author_id)}">автор</a>'
+    else:
+        author_display = "невідомий"
 
     title = html.escape(str(item.get("title") or "—"))
     description = str(item.get("description") or "")
@@ -190,8 +195,6 @@ def _format_admin_message(item: dict) -> str:
         f"👤 Автор: {author_display}",
         f"📢 Канал: @{html.escape(str(channel))}",
     ]
-    if msg_link_safe:
-        lines.append(f'🔗 <a href="{msg_link_safe}">Оригінальне повідомлення</a>')
     lines.extend(
         [
             f"",
@@ -363,6 +366,11 @@ def _parser_error_notify_enabled() -> bool:
     return raw not in ("0", "false", "no")
 
 
+def _parser_schedule_report_enabled() -> bool:
+    raw = (os.getenv("PARSER_SCHEDULE_REPORT_ADMINS") or "1").strip().lower()
+    return raw not in ("0", "false", "no")
+
+
 async def notify_parser_error_admins(bot: Bot, title: str, details: str) -> None:
     """Надсилає повідомлення про помилку парсера всім адмінам (config.administrators)."""
     if not _parser_error_notify_enabled():
@@ -414,3 +422,41 @@ async def notify_parser_channel_errors(
         "помилки каналів",
         "\n\n".join(lines) + extra,
     )
+
+
+async def notify_parser_scheduled_report(
+    bot: Bot,
+    stats: dict | None,
+    *,
+    lookback: int | None = None,
+    skip_note: str | None = None,
+) -> None:
+    """Звіт адмінам після планового циклу парсингу."""
+    if not _parser_schedule_report_enabled():
+        return
+
+    try:
+        from config import administrators
+    except Exception as e:
+        logger.warning("Не вдалося завантажити administrators: %s", e)
+        return
+
+    if not administrators:
+        return
+
+    from parser.notify.report import format_parser_stats
+
+    body = format_parser_stats(
+        stats,
+        scheduled=True,
+        lookback=lookback,
+        skip_note=skip_note,
+    )
+    if len(body) > 4000:
+        body = body[:4000] + "…"
+
+    for admin_id in administrators:
+        try:
+            await bot.send_message(admin_id, body, parse_mode="HTML")
+        except Exception as e:
+            logger.warning("Parser schedule report admin %s: %s", admin_id, e)
