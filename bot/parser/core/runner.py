@@ -14,7 +14,7 @@ from parser.config.channels import (
     normalize_channel_key,
 )
 from parser.moderation.approve_routing import notify_chat_for_parsed_item
-from parser.config.settings import FETCH_LIMIT
+from parser.config.settings import FETCH_LIMIT, PARSER_ROLLING_LOOKBACK
 from parser.core.channel_fetch import iter_new_channel_messages
 from parser.core.photos import download_photos
 from parser.core.quality import (
@@ -54,8 +54,9 @@ logger = logging.getLogger(__name__)
 class ParseRunConfig:
     fetch_limit: int | None = None
     ignore_cursor: bool = False
-    # False на lookback (/parse50): не різати за текстом інших постів — лише message_id / marketplace.
-    dedup_enabled: bool = True
+    # False за замовчуванням: text-dedup різав нові message_id з тим самим текстом.
+    # Завжди лишається dedup за message_id + активне оголошення на MP.
+    dedup_enabled: bool = False
 
 
 _default_run_config = ParseRunConfig()
@@ -79,6 +80,8 @@ async def parse_run(config: ParseRunConfig | None = None):
 def _active_fetch_options() -> tuple[int, bool]:
     if _run_config.fetch_limit is not None:
         return max(1, _run_config.fetch_limit), True
+    if PARSER_ROLLING_LOOKBACK > 0:
+        return PARSER_ROLLING_LOOKBACK, True
     return FETCH_LIMIT, False
 
 

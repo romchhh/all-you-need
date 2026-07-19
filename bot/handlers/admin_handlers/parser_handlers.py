@@ -30,8 +30,8 @@ def _has_parser_accounts() -> bool:
 
 def _parse_lookback(message: types.Message) -> int | None:
     """
-    /parse — інкрементально (cursor).
-    /parse10 або /parse 10 — останні N постів без cursor, dedup вимк.
+    /parse — останні PARSER_ROLLING_LOOKBACK постів (за замовч. 100).
+    /parse10 або /parse 10 — останні N постів.
     """
     text = (message.text or "").strip()
     if not text:
@@ -93,9 +93,14 @@ def _format_parser_stats(stats: dict | None) -> str:
         f"⏭ Пропущено: <b>{skipped}</b>",
     ]
     if lookback:
-        lines.append(f"📥 Останні <b>{lookback}</b> постів на канал (cursor ігноровано)")
+        lines.append(f"📥 Останні <b>{lookback}</b> постів на канал")
     else:
-        lines.append("📍 Інкрементально (cursor + overlap)")
+        from parser.config.settings import PARSER_ROLLING_LOOKBACK
+
+        if PARSER_ROLLING_LOOKBACK > 0:
+            lines.append(f"📥 Останні <b>{PARSER_ROLLING_LOOKBACK}</b> постів на канал")
+        else:
+            lines.append("📍 Інкрементально (cursor + overlap)")
     if channels is not None:
         lines.append(f"📢 Груп/каналів: <b>{channels}</b>")
 
@@ -119,12 +124,30 @@ def _format_parser_stats(stats: dict | None) -> str:
         "• Hamburg послуги → канал Hamburg + маркетплейс\n"
         "• Germany послуги → канал Germany + маркетплейс\n"
         "• Товари → лише маркетплейс\n\n"
-        "💡 <code>/parse</code> — лише нові після cursor (+overlap)\n"
-        "💡 <code>/parse50</code> — catch-up: останні 50 без cursor"
+        "💡 <code>/parse</code> — останні 100 постів на канал\n"
+        "💡 <code>/parse200</code> — глибший catch-up"
     )
-    if added == 0:
+    if added == 0 and reasons:
+        top_reason = max(reasons.items(), key=lambda x: x[1])[0]
+        if "дублікат (оголошення)" in top_reason:
+            lines.append("")
+            lines.append(
+                "ℹ️ Багато «дублікат (оголошення)» — увімкнено text-dedup "
+                "(<code>PARSER_DEDUP_ENABLED=1</code>). За замовч. він вимкнений."
+            )
+        elif "дублікат" in top_reason:
+            lines.append("")
+            lines.append(
+                "ℹ️ +0 нових — усі пости вже з message_id у БД або відфільтровані."
+            )
+        else:
+            lines.append("")
+            lines.append(
+                "Якщо очікували нові — спробуйте <code>/parse200</code> або перевірте фільтри."
+            )
+    elif added == 0:
         lines.append("")
-        lines.append("Якщо очікували нові оголошення — можливо вони вже в БД або канал без нових постів.")
+        lines.append("Якщо очікували нові оголошення — можливо канал без нових постів.")
 
     return "\n".join(lines)
 
@@ -149,13 +172,16 @@ async def _run_unified_parser(message: types.Message, *, lookback: int | None):
     if lookback:
         status_text = (
             f"🔍 <b>Парсинг усіх груп: останні {lookback} постів</b>\n\n"
-            "Cursor ігноровано. Оголошення розкидаються по групах модерації автоматично."
+            "Унікальні оголошення → групи модерації (дедуп увімкнено)."
         )
     else:
+        from parser.config.settings import PARSER_ROLLING_LOOKBACK
+
+        lb = PARSER_ROLLING_LOOKBACK or 100
         status_text = (
-            "🔍 <b>Запускаю парсинг усіх груп…</b>\n\n"
-            "Товари + послуги → відповідні групи модерації.\n"
-            "💡 <code>/parse10</code> — примусово останні 10 постів"
+            f"🔍 <b>Запускаю парсинг усіх груп…</b>\n\n"
+            f"Останні <b>{lb}</b> постів на канал (нові message_id → модерація).\n"
+            "💡 <code>/parse200</code> — глибший catch-up"
         )
     status_msg = await message.answer(status_text, parse_mode="HTML")
 

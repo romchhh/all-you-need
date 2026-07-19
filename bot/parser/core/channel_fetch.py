@@ -31,6 +31,11 @@ async def iter_new_channel_messages(
     Інакше — новіші за cursor, плюс overlap (перечитати останні N на випадок збоїв).
     """
     apply_pyrogram_photo_size_patch()
+    if chat_target is None:
+        raise RuntimeError(
+            f"{source_channel}: chat_target=None "
+            f"(invite не зарезолвився в numeric id)"
+        )
     limit = max(1, int(fetch_limit or FETCH_LIMIT))
     stored_cursor = 0
     if not ignore_cursor:

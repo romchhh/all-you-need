@@ -19,7 +19,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from parser.config.settings import (
+    FETCH_LIMIT,
+    PARSER_DEDUP_ENABLED,
     PARSER_INTERVAL_MIN,
+    PARSER_ROLLING_LOOKBACK,
 )
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -82,28 +85,37 @@ async def run_parser_cycle(
         stats: dict | None = None
         run_cfg = None
         services_cfg = None
-        if fetch_limit is not None:
+
+        effective_limit = fetch_limit
+        if effective_limit is None and PARSER_ROLLING_LOOKBACK > 0:
+            effective_limit = PARSER_ROLLING_LOOKBACK
+        elif effective_limit is None and ignore_cursor:
+            effective_limit = FETCH_LIMIT
+
+        if effective_limit:
             run_cfg = ParseRunConfig(
-                fetch_limit=fetch_limit,
+                fetch_limit=effective_limit,
                 ignore_cursor=True,
-                dedup_enabled=False,
+                dedup_enabled=PARSER_DEDUP_ENABLED,
             )
-            services_cfg = ServicesParseRunConfig(fetch_limit=fetch_limit, ignore_cursor=True)
-        elif ignore_cursor:
-            run_cfg = ParseRunConfig(ignore_cursor=True, dedup_enabled=False)
-            services_cfg = ServicesParseRunConfig(ignore_cursor=True)
+            services_cfg = ServicesParseRunConfig(
+                fetch_limit=effective_limit,
+                ignore_cursor=True,
+            )
         try:
             async with GLOBAL_PARSER_RUN_LOCK:
                 with parser_db_cycle():
                     await asyncio.to_thread(ensure_parser_storage)
-                    if fetch_limit:
+                    if effective_limit:
+                        dedup_note = "dedup увімкнено" if PARSER_DEDUP_ENABLED else "dedup вимкнено (лише message_id)"
                         logger.info(
-                            "🔍 Парсинг усіх груп (lookback %s постів, cursor ігноровано)…",
-                            fetch_limit,
+                            "🔍 Парсинг усіх груп (останні %s постів, %s)…",
+                            effective_limit,
+                            dedup_note,
                         )
                     else:
                         logger.info(
-                            "🔍 Починаємо парсинг усіх груп (%s Telegram-акаунт(ів))…",
+                            "🔍 Починаємо парсинг усіх груп (%s Telegram-акаунт(ів), cursor)…",
                             len(accounts),
                         )
                     async with parse_run(run_cfg):

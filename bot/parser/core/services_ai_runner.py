@@ -15,6 +15,7 @@ from parser.config.channels import (
     normalize_channel_key,
 )
 from parser.config.settings import (
+    PARSER_ROLLING_LOOKBACK,
     PARSER_SERVICES_FETCH_LIMIT,
     PARSER_SERVICES_IGNORE_CURSOR,
 )
@@ -78,6 +79,8 @@ async def services_parse_run(config: ServicesParseRunConfig | None = None):
 def _active_fetch_options() -> tuple[int, bool]:
     if _run_config.fetch_limit is not None:
         return max(1, _run_config.fetch_limit), True
+    if PARSER_ROLLING_LOOKBACK > 0:
+        return PARSER_ROLLING_LOOKBACK, True
     return PARSER_SERVICES_FETCH_LIMIT, PARSER_SERVICES_IGNORE_CURSOR
 
 

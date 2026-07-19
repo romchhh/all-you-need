@@ -57,8 +57,11 @@ PARSER_SERVICES_FETCH_LIMIT: int = max(
 PARSER_SERVICES_IGNORE_CURSOR: bool = _env_bool("PARSER_SERVICES_IGNORE_CURSOR", False)
 # Скільки останніх message_id перечитати поверх cursor (пропущені через збій / гонки).
 PARSER_CURSOR_OVERLAP: int = max(0, _env_int("PARSER_CURSOR_OVERLAP", 25))
+# Звичайний /parse і шедулер: завжди останні N постів (ignore cursor).
+# 0 = режим cursor+overlap (лише нові message_id після cursor).
+PARSER_ROLLING_LOOKBACK: int = max(0, _env_int("PARSER_ROLLING_LOOKBACK", 100))
 
-PARSER_DEDUP_ENABLED: bool = _env_bool("PARSER_DEDUP_ENABLED", True)
+PARSER_DEDUP_ENABLED: bool = _env_bool("PARSER_DEDUP_ENABLED", False)
 PARSER_SERVICES_DEDUP_ENABLED: bool = _env_bool("PARSER_SERVICES_DEDUP_ENABLED", True)
 PARSER_DEDUP_DAYS: int = max(1, _env_int("PARSER_DEDUP_DAYS", 14))
 # Вікно dedup_key (title+desc+price) для services_channel approved без MP
