@@ -1039,7 +1039,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         
         <button
           onClick={() => {
-            const supportManager = process.env.NEXT_PUBLIC_SUPPORT_MANAGER || 'https://t.me/opluger';
+            const supportManager = process.env.NEXT_PUBLIC_SUPPORT_MANAGER || 'https://t.me/tradeground_seller2';
             if (tg && tg.openTelegramLink) {
               tg.openTelegramLink(supportManager);
               tg.HapticFeedback?.impactOccurred('medium');
