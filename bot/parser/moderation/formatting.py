@@ -13,10 +13,32 @@ from aiogram.types import Message
 
 from parser.category_keywords import get_category_label, get_subcategory_label
 from parser.config.settings import BOT_USERNAME, WEBAPP_URL
-from parser.core.telegram_meta import extract_username_from_text, parsed_item_message_link
+from parser.core.telegram_meta import (
+    extract_username_from_text,
+    message_link,
+    normalize_channel_key,
+    parsed_item_message_link,
+)
 from parser.core.text import detect_lang, enrich_description
 
 logger = logging.getLogger(__name__)
+
+
+def _source_channel_url(item: dict) -> str:
+    """Посилання на канал/групу-джерело (без message_id), якщо можливо."""
+    source = (item.get("source_channel") or "").strip()
+    if not source:
+        return ""
+    clean = normalize_channel_key(source)
+    lower = clean.lower()
+    if lower.startswith("t.me/+") or lower.startswith("t.me/joinchat/"):
+        return f"https://{clean}"
+    if lower.startswith("t.me/"):
+        return f"https://{clean.split('/', 1)[0]}/{clean.split('/', 1)[1].split('/')[0]}"
+    name = clean.lstrip("@").split("/")[0]
+    if not name or name.isdigit() or name.startswith("-"):
+        return ""
+    return f"https://t.me/{name}"
 
 
 # ── URLs ──────────────────────────────────────
@@ -174,7 +196,7 @@ def build_marketplace_description(item: dict) -> str:
     """
     Опис для Listing на маркетплейсі:
     - @username автора, якщо відомий
-    - інакше посилання на оригінальний пост у каналі (якщо є)
+    - інакше посилання на оригінальний пост / канал-джерело
     """
     base = enrich_description(item["title"], item["description"])
     base = strip_original_post_link_block(base)
@@ -186,6 +208,18 @@ def build_marketplace_description(item: dict) -> str:
 
     extras: list[str] = []
     msg_link = parsed_item_message_link(item)
+    if not msg_link:
+        # msg_link у item або зібрати з source_channel + message_id
+        mid = item.get("message_id")
+        source = (item.get("source_channel") or "").strip()
+        if source and mid is not None:
+            try:
+                msg_link = message_link(source, int(mid))
+            except (TypeError, ValueError):
+                msg_link = None
+    if not msg_link:
+        msg_link = _source_channel_url(item) or None
+
     if author_username:
         extras.append(f"👤 Автор: @{author_username}")
     elif msg_link:
