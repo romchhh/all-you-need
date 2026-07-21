@@ -249,6 +249,12 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         base_name = f"{chan_slug}_{effective_message_id}"
         images = await download_photos(app, photos, base_name, max_photos=3)
 
+        post_msg_link = message_link(
+            channel,
+            effective_message_id,
+            chat_id=chat_target if isinstance(chat_target, int) else None,
+        )
+
         # AI міг визначити товар у послуговому каналі — не лишаємо services_channel
         final_parser_type = (
             PARSER_TYPE_SERVICES_CHANNEL
@@ -278,6 +284,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             dedup_key=dedup_key,
             parser_type=final_parser_type,
             text_embedding=embedding_json,
+            msg_link=post_msg_link,
         )
 
         if item_id:
@@ -299,11 +306,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
                 "location": location,
                 "images": images,
                 "raw_text": text[:4000],
-                "msg_link": message_link(
-                    channel,
-                    effective_message_id,
-                    chat_id=chat_target if isinstance(chat_target, int) else None,
-                ),
+                "msg_link": post_msg_link,
                 "parser_type": PARSER_TYPE_SERVICES_CHANNEL,
             }
             try:

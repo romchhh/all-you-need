@@ -28,7 +28,9 @@ from parser.core.location import resolve_parsed_location
 from parser.moderation.formatting import (
     build_marketplace_description,
     edit_group_message,
+    ensure_marketplace_description_has_source,
     listing_miniapp_url,
+    preserve_parsed_source_fields,
 )
 from parser.moderation.services_publish import (
     format_services_channels_labels,
@@ -122,6 +124,7 @@ async def _approve_services_both(
     )
     listing_item = apply_marketplace_categories_to_item(listing_item)
     listing_item = _force_listing_location(listing_item)
+    listing_item = preserve_parsed_source_fields(listing_item, item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
     if item_category != "services_work":
@@ -139,7 +142,10 @@ async def _approve_services_both(
         user_id = get_or_create_bot_user(8590825131, "parser_bot", "Parser Bot")
 
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
-    description = build_marketplace_description(listing_item)
+    description = ensure_marketplace_description_has_source(
+        build_marketplace_description(listing_item),
+        listing_item,
+    )
 
     dedup_key = fingerprint_title_desc(
         str(listing_item.get("title") or ""),
@@ -272,6 +278,7 @@ async def _approve_marketplace(
     )
     listing_item = apply_marketplace_categories_to_item(listing_item)
     listing_item = _force_listing_location(listing_item)
+    listing_item = preserve_parsed_source_fields(listing_item, item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
     pool = list_parser_accounts()
@@ -288,7 +295,10 @@ async def _approve_marketplace(
         user_id = get_or_create_bot_user(8590825131, "parser_bot", "Parser Bot")
 
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
-    description = build_marketplace_description(listing_item)
+    description = ensure_marketplace_description_has_source(
+        build_marketplace_description(listing_item),
+        listing_item,
+    )
 
     dedup_key = fingerprint_title_desc(
         str(listing_item.get("title") or ""),

@@ -180,8 +180,13 @@ export const ListingDetail = ({
     return new URL(rawUrl, publicBaseUrl).toString();
   }, [listing.image, listing.images]);
   const displayDescription = useMemo(
-    () => formatListingDescriptionForDisplay(listing.description || '', listing.seller.username),
-    [listing.description, listing.seller.username]
+    () =>
+      formatListingDescriptionForDisplay(
+        listing.description || '',
+        listing.seller.username,
+        listing.seller.telegramId
+      ),
+    [listing.description, listing.seller.username, listing.seller.telegramId]
   );
   const telegramShareDescription = useMemo(() => {
     const raw = displayDescription;

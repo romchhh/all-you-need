@@ -238,6 +238,12 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
         base_name = f"{chan_slug}_{effective_message_id}"
         images = await download_photos(app, photos, base_name, max_photos=3)
 
+        post_msg_link = message_link(
+            channel,
+            effective_message_id,
+            chat_id=chat_target if isinstance(chat_target, int) else None,
+        )
+
         item_id = insert_parsed_item(
             source_channel=channel,
             source_city=source_city,
@@ -259,6 +265,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             content_hash=content_hash,
             dedup_key=dedup_key,
             text_embedding=embedding_json,
+            msg_link=post_msg_link,
         )
 
         if item_id:
@@ -280,11 +287,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
                 "location": location,
                 "images": images,
                 "raw_text": text[:4000],
-                "msg_link": message_link(
-                    channel,
-                    effective_message_id,
-                    chat_id=chat_target if isinstance(chat_target, int) else None,
-                ),
+                "msg_link": post_msg_link,
                 "notify_chat_id": notify_chat_for_parsed_item(
                     {
                         "category": category,

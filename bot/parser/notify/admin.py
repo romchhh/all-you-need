@@ -161,9 +161,7 @@ def _format_admin_message(item: dict) -> str:
     if author:
         author_display = f'<a href="https://t.me/{html.escape(author)}">@{html.escape(author)}</a>'
     elif msg_link_safe:
-        author_display = (
-            f'<a href="{msg_link_safe}">Оригінальне повідомлення</a>'
-        )
+        author_display = f'немає @ — <a href="{msg_link_safe}">оригінальний пост</a>'
     elif author_id:
         author_display = f'<a href="tg://user?id={int(author_id)}">автор</a>'
     else:

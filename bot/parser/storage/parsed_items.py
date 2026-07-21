@@ -264,6 +264,10 @@ def ensure_parsed_items_table():
         cursor.execute(
             "ALTER TABLE parsed_items ADD COLUMN channel_mod_status TEXT DEFAULT 'pending'"
         )
+    cursor.execute("PRAGMA table_info(parsed_items)")
+    col_names7 = {row[1] for row in cursor.fetchall()}
+    if "msg_link" not in col_names7:
+        cursor.execute("ALTER TABLE parsed_items ADD COLUMN msg_link TEXT")
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_parsed_items_admin_msg_channel "
         "ON parsed_items(admin_message_id_channel) WHERE admin_message_id_channel IS NOT NULL"
@@ -534,6 +538,7 @@ def insert_parsed_item(
     dedup_key: Optional[str] = None,
     parser_type: str = "default",
     text_embedding: Optional[str] = None,
+    msg_link: Optional[str] = None,
 ) -> int:
     from parser.core.location import channel_city_from_source, resolve_parsed_location
 
@@ -554,15 +559,15 @@ def insert_parsed_item(
             author_username, author_id,
             title, description, price, currency, is_free,
             category, subcategory, condition, location,
-            images_json, raw_text, content_hash, dedup_key, parser_type, text_embedding, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            images_json, raw_text, content_hash, dedup_key, parser_type, text_embedding, msg_link, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     """, (
         source_channel, source_city, message_id, media_group_id,
         author_username, author_id,
         title, description, price, currency, int(is_free),
         category, subcategory, condition, location,
         json.dumps(images, ensure_ascii=False), raw_text, content_hash, dedup_key, parser_type,
-        text_embedding,
+        text_embedding, (msg_link or "").strip() or None,
     ))
     conn.commit()
     item_id = cursor.lastrowid

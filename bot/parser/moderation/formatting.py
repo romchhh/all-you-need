@@ -161,9 +161,22 @@ def strip_original_post_link_block(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
 
+def _source_channel_slug(item: dict) -> str:
+    source = (item.get("source_channel") or "").strip()
+    if not source:
+        return ""
+    clean = normalize_channel_key(source)
+    if clean.lower().startswith("t.me/"):
+        return clean.rsplit("/", 1)[-1].lower()
+    return clean.lstrip("@").split("/")[0].lower()
+
+
 def resolved_author_username(item: dict) -> str:
-    """@username автора з item або з тексту поста."""
+    """@username автора з item або з тексту поста (не @ каналу-джерела)."""
+    channel_slug = _source_channel_slug(item)
     author_username = (item.get("author_username") or "").strip().lstrip("@")
+    if author_username and channel_slug and author_username.lower() == channel_slug:
+        author_username = ""
     if not author_username:
         author_username = (
             extract_username_from_text(
@@ -172,7 +185,88 @@ def resolved_author_username(item: dict) -> str:
             )
             or ""
         ).lstrip("@")
+    if author_username and channel_slug and author_username.lower() == channel_slug:
+        return ""
     return author_username
+
+
+def resolve_marketplace_post_link(item: dict) -> str:
+    """URL оригінального поста або канал-джерело."""
+    link = (item.get("msg_link") or "").strip()
+    if link:
+        return link
+    link = parsed_item_message_link(item) or ""
+    if link:
+        return link
+    mid = item.get("message_id")
+    source = (item.get("source_channel") or "").strip()
+    if source and mid is not None:
+        try:
+            return message_link(source, int(mid))
+        except (TypeError, ValueError):
+            pass
+    return _source_channel_url(item)
+
+
+def marketplace_author_source_footer(item: dict) -> str:
+    """Рядок @автора або 🔗 посилання для кінця опису Listing."""
+    lang = detect_lang(
+        f"{item.get('title') or ''}\n{item.get('description') or ''}"
+    )
+    author_username = resolved_author_username(item)
+    if author_username:
+        return f"👤 Автор: @{author_username}"
+    msg_link = resolve_marketplace_post_link(item)
+    if not msg_link:
+        return ""
+    label = (
+        "Оригінальне оголошення"
+        if lang == "uk"
+        else "Оригинальное объявление"
+    )
+    return f"🔗 {label}: {msg_link}"
+
+
+def ensure_marketplace_description_has_source(description: str, item: dict) -> str:
+    """Гарантує @автора або 🔗 посилання в описі (на approve)."""
+    footer = marketplace_author_source_footer(item)
+    if not footer:
+        return (description or "").strip()
+    body = (description or "").strip()
+    if re.search(r"👤\s*(?:Автор|Author):\s*@", body, re.I):
+        return body
+    if re.search(
+        r"🔗\s*(?:Оригінальне|Оригинальное|Original)",
+        body,
+        re.I,
+    ):
+        return body
+    if not body:
+        return footer
+    return f"{body}\n\n{footer}"
+
+
+def preserve_parsed_source_fields(enriched: dict, source: dict) -> dict:
+    """Після AI enrich не губимо source_channel / message_id / автора."""
+    out = dict(enriched)
+    for key in (
+        "id",
+        "source_channel",
+        "source_city",
+        "message_id",
+        "media_group_id",
+        "author_username",
+        "author_id",
+        "raw_text",
+        "msg_link",
+        "parser_type",
+        "images_json",
+        "content_hash",
+        "dedup_key",
+    ):
+        if key in source and source.get(key) is not None:
+            out[key] = source[key]
+    return out
 
 
 def format_original_post_link_html(item: dict, lang: str | None = None) -> str:
@@ -196,41 +290,12 @@ def build_marketplace_description(item: dict) -> str:
     """
     Опис для Listing на маркетплейсі:
     - @username автора, якщо відомий
-    - інакше посилання на оригінальний пост / канал-джерело
+    - інакше посилання на оригінальний post / канал-джерело
     """
     base = enrich_description(item["title"], item["description"])
     base = strip_original_post_link_block(base)
-    lang = detect_lang(
-        f"{item.get('title') or ''}\n{item.get('description') or ''}"
-    )
-
-    author_username = resolved_author_username(item)
-
-    extras: list[str] = []
-    msg_link = parsed_item_message_link(item)
-    if not msg_link:
-        # msg_link у item або зібрати з source_channel + message_id
-        mid = item.get("message_id")
-        source = (item.get("source_channel") or "").strip()
-        if source and mid is not None:
-            try:
-                msg_link = message_link(source, int(mid))
-            except (TypeError, ValueError):
-                msg_link = None
-    if not msg_link:
-        msg_link = _source_channel_url(item) or None
-
-    if author_username:
-        extras.append(f"👤 Автор: @{author_username}")
-    elif msg_link:
-        label = (
-            "Оригінальне оголошення"
-            if lang == "uk"
-            else "Оригинальное объявление"
-        )
-        extras.append(f"🔗 {label}: {msg_link}")
-
-    parts = [base, *extras]
+    footer = marketplace_author_source_footer(item)
+    parts = [base, footer]
     return "\n\n".join(p for p in parts if p)
 
 
