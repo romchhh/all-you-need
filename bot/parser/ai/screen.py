@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from parser.ai.enrich import (
     AiEnrichmentResult,
     _normalize_price_fields,
+    _prefer_full_description,
     _validate_condition,
     _validate_location,
     is_ai_enrich_enabled,
@@ -51,7 +52,7 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
     from parser.core.location import is_local_source_city
     from parser.marketplace_categories import marketplace_taxonomy_for_ai
 
-    raw_text = (item.get("raw_text") or "")[:2800]
+    raw_text = (item.get("raw_text") or "")[:4000]
     pending = context.get("pending_titles") or []
     active = context.get("active_listings") or []
     channel_city = str(item.get("source_city") or "")
@@ -80,7 +81,7 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
 
 Подсказки парсера:
 - title: {item.get("title") or ""}
-- description: {(item.get("description") or "")[:400]}
+- description: {(item.get("description") or "")[:800]}
 - category: {item.get("category")}/{item.get("subcategory")}
 - канал: {item.get("source_channel")}, город: {channel_city} ({"ЛОКАЛЬНЫЙ" if local_channel else "ОБЩИЙ по Германии"})
 
@@ -105,8 +106,12 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
 3. accept=true ТОЛЬКО если есть конкретное предложение:
    - товар (продажа / отдам / обмен) ИЛИ
    - услуга (красота, ремонт, обучение, работа мастера и т.п. с оффером)
-4. Если accept=true — улучши title (рус, до 80 симв), description (рус, чистый текст),
-   category/subcategory, price, location, condition.
+4. Если accept=true — улучши поля:
+   - title (рус, 4–80): суть товара/услуги; БЕЗ цены, города, приветствий («Здравствуйте»), «продам»
+   - description (рус): полный смысл поста, не урезай важное (можно 800–2000 символов)
+   - category/subcategory: услуги → services_work + подкатегория; вакансии НЕ fashion;
+     товары → electronics/fashion/… + подкатегория
+   - price, location, condition
    {location_hint}
    Услуги без цены → price=null, is_free=false; condition для услуг всегда "new".
 
@@ -159,8 +164,8 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
             ],
             response_format={"type": "json_object"},
             temperature=0.1,
-            max_tokens=1100,
-            timeout=55,
+            max_tokens=2200,
+            timeout=70,
         )
     except Exception as e:
         logger.warning("AI screen failed (пропускаємо): %s", e)
@@ -197,7 +202,12 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
     if not title or title == "Объявление":
         title = clean_title(str(item.get("title") or ""), raw_text)
 
-    description = str(data.get("description") or item.get("description") or "").strip()
+    description = _prefer_full_description(
+        str(data.get("description") or ""),
+        str(item.get("description") or ""),
+        raw_text,
+        title,
+    )
     category, subcategory = resolve_marketplace_category(
         str(data.get("category") or ""),
         data.get("subcategory"),

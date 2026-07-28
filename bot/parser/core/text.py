@@ -55,16 +55,30 @@ def _is_generic_title(title: str) -> bool:
 
 
 def extract_title(text: str) -> str:
+    from parser.core.patterns import GREETING_TITLE_RE
+    from parser.marketplace_categories import clean_title
+
     text = text.strip()
+    lines = [ln.strip() for ln in re.split(r"\n+", text) if ln.strip()]
+    candidates: list[str] = []
+
     first = re.split(r"[\n!?]|(?<=[.])\s", text, maxsplit=1)[0].strip()
-    if _is_generic_title(first):
-        rest = text[len(first):].lstrip()
-        for line in re.split(r"\n+", rest):
-            line = line.strip()
-            if len(line) >= 2 and not _is_generic_title(line) and len(line) <= 200:
-                first = line
-                break
-    return first[:97].rstrip() + "…" if len(first) > 100 else first
+    if first:
+        candidates.append(first)
+    candidates.extend(lines[:5])
+
+    for cand in candidates:
+        # Пропустити чисті привітання / «продам»
+        stripped = GREETING_TITLE_RE.sub("", cand).strip()
+        if not stripped or _is_generic_title(stripped) or _is_generic_title(cand):
+            continue
+        cleaned = clean_title(cand, "")
+        if cleaned and cleaned != "Объявление" and len(cleaned) >= 4:
+            return cleaned[:97].rstrip() + "…" if len(cleaned) > 100 else cleaned
+
+    # Fallback: перший рядок після clean
+    cleaned = clean_title(first or (lines[0] if lines else ""), text)
+    return cleaned[:97].rstrip() + "…" if len(cleaned) > 100 else cleaned
 
 
 def extract_description(text: str, title: str) -> str:

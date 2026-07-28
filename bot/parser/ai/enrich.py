@@ -55,6 +55,42 @@ NEGOTIABLE_PRICES = frozenset({
 })
 
 
+def _prefer_full_description(
+    ai_desc: str,
+    parser_desc: str,
+    raw_text: str,
+    title: str,
+) -> str:
+    """
+    Якщо AI сильно обрізав опис — беремо довший осмислений варіант з парсера/raw.
+    """
+    ai = (ai_desc or "").strip()
+    parser = (parser_desc or "").strip()
+    raw = (raw_text or "").strip()
+
+    # Прибрати title з початку raw для порівняння обсягу
+    raw_body = raw
+    t = (title or "").strip()
+    if t and raw_body.lower().startswith(t.lower()[:40].lower()):
+        raw_body = raw_body[len(t):].lstrip(" .,\n")
+
+    candidates = [c for c in (ai, parser, raw_body, raw) if c]
+    if not candidates:
+        return ai or parser or raw
+
+    # Якщо AI-опис ≥ 55% від raw — ок; інакше беремо найдовший розумний
+    baseline = max(len(raw_body), len(parser), 1)
+    if ai and len(ai) >= max(180, int(baseline * 0.55)):
+        return ai
+
+    best = max(candidates, key=len)
+    # Не підставляти гігантський сирий пост з купою сміття без потреби
+    if best is raw or best is raw_body:
+        if len(best) > 3500:
+            best = best[:3500].rsplit("\n", 1)[0].strip() or best[:3500]
+    return best.strip()
+
+
 @dataclass
 class AiEnrichmentResult:
     title: str
@@ -161,7 +197,7 @@ def _build_prompt(item: dict) -> str:
     from parser.core.location import is_local_source_city
 
     channel_city = item.get("source_city") or item.get("location") or ""
-    raw_text = (item.get("raw_text") or "")[:2500]
+    raw_text = (item.get("raw_text") or "")[:4000]
     parser_cat = item.get("category") or ""
     parser_sub = item.get("subcategory") or ""
     local_channel = is_local_source_city(str(channel_city))
@@ -200,14 +236,22 @@ def _build_prompt(item: dict) -> str:
 Города (канонические): {", ".join(GERMAN_CITIES[:40])}, …
 
 Правила:
-1. title — на РУССКОМ, до 80 символов. Конкретное название товара/услуги: бренд, модель, тип.
-   НЕ начинай с «продам/продаю/отдам», без эмодзи и хештегов. Не копируй первую строку поста дословно.
-2. description — на РУССКОМ (переведи с украинского если нужно). Чистый текст: что продаётся,
-   состояние, комплектация, цена если есть. Без ссылок на канал, без «пишите в лс», без хештегов.
+1. title — на РУССКОМ, 4–80 символов. Суть товара/услуги: бренд, модель, тип услуги.
+   ЗАПРЕЩЕНО в title: цена (€/EUR/числа с валютой), город, индекс PLZ,
+   приветствия («Здравствуйте», «Добрый день», «Привет»), «продам/продаю/отдам», эмодзи, хештеги.
+   Для УСЛУГ: краткая суть («Маникюр гель-лак», «Ремонт стиральных машин», «Репетитор по математике»),
+   НЕ копируй первую строку поста если это приветствие.
+2. description — на РУССКОМ (переведи с украинского если нужно). СОХРАНИ всю важную информацию
+   из raw_text: условия, прайс, детали, опыт, контакты-смысл. НЕ сокращай сильно —
+   если пост длинный, description тоже должен быть полным (можно 800–2000 символов).
+   Без ссылок на канал, без «пишите в лс»/хештегов, без дублирования title в первой строке.
 3. category/subcategory — самые точные id из списка маркетплейса выше.
    Обязательно укажи подкатегорию (subcategory), не оставляй только category.
-   Услуги (маникюр, ремонт, репетитор) → services_work + нужная подкатегория.
+   Услуги (маникюр, ремонт, репетитор, клининг, перевозки) → services_work + нужная подкатегория
+   (beauty_health, repair_installation, cleaning, education_tutors, …).
+   Вакансии / поиск работы → services_work + vacancies|part_time|looking_for_work (НЕ fashion!).
    Товары → соответствующий раздел (electronics, fashion, kids, furniture и т.д.) + подкатегория.
+   НЕ ставь fashion/одежду, если пост — услуга, вакансия или работа.
 4. price — число строкой ("25" или "25.50"); если цены нет → null (договорная).
 5. is_free — true ТОЛЬКО если в тексте явно «бесплатно/віддам/даром/free». Для услуг без цены is_free=false.
 6. currency — EUR по умолчанию; UAH только если явно грн.
@@ -249,8 +293,9 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
                     "role": "system",
                     "content": (
                         "Ты модератор маркетплейса Trade Ground для рус/укр аудитории в Германии. "
-                        "Улучшай объявления с барахолок: точный заголовок на русском, описание на русском, "
-                        "правильная категория из списка id, цена, город. "
+                        "Улучшай объявления: точный заголовок БЕЗ цены/города/приветствия, "
+                        "полное описание на русском (не обрезай важное), "
+                        "правильная категория из списка id (услуги ≠ одежда/fashion). "
                         "Отвечай только валидным JSON без markdown."
                     ),
                 },
@@ -258,8 +303,8 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
             ],
             response_format={"type": "json_object"},
             temperature=0.15,
-            max_tokens=1200,
-            timeout=60,
+            max_tokens=2500,
+            timeout=90,
         )
     except Exception as e:
         logger.error("OpenAI enrich failed: %s", e, exc_info=True)
@@ -277,7 +322,12 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
     if not title or title == "Объявление":
         title = clean_title(str(item.get("title") or ""), raw_text)
 
-    description = str(data.get("description") or item.get("description") or "").strip()
+    description = _prefer_full_description(
+        str(data.get("description") or ""),
+        str(item.get("description") or ""),
+        raw_text,
+        title,
+    )
 
     category, subcategory = resolve_marketplace_category(
         str(data.get("category") or ""),

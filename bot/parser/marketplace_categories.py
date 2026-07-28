@@ -122,6 +122,9 @@ PARSER_TO_MARKETPLACE: dict[tuple[str, str | None], tuple[str, str | None]] = {
     ("services_work", "beauty_services"): ("services_work", "beauty_health"),
     ("services_work", "it_services"): ("services_work", "it_design_websites"),
     ("services_work", "other_services"): ("services_work", "other_services"),
+    ("services_work", "vacancies"): ("services_work", "vacancies"),
+    ("services_work", "looking_for_work"): ("services_work", "looking_for_work"),
+    ("services_work", "part_time"): ("services_work", "part_time"),
     ("services_work", None): ("services_work", "services"),
     ("clothing", "womens"): ("fashion", "women_clothing"),
     ("clothing", "mens"): ("fashion", "men_clothing"),
@@ -199,7 +202,8 @@ PARSER_TO_MARKETPLACE: dict[tuple[str, str | None], tuple[str, str | None]] = {
     ("free_stuff", "giveaway"): ("free", None),
     ("free_stuff", "exchange"): ("free", None),
     ("free_stuff", None): ("free", None),
-    ("other", None): ("fashion", "other"),
+    # Невідома категорія — не fashion (інакше вакансії/сміття стають «Мода»)
+    ("other", None): ("home", "other"),
 }
 
 # Ключові слова → id підкатегорії маркетплейсу (для уточнення після AI / парсера)
@@ -267,9 +271,13 @@ MARKETPLACE_SUB_KEYWORDS: dict[str, dict[str, list[str]]] = {
         "education_tutors": ["репетитор", "репетит", "урок", "обучен", "навчан"],
         "translations": ["перевод", "переклад", "translator"],
         "auto_services": ["автосервис", "автосервіс", "шиномонтаж", "sto "],
-        "vacancies": ["ваканс", "ищу работ", "шукаю робот", "job"],
-        "part_time": ["подработ", "підробіт"],
-        "looking_for_work": ["ищу работ", "шукаю робот"],
+        "vacancies": [
+            "ваканс", "ищу работ", "шукаю робот", "job", "сотрудник", "працівник",
+            "требуется", "потрібен", "на постоянку", "полная занятость",
+        ],
+        "part_time": ["подработ", "підробіт", "part time", "nebenjob"],
+        "looking_for_work": ["ищу работ", "шукаю робот", "ищу подработ", "шукаю підробіт"],
+        "consultations": ["консультац", "юрист", "адвокат", "психолог"],
     },
     "beauty_wellness": {
         "cosmetics": ["косметик", "крем", "макияж", "мейкап"],
@@ -407,6 +415,19 @@ def map_parser_to_marketplace(
     p_cat = (parser_category or "other").strip().lower()
     p_sub = (parser_subcategory or "").strip() or None
 
+    # Уже marketplace id (після AI / повторного resolve)
+    if p_cat in MARKETPLACE_TAXONOMY:
+        subs = MARKETPLACE_TAXONOMY[p_cat]
+        if subs is None:
+            return p_cat, None
+        if p_sub and p_sub in subs:
+            return p_cat, p_sub
+        if "other" in subs:
+            return p_cat, "other"
+        if "services" in subs:
+            return p_cat, "services"
+        return p_cat, next(iter(subs)) if subs else None
+
     key = (p_cat, p_sub)
     if key in PARSER_TO_MARKETPLACE:
         return PARSER_TO_MARKETPLACE[key]
@@ -416,12 +437,11 @@ def map_parser_to_marketplace(
         return PARSER_TO_MARKETPLACE[key_no_sub]
 
     if p_sub and p_sub.startswith("other_"):
-        key_other = (p_cat, p_sub)
         for k, v in PARSER_TO_MARKETPLACE.items():
             if k[0] == p_cat and k[1] and k[1].startswith("other"):
                 return v
 
-    return "fashion", "other"
+    return "home", "other"
 
 
 def resolve_marketplace_category(
@@ -430,10 +450,21 @@ def resolve_marketplace_category(
     item: dict,
 ) -> tuple[str, str | None]:
     """AI id → marketplace id; fallback на парсер + keyword detect."""
+    from parser.core.patterns import VACANCY_RE
+
     text = "\n".join(
         str(item.get(k) or "")
         for k in ("raw_text", "title", "description")
     )
+
+    # Вакансії ніколи не мають ставати fashion через «форма/куртка» у тексті
+    if VACANCY_RE.search(text):
+        sub = detect_marketplace_subcategory("services_work", text)
+        if sub in ("vacancies", "part_time", "looking_for_work", "other_work"):
+            return "services_work", sub
+        if re.search(r"ищу\s+работ|шукаю\s+робот", text.lower()):
+            return "services_work", "looking_for_work"
+        return "services_work", "vacancies"
 
     cat, sub = validate_marketplace_category(ai_category, ai_subcategory, text)
     if cat:
@@ -453,24 +484,113 @@ def resolve_marketplace_category(
     p_cat, p_sub = detect_category(text, skip_free=skip_free)
     mapped = map_parser_to_marketplace(p_cat, p_sub)
     result = validate_marketplace_category(mapped[0], mapped[1], text)
-    return result if result[0] else ("fashion", "other")
+    return result if result[0] else ("home", "other")
 
 
 def clean_title(title: str, raw_text: str = "") -> str:
+    """
+    Заголовок без префіксів «продам», привітань, ціни та міста.
+    """
+    from parser.core.patterns import GREETING_TITLE_RE
+
     t = (title or "").strip()
     t = re.sub(r"^[\s🔥⭐️✨🎁📦💥❗️]+", "", t)
+    t = GREETING_TITLE_RE.sub("", t).strip()
     t = re.sub(
         r"^(?:продам|продаю|продаётся|продается|отдам|віддам|"
-        r"продаюсь|куплю|ищу|шукаю|продаю!)\s*[-–—:]?\s*",
+        r"продаюсь|куплю|ищу|шукаю|продаю!|предлагаю|пропоную|"
+        r"выполняю|виконую|оказываю|надаю)\s*[-–—:]?\s*",
         "",
         t,
         flags=re.IGNORECASE,
     )
+    # Прибрати ціну з заголовка (обережно: не чіпати «iPhone 13»)
+    t = re.sub(
+        r"(?i)(?:ціна|цiна|цена|price|стоимость|вартість)\s*[:\s]*[\d\s.,]+"
+        r"(?:\s*(?:[€$£]|євро|евро|euro|eur|грн))?",
+        " ",
+        t,
+    )
+    t = re.sub(
+        r"(?i)(?<!\w)(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:€|eur\b|euro\b|євро|евро|\$|грн\b|uah\b)",
+        " ",
+        t,
+    )
+    t = re.sub(
+        r"(?i)(?:€|\$)\s*(\d{1,6}(?:[.,]\d{1,2})?)\b",
+        " ",
+        t,
+    )
+
+    # Прибрати відомі міста / Germany / PLZ
+    city_tokens: set[str] = set()
+    try:
+        from parser.core.location import _KNOWN_CITIES
+        from utils.location_normalization import CITY_SYNONYMS
+
+        city_tokens.update(_KNOWN_CITIES)
+        city_tokens.update(CITY_SYNONYMS.keys())
+    except Exception:
+        pass
+    for city in sorted(city_tokens, key=len, reverse=True):
+        if len(city) < 3:
+            continue
+        # Гамбург/Гамбурге/Hamburg…
+        stem = re.escape(city)
+        t = re.sub(
+            rf"(?i)(?:^|[\s,./|(])(?:в|у|in|из|із)?\s*{stem}\w{{0,3}}\b",
+            " ",
+            t,
+        )
+    t = re.sub(r"(?i)\b(?:germany|deutschland|deutschland|нрв|nrw)\b", " ", t)
+    t = re.sub(r"\b\d{5}\b", " ", t)  # PLZ
+    t = re.sub(r"\s*[|/\-–—,]\s*$", "", t)
     t = re.sub(r"\s+", " ", t).strip(" -–—,.")
+
     if len(t) < 4 and raw_text:
-        first_line = raw_text.strip().split("\n", 1)[0][:100]
-        t = clean_title(first_line, "")
+        # Наступний змістовний рядок після привітання
+        for line in raw_text.strip().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            candidate = clean_title(line, "")
+            if len(candidate) >= 4 and candidate != "Объявление":
+                t = candidate
+                break
     return t[:100] if t else "Объявление"
+
+
+def force_services_marketplace_categories(item: dict) -> dict:
+    """
+    Для публікації з каналів послуг: category=services_work + валідна підкатегорія послуг.
+    Якщо AI/парсер дав fashion/electronics — перекласифіковуємо за текстом.
+    """
+    out = dict(item)
+    text = "\n".join(
+        str(out.get(k) or "")
+        for k in ("raw_text", "title", "description")
+    )
+    current_sub = (out.get("subcategory") or "").strip() or None
+    services_subs = MARKETPLACE_TAXONOMY.get("services_work") or {}
+
+    if current_sub and current_sub in services_subs and current_sub not in _GENERIC_SUB_IDS:
+        out["category"] = "services_work"
+        out["subcategory"] = current_sub
+        return out
+
+    detected = detect_marketplace_subcategory("services_work", text)
+    if detected and detected in services_subs:
+        out["category"] = "services_work"
+        out["subcategory"] = detected
+        return out
+
+    # map parser sub → marketplace
+    mapped = map_parser_to_marketplace("services_work", out.get("subcategory"))
+    sub = mapped[1] if mapped[0] == "services_work" else None
+    sub = _refine_subcategory("services_work", sub, text)
+    out["category"] = "services_work"
+    out["subcategory"] = sub or "other_services"
+    return out
 
 
 def apply_marketplace_categories_to_item(item: dict) -> dict:

@@ -22,7 +22,7 @@ type PlatformTickerInfoModalProps = {
 export function PlatformTickerInfoModal({
   isOpen,
   onClose,
-  highlightType,
+  highlightType: _highlightType,
   onAction,
 }: PlatformTickerInfoModalProps) {
   const { t } = useLanguage();
@@ -116,20 +116,11 @@ export function PlatformTickerInfoModal({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
           <ul className="space-y-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {ONBOARDING_SECTIONS.map((section) => {
-              const isHighlighted =
-                highlightType != null && section.highlightTypes.includes(highlightType);
-
               return (
                 <li
                   key={section.id}
                   className={`rounded-2xl px-3.5 py-3 ${
-                    isHighlighted
-                      ? isLight
-                        ? 'bg-[#C8E6A0]/40 ring-1 ring-[#3F5331]/15'
-                        : 'bg-[#C8E6A0]/10 ring-1 ring-[#C8E6A0]/20'
-                      : isLight
-                        ? 'bg-gray-50/80'
-                        : 'bg-white/[0.04]'
+                    isLight ? 'bg-gray-50/80' : 'bg-white/[0.04]'
                   }`}
                 >
                   <div className="flex items-start gap-3">

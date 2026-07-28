@@ -284,8 +284,18 @@ CATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
             "ремонт комп'ютера", "ремонт компьютера", "налаштування", "настройка",
             "it послуги", "программирование", "програмування", "web розробка",
         ],
+        "vacancies": [
+            "вакансия", "вакансія", "вакансии", "вакансії", "ищем сотрудника",
+            "шукаємо співробітника", "требуется сотрудник", "потрібен працівник",
+            "на постоянку", "полная занятость", "график работы",
+        ],
+        "looking_for_work": [
+            "ищу работу", "шукаю роботу", "ищу работу в", "шукаю роботу в",
+            "looking for a job", "ищу подработку", "шукаю підробіток",
+        ],
         "other_services": [
             "послуга", "услуга", "допомога", "помощь", "навчання",
+            "репетитор", "клининг", "клінінг", "перевозки", "перевезення",
         ],
     },
     "realestate": {
@@ -321,7 +331,17 @@ def detect_category(text: str, skip_free: bool = False) -> tuple[str, str | None
     skip_free=True — не відносити до free_stuff якщо є явна ціна.
     Повертає (category, subcategory).
     """
+    from parser.core.patterns import VACANCY_RE
+
     lower = text.lower()
+    # Вакансії / пошук роботи — не fashion через «форма/куртка» у тексті
+    if VACANCY_RE.search(lower):
+        if re.search(r"ищу\s+работ|шукаю\s+робот|ищу\s+подработ|шукаю\s+підробіт", lower):
+            return "services_work", "looking_for_work"
+        if re.search(r"подработ|підробіт|part.?time", lower):
+            return "services_work", "vacancies"  # part_time mapped later
+        return "services_work", "vacancies"
+
     best_category = "other"
     best_subcategory = None
     best_score = 0

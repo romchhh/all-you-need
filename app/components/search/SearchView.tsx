@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowLeft, Clock, Flame, MapPin, Search, SlidersHorizontal, Sparkles, TrendingUp, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowLeft, Clock, Flame, Search, Sparkles, TrendingUp, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category, Listing } from '@/types';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -11,8 +11,6 @@ import { dismissMobileKeyboard } from '@/utils/dismissMobileKeyboard';
 import { useDebounce } from '@/features/ui/hooks/useDebounce';
 import { POPULAR_SEARCH_QUERY_KEYS } from '@/constants/popularSearchQueries';
 import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
-import { SortModal } from '@/components/modals/SortModal';
-import { CityModal } from '@/components/modals/CityModal';
 import {
   addToSearchHistory,
   clearSearchHistory,
@@ -178,10 +176,8 @@ export function SearchView({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
   const [localCities, setLocalCities] = useState<string[]>(selectedCities);
   const citiesKey = localCities.join(',');
-  const [sortBy, setSortBy] = useState<SortOption>('newest');
-  const [showFreeOnly, setShowFreeOnly] = useState(false);
-  const [showSortModal, setShowSortModal] = useState(false);
-  const [showCityModal, setShowCityModal] = useState(false);
+  const [sortBy] = useState<SortOption>('newest');
+  const [showFreeOnly] = useState(false);
   const debouncedQuery = useDebounce(localQuery, SEARCH_DEBOUNCE_MS);
   const [activeQuery, setActiveQuery] = useState(initialCommitted ? initialQuery.trim() : '');
   const [searchResults, setSearchResults] = useState<Listing[]>([]);
@@ -231,6 +227,21 @@ export function SearchView({
     dismissMobileKeyboard();
     tg?.HapticFeedback?.impactOccurred?.('light');
   }, [resetSearchState, tg]);
+
+  /** З екрана результатів — на головну сторінку пошуку (залишаємо текст у полі). */
+  const openMainSearchPage = useCallback(() => {
+    if (screenMode !== 'results') return;
+    setScreenMode('discover');
+    setActiveQuery('');
+    setSearchResults([]);
+    setSearchTotal(0);
+    setLoadingResults(false);
+    lastFetchKeyRef.current = '';
+    tg?.HapticFeedback?.impactOccurred?.('light');
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, [screenMode, tg]);
 
   const buildFetchKey = useCallback(
     (query: string, category: string | null) =>
@@ -361,9 +372,6 @@ export function SearchView({
       if (screenMode === 'results' && query.length >= MIN_QUERY_LENGTH) {
         lastFetchKeyRef.current = '';
         void fetchSearchResults(query, { force: true, category: next });
-      } else if (screenMode === 'discover' && query.length >= MIN_QUERY_LENGTH) {
-        lastFetchKeyRef.current = '';
-        void fetchSearchResults(query, { previewOnly: true, force: true, category: next });
       }
     },
     [fetchSearchResults, localQuery, screenMode, selectedCategory, tg]
@@ -418,24 +426,18 @@ export function SearchView({
     }
   }, [initialQuery, initialCategory, fetchSearchResults, resetSearchState]);
 
-  // У режимі discover — лише підказки (preview), без переходу в результати
+  // У режимі discover URL-query оновлюємо без автопошуку
   useEffect(() => {
     if (screenMode !== 'discover') return;
-
     const trimmed = debouncedQuery.trim();
-
     if (trimmed.length >= MIN_QUERY_LENGTH) {
       onQueryChangeRef.current?.(trimmed);
-      lastFetchKeyRef.current = '';
-      void fetchSearchResults(trimmed, { haptic: false, saveHistory: false, previewOnly: true });
       return;
     }
-
     if (trimmed.length === 0) {
-      setPreviewResults([]);
       onQueryChangeRef.current?.('');
     }
-  }, [debouncedQuery, fetchSearchResults, screenMode]);
+  }, [debouncedQuery, screenMode]);
 
   const activeQueryRef = useRef(activeQuery);
   activeQueryRef.current = activeQuery;
@@ -508,20 +510,6 @@ export function SearchView({
     };
   }, [profileTelegramId]);
 
-  const suggestions = useMemo(() => {
-    const q = localQuery.toLowerCase().trim();
-    if (!q || q.length < MIN_QUERY_LENGTH) return [];
-    const pool =
-      screenMode === 'discover'
-        ? [...previewResults, ...popularListings, ...recentViewedListings]
-        : [...searchResults, ...previewResults, ...popularListings, ...recentViewedListings];
-    const titles = new Set<string>();
-    pool.forEach((listing) => {
-      if (listing.title.toLowerCase().includes(q)) titles.add(listing.title);
-    });
-    return Array.from(titles).slice(0, 8);
-  }, [localQuery, screenMode, searchResults, previewResults, popularListings, recentViewedListings]);
-
   const inputClass = isLight
     ? 'w-full rounded-xl border border-gray-300 bg-white py-3 pr-10 text-gray-900 placeholder:text-gray-500 focus:border-[#3F5331]/30 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/20'
     : 'w-full rounded-xl border border-white bg-transparent py-3 pr-10 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30';
@@ -533,26 +521,10 @@ export function SearchView({
   const trimmedLocal = localQuery.trim();
   const isTypingPending =
     trimmedLocal.length >= MIN_QUERY_LENGTH && trimmedLocal !== debouncedQuery.trim();
-  const showDiscoverSuggestions =
-    screenMode === 'discover' &&
-    trimmedLocal.length >= MIN_QUERY_LENGTH &&
-    suggestions.length > 0;
-  const showResultsEditSuggestions =
-    screenMode === 'results' &&
-    trimmedLocal.length >= MIN_QUERY_LENGTH &&
-    trimmedLocal !== activeQuery &&
-    suggestions.length > 0;
-  const hasActiveFilters = Boolean(
-    sortBy !== 'newest' || showFreeOnly || selectedCategory || localCities.length > 0
-  );
 
-  const stickyHeaderBg = isLight
-    ? 'border-b border-gray-200/90 bg-white/95 shadow-sm backdrop-blur-md'
-    : 'border-b border-white/10 bg-[#000000]/95 backdrop-blur-md';
-
-  const filterBtnClass = isLight
-    ? 'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200/90 bg-white shadow-sm transition-colors hover:bg-gray-50'
-    : 'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white bg-transparent transition-colors hover:bg-white/10';
+  const stickySearchBg = isLight
+    ? 'border-b border-gray-200/80 bg-white/95 backdrop-blur-md'
+    : 'border-b border-white/10 bg-[var(--tg-theme-bg-color,#111111)]/95 backdrop-blur-md';
 
   const catalogListingsProps = {
     favorites,
@@ -564,16 +536,14 @@ export function SearchView({
 
   const resultsContent = (
     <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto space-y-4">
-      <div className="min-w-0">
-        <p className={`text-sm font-semibold ${ac.pageHeading}`}>
-          {activeQuery
-            ? t('bazaar.search.resultsTitle', { query: activeQuery })
-            : t('bazaar.search.searching')}
-        </p>
+      <div className="min-w-0 pt-1">
         {!loadingResults && !isTypingPending && activeQuery && (
-          <p className={`mt-0.5 text-xs ${ac.mutedText}`}>
+          <p className={`text-sm ${ac.mutedText}`}>
             {t('bazaar.search.resultsCount', { count: String(searchTotal) })}
           </p>
+        )}
+        {activeQuery && (loadingResults || (isTypingPending && trimmedLocal !== activeQuery)) && (
+          <p className={`text-sm ${ac.mutedText}`}>{t('bazaar.search.searching')}</p>
         )}
       </div>
 
@@ -680,23 +650,6 @@ export function SearchView({
     ? 'border-gray-300/90 bg-white/95 text-gray-900 shadow-sm hover:bg-white'
     : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
 
-  const titleSuggestionsDropdown =
-    (showDiscoverSuggestions || showResultsEditSuggestions) && (
-      <div className={`overflow-hidden rounded-2xl border ${ac.suggestionDropdown}`}>
-        {suggestions.map((suggestion, index) => (
-          <button
-            key={`${suggestion}-${index}`}
-            type="button"
-            onClick={() => pickQuery(suggestion)}
-            className={ac.suggestionRow}
-          >
-            <Search size={16} className={ac.suggestionIcon} />
-            <span className="truncate text-left">{suggestion}</span>
-          </button>
-        ))}
-      </div>
-    );
-
   const categoriesRow = (
     <div
       className="scrollbar-hide w-full max-w-full overflow-x-auto"
@@ -768,6 +721,11 @@ export function SearchView({
         placeholder={searchPlaceholder || t('bazaar.whatInterestsYou')}
         value={localQuery}
         onChange={(e) => setLocalQuery(e.target.value)}
+        onFocus={() => {
+          if (screenMode === 'results') {
+            openMainSearchPage();
+          }
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -795,55 +753,11 @@ export function SearchView({
     </div>
   );
 
-  const resultsToolbar = (
-    <div className="flex shrink-0 items-center gap-1.5">
-      <button
-        type="button"
-        onClick={() => {
-          setShowCityModal(true);
-          tg?.HapticFeedback?.impactOccurred?.('light');
-        }}
-        className={`${filterBtnClass} ${
-          localCities.length > 0
-            ? isLight
-              ? 'border-[#3F5331]/40 bg-[#3F5331]/10'
-              : 'border-[#C8E6A0]/50 bg-[#C8E6A0]/10'
-            : ''
-        }`}
-        aria-label={t('bazaar.selectCity')}
-      >
-        <MapPin size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
-        {localCities.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#3F5331] px-1 text-[10px] font-bold text-white">
-            {localCities.length > 9 ? '9+' : localCities.length}
-          </span>
-        )}
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setShowSortModal(true);
-          tg?.HapticFeedback?.impactOccurred?.('light');
-        }}
-        className={`${filterBtnClass} ${
-          hasActiveFilters && !localCities.length
-            ? isLight
-              ? 'border-[#3F5331]/40 bg-[#3F5331]/10'
-              : 'border-[#C8E6A0]/50 bg-[#C8E6A0]/10'
-            : ''
-        }`}
-        aria-label={t('common.filter')}
-      >
-        <SlidersHorizontal size={18} className={isLight ? 'text-gray-800' : 'text-white'} />
-      </button>
-    </div>
-  );
-
   return (
     <>
       {screenMode === 'discover' ? (
         <>
-          <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-1">
+          <div className="flex items-center justify-between gap-3 px-4 pb-4 pt-0">
             <h1 className={`min-w-0 flex-1 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
               {t('bazaar.search.pageTitle')}
             </h1>
@@ -854,7 +768,7 @@ export function SearchView({
                 onBack();
               }}
               aria-label={t('common.close')}
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
+              className={`-mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
             >
               <X size={20} />
             </button>
@@ -864,78 +778,32 @@ export function SearchView({
 
           <div className="mx-auto w-full max-w-xl space-y-2 px-4 pb-2 pt-1 xl:max-w-2xl lg:mx-auto">
             {searchField}
-            {titleSuggestionsDropdown}
           </div>
 
           {discoverContent}
         </>
       ) : (
         <>
-          <div className={`${STICKY_BELOW_APP_HEADER_CLASS} ${stickyHeaderBg}`}>
-            <div className="mx-auto w-full max-w-xl space-y-2 px-4 pb-2 pt-2 xl:max-w-2xl lg:mx-auto">
-              {searchField}
-              {titleSuggestionsDropdown}
-            </div>
-
-            <div className="flex items-center gap-2 px-4 pb-2">
+          <div className={`${STICKY_BELOW_APP_HEADER_CLASS} ${stickySearchBg}`}>
+            <div className="mx-auto flex w-full max-w-xl items-center gap-2 px-4 py-2 xl:max-w-2xl lg:mx-auto">
               <button
                 type="button"
                 onClick={() => {
                   tg?.HapticFeedback?.impactOccurred?.('light');
-                  onBack();
+                  openMainSearchPage();
                 }}
                 aria-label={t('common.back')}
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
               >
                 <ArrowLeft size={20} />
               </button>
-              {resultsToolbar}
+              <div className="min-w-0 flex-1">{searchField}</div>
             </div>
-
-            {categoriesRow}
           </div>
 
           {resultsContent}
         </>
       )}
-
-      <SortModal
-        isOpen={showSortModal}
-        currentSort={sortBy}
-        showFreeOnly={showFreeOnly}
-        minPrice={null}
-        maxPrice={null}
-        selectedCategory={selectedCategory}
-        selectedSubcategory={null}
-        selectedCondition={null}
-        selectedCurrency={null}
-        onClose={() => setShowSortModal(false)}
-        onSelect={(sort) => {
-          setSortBy(sort);
-          setShowSortModal(false);
-        }}
-        onToggleFreeOnly={setShowFreeOnly}
-        onCategoryChange={(categoryId) => {
-          setSelectedCategory(categoryId);
-          onCategoryChangeRef.current?.(categoryId);
-          lastFetchKeyRef.current = '';
-        }}
-        onPriceRangeChange={() => {}}
-        tg={tg}
-      />
-
-      <CityModal
-        isOpen={showCityModal}
-        selectedCities={localCities}
-        onClose={() => setShowCityModal(false)}
-        onSelect={(cities) => {
-          setLocalCities(cities);
-          setShowCityModal(false);
-          lastFetchKeyRef.current = '';
-        }}
-        tg={tg}
-        profileTelegramId={profileTelegramId ?? undefined}
-      />
     </>
   );
 }

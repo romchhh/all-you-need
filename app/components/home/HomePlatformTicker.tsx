@@ -174,34 +174,34 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({
   const displayMessage = current ?? welcomeMessage;
 
   const barClass = isLight
-    ? 'flex w-full items-center gap-2.5 rounded-xl border border-[#3F5331]/25 bg-[#C8E6A0]/75 px-3 py-2 text-xs shadow-sm ring-1 ring-[#3F5331]/10 sm:text-sm'
-    : 'flex w-full items-center gap-2.5 rounded-xl bg-[#C8E6A0]/95 px-3 py-2 text-xs sm:text-sm';
+    ? 'flex w-full items-center gap-2 rounded-lg border border-[#3F5331]/20 bg-[#C8E6A0]/70 px-2.5 py-1 text-[11px] sm:text-xs'
+    : 'flex w-full items-center gap-2 rounded-lg bg-[#C8E6A0]/95 px-2.5 py-1 text-[11px] sm:text-xs';
 
   const textClass = isLight ? 'text-[#1e2e18] font-medium' : 'text-[#0f1408] font-medium';
   const infoButtonClass = isLight
-    ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#3F5331]/25 bg-white/70 text-[#3F5331] transition-colors hover:bg-white'
-    : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#0f1408]/15 bg-[#0f1408]/5 text-[#0f1408] transition-colors hover:bg-[#0f1408]/10';
+    ? 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#3F5331]/80 transition-opacity hover:opacity-80'
+    : 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#0f1408]/75 transition-opacity hover:opacity-80';
 
   return (
     <>
       <div ref={barRef} className={barClass} role="status" aria-live="polite">
-        <span className="shrink-0 text-lg leading-none" aria-hidden>
+        <span className="shrink-0 text-sm leading-none" aria-hidden>
           {displayMessage.emoji}
         </span>
         <p
           key={displayMessage.id}
-          className={`min-w-0 flex-1 truncate leading-snug ${animClass} ${textClass}`}
+          className={`min-w-0 flex-1 truncate leading-tight ${animClass} ${textClass}`}
         >
           {displayMessage.text}
         </p>
         <button
           type="button"
           onClick={() => setInfoOpen((open) => !open)}
-          className={`${infoButtonClass}${infoOpen ? (isLight ? ' bg-white ring-1 ring-[#3F5331]/30' : ' bg-[#0f1408]/15') : ''}`}
+          className={infoButtonClass}
           aria-label={t('platformTicker.info.ariaLabel')}
           aria-expanded={infoOpen}
         >
-          <Info size={15} strokeWidth={2.25} />
+          <Info size={14} strokeWidth={2} />
         </button>
       </div>
 

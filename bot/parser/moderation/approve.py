@@ -21,7 +21,10 @@ from parser.moderation.approve_routing import (
     resolve_parser_approve_target,
     validate_parser_approve_context,
 )
-from parser.marketplace_categories import apply_marketplace_categories_to_item
+from parser.marketplace_categories import (
+    apply_marketplace_categories_to_item,
+    force_services_marketplace_categories,
+)
 from parser.moderation.author_notify import schedule_author_notify
 from parser.core.account_pool import list_parser_accounts
 from parser.core.location import resolve_parsed_location
@@ -125,10 +128,13 @@ async def _approve_services_both(
     listing_item = apply_marketplace_categories_to_item(listing_item)
     listing_item = _force_listing_location(listing_item)
     listing_item = preserve_parsed_source_fields(listing_item, item)
+    # Канали послуг → завжди services_work + коректна підкатегорія (не fashion/…)
+    listing_item = force_services_marketplace_categories(listing_item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
     if item_category != "services_work":
         listing_item["category"] = "services_work"
+        listing_item = force_services_marketplace_categories(listing_item)
 
     pool = list_parser_accounts()
     seller = pool[1] if len(pool) > 1 else (pool[0] if pool else None)
@@ -281,6 +287,11 @@ async def _approve_marketplace(
     listing_item = preserve_parsed_source_fields(listing_item, item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
+    # Послуги (у т.ч. з сервіс-каналів / дублікати) — валідна підкатегорія services_work
+    if item_category == "services_work" or (item.get("parser_type") or "") == "services_channel":
+        listing_item = force_services_marketplace_categories(listing_item)
+        item_category = "services_work"
+
     pool = list_parser_accounts()
     seller = pool[0] if pool else None
     if item_category == "services_work" and len(pool) > 1:
