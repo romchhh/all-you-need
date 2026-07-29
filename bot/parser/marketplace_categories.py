@@ -129,7 +129,7 @@ PARSER_TO_MARKETPLACE: dict[tuple[str, str | None], tuple[str, str | None]] = {
     ("clothing", "womens"): ("fashion", "women_clothing"),
     ("clothing", "mens"): ("fashion", "men_clothing"),
     ("clothing", "kids"): ("kids", "clothing"),
-    ("clothing", "shoes"): ("fashion", "other"),
+    ("clothing", "shoes"): ("fashion", "men_shoes"),
     ("clothing", "outerwear"): ("fashion", "other"),
     ("clothing", "accessories_clothing"): ("fashion", "accessories"),
     ("clothing", "sportswear"): ("fashion", "other"),
@@ -229,9 +229,16 @@ MARKETPLACE_SUB_KEYWORDS: dict[str, dict[str, list[str]]] = {
         "women_clothing": [
             "женск", "жіноч", "платье", "сукн", "блуз", "юбк", "куртк", "пальто",
         ],
-        "women_shoes": ["женск", "жіноч", "туфл", "ботин", "кроссовк", "кросівк"],
+        "women_shoes": [
+            "женск", "жіноч", "туфл", "ботин", "кроссовк", "кросівк", "босонож", "босоніж",
+        ],
         "men_clothing": ["мужск", "чоловіч", "рубашк", "костюм", "джинс"],
-        "men_shoes": ["мужск", "чоловіч", "ботин", "кроссовк", "кросівк"],
+        "men_shoes": [
+            "мужск", "чоловіч", "ботин", "кроссовк", "кросівк", "кед",
+            "new balance", "newbalance", "nike", "adidas", "puma", "reebok",
+            "asics", "converse", "vans", "jordan", "yeezy", "salomon", "hoka",
+            "sneakers", "sneaker", "timberland",
+        ],
         "accessories": ["сумк", "рюкзак", "ремень", "шарф", "очк"],
         "hats": ["шапк", "кепк", "шляп"],
     },
@@ -329,7 +336,6 @@ _GENERIC_SUB_IDS = frozenset({
     "other_work",
 })
 
-
 def detect_marketplace_subcategory(category: str, text: str) -> str | None:
     """Підкатегорія маркетплейсу за ключовими словами в тексті."""
     subs = MARKETPLACE_SUB_KEYWORDS.get(category)
@@ -353,28 +359,26 @@ def detect_marketplace_subcategory(category: str, text: str) -> str | None:
 
 
 def _refine_subcategory(category: str, subcategory: str | None, text: str) -> str | None:
-    """Уточнює підкатегорію, якщо AI/парсер дав загальну."""
+    """Залишає subcategory від AI, якщо id валідний; keywords — лише для порожнього/other."""
     subs = MARKETPLACE_TAXONOMY.get(category)
     if subs is None:
         return None
 
     sub = (subcategory or "").strip() or None
-    if sub and sub not in _GENERIC_SUB_IDS and sub in subs:
+    if sub and sub in subs and sub not in _GENERIC_SUB_IDS:
+        return sub  # довіряємо AI
+
+    if sub and sub in subs:
+        # AI дав other/services — спробуємо уточнити keywords лише всередині цієї category
+        detected = detect_marketplace_subcategory(category, text)
+        if detected and detected in subs and detected not in _GENERIC_SUB_IDS:
+            return detected
         return sub
 
     detected = detect_marketplace_subcategory(category, text)
     if detected and detected in subs:
         return detected
 
-    from parser.category_keywords import detect_category
-
-    p_cat, p_sub = detect_category(text, skip_free=True)
-    mapped = map_parser_to_marketplace(p_cat, p_sub)
-    if mapped[0] == category and mapped[1] and mapped[1] in subs:
-        return mapped[1]
-
-    if sub and sub in subs:
-        return sub
     if "other" in subs:
         return "other"
     return next(iter(subs))
@@ -449,34 +453,37 @@ def resolve_marketplace_category(
     ai_subcategory: str | None,
     item: dict,
 ) -> tuple[str, str | None]:
-    """AI id → marketplace id; fallback на парсер + keyword detect."""
-    from parser.core.patterns import VACANCY_RE
-
+    """
+    Категорію задає AI (id з таксономії маркетплейсу).
+    Regex/keywords — лише валідація id та fallback, якщо AI не дав категорію.
+    """
     text = "\n".join(
         str(item.get(k) or "")
         for k in ("raw_text", "title", "description")
     )
 
-    # Вакансії ніколи не мають ставати fashion через «форма/куртка» у тексті
-    if VACANCY_RE.search(text):
-        sub = detect_marketplace_subcategory("services_work", text)
-        if sub in ("vacancies", "part_time", "looking_for_work", "other_work"):
-            return "services_work", sub
-        if re.search(r"ищу\s+работ|шукаю\s+робот", text.lower()):
-            return "services_work", "looking_for_work"
-        return "services_work", "vacancies"
-
+    # 1) Відповідь AI — пріоритет (лише перевіряємо, що id існують)
     cat, sub = validate_marketplace_category(ai_category, ai_subcategory, text)
     if cat:
         return cat, sub
 
+    # 2) AI міг дати parser-id (clothing/shoes) — мапимо на marketplace
     mapped = map_parser_to_marketplace(
-        str(ai_category or item.get("category") or ""),
-        ai_subcategory or item.get("subcategory"),
+        str(ai_category or "").strip() or None,
+        ai_subcategory,
     )
-    cat, sub = validate_marketplace_category(mapped[0], mapped[1], text)
-    if cat:
-        return cat, sub
+    if str(ai_category or "").strip():
+        cat, sub = validate_marketplace_category(mapped[0], mapped[1], text)
+        if cat:
+            return cat, sub
+
+    # 3) Fallback лише коли AI не дав category (вимкнений / помилка / порожньо)
+    item_cat = str(item.get("category") or "").strip()
+    if item_cat:
+        mapped = map_parser_to_marketplace(item_cat, item.get("subcategory"))
+        cat, sub = validate_marketplace_category(mapped[0], mapped[1], text)
+        if cat:
+            return cat, sub
 
     from parser.category_keywords import detect_category
 
@@ -491,7 +498,7 @@ def clean_title(title: str, raw_text: str = "") -> str:
     """
     Заголовок без префіксів «продам», привітань, ціни та міста.
     """
-    from parser.core.patterns import GREETING_TITLE_RE
+    from parser.core.patterns import GREETING_TITLE_RE, GENERIC_LISTING_TITLE_RE
 
     t = (title or "").strip()
     t = re.sub(r"^[\s🔥⭐️✨🎁📦💥❗️]+", "", t)
@@ -547,16 +554,23 @@ def clean_title(title: str, raw_text: str = "") -> str:
     t = re.sub(r"\s*[|/\-–—,]\s*$", "", t)
     t = re.sub(r"\s+", " ", t).strip(" -–—,.")
 
-    if len(t) < 4 and raw_text:
-        # Наступний змістовний рядок після привітання
-        for line in raw_text.strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            candidate = clean_title(line, "")
-            if len(candidate) >= 4 and candidate != "Объявление":
-                t = candidate
-                break
+    t = re.sub(r"\s+", " ", t).strip(" -–—,.")
+
+    if GENERIC_LISTING_TITLE_RE.match(t) or len(t) < 4:
+        if raw_text:
+            for line in raw_text.strip().split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                candidate = clean_title(line, "")
+                if (
+                    candidate
+                    and candidate != "Объявление"
+                    and len(candidate) >= 4
+                    and not GENERIC_LISTING_TITLE_RE.match(candidate)
+                ):
+                    t = candidate
+                    break
     return t[:100] if t else "Объявление"
 
 

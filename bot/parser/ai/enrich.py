@@ -245,13 +245,16 @@ def _build_prompt(item: dict) -> str:
    из raw_text: условия, прайс, детали, опыт, контакты-смысл. НЕ сокращай сильно —
    если пост длинный, description тоже должен быть полным (можно 800–2000 символов).
    Без ссылок на канал, без «пишите в лс»/хештегов, без дублирования title в первой строке.
-3. category/subcategory — самые точные id из списка маркетплейса выше.
-   Обязательно укажи подкатегорию (subcategory), не оставляй только category.
-   Услуги (маникюр, ремонт, репетитор, клининг, перевозки) → services_work + нужная подкатегория
-   (beauty_health, repair_installation, cleaning, education_tutors, …).
-   Вакансии / поиск работы → services_work + vacancies|part_time|looking_for_work (НЕ fashion!).
-   Товары → соответствующий раздел (electronics, fashion, kids, furniture и т.д.) + подкатегория.
-   НЕ ставь fashion/одежду, если пост — услуга, вакансия или работа.
+3. category/subcategory — ГЛАВНОЕ: определяй ТОЛЬКО по смыслу товара/услуги во ВСЁМ raw_text
+   (бренд, модель, что продают). Игнорируй шаблонные title («Акційний товар», «Товар», «Sale»).
+   Используй ТОЛЬКО id из списка маркетплейса выше; subcategory обязательна.
+   Примеры:
+   - «New Balance 725 Grey White» / Nike / Adidas / кроссовки / обувь → fashion + men_shoes
+     (или women_shoes если явно женское). НЕ home, НЕ decor.
+   - iPhone / Samsung Galaxy / Xiaomi → electronics + smartphones. НЕ home.
+   - диван / шкаф → furniture; маникюр / косметолог → services_work + beauty_health.
+   - вакансия / ищу работу → services_work + vacancies|looking_for_work (НЕ fashion).
+   Подсказки парсера category/sub могут быть неверны — не копируй их слепо.
 4. price — число строкой ("25" или "25.50"); если цены нет → null (договорная).
 5. is_free — true ТОЛЬКО если в тексте явно «бесплатно/віддам/даром/free». Для услуг без цены is_free=false.
 6. currency — EUR по умолчанию; UAH только если явно грн.
@@ -292,10 +295,12 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
                 {
                     "role": "system",
                     "content": (
-                        "Ты модератор маркетплейса Trade Ground для рус/укр аудитории в Германии. "
-                        "Улучшай объявления: точный заголовок БЕЗ цены/города/приветствия, "
-                        "полное описание на русском (не обрезай важное), "
-                        "правильная категория из списка id (услуги ≠ одежда/fashion). "
+                        "Ты модератор маркетплейса Trade Ground. "
+                        "Категорию и подкатегорию выбираешь ТОЛЬКО ты по смыслу всего текста "
+                        "(бренд, модель, тип товара/услуги) — не по шаблонному title вроде «Акційний товар». "
+                        "New Balance/Nike/кроссовки → fashion/men_shoes|women_shoes; "
+                        "iPhone → electronics/smartphones; услуги → services_work. "
+                        "Заголовок без цены/города/приветствия, описание полное. "
                         "Отвечай только валидным JSON без markdown."
                     ),
                 },

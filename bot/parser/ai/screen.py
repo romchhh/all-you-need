@@ -107,10 +107,13 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
    - товар (продажа / отдам / обмен) ИЛИ
    - услуга (красота, ремонт, обучение, работа мастера и т.п. с оффером)
 4. Если accept=true — улучши поля:
-   - title (рус, 4–80): суть товара/услуги; БЕЗ цены, города, приветствий («Здравствуйте»), «продам»
+   - title (рус, 4–80): суть товара/услуги из текста; БЕЗ цены, города, приветствий, «продам»;
+     если title шаблонный («Акційний товар») — возьми бренд/модель из описания
    - description (рус): полный смысл поста, не урезай важное (можно 800–2000 символов)
-   - category/subcategory: услуги → services_work + подкатегория; вакансии НЕ fashion;
-     товары → electronics/fashion/… + подкатегория
+   - category/subcategory: ТОЛЬКО ты по смыслу товара во всём тексте (не копируй подсказку парсера).
+     New Balance/Nike/кроссовки → fashion/men_shoes|women_shoes (НЕ home/decor);
+     iPhone → electronics/smartphones; услуги → services_work + подкатегория;
+     вакансии → services_work/vacancies (НЕ fashion)
    - price, location, condition
    {location_hint}
    Услуги без цены → price=null, is_free=false; condition для услуг всегда "new".
@@ -157,7 +160,8 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
                     "role": "system",
                     "content": (
                         "Ты фильтр маркетплейса Trade Ground. Отсекаешь мусор и дубли. "
-                        "Отвечай только JSON."
+                        "Категорию выбираешь по смыслу всего поста (бренд/товар), "
+                        "не по шаблонному заголовку. Отвечай только JSON."
                     ),
                 },
                 {"role": "user", "content": _build_screen_prompt(item, context)},
