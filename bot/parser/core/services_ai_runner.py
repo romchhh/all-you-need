@@ -157,7 +157,8 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         title = extract_title(text)
         description = enrich_description(title, extract_description(text, title))
 
-        if not force_service_channel and is_likely_not_listing(title, description):
+        # Навіть у beauty/service-каналах бувають новини/попередження — не послуга.
+        if is_likely_not_listing(title, description, text):
             stats["skipped"] += 1
             stats["reasons"]["не оголошення"] = stats["reasons"].get("не оголошення", 0) + 1
             continue

@@ -152,7 +152,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
         title = extract_title(text)
         description = enrich_description(title, extract_description(text, title))
 
-        if is_likely_not_listing(title, description):
+        if is_likely_not_listing(title, description, text):
             stats["skipped"] += 1
             stats["reasons"]["не оголошення"] = stats["reasons"].get("не оголошення", 0) + 1
             continue

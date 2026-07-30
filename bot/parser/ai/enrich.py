@@ -204,76 +204,86 @@ def _build_prompt(item: dict) -> str:
 
     if local_channel:
         location_rule = (
-            f"7. location — ОБЯЗАТЕЛЬНО ровно «{channel_city}» "
-            f"(локальный канал барахолки). Не меняй город по тексту поста."
+            f'7. location MUST be exactly "{channel_city}" '
+            "(local flea-market channel). Do not change it based on post text."
         )
     else:
         location_rule = (
-            "7. location — найди город продажи/услуги В ТЕКСТЕ "
-            "(«в Гамбурге», «Berlin», «Кёльн»…) и верни НЕМЕЦКИМ оригиналом "
-            "(Hamburg, München, Köln…). Если города в тексте нет — «Germany»."
+            "7. location — city of sale/service FROM THE TEXT "
+            '(e.g. "в Гамбурге", Berlin, Köln) as German canonical name '
+            "(Hamburg, München, Köln, …). If no city in text → \"Germany\"."
         )
 
-    return f"""Проанализируй объявление с Telegram-барахолки (Германия, рус/укр аудитория).
-Используй ТОЛЬКО текст ниже — фото нет.
+    scope = "LOCAL city channel" if local_channel else "Germany-wide channel"
 
-Текст объявления (raw_text):
+    return f"""Enrich a Telegram flea-market listing for Trade Ground (Germany; RU/UK/DE audience).
+Use ONLY the text below — no photos.
+
+Listing text (raw_text):
 {raw_text}
 
-Подсказки парсера (могут быть неточными, не копируй слепо):
+Parser hints (may be wrong — do not copy blindly):
 - title: {item.get("title") or ""}
 - description: {item.get("description") or ""}
-- category/sub (парсер): {parser_cat}/{parser_sub}
+- category/sub: {parser_cat}/{parser_sub}
 - price: {item.get("price") or ""} {item.get("currency") or ""}
 - is_free: {bool(item.get("is_free"))}
-- город канала: {channel_city} ({"ЛОКАЛЬНЫЙ канал" if local_channel else "ОБЩИЙ канал по Германии"})
+- channel city: {channel_city} ({scope})
 - condition: {item.get("condition") or ""}
-- канал: {item.get("source_channel") or ""}
+- channel: {item.get("source_channel") or ""}
 
-Категории маркетплейса — используй ТОЛЬКО эти id (category / subcategory):
+Marketplace category ids only (category / subcategory):
 {marketplace_taxonomy_for_ai()}
 
-Города (канонические): {", ".join(GERMAN_CITIES[:40])}, …
+Canonical cities: {", ".join(GERMAN_CITIES[:40])}, …
 
-Правила:
-1. title — на РУССКОМ, 4–80 символов. Суть товара/услуги: бренд, модель, тип услуги.
-   ЗАПРЕЩЕНО в title: цена (€/EUR/числа с валютой), город, индекс PLZ,
-   приветствия («Здравствуйте», «Добрый день», «Привет»), «продам/продаю/отдам», эмодзи, хештеги.
-   Для УСЛУГ: краткая суть («Маникюр гель-лак», «Ремонт стиральных машин», «Репетитор по математике»),
-   НЕ копируй первую строку поста если это приветствие.
-2. description — на РУССКОМ (переведи с украинского если нужно). СОХРАНИ всю важную информацию
-   из raw_text: условия, прайс, детали, опыт, контакты-смысл. НЕ сокращай сильно —
-   если пост длинный, description тоже должен быть полным (можно 800–2000 символов).
-   Без ссылок на канал, без «пишите в лс»/хештегов, без дублирования title в первой строке.
-3. category/subcategory — ГЛАВНОЕ: определяй ТОЛЬКО по смыслу товара/услуги во ВСЁМ raw_text
-   (бренд, модель, что продают). Игнорируй шаблонные title («Акційний товар», «Товар», «Sale»).
-   Используй ТОЛЬКО id из списка маркетплейса выше; subcategory обязательна.
-   Примеры:
-   - «New Balance 725 Grey White» / Nike / Adidas / кроссовки / обувь → fashion + men_shoes
-     (или women_shoes если явно женское). НЕ home, НЕ decor.
-   - iPhone / Samsung Galaxy / Xiaomi → electronics + smartphones. НЕ home.
-   - диван / шкаф → furniture; маникюр / косметолог → services_work + beauty_health.
-   - вакансия / ищу работу → НЕ оголошення барахолки (reject на screen; не класифікуй як fashion).
-   Подсказки парсера category/sub могут быть неверны — не копируй их слепо.
-4. price — число строкой ("25" или "25.50"); если цены нет → null (договорная).
-5. is_free — true ТОЛЬКО если в тексте явно «бесплатно/віддам/даром/free». Для услуг без цены is_free=false.
-6. currency — EUR по умолчанию; UAH только если явно грн.
+Rules:
+1. title — Russian, 4–80 chars. Item/service essence: brand, model, service type.
+   FORBIDDEN in title: price (€/EUR/currency numbers), city, PLZ,
+   greetings (“Здравствуйте”, “Добрый день”), “selling/for sale/giving away”, emoji, hashtags.
+   Services: short essence (“Маникюр гель-лак”, “Ремонт стиральных машин”) —
+   do not copy a greeting first line.
+2. description — Russian (translate from Ukrainian if needed). Keep all important info
+   from raw_text: terms, prices, details, experience. Do not over-truncate
+   (800–2000 chars ok for long posts). No channel promo links, no “DM me” spam/hashtags,
+   do not repeat title as the first line.
+3. category/subcategory — from FULL raw_text meaning only (brand, model, what is offered).
+   Ignore stub titles (“Акційний товар”, “Товар”, “Sale”). Use taxonomy ids only; subcategory required.
+   Examples:
+   - New Balance / Nike / Adidas / sneakers → fashion + men_shoes (or women_shoes if clearly women’s). NOT home/decor.
+   - iPhone / Samsung Galaxy / Xiaomi → electronics + smartphones. NOT home.
+   - sofa / wardrobe → furniture; nails / cosmetologist → services_work + beauty_health.
+   - jobs / “looking for work” are NOT marketplace listings — do not classify as fashion.
+   Parser category hints may be wrong — do not copy them.
+4. price — numeric string ("25" or "25.50"); no price → null (negotiable).
+5. is_free — true ONLY if text clearly says free/віддам/даром/free. Services without price → is_free=false.
+6. currency — EUR by default; UAH only if грн is explicit.
 {location_rule}
-8. condition — "new" или "used" для товаров; для services_work ВСЕГДА "new".
+8. condition — "new" or "used" for goods; for services_work ALWAYS "new".
 
-Верни ТОЛЬКО JSON:
+JSON only:
 {{
-  "title": "...",
-  "description": "...",
-  "category": "...",
-  "subcategory": "... или null",
-  "price": "... или null",
+  "title": "string",
+  "description": "string",
+  "category": "string",
+  "subcategory": "string or null",
+  "price": "string or null",
   "currency": "EUR|USD|UAH|null",
   "is_free": false,
-  "location": "...",
+  "location": "string",
   "condition": "new|used|null",
-  "changes_summary": "коротко по-русски что исправлено"
+  "changes_summary": "short note in Russian"
 }}"""
+
+
+_ENRICH_SYSTEM_PROMPT = (
+    "You enrich Trade Ground marketplace listings. "
+    "Choose category/subcategory from the full text meaning only "
+    "(brand, model, goods/service type) — never from stub titles like “Акційний товар”. "
+    "Sneakers/New Balance/Nike → fashion/men_shoes|women_shoes; "
+    "iPhone → electronics/smartphones; master services → services_work. "
+    "Title: no price/city/greeting. Description: complete. Reply with JSON only."
+)
 
 
 async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]:
@@ -292,18 +302,7 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
         response = await client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Ты модератор маркетплейса Trade Ground. "
-                        "Категорию и подкатегорию выбираешь ТОЛЬКО ты по смыслу всего текста "
-                        "(бренд, модель, тип товара/услуги) — не по шаблонному title вроде «Акційний товар». "
-                        "New Balance/Nike/кроссовки → fashion/men_shoes|women_shoes; "
-                        "iPhone → electronics/smartphones; услуги → services_work. "
-                        "Заголовок без цены/города/приветствия, описание полное. "
-                        "Отвечай только валидным JSON без markdown."
-                    ),
-                },
+                {"role": "system", "content": _ENRICH_SYSTEM_PROMPT},
                 {"role": "user", "content": _build_prompt(item)},
             ],
             response_format={"type": "json_object"},
