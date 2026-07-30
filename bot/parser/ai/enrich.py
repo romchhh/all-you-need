@@ -253,7 +253,7 @@ def _build_prompt(item: dict) -> str:
      (или women_shoes если явно женское). НЕ home, НЕ decor.
    - iPhone / Samsung Galaxy / Xiaomi → electronics + smartphones. НЕ home.
    - диван / шкаф → furniture; маникюр / косметолог → services_work + beauty_health.
-   - вакансия / ищу работу → services_work + vacancies|looking_for_work (НЕ fashion).
+   - вакансия / ищу работу → НЕ оголошення барахолки (reject на screen; не класифікуй як fashion).
    Подсказки парсера category/sub могут быть неверны — не копируй их слепо.
 4. price — число строкой ("25" или "25.50"); если цены нет → null (договорная).
 5. is_free — true ТОЛЬКО если в тексте явно «бесплатно/віддам/даром/free». Для услуг без цены is_free=false.

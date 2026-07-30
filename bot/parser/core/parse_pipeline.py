@@ -7,9 +7,12 @@ from typing import Any, Optional
 
 from parser.ai.screen import ai_screen_parsed_listing, apply_screen_enrichment
 from parser.core.dedup import check_parser_duplicates
+from parser.core.quality import is_job_or_earn_spam
 from parser.storage.listing_dedup import active_listing_duplicate
 
 logger = logging.getLogger(__name__)
+
+_JOB_SUBCATEGORIES = frozenset({"vacancies", "part_time", "looking_for_work"})
 
 
 async def run_ai_screen_and_dedup(
@@ -49,6 +52,9 @@ async def run_ai_screen_and_dedup(
     if active_listing_duplicate(dedup_key, title, description):
         return False, "дублікат (маркетплейс)", None, {}
 
+    if is_job_or_earn_spam(title, description, raw_text):
+        return False, "спам/вакансія", None, {}
+
     candidate = {
         "raw_text": raw_text,
         "title": title,
@@ -82,6 +88,12 @@ async def run_ai_screen_and_dedup(
             "condition": enriched.get("condition"),
             "location": enriched.get("location"),
         }
+        check_title = str(fields.get("title") or title)
+        check_desc = str(fields.get("description") or description)
+        if is_job_or_earn_spam(check_title, check_desc, raw_text):
+            return False, "спам/вакансія (ai)", None, {}
+        if str(fields.get("subcategory") or "") in _JOB_SUBCATEGORIES:
+            return False, "вакансія (ai)", None, {}
         logger.info(
             "AI screen OK %s/%s: %s → %s/%s",
             source_channel,
@@ -90,5 +102,7 @@ async def run_ai_screen_and_dedup(
             fields.get("category"),
             fields.get("subcategory"),
         )
+    elif is_job_or_earn_spam(title, description, raw_text):
+        return False, "спам/вакансія", None, {}
 
     return True, "", embedding_json, fields

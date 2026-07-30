@@ -46,3 +46,14 @@ def has_too_many_emojis(description: str) -> bool:
 def is_likely_not_listing(title: str, description: str) -> bool:
     text = ((title or "") + " " + (description or "")).lower()
     return bool(NOT_LISTING_RE.search(text))
+
+
+def is_job_or_earn_spam(title: str = "", description: str = "", raw_text: str = "") -> bool:
+    """Вакансії / «зароби від $N» / боти вакансій — не оголошення барахолки."""
+    text = f"{title or ''} {description or ''} {raw_text or ''}"
+    if SPAM_RE.search(text):
+        return True
+    low = text.lower()
+    if "vakansiy" in low or "managervakansiy" in low:
+        return True
+    return False
