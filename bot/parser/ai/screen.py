@@ -98,15 +98,17 @@ ALREADY LIVE ON MARKETPLACE (recent; reject duplicates):
 Allowed marketplace category ids only:
 {marketplace_taxonomy_for_ai()}
 
-DECISION RULES (strict):
-Default: accept=false. When unsure, reject.
+DECISION RULES (strict but practical for flea markets):
+Reject junk. Accept real listings. When the post is clearly an item/service for sale — ACCEPT.
 
-ACCEPT (accept=true) only if the post is a REAL listing with a clear offer:
-- GOODS: selling / giving away / swapping a specific item, OR
-- SERVICE: a provider offering a service to a client (nails, repair, cleaning, tutoring, etc.)
+ACCEPT (accept=true) when there is a REAL offer:
+- GOODS: a concrete item (phone, sofa, shoes, appliance, clothes, bike, …)
+  with price and/or sell/give/swap wording, OR a typical flea caption like
+  "iPhone 13 300€" / "Диван, самовывоз" even without the word "selling"
+- SERVICE: a provider offering a service to a client (nails, repair, cleaning, tutoring, …)
 There must be a concrete subject (what is sold or which service is offered).
 
-REJECT (accept=false) for everything else, including:
+REJECT (accept=false) for:
 - news / info alerts (police, speed cameras, ROADPOL, weather, laws, “attention drivers”)
 - chat / questions (“who knows…”, “any tips…”, polls, memes, discussion with no offer)
 - channel meta (rules, welcome, “subscribe”, pins, channel ads)
@@ -115,19 +117,28 @@ REJECT (accept=false) for everything else, including:
 - earn-money schemes / MLM / “$150 per day — write to the bot”
 - wanted-only posts (“buying / looking for…”) with no own goods or service offer
 - empty, spam, or unrelated content
-A price number alone does NOT make a job/news post a listing.
+A salary/day rate does NOT make a job post a goods listing.
 Channel theme (e.g. beauty) and parser category hints do NOT make a post a listing.
+If unsure between NEWS/JOB vs listing → reject. If unsure but item+price is obvious → accept.
 
 Duplicates: if the same item/service already appears in the queues above →
 accept=false, is_duplicate=true, reject_reason="duplicate".
 
-If accept=true, also enrich fields:
-- title: Russian, 4–80 chars; what is offered; NO price, city, greetings, or “selling”
-  If the parser title is a stub (“Акційний товар”), take brand/model from the full text
-- description: Russian; keep full meaning (800–2000 chars ok); do not truncate important details
-- category/subcategory: from FULL TEXT meaning only; never vacancies / looking_for_work / part_time
-  Examples: sneakers/New Balance → fashion/men_shoes|women_shoes (NOT home/decor);
-  iPhone → electronics/smartphones; master services → services_work + fitting subcategory
+If accept=true, enrich fields carefully (auto-publish quality):
+- title: Russian, 4–80 chars; brand/model/item/service essence ONLY
+  NO price, city, PLZ, greetings, “selling/продам”, emoji spam, hashtags
+  Stub parser titles (“Акційний товар”, “Товар”) → rebuild from full text
+- description: Russian; FULL useful text (800–2000 ok); keep specs, size, condition, terms
+  Strip channel promo / “subscribe” fluff; keep factual listing content
+- category/subcategory: from FULL TEXT only; NEVER vacancies|looking_for_work|part_time
+  Critical mappings:
+  • sneakers / New Balance / Nike / Adidas / Jordan → fashion/men_shoes|women_shoes (NOT home/decor)
+  • iPhone / Samsung phone / Xiaomi → electronics/smartphones (NOT home)
+  • MacBook / laptop / iPad → electronics/computers_laptops
+  • PS5 / Xbox / Nintendo → electronics/game_consoles
+  • sofa / wardrobe / bed → furniture/…
+  • washing machine / fridge → appliances/…
+  • nails / brow / lash / cosmetologist → services_work/beauty_health
 - price / currency / is_free / location / condition
   {location_hint}
   Services without a stated price → price=null, is_free=false; condition for services is always "new"
@@ -151,10 +162,11 @@ Respond with JSON only:
 
 
 _SCREEN_SYSTEM_PROMPT = (
-    "You are a strict listing filter for the Trade Ground marketplace. "
-    "Default to reject. Accept ONLY real goods or master-service listings with a clear offer. "
-    "Reject news, jobs, templates, chat, wanted-only posts, spam, and anything without an offer. "
-    "Channel topic is not an offer. Reply with JSON only."
+    "You filter and enrich Trade Ground flea-market listings. "
+    "ACCEPT real goods/services with a clear offer (item+price is enough). "
+    "REJECT news, jobs, templates, chat, wanted-only, spam. "
+    "Categories must match the item (sneakers→fashion, iPhone→electronics — never home). "
+    "Titles: Russian, no price/city/greeting. Descriptions: complete. JSON only."
 )
 
 
@@ -195,6 +207,10 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
             timeout=70,
         )
     except Exception as e:
+        # Вузький fail-open: ясний офер уже пройшов детермінований junk — не губимо товар
+        if has_listing_offer_signal(raw_preview):
+            logger.warning("AI screen failed (пропускаємо з офером): %s", e)
+            return AiScreenResult(accept=True)
         logger.warning("AI screen failed (відхиляємо): %s", e)
         return AiScreenResult(accept=False, reason="ai помилка")
 
@@ -203,6 +219,8 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
         data = json.loads(raw)
     except json.JSONDecodeError:
         logger.error("AI screen invalid JSON: %s", raw[:400])
+        if has_listing_offer_signal(raw_preview):
+            return AiScreenResult(accept=True)
         return AiScreenResult(accept=False, reason="ai помилка")
 
     # За замовчуванням reject, якщо accept не true явно
@@ -229,6 +247,8 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
     title = clean_title(str(data.get("title") or ""), raw_text)
     if not title or title == "Объявление":
         title = clean_title(str(item.get("title") or ""), raw_text)
+    if not title or title == "Объявление":
+        title = clean_title(raw_text.split("\n", 1)[0] if raw_text else "", raw_text)
 
     description = _prefer_full_description(
         str(data.get("description") or ""),
@@ -236,10 +256,17 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
         raw_text,
         title,
     )
+    # Resolve з оновленим title/description для сильних сигналів категорії
+    resolve_item = {
+        **item,
+        "title": title,
+        "description": description,
+        "raw_text": raw_text,
+    }
     category, subcategory = resolve_marketplace_category(
         str(data.get("category") or ""),
         data.get("subcategory"),
-        item,
+        resolve_item,
     )
     channel_city = item.get("source_city") or item.get("location") or "Germany"
     location = _validate_location(

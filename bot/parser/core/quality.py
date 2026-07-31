@@ -60,7 +60,8 @@ def is_quality(text: str, has_photo: bool, relaxed: bool = False) -> tuple[bool,
             return False, "замало тексту без фото"
         return True, ""
     if not has_photo:
-        if len(t) < 45:
+        # Товар з ціною/офером без фото — ок при нормальному тексті
+        if len(t) < 45 and not (has_listing_offer_signal(t) and len(t) >= 28):
             return False, "немає фото"
     elif len(t) < 15:
         return False, "замало тексту"

@@ -89,8 +89,14 @@ async def run_ai_screen_and_dedup(
             "condition": enriched.get("condition"),
             "location": enriched.get("location"),
         }
-        check_title = str(fields.get("title") or title)
+        check_title = str(fields.get("title") or title).strip()
         check_desc = str(fields.get("description") or description)
+        if not check_title or len(check_title) < 4 or check_title.lower() in {
+            "объявление",
+            "оголошення",
+            "listing",
+        }:
+            return False, "поганий заголовок", None, {}
         junk, junk_reason = is_junk_for_marketplace(
             check_title,
             check_desc,
@@ -100,11 +106,12 @@ async def run_ai_screen_and_dedup(
         )
         if junk:
             return False, f"{junk_reason} (ai)", None, {}
+        fields["title"] = check_title
         logger.info(
             "AI screen OK %s/%s: %s → %s/%s",
             source_channel,
             message_id,
-            title[:40],
+            check_title[:40],
             fields.get("category"),
             fields.get("subcategory"),
         )

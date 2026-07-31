@@ -64,11 +64,20 @@ def _prefer_full_description(
     """
     Якщо AI сильно обрізав опис — беремо довший осмислений варіант з парсера/raw.
     """
-    ai = (ai_desc or "").strip()
-    parser = (parser_desc or "").strip()
-    raw = (raw_text or "").strip()
+    from parser.core.patterns import GREETING_TITLE_RE
 
-    # Прибрати title з початку raw для порівняння обсягу
+    def _sanitize(text: str) -> str:
+        t = (text or "").strip()
+        t = GREETING_TITLE_RE.sub("", t, count=1).strip()
+        t = re.sub(r"https?://t\.me/\S+", "", t, flags=re.I)
+        t = re.sub(r"(?i)\b(?:підпишіть?ся|подпишитесь|subscribe)\b[^\n]*", "", t)
+        t = re.sub(r"\n{3,}", "\n\n", t)
+        return t.strip()
+
+    ai = _sanitize(ai_desc)
+    parser = _sanitize(parser_desc)
+    raw = _sanitize(raw_text)
+
     raw_body = raw
     t = (title or "").strip()
     if t and raw_body.lower().startswith(t.lower()[:40].lower()):
@@ -78,13 +87,11 @@ def _prefer_full_description(
     if not candidates:
         return ai or parser or raw
 
-    # Якщо AI-опис ≥ 55% від raw — ок; інакше беремо найдовший розумний
     baseline = max(len(raw_body), len(parser), 1)
     if ai and len(ai) >= max(180, int(baseline * 0.55)):
         return ai
 
     best = max(candidates, key=len)
-    # Не підставляти гігантський сирий пост з купою сміття без потреби
     if best is raw or best is raw_body:
         if len(best) > 3500:
             best = best[:3500].rsplit("\n", 1)[0].strip() or best[:3500]
@@ -277,12 +284,12 @@ JSON only:
 
 
 _ENRICH_SYSTEM_PROMPT = (
-    "You enrich Trade Ground marketplace listings. "
+    "You enrich Trade Ground marketplace listings for auto-publish quality. "
     "Choose category/subcategory from the full text meaning only "
     "(brand, model, goods/service type) — never from stub titles like “Акційний товар”. "
-    "Sneakers/New Balance/Nike → fashion/men_shoes|women_shoes; "
-    "iPhone → electronics/smartphones; master services → services_work. "
-    "Title: no price/city/greeting. Description: complete. Reply with JSON only."
+    "Sneakers/New Balance/Nike → fashion/men_shoes|women_shoes (NOT home); "
+    "iPhone → electronics/smartphones (NOT home); master services → services_work. "
+    "Title: Russian, no price/city/greeting. Description: complete, factual. JSON only."
 )
 
 
@@ -323,8 +330,10 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
 
     raw_text = str(item.get("raw_text") or "")
     title = clean_title(str(data.get("title") or ""), raw_text)
-    if not title or title == "Объявление":
+    if not title or len(title) < 4:
         title = clean_title(str(item.get("title") or ""), raw_text)
+    if not title or len(title) < 4:
+        title = clean_title(raw_text.split("\n", 1)[0] if raw_text else "", raw_text)
 
     description = _prefer_full_description(
         str(data.get("description") or ""),
@@ -333,10 +342,16 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
         title,
     )
 
+    resolve_item = {
+        **item,
+        "title": title,
+        "description": description,
+        "raw_text": raw_text,
+    }
     category, subcategory = resolve_marketplace_category(
         str(data.get("category") or ""),
         data.get("subcategory"),
-        item,
+        resolve_item,
     )
     logger.info(
         "AI enrich cat: ai=%s/%s → marketplace=%s/%s (parser was %s/%s)",

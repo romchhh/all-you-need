@@ -448,23 +448,97 @@ def map_parser_to_marketplace(
     return "home", "other"
 
 
+# Сильні сигнали товару: якщо AI поклав home/other — перевизначаємо
+_STRONG_ITEM_SIGNALS: list[tuple[re.Pattern[str], str, str | None]] = [
+    (
+        re.compile(
+            r"iphone|айфон|samsung\s*galaxy|xiaomi|redmi|pixel\s*\d|смартфон|телефон",
+            re.I,
+        ),
+        "electronics",
+        "smartphones",
+    ),
+    (
+        re.compile(r"macbook|ноутбук|laptop|\bipad\b|планшет", re.I),
+        "electronics",
+        "computers_laptops",
+    ),
+    (
+        re.compile(r"playstation|ps\s*[45]|xbox|nintendo|switch|приставк", re.I),
+        "electronics",
+        "game_consoles",
+    ),
+    (
+        re.compile(
+            r"new\s*balance|nike|adidas|puma|reebok|asics|converse|vans|jordan|"
+            r"yeezy|salomon|hoka|timberland|sneakers?|кроссовк|кросівк|\bкед[ыи]?\b",
+            re.I,
+        ),
+        "fashion",
+        "men_shoes",
+    ),
+    (
+        re.compile(r"\bдиван|\bкресл|\bкрісл|\bsofa\b", re.I),
+        "furniture",
+        "sofas_chairs",
+    ),
+    (
+        re.compile(r"\bшкаф|\bкомод|\bстеллаж|гардероб", re.I),
+        "furniture",
+        "wardrobes_chests",
+    ),
+    (
+        re.compile(r"холодильник|стиральн|сушильн|посудомой|посудомийн", re.I),
+        "appliances",
+        "large_appliances",
+    ),
+    (
+        re.compile(r"\bколяск|автокресл|автокрісл", re.I),
+        "kids",
+        "strollers_car_seats",
+    ),
+]
+
+_WEAK_AI_CATEGORIES = frozenset({"home", "free"})
+
+
+def detect_strong_item_category(text: str) -> tuple[str, str | None] | None:
+    """Явний бренд/товар у тексті — пріоритет над слабкою AI-категорією (home)."""
+    if not (text or "").strip():
+        return None
+    for pattern, cat, sub in _STRONG_ITEM_SIGNALS:
+        if pattern.search(text):
+            # Жіноче взуття за маркерами
+            if cat == "fashion" and sub == "men_shoes":
+                low = text.lower()
+                if re.search(r"женск|жіноч|women|lady|damas", low):
+                    return cat, "women_shoes"
+            return cat, sub
+    return None
+
+
 def resolve_marketplace_category(
     ai_category: str,
     ai_subcategory: str | None,
     item: dict,
 ) -> tuple[str, str | None]:
     """
-    Категорію задає AI (id з таксономії маркетплейсу).
-    Regex/keywords — лише валідація id та fallback, якщо AI не дав категорію.
+    Категорію задає AI; сильні сигнали товару виправляють home/other помилки.
     """
     text = "\n".join(
         str(item.get(k) or "")
         for k in ("raw_text", "title", "description")
     )
 
-    # 1) Відповідь AI — пріоритет (лише перевіряємо, що id існують)
+    strong = detect_strong_item_category(text)
+
+    # 1) Відповідь AI — пріоритет; сильний сигнал виправляє лише home/free
     cat, sub = validate_marketplace_category(ai_category, ai_subcategory, text)
     if cat:
+        if strong and cat in _WEAK_AI_CATEGORIES:
+            fixed = validate_marketplace_category(strong[0], strong[1], text)
+            if fixed[0]:
+                return fixed
         return cat, sub
 
     # 2) AI міг дати parser-id (clothing/shoes) — мапимо на marketplace
@@ -475,9 +549,19 @@ def resolve_marketplace_category(
     if str(ai_category or "").strip():
         cat, sub = validate_marketplace_category(mapped[0], mapped[1], text)
         if cat:
+            if strong and cat in _WEAK_AI_CATEGORIES:
+                fixed = validate_marketplace_category(strong[0], strong[1], text)
+                if fixed[0]:
+                    return fixed
             return cat, sub
 
-    # 3) Fallback лише коли AI не дав category (вимкнений / помилка / порожньо)
+    # 3) Сильний сигнал без AI
+    if strong:
+        fixed = validate_marketplace_category(strong[0], strong[1], text)
+        if fixed[0]:
+            return fixed
+
+    # 4) Fallback лише коли AI не дав category
     item_cat = str(item.get("category") or "").strip()
     if item_cat:
         mapped = map_parser_to_marketplace(item_cat, item.get("subcategory"))
@@ -498,80 +582,103 @@ def clean_title(title: str, raw_text: str = "") -> str:
     """
     Заголовок без префіксів «продам», привітань, ціни та міста.
     """
-    from parser.core.patterns import GREETING_TITLE_RE, GENERIC_LISTING_TITLE_RE
+    from parser.core.patterns import GREETING_TITLE_RE, GENERIC_LISTING_TITLE_RE, PRICE_RE
 
-    t = (title or "").strip()
-    t = re.sub(r"^[\s🔥⭐️✨🎁📦💥❗️]+", "", t)
-    t = GREETING_TITLE_RE.sub("", t).strip()
-    t = re.sub(
-        r"^(?:продам|продаю|продаётся|продается|отдам|віддам|"
-        r"продаюсь|куплю|ищу|шукаю|продаю!|предлагаю|пропоную|"
-        r"выполняю|виконую|оказываю|надаю)\s*[-–—:]?\s*",
-        "",
-        t,
-        flags=re.IGNORECASE,
-    )
-    # Прибрати ціну з заголовка (обережно: не чіпати «iPhone 13»)
-    t = re.sub(
-        r"(?i)(?:ціна|цiна|цена|price|стоимость|вартість)\s*[:\s]*[\d\s.,]+"
-        r"(?:\s*(?:[€$£]|євро|евро|euro|eur|грн))?",
-        " ",
-        t,
-    )
-    t = re.sub(
-        r"(?i)(?<!\w)(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:€|eur\b|euro\b|євро|евро|\$|грн\b|uah\b)",
-        " ",
-        t,
-    )
-    t = re.sub(
-        r"(?i)(?:€|\$)\s*(\d{1,6}(?:[.,]\d{1,2})?)\b",
-        " ",
-        t,
-    )
-
-    # Прибрати відомі міста / Germany / PLZ
-    city_tokens: set[str] = set()
-    try:
-        from parser.core.location import _KNOWN_CITIES
-        from utils.location_normalization import CITY_SYNONYMS
-
-        city_tokens.update(_KNOWN_CITIES)
-        city_tokens.update(CITY_SYNONYMS.keys())
-    except Exception:
-        pass
-    for city in sorted(city_tokens, key=len, reverse=True):
-        if len(city) < 3:
-            continue
-        # Гамбург/Гамбурге/Hamburg…
-        stem = re.escape(city)
+    def _clean_once(src: str) -> str:
+        t = (src or "").strip()
+        t = re.sub(r"^[\s🔥⭐️✨🎁📦💥❗️]+", "", t)
+        t = GREETING_TITLE_RE.sub("", t).strip()
         t = re.sub(
-            rf"(?i)(?:^|[\s,./|(])(?:в|у|in|из|із)?\s*{stem}\w{{0,3}}\b",
+            r"^(?:продам|продаю|продаётся|продается|отдам|віддам|"
+            r"продаюсь|куплю|ищу|шукаю|продаю!|предлагаю|пропоную|"
+            r"выполняю|виконую|оказываю|надаю)\s*[-–—:]?\s*",
+            "",
+            t,
+            flags=re.IGNORECASE,
+        )
+        t = re.sub(
+            r"(?i)(?:ціна|цiна|цена|price|стоимость|вартість)\s*[:\s]*[\d\s.,]+"
+            r"(?:\s*(?:[€$£]|євро|евро|euro|eur|грн))?",
             " ",
             t,
         )
-    t = re.sub(r"(?i)\b(?:germany|deutschland|deutschland|нрв|nrw)\b", " ", t)
-    t = re.sub(r"\b\d{5}\b", " ", t)  # PLZ
-    t = re.sub(r"\s*[|/\-–—,]\s*$", "", t)
-    t = re.sub(r"\s+", " ", t).strip(" -–—,.")
+        t = re.sub(
+            r"(?i)(?<!\w)(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:€|eur\b|euro\b|євро|евро|\$|грн\b|uah\b)",
+            " ",
+            t,
+        )
+        t = re.sub(
+            r"(?i)(?:€|\$)\s*(\d{1,6}(?:[.,]\d{1,2})?)\b",
+            " ",
+            t,
+        )
 
-    t = re.sub(r"\s+", " ", t).strip(" -–—,.")
+        city_tokens: set[str] = set()
+        try:
+            from parser.core.location import _KNOWN_CITIES
+            from utils.location_normalization import CITY_SYNONYMS
 
-    if GENERIC_LISTING_TITLE_RE.match(t) or len(t) < 4:
+            city_tokens.update(_KNOWN_CITIES)
+            city_tokens.update(CITY_SYNONYMS.keys())
+        except Exception:
+            pass
+        for city in sorted(city_tokens, key=len, reverse=True):
+            if len(city) < 3:
+                continue
+            stem = re.escape(city)
+            t = re.sub(
+                rf"(?i)(?:^|[\s,./|(])(?:в|у|in|из|із)?\s*{stem}\w{{0,3}}\b",
+                " ",
+                t,
+            )
+        t = re.sub(r"(?i)\b(?:germany|deutschland|нрв|nrw)\b", " ", t)
+        t = re.sub(r"\b\d{5}\b", " ", t)
+        t = re.sub(r"\s*[|/\-–—,]\s*$", "", t)
+        t = re.sub(r"\s+", " ", t).strip(" -–—,.")
+        return t
+
+    t = _clean_once(title)
+
+    if GENERIC_LISTING_TITLE_RE.match(t) or len(t) < 4 or not t:
         if raw_text:
             for line in raw_text.strip().split("\n"):
                 line = line.strip()
                 if not line:
                     continue
-                candidate = clean_title(line, "")
+                # Пропустити рядки = лише ціна / привітання
+                if PRICE_RE.fullmatch(line.strip()) or len(PRICE_RE.sub("", line).strip()) < 3:
+                    continue
+                candidate = _clean_once(line)
                 if (
                     candidate
-                    and candidate != "Объявление"
                     and len(candidate) >= 4
                     and not GENERIC_LISTING_TITLE_RE.match(candidate)
                 ):
                     t = candidate
                     break
-    return t[:100] if t else "Объявление"
+
+    if not t or len(t) < 4 or GENERIC_LISTING_TITLE_RE.match(t):
+        # Останній шанс: бренд із сильного сигналу
+        strong = detect_strong_item_category(raw_text or title or "")
+        if strong and strong[0] == "electronics" and strong[1] == "smartphones":
+            m = re.search(
+                r"(iphone\s*\d+[^\n,]{0,20}|айфон\s*\d+[^\n,]{0,20}|"
+                r"samsung[^\n,]{0,24}|xiaomi[^\n,]{0,20})",
+                raw_text or title or "",
+                re.I,
+            )
+            if m:
+                t = _clean_once(m.group(0))
+        elif strong and strong[0] == "fashion":
+            m = re.search(
+                r"(new\s*balance[^\n,]{0,30}|nike[^\n,]{0,24}|adidas[^\n,]{0,24})",
+                raw_text or title or "",
+                re.I,
+            )
+            if m:
+                t = _clean_once(m.group(0))
+
+    return t[:100] if t and len(t) >= 4 else ""
 
 
 def force_services_marketplace_categories(item: dict) -> dict:
