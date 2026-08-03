@@ -8,9 +8,65 @@ from typing import Any, Optional
 from parser.ai.screen import ai_screen_parsed_listing, apply_screen_enrichment
 from parser.core.dedup import check_parser_duplicates
 from parser.core.quality import is_junk_for_marketplace
+from parser.core.text import format_listing_description
+from parser.marketplace_categories import (
+    clean_title,
+    force_services_marketplace_categories,
+    should_treat_as_service,
+)
 from parser.storage.listing_dedup import active_listing_duplicate
 
 logger = logging.getLogger(__name__)
+
+
+def _finalize_fields(
+    *,
+    title: str,
+    description: str,
+    raw_text: str,
+    category: str,
+    subcategory: Optional[str],
+    price: Any,
+    currency: Any,
+    is_free: Any,
+    condition: Any,
+    location: Any,
+    force_service: bool = False,
+) -> dict[str, Any]:
+    title = clean_title(title or "", raw_text)
+    description = format_listing_description(description or raw_text or "")
+
+    blob = f"{title}\n{description}\n{raw_text}"
+    if force_service or should_treat_as_service(
+        blob, force_service_channel=force_service, category=category
+    ):
+        locked = force_services_marketplace_categories(
+            {
+                "title": title,
+                "description": description,
+                "raw_text": raw_text,
+                "subcategory": subcategory,
+            }
+        )
+        category = locked["category"]
+        subcategory = locked.get("subcategory")
+        condition = "new"
+        if not price or str(price).strip().lower() in ("", "0", "none"):
+            price = "Договорная"
+            currency = None
+            is_free = False
+
+    return {
+        "title": title,
+        "description": description,
+        "category": category,
+        "subcategory": subcategory,
+        "price": price,
+        "currency": currency,
+        "is_free": bool(is_free),
+        "condition": condition,
+        "location": location,
+    }
 
 
 async def run_ai_screen_and_dedup(
@@ -30,6 +86,7 @@ async def run_ai_screen_and_dedup(
     currency: Optional[str],
     is_free: bool,
     condition: Optional[str],
+    force_service: bool = False,
 ) -> tuple[bool, str, Optional[str], dict[str, Any]]:
     """
     Повертає (ok, reason, embedding_json, fields_for_insert).
@@ -75,51 +132,61 @@ async def run_ai_screen_and_dedup(
     if not screen.accept:
         return False, screen.reason or "ai відхилено", None, {}
 
-    fields: dict[str, Any] = {}
     if screen.enrichment:
         enriched = apply_screen_enrichment(candidate, screen.enrichment)
-        fields = {
-            "title": enriched["title"],
-            "description": enriched["description"],
-            "category": enriched["category"],
-            "subcategory": enriched.get("subcategory"),
-            "price": enriched.get("price"),
-            "currency": enriched.get("currency"),
-            "is_free": enriched.get("is_free"),
-            "condition": enriched.get("condition"),
-            "location": enriched.get("location"),
-        }
-        check_title = str(fields.get("title") or title).strip()
-        check_desc = str(fields.get("description") or description)
-        if not check_title or len(check_title) < 4 or check_title.lower() in {
-            "объявление",
-            "оголошення",
-            "listing",
-        }:
-            return False, "поганий заголовок", None, {}
-        junk, junk_reason = is_junk_for_marketplace(
-            check_title,
-            check_desc,
-            raw_text,
-            str(fields.get("category") or category),
-            fields.get("subcategory") or subcategory,
-        )
-        if junk:
-            return False, f"{junk_reason} (ai)", None, {}
-        fields["title"] = check_title
-        logger.info(
-            "AI screen OK %s/%s: %s → %s/%s",
-            source_channel,
-            message_id,
-            check_title[:40],
-            fields.get("category"),
-            fields.get("subcategory"),
+        fields = _finalize_fields(
+            title=str(enriched.get("title") or title),
+            description=str(enriched.get("description") or description),
+            raw_text=raw_text,
+            category=str(enriched.get("category") or category),
+            subcategory=enriched.get("subcategory") or subcategory,
+            price=enriched.get("price", price),
+            currency=enriched.get("currency", currency),
+            is_free=enriched.get("is_free", is_free),
+            condition=enriched.get("condition", condition),
+            location=enriched.get("location"),
+            force_service=force_service,
         )
     else:
-        junk, junk_reason = is_junk_for_marketplace(
-            title, description, raw_text, category, subcategory
+        fields = _finalize_fields(
+            title=title,
+            description=description,
+            raw_text=raw_text,
+            category=category,
+            subcategory=subcategory,
+            price=price,
+            currency=currency,
+            is_free=is_free,
+            condition=condition,
+            location=source_city,
+            force_service=force_service,
         )
-        if junk:
-            return False, junk_reason, None, {}
 
+    check_title = str(fields.get("title") or "").strip()
+    if not check_title or len(check_title) < 4 or check_title.lower() in {
+        "объявление",
+        "оголошення",
+        "listing",
+    }:
+        return False, "поганий заголовок", None, {}
+
+    junk, junk_reason = is_junk_for_marketplace(
+        check_title,
+        str(fields.get("description") or description),
+        raw_text,
+        str(fields.get("category") or category),
+        fields.get("subcategory") or subcategory,
+    )
+    if junk:
+        return False, f"{junk_reason} (ai)", None, {}
+
+    fields["title"] = check_title
+    logger.info(
+        "AI screen OK %s/%s: %s → %s/%s",
+        source_channel,
+        message_id,
+        check_title[:40],
+        fields.get("category"),
+        fields.get("subcategory"),
+    )
     return True, "", embedding_json, fields

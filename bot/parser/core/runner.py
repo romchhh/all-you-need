@@ -10,6 +10,7 @@ from parser.category_keywords import detect_category
 from parser.config.channels import (
     BEAUTY_SERVICE_CHANNELS,
     CHANNELS,
+    PARSER_TYPE_SERVICES_CHANNEL,
     SERVICE_CHANNELS,
     normalize_channel_key,
 )
@@ -22,6 +23,10 @@ from parser.core.quality import (
     is_likely_not_listing,
     is_likely_service_ad,
     is_quality,
+)
+from parser.marketplace_categories import (
+    force_services_marketplace_categories,
+    should_treat_as_service,
 )
 from parser.core.telegram_meta import (
     message_link,
@@ -169,14 +174,29 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             is_free=is_free,
         )
         category, subcategory = detect_category(text, skip_free=(price_str is not None and not is_free))
-        if channel_key in SERVICE_CHANNELS:
-            detected_sub = subcategory if category == "services_work" else None
-            category = "services_work"
-            if channel_key in BEAUTY_SERVICE_CHANNELS:
-                subcategory = detected_sub or "beauty_services"
-            else:
-                subcategory = detected_sub or "other_services"
-        condition = detect_condition(text, category)
+        as_service = should_treat_as_service(
+            text,
+            force_service_channel=channel_key in SERVICE_CHANNELS,
+            category=category,
+        )
+        if as_service:
+            locked = force_services_marketplace_categories(
+                {
+                    "raw_text": text,
+                    "title": title,
+                    "description": description,
+                    "subcategory": subcategory if category == "services_work" else None,
+                }
+            )
+            category = locked["category"]
+            subcategory = locked.get("subcategory")
+            if channel_key in BEAUTY_SERVICE_CHANNELS and not subcategory:
+                subcategory = "beauty_services"
+            condition = "new"
+        else:
+            condition = detect_condition(text, category)
+
+        item_parser_type = PARSER_TYPE_SERVICES_CHANNEL if as_service else "default"
 
         ok, skip_reason, embedding_json, ai_fields = await run_ai_screen_and_dedup(
             source_channel=channel,
@@ -185,7 +205,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             dedup_key=dedup_key,
             title=title,
             description=description,
-            parser_type="default",
+            parser_type=item_parser_type,
             raw_text=text[:4000],
             source_city=city,
             category=category,
@@ -194,6 +214,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             currency=currency,
             is_free=is_free,
             condition=condition,
+            force_service=as_service,
         )
         if not ok:
             stats["skipped"] += 1
@@ -228,6 +249,27 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
                 source_channel=channel,
                 text=f"{title}\n{description}\n{text}",
             )
+
+        # Після AI ще раз фіксуємо послуги з goods-каналів → мод послуг
+        if as_service or should_treat_as_service(
+            f"{title}\n{description}\n{text}",
+            force_service_channel=channel_key in SERVICE_CHANNELS,
+            category=category,
+        ):
+            locked = force_services_marketplace_categories(
+                {
+                    "raw_text": text,
+                    "title": title,
+                    "description": description,
+                    "subcategory": subcategory,
+                }
+            )
+            category = locked["category"]
+            subcategory = locked.get("subcategory")
+            condition = "new"
+            item_parser_type = PARSER_TYPE_SERVICES_CHANNEL
+        else:
+            item_parser_type = "default"
 
         author_username, author_id = resolve_author_contact(msg_for_link, text, channel)
         media_group_id = getattr(msg, "media_group_id", None)
@@ -264,11 +306,22 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             raw_text=text[:4000],
             content_hash=content_hash,
             dedup_key=dedup_key,
+            parser_type=item_parser_type,
             text_embedding=embedding_json,
             msg_link=post_msg_link,
         )
 
         if item_id:
+            notify_payload = {
+                "category": category,
+                "location": location,
+                "source_city": source_city,
+                "title": title,
+                "description": description,
+                "raw_text": text[:4000],
+                "subcategory": subcategory,
+                "parser_type": item_parser_type,
+            }
             item_data = {
                 "id": item_id,
                 "source_channel": channel,
@@ -288,18 +341,11 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
                 "images": images,
                 "raw_text": text[:4000],
                 "msg_link": post_msg_link,
-                "notify_chat_id": notify_chat_for_parsed_item(
-                    {
-                        "category": category,
-                        "location": location,
-                        "source_city": source_city,
-                        "title": title,
-                        "description": description,
-                        "raw_text": text[:4000],
-                        "subcategory": subcategory,
-                    }
-                ),
+                "parser_type": item_parser_type,
+                "notify_chat_id": notify_chat_for_parsed_item(notify_payload),
             }
+            if item_parser_type == PARSER_TYPE_SERVICES_CHANNEL:
+                item_data["moderation_target"] = "services_both"
             try:
                 await notify_callback(item_data)
                 await asyncio.sleep(3)

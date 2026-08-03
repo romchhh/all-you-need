@@ -15,7 +15,7 @@ MARKETPLACE_TAXONOMY: dict[str, dict[str, str] | None] = {
         "repair_installation": "ремонт, монтаж, сантехник, электрик",
         "cleaning": "уборка, клининг",
         "transportation": "перевозки, грузоперевозки",
-        "beauty_health": "маникюр, косметолог, массаж, брови, ресницы",
+        "beauty_health": "маникюр, косметолог, массаж, брови, ресницы, тату, пирсинг, эпиляция",
         "it_design_websites": "IT, компьютеры, сайты, программирование",
         "photo_video": "фото, видео, оператор",
         "education_tutors": "репетитор, обучение",
@@ -267,20 +267,30 @@ MARKETPLACE_SUB_KEYWORDS: dict[str, dict[str, list[str]]] = {
         "beauty_health": [
             "маникюр", "манікюр", "педикюр", "косметолог", "массаж", "масаж", "бров",
             "ресниц", "вії", "ногт",
+            "эпиляц", "епіляц", "депиляц", "депіляц", "лазерн", "шугаринг", "восков",
+            "ботокс", "филлер", "філер", "перманент", "татуаж", "перманентн",
+            "beauty", "салон красот", "поцелил", "губы филлер", "губи філер",
+            "ламинир", "ламінув", "наращиван ресниц", "нарощуван ві",
+            "тату", "tattoo", "татуиров", "татуюван", "пирсинг", "piercing",
+            "тату-мастер", "тату мастер", "майстер тату",
         ],
         "repair_installation": [
             "ремонт", "сантехник", "сантехнік", "электрик", "електрик", "монтаж", "установк",
         ],
-        "cleaning": ["уборк", "клінінг", "чистк", "мийк"],
-        "transportation": ["перевоз", "перевез", "грузоперевоз", "ван", "грузчик"],
-        "it_design_websites": ["програм", "сайт", "it ", "компьютер", "ноутбук", "windows"],
-        "photo_video": ["фото", "видео", "оператор", "съемк", "зйомк"],
-        "education_tutors": ["репетитор", "репетит", "урок", "обучен", "навчан"],
-        "translations": ["перевод", "переклад", "translator"],
-        "auto_services": ["автосервис", "автосервіс", "шиномонтаж", "sto "],
+        "cleaning": ["уборк", "клінінг", "клининг", "хімчист", "химчист"],
+        "transportation": ["перевоз", "перевез", "грузоперевоз", "грузчик", "переезд"],
+        "it_design_websites": [
+            "сайт ", "сайты", "сайт:", "вебсайт", "web сайт", "landing", "лендинг",
+            "программист", "програміст", "разработк сайт", "розробк сайт",
+            "wordpress", "tilda", "figma", "ui/ux", "ui ux",
+        ],
+        "photo_video": ["фотосъ", "фотозй", "видеосъ", "відеозй", "оператор съем", "оператор зйом"],
+        "education_tutors": ["репетитор", "репетит", "урок англий", "урок німец", "обучен англий"],
+        "translations": ["переводчик", "перекладач", "translator", "перевод текст", "переклад текст"],
+        "auto_services": ["автосервис", "автосервіс", "шиномонтаж", "сто "],
         "vacancies": [
             "ваканс", "ищу работ", "шукаю робот", "job", "сотрудник", "працівник",
-            "требуется", "потрібен", "на постоянку", "полная занятость",
+            "требуется сотрудник", "потрібен працівник", "на постоянку", "полная занятость",
         ],
         "part_time": ["подработ", "підробіт", "part time", "nebenjob"],
         "looking_for_work": ["ищу работ", "шукаю робот", "ищу подработ", "шукаю підробіт"],
@@ -347,10 +357,13 @@ def detect_marketplace_subcategory(category: str, text: str) -> str | None:
     best_score = 0
 
     for sub_id, keywords in subs.items():
+        if sub_id in ("vacancies", "part_time", "looking_for_work"):
+            continue
         score = 0
         for kw in keywords:
             if kw in lower:
-                score += 1
+                # Довші ключі важать більше (епіляц > загальне «сайт »)
+                score += max(1, len(kw) // 4)
         if score > best_score:
             best_score = score
             best_sub = sub_id
@@ -358,29 +371,52 @@ def detect_marketplace_subcategory(category: str, text: str) -> str | None:
     return best_sub if best_score > 0 else None
 
 
+def subcategory_keyword_score(category: str, subcategory: str | None, text: str) -> int:
+    """Наскільки subcategory підтверджена текстом (0 = AI-галюцинація)."""
+    if not subcategory:
+        return 0
+    keywords = (MARKETPLACE_SUB_KEYWORDS.get(category) or {}).get(subcategory) or []
+    lower = (text or "").lower()
+    score = 0
+    for kw in keywords:
+        if kw in lower:
+            score += max(1, len(kw) // 4)
+    return score
+
+
 def _refine_subcategory(category: str, subcategory: str | None, text: str) -> str | None:
-    """Залишає subcategory від AI, якщо id валідний; keywords — лише для порожнього/other."""
+    """AI subcategory лише якщо підтверджена текстом; інакше keywords."""
     subs = MARKETPLACE_TAXONOMY.get(category)
     if subs is None:
         return None
 
     sub = (subcategory or "").strip() or None
+    detected = detect_marketplace_subcategory(category, text)
+
     if sub and sub in subs and sub not in _GENERIC_SUB_IDS:
-        return sub  # довіряємо AI
+        ai_score = subcategory_keyword_score(category, sub, text)
+        det_score = subcategory_keyword_score(category, detected, text) if detected else 0
+        # AI без опори в тексті, а keywords знайшли інше → беремо текст
+        if ai_score == 0 and detected and detected in subs and det_score > 0:
+            return detected
+        if detected and det_score > ai_score * 2 and detected in subs:
+            return detected
+        return sub
 
     if sub and sub in subs:
-        # AI дав other/services — спробуємо уточнити keywords лише всередині цієї category
-        detected = detect_marketplace_subcategory(category, text)
         if detected and detected in subs and detected not in _GENERIC_SUB_IDS:
             return detected
         return sub
 
-    detected = detect_marketplace_subcategory(category, text)
     if detected and detected in subs:
         return detected
 
     if "other" in subs:
         return "other"
+    if "other_services" in subs:
+        return "other_services"
+    if "services" in subs:
+        return "services"
     return next(iter(subs))
 
 
@@ -532,9 +568,20 @@ def resolve_marketplace_category(
 
     strong = detect_strong_item_category(text)
 
+    # Послуга з beauty-маркерами, яку AI поклав у fashion/beauty_wellness
+    from parser.core.quality import is_likely_service_ad
+
+    service_like = is_likely_service_ad(text)
+
     # 1) Відповідь AI — пріоритет; сильний сигнал виправляє лише home/free
     cat, sub = validate_marketplace_category(ai_category, ai_subcategory, text)
     if cat:
+        if service_like and cat in ("fashion", "beauty_wellness", "home", "hobby_sports"):
+            forced = force_services_marketplace_categories(
+                {"raw_text": text, "title": item.get("title"), "description": item.get("description"),
+                 "subcategory": ai_subcategory}
+            )
+            return forced["category"], forced.get("subcategory")
         if strong and cat in _WEAK_AI_CATEGORIES:
             fixed = validate_marketplace_category(strong[0], strong[1], text)
             if fixed[0]:
@@ -627,14 +674,19 @@ def clean_title(title: str, raw_text: str = "") -> str:
                 continue
             stem = re.escape(city)
             t = re.sub(
-                rf"(?i)(?:^|[\s,./|(])(?:в|у|in|из|із)?\s*{stem}\w{{0,3}}\b",
+                rf"(?i)(?:^|[\s,./|(])(?:в|у|in|из|із)?\s*{stem}\w{{0,6}}\b",
                 " ",
                 t,
             )
         t = re.sub(r"(?i)\b(?:germany|deutschland|нрв|nrw)\b", " ", t)
         t = re.sub(r"\b\d{5}\b", " ", t)
+        # Хвости на кшталт «… — 50€» / «… Hamburg»
         t = re.sub(r"\s*[|/\-–—,]\s*$", "", t)
         t = re.sub(r"\s+", " ", t).strip(" -–—,.")
+        # Якщо після чистки лишилась ціна — прибрати ще раз
+        if PRICE_RE.search(t):
+            t = PRICE_RE.sub(" ", t)
+            t = re.sub(r"\s+", " ", t).strip(" -–—,.")
         return t
 
     t = _clean_once(title)
@@ -678,13 +730,53 @@ def clean_title(title: str, raw_text: str = "") -> str:
             if m:
                 t = _clean_once(m.group(0))
 
+    # Слоган / «меня зовут…» замість суті послуги → епіляція / тату / манікюр з тексту
+    blob = f"{raw_text or ''}\n{title or ''}"
+    needs_service_title = bool(
+        re.search(
+            r"(?i)красота\s+начина|краса\s+почина|заботы\s+о\s+себе|турботи\s+про\s+себе"
+            r"|меня\s+зовут|мене\s+звати|меня\s+звати|привет\b|вітаю\b",
+            t or "",
+        )
+    ) or (
+        t
+        and len(t) > 8
+        and not detect_marketplace_subcategory("services_work", t)
+        and detect_marketplace_subcategory("services_work", blob)
+    )
+    if needs_service_title or (
+        detect_marketplace_subcategory("services_work", blob) == "beauty_health"
+        and (
+            needs_service_title
+            or re.search(r"(?i)зовут|звати|привет|из\s+украин|з\s+україн", t or "")
+            or len(t or "") > 40
+        )
+    ):
+        m = re.search(
+            r"(?i)((?:курсы?\s+)?лазерн\w*\s+эпиляц\w*"
+            r"|(?:курси?\s+)?лазерн\w*\s+епіляц\w*"
+            r"|шугаринг\w*|маникюр\w*|манікюр\w*|педикюр\w*"
+            r"|ботокс\w*|косметолог\w*"
+            r"|тату[\s\-]?мастер\w*|майстер\s+тату|услуги?\s+тату|послуг[аиі]\s+тату"
+            r"|татуировк\w*|татуюванн\w*|tattoo\s+artist)",
+            blob,
+        )
+        if m:
+            recovered = _clean_once(m.group(1))
+            if recovered:
+                t = recovered[:1].upper() + recovered[1:]
+        elif re.search(r"(?i)\bтату\b|\btattoo\b", blob) and re.search(
+            r"(?i)мастер|майстер|предлагаю|пропоную|делаю|роблю", blob
+        ):
+            t = "Тату-мастер"
+
     return t[:100] if t and len(t) >= 4 else ""
 
 
 def force_services_marketplace_categories(item: dict) -> dict:
     """
-    Для публікації з каналів послуг: category=services_work + валідна підкатегорія послуг.
-    Якщо AI/парсер дав fashion/electronics — перекласифіковуємо за текстом.
+    Для публікації послуг: category=services_work + підкатегорія з ТЕКСТУ
+    (AI subcategory без підтвердження в тексті не довіряємо).
     """
     out = dict(item)
     text = "\n".join(
@@ -693,25 +785,64 @@ def force_services_marketplace_categories(item: dict) -> dict:
     )
     current_sub = (out.get("subcategory") or "").strip() or None
     services_subs = MARKETPLACE_TAXONOMY.get("services_work") or {}
+    job_subs = frozenset({"vacancies", "part_time", "looking_for_work"})
 
-    if current_sub and current_sub in services_subs and current_sub not in _GENERIC_SUB_IDS:
-        out["category"] = "services_work"
-        out["subcategory"] = current_sub
-        return out
+    if current_sub in job_subs:
+        current_sub = None
 
     detected = detect_marketplace_subcategory("services_work", text)
-    if detected and detected in services_subs:
-        out["category"] = "services_work"
-        out["subcategory"] = detected
-        return out
+    if detected in job_subs:
+        detected = None
 
-    # map parser sub → marketplace
+    # Текст має пріоритет над AI, якщо знайдена конкретна підкатегорія
+    if detected and detected in services_subs:
+        ai_score = subcategory_keyword_score("services_work", current_sub, text)
+        det_score = subcategory_keyword_score("services_work", detected, text)
+        if ai_score == 0 or det_score >= ai_score:
+            out["category"] = "services_work"
+            out["subcategory"] = detected
+            return out
+
+    if current_sub and current_sub in services_subs and current_sub not in _GENERIC_SUB_IDS:
+        if subcategory_keyword_score("services_work", current_sub, text) > 0:
+            out["category"] = "services_work"
+            out["subcategory"] = current_sub
+            return out
+
     mapped = map_parser_to_marketplace("services_work", out.get("subcategory"))
     sub = mapped[1] if mapped[0] == "services_work" else None
+    if sub in job_subs:
+        sub = None
     sub = _refine_subcategory("services_work", sub, text)
+    if sub in job_subs:
+        sub = "other_services"
     out["category"] = "services_work"
     out["subcategory"] = sub or "other_services"
     return out
+
+
+def should_treat_as_service(
+    text: str,
+    *,
+    force_service_channel: bool = False,
+    category: str | None = None,
+) -> bool:
+    """Чи пост має йти як послуга (мод послуг + dual publish), а не як товар."""
+    from parser.core.quality import is_likely_service_ad
+
+    if force_service_channel:
+        # На service-каналі товар (iPhone тощо) без сервісних маркерів — лишаємо товаром
+        strong = detect_strong_item_category(text or "")
+        if (
+            strong
+            and strong[0] in ("electronics", "furniture", "appliances", "auto")
+            and not is_likely_service_ad(text or "")
+        ):
+            return False
+        return True
+    if (category or "").strip().lower() == "services_work":
+        return True
+    return is_likely_service_ad(text or "")
 
 
 def apply_marketplace_categories_to_item(item: dict) -> dict:

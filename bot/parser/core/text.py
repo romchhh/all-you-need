@@ -128,6 +128,38 @@ def enrich_description(title: str, description: str) -> str:
     return d
 
 
+def format_listing_description(description: str, *, max_len: int = 1800) -> str:
+    """
+    Охайний опис для маркетплейсу: прибрати промо, згорнути порожні рядки,
+    обрізати надто довгий текст по реченню/абзацу.
+    """
+    from parser.core.patterns import GREETING_TITLE_RE
+
+    t = (description or "").strip()
+    if not t:
+        return ""
+    t = GREETING_TITLE_RE.sub("", t, count=1).strip()
+    t = re.sub(r"https?://t\.me/\S+", "", t, flags=re.I)
+    t = re.sub(
+        r"(?im)^(?:підпишіть?ся|подпишитесь|subscribe|реклама\s+канала).*$",
+        "",
+        t,
+    )
+    t = re.sub(r"[ \t]+\n", "\n", t)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    t = re.sub(r"[ \t]{2,}", " ", t).strip()
+    if len(t) <= max_len:
+        return t
+
+    cut = t[:max_len]
+    for sep in ("\n\n", "\n", ". ", "! ", "? "):
+        idx = cut.rfind(sep)
+        if idx >= int(max_len * 0.55):
+            cut = cut[: idx + (0 if sep.startswith("\n") else 1)].strip()
+            break
+    return cut.rstrip(" ,;") + "…"
+
+
 def detect_condition(text: str, category: str) -> Optional[str]:
     if category == "services_work":
         return "new"

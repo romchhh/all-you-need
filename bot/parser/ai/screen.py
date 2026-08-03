@@ -138,7 +138,9 @@ If accept=true, enrich fields carefully (auto-publish quality):
   • PS5 / Xbox / Nintendo → electronics/game_consoles
   • sofa / wardrobe / bed → furniture/…
   • washing machine / fridge → appliances/…
-  • nails / brow / lash / cosmetologist → services_work/beauty_health
+  • nails / brow / lash / cosmetologist / laser epilation / шугаринг / tattoo / piercing → services_work/beauty_health (NOT home/other, NOT it_design_websites, NOT fashion)
+  • website / developer / WordPress → services_work/it_design_websites ONLY if the offer is making a website
+  • Services always condition=new; never “used” for a master offering a service
 - price / currency / is_free / location / condition
   {location_hint}
   Services without a stated price → price=null, is_free=false; condition for services is always "new"
@@ -256,6 +258,9 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
         raw_text,
         title,
     )
+    from parser.core.text import format_listing_description
+
+    description = format_listing_description(description)
     # Resolve з оновленим title/description для сильних сигналів категорії
     resolve_item = {
         **item,

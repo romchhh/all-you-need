@@ -43,6 +43,10 @@ from parser.core.text import (
     to_plain_str,
 )
 from parser.core.parse_pipeline import run_ai_screen_and_dedup
+from parser.marketplace_categories import (
+    force_services_marketplace_categories,
+    should_treat_as_service,
+)
 from parser.storage.parsed_items import (
     ensure_parsed_items_table,
     fingerprint_parsed_text,
@@ -206,6 +210,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             currency=currency,
             is_free=is_free,
             condition=condition,
+            force_service=force_service_channel or is_service,
         )
         if not ok:
             stats["skipped"] += 1
@@ -241,6 +246,27 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
                 text=f"{title}\n{description}\n{text}",
             )
 
+        as_service = should_treat_as_service(
+            f"{title}\n{description}\n{text}",
+            force_service_channel=force_service_channel,
+            category=category,
+        )
+        if as_service:
+            locked = force_services_marketplace_categories(
+                {
+                    "raw_text": text,
+                    "title": title,
+                    "description": description,
+                    "subcategory": subcategory,
+                }
+            )
+            category = locked["category"]
+            subcategory = locked.get("subcategory")
+            condition = "new"
+            final_parser_type = PARSER_TYPE_SERVICES_CHANNEL
+        else:
+            final_parser_type = "default"
+
         author_username, author_id = resolve_author_contact(msg_for_link, text, channel)
         media_group_id = getattr(msg, "media_group_id", None)
         if media_group_id:
@@ -254,13 +280,6 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             channel,
             effective_message_id,
             chat_id=chat_target if isinstance(chat_target, int) else None,
-        )
-
-        # AI міг визначити товар у послуговому каналі — не лишаємо services_channel
-        final_parser_type = (
-            PARSER_TYPE_SERVICES_CHANNEL
-            if (category or "").strip().lower() == "services_work"
-            else "default"
         )
 
         item_id = insert_parsed_item(
@@ -308,12 +327,16 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
                 "images": images,
                 "raw_text": text[:4000],
                 "msg_link": post_msg_link,
-                "parser_type": PARSER_TYPE_SERVICES_CHANNEL,
+                "parser_type": final_parser_type,
             }
             try:
                 item_data = {
                     **base_item_data,
-                    "moderation_target": "services_both",
+                    "moderation_target": (
+                        "services_both"
+                        if final_parser_type == PARSER_TYPE_SERVICES_CHANNEL
+                        else "marketplace"
+                    ),
                     "notify_chat_id": notify_chat_for_parsed_item(base_item_data),
                 }
                 await notify_callback(item_data)

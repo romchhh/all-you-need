@@ -150,24 +150,34 @@ def _normalize_price_fields(
         return "Free", None, True
 
     if not price_s or price_s.lower() in NEGOTIABLE_PRICES or price_s.lower() in ("free", "0"):
-        if is_services or not explicit_free:
+        if explicit_free:
+            return "Free", None, True
+        if is_services:
             return "Договорная", None, False
-        return "Договорная", None, False
+        return None, None, False
 
     cleaned = price_s.replace(" ", "").replace(",", ".")
     if cleaned.lower() in NEGOTIABLE_PRICES or cleaned.lower() == "free":
-        return "Договорная", None, False
+        if is_services:
+            return "Договорная", None, False
+        return None, None, False
 
     m = re.search(r"(\d+(?:[.,]\d+)?)", cleaned)
     if not m:
-        return "Договорная", None, False
+        if is_services:
+            return "Договорная", None, False
+        return None, None, False
 
     num = m.group(1).replace(",", ".")
     try:
         if float(num) <= 0:
-            return "Договорная", None, False
+            if is_services:
+                return "Договорная", None, False
+            return None, None, False
     except ValueError:
-        return "Договорная", None, False
+        if is_services:
+            return "Договорная", None, False
+        return None, None, False
     return num, currency or "EUR", False
 
 
@@ -341,6 +351,9 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
         raw_text,
         title,
     )
+    from parser.core.text import format_listing_description
+
+    description = format_listing_description(description)
 
     resolve_item = {
         **item,
