@@ -9,11 +9,6 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
-from parser.ai.enrich import (
-    enrich_parsed_item_with_ai,
-    is_ai_enrich_enabled,
-    merge_enrichment_into_item,
-)
 from parser.category_keywords import get_category_label
 from parser.moderation.approve_routing import (
     APPROVE_TARGET_SERVICES_BOTH,
@@ -25,6 +20,7 @@ from parser.marketplace_categories import (
     apply_marketplace_categories_to_item,
     force_services_marketplace_categories,
 )
+from parser.core.parse_pipeline import finalize_listing_item_for_publish
 from parser.moderation.author_notify import schedule_author_notify
 from parser.core.account_pool import list_parser_accounts
 from parser.core.location import resolve_parsed_location
@@ -56,40 +52,31 @@ from utils.city_digest_notify import enqueue_city_digest_listing
 logger = logging.getLogger(__name__)
 
 
-async def _apply_ai_enrichment(
-    callback: CallbackQuery,
-    item: dict,
-    item_id: int,
-    force_ai: bool = False,
-) -> tuple[dict, str]:
-    listing_item = dict(item)
-    ai_summary = ""
+async def _ack_processing(callback: CallbackQuery) -> None:
+    """Швидкий ack модератору; AI на approve не викликаємо (лише screen на парсингу)."""
+    try:
+        await callback.answer("⏳ Обробляємо…", show_alert=False)
+    except TelegramBadRequest:
+        pass
 
-    ai_enabled = is_ai_enrich_enabled() or force_ai
-    if ai_enabled:
-        try:
-            await callback.answer("🤖 AI аналізує оголошення…", show_alert=False)
-        except TelegramBadRequest:
-            pass
-        enriched = await enrich_parsed_item_with_ai(item)
-        if enriched and enriched.applied:
-            listing_item = merge_enrichment_into_item(item, enriched)
-            ai_summary = enriched.summary
-            logger.info(
-                "parsed_item %s AI enrich: cat=%s/%s loc=%s price=%s",
-                item_id,
-                listing_item.get("category"),
-                listing_item.get("subcategory"),
-                listing_item.get("location"),
-                listing_item.get("price"),
-            )
+
+def _prepare_listing_for_publish(item: dict, source: dict) -> dict:
+    """Категорії + локація + фінальний clean title/description перед Listing/каналом."""
+    listing_item = preserve_parsed_source_fields(item, source)
+    force_service = (
+        (listing_item.get("category") or "").strip().lower() == "services_work"
+        or (source.get("parser_type") or "") == "services_channel"
+    )
+    listing_item = finalize_listing_item_for_publish(
+        listing_item, force_service=force_service
+    )
+    listing_item = _force_listing_location(listing_item)
+    if force_service:
+        listing_item = force_services_marketplace_categories(listing_item)
+        listing_item["condition"] = "new"
     else:
-        try:
-            await callback.answer("⏳ Обробляємо…", show_alert=False)
-        except TelegramBadRequest:
-            pass
-
-    return listing_item, ai_summary
+        listing_item = apply_marketplace_categories_to_item(listing_item)
+    return listing_item
 
 
 def _force_listing_location(item: dict) -> dict:
@@ -122,19 +109,14 @@ async def _approve_services_both(
     except Exception:
         images = []
 
-    listing_item, ai_summary = await _apply_ai_enrichment(
-        callback, item, item_id, force_ai=True
-    )
-    listing_item = apply_marketplace_categories_to_item(listing_item)
-    listing_item = _force_listing_location(listing_item)
-    listing_item = preserve_parsed_source_fields(listing_item, item)
-    # Канали послуг → завжди services_work + коректна підкатегорія (не fashion/…)
-    listing_item = force_services_marketplace_categories(listing_item)
+    await _ack_processing(callback)
+    listing_item = _prepare_listing_for_publish(dict(item), item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
     if item_category != "services_work":
         listing_item["category"] = "services_work"
         listing_item = force_services_marketplace_categories(listing_item)
+        listing_item["condition"] = "new"
 
     pool = list_parser_accounts()
     seller = pool[1] if len(pool) > 1 else (pool[0] if pool else None)
@@ -214,8 +196,6 @@ async def _approve_services_both(
         f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
         f"📍 {location_label}"
     )
-    if ai_summary:
-        status_text += f"\n🤖 {html.escape(ai_summary[:220])}"
 
     async def _followup():
         try:
@@ -279,17 +259,14 @@ async def _approve_marketplace(
     except Exception:
         images = []
 
-    listing_item, ai_summary = await _apply_ai_enrichment(
-        callback, item, item_id, force_ai=True
-    )
-    listing_item = apply_marketplace_categories_to_item(listing_item)
-    listing_item = _force_listing_location(listing_item)
-    listing_item = preserve_parsed_source_fields(listing_item, item)
+    await _ack_processing(callback)
+    listing_item = _prepare_listing_for_publish(dict(item), item)
 
     item_category = (listing_item.get("category") or "").strip().lower()
     # Послуги (у т.ч. з сервіс-каналів / дублікати) — валідна підкатегорія services_work
     if item_category == "services_work" or (item.get("parser_type") or "") == "services_channel":
         listing_item = force_services_marketplace_categories(listing_item)
+        listing_item["condition"] = "new"
         item_category = "services_work"
 
     pool = list_parser_accounts()
@@ -363,8 +340,6 @@ async def _approve_marketplace(
         f"📂 {html.escape(get_category_label(listing_item.get('category', 'other'), listing_item.get('subcategory')))}\n"
         f"📍 {html.escape(str(listing_item.get('location') or ''))}"
     )
-    if ai_summary:
-        status_text += f"\n🤖 {html.escape(ai_summary[:220])}"
 
     async def _approve_followup():
         try:

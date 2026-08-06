@@ -69,6 +69,50 @@ def _finalize_fields(
     }
 
 
+def finalize_listing_item_for_publish(
+    item: dict,
+    *,
+    force_service: bool = False,
+) -> dict[str, Any]:
+    """
+    Фінальна нормалізація перед Listing / каналом послуг:
+    title без ціни/міста, опис відформатований, категорія/стан/ціна для послуг.
+    """
+    from parser.core.location import resolve_parsed_location
+    from parser.marketplace_categories import apply_marketplace_categories_to_item
+
+    out = dict(item)
+    raw = str(out.get("raw_text") or "")
+    fields = _finalize_fields(
+        title=str(out.get("title") or ""),
+        description=str(out.get("description") or ""),
+        raw_text=raw,
+        category=str(out.get("category") or ""),
+        subcategory=out.get("subcategory"),
+        price=out.get("price"),
+        currency=out.get("currency"),
+        is_free=out.get("is_free"),
+        condition=out.get("condition"),
+        location=out.get("location"),
+        force_service=force_service,
+    )
+    out.update(fields)
+
+    if force_service or (out.get("category") or "").strip().lower() == "services_work":
+        out = force_services_marketplace_categories(out)
+        out["condition"] = "new"
+    else:
+        out = apply_marketplace_categories_to_item(out)
+
+    out["location"] = resolve_parsed_location(
+        channel_city=str(out.get("source_city") or ""),
+        source_channel=str(out.get("source_channel") or "") or None,
+        suggested=str(out.get("location") or ""),
+        text=f"{out.get('title') or ''}\n{out.get('description') or ''}\n{raw}",
+    )
+    return out
+
+
 async def run_ai_screen_and_dedup(
     *,
     source_channel: str,

@@ -19,7 +19,7 @@ from parser.core.telegram_meta import (
     normalize_channel_key,
     parsed_item_message_link,
 )
-from parser.core.text import detect_lang, enrich_description
+from parser.core.text import detect_lang
 
 logger = logging.getLogger(__name__)
 
@@ -288,12 +288,21 @@ def format_original_post_link_html(item: dict, lang: str | None = None) -> str:
 
 def build_marketplace_description(item: dict) -> str:
     """
-    Опис для Listing на маркетплейсі:
+    Опис для Listing на маркетплейсі (без дубля title — title окреме поле).
     - @username автора, якщо відомий
     - інакше посилання на оригінальний post / канал-джерело
     """
-    base = enrich_description(item["title"], item["description"])
+    from parser.core.text import format_listing_description
+
+    base = format_listing_description(str(item.get("description") or ""))
+    if not base:
+        # fallback: короткий опис з title лише якщо опису немає
+        base = format_listing_description(str(item.get("title") or ""))
     base = strip_original_post_link_block(base)
+    # Не дублювати title на початку опису
+    title = str(item.get("title") or "").strip()
+    if title and base.lower().startswith(title.lower()):
+        base = base[len(title):].lstrip(" .,\n:—-")
     footer = marketplace_author_source_footer(item)
     parts = [base, footer]
     return "\n\n".join(p for p in parts if p)

@@ -63,14 +63,20 @@ def _prefer_full_description(
 ) -> str:
     """
     Якщо AI сильно обрізав опис — беремо довший осмислений варіант з парсера/raw.
+    Не підставляємо сирий raw поверх уже нормального AI-опису.
     """
     from parser.core.patterns import GREETING_TITLE_RE
+    from parser.core.text import format_listing_description
 
     def _sanitize(text: str) -> str:
         t = (text or "").strip()
         t = GREETING_TITLE_RE.sub("", t, count=1).strip()
         t = re.sub(r"https?://t\.me/\S+", "", t, flags=re.I)
-        t = re.sub(r"(?i)\b(?:підпишіть?ся|подпишитесь|subscribe)\b[^\n]*", "", t)
+        t = re.sub(
+            r"(?i)\b(?:підпишіть?ся|подпишитесь|subscribe)\b[^\n]*",
+            "",
+            t,
+        )
         t = re.sub(r"\n{3,}", "\n\n", t)
         return t.strip()
 
@@ -83,19 +89,23 @@ def _prefer_full_description(
     if t and raw_body.lower().startswith(t.lower()[:40].lower()):
         raw_body = raw_body[len(t):].lstrip(" .,\n")
 
+    # Нормальний AI-опис (≥80) — не замінюємо на raw зі сміттям
+    if ai and len(ai) >= 80:
+        return format_listing_description(ai)
+
     candidates = [c for c in (ai, parser, raw_body, raw) if c]
     if not candidates:
-        return ai or parser or raw
+        return format_listing_description(ai or parser or raw)
 
     baseline = max(len(raw_body), len(parser), 1)
-    if ai and len(ai) >= max(180, int(baseline * 0.55)):
-        return ai
+    if ai and len(ai) >= max(120, int(baseline * 0.45)):
+        return format_listing_description(ai)
 
     best = max(candidates, key=len)
     if best is raw or best is raw_body:
         if len(best) > 3500:
             best = best[:3500].rsplit("\n", 1)[0].strip() or best[:3500]
-    return best.strip()
+    return format_listing_description(best)
 
 
 @dataclass
@@ -239,7 +249,7 @@ Use ONLY the text below — no photos.
 Listing text (raw_text):
 {raw_text}
 
-Parser hints (may be wrong — do not copy blindly):
+Parser hints (prefer keeping a CLEAN title/description if already good):
 - title: {item.get("title") or ""}
 - description: {item.get("description") or ""}
 - category/sub: {parser_cat}/{parser_sub}
@@ -256,10 +266,11 @@ Canonical cities: {", ".join(GERMAN_CITIES[:40])}, …
 
 Rules:
 1. title — Russian, 4–80 chars. Item/service essence: brand, model, service type.
+   If the hint title is already clean (no price/city/greeting, names the item/service) — KEEP it.
+   Only rewrite stubs, greetings, or titles that still contain price/city.
    FORBIDDEN in title: price (€/EUR/currency numbers), city, PLZ,
    greetings (“Здравствуйте”, “Добрый день”), “selling/for sale/giving away”, emoji, hashtags.
-   Services: short essence (“Маникюр гель-лак”, “Ремонт стиральных машин”) —
-   do not copy a greeting first line.
+   Services: short essence (“Маникюр гель-лак”, “Тату-мастер”, “Ремонт стиральных машин”).
 2. description — Russian (translate from Ukrainian if needed). Keep all important info
    from raw_text: terms, prices, details, experience. Do not over-truncate
    (800–2000 chars ok for long posts). No channel promo links, no “DM me” spam/hashtags,
@@ -269,10 +280,10 @@ Rules:
    Examples:
    - New Balance / Nike / Adidas / sneakers → fashion + men_shoes (or women_shoes if clearly women’s). NOT home/decor.
    - iPhone / Samsung Galaxy / Xiaomi → electronics + smartphones. NOT home.
-   - sofa / wardrobe → furniture; nails / cosmetologist → services_work + beauty_health.
+   - sofa / wardrobe → furniture; nails / tattoo / epilation / cosmetologist → services_work + beauty_health.
    - jobs / “looking for work” are NOT marketplace listings — do not classify as fashion.
    Parser category hints may be wrong — do not copy them.
-4. price — numeric string ("25" or "25.50"); no price → null (negotiable).
+4. price — numeric string ("25" or "25.50"); goods with no price → null; services with no price → null (app sets negotiable).
 5. is_free — true ONLY if text clearly says free/віддам/даром/free. Services without price → is_free=false.
 6. currency — EUR by default; UAH only if грн is explicit.
 {location_rule}
@@ -295,16 +306,23 @@ JSON only:
 
 _ENRICH_SYSTEM_PROMPT = (
     "You enrich Trade Ground marketplace listings for auto-publish quality. "
+    "If the existing title is already a clean item/service name (no price, city, greeting), KEEP it. "
+    "Only rewrite title when it is a stub, greeting, or contains price/city. "
     "Choose category/subcategory from the full text meaning only "
     "(brand, model, goods/service type) — never from stub titles like “Акційний товар”. "
     "Sneakers/New Balance/Nike → fashion/men_shoes|women_shoes (NOT home); "
-    "iPhone → electronics/smartphones (NOT home); master services → services_work. "
+    "iPhone → electronics/smartphones (NOT home); "
+    "tattoo/nails/epilation → services_work/beauty_health; master services → services_work. "
     "Title: Russian, no price/city/greeting. Description: complete, factual. JSON only."
 )
 
 
 async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]:
-    """Викликає OpenAI (лише текст); при помилці повертає None (fallback на дані парсера)."""
+    """
+    Окремий enrich-виклик. Не використовувати на approve —
+    збагачення робить лише ai_screen_parsed_listing (один AI за пост).
+    Залишено для ручних/тестів.
+    """
     if not is_ai_enrich_enabled():
         return None
 
@@ -409,14 +427,66 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
 
 
 def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict:
-    """Повертає копію item з полями після AI."""
+    """Повертає копію item з полями після AI; кращий title з парсера не затираємо."""
     from parser.core.location import resolve_parsed_location
+    from parser.core.patterns import GREETING_TITLE_RE, PRICE_RE
+    from parser.marketplace_categories import clean_title
+    from parser.core.text import format_listing_description
+
+    raw = str(item.get("raw_text") or "")
+
+    def _title_score(title: str) -> int:
+        t = (title or "").strip()
+        if not t or len(t) < 4:
+            return -20
+        score = 5
+        if PRICE_RE.search(t):
+            score -= 8
+        if GREETING_TITLE_RE.match(t) or re.search(
+            r"(?i)^(меня\s+зовут|мене\s+звати|здравствуй|добр)", t
+        ):
+            score -= 6
+        if t.lower() in ("объявление", "оголошення", "listing", "товар", "акційний товар"):
+            score -= 15
+        if 6 <= len(t) <= 70:
+            score += 3
+        if len(t) > 90:
+            score -= 2
+        return score
 
     out = dict(item)
-    out["title"] = enriched.title
-    out["description"] = enriched.description
-    out["category"] = enriched.category
-    out["subcategory"] = enriched.subcategory
+    old_title = str(item.get("title") or "")
+    new_title = clean_title(enriched.title or "", raw)
+    old_clean = clean_title(old_title, raw)
+    if _title_score(old_clean) > _title_score(new_title):
+        out["title"] = old_clean
+    else:
+        out["title"] = new_title or old_clean
+
+    old_desc = format_listing_description(str(item.get("description") or ""))
+    new_desc = format_listing_description(enriched.description or "")
+    # Не замінюємо нормальний опис на коротший/гірший
+    if old_desc and len(old_desc) >= 40 and (
+        not new_desc or len(new_desc) < 40 or len(new_desc) < len(old_desc) * 0.5
+    ):
+        out["description"] = old_desc
+    else:
+        out["description"] = new_desc or old_desc
+
+    old_cat = str(item.get("category") or "").strip().lower()
+    new_cat = str(enriched.category or "").strip().lower()
+    old_sub = str(item.get("subcategory") or "").strip().lower()
+    new_sub = str(enriched.subcategory or "").strip().lower()
+    # Не затираємо конкретну категорію слабким home/other від AI
+    weak_new = new_cat in ("", "home", "other") or new_sub in ("", "other")
+    specific_old = old_cat and old_cat not in ("home", "other") and old_sub not in ("", "other")
+    if specific_old and weak_new:
+        out["category"] = item.get("category")
+        out["subcategory"] = item.get("subcategory")
+    else:
+        out["category"] = enriched.category
+        out["subcategory"] = enriched.subcategory
+
     out["price"] = enriched.price
     out["currency"] = enriched.currency
     out["is_free"] = enriched.is_free
@@ -424,7 +494,11 @@ def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict
         channel_city=str(item.get("source_city") or ""),
         source_channel=str(item.get("source_channel") or "") or None,
         suggested=enriched.location,
-        text=f"{enriched.title}\n{enriched.description}\n{item.get('raw_text') or ''}",
+        text=f"{out['title']}\n{out['description']}\n{raw}",
     )
-    out["condition"] = enriched.condition
+    # Послуги завжди new — не беремо «б/у» з AI
+    if (out.get("category") or "").strip().lower() == "services_work":
+        out["condition"] = "new"
+    else:
+        out["condition"] = enriched.condition
     return out
