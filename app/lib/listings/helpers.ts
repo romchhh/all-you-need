@@ -7,6 +7,15 @@ import sharp from 'sharp';
 import { toSQLiteDate, addDays, nowSQLite } from '@/utils/dateHelpers';
 import { getSystemSetting } from '@/utils/dbHelpers';
 
+/** Шлях до файлу в public/listings без path.join(dir, dynamic) — Turbopack інакше сканує всі uploads. */
+function listingDiskFile(baseDir: string, filename: string): string {
+  return `${baseDir}/${filename}`;
+}
+
+function listingPublicDir(...segments: string[]): string {
+  return join(process.cwd(), 'public', 'listings', ...segments);
+}
+
 interface User {
   id: number;
   listingPackagesBalance: number;
@@ -101,7 +110,7 @@ export async function saveOriginalImages(
     return [];
   }
 
-  const uploadsDir = join(process.cwd(), 'public', 'listings', 'originals');
+  const uploadsDir = listingPublicDir('originals');
   if (!existsSync(uploadsDir)) {
     await mkdir(uploadsDir, { recursive: true });
   }
@@ -127,7 +136,7 @@ export async function saveOriginalImages(
       try {
         const ext = file.type.split('/')[1] || 'jpg';
         const filename = `listing_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-        const filepath = join(uploadsDir, filename);
+        const filepath = listingDiskFile(uploadsDir, filename);
         
         // Конвертуємо File в Buffer
         const bytes = await file.arrayBuffer();
@@ -135,7 +144,7 @@ export async function saveOriginalImages(
         
         // Зберігаємо з timeout для запобігання зависанню
         await Promise.race([
-          writeFile(filepath, buffer, { 
+          writeFile(/* turbopackIgnore: true */ filepath, buffer, { 
             flag: 'w',
             mode: 0o666
           }),
@@ -203,7 +212,7 @@ export async function optimizeImages(
     return [];
   }
 
-  const optimizedDir = join(process.cwd(), 'public', 'listings', 'optimized');
+  const optimizedDir = listingPublicDir('optimized');
   if (!existsSync(optimizedDir)) {
     await mkdir(optimizedDir, { recursive: true });
   }
@@ -211,15 +220,15 @@ export async function optimizeImages(
   const optimizationPromises = originalImageUrls.map(async (url) => {
     try {
       // Отримуємо шлях до оригіналу
-      const originalPath = join(process.cwd(), 'public', url);
+      const originalPath = join(process.cwd(), 'public', url.replace(/^\/+/, ''));
       
-      if (!existsSync(originalPath)) {
+      if (!existsSync(/* turbopackIgnore: true */ originalPath)) {
         console.warn(`[optimizeImages] Original file not found: ${originalPath}`);
         return url; // Повертаємо оригінальний URL якщо файл не знайдено
       }
 
       // Читаємо оригінал
-      const buffer = await import('fs/promises').then(fs => fs.readFile(originalPath));
+      const buffer = await import('fs/promises').then(fs => fs.readFile(/* turbopackIgnore: true */ originalPath));
       
       // Оптимізуємо: WebP, 1200x1200, якість 75
       const optimizedBuffer = await sharp(buffer)
@@ -229,9 +238,9 @@ export async function optimizeImages(
         .toBuffer();
 
       const filename = `opt_${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
-      const filepath = join(optimizedDir, filename);
+      const filepath = listingDiskFile(optimizedDir, filename);
       
-      await writeFile(filepath, optimizedBuffer);
+      await writeFile(/* turbopackIgnore: true */ filepath, optimizedBuffer);
       return `/listings/optimized/${filename}`;
     } catch (error) {
       console.error(`[optimizeImages] Error optimizing ${url}:`, error);
@@ -257,7 +266,7 @@ export async function processAndUploadImages(
     return existingImages || [];
   }
 
-  const uploadsDir = join(process.cwd(), 'public', 'listings');
+  const uploadsDir = listingPublicDir();
   if (!existsSync(uploadsDir)) {
     await mkdir(uploadsDir, { recursive: true });
   }
@@ -286,9 +295,9 @@ export async function processAndUploadImages(
         .toBuffer();
 
       const filename = generateImageFilename();
-      const filepath = join(uploadsDir, filename);
+      const filepath = listingDiskFile(uploadsDir, filename);
       
-      await writeFile(filepath, optimizedBuffer);
+      await writeFile(/* turbopackIgnore: true */ filepath, optimizedBuffer);
       return `/listings/${filename}`;
     } catch (error) {
       console.error(`[processAndUploadImages] Error processing file ${file.name}:`, error);

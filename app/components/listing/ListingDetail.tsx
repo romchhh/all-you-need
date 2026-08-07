@@ -9,6 +9,7 @@ import { ImageViewModal } from '@/components/modals/ImageViewModal';
 import { PhoneModal } from '@/components/modals/PhoneModal';
 import dynamic from 'next/dynamic';
 import { getAvatarColor } from '@/utils/avatarColors';
+import { getListingShareLink } from '@/utils/botLinks';
 import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 import {
   buildSellerContactMessage,
