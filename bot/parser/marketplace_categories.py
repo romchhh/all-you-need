@@ -178,6 +178,15 @@ PARSER_TO_MARKETPLACE: dict[tuple[str, str | None], tuple[str, str | None]] = {
     ("vehicles", "car_parts"): ("auto", "parts"),
     ("vehicles", "other_vehicles"): ("auto", "other"),
     ("vehicles", None): ("auto", "other"),
+    # Часті AI-галюцинації назв категорій
+    ("transport", "cars"): ("auto", "cars"),
+    ("transport", "auto"): ("auto", "cars"),
+    ("transport", None): ("auto", "cars"),
+    ("transportation", None): ("auto", "cars"),
+    ("car", None): ("auto", "cars"),
+    ("cars", None): ("auto", "cars"),
+    ("automobile", None): ("auto", "cars"),
+    ("automotive", None): ("auto", "cars"),
     ("beauty", "cosmetics"): ("beauty_wellness", "cosmetics"),
     ("beauty", "hair"): ("beauty_wellness", "personal_care"),
     ("beauty", "skincare"): ("beauty_wellness", "cosmetics"),
@@ -302,9 +311,20 @@ MARKETPLACE_SUB_KEYWORDS: dict[str, dict[str, list[str]]] = {
         "personal_care": ["фен", "эпилятор", "епілятор", "для волос"],
     },
     "auto": {
-        "cars": ["автомобил", "автомобіль", "машин", "bmw", "audi", "mercedes", "vw "],
-        "tires_wheels": ["шин", "диск", "колес", "коліс"],
-        "parts": ["запчаст", "запчастин", "детал"],
+        "cars": [
+            "автомобил", "автомобіль", "машин", "продам авто", "продаю авто",
+            "nissan", "toyota", "volkswagen", "mercedes", "bmw", "audi", "opel",
+            "ford", "skoda", "škoda", "hyundai", "kia", "renault", "peugeot",
+            "mazda", "honda", "volvo", "seat", "fiat", "dacia", "porsche", "tesla",
+            "citroen", "citroën", "vw ", "diesel", "дизель", "бензин",
+            "тыс км", "тис км", "пробег", "пробіг",
+        ],
+        # Не «шин» / «диск» — інакше шин⊂машин, диск⊂дисконт
+        "tires_wheels": [
+            "шины", "шина", "шини", "резин", "диски", "диск ", " r1", " r2",
+            "колёса", "колеса", "коліс", "литые", "литі",
+        ],
+        "parts": ["запчаст", "запчастин", "детал авто", "автозапчаст"],
     },
     "hobby_sports": {
         "sports_equipment": ["спорт", "фитнес", "фітнес", "тренаж", "гантел"],
@@ -346,6 +366,26 @@ _GENERIC_SUB_IDS = frozenset({
     "other_work",
 })
 
+
+def _keyword_hit(kw: str, lower: str) -> bool:
+    """
+    Збіг ключового слова без false positive (шин⊂машин, игр⊂игрушк тощо).
+    Фрази з пробілом — звичайний substring; інакше — не всередині слова.
+    """
+    kw = (kw or "").strip().lower()
+    if not kw or not lower:
+        return False
+    if " " in kw:
+        return kw in lower
+    return bool(
+        re.search(
+            rf"(?<![a-zа-яёіїєґ0-9]){re.escape(kw)}",
+            lower,
+            re.IGNORECASE,
+        )
+    )
+
+
 def detect_marketplace_subcategory(category: str, text: str) -> str | None:
     """Підкатегорія маркетплейсу за ключовими словами в тексті."""
     subs = MARKETPLACE_SUB_KEYWORDS.get(category)
@@ -361,7 +401,7 @@ def detect_marketplace_subcategory(category: str, text: str) -> str | None:
             continue
         score = 0
         for kw in keywords:
-            if kw in lower:
+            if _keyword_hit(kw, lower):
                 # Довші ключі важать більше (епіляц > загальне «сайт »)
                 score += max(1, len(kw) // 4)
         if score > best_score:
@@ -379,7 +419,7 @@ def subcategory_keyword_score(category: str, subcategory: str | None, text: str)
     lower = (text or "").lower()
     score = 0
     for kw in keywords:
-        if kw in lower:
+        if _keyword_hit(kw, lower):
             score += max(1, len(kw) // 4)
     return score
 
@@ -533,6 +573,27 @@ _STRONG_ITEM_SIGNALS: list[tuple[re.Pattern[str], str, str | None]] = [
         "kids",
         "strollers_car_seats",
     ),
+    (
+        re.compile(
+            r"(?i)\b(?:nissan|toyota|volkswagen|\bvw\b|mercedes|bmw|audi|opel|ford|"
+            r"skoda|škoda|hyundai|kia|renault|peugeot|mazda|honda|volvo|seat|fiat|"
+            r"dacia|porsche|tesla|citroen|citroën)\b|"
+            r"продам\s+авто|продаю\s+авто|продається\s+авто|"
+            r"автомобил\w*|автомобіль\w*|"
+            r"\bdiesel\b|\bдизель\b|\bбензин\b|"
+            r"\d[\d\s.,]{2,6}\s*(?:тыс|тис)\.?\s*км|\bпробег\b|\bпробіг\b",
+        ),
+        "auto",
+        "cars",
+    ),
+    (
+        re.compile(
+            r"(?i)(?:\bшин[аыиуеі]\b|\bрезин[аыуи]\b|\bдиски\b|"
+            r"литые\s+диски|литі\s+диски|\br1[4-9]\b|\br2[0-2]\b)",
+        ),
+        "auto",
+        "tires_wheels",
+    ),
 ]
 
 _WEAK_AI_CATEGORIES = frozenset({"home", "free"})
@@ -542,15 +603,33 @@ def detect_strong_item_category(text: str) -> tuple[str, str | None] | None:
     """Явний бренд/товар у тексті — пріоритет над слабкою AI-категорією (home)."""
     if not (text or "").strip():
         return None
+    # Авто > шини, якщо є бренд/модель авто (інакше «шин» у «машин» тощо)
+    car_hit = False
+    tire_hit = False
+    fashion_hit: tuple[str, str | None] | None = None
+    other_hit: tuple[str, str | None] | None = None
     for pattern, cat, sub in _STRONG_ITEM_SIGNALS:
-        if pattern.search(text):
-            # Жіноче взуття за маркерами
-            if cat == "fashion" and sub == "men_shoes":
-                low = text.lower()
-                if re.search(r"женск|жіноч|women|lady|damas", low):
-                    return cat, "women_shoes"
-            return cat, sub
-    return None
+        if not pattern.search(text):
+            continue
+        if cat == "auto" and sub == "cars":
+            car_hit = True
+        elif cat == "auto" and sub == "tires_wheels":
+            tire_hit = True
+        elif cat == "fashion" and sub == "men_shoes":
+            low = text.lower()
+            if re.search(r"женск|жіноч|women|lady|damas", low):
+                fashion_hit = (cat, "women_shoes")
+            else:
+                fashion_hit = (cat, sub)
+        elif other_hit is None:
+            other_hit = (cat, sub)
+    if car_hit:
+        return "auto", "cars"
+    if tire_hit:
+        return "auto", "tires_wheels"
+    if fashion_hit:
+        return fashion_hit
+    return other_hit
 
 
 def resolve_marketplace_category(
@@ -573,7 +652,7 @@ def resolve_marketplace_category(
 
     service_like = is_likely_service_ad(text)
 
-    # 1) Відповідь AI — пріоритет; сильний сигнал виправляє лише home/free
+    # 1) Відповідь AI — пріоритет; сильний сигнал виправляє home/free і явні помилки
     cat, sub = validate_marketplace_category(ai_category, ai_subcategory, text)
     if cat:
         if service_like and cat in ("fashion", "beauty_wellness", "home", "hobby_sports"):
@@ -586,6 +665,11 @@ def resolve_marketplace_category(
             fixed = validate_marketplace_category(strong[0], strong[1], text)
             if fixed[0]:
                 return fixed
+        # Nissan/BMW тощо → cars, навіть якщо AI поставив tires_wheels / інше
+        if strong and strong[0] == "auto" and strong[1] == "cars":
+            if cat != "auto" or sub in (None, "other", "tires_wheels", "parts", "accessories"):
+                if subcategory_keyword_score("auto", "tires_wheels", text) == 0:
+                    return "auto", "cars"
         return cat, sub
 
     # 2) AI міг дати parser-id (clothing/shoes) — мапимо на marketplace
@@ -659,6 +743,18 @@ def clean_title(title: str, raw_text: str = "") -> str:
             " ",
             t,
         )
+        # Спеки/логистика — в description, не в title
+        t = re.sub(
+            r"(?i)\b(?:батаре[яи]|battery|аккумулятор|акумулятор)\s*[:\s]*\d{1,3}\s*%?",
+            " ",
+            t,
+        )
+        t = re.sub(
+            r"(?i)\b(?:самовывоз|самовивіз|коробка\s+есть|в\s+коробке|у\s+коробці|"
+            r"пиши(?:те)?\s+в\s+л[сc]|л\.?\s*с\.?)\b",
+            " ",
+            t,
+        )
 
         city_tokens: set[str] = set()
         try:
@@ -693,6 +789,8 @@ def clean_title(title: str, raw_text: str = "") -> str:
 
     if GENERIC_LISTING_TITLE_RE.match(t) or len(t) < 4 or not t:
         if raw_text:
+            best = ""
+            best_score = -1
             for line in raw_text.strip().split("\n"):
                 line = line.strip()
                 if not line:
@@ -702,21 +800,36 @@ def clean_title(title: str, raw_text: str = "") -> str:
                     continue
                 candidate = _clean_once(line)
                 if (
-                    candidate
-                    and len(candidate) >= 4
-                    and not GENERIC_LISTING_TITLE_RE.match(candidate)
+                    not candidate
+                    or len(candidate) < 4
+                    or GENERIC_LISTING_TITLE_RE.match(candidate)
                 ):
-                    t = candidate
-                    break
+                    continue
+                score = len(candidate)
+                # Бренд авто / латиниця з моделлю — сильніший кандидат
+                if re.search(
+                    r"(?i)\b(?:nissan|toyota|volkswagen|bmw|audi|mercedes|opel|ford|"
+                    r"skoda|hyundai|kia|renault|mazda|honda|volvo|tesla)\b",
+                    candidate,
+                ):
+                    score += 40
+                if re.search(r"[A-Za-z]{2,}", candidate):
+                    score += 5
+                if score > best_score:
+                    best_score = score
+                    best = candidate
+            if best:
+                t = best
 
     if not t or len(t) < 4 or GENERIC_LISTING_TITLE_RE.match(t):
         # Останній шанс: бренд із сильного сигналу
         strong = detect_strong_item_category(raw_text or title or "")
+        blob = raw_text or title or ""
         if strong and strong[0] == "electronics" and strong[1] == "smartphones":
             m = re.search(
                 r"(iphone\s*\d+[^\n,]{0,20}|айфон\s*\d+[^\n,]{0,20}|"
                 r"samsung[^\n,]{0,24}|xiaomi[^\n,]{0,20})",
-                raw_text or title or "",
+                blob,
                 re.I,
             )
             if m:
@@ -724,11 +837,25 @@ def clean_title(title: str, raw_text: str = "") -> str:
         elif strong and strong[0] == "fashion":
             m = re.search(
                 r"(new\s*balance[^\n,]{0,30}|nike[^\n,]{0,24}|adidas[^\n,]{0,24})",
-                raw_text or title or "",
+                blob,
                 re.I,
             )
             if m:
                 t = _clean_once(m.group(0))
+        elif strong and strong[0] == "auto" and strong[1] == "cars":
+            m = re.search(
+                r"(?i)\b((?:nissan|toyota|volkswagen|bmw|audi|mercedes[\s-]?benz|"
+                r"opel|ford|skoda|škoda|hyundai|kia|renault|peugeot|mazda|honda|"
+                r"volvo|seat|fiat|dacia|porsche|tesla|citroen|citroën|vw)"
+                r"(?:\s+[a-zа-яёіїєґ0-9][a-zа-яёіїєґ0-9./-]{0,24})"
+                r"(?:\s+\d+[.,]\d+\s*(?:diesel|tdi|cdi|бензин|дизель))?"
+                r")",
+                blob,
+            )
+            if m:
+                t = _clean_once(m.group(1))
+            elif re.search(r"(?i)\bавтомоб|\bпродам\s+авто|\bпродаю\s+авто", blob):
+                t = "Автомобиль"
 
     # Слоган / «меня зовут…» замість суті послуги → епіляція / тату / манікюр з тексту
     blob = f"{raw_text or ''}\n{title or ''}"

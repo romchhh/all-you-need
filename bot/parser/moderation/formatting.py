@@ -43,15 +43,48 @@ def _source_channel_url(item: dict) -> str:
 
 # ── URLs ──────────────────────────────────────
 
-def listing_url(listing_id: int) -> str:
+def listing_url(listing_id: int, lang: str = "uk") -> str:
+    """Веб-сторінка оголошення (поза Telegram)."""
     base = WEBAPP_URL.rstrip("/")
-    return f"{base}/listing/{listing_id}"
+    return f"{base}/{lang}/listing/{listing_id}"
 
 
 def listing_miniapp_url(listing_id: int) -> str:
+    """Deep-link у Mini App: t.me/bot?startapp=listing_X."""
     if BOT_USERNAME:
-        return f"https://t.me/{BOT_USERNAME}?startapp=listing_{listing_id}"
+        return f"https://t.me/{BOT_USERNAME.lstrip('@')}?startapp=listing_{listing_id}"
     return listing_url(listing_id)
+
+
+def listing_bot_url(listing_id: int) -> str:
+    """Deep-link у чат бота (/start listing_X) — картка оголошення в боті."""
+    if not BOT_USERNAME:
+        return ""
+    return f"https://t.me/{BOT_USERNAME.lstrip('@')}?start=listing_{listing_id}"
+
+
+def format_listing_open_links_html(listing_id: int, *, lang: str = "uk") -> str:
+    """
+    HTML-рядки з посиланнями на оголошення після публікації:
+    міні-додаток + бот (або веб, якщо немає BOT_USERNAME).
+    """
+    is_uk = (lang or "uk").lower().startswith("uk")
+    mini_label = "міні-додаток" if is_uk else "мини-приложение"
+    bot_label = "відкрити в боті" if is_uk else "открыть в боте"
+    web_label = "на сайті" if is_uk else "на сайте"
+
+    lines: list[str] = []
+    if BOT_USERNAME:
+        mini = html.escape(listing_miniapp_url(listing_id), quote=True)
+        lines.append(f'📱 <a href="{mini}">{mini_label}</a>')
+        bot = listing_bot_url(listing_id)
+        if bot:
+            bot_esc = html.escape(bot, quote=True)
+            lines.append(f'🤖 <a href="{bot_esc}">{bot_label}</a>')
+    else:
+        web = html.escape(listing_url(listing_id), quote=True)
+        lines.append(f'🌐 <a href="{web}">{web_label}</a>')
+    return "\n".join(lines)
 
 
 # ── Group message edit ────────────────────────
@@ -299,10 +332,19 @@ def build_marketplace_description(item: dict) -> str:
         # fallback: короткий опис з title лише якщо опису немає
         base = format_listing_description(str(item.get("title") or ""))
     base = strip_original_post_link_block(base)
-    # Не дублювати title на початку опису
+    # Не дублювати title на початку опису (але не зрізати опис у порожнечу)
     title = str(item.get("title") or "").strip()
     if title and base.lower().startswith(title.lower()):
-        base = base[len(title):].lstrip(" .,\n:—-")
+        remainder = base[len(title) :].lstrip(" .,\n:—-")
+        if remainder:
+            base = remainder
+    # Якщо після чисток лишилось порожньо — зібрати з raw (без дубля title)
+    if not base:
+        raw = format_listing_description(str(item.get("raw_text") or ""))
+        if raw:
+            if title and raw.lower().startswith(title.lower()):
+                raw = raw[len(title) :].lstrip(" .,\n:—-") or raw
+            base = raw
     footer = marketplace_author_source_footer(item)
     parts = [base, footer]
     return "\n\n".join(p for p in parts if p)

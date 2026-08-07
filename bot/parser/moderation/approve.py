@@ -28,7 +28,7 @@ from parser.moderation.formatting import (
     build_marketplace_description,
     edit_group_message,
     ensure_marketplace_description_has_source,
-    listing_miniapp_url,
+    format_listing_open_links_html,
     preserve_parsed_source_fields,
 )
 from parser.moderation.services_publish import (
@@ -180,7 +180,7 @@ async def _approve_services_both(
 
     group_id = callback.message.chat.id
     msg_id = callback.message.message_id
-    mini_url = html.escape(listing_miniapp_url(listing_id))
+    open_links = format_listing_open_links_html(listing_id)
     if callback.from_user.username:
         mod_mention = "@" + html.escape(callback.from_user.username)
     else:
@@ -190,8 +190,8 @@ async def _approve_services_both(
     force_channels = force_services_channel_ids_for_mod_chat(group_id, listing_item)
     status_text = (
         f"✅ <b>Підтверджено</b> модератором {mod_mention}\n"
-        f"📌 Listing #{listing_id}: "
-        f'<a href="{mini_url}">відкрити в міні-додатку</a>\n'
+        f"📌 Listing #{listing_id}\n"
+        f"{open_links}\n"
         f"📣 Публікуємо в Telegram-канал послуг\n"
         f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
         f"📍 {location_label}"
@@ -328,15 +328,15 @@ async def _approve_marketplace(
 
     group_id = callback.message.chat.id
     msg_id = callback.message.message_id
-    mini_url = html.escape(listing_miniapp_url(listing_id))
+    open_links = format_listing_open_links_html(listing_id)
     if callback.from_user.username:
         mod_mention = "@" + html.escape(callback.from_user.username)
     else:
         mod_mention = f"<code>{moderator_id}</code>"
     status_text = (
         f"✅ <b>Підтверджено</b> модератором {mod_mention}\n"
-        f"📌 Listing #{listing_id}: "
-        f"<a href=\"{mini_url}\">відкрити в міні-додатку бота</a>\n"
+        f"📌 Listing #{listing_id}\n"
+        f"{open_links}\n"
         f"📂 {html.escape(get_category_label(listing_item.get('category', 'other'), listing_item.get('subcategory')))}\n"
         f"📍 {html.escape(str(listing_item.get('location') or ''))}"
     )

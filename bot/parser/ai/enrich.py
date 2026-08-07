@@ -266,24 +266,22 @@ Canonical cities: {", ".join(GERMAN_CITIES[:40])}, …
 
 Rules:
 1. title — Russian, 4–80 chars. Item/service essence: brand, model, service type.
-   If the hint title is already clean (no price/city/greeting, names the item/service) — KEEP it.
-   Only rewrite stubs, greetings, or titles that still contain price/city.
-   FORBIDDEN in title: price (€/EUR/currency numbers), city, PLZ,
-   greetings (“Здравствуйте”, “Добрый день”), “selling/for sale/giving away”, emoji, hashtags.
-   Services: short essence (“Маникюр гель-лак”, “Тату-мастер”, “Ремонт стиральных машин”).
+   Rebuild stubs («авто», «товар», «машина», «Акційний товар», greetings).
+   FORBIDDEN in title: price (€/EUR), city, PLZ, “продам/продаю”, emoji, hashtags.
+   Examples: "Nissan Pulsar 1.5 Diesel", "iPhone 13 Pro 256GB", "Тату-мастер", "Nike Air Force 1".
 2. description — Russian (translate from Ukrainian if needed). Keep all important info
-   from raw_text: terms, prices, details, experience. Do not over-truncate
-   (800–2000 chars ok for long posts). No channel promo links, no “DM me” spam/hashtags,
-   do not repeat title as the first line.
-3. category/subcategory — from FULL raw_text meaning only (brand, model, what is offered).
-   Ignore stub titles (“Акційний товар”, “Товар”, “Sale”). Use taxonomy ids only; subcategory required.
+   from raw_text: specs, terms, prices, details. 2–8 sentences; 800–2000 chars ok for long posts.
+   Do not start by repeating the title. No channel promo / subscribe spam. No invented facts.
+3. category/subcategory — from FULL raw_text only. Use taxonomy ids only; subcategory required.
    Examples:
-   - New Balance / Nike / Adidas / sneakers → fashion + men_shoes (or women_shoes if clearly women’s). NOT home/decor.
-   - iPhone / Samsung Galaxy / Xiaomi → electronics + smartphones. NOT home.
-   - sofa / wardrobe → furniture; nails / tattoo / epilation / cosmetologist → services_work + beauty_health.
-   - jobs / “looking for work” are NOT marketplace listings — do not classify as fashion.
+   - Car (Nissan/BMW/…) → auto + cars (NOT tires_wheels)
+   - Tires/rims → auto + tires_wheels
+   - New Balance / Nike / sneakers → fashion + men_shoes|women_shoes (NOT home)
+   - iPhone / Samsung → electronics + smartphones (NOT home)
+   - sofa / wardrobe → furniture; nails / tattoo / epilation → services_work + beauty_health
+   - NEVER invent transport/vehicles/car; NEVER vacancies/looking_for_work for goods
    Parser category hints may be wrong — do not copy them.
-4. price — numeric string ("25" or "25.50"); goods with no price → null; services with no price → null (app sets negotiable).
+4. price — numeric string ("25" or "25.50"); goods with no price → null; services with no price → null.
 5. is_free — true ONLY if text clearly says free/віддам/даром/free. Services without price → is_free=false.
 6. currency — EUR by default; UAH only if грн is explicit.
 {location_rule}
@@ -306,14 +304,13 @@ JSON only:
 
 _ENRICH_SYSTEM_PROMPT = (
     "You enrich Trade Ground marketplace listings for auto-publish quality. "
-    "If the existing title is already a clean item/service name (no price, city, greeting), KEEP it. "
-    "Only rewrite title when it is a stub, greeting, or contains price/city. "
-    "Choose category/subcategory from the full text meaning only "
-    "(brand, model, goods/service type) — never from stub titles like “Акційний товар”. "
-    "Sneakers/New Balance/Nike → fashion/men_shoes|women_shoes (NOT home); "
-    "iPhone → electronics/smartphones (NOT home); "
-    "tattoo/nails/epilation → services_work/beauty_health; master services → services_work. "
-    "Title: Russian, no price/city/greeting. Description: complete, factual. JSON only."
+    "Title: Russian brand/model/service essence — never stubs («авто», «товар»), "
+    "never price/city/greeting. "
+    "Description: complete factual Russian from the post, no invention, do not only repeat title. "
+    "Category: ONLY allowed marketplace ids "
+    "(cars→auto/cars; phones→electronics/smartphones; "
+    "tattoo/nails/epilation→services_work/beauty_health). Never invent transport/vehicles. "
+    "JSON only."
 )
 
 

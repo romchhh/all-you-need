@@ -140,6 +140,14 @@ def format_listing_description(description: str, *, max_len: int = 1800) -> str:
         return ""
     t = GREETING_TITLE_RE.sub("", t, count=1).strip()
     t = re.sub(r"https?://t\.me/\S+", "", t, flags=re.I)
+    # «Продам авто» як перший рядок, якщо далі є суть (модель) — прибрати заглушку
+    t = re.sub(
+        r"(?is)^(продам|продаю|отдам|віддам)\s+"
+        r"(?:авто|машину|автомобиль|автомобіль|товар)\s*[\n\r]+",
+        "",
+        t,
+        count=1,
+    ).strip()
     t = re.sub(
         r"(?im)^(?:підпишіть?ся|подпишитесь|subscribe|реклама\s+канала).*$",
         "",

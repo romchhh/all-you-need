@@ -1,7 +1,7 @@
 """
-AI-фільтр парсованих оголошень: сміття, дублі, попереднє збагачення.
+AI-фільтр парсованих оголошень: сміття, дублі, збагачення title/desc/category.
 
-Викликається на етапі парсингу перед insert + модерацією.
+Один виклик AI на пост (на етапі парсингу перед insert + модерацією).
 """
 
 from __future__ import annotations
@@ -9,9 +9,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -48,6 +49,84 @@ def is_ai_screen_enabled() -> bool:
     return raw not in ("0", "false", "no", "off")
 
 
+def _title_quality_score(title: str, raw_text: str = "") -> int:
+    """Вищий бал = кращий marketplace title."""
+    from parser.core.patterns import GENERIC_LISTING_TITLE_RE, GREETING_TITLE_RE, PRICE_RE
+
+    t = (title or "").strip()
+    if not t or len(t) < 4:
+        return -30
+    score = 8
+    if GENERIC_LISTING_TITLE_RE.match(t):
+        score -= 25
+    if PRICE_RE.search(t):
+        score -= 12
+    if GREETING_TITLE_RE.match(t) or re.search(
+        r"(?i)^(меня\s+зовут|мене\s+звати|здравствуй|добр|привет|вітаю)", t
+    ):
+        score -= 15
+    if re.search(
+        r"(?i)^(продам|продаю|отдам|віддам|куплю|ищу|шукаю|предлагаю|пропоную)\b",
+        t,
+    ):
+        score -= 8
+    low = t.lower()
+    if low in (
+        "объявление",
+        "оголошення",
+        "listing",
+        "товар",
+        "авто",
+        "машина",
+        "услуга",
+        "послуга",
+    ):
+        score -= 20
+    if 8 <= len(t) <= 70:
+        score += 4
+    if len(t) > 90:
+        score -= 4
+    # Бренд / латиниця з моделлю — сильний сигнал якісного title
+    if re.search(
+        r"(?i)\b(?:iphone|samsung|xiaomi|nike|adidas|bmw|audi|mercedes|nissan|"
+        r"toyota|volkswagen|macbook|playstation|xbox|lego)\b",
+        t,
+    ):
+        score += 12
+    if re.search(r"[A-Za-z]{2,}", t) and re.search(r"[а-яёіїєґА-ЯЁІЇЄҐ]", t):
+        score += 2
+    # Title має перетинатися з raw (не вигаданий)
+    if raw_text:
+        tokens = [w for w in re.findall(r"[a-zа-яёіїєґ0-9]{3,}", t.lower()) if w]
+        raw_l = raw_text.lower()
+        hits = sum(1 for w in tokens if w in raw_l)
+        if tokens and hits == 0:
+            score -= 10
+        elif tokens and hits >= max(1, len(tokens) // 2):
+            score += 3
+    return score
+
+
+def _pick_best_title(ai_title: str, item: dict, raw_text: str) -> str:
+    """AI title vs recovery з raw — беремо якісніший."""
+    candidates = [
+        clean_title(ai_title or "", raw_text),
+        clean_title(str(item.get("title") or ""), raw_text),
+        clean_title(raw_text.split("\n", 1)[0] if raw_text else "", raw_text),
+        clean_title("", raw_text),  # stub recovery з усього raw
+    ]
+    best = ""
+    best_score = -999
+    for cand in candidates:
+        if not cand:
+            continue
+        sc = _title_quality_score(cand, raw_text)
+        if sc > best_score:
+            best_score = sc
+            best = cand
+    return best
+
+
 def _build_screen_prompt(item: dict, context: dict) -> str:
     from parser.core.location import is_local_source_city
     from parser.marketplace_categories import marketplace_taxonomy_for_ai
@@ -77,12 +156,12 @@ def _build_screen_prompt(item: dict, context: dict) -> str:
 
     channel_scope = "LOCAL city channel" if local_channel else "Germany-wide channel"
 
-    return f"""You moderate Telegram flea-market posts for Trade Ground (Germany; RU/UK/DE text).
+    return f"""You moderate AND enrich Telegram flea-market posts for Trade Ground (Germany; RU/UK/DE).
 
 POST TEXT:
 {raw_text}
 
-Parser hints (untrusted — do NOT treat as ground truth):
+Parser hints (UNTRUSTED — often wrong stubs; rebuild from POST TEXT):
 - title: {item.get("title") or ""}
 - description: {(item.get("description") or "")[:800]}
 - suggested category: {item.get("category")}/{item.get("subcategory")}
@@ -95,55 +174,90 @@ ALREADY IN MODERATION QUEUE (reject duplicates):
 ALREADY LIVE ON MARKETPLACE (recent; reject duplicates):
 {active_block}
 
-Allowed marketplace category ids only:
+Allowed marketplace category / subcategory ids ONLY:
 {marketplace_taxonomy_for_ai()}
 
-DECISION RULES (strict but practical for flea markets):
-Reject junk. Accept real listings. When the post is clearly an item/service for sale — ACCEPT.
-
+══════════════════════════════════════
+ACCEPT / REJECT
+══════════════════════════════════════
 ACCEPT (accept=true) when there is a REAL offer:
-- GOODS: a concrete item (phone, sofa, shoes, appliance, clothes, bike, …)
-  with price and/or sell/give/swap wording, OR a typical flea caption like
-  "iPhone 13 300€" / "Диван, самовывоз" even without the word "selling"
-- SERVICE: a provider offering a service to a client (nails, repair, cleaning, tutoring, …)
-There must be a concrete subject (what is sold or which service is offered).
+- GOODS: concrete item (phone, car, sofa, shoes, appliance…) with price and/or sell/give wording,
+  or a typical flea caption like "iPhone 13 300€" / "Диван, самовывоз"
+- SERVICE: provider offers a service (nails, tattoo, repair, cleaning, tutoring…)
 
-REJECT (accept=false) for:
-- news / info alerts (police, speed cameras, ROADPOL, weather, laws, “attention drivers”)
-- chat / questions (“who knows…”, “any tips…”, polls, memes, discussion with no offer)
-- channel meta (rules, welcome, “subscribe”, pins, channel ads)
-- jobs / hiring / employers / salary / “join the team” / side gigs / vacancy bots
-- form templates (“Employer name, city, employment type, schedule, salary…”)
-- earn-money schemes / MLM / “$150 per day — write to the bot”
-- wanted-only posts (“buying / looking for…”) with no own goods or service offer
-- empty, spam, or unrelated content
-A salary/day rate does NOT make a job post a goods listing.
-Channel theme (e.g. beauty) and parser category hints do NOT make a post a listing.
-If unsure between NEWS/JOB vs listing → reject. If unsure but item+price is obvious → accept.
+REJECT (accept=false):
+- news / police / ROADPOL / weather / laws
+- chat, polls, memes, “who knows…”, no offer
+- channel meta / subscribe / pins
+- jobs, hiring, salary, vacancy bots, MLM, “$150/day”
+- wanted-only (“куплю / ищу”) with no own offer
+- empty / spam
+If unsure NEWS/JOB vs listing → reject. If item+price is obvious → accept.
+Duplicates vs queues above → accept=false, is_duplicate=true, reject_reason="duplicate".
 
-Duplicates: if the same item/service already appears in the queues above →
-accept=false, is_duplicate=true, reject_reason="duplicate".
+══════════════════════════════════════
+ENRICHMENT (only if accept=true) — marketplace auto-publish quality
+══════════════════════════════════════
 
-If accept=true, enrich fields carefully (auto-publish quality):
-- title: Russian, 4–80 chars; brand/model/item/service essence ONLY
-  NO price, city, PLZ, greetings, “selling/продам”, emoji spam, hashtags
-  Stub parser titles (“Акційний товар”, “Товар”) → rebuild from full text
-- description: Russian; FULL useful text (800–2000 ok); keep specs, size, condition, terms
-  Strip channel promo / “subscribe” fluff; keep factual listing content
-- category/subcategory: from FULL TEXT only; NEVER vacancies|looking_for_work|part_time
-  Critical mappings:
-  • sneakers / New Balance / Nike / Adidas / Jordan → fashion/men_shoes|women_shoes (NOT home/decor)
-  • iPhone / Samsung phone / Xiaomi → electronics/smartphones (NOT home)
-  • MacBook / laptop / iPad → electronics/computers_laptops
-  • PS5 / Xbox / Nintendo → electronics/game_consoles
-  • sofa / wardrobe / bed → furniture/…
-  • washing machine / fridge → appliances/…
-  • nails / brow / lash / cosmetologist / laser epilation / шугаринг / tattoo / piercing → services_work/beauty_health (NOT home/other, NOT it_design_websites, NOT fashion)
-  • website / developer / WordPress → services_work/it_design_websites ONLY if the offer is making a website
-  • Services always condition=new; never “used” for a master offering a service
-- price / currency / is_free / location / condition
-  {location_hint}
-  Services without a stated price → price=null, is_free=false; condition for services is always "new"
+TITLE (critical):
+- Russian, 4–80 chars. Name the ITEM or SERVICE: brand + model + key spec OR service type.
+- FORBIDDEN in title: price, €, city, PLZ, greetings, “продам/продаю/отдам”, emoji spam, hashtags.
+- NEVER leave stubs: «авто», «машина», «товар», «объявление», «Акційний товар», «телефон».
+- Rebuild stubs from POST TEXT (brand/model lines).
+
+TITLE EXAMPLES:
+✗ "авто" / "Продам авто 5500€ Stuttgart"  → ✓ "Nissan Pulsar 1.5 Diesel"
+✗ "Продам телефон" / "iPhone 13 Pro 450€ Köln" → ✓ "iPhone 13 Pro 256GB"
+✗ "Меня зовут Женя я тату мастер" → ✓ "Тату-мастер"
+✗ "Nike Air Force 1 80€" → ✓ "Nike Air Force 1"
+✗ "Лазерная эпиляция Hamburg" → ✓ "Лазерная эпиляция"
+✗ "Акційний товар" → rebuild from text (brand/model)
+
+DESCRIPTION (critical):
+- Russian (translate UK→RU if needed). 2–8 short paragraphs/sentences.
+- Keep ALL useful facts from POST TEXT: specs, size, year, mileage, condition, pickup, extras.
+- Do NOT start with the same words as title. Do NOT invent facts not in the post.
+- Strip: subscribe spam, channel ads, endless emoji, “пиши в лс” fluff is ok once if that is the CTA.
+- Short posts: expand into a clean readable blurb from the same facts (still no invention).
+- Long posts: keep substance (800–2000 chars ok); do not crush to one line.
+
+DESCRIPTION EXAMPLES:
+Post: "Продам авто\\nNissan Pulsar 1,5 Diesel\\n5500€ Stuttgart"
+→ title "Nissan Pulsar 1.5 Diesel"
+→ description "Продается Nissan Pulsar, двигатель 1.5 Diesel. Цена 5500€. Город Stuttgart. Самовывоз."
+
+Post: "iPhone 13 Pro 256GB батарея 88% коробка есть 450€ Köln"
+→ title "iPhone 13 Pro 256GB"
+→ description "iPhone 13 Pro, память 256GB, состояние батареи 88%, коробка в комплекте. Цена 450€. Самовывоз Köln."
+
+CATEGORY / SUBCATEGORY (critical):
+- Use ONLY ids from the Allowed list above. NEVER invent: transport, vehicles, car, cars, clothing, phone…
+- Decide from FULL POST TEXT meaning, ignore stub parser hints.
+- subcategory is required when the category has sub-ids.
+
+CATEGORY MAP (memorize):
+• Car for sale (Nissan/BMW/VW/Toyota…, “продам авто”, diesel/petrol, mileage) → auto / cars
+  (NOT tires_wheels unless the post is ONLY about tires/rims)
+• Tires / rims / R16–R19 → auto / tires_wheels
+• iPhone / Samsung phone / Xiaomi → electronics / smartphones
+• MacBook / laptop / iPad → electronics / computers_laptops
+• PS5 / Xbox / Nintendo → electronics / games_consoles
+• Nike / Adidas / New Balance / sneakers → fashion / men_shoes or women_shoes
+• Sofa / wardrobe / bed → furniture / …
+• Fridge / washing machine → appliances / …
+• Nails / brows / lashes / cosmetologist / laser epilation / шугаринг / tattoo / piercing
+  → services_work / beauty_health (NOT it_design_websites, NOT fashion, NOT home)
+• Plumber / electrician / appliance repair → services_work / repair_installation
+• Cleaning → services_work / cleaning
+• Website / WordPress developer offer → services_work / it_design_websites ONLY if making sites
+• NEVER use vacancies | looking_for_work | part_time for marketplace goods/services
+
+PRICE / LOCATION / CONDITION:
+- price: numeric string "5500" or null; currency EUR unless грн explicit
+- is_free: true ONLY if text says free/віддам/даром
+- {location_hint}
+- goods: condition new|used from text; services_work: ALWAYS condition="new"
+- services with no price → price=null, is_free=false
 
 Respond with JSON only:
 {{
@@ -164,22 +278,25 @@ Respond with JSON only:
 
 
 _SCREEN_SYSTEM_PROMPT = (
-    "You filter and enrich Trade Ground flea-market listings. "
-    "ACCEPT real goods/services with a clear offer (item+price is enough). "
-    "REJECT news, jobs, templates, chat, wanted-only, spam. "
-    "Categories must match the item (sneakers→fashion, iPhone→electronics — never home). "
-    "Titles: Russian, no price/city/greeting. Descriptions: complete. JSON only."
+    "You are the listing quality engine for Trade Ground marketplace (Germany). "
+    "For each Telegram flea-market post: (1) accept only real goods/service offers; "
+    "(2) write a marketplace-ready Russian title (brand/model/service — never stubs like "
+    "«авто»/«товар», never price/city in title); "
+    "(3) write a complete factual Russian description from the post (no invention); "
+    "(4) assign category/subcategory ONLY from the allowed id list "
+    "(cars → auto/cars; phones → electronics/smartphones; tattoo/nails → "
+    "services_work/beauty_health). Never invent category ids. JSON only."
 )
 
 
 async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
-    """Фільтр + попереднє збагачення. При помилці API — відхиляємо (fail-closed)."""
+    """Фільтр + збагачення. При помилці API — fail-closed, з вузьким fail-open на явному офері."""
     from parser.core.quality import has_listing_offer_signal
+    from parser.core.text import format_listing_description
 
     raw_preview = str(item.get("raw_text") or item.get("description") or "")
 
     if not is_ai_screen_enabled():
-        # Без AI — лише пости з явним офером (ціна/продаж/послуга)
         if not has_listing_offer_signal(raw_preview):
             return AiScreenResult(accept=False, reason="немає оферу")
         return AiScreenResult(accept=True)
@@ -205,11 +322,10 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=2200,
-            timeout=70,
+            max_tokens=2800,
+            timeout=75,
         )
     except Exception as e:
-        # Вузький fail-open: ясний офер уже пройшов детермінований junk — не губимо товар
         if has_listing_offer_signal(raw_preview):
             logger.warning("AI screen failed (пропускаємо з офером): %s", e)
             return AiScreenResult(accept=True)
@@ -225,7 +341,6 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
             return AiScreenResult(accept=True)
         return AiScreenResult(accept=False, reason="ai помилка")
 
-    # За замовчуванням reject, якщо accept не true явно
     if data.get("accept") is not True:
         reason = str(data.get("reject_reason") or "ai відхилено").strip().lower()
         if data.get("is_duplicate") or "duplicate" in reason or "дубл" in reason:
@@ -246,11 +361,7 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
         return AiScreenResult(accept=False, reason="дублікат (ai)")
 
     raw_text = str(item.get("raw_text") or "")
-    title = clean_title(str(data.get("title") or ""), raw_text)
-    if not title or title == "Объявление":
-        title = clean_title(str(item.get("title") or ""), raw_text)
-    if not title or title == "Объявление":
-        title = clean_title(raw_text.split("\n", 1)[0] if raw_text else "", raw_text)
+    title = _pick_best_title(str(data.get("title") or ""), item, raw_text)
 
     description = _prefer_full_description(
         str(data.get("description") or ""),
@@ -258,10 +369,13 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
         raw_text,
         title,
     )
-    from parser.core.text import format_listing_description
-
     description = format_listing_description(description)
-    # Resolve з оновленим title/description для сильних сигналів категорії
+    # Якщо AI дав лише title-дубль — підтягнути факти з raw
+    if title and description and description.strip().lower() == title.strip().lower():
+        description = format_listing_description(
+            _prefer_full_description("", str(item.get("description") or ""), raw_text, title)
+        )
+
     resolve_item = {
         **item,
         "title": title,

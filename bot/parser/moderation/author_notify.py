@@ -15,7 +15,7 @@ from parser.core.account_pool import (
     list_accounts_round_robin,
 )
 from parser.core.telegram_meta import resolve_pyrogram_chat_ref
-from parser.moderation.formatting import listing_miniapp_url
+from parser.moderation.formatting import format_listing_open_links_html
 from parser.storage import parser_accounts_db as accounts_db
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,8 @@ NOTIFY_AUTHOR_TEXT_RU = (
     "Привет! 👋\n\n"
     "Мы нашли ваше объявление «{title}» и добавили его на наш маркетплейс "
     "<b>Trade Ground</b> — площадку для украино- и русскоязычных в Германии.\n\n"
-    "🔗 Ваше объявление: <a href=\"{listing_url}\">открыть в мини-приложении бота</a>\n\n"
+    "🔗 Ваше объявление:\n"
+    "{open_links}\n\n"
     "Если хотите внести изменения или удалить объявление — напишите нам."
 )
 
@@ -154,7 +155,7 @@ def _build_notify_text(item: dict, listing_id: int, *, channel_only: bool) -> st
         return NOTIFY_AUTHOR_CHANNEL_TEXT_RU.format(title=title)
     return NOTIFY_AUTHOR_TEXT_RU.format(
         title=title,
-        listing_url=html.escape(listing_miniapp_url(listing_id), quote=True),
+        open_links=format_listing_open_links_html(listing_id, lang="ru"),
     )
 
 

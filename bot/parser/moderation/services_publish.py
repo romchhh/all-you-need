@@ -22,6 +22,7 @@ from parser.moderation.formatting import (
     assemble_telegram_caption,
     build_channel_hashtags,
     format_original_post_link_html,
+    listing_bot_url,
     listing_miniapp_url,
     resolved_author_username,
     strip_original_post_link_block,
@@ -629,6 +630,9 @@ async def publish_services_listing_to_channel(
     listing_open_url = (
         listing_miniapp_url(marketplace_listing_id) if marketplace_listing_id else None
     )
+    listing_bot_open_url = (
+        listing_bot_url(marketplace_listing_id) if marketplace_listing_id else None
+    )
 
     if author_username:
         seller_full_name = f"@{author_username}"
@@ -677,7 +681,11 @@ async def publish_services_listing_to_channel(
     if listing_open_url:
         view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
         keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=listing_open_url)])
-    elif msg_link and not author_username:
+    if listing_bot_open_url and listing_bot_open_url != listing_open_url:
+        lang = detect_lang(f"{item.get('title') or ''}\n{item.get('description') or ''}")
+        bot_view = "🤖 Відкрити в боті" if lang == "uk" else "🤖 Открыть в боте"
+        keyboard_rows.append([InlineKeyboardButton(text=bot_view, url=listing_bot_open_url)])
+    if not listing_open_url and msg_link and not author_username:
         view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
         keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=msg_link)])
     keyboard_rows.append([InlineKeyboardButton(text=submit_btn, url=bot_link)])
