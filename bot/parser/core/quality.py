@@ -1,5 +1,7 @@
 """Перевірки якості та релевантності оголошень."""
 
+import re
+
 from parser.core.patterns import (
     CHAT_OR_META_RE,
     FREE_GIVEAWAY_RE,
@@ -137,3 +139,61 @@ def is_junk_for_marketplace(
     if require_offer and not has_listing_offer_signal(blob):
         return True, "немає оферу"
     return False, ""
+
+
+def _description_looks_unprocessed(description: str, raw_text: str) -> bool:
+    """Опис майже не відрізняється від сирого поста — AI не обробляв."""
+    desc = (description or "").strip()
+    raw = (raw_text or "").strip()
+    if not desc or not raw:
+        return bool(raw and not desc)
+    d = desc.lower()
+    r = raw.lower()
+    if d == r:
+        return True
+    if len(d) >= len(r) * 0.72:
+        return True
+    if r.startswith(d[: min(len(d), 240)]):
+        return True
+    return False
+
+
+def parsed_item_needs_ai_screen(item: dict) -> bool:
+    """
+    Чи потрібен AI screen перед публікацією (parse пропустив enrich або fail-open).
+    """
+    from parser.ai.screen import is_ai_screen_enabled
+    from parser.core.patterns import GENERIC_LISTING_TITLE_RE, GREETING_TITLE_RE
+    from parser.marketplace_categories import MARKETPLACE_TAXONOMY
+
+    if not is_ai_screen_enabled():
+        return False
+
+    raw = str(item.get("raw_text") or "").strip()
+    if len(raw) < 12:
+        return False
+
+    title = str(item.get("title") or "").strip()
+    desc = str(item.get("description") or "").strip()
+
+    if not title or len(title) < 4 or GENERIC_LISTING_TITLE_RE.match(title):
+        return True
+    if GREETING_TITLE_RE.search(title):
+        return True
+    if re.search(r"(?i)^(продам|продаю|продаётся|продается|отдам|віддам|🚨)", title):
+        return True
+    if PRICE_RE.search(title):
+        return True
+
+    if _description_looks_unprocessed(desc, raw):
+        return True
+
+    cat = str(item.get("category") or "").strip().lower()
+    if cat and cat not in MARKETPLACE_TAXONOMY:
+        return True
+
+    price = str(item.get("price") or "").strip().lower()
+    if price in ("", "0", "none", "null"):
+        return True
+
+    return False

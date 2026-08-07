@@ -20,7 +20,7 @@ from parser.marketplace_categories import (
     apply_marketplace_categories_to_item,
     force_services_marketplace_categories,
 )
-from parser.core.parse_pipeline import finalize_listing_item_for_publish
+from parser.core.parse_pipeline import finalize_listing_item_for_publish, ensure_parsed_item_ai_screened
 from parser.moderation.author_notify import schedule_author_notify
 from parser.core.account_pool import list_parser_accounts
 from parser.core.location import resolve_parsed_location
@@ -53,16 +53,17 @@ logger = logging.getLogger(__name__)
 
 
 async def _ack_processing(callback: CallbackQuery) -> None:
-    """Швидкий ack модератору; AI на approve не викликаємо (лише screen на парсингу)."""
+    """Швидкий ack модератору перед AI enrich."""
     try:
-        await callback.answer("⏳ Обробляємо…", show_alert=False)
+        await callback.answer("⏳ Обробляємо (AI)…", show_alert=False)
     except TelegramBadRequest:
         pass
 
 
-def _prepare_listing_for_publish(item: dict, source: dict) -> dict:
-    """Категорії + локація + фінальний clean title/description перед Listing/каналом."""
-    listing_item = preserve_parsed_source_fields(item, source)
+async def _prepare_listing_for_publish(item: dict, source: dict) -> dict:
+    """Завжди AI enrich + категорії + локація + фінальний title/description."""
+    working = await ensure_parsed_item_ai_screened(dict(item))
+    listing_item = preserve_parsed_source_fields(working, source)
     force_service = (
         (listing_item.get("category") or "").strip().lower() == "services_work"
         or (source.get("parser_type") or "") == "services_channel"
@@ -77,6 +78,33 @@ def _prepare_listing_for_publish(item: dict, source: dict) -> dict:
     else:
         listing_item = apply_marketplace_categories_to_item(listing_item)
     return listing_item
+
+
+async def _prepare_listing_for_publish_or_alert(
+    callback: CallbackQuery, item: dict, source: dict
+) -> dict | None:
+    """AI enrich + finalize; при помилці AI — alert модератору."""
+    try:
+        return await _prepare_listing_for_publish(item, source)
+    except RuntimeError as e:
+        logger.error("parsed_item %s: AI publish failed: %s", source.get("id"), e)
+        try:
+            await callback.answer(f"❌ {e}", show_alert=True)
+        except TelegramBadRequest:
+            pass
+        return None
+    except Exception as e:
+        logger.error(
+            "parsed_item %s: prepare for publish failed: %s",
+            source.get("id"),
+            e,
+            exc_info=True,
+        )
+        try:
+            await callback.answer("❌ Помилка AI / підготовки оголошення", show_alert=True)
+        except TelegramBadRequest:
+            pass
+        return None
 
 
 def _force_listing_location(item: dict) -> dict:
@@ -110,7 +138,9 @@ async def _approve_services_both(
         images = []
 
     await _ack_processing(callback)
-    listing_item = _prepare_listing_for_publish(dict(item), item)
+    listing_item = await _prepare_listing_for_publish_or_alert(callback, dict(item), item)
+    if not listing_item:
+        return
 
     item_category = (listing_item.get("category") or "").strip().lower()
     if item_category != "services_work":
@@ -260,7 +290,9 @@ async def _approve_marketplace(
         images = []
 
     await _ack_processing(callback)
-    listing_item = _prepare_listing_for_publish(dict(item), item)
+    listing_item = await _prepare_listing_for_publish_or_alert(callback, dict(item), item)
+    if not listing_item:
+        return
 
     item_category = (listing_item.get("category") or "").strip().lower()
     # Послуги (у т.ч. з сервіс-каналів / дублікати) — валідна підкатегорія services_work

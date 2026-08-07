@@ -302,6 +302,7 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
     if not is_ai_screen_enabled():
         if not has_listing_offer_signal(raw_preview):
             return AiScreenResult(accept=False, reason="немає оферу")
+        logger.warning("AI screen вимкнено — оголошення без enrich (approve спробує знову)")
         return AiScreenResult(accept=True)
 
     try:
@@ -330,7 +331,9 @@ async def ai_screen_parsed_listing(item: dict) -> AiScreenResult:
         )
     except Exception as e:
         if has_listing_offer_signal(raw_preview):
-            logger.warning("AI screen failed (пропускаємо з офером): %s", e)
+            logger.warning(
+                "AI screen failed (пропускаємо без enrich; approve повторить): %s", e
+            )
             return AiScreenResult(accept=True)
         logger.warning("AI screen failed (відхиляємо): %s", e)
         return AiScreenResult(accept=False, reason="ai помилка")

@@ -240,3 +240,54 @@ async def run_ai_screen_and_dedup(
         fields.get("subcategory"),
     )
     return True, "", embedding_json, fields
+
+
+async def ensure_parsed_item_ai_screened(item: dict) -> dict:
+    """
+    Завжди один AI screen перед approve/publish (title, description, category).
+    Поля з enrichment застосовуються напряму — без «залишити старий title якщо кращий».
+    """
+    from parser.ai.screen import is_ai_screen_enabled
+
+    item_id = item.get("id")
+
+    if not is_ai_screen_enabled():
+        raise RuntimeError(
+            "AI вимкнено — потрібні OPENAI_API_KEY та PARSER_AI_ENABLED=1"
+        )
+
+    logger.info("parsed_item %s: AI enrich перед публікацією", item_id)
+
+    screen = await ai_screen_parsed_listing(item)
+    if not screen.accept:
+        raise RuntimeError(
+            f"AI відхилив оголошення: {screen.reason or 'невідома причина'}"
+        )
+    if not screen.enrichment:
+        raise RuntimeError(
+            "AI не повернув результат — перевірте OPENAI_API_KEY та доступ до API"
+        )
+
+    e = screen.enrichment
+    fields = _finalize_fields(
+        title=str(e.title or item.get("title") or ""),
+        description=str(e.description or item.get("description") or ""),
+        raw_text=str(item.get("raw_text") or ""),
+        category=str(e.category or item.get("category") or ""),
+        subcategory=e.subcategory if e.subcategory is not None else item.get("subcategory"),
+        price=e.price if e.price is not None else item.get("price"),
+        currency=e.currency if e.currency is not None else item.get("currency"),
+        is_free=e.is_free if e.is_free is not None else item.get("is_free"),
+        condition=e.condition if e.condition is not None else item.get("condition"),
+        location=e.location or item.get("location"),
+        force_service=(str(e.category or item.get("category") or "").strip().lower() == "services_work"),
+    )
+    out = {**item, **fields}
+    logger.info(
+        "parsed_item %s: AI publish → «%s» / %s/%s",
+        item_id,
+        (out.get("title") or "")[:50],
+        out.get("category"),
+        out.get("subcategory"),
+    )
+    return out

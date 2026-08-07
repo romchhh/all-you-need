@@ -444,15 +444,28 @@ def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict
     old_title = str(item.get("title") or "")
     new_title = clean_title(enriched.title or "", raw)
     old_clean = clean_title(old_title, raw)
-    if _title_score(old_clean) > _title_score(new_title):
+    old_title_rawish = bool(
+        re.search(r"(?i)^(продам|продаю|продаётся|продается|отдам|віддам|🚨)", old_clean)
+        or PRICE_RE.search(old_clean)
+    )
+    if old_title_rawish and new_title and not re.search(
+        r"(?i)^(продам|продаю|продаётся|продается|отдам|віддам)\b", new_title
+    ):
+        out["title"] = new_title
+    elif _title_score(old_clean) > _title_score(new_title):
         out["title"] = old_clean
     else:
         out["title"] = new_title or old_clean
 
     old_desc = format_listing_description(str(item.get("description") or ""))
     new_desc = format_listing_description(enriched.description or "")
-    # Не замінюємо нормальний опис на коротший/гірший
-    if old_desc and len(old_desc) >= 40 and (
+    from parser.core.quality import _description_looks_unprocessed
+
+    desc_is_raw = _description_looks_unprocessed(old_desc, raw)
+    # Не замінюємо нормальний опис на коротший/гірший — але сирий пост завжди замінюємо AI
+    if desc_is_raw and new_desc:
+        out["description"] = new_desc
+    elif old_desc and len(old_desc) >= 40 and (
         not new_desc or len(new_desc) < 40 or len(new_desc) < len(old_desc) * 0.5
     ):
         out["description"] = old_desc
