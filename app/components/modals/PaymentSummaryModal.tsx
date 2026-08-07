@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo } from 'react';
 interface PaymentSummaryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (paymentMethod: 'balance' | 'direct') => void;
+  onConfirm: (paymentMethod: 'balance' | 'direct') => void | Promise<void>;
   packageType?: string | null;
   promotionType?: string | null;
   userBalance?: number;
@@ -148,7 +148,9 @@ export const PaymentSummaryModal = ({
     if (confirmDisabled) return;
     setConfirming(true);
     try {
-      onConfirm(paymentMethod);
+      await onConfirm(paymentMethod);
+    } catch (error) {
+      console.error('[PaymentSummaryModal] Payment confirm failed:', error);
     } finally {
       setConfirming(false);
     }

@@ -140,7 +140,7 @@ def _normalize_price_fields(
 ) -> tuple[Optional[str], Optional[str], bool]:
     """
     Free — лише при явних маркерах у тексті.
-    Для services_work без числової ціни — завжди «Договорная».
+    Без числової ціни — «Договорная» (товари та послуги).
     """
     price_s = str(price_raw or "").strip()
     currency = (str(currency_raw or "").strip().upper() or None)
@@ -151,7 +151,6 @@ def _normalize_price_fields(
     explicit_free = bool(
         re.search(r"\b(безкоштовно|бесплатно|віддам|отдам|даром|free)\b", lower)
     )
-    is_services = (category or "").strip().lower() == "services_work"
 
     # Не довіряємо голому is_free від AI без текстових маркерів (особливо для послуг).
     if bool(is_free_raw) and explicit_free:
@@ -162,32 +161,22 @@ def _normalize_price_fields(
     if not price_s or price_s.lower() in NEGOTIABLE_PRICES or price_s.lower() in ("free", "0"):
         if explicit_free:
             return "Free", None, True
-        if is_services:
-            return "Договорная", None, False
-        return None, None, False
+        return "Договорная", None, False
 
     cleaned = price_s.replace(" ", "").replace(",", ".")
     if cleaned.lower() in NEGOTIABLE_PRICES or cleaned.lower() == "free":
-        if is_services:
-            return "Договорная", None, False
-        return None, None, False
+        return "Договорная", None, False
 
     m = re.search(r"(\d+(?:[.,]\d+)?)", cleaned)
     if not m:
-        if is_services:
-            return "Договорная", None, False
-        return None, None, False
+        return "Договорная", None, False
 
     num = m.group(1).replace(",", ".")
     try:
         if float(num) <= 0:
-            if is_services:
-                return "Договорная", None, False
-            return None, None, False
-    except ValueError:
-        if is_services:
             return "Договорная", None, False
-        return None, None, False
+    except ValueError:
+        return "Договорная", None, False
     return num, currency or "EUR", False
 
 

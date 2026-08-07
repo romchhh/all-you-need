@@ -328,7 +328,12 @@ MARKETPLACE_SUB_KEYWORDS: dict[str, dict[str, list[str]]] = {
     },
     "hobby_sports": {
         "sports_equipment": ["спорт", "фитнес", "фітнес", "тренаж", "гантел"],
-        "bikes_scooters": ["велосипед", "самокат", "bike", "scooter"],
+        "bikes_scooters": [
+            "велосипед", "велик", "самокат", "bike", "bicycle", "scooter", "e-bike", "ebike",
+            "электровелосипед", "електровелосипед", "centurion", "shimano", "tektro",
+            "размер рам", "розмір рам", "переключател", "передач", "гидравлич", "гідравліч",
+            "bosch performance", "performance line",
+        ],
         "music_instruments": ["гитар", "гітар", "пианино", "фортеп", "синтез"],
         "books_learning": ["книг", "книж", "учебник", "підручник"],
     },
@@ -528,6 +533,19 @@ def map_parser_to_marketplace(
 _STRONG_ITEM_SIGNALS: list[tuple[re.Pattern[str], str, str | None]] = [
     (
         re.compile(
+            r"(?i)\b(?:велосипед|велосипеды|велосипеди|bike|bicycle|e-?bike|"
+            r"электровелосипед|електровелосипед|самокат|scooter|"
+            r"centurion|shimano|tektro|"
+            r"размер\s+рам|розмір\s+рам|"
+            r"переключател\w*\s+передач|"
+            r"гидравлич\w*\s+тормоз|гідравліч\w*\s+гальм|"
+            r"bosch\s+performance\s+line)",
+        ),
+        "hobby_sports",
+        "bikes_scooters",
+    ),
+    (
+        re.compile(
             r"iphone|айфон|samsung\s*galaxy|xiaomi|redmi|pixel\s*\d|смартфон|телефон",
             re.I,
         ),
@@ -615,6 +633,7 @@ def detect_strong_item_category(text: str) -> tuple[str, str | None] | None:
     # Авто > шини, якщо є бренд/модель авто (інакше «шин» у «машин» тощо)
     car_hit = False
     tire_hit = False
+    bike_hit = False
     kitchen_hit = False
     appliance_hit: tuple[str, str | None] | None = None
     fashion_hit: tuple[str, str | None] | None = None
@@ -626,6 +645,8 @@ def detect_strong_item_category(text: str) -> tuple[str, str | None] | None:
             car_hit = True
         elif cat == "auto" and sub == "tires_wheels":
             tire_hit = True
+        elif cat == "hobby_sports" and sub == "bikes_scooters":
+            bike_hit = True
         elif cat == "furniture" and sub == "tables_chairs" and re.search(r"(?i)кухн", text):
             kitchen_hit = True
         elif cat == "appliances" and appliance_hit is None:
@@ -640,6 +661,8 @@ def detect_strong_item_category(text: str) -> tuple[str, str | None] | None:
             other_hit = (cat, sub)
     if car_hit:
         return "auto", "cars"
+    if bike_hit:
+        return "hobby_sports", "bikes_scooters"
     if tire_hit:
         return "auto", "tires_wheels"
     if kitchen_hit:
@@ -684,6 +707,12 @@ def resolve_marketplace_category(
             fixed = validate_marketplace_category(strong[0], strong[1], text)
             if fixed[0]:
                 return fixed
+        # Велосипед / e-bike — hobby_sports, не electronics через Bosch/Shimano
+        if strong and strong[0] == "hobby_sports" and strong[1] == "bikes_scooters":
+            if cat in ("electronics", "appliances", "home", "auto") or (
+                cat == "hobby_sports" and sub in (None, "other", "sports_equipment")
+            ):
+                return "hobby_sports", "bikes_scooters"
         # Nissan/BMW тощо → cars, навіть якщо AI поставив tires_wheels / інше
         if strong and strong[0] == "auto" and strong[1] == "cars":
             if cat != "auto" or sub in (None, "other", "tires_wheels", "parts", "accessories"):
@@ -1002,7 +1031,7 @@ def should_treat_as_service(
         strong = detect_strong_item_category(text or "")
         if (
             strong
-            and strong[0] in ("electronics", "furniture", "appliances", "auto")
+            and strong[0] in ("electronics", "furniture", "appliances", "auto", "hobby_sports")
             and not is_likely_service_ad(text or "")
         ):
             return False

@@ -237,8 +237,10 @@ export async function processPromotionPurchaseFromBalance(
   listingId?: number
 ): Promise<{ newBalance: number; promotionEnds: Date }> {
   const promotionInfo = PROMOTION_PRICES[promotionType];
+  const price = promotionInfo.price;
+  const balanceBefore = Number(currentBalance);
 
-  if (currentBalance < promotionInfo.price) {
+  if (!Number.isFinite(balanceBefore) || balanceBefore < price) {
     throw new Error('Insufficient balance');
   }
 
@@ -246,40 +248,68 @@ export async function processPromotionPurchaseFromBalance(
   const endsAt = new Date();
   endsAt.setDate(endsAt.getDate() + promotionInfo.duration);
 
-  const newBalance = currentBalance - promotionInfo.price;
+  let newBalance = balanceBefore;
 
-  // Оновлюємо баланс користувача
-  await prisma.$executeRawUnsafe(
-    `UPDATE User SET balance = ?, updatedAt = ? WHERE id = ?`,
-    newBalance,
-    nowStr,
-    userId
-  );
+  try {
+    await prisma.$executeRawUnsafe(
+      `UPDATE User SET balance = balance - ?, updatedAt = ? WHERE id = ? AND balance >= ?`,
+      price,
+      nowStr,
+      userId,
+      price
+    );
 
-  // Створюємо транзакцію
-  await createTransaction({
-    userId,
-    type: 'payment',
-    amount: promotionInfo.price,
-    currency: 'EUR',
-    status: 'completed',
-    description: `Реклама: ${promotionType}`,
-  });
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT balance FROM User WHERE id = ?`,
+      userId
+    ) as Array<{ balance: number | string }>;
 
-  // Створюємо запис про покупку реклами (для можливості повернення коштів)
-  await createPromotionPurchaseRecord(
-    userId,
-    promotionType,
-    'balance',
-    listingId || undefined,
-    'completed' // Статус 'completed' для оплати з балансу
-  );
+    if (rows.length === 0) {
+      throw new Error('User not found');
+    }
 
-  if (listingId) {
-    await applyPromotionPurchaseToListing(listingId, promotionType, endsAt, nowStr);
+    newBalance = Number(rows[0].balance);
+    if (!Number.isFinite(newBalance) || balanceBefore - newBalance + 0.001 < price) {
+      throw new Error('Insufficient balance');
+    }
+
+    await createTransaction({
+      userId,
+      type: 'payment',
+      amount: price,
+      currency: 'EUR',
+      status: 'completed',
+      description: `Реклама: ${promotionType}`,
+    });
+
+    await createPromotionPurchaseRecord(
+      userId,
+      promotionType,
+      'balance',
+      listingId || undefined,
+      'completed'
+    );
+
+    if (listingId) {
+      await applyPromotionPurchaseToListing(listingId, promotionType, endsAt, nowStr);
+    }
+
+    return { newBalance, promotionEnds: endsAt };
+  } catch (error) {
+    if (Number.isFinite(newBalance) && balanceBefore - newBalance + 0.001 >= price) {
+      try {
+        await prisma.$executeRawUnsafe(
+          `UPDATE User SET balance = balance + ?, updatedAt = ? WHERE id = ?`,
+          price,
+          nowStr,
+          userId
+        );
+      } catch (refundError) {
+        console.error('[processPromotionPurchaseFromBalance] Failed to refund balance:', refundError);
+      }
+    }
+    throw error;
   }
-
-  return { newBalance, promotionEnds: endsAt };
 }
 
 /**

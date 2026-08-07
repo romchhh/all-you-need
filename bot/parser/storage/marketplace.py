@@ -140,7 +140,15 @@ def create_marketplace_listing(
     loc = canonicalize_known_city(location) or normalize_city_name(location) or "Germany"
     if not canonicalize_known_city(loc) and loc.lower() not in ("germany", "nrw"):
         loc = "Germany"
-    price_str = price if price else ("Договорная" if cat == "services_work" else "0")
+    price_l = (price or "").strip().lower()
+    if is_free and price_l in ("", "0", "free", "договорная", "договірна", "negotiable"):
+        price_str = "Free"
+    elif not price or price_l in ("", "0", "none", "null"):
+        price_str = "Договорная"
+    elif price_l in ("договорная", "договірна", "negotiable"):
+        price_str = "Договорная"
+    else:
+        price_str = price
     if cat == "services_work" and is_free:
         # ще раз: послуги майже ніколи не Free без явного маркера (вже знято вище)
         pass

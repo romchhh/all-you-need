@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
+import { prisma } from '@/lib/prisma';
 import {
   PROMOTION_PRICES,
   isValidPromotionType,
@@ -44,30 +45,52 @@ export async function POST(request: NextRequest) {
     }
 
     const promotionInfo = PROMOTION_PRICES[promotionType as PromotionType];
-    const parsedListingId = listingId ? parseInt(listingId) : undefined;
+    const parsedListingId =
+      listingId != null && String(listingId).trim() !== ''
+        ? parseInt(String(listingId), 10)
+        : undefined;
+
+    if (parsedListingId != null && !Number.isFinite(parsedListingId)) {
+      return NextResponse.json({ error: 'Invalid listingId' }, { status: 400 });
+    }
 
     // Оплата з балансу
     if (paymentMethod === 'balance') {
       console.log('[Promotions API] Balance payment selected');
 
-      // Перевіряємо баланс
-      if (user.balance < promotionInfo.price) {
+      const balance = Number(user.balance);
+      if (!Number.isFinite(balance) || balance < promotionInfo.price) {
         console.error('[Promotions API] Insufficient balance:', { balance: user.balance, price: promotionInfo.price });
         return NextResponse.json(
-          { 
+          {
             error: 'Insufficient balance',
-            balance: user.balance,
+            balance,
             required: promotionInfo.price,
           },
           { status: 400 }
         );
       }
 
+      if (parsedListingId) {
+        const listingRows = await prisma.$queryRawUnsafe(
+          `SELECT id, userId FROM Listing WHERE id = ?`,
+          parsedListingId
+        ) as Array<{ id: number; userId: number }>;
+
+        if (listingRows.length === 0) {
+          return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+        }
+
+        if (listingRows[0].userId !== user.id) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+      }
+
       // Списуємо з балансу
       try {
         const result = await processPromotionPurchaseFromBalance(
           user.id,
-          user.balance,
+          balance,
           promotionType as PromotionType,
           parsedListingId
         );
@@ -81,10 +104,9 @@ export async function POST(request: NextRequest) {
         });
       } catch (error) {
         console.error('[Promotions API] Failed to process balance payment:', error);
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : 'Failed to process payment' },
-          { status: 500 }
-        );
+        const message = error instanceof Error ? error.message : 'Failed to process payment';
+        const status = message === 'Insufficient balance' ? 400 : 500;
+        return NextResponse.json({ error: message }, { status });
       }
     }
 

@@ -9,7 +9,7 @@ import { ImageViewModal } from '@/components/modals/ImageViewModal';
 import { PhoneModal } from '@/components/modals/PhoneModal';
 import dynamic from 'next/dynamic';
 import { getAvatarColor } from '@/utils/avatarColors';
-import { getListingShareLink } from '@/utils/botLinks';
+import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 import {
   buildSellerContactMessage,
   getListingContactUrl,
@@ -427,18 +427,18 @@ export const ListingDetail = ({
   const handlePaymentConfirm = async (paymentMethod: 'balance' | 'direct') => {
     if (!selectedPromotionType) return;
     
+    const telegramId = resolvePaymentTelegramId(tg, currentUser?.id || profile?.telegramId);
+    if (!telegramId) {
+      showToast(t('common.error'), 'error');
+      throw new Error('Missing telegramId');
+    }
+    
     try {
-      const userTelegramId = currentUser?.id || profile?.telegramId;
-      if (!userTelegramId) {
-        showToast(t('common.error'), 'error');
-        return;
-      }
-      
       const response = await fetch('/api/listings/promotions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          telegramId: userTelegramId,
+          telegramId,
           listingId: listing.id,
           promotionType: selectedPromotionType,
           paymentMethod,
@@ -448,7 +448,14 @@ export const ListingDetail = ({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to purchase promotion');
+        const apiError = data.error || 'Failed to purchase promotion';
+        if (apiError === 'Insufficient balance') {
+          throw new Error(t('payment.insufficientBalance'));
+        }
+        if (apiError === 'Forbidden') {
+          throw new Error(t('common.error'));
+        }
+        throw new Error(apiError);
       }
 
       if (data.paymentRequired && data.pageUrl) {
@@ -489,6 +496,7 @@ export const ListingDetail = ({
       console.error('Error purchasing promotion:', error);
       showToast(error.message || t('promotions.promotionError'), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
+      throw error;
     }
   };
 

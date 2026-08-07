@@ -245,6 +245,8 @@ CATEGORY MAP (memorize):
 • Nike / Adidas / New Balance / sneakers → fashion / men_shoes or women_shoes
 • Sofa / wardrobe / bed → furniture / …
 • Fridge / washing machine → appliances / …
+• Bicycle / e-bike (Centurion, Shimano, frame size, brakes) → hobby_sports / bikes_scooters
+  (NOT electronics — Bosch motor on a bike is still a bicycle)
 • Nails / brows / lashes / cosmetologist / laser epilation / шугаринг / tattoo / piercing
   → services_work / beauty_health (NOT it_design_websites, NOT fashion, NOT home)
 • Plumber / electrician / appliance repair → services_work / repair_installation
@@ -253,7 +255,8 @@ CATEGORY MAP (memorize):
 • NEVER use vacancies | looking_for_work | part_time for marketplace goods/services
 
 PRICE / LOCATION / CONDITION:
-- price: numeric string "5500" or null; currency EUR unless грн explicit
+- price: numeric string "5500" or null; if no price in post → null (stored as negotiable/Договорная)
+- currency EUR unless грн explicit
 - is_free: true ONLY if text says free/віддам/даром
 - {location_hint}
 - goods: condition new|used from text; services_work: ALWAYS condition="new"

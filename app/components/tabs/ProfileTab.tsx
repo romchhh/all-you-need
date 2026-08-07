@@ -22,6 +22,7 @@ import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { getBotBaseUrl, getBotStartLink } from '@/utils/botLinks';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { getFavoritesFromStorage } from '@/utils/favorites';
+import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
@@ -348,6 +349,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   // Обробка підтвердження оплати в PaymentSummaryModal
   const handlePaymentConfirm = async (paymentMethod: 'balance' | 'direct') => {
     if (!selectedListingForPromotion || !selectedPromotionType) return;
+
+    const telegramId = resolvePaymentTelegramId(tg, profile?.telegramId);
+    if (!telegramId) {
+      showToast(t('common.error'), 'error');
+      throw new Error('Missing telegramId');
+    }
     
     try {
       const listingId = selectedListingForPromotion.id;
@@ -356,8 +363,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          telegramId: profile?.telegramId,
-          listingId: listingId,
+          telegramId,
+          listingId,
           promotionType: selectedPromotionType,
           paymentMethod,
         }),
@@ -366,7 +373,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to purchase promotion');
+        const apiError = data.error || 'Failed to purchase promotion';
+        if (apiError === 'Insufficient balance') {
+          throw new Error(t('payment.insufficientBalance'));
+        }
+        if (apiError === 'Forbidden') {
+          throw new Error(t('common.error'));
+        }
+        throw new Error(apiError);
       }
 
       if (data.paymentRequired && data.pageUrl) {
@@ -395,6 +409,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       console.error('Error in payment confirmation:', error);
       showToast(error.message || t('promotions.promotionError'), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
+      throw error;
     }
   };
 

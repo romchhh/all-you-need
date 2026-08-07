@@ -56,10 +56,11 @@ def _finalize_fields(
         category = locked["category"]
         subcategory = locked.get("subcategory")
         condition = "new"
-        if not price or str(price).strip().lower() in ("", "0", "none"):
-            price = "Договорная"
-            currency = None
-            is_free = False
+
+    if not price or str(price).strip().lower() in ("", "0", "none", "null"):
+        price = "Договорная"
+        currency = None
+        is_free = False
 
     return {
         "title": title,
