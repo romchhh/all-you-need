@@ -564,6 +564,15 @@ _STRONG_ITEM_SIGNALS: list[tuple[re.Pattern[str], str, str | None]] = [
         "wardrobes_chests",
     ),
     (
+        re.compile(
+            r"(?i)кухн\w*\s+(?:бел\w*|біл\w*|white|с\s+техник|с\s+технік|"
+            r"комплект|гарнитур|мебел\w*|мебл\w*)|"
+            r"кухонн\w*\s+(?:гарнитур|мебел|мебл|комплект)",
+        ),
+        "furniture",
+        "tables_chairs",
+    ),
+    (
         re.compile(r"холодильник|стиральн|сушильн|посудомой|посудомийн", re.I),
         "appliances",
         "large_appliances",
@@ -606,6 +615,8 @@ def detect_strong_item_category(text: str) -> tuple[str, str | None] | None:
     # Авто > шини, якщо є бренд/модель авто (інакше «шин» у «машин» тощо)
     car_hit = False
     tire_hit = False
+    kitchen_hit = False
+    appliance_hit: tuple[str, str | None] | None = None
     fashion_hit: tuple[str, str | None] | None = None
     other_hit: tuple[str, str | None] | None = None
     for pattern, cat, sub in _STRONG_ITEM_SIGNALS:
@@ -615,6 +626,10 @@ def detect_strong_item_category(text: str) -> tuple[str, str | None] | None:
             car_hit = True
         elif cat == "auto" and sub == "tires_wheels":
             tire_hit = True
+        elif cat == "furniture" and sub == "tables_chairs" and re.search(r"(?i)кухн", text):
+            kitchen_hit = True
+        elif cat == "appliances" and appliance_hit is None:
+            appliance_hit = (cat, sub)
         elif cat == "fashion" and sub == "men_shoes":
             low = text.lower()
             if re.search(r"женск|жіноч|women|lady|damas", low):
@@ -627,6 +642,10 @@ def detect_strong_item_category(text: str) -> tuple[str, str | None] | None:
         return "auto", "cars"
     if tire_hit:
         return "auto", "tires_wheels"
+    if kitchen_hit:
+        return "furniture", "tables_chairs"
+    if appliance_hit:
+        return appliance_hit
     if fashion_hit:
         return fashion_hit
     return other_hit
@@ -670,6 +689,16 @@ def resolve_marketplace_category(
             if cat != "auto" or sub in (None, "other", "tires_wheels", "parts", "accessories"):
                 if subcategory_keyword_score("auto", "tires_wheels", text) == 0:
                     return "auto", "cars"
+        # Кухня з технікою — furniture, не «лише холодильник» → appliances
+        if (
+            strong
+            and strong[0] == "furniture"
+            and cat == "appliances"
+            and re.search(r"(?i)кухн", text)
+        ):
+            fixed = validate_marketplace_category(strong[0], strong[1], text)
+            if fixed[0]:
+                return fixed
         return cat, sub
 
     # 2) AI міг дати parser-id (clothing/shoes) — мапимо на marketplace
@@ -717,6 +746,14 @@ def clean_title(title: str, raw_text: str = "") -> str:
 
     def _clean_once(src: str) -> str:
         t = (src or "").strip()
+        # Усі emoji на початку (🚨 тощо)
+        from parser.core.patterns import ONE_EMOJI_RE
+
+        while True:
+            m = re.match(rf"^\s*(?:{ONE_EMOJI_RE.pattern}\s*)+", t)
+            if not m:
+                break
+            t = t[m.end() :].strip()
         t = re.sub(r"^[\s🔥⭐️✨🎁📦💥❗️]+", "", t)
         t = GREETING_TITLE_RE.sub("", t).strip()
         t = re.sub(
@@ -896,6 +933,9 @@ def clean_title(title: str, raw_text: str = "") -> str:
             r"(?i)мастер|майстер|предлагаю|пропоную|делаю|роблю", blob
         ):
             t = "Тату-мастер"
+
+    if t and t[0].islower():
+        t = t[0].upper() + t[1:]
 
     return t[:100] if t and len(t) >= 4 else ""
 

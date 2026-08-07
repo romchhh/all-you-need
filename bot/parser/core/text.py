@@ -7,6 +7,7 @@ from parser.config.channels import CHANNELS_STRIP_TRAILING_LINK, normalize_chann
 from parser.core.patterns import (
     FREE_GIVEAWAY_RE,
     GENERIC_TITLE_RE,
+    ONE_EMOJI_RE,
     PRICE_RE,
 )
 
@@ -128,6 +129,137 @@ def enrich_description(title: str, description: str) -> str:
     return d
 
 
+_AUTHOR_IN_BODY_RE = re.compile(
+    r"(?:^|\n)\s*👤\s*(?:Автор|Author)\s*:\s*@?\w+.*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_LEADING_PRICE_RE = re.compile(
+    r"^(?:\s*(?:ціна|цена|price)\s*[:\s]*)?"
+    r"\d{1,6}(?:[.,]\d{1,2})?\s*(?:€|eur|euro|євро|евро|\$|грн|uah)\s*",
+    re.IGNORECASE,
+)
+
+
+def strip_listing_body_metadata(text: str) -> str:
+    """Прибрати з опису ціну на початку, автора, emoji-алерти (ціна — окреме поле)."""
+    t = (text or "").strip()
+    if not t:
+        return ""
+    t = _AUTHOR_IN_BODY_RE.sub("", t).strip()
+    t = re.sub(r"(?:^|\n)\s*@[a-zA-Z0-9_]{4,32}\s*$", "", t, flags=re.MULTILINE)
+    # Алерти на кшталт 🚨 на початку
+    while True:
+        m = re.match(rf"^\s*(?:{ONE_EMOJI_RE.pattern}\s*)+", t)
+        if not m:
+            break
+        t = t[m.end() :].strip()
+    for _ in range(3):
+        nxt = _LEADING_PRICE_RE.sub("", t, count=1).strip()
+        if nxt == t:
+            break
+        t = nxt
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
+
+
+def _description_looks_unpolished(desc: str, title: str) -> bool:
+    d = (desc or "").strip()
+    if not d or len(d) < 12:
+        return True
+    if _LEADING_PRICE_RE.match(d) or PRICE_RE.fullmatch(d.strip()):
+        return True
+    if _AUTHOR_IN_BODY_RE.search(d):
+        return True
+    if title and d.lower().strip() == title.lower().strip():
+        return True
+    # Один рядок-перелік без нормальних речень
+    if "\n" not in d and len(d) < 160 and not re.search(r"[.!?…]\s", d):
+        if d.count(",") >= 1 or len(d.split()) >= 6:
+            return True
+    return False
+
+
+def rebuild_description_from_raw(
+    *,
+    title: str,
+    raw_text: str,
+    price: str | None = None,
+) -> str:
+    """
+    З сирого поста — читабельний опис (RU), без ціни на початку (ціна окремо).
+    """
+    blob = strip_listing_body_metadata(raw_text or "")
+    blob = PRICE_RE.sub(" ", blob)
+    blob = re.sub(r"\s+", " ", blob).strip(" ,.;")
+    if not blob:
+        return ""
+
+    t = (title or "").strip()
+    if t and blob.lower().startswith(t.lower()[: min(len(t), 40)]):
+        blob = blob[len(t) :].lstrip(" .,\n-—")
+
+    # Відомі токени товарів → список
+    tokens = re.findall(
+        r"(?i)(?:холодильник\w*|посудомо(?:й|е)\w*|плит\w*|духов(?:к|ок)\w*|"
+        r"мойк\w*|кран\w*|стиральн\w*|диван\w*|кроват\w*|шкаф\w*|"
+        r"iphone\s*\d+[^\s,]*|samsung[^\s,]*|nissan[^\s,]*|"
+        r"доставк\w+|самовывоз\w*|самовивіз\w*)",
+        blob,
+    )
+    seen: set[str] = set()
+    items: list[str] = []
+    for tok in tokens:
+        key = tok.lower()[:8]
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(tok.strip())
+
+    parts: list[str] = []
+    if t:
+        parts.append(f"Продаётся {t}.")
+    elif items:
+        parts.append("Продаётся комплект.")
+
+    if items:
+        goods = [i for i in items if not re.search(r"(?i)достав|самов", i)]
+        extras = [i for i in items if re.search(r"(?i)достав|самов", i)]
+        if goods:
+            if len(goods) == 1:
+                parts.append(f"В комплекте: {goods[0].capitalize()}.")
+            else:
+                joined = ", ".join(g.capitalize() for g in goods[:-1])
+                parts.append(f"В комплекте: {joined}, {goods[-1].capitalize()}.")
+        for ex in extras:
+            parts.append(f"{ex.capitalize()}.")
+
+    if not parts and blob:
+        parts.append(blob[:500])
+
+    return "\n".join(parts).strip()
+
+
+def polish_listing_description(
+    description: str,
+    *,
+    raw_text: str = "",
+    title: str = "",
+    price: str | None = None,
+) -> str:
+    """Фінальний опис для Listing: без ціни/автора в тілі, з fallback з raw."""
+    base = strip_listing_body_metadata(description or "")
+    base = format_listing_description(base)
+    if _description_looks_unpolished(base, title):
+        rebuilt = rebuild_description_from_raw(
+            title=title,
+            raw_text=raw_text,
+            price=price,
+        )
+        if rebuilt and len(rebuilt) >= len(base or ""):
+            base = format_listing_description(rebuilt)
+    return base or format_listing_description(strip_listing_body_metadata(raw_text or ""))
+
+
 def format_listing_description(description: str, *, max_len: int = 1800) -> str:
     """
     Охайний опис для маркетплейсу: прибрати промо, згорнути порожні рядки,
@@ -138,6 +270,7 @@ def format_listing_description(description: str, *, max_len: int = 1800) -> str:
     t = (description or "").strip()
     if not t:
         return ""
+    t = strip_listing_body_metadata(t)
     t = GREETING_TITLE_RE.sub("", t, count=1).strip()
     t = re.sub(r"https?://t\.me/\S+", "", t, flags=re.I)
     # «Продам авто» як перший рядок, якщо далі є суть (модель) — прибрати заглушку

@@ -8,7 +8,7 @@ from typing import Any, Optional
 from parser.ai.screen import ai_screen_parsed_listing, apply_screen_enrichment
 from parser.core.dedup import check_parser_duplicates
 from parser.core.quality import is_junk_for_marketplace
-from parser.core.text import format_listing_description
+from parser.core.text import format_listing_description, polish_listing_description
 from parser.marketplace_categories import (
     clean_title,
     force_services_marketplace_categories,
@@ -34,7 +34,12 @@ def _finalize_fields(
     force_service: bool = False,
 ) -> dict[str, Any]:
     title = clean_title(title or "", raw_text)
-    description = format_listing_description(description or raw_text or "")
+    description = polish_listing_description(
+        description or raw_text or "",
+        raw_text=raw_text,
+        title=title,
+        price=str(price) if price is not None else None,
+    )
 
     blob = f"{title}\n{description}\n{raw_text}"
     if force_service or should_treat_as_service(

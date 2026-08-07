@@ -261,22 +261,49 @@ def marketplace_author_source_footer(item: dict) -> str:
 
 
 def ensure_marketplace_description_has_source(description: str, item: dict) -> str:
-    """Гарантує @автора або 🔗 посилання в описі (на approve)."""
+    """Гарантує @автора або 🔗 посилання в описі (на approve), без дубля в тілі."""
+    from parser.core.text import strip_listing_body_metadata
+
     footer = marketplace_author_source_footer(item)
     if not footer:
-        return (description or "").strip()
-    body = (description or "").strip()
-    if re.search(r"👤\s*(?:Автор|Author):\s*@", body, re.I):
-        return body
-    if re.search(
-        r"🔗\s*(?:Оригінальне|Оригинальное|Original)",
-        body,
-        re.I,
-    ):
-        return body
+        return strip_listing_body_metadata((description or "").strip())
+    body = strip_listing_body_metadata((description or "").strip())
+    body = strip_original_post_link_block(body)
     if not body:
         return footer
     return f"{body}\n\n{footer}"
+
+
+def build_marketplace_description(item: dict) -> str:
+    """
+    Опис для Listing на маркетплейсі (без дубля title — title окреме поле).
+    - @username автора, якщо відомий
+    - інакше посилання на оригінальний post / канал-джерело
+    """
+    from parser.core.text import polish_listing_description
+
+    title = str(item.get("title") or "").strip()
+    base = polish_listing_description(
+        str(item.get("description") or ""),
+        raw_text=str(item.get("raw_text") or ""),
+        title=title,
+        price=str(item.get("price") or "") if item.get("price") else None,
+    )
+    if not base:
+        base = polish_listing_description(
+            str(item.get("raw_text") or ""),
+            raw_text=str(item.get("raw_text") or ""),
+            title=title,
+            price=str(item.get("price") or "") if item.get("price") else None,
+        )
+    base = strip_original_post_link_block(base)
+    if title and base.lower().startswith(title.lower()):
+        remainder = base[len(title) :].lstrip(" .,\n:—-")
+        if remainder:
+            base = remainder
+    footer = marketplace_author_source_footer(item)
+    parts = [base, footer]
+    return "\n\n".join(p for p in parts if p)
 
 
 def preserve_parsed_source_fields(enriched: dict, source: dict) -> dict:
@@ -317,37 +344,6 @@ def format_original_post_link_html(item: dict, lang: str | None = None) -> str:
     safe_url = html.escape(msg_link, quote=True)
     safe_label = html.escape(label)
     return f'🔗 <a href="{safe_url}">{safe_label}</a>'
-
-
-def build_marketplace_description(item: dict) -> str:
-    """
-    Опис для Listing на маркетплейсі (без дубля title — title окреме поле).
-    - @username автора, якщо відомий
-    - інакше посилання на оригінальний post / канал-джерело
-    """
-    from parser.core.text import format_listing_description
-
-    base = format_listing_description(str(item.get("description") or ""))
-    if not base:
-        # fallback: короткий опис з title лише якщо опису немає
-        base = format_listing_description(str(item.get("title") or ""))
-    base = strip_original_post_link_block(base)
-    # Не дублювати title на початку опису (але не зрізати опис у порожнечу)
-    title = str(item.get("title") or "").strip()
-    if title and base.lower().startswith(title.lower()):
-        remainder = base[len(title) :].lstrip(" .,\n:—-")
-        if remainder:
-            base = remainder
-    # Якщо після чисток лишилось порожньо — зібрати з raw (без дубля title)
-    if not base:
-        raw = format_listing_description(str(item.get("raw_text") or ""))
-        if raw:
-            if title and raw.lower().startswith(title.lower()):
-                raw = raw[len(title) :].lstrip(" .,\n:—-") or raw
-            base = raw
-    footer = marketplace_author_source_footer(item)
-    parts = [base, footer]
-    return "\n\n".join(p for p in parts if p)
 
 
 # ── Hashtags ─────────────────────────────────
