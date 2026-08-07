@@ -117,6 +117,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         listingPackagesBalance: packagesBalance,
         paidListingsEnabled: isPaidEnabled,
       });
+      setUserBalance(Number(balance.balance) || 0);
 
       // Зберігаємо баланс користувача
       setUserBalance(balance.balance || 0);
