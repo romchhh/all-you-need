@@ -1,0 +1,8 @@
+# Приклад crontab для очищення фото парсера на VPS.
+# Відредагуй шлях до свого репозиторію, потім: crontab -e
+#
+# Щоденно о 03:30 (Europe/Kyiv / Berlin — залежить від TZ сервера)
+30 3 * * * /home/deploy/AllYouNeed/bot/scripts/cron_cleanup_parsed_photos.sh
+#
+# Опційно: раз на тиждень dry-run звіт у лог (без видалення)
+# 0 4 * * 0 cd /home/deploy/AllYouNeed/bot && python3 -m parser.scripts.cleanup_parsed_photos --all --dry-run >> logs/parsed_photos_cleanup.log 2>&1

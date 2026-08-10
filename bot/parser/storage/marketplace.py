@@ -8,12 +8,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from parser.config.settings import PARSER_MAX_PHOTOS
 from parser.storage.connection import BASE_DIR, get_connection
 
 logger = logging.getLogger(__name__)
 
 
 def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -> list[str]:
+    rel_paths = list(rel_paths or [])[:PARSER_MAX_PHOTOS]
     if not rel_paths:
         return _copy_default_listing_photo(prefix)
     dest_dir = BASE_DIR / "app" / "public" / "listings" / "originals"

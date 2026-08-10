@@ -178,6 +178,20 @@ async def run_parser_cycle(
                 channel_errors = stats.get("errors") or []
                 if channel_errors and not scheduled:
                     await notify_parser_channel_errors(aiogram_bot, channel_errors)
+                from parser.config.settings import PARSER_PHOTOS_AUTO_CLEANUP
+
+                if PARSER_PHOTOS_AUTO_CLEANUP:
+                    try:
+                        from parser.storage.photos_cleanup import run_auto_parsed_photos_cleanup
+
+                        cleanup_stats = await asyncio.to_thread(run_auto_parsed_photos_cleanup)
+                        if not cleanup_stats.get("skipped"):
+                            logger.info(
+                                "🧹 Очищення parsed_photos: видалено %s файлів",
+                                cleanup_stats.get("files_deleted", 0),
+                            )
+                    except Exception as cleanup_err:
+                        logger.warning("Не вдалося очистити parsed_photos: %s", cleanup_err)
         except RuntimeError as e:
             logger.error("Сесія парсера зайнята: %s", e, exc_info=True)
             await _notify_error("сесія зайнята", str(e))

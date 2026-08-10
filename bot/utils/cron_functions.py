@@ -391,6 +391,19 @@ async def run_scheduled_tasks():
         await deactivate_old_listings(bot)
         await deactivate_old_telegram_listings(bot)
         await unpin_expired_pinned_telegram_listings(bot)
+
+        try:
+            from parser.storage.photos_cleanup import run_auto_parsed_photos_cleanup
+
+            cleanup_stats = run_auto_parsed_photos_cleanup()
+            if not cleanup_stats.get("skipped"):
+                print(
+                    "[parsed_photos_cleanup] deleted="
+                    f"{cleanup_stats.get('files_deleted', 0)} "
+                    f"freed={cleanup_stats.get('bytes_freed', 0)} bytes"
+                )
+        except Exception as cleanup_err:
+            print(f"[parsed_photos_cleanup] error: {cleanup_err}")
         
     finally:
         await bot.session.close()

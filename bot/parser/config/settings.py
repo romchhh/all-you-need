@@ -107,6 +107,16 @@ PARSER_SERVICES_AI_INTERVAL_MIN: float = float(
     os.getenv("PARSER_SERVICES_AI_INTERVAL_MIN", os.getenv("PARSER_INTERVAL_MIN", "30"))
 )
 
+# Максимум фото на одне parsed_items (жорстко не більше 3)
+PARSER_MAX_PHOTOS: int = min(3, max(1, _env_int("PARSER_MAX_PHOTOS", 3)))
+
+# Автоочистка parsed_photos (після циклу парсингу + cron/APScheduler)
+PARSER_PHOTOS_AUTO_CLEANUP: bool = _env_bool("PARSER_PHOTOS_AUTO_CLEANUP", True)
+PARSER_PHOTOS_CLEANUP_DAYS: int = max(1, _env_int("PARSER_PHOTOS_CLEANUP_DAYS", 7))
+PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS: int = max(0, _env_int("PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS", 7))
+# public/listings/originals — важкий прохід на малому VPS; за замовчуванням вимкнено в авто-режимі
+PARSER_PHOTOS_CLEANUP_PUBLIC: bool = _env_bool("PARSER_PHOTOS_CLEANUP_PUBLIC", False)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 PHOTOS_DIR = REPO_ROOT / "database" / "parsed_photos"
 PHOTOS_DIR.mkdir(parents=True, exist_ok=True)

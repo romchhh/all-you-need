@@ -15,7 +15,7 @@ from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarku
 from dotenv import load_dotenv
 
 from parser.category_keywords import get_category_label
-from parser.config.settings import BOT_USERNAME, WEBAPP_URL
+from parser.config.settings import BOT_USERNAME, PARSER_MAX_PHOTOS, WEBAPP_URL
 from parser.core.telegram_meta import parsed_item_message_link
 from parser.core.text import detect_lang
 from parser.moderation.formatting import (
@@ -371,7 +371,7 @@ def _channel_photo_inputs_from_images_web(images_web: list) -> list:
     out: list = []
     base = (WEBAPP_URL or "").rstrip("/")
     project_root = Path(__file__).resolve().parent.parent.parent.parent
-    for img in (images_web or [])[:10]:
+    for img in (images_web or [])[:PARSER_MAX_PHOTOS]:
         if not img or not isinstance(img, str):
             continue
         s = img.strip()

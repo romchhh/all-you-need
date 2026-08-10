@@ -278,7 +278,7 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
 
         chan_slug = re.sub(r"[^a-z0-9]+", "_", channel.lower()).strip("_")[:24] or "ch"
         base_name = f"{chan_slug}_{effective_message_id}"
-        images = await download_photos(app, photos, base_name, max_photos=3)
+        images = await download_photos(app, photos, base_name)
 
         post_msg_link = message_link(
             channel,

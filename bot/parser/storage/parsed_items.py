@@ -541,6 +541,9 @@ def insert_parsed_item(
     msg_link: Optional[str] = None,
 ) -> int:
     from parser.core.location import channel_city_from_source, resolve_parsed_location
+    from parser.config.settings import PARSER_MAX_PHOTOS
+
+    images = list(images or [])[:PARSER_MAX_PHOTOS]
 
     # source_city — завжди з реєстру каналу; location — за правилами local/Germany
     source_city = channel_city_from_source(source_channel, source_city)

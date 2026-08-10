@@ -77,6 +77,30 @@ async def scheduler_jobs():
         import traceback
         traceback.print_exc()
 
+    # Щоденне очищення parsed_photos (сироти, rejected, stale, published копії)
+    try:
+        from parser.storage.photos_cleanup import run_auto_parsed_photos_cleanup
+
+        cleanup_job_id = "cleanup_parsed_photos"
+        existing_cleanup_job = scheduler.get_job(cleanup_job_id)
+        if existing_cleanup_job:
+            scheduler.remove_job(cleanup_job_id)
+
+        scheduler.add_job(
+            run_auto_parsed_photos_cleanup,
+            "cron",
+            hour=3,
+            minute=30,
+            id=cleanup_job_id,
+            replace_existing=True,
+            max_instances=1,
+        )
+        print(f"✅ Scheduler job '{cleanup_job_id}' додано (щоденно о 03:30)")
+    except Exception as e:
+        print(f"❌ Помилка додавання job 'cleanup_parsed_photos': {e}")
+        import traceback
+        traceback.print_exc()
+
     # Job для парсера оголошень з Telegram-каналів
     try:
         from parser.core.account_pool import list_parser_accounts
