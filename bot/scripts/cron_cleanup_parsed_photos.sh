@@ -25,11 +25,11 @@ DAYS="${PARSER_PHOTOS_CLEANUP_DAYS:-7}"
 PUBLIC="${PARSER_PHOTOS_CLEANUP_PUBLIC:-0}"
 EXTRA=()
 if [[ "$PUBLIC" == "1" || "$PUBLIC" == "true" || "$PUBLIC" == "yes" ]]; then
-  EXTRA+=(--public-orphans)
+  EXTRA+=(--public)
 fi
 
 {
-  echo "=== $(date -Iseconds) cleanup parsed_photos (days=$DAYS) ==="
-  python3 -m parser.scripts.cleanup_parsed_photos --all -v --days "$DAYS" "${EXTRA[@]}"
+  echo "=== $(date -Iseconds) cleanup parsed_photos (days=$DAYS, надто старі) ==="
+  python3 -m parser.scripts.cleanup_parsed_photos -v --days "$DAYS" "${EXTRA[@]}"
   echo
 } >>"$LOG_FILE" 2>&1

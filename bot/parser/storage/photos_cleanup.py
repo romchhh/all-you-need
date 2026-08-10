@@ -97,25 +97,12 @@ def _build_listing_image_basenames(cursor) -> frozenset[str]:
     return frozenset(basenames)
 
 
-def _build_parsed_referenced_basenames(cursor) -> frozenset[str]:
-    basenames: set[str] = set()
-    for row in _iter_query_rows(
-        cursor,
-        """
-        SELECT images_json FROM parsed_items
-        WHERE images_json IS NOT NULL
-          AND TRIM(images_json) NOT IN ('', '[]')
-        """,
-    ):
-        for ref in _load_images_json(row["images_json"]):
-            path = _normalize_parsed_image_path(ref)
-            if path is not None:
-                basenames.add(path.name)
-    return frozenset(basenames)
-
-
-def _row_is_protected(basenames: list[str], listing_basenames: frozenset[str]) -> bool:
-    return any(bn in listing_basenames for bn in basenames)
+def _file_is_too_old(path: Path, cutoff: datetime) -> bool:
+    try:
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return False
+    return mtime <= cutoff
 
 
 def _delete_file(
@@ -123,6 +110,7 @@ def _delete_file(
     dry_run: bool,
     stats: dict[str, Any],
     pending_commits: list[int],
+    reason: str = "unused",
 ) -> bool:
     if not path.is_file():
         return True
@@ -134,11 +122,15 @@ def _delete_file(
     if dry_run:
         stats["files_deleted"] += 1
         stats["bytes_freed"] += size
+        if reason == "too_old":
+            stats["too_old_deleted"] += 1
         return True
     try:
         path.unlink()
         stats["files_deleted"] += 1
         stats["bytes_freed"] += size
+        if reason == "too_old":
+            stats["too_old_deleted"] += 1
         pending_commits[0] += 1
         return True
     except OSError as e:
@@ -173,81 +165,54 @@ def _clear_parsed_item_images(
     _maybe_commit(conn, pending_commits, dry_run)
 
 
-def _cleanup_parsed_item_row(
+def _update_parsed_item_images(
     cursor,
     conn,
     item_id: int,
     refs: list[str],
     dry_run: bool,
     stats: dict[str, Any],
-    listing_basenames: frozenset[str],
     pending_commits: list[int],
 ) -> None:
-    basenames: list[str] = []
-    for ref in refs:
-        path = _normalize_parsed_image_path(ref)
-        if path is not None:
-            basenames.append(path.name)
-
-    if _row_is_protected(basenames, listing_basenames):
-        stats["skipped_rows_in_use"] += 1
+    if dry_run:
+        stats["parsed_items_images_trimmed"] += 1
         return
-
-    row_ok = True
-    for ref in refs:
-        path = _normalize_parsed_image_path(ref)
-        if path is None or not path.is_file():
-            continue
-        if not _delete_file(path, dry_run, stats, pending_commits):
-            row_ok = False
-        _maybe_commit(conn, pending_commits, dry_run)
-
-    if row_ok:
-        _clear_parsed_item_images(cursor, conn, item_id, dry_run, stats, pending_commits)
+    cursor.execute(
+        "UPDATE parsed_items SET images_json = ? WHERE id = ?",
+        (json.dumps(refs, ensure_ascii=False), item_id),
+    )
+    stats["parsed_items_images_trimmed"] += 1
+    pending_commits[0] += 1
+    _maybe_commit(conn, pending_commits, dry_run)
 
 
-def _cleanup_parsed_item_batches(
+def _delete_parsed_item_row(
     cursor,
     conn,
-    sql: str,
-    params: tuple,
+    item_id: int,
     dry_run: bool,
     stats: dict[str, Any],
-    stat_key: str,
-    listing_basenames: frozenset[str],
     pending_commits: list[int],
-    on_progress: Callable[[str], None] | None,
 ) -> None:
-    processed = 0
-    for row in _iter_query_rows(cursor, sql, params):
-        refs = _load_images_json(row["images_json"])
-        if not refs:
-            continue
-        stats[stat_key] += 1
-        processed += 1
-        _cleanup_parsed_item_row(
-            cursor,
-            conn,
-            row["id"],
-            refs,
-            dry_run,
-            stats,
-            listing_basenames,
-            pending_commits,
-        )
-        if processed % _PROGRESS_EVERY == 0:
-            _progress(f"cleanup: {stat_key} processed={processed}", on_progress)
+    if dry_run:
+        stats["parsed_items_deleted"] += 1
+        return
+    cursor.execute("DELETE FROM parsed_items WHERE id = ?", (item_id,))
+    stats["parsed_items_deleted"] += 1
+    pending_commits[0] += 1
+    _maybe_commit(conn, pending_commits, dry_run)
 
 
-def _cleanup_orphan_parsed_files(
+def _cleanup_old_parsed_photos_on_disk(
     conn,
     dry_run: bool,
     stats: dict[str, Any],
-    referenced: frozenset[str],
     listing_basenames: frozenset[str],
+    cutoff: datetime,
     pending_commits: list[int],
     on_progress: Callable[[str], None] | None,
 ) -> None:
+    """Видалити файли parsed_photos/: не в Listing і старіші за cutoff."""
     if not PHOTOS_DIR.is_dir():
         return
 
@@ -259,69 +224,358 @@ def _cleanup_orphan_parsed_files(
                     continue
                 scanned += 1
                 name = entry.name
-                if name in referenced or name in listing_basenames:
+                path = Path(entry.path)
+
+                if name in listing_basenames:
+                    stats["skipped_in_use"] += 1
                     continue
-                stats["orphan_files"] += 1
-                if not _delete_file(Path(entry.path), dry_run, stats, pending_commits):
+
+                if not _file_is_too_old(path, cutoff):
+                    stats["skipped_too_recent"] += 1
+                    continue
+
+                stats["too_old_candidates"] += 1
+                if not _delete_file(path, dry_run, stats, pending_commits, reason="too_old"):
                     continue
                 _maybe_commit(conn, pending_commits, dry_run)
+
                 if scanned % _PROGRESS_EVERY == 0:
                     _progress(
-                        f"cleanup: orphan scan scanned={scanned} deleted={stats['orphan_files']}",
+                        f"cleanup: надто старі — переглянуто {scanned}, "
+                        f"видалено {stats['too_old_deleted']}",
                         on_progress,
                     )
     except OSError as e:
         stats["errors"].append(f"scandir {PHOTOS_DIR}: {e}")
 
 
-def _cleanup_public_parser_orphans(
+def _sync_parsed_items_images_in_db(
+    cursor,
     conn,
     dry_run: bool,
     stats: dict[str, Any],
     listing_basenames: frozenset[str],
-    public_orphan_days: int,
+    cutoff: datetime,
+    time_mod: str,
+    pending_commits: list[int],
+    on_progress: Callable[[str], None] | None,
+) -> None:
+    """Синхронізувати parsed_items.images_json з диском після видалення фото."""
+    processed = 0
+    for row in _iter_query_rows(
+        cursor,
+        """
+        SELECT id, images_json, created_at
+        FROM parsed_items
+        WHERE images_json IS NOT NULL
+          AND TRIM(images_json) NOT IN ('', '[]')
+        """,
+    ):
+        refs = _load_images_json(row["images_json"])
+        if not refs:
+            continue
+
+        basenames: list[str] = []
+        kept_refs: list[str] = []
+        for ref in refs:
+            path = _normalize_parsed_image_path(ref)
+            if path is None:
+                continue
+            basenames.append(path.name)
+            if path.name in listing_basenames:
+                kept_refs.append(ref)
+                continue
+            if path.is_file() and not _file_is_too_old(path, cutoff):
+                kept_refs.append(ref)
+
+        if _any_in_listing(basenames, listing_basenames):
+            if kept_refs != refs:
+                processed += 1
+                if kept_refs:
+                    _update_parsed_item_images(
+                        cursor, conn, row["id"], kept_refs, dry_run, stats, pending_commits
+                    )
+                else:
+                    _clear_parsed_item_images(
+                        cursor, conn, row["id"], dry_run, stats, pending_commits
+                    )
+            continue
+
+        row_old = _row_created_before(row["created_at"], time_mod, cursor)
+        all_gone = all(
+            (p := _normalize_parsed_image_path(ref)) is None or not p.is_file()
+            for ref in refs
+        )
+
+        if row_old or all_gone or not kept_refs:
+            processed += 1
+            _clear_parsed_item_images(cursor, conn, row["id"], dry_run, stats, pending_commits)
+        elif kept_refs != refs:
+            processed += 1
+            _update_parsed_item_images(
+                cursor, conn, row["id"], kept_refs, dry_run, stats, pending_commits
+            )
+
+        if processed % _PROGRESS_EVERY == 0:
+            _progress(
+                f"cleanup: БД images_json — оновлено {processed} "
+                f"(очищено {stats['parsed_items_cleared']}, "
+                f"підрізано {stats['parsed_items_images_trimmed']})",
+                on_progress,
+            )
+
+
+def _delete_old_parsed_items_from_db(
+    cursor,
+    conn,
+    dry_run: bool,
+    stats: dict[str, Any],
+    time_mod: str,
+    pending_commits: list[int],
+    on_progress: Callable[[str], None] | None,
+) -> None:
+    """
+    Видалити застарілі рядки parsed_items (> N днів):
+    rejected, опубліковані (є listing), або без фото (images_json порожній).
+    """
+    deleted_batch = 0
+    for row in _iter_query_rows(
+        cursor,
+        """
+        SELECT id, status, marketplace_mod_status, channel_mod_status,
+               marketplace_listing_id, images_json
+        FROM parsed_items
+        WHERE datetime(created_at) < datetime('now', ?)
+        """,
+        (time_mod,),
+    ):
+        status = (row["status"] or "").strip().lower()
+        mp = (row["marketplace_mod_status"] or status or "pending").strip().lower()
+        ch = (row["channel_mod_status"] or status or "pending").strip().lower()
+        images_raw = (row["images_json"] or "").strip()
+        has_listing = row["marketplace_listing_id"] is not None
+        no_images = images_raw in ("", "[]")
+
+        should_delete = (
+            status == "rejected"
+            or (mp == "rejected" and ch == "rejected")
+            or has_listing
+            or no_images
+        )
+        if not should_delete:
+            stats["parsed_items_kept"] += 1
+            continue
+
+        deleted_batch += 1
+        _delete_parsed_item_row(cursor, conn, row["id"], dry_run, stats, pending_commits)
+
+        if deleted_batch % _PROGRESS_EVERY == 0:
+            _progress(
+                f"cleanup: БД parsed_items — видалено {stats['parsed_items_deleted']} застарілих рядків",
+                on_progress,
+            )
+
+
+def _cleanup_old_parsed_item_rows(
+    cursor,
+    conn,
+    dry_run: bool,
+    stats: dict[str, Any],
+    listing_basenames: frozenset[str],
+    cutoff: datetime,
+    time_mod: str,
+    pending_commits: list[int],
+    on_progress: Callable[[str], None] | None,
+) -> None:
+    """Видалити файли з parsed_items старіших за N днів (допоміжний прохід перед sync БД)."""
+    processed = 0
+    for row in _iter_query_rows(
+        cursor,
+        """
+        SELECT id, images_json, created_at
+        FROM parsed_items
+        WHERE images_json IS NOT NULL
+          AND TRIM(images_json) NOT IN ('', '[]')
+          AND datetime(created_at) < datetime('now', ?)
+        """,
+        (time_mod,),
+    ):
+        refs = _load_images_json(row["images_json"])
+        if not refs:
+            continue
+
+        basenames: list[str] = []
+        paths: list[Path] = []
+        for ref in refs:
+            path = _normalize_parsed_image_path(ref)
+            if path is not None:
+                basenames.append(path.name)
+                paths.append(path)
+
+        if _any_in_listing(basenames, listing_basenames):
+            stats["skipped_rows_in_use"] += 1
+            continue
+
+        processed += 1
+        stats["stale_parsed_rows"] += 1
+
+        for path in paths:
+            if not path.is_file():
+                continue
+            if path.name in listing_basenames:
+                continue
+            if not _file_is_too_old(path, cutoff):
+                continue
+            _delete_file(path, dry_run, stats, pending_commits, reason="too_old")
+            _maybe_commit(conn, pending_commits, dry_run)
+
+        if processed % _PROGRESS_EVERY == 0:
+            _progress(f"cleanup: parsed_items файли — оброблено {processed}", on_progress)
+
+
+def _any_in_listing(basenames: list[str], listing_basenames: frozenset[str]) -> bool:
+    return any(bn in listing_basenames for bn in basenames)
+
+
+def _row_created_before(created_at: Any, time_mod: str, cursor) -> bool:
+    if not created_at:
+        return True
+    cursor.execute(
+        "SELECT 1 WHERE datetime(?) < datetime('now', ?)",
+        (str(created_at), time_mod),
+    )
+    return cursor.fetchone() is not None
+
+
+def _cleanup_old_public_parser_photos(
+    conn,
+    dry_run: bool,
+    stats: dict[str, Any],
+    listing_basenames: frozenset[str],
+    cutoff: datetime,
     pending_commits: list[int],
     on_progress: Callable[[str], None] | None,
 ) -> None:
     if not PUBLIC_ORIGINALS_DIR.is_dir():
         return
 
-    cutoff = (
-        datetime.now(timezone.utc) - timedelta(days=public_orphan_days)
-        if public_orphan_days > 0
-        else None
-    )
     scanned = 0
-
     for pattern in ("parser_*", "pi*"):
         for path in PUBLIC_ORIGINALS_DIR.glob(pattern):
             if not path.is_file():
                 continue
             scanned += 1
-            name = path.name
-            if name in listing_basenames:
+            if path.name in listing_basenames:
+                stats["skipped_in_use"] += 1
                 continue
-            if cutoff is not None:
-                try:
-                    mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
-                except OSError as e:
-                    stats["errors"].append(f"stat {path}: {e}")
-                    continue
-                if mtime > cutoff:
-                    continue
-            stats["public_orphan_files"] += 1
-            if not _delete_file(path, dry_run, stats, pending_commits):
+            if not _file_is_too_old(path, cutoff):
+                stats["skipped_too_recent"] += 1
+                continue
+            stats["public_too_old_deleted"] += 1
+            if not _delete_file(path, dry_run, stats, pending_commits, reason="too_old"):
                 continue
             _maybe_commit(conn, pending_commits, dry_run)
             if scanned % _PROGRESS_EVERY == 0:
                 _progress(
-                    f"cleanup: public orphans scanned={scanned} deleted={stats['public_orphan_files']}",
+                    f"cleanup: public надто старі — переглянуто {scanned}, "
+                    f"видалено {stats['public_too_old_deleted']}",
                     on_progress,
                 )
 
 
+def cleanup_old_unused_parser_photos(
+    days: int = 7,
+    dry_run: bool = False,
+    *,
+    include_public: bool = True,
+    on_progress: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    """
+    Видалити фото парсера, які:
+    - не використовуються в Listing.images
+    - старіші за `days` днів (за mtime файлу або created_at parsed_items)
+
+    Без підтвердження — dry_run=False видаляє одразу.
+    """
+    if days < 1 or days > 3650:
+        raise ValueError("days must be between 1 and 3650")
+
+    stats: dict[str, Any] = {
+        "files_deleted": 0,
+        "bytes_freed": 0,
+        "too_old_deleted": 0,
+        "too_old_candidates": 0,
+        "public_too_old_deleted": 0,
+        "parsed_items_cleared": 0,
+        "parsed_items_images_trimmed": 0,
+        "parsed_items_deleted": 0,
+        "parsed_items_kept": 0,
+        "stale_parsed_rows": 0,
+        "skipped_in_use": 0,
+        "skipped_too_recent": 0,
+        "skipped_rows_in_use": 0,
+        "errors": [],
+        "days": days,
+        "reason": "надто старі та не використовуються в оголошеннях",
+    }
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    time_mod = f"-{days} days"
+
+    _progress(f"cleanup: правило — старіші {days} дн., не в Listing → видалити", on_progress)
+    _progress("cleanup: завантаження індексу Listing…", on_progress)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    listing_basenames = _build_listing_image_basenames(cursor)
+    _progress(f"cleanup: фото в оголошеннях (захищені): {len(listing_basenames)}", on_progress)
+
+    pending_commits = [0]
+
+    _progress("cleanup: parsed_photos/ — надто старі…", on_progress)
+    _cleanup_old_parsed_photos_on_disk(
+        conn, dry_run, stats, listing_basenames, cutoff, pending_commits, on_progress
+    )
+
+    _progress("cleanup: parsed_items — файли старіших за поріг…", on_progress)
+    _cleanup_old_parsed_item_rows(
+        cursor, conn, dry_run, stats, listing_basenames, cutoff, time_mod, pending_commits, on_progress
+    )
+
+    _progress("cleanup: БД — синхронізація images_json…", on_progress)
+    _sync_parsed_items_images_in_db(
+        cursor, conn, dry_run, stats, listing_basenames, cutoff, time_mod, pending_commits, on_progress
+    )
+
+    _progress("cleanup: БД — видалення застарілих parsed_items…", on_progress)
+    _delete_old_parsed_items_from_db(
+        cursor, conn, dry_run, stats, time_mod, pending_commits, on_progress
+    )
+
+    if include_public:
+        _progress("cleanup: public parser/pi* — надто старі…", on_progress)
+        _cleanup_old_public_parser_photos(
+            conn, dry_run, stats, listing_basenames, cutoff, pending_commits, on_progress
+        )
+
+    if not dry_run:
+        conn.commit()
+    conn.close()
+
+    _progress(
+        f"cleanup: готово — файли {stats['files_deleted']} (надто старі {stats['too_old_deleted']}), "
+        f"БД images_json очищено {stats['parsed_items_cleared']}, "
+        f"рядків видалено {stats['parsed_items_deleted']}",
+        on_progress,
+    )
+
+    if dry_run:
+        stats["note"] = "dry_run: лише прогноз, файли та БД не змінювались"
+    return stats
+
+
 def cleanup_unused_parsed_photos(
-    days: int = 30,
+    days: int = 7,
     dry_run: bool = False,
     *,
     delete_rejected: bool = True,
@@ -332,205 +586,46 @@ def cleanup_unused_parsed_photos(
     public_orphan_days: int = 7,
     on_progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
-    """
-    Комплексне очищення фото парсера (оптимізовано для VPS: без LIKE, батчі, commit кожні N файлів).
-    """
-    if days < 1 or days > 3650:
-        raise ValueError("days must be between 1 and 3650")
-    if public_orphan_days < 0 or public_orphan_days > 3650:
-        raise ValueError("public_orphan_days must be between 0 and 3650")
-
-    stats: dict[str, Any] = {
-        "files_deleted": 0,
-        "bytes_freed": 0,
-        "parsed_items_cleared": 0,
-        "skipped_rows_in_use": 0,
-        "rejected_rows": 0,
-        "stale_pending_rows": 0,
-        "published_rows": 0,
-        "orphan_files": 0,
-        "public_orphan_files": 0,
-        "errors": [],
-    }
-
-    _progress("cleanup: loading Listing image index…", on_progress)
-    conn = get_connection()
-    cursor = conn.cursor()
-    listing_basenames = _build_listing_image_basenames(cursor)
-    referenced_parsed = _build_parsed_referenced_basenames(cursor)
-    _progress(
-        f"cleanup: listing_images={len(listing_basenames)} parsed_refs={len(referenced_parsed)}",
-        on_progress,
+    """Зворотна сумісність — делегує в age-based cleanup."""
+    del delete_rejected, delete_stale_pending, delete_published, delete_orphans, public_orphan_days
+    return cleanup_old_unused_parser_photos(
+        days=days,
+        dry_run=dry_run,
+        include_public=delete_public_orphans,
+        on_progress=on_progress,
     )
-
-    pending_commits = [0]
-    time_mod = f"-{days} days"
-
-    if delete_rejected:
-        _progress("cleanup: rejected rows…", on_progress)
-        _cleanup_parsed_item_batches(
-            cursor,
-            conn,
-            """
-            SELECT id, images_json
-            FROM parsed_items
-            WHERE images_json IS NOT NULL
-              AND TRIM(images_json) NOT IN ('', '[]')
-              AND (
-                    LOWER(COALESCE(status, '')) = 'rejected'
-                 OR (
-                        LOWER(COALESCE(marketplace_mod_status, '')) = 'rejected'
-                    AND LOWER(COALESCE(channel_mod_status, '')) = 'rejected'
-                 )
-              )
-            """,
-            (),
-            dry_run,
-            stats,
-            "rejected_rows",
-            listing_basenames,
-            pending_commits,
-            on_progress,
-        )
-
-    if delete_stale_pending:
-        _progress("cleanup: stale pending rows…", on_progress)
-        _cleanup_parsed_item_batches(
-            cursor,
-            conn,
-            """
-            SELECT id, images_json
-            FROM parsed_items
-            WHERE marketplace_listing_id IS NULL
-              AND images_json IS NOT NULL
-              AND TRIM(images_json) NOT IN ('', '[]')
-              AND datetime(created_at) < datetime('now', ?)
-              AND LOWER(COALESCE(status, 'pending')) != 'rejected'
-            """,
-            (time_mod,),
-            dry_run,
-            stats,
-            "stale_pending_rows",
-            listing_basenames,
-            pending_commits,
-            on_progress,
-        )
-
-    if delete_published:
-        _progress("cleanup: published rows…", on_progress)
-        _cleanup_parsed_item_batches(
-            cursor,
-            conn,
-            """
-            SELECT id, images_json
-            FROM parsed_items
-            WHERE marketplace_listing_id IS NOT NULL
-              AND images_json IS NOT NULL
-              AND TRIM(images_json) NOT IN ('', '[]')
-            """,
-            (),
-            dry_run,
-            stats,
-            "published_rows",
-            listing_basenames,
-            pending_commits,
-            on_progress,
-        )
-
-    if delete_orphans:
-        _progress("cleanup: orphan files in parsed_photos/…", on_progress)
-        _cleanup_orphan_parsed_files(
-            conn,
-            dry_run,
-            stats,
-            referenced_parsed,
-            listing_basenames,
-            pending_commits,
-            on_progress,
-        )
-
-    if delete_public_orphans:
-        _progress("cleanup: public parser orphans…", on_progress)
-        _cleanup_public_parser_orphans(
-            conn,
-            dry_run,
-            stats,
-            listing_basenames,
-            public_orphan_days,
-            pending_commits,
-            on_progress,
-        )
-
-    if not dry_run:
-        conn.commit()
-    conn.close()
-
-    _progress(
-        f"cleanup: done deleted={stats['files_deleted']} freed={stats['bytes_freed']} bytes",
-        on_progress,
-    )
-
-    if dry_run:
-        stats["note"] = (
-            "dry_run: files_deleted/bytes_freed — прогноз; parsed_items_cleared — "
-            "скільки рядків отримали б images_json=[]; БД не змінювалась"
-        )
-    return stats
 
 
 def cleanup_stale_parsed_photos(
-    days: int = 30,
+    days: int = 7,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Зворотна сумісність: лише застарілі pending без marketplace_listing_id."""
-    result = cleanup_unused_parsed_photos(
-        days=days,
-        dry_run=dry_run,
-        delete_rejected=False,
-        delete_stale_pending=True,
-        delete_published=False,
-        delete_orphans=False,
-        delete_public_orphans=False,
-    )
-    return {
-        "files_deleted": result["files_deleted"],
-        "bytes_freed": result["bytes_freed"],
-        "parsed_items_cleared": result["parsed_items_cleared"],
-        "skipped_rows_in_use": result["skipped_rows_in_use"],
-        "errors": result["errors"],
-        **({"note": result["note"]} if dry_run and "note" in result else {}),
-    }
+    return cleanup_old_unused_parser_photos(days=days, dry_run=dry_run, include_public=False)
 
 
 def run_auto_parsed_photos_cleanup() -> dict[str, Any]:
-    """Автоочистка parsed_photos (після парсингу / cron)."""
+    """Автоочистка без підтвердження — після парсингу / cron."""
     from parser.config.settings import (
         PARSER_PHOTOS_AUTO_CLEANUP,
         PARSER_PHOTOS_CLEANUP_DAYS,
         PARSER_PHOTOS_CLEANUP_PUBLIC,
-        PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS,
     )
 
     if not PARSER_PHOTOS_AUTO_CLEANUP:
         return {"skipped": True, "reason": "PARSER_PHOTOS_AUTO_CLEANUP=0"}
 
-    result = cleanup_unused_parsed_photos(
+    result = cleanup_old_unused_parser_photos(
         days=PARSER_PHOTOS_CLEANUP_DAYS,
         dry_run=False,
-        delete_rejected=True,
-        delete_stale_pending=True,
-        delete_published=True,
-        delete_orphans=True,
-        delete_public_orphans=PARSER_PHOTOS_CLEANUP_PUBLIC,
-        public_orphan_days=PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS,
+        include_public=PARSER_PHOTOS_CLEANUP_PUBLIC,
     )
-    if result.get("files_deleted") or result.get("parsed_items_cleared"):
+    if result.get("files_deleted") or result.get("parsed_items_cleared") or result.get("parsed_items_deleted"):
         logger.info(
-            "auto parsed photos cleanup: deleted=%s freed=%s bytes cleared_rows=%s orphans=%s public_orphans=%s",
+            "auto parsed photos cleanup (надто старі >%sd): files=%s db_cleared=%s db_deleted=%s freed=%s",
+            result.get("days", 7),
             result.get("files_deleted", 0),
-            result.get("bytes_freed", 0),
             result.get("parsed_items_cleared", 0),
-            result.get("orphan_files", 0),
-            result.get("public_orphan_files", 0),
+            result.get("parsed_items_deleted", 0),
+            result.get("bytes_freed", 0),
         )
     return result

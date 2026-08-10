@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Видалення невикористовуваних і застарілих фото парсера.
+Видалення фото парсера: не в оголошеннях і старіші за N днів (за замовч. 7).
+Видаляє одразу, без підтвердження. Для перегляду — --dry-run.
 
-Запуск з каталогу `bot/`:
+  python3 -m parser.scripts.cleanup_parsed_photos -v
   python3 -m parser.scripts.cleanup_parsed_photos --dry-run -v
-  python3 -m parser.scripts.cleanup_parsed_photos --all -v
-  python3 -m parser.scripts.cleanup_parsed_photos --orphans-only -v
+  python3 -m parser.scripts.cleanup_parsed_photos --days 7 --public -v
 """
 from __future__ import annotations
 
@@ -18,10 +18,7 @@ _BOT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_BOT_ROOT) not in sys.path:
     sys.path.insert(0, str(_BOT_ROOT))
 
-from parser.storage.photos_cleanup import (  # noqa: E402
-    cleanup_stale_parsed_photos,
-    cleanup_unused_parsed_photos,
-)
+from parser.storage.photos_cleanup import cleanup_old_unused_parser_photos  # noqa: E402
 
 
 def _format_bytes(n: int) -> str:
@@ -34,37 +31,31 @@ def _format_bytes(n: int) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Очистити невикористовувані фото парсера (parsed_photos та опційно public)"
+        description=(
+            "Видалити фото парсера, які не в Listing і старіші за N днів (надто старі). "
+            "Без --dry-run видаляє одразу."
+        )
     )
-    ap.add_argument("--days", type=int, default=30, help="Вік stale pending у днях (default 30)")
     ap.add_argument(
-        "--public-orphan-days",
+        "--days",
         type=int,
         default=7,
-        help="Мін. вік parser_* у public перед видаленням (0 = одразу)",
+        help="Вік у днях — старіші видаляються (default 7)",
     )
-    ap.add_argument("--dry-run", action="store_true", help="Лише звіт, без змін")
-    ap.add_argument("-v", "--verbose", action="store_true", help="Прогрес у stderr")
-    ap.add_argument("--legacy", action="store_true", help="Лише stale pending")
+    ap.add_argument("--dry-run", action="store_true", help="Лише звіт, без видалення")
+    ap.add_argument("-v", "--verbose", action="store_true", help="Прогрес")
     ap.add_argument(
-        "--all",
-        action="store_true",
-        help="rejected + stale + published + orphans (+ public з --public-orphans)",
-    )
-    ap.add_argument(
-        "--orphans-only",
-        action="store_true",
-        help="Швидкий режим для VPS: лише сироти в parsed_photos/",
-    )
-    ap.add_argument("--no-rejected", action="store_true")
-    ap.add_argument("--no-published", action="store_true")
-    ap.add_argument("--no-orphans", action="store_true")
-    ap.add_argument(
-        "--public-orphans",
+        "--public",
         action="store_true",
         help="Також parser_* / pi* у public/listings/originals",
     )
+    # зворотна сумісність
+    ap.add_argument("--all", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--public-orphans", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--orphans-only", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args()
+
+    include_public = args.public or args.public_orphans or args.all
 
     on_progress = None
     if args.verbose:
@@ -73,48 +64,30 @@ def main() -> None:
 
         on_progress("cleanup: start")
 
-    if args.orphans_only:
-        result = cleanup_unused_parsed_photos(
-            days=args.days,
-            dry_run=args.dry_run,
-            delete_rejected=False,
-            delete_stale_pending=False,
-            delete_published=False,
-            delete_orphans=True,
-            delete_public_orphans=False,
-            on_progress=on_progress,
-        )
-    elif args.legacy:
-        result = cleanup_stale_parsed_photos(days=args.days, dry_run=args.dry_run)
-    elif args.all:
-        result = cleanup_unused_parsed_photos(
-            days=args.days,
-            dry_run=args.dry_run,
-            delete_rejected=True,
-            delete_stale_pending=True,
-            delete_published=True,
-            delete_orphans=True,
-            delete_public_orphans=args.public_orphans,
-            public_orphan_days=args.public_orphan_days,
-            on_progress=on_progress,
-        )
-    else:
-        result = cleanup_unused_parsed_photos(
-            days=args.days,
-            dry_run=args.dry_run,
-            delete_rejected=not args.no_rejected,
-            delete_stale_pending=True,
-            delete_published=not args.no_published,
-            delete_orphans=not args.no_orphans,
-            delete_public_orphans=args.public_orphans,
-            public_orphan_days=args.public_orphan_days,
-            on_progress=on_progress,
-        )
+    result = cleanup_old_unused_parser_photos(
+        days=args.days,
+        dry_run=args.dry_run,
+        include_public=include_public,
+        on_progress=on_progress,
+    )
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    deleted = result.get("files_deleted", 0)
+    too_old = result.get("too_old_deleted", 0)
+    db_cleared = result.get("parsed_items_cleared", 0)
+    db_deleted = result.get("parsed_items_deleted", 0)
     freed = result.get("bytes_freed", 0)
-    if freed:
-        print(f"\nЗвільнено: {_format_bytes(freed)}", file=sys.stderr)
+    if deleted or db_cleared or db_deleted:
+        mode = "прогноз" if args.dry_run else "готово"
+        print(
+            f"\n{mode}: файлів {deleted} (надто старі {too_old}), "
+            f"БД images_json очищено {db_cleared}, рядків parsed_items видалено {db_deleted}, "
+            f"диск {_format_bytes(freed)}",
+            file=sys.stderr,
+        )
+    elif args.verbose:
+        print("\nНічого не видалено (усі файли або в оголошеннях, або новіші за поріг)", file=sys.stderr)
 
 
 if __name__ == "__main__":
