@@ -1,0 +1,59 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_URL: ${WEBAPP_URL:-}
+        NEXT_PUBLIC_WEBAPP_URL: ${WEBAPP_URL:-}
+        NEXT_PUBLIC_BOT_URL: ${NEXT_PUBLIC_BOT_URL:-}
+        NEXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-}
+        NEXT_PUBLIC_SUPPORT_MANAGER: ${SUPPORT_MANAGER:-}
+        NEXT_PUBLIC_MARKETPLACE_TELEGRAM_ONLY: ${NEXT_PUBLIC_MARKETPLACE_TELEGRAM_ONLY:-}
+    image: allyouneed-app:latest
+    container_name: allyouneed-app
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - ./bot/.env
+    environment:
+      DATABASE_URL: file:/app/database/ayn_marketplace.db
+      NODE_OPTIONS: --max-old-space-size=384
+    volumes:
+      - ./database:/app/database
+      - ./app/public/listings:/app/app/public/listings
+      - ./app/public/avatars:/app/app/public/avatars
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 8
+      start_period: 40s
+
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    image: allyouneed-bot:latest
+    container_name: allyouneed-bot
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ./bot/.env
+    volumes:
+      - ./database:/app/database
+      - ./app/public/listings:/app/app/public/listings
+      - ./app/public/avatars:/app/app/public/avatars
+      - ./bot/parser/sessions:/app/bot/parser/sessions
+      - ./bot/logs:/app/bot/logs
+    depends_on:
+      app:
+        condition: service_healthy

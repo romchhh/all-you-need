@@ -17,24 +17,27 @@
     "test:city-notify": "tsx scripts/test-city-subscription-notify.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0",
-    "adm-zip": "^0.5.16",
-    "lucide-react": "^0.562.0",
-    "next": "16.1.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "sharp": "^0.33.5"
+    "@prisma/client": "6.19.3",
+    "adm-zip": "0.6.0",
+    "lucide-react": "^0.577.0",
+    "next": "16.3.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "sharp": "0.35.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.1",
-    "prisma": "^6.0.0",
-    "tailwindcss": "^4",
+    "eslint-config-next": "16.3.1",
+    "prisma": "6.19.3",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.7.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.1"
   }
 }
