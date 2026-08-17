@@ -191,9 +191,9 @@ docker compose logs -f --tail=80
 
 **Бот не стартує, app unhealthy**  
 ```bash
-docker compose logs app
+docker compose logs app --tail=80
 ```
-Часто: немає `bot/.env`, зайнятий порт 3000, або Prisma не може відкрити `database/`.
+Часто: немає `bot/.env`, зайнятий порт 3000, або контейнер падав на `prisma db push` (це вже прибрано з entrypoint). Healthcheck дивиться на `/api/health`.
 
 **`database is locked`**  
 Переконайся, що старий Python-бот і `next start` на хості вимкнені. Працюють лише контейнери.

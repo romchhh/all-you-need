@@ -19,7 +19,7 @@ services:
     env_file:
       - ./bot/.env
     environment:
-      DATABASE_URL: file:/app/database/ayn_marketplace.db
+      DATABASE_URL: file:///app/database/ayn_marketplace.db
       NODE_OPTIONS: --max-old-space-size=384
     volumes:
       - ./database:/app/database
@@ -31,12 +31,12 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
-      interval: 30s
+      interval: 15s
       timeout: 5s
-      retries: 8
-      start_period: 40s
+      retries: 12
+      start_period: 90s
 
   bot:
     build:
@@ -56,4 +56,4 @@ services:
       - ./bot/logs:/app/bot/logs
     depends_on:
       app:
-        condition: service_healthy
+        condition: service_started

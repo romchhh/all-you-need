@@ -42,7 +42,7 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     TZ=Europe/Kyiv \
-    DATABASE_URL="file:/app/database/ayn_marketplace.db"
+    DATABASE_URL="file:///app/database/ayn_marketplace.db"
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates tzdata \
