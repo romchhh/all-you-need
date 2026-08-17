@@ -17,6 +17,7 @@ ARG NEXT_PUBLIC_MARKETPLACE_TELEGRAM_ONLY=
 
 ENV NEXT_TELEMETRY_DISABLED=1 \
     DATABASE_URL="file:/tmp/build.db" \
+    PRISMA_CLI_BINARY_TARGETS="native,debian-openssl-3.0.x" \
     NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL} \
     NEXT_PUBLIC_WEBAPP_URL=${NEXT_PUBLIC_WEBAPP_URL} \
     NEXT_PUBLIC_BOT_URL=${NEXT_PUBLIC_BOT_URL} \
@@ -42,7 +43,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     TZ=Europe/Kyiv \
-    DATABASE_URL="file:///app/database/ayn_marketplace.db"
+    DATABASE_URL="file:///app/database/ayn_marketplace.db" \
+    PRISMA_CLI_BINARY_TARGETS="native,debian-openssl-3.0.x"
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates tzdata \
@@ -59,7 +61,8 @@ COPY --from=builder /app/app/next.config.ts ./
 COPY --from=builder /app/app/lib/media/listingMediaConstants.ts ./lib/media/listingMediaConstants.ts
 COPY docker/app-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
- && mkdir -p /app/database /app/app/public/listings/originals /app/app/public/avatars
+ && mkdir -p /app/database /app/app/public/listings/originals /app/app/public/avatars \
+ && npx prisma generate --schema=/app/app/prisma/schema.prisma
 
 EXPOSE 3000
 ENTRYPOINT ["/entrypoint.sh"]
