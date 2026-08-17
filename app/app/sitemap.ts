@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 
 const BASE_URL = (process.env.WEBAPP_URL || 'https://allyouneed-marketplace.com').replace(/\/$/, '');
 
+/** Не пререндерити під час docker build — БД з’являється лише в runtime. */
+export const dynamic = 'force-dynamic';
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
@@ -30,17 +33,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }))
   );
 
-  // Додаємо всі активні та схвалені товари як окремі SEO-сторінки
-  // Беремо тільки id, щоб обійти проблемні значення дат у БД
-  const listings = await prisma.listing.findMany({
-    where: {
-      status: 'active',
-      moderationStatus: 'approved',
-    },
-    select: {
-      id: true,
-    },
-  });
+  let listings: { id: number }[] = [];
+  try {
+    listings = await prisma.listing.findMany({
+      where: {
+        status: 'active',
+        moderationStatus: 'approved',
+      },
+      select: {
+        id: true,
+      },
+    });
+  } catch (err) {
+    console.warn('[sitemap] skip listings (DB unavailable during build):', err);
+  }
 
   const listingEntries: MetadataRoute.Sitemap = listings.flatMap((listing) =>
     languages.map((lang) => ({
@@ -53,4 +59,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [...staticEntries, ...listingEntries];
 }
+
 

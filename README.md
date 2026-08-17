@@ -31,30 +31,15 @@ Telegram маркетплейс для продажу та покупки тов
 
 ## Docker
 
-На VPS бот і Next.js крутяться в двох контейнерах і ділять SQLite + фото через bind-mount (існуючі `database/`, `app/public/listings`, сесії парсера не чіпаються).
+Повна інструкція: **[DOCKER.md](./DOCKER.md)** (підготовка, запуск, томи, оновлення, nginx).
+
+Коротко:
 
 ```bash
-# 1) змінні для compose (інтерполяція ${WEBAPP_URL} під час build)
 ln -sf bot/.env .env
-
-# 2) збірка і запуск
 docker compose up -d --build
-
-# логи
-docker compose logs -f app bot
+docker compose logs -f
 ```
-
-Після цього міні-ап: `http://SERVER:3000` (або проксі на 443). `WEBAPP_URL` у `bot/.env` має бути публічним HTTPS.
-
-Корисні команди:
-
-```bash
-docker compose ps
-docker compose restart bot
-docker compose down          # контейнери; дані на диску лишаються
-```
-
-На Droplet 1 GB збірка Next.js може не вміститись у RAM — додай swap (~2 GB) або збери образ на машині з більшою пам’яттю і завантаж на сервер.
 
 ## 🛠️ Встановлення
 

@@ -29,6 +29,7 @@ COPY --from=deps /app/app/node_modules ./node_modules
 COPY app/ ./
 
 RUN npx prisma generate \
+ && npx prisma db push --skip-generate \
  && npm run build \
  && npm prune --omit=dev \
  && npm install prisma@6.19.3 --omit=dev --no-audit --no-fund

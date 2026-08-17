@@ -22,20 +22,25 @@ export async function generateMetadata(
     };
   }
 
-  const listing = await prisma.listing.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      images: true,
-      status: true,
-      moderationStatus: true,
-      location: true,
-      price: true,
-      currency: true,
-    },
-  });
+  let listing = null;
+  try {
+    listing = await prisma.listing.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        images: true,
+        status: true,
+        moderationStatus: true,
+        location: true,
+        price: true,
+        currency: true,
+      },
+    });
+  } catch {
+    listing = null;
+  }
 
   if (!listing) {
     return {
@@ -116,14 +121,19 @@ export default async function ListingPage(props: PageProps) {
     notFound();
   }
 
-  const listing = await prisma.listing.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      status: true,
-      moderationStatus: true,
-    },
-  });
+  let listing = null;
+  try {
+    listing = await prisma.listing.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        moderationStatus: true,
+      },
+    });
+  } catch {
+    notFound();
+  }
 
   // 404 тільки якщо товар взагалі не існує
   if (!listing) {
