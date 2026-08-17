@@ -2,6 +2,9 @@
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app/app
 
+# Не генерувати Prisma під час npm install — engine тоді часто стає openssl-1.1
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
+
 COPY app/package.json ./
 RUN npm install --no-audit --no-fund
 
@@ -17,7 +20,8 @@ ARG NEXT_PUBLIC_MARKETPLACE_TELEGRAM_ONLY=
 
 ENV NEXT_TELEMETRY_DISABLED=1 \
     DATABASE_URL="file:/tmp/build.db" \
-    PRISMA_CLI_BINARY_TARGETS="native,debian-openssl-3.0.x" \
+    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x" \
+    PRISMA_SKIP_POSTINSTALL_GENERATE=1 \
     NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL} \
     NEXT_PUBLIC_WEBAPP_URL=${NEXT_PUBLIC_WEBAPP_URL} \
     NEXT_PUBLIC_BOT_URL=${NEXT_PUBLIC_BOT_URL} \
@@ -26,6 +30,10 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     NEXT_PUBLIC_MARKETPLACE_TELEGRAM_ONLY=${NEXT_PUBLIC_MARKETPLACE_TELEGRAM_ONLY} \
     NODE_OPTIONS="--max-old-space-size=1536"
 
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY --from=deps /app/app/node_modules ./node_modules
 COPY app/ ./
 
@@ -33,7 +41,8 @@ RUN npx prisma generate \
  && npx prisma db push --skip-generate \
  && npm run build \
  && npm prune --omit=dev \
- && npm install prisma@6.19.3 --omit=dev --no-audit --no-fund
+ && npm install prisma@6.19.3 --omit=dev --no-audit --no-fund \
+ && npx prisma generate
 
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app/app
@@ -44,10 +53,10 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     TZ=Europe/Kyiv \
     DATABASE_URL="file:///app/database/ayn_marketplace.db" \
-    PRISMA_CLI_BINARY_TARGETS="native,debian-openssl-3.0.x"
+    PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x"
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates tzdata \
+ && apt-get install -y --no-install-recommends ca-certificates tzdata openssl libssl3 \
  && rm -rf /var/lib/apt/lists/* \
  && ln -snf /usr/share/zoneinfo/Europe/Kyiv /etc/localtime \
  && echo Europe/Kyiv > /etc/timezone

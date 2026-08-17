@@ -189,11 +189,13 @@ docker compose logs -f --tail=80
 **`Killed` під час `docker compose build` (app)**  
 Не вистачає RAM. Додай swap (розділ 1) або збери образ на потужнішій машині і завантаж на VPS.
 
-**Бот не стартує, app unhealthy**  
+**Prisma: debian-openssl-1.1.x vs 3.0.x**  
+Перезбери app **без кешу**:
+
 ```bash
-docker compose logs app --tail=80
+docker compose build --no-cache app
+docker compose up -d app
 ```
-Часто: немає `bot/.env`, зайнятий порт 3000, або контейнер падав на `prisma db push` (це вже прибрано з entrypoint). Healthcheck дивиться на `/api/health`.
 
 **`database is locked`**  
 Переконайся, що старий Python-бот і `next start` на хості вимкнені. Працюють лише контейнери.
