@@ -103,20 +103,24 @@ async def edit_group_message(
     parse_mode: Optional[str] = None,
     *,
     message: Message | None = None,
+    reply_markup=None,
+    clear_markup: bool = True,
 ):
-    """Редагує повідомлення модерації (текст або caption), прибирає кнопки."""
+    """Редагує повідомлення модерації (текст або caption). За замовчуванням прибирає кнопки."""
+    markup = None if clear_markup else reply_markup
     base_kwargs = {
         "chat_id": group_id,
         "message_id": message_id,
-        "reply_markup": None,
+        "reply_markup": markup,
     }
 
-    try:
-        await bot.edit_message_reply_markup(**base_kwargs)
-    except TelegramBadRequest:
-        pass
-    except Exception as e:
-        logger.debug("edit_message_reply_markup: %s", e)
+    if clear_markup or reply_markup is not None:
+        try:
+            await bot.edit_message_reply_markup(**base_kwargs)
+        except TelegramBadRequest:
+            pass
+        except Exception as e:
+            logger.debug("edit_message_reply_markup: %s", e)
 
     use_caption = _message_has_caption(message)
     content = status_text[:1024] if use_caption else status_text[:4096]

@@ -122,6 +122,13 @@ async def scheduler_jobs():
             print("✅ Scheduler job 'telegram_parser' додано (усі групи → модерація)")
         else:
             print("ℹ️ Parser jobs не додано — немає акаунтів (Адмін → Парсер акаунти)")
+            try:
+                from parser.moderation.auto_approve import register_auto_approve_job
+
+                register_auto_approve_job(scheduler)
+                print("✅ Scheduler job 'parser_auto_approve_drain' додано")
+            except Exception as auto_err:
+                print(f"❌ Помилка реєстрації auto-approve job: {auto_err}")
     except Exception as e:
         print(f"❌ Помилка реєстрації parser job: {e}")
         import traceback

@@ -27,7 +27,11 @@ from parser.config.settings import (
 )
 from parser.ai.screen import is_ai_screen_enabled
 from parser.core.telegram_meta import parsed_item_message_link
-from parser.moderation.formatting import resolved_author_username
+from parser.moderation.formatting import (
+    edit_group_message,
+    format_listing_open_links_html,
+    resolved_author_username,
+)
 from parser.moderation.approve_routing import (
     is_services_moderation_chat,
     services_moderation_chat_ids,
@@ -222,6 +226,50 @@ def _make_keyboard(item_id: int) -> InlineKeyboardMarkup:
     ])
 
 
+def _format_auto_approved_message(
+    item: dict,
+    listing_id: int,
+    listing_item: dict | None = None,
+) -> str:
+    src = listing_item or item
+    category_label = get_category_label(
+        src.get("category", "other"), src.get("subcategory")
+    )
+    cat_emoji = CATEGORY_EMOJI.get(src.get("category", "other"), "📦")
+    title = html.escape(str(src.get("title") or item.get("title") or "—"))
+    open_links = format_listing_open_links_html(listing_id)
+    channel = html.escape(str(item.get("source_channel") or ""))
+    loc_raw = str(src.get("location") or src.get("source_city") or "")
+    city_de = normalize_city_name(loc_raw) if loc_raw else ""
+    city_display = CITY_FLAG.get(city_de, f"🇩🇪 {city_de}" if city_de else "—")
+    is_services = _is_services_item(item) or _is_services_item(src)
+
+    lines = [
+        "🤖 <b>АВТОПІДТВЕРДЖЕНО</b> (маркетплейс)",
+        "",
+        "Оголошення опубліковано на маркетплейсі автоматично.",
+        "📣 <b>Telegram-канал не публікувався.</b>",
+        "",
+        f"📋 <b>{title}</b>",
+        f"{cat_emoji} {html.escape(category_label)}",
+        f"📍 {html.escape(city_display)}",
+        f"📢 @{channel}" if channel else "📢 —",
+        f"📌 Listing #{listing_id}",
+        open_links,
+    ]
+    if is_services:
+        lines.extend(
+            [
+                "",
+                "<i>✅ — опублікувати в Telegram-канал послуг</i>",
+                "<i>❌ — канал не публікувати (маркетплейс лишається)</i>",
+            ]
+        )
+    else:
+        lines.extend(["", "<i>Товари: лише маркетплейс, без каналу.</i>"])
+    return "\n".join(lines)
+
+
 # ──────────────────────────────────────────────
 # Надсилання в групу
 # ──────────────────────────────────────────────
@@ -244,41 +292,56 @@ async def _send_with_retry(coro_fn, *args, **kwargs):
     return await coro_fn(*args, **kwargs)
 
 
-async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
-    """
-    Надсилає оголошення в групу модерації парсера.
-    Якщо в item задано notify_chat_id (напр. послуги з parser.py) — надсилання туди.
-    Повертає message_id надісланого повідомлення або None.
-    """
+def _resolve_notify_group_id(item: dict) -> Optional[int]:
     override = item.get("notify_chat_id")
     if override is not None:
         try:
-            group_id = int(override)
+            return int(override)
         except (TypeError, ValueError):
-            group_id = get_parser_group_id()
-    else:
-        group_id = get_parser_group_id()
-    if not group_id:
-        logger.warning("notify_chat_id / PARSER_MOD_GOODS_ID не встановлено — пропускаємо надсилання адміну")
-        return None
+            pass
+    stored = item.get("moderation_chat_id")
+    if stored is not None:
+        try:
+            return int(stored)
+        except (TypeError, ValueError):
+            pass
+    return get_parser_group_id()
 
-    item_id = item["id"]
-    text = _format_admin_message(item)
-    keyboard = _make_keyboard(item_id)
+
+def _absolute_item_images(item: dict) -> list[str]:
     images: list[str] = item.get("images") or []
+    if not images:
+        from parser.storage.parsed_items import parsed_item_image_refs
 
-    # Перетворюємо відносні шляхи на абсолютні
+        images = parsed_item_image_refs(item)
     abs_images = []
     for img in images:
         p = BASE_DIR / img
         if p.exists():
             abs_images.append(str(p))
-
-    # Послуги без фото — лого TradeGround (як у каналах)
     if not abs_images and _is_services_item(item):
         logo = _tgground_logo_path()
         if logo:
             abs_images = [logo]
+    return abs_images
+
+
+async def _send_moderation_card(
+    bot: Bot,
+    item: dict,
+    text: str,
+    keyboard: Optional[InlineKeyboardMarkup],
+    *,
+    followup_text: Optional[str] = None,
+) -> Optional[int]:
+    group_id = _resolve_notify_group_id(item)
+    if not group_id:
+        logger.warning("notify_chat_id / PARSER_MOD_GOODS_ID не встановлено — пропускаємо надсилання адміну")
+        return None
+
+    item_id = item["id"]
+    abs_images = _absolute_item_images(item)
+    followup = followup_text or (f"⬆️ Оголошення #{item_id} — оберіть дію:" if keyboard else None)
 
     try:
         if len(abs_images) == 0:
@@ -320,19 +383,40 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
                 media=media_group,
             )
             first_msg_id = sent_group[0].message_id
-
             await asyncio.sleep(1)
-
+            kb_text = followup or f"⬆️ Оголошення #{item_id}"
             sent_kb = await _send_with_retry(
                 bot.send_message,
                 chat_id=group_id,
-                text=f"⬆️ Оголошення #{item_id} — оберіть дію:",
+                text=kb_text[:4096],
                 reply_to_message_id=first_msg_id,
                 reply_markup=keyboard,
+                parse_mode="HTML",
             )
             msg_id = sent_kb.message_id
 
-        # Одна картка на оголошення — зберігаємо в основних полях модерації
+        record_moderation_message(item_id, msg_id, group_id, target="marketplace")
+        return msg_id
+    except Exception as e:
+        logger.error(f"Помилка надсилання оголошення {item_id} в групу: {e}", exc_info=True)
+        return None
+
+
+async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
+    """
+    Надсилає оголошення в групу модерації парсера.
+    Якщо в item задано notify_chat_id (напр. послуги з parser.py) — надсилання туди.
+    Повертає message_id надісланого повідомлення або None.
+    """
+    item_id = item["id"]
+    group_id = _resolve_notify_group_id(item)
+    msg_id = await _send_moderation_card(
+        bot,
+        item,
+        _format_admin_message(item),
+        _make_keyboard(item_id),
+    )
+    if msg_id and group_id:
         mod_target = (item.get("moderation_target") or "").strip().lower()
         if not mod_target:
             mod_target = (
@@ -340,7 +424,6 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
                 if is_services_moderation_chat(group_id)
                 else "marketplace"
             )
-        record_moderation_message(item_id, msg_id, group_id, target="marketplace")
         logger.info(
             "Надіслано оголошення %s в групу %s (%s), msg_id=%s",
             item_id,
@@ -348,11 +431,61 @@ async def notify_admin_group(bot: Bot, item: dict) -> Optional[int]:
             mod_target,
             msg_id,
         )
-        return msg_id
+    return msg_id
 
-    except Exception as e:
-        logger.error(f"Помилка надсилання оголошення {item_id} в групу: {e}", exc_info=True)
-        return None
+
+async def notify_auto_approved_marketplace(
+    bot: Bot,
+    item: dict,
+    listing_id: int,
+    listing_item: dict | None = None,
+) -> Optional[int]:
+    """
+    Картка в групі модерації: оголошення вже на маркетплейсі (авто).
+    Товари — без кнопок. Послуги — ✅ лише в Telegram-канал.
+    Якщо картка вже була (drain) — редагуємо її.
+    """
+    text = _format_auto_approved_message(item, listing_id, listing_item)
+    keep_keyboard = _is_services_item(item) or (
+        listing_item and _is_services_item(listing_item)
+    )
+    keyboard = _make_keyboard(int(item["id"])) if keep_keyboard else None
+
+    admin_msg_id = item.get("admin_message_id")
+    group_id = _resolve_notify_group_id(item)
+    if admin_msg_id and group_id:
+        try:
+            await edit_group_message(
+                bot,
+                int(group_id),
+                int(admin_msg_id),
+                text,
+                parse_mode="HTML",
+                reply_markup=keyboard,
+                clear_markup=not keep_keyboard,
+            )
+            return int(admin_msg_id)
+        except Exception:
+            logger.warning(
+                "Не вдалося оновити картку auto-approve %s, надсилаємо нову",
+                item.get("id"),
+                exc_info=True,
+            )
+
+    msg_id = await _send_moderation_card(
+        bot,
+        item,
+        text,
+        keyboard,
+        followup_text=text,
+    )
+    if msg_id:
+        logger.info(
+            "Надіслано auto-approve картку parsed_item %s listing %s в групу",
+            item.get("id"),
+            listing_id,
+        )
+    return msg_id
 
 
 # ──────────────────────────────────────────────

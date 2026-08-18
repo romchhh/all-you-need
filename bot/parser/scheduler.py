@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 
 from parser.config.settings import (
     FETCH_LIMIT,
+    PARSER_AUTO_APPROVE_ENABLED,
     PARSER_DEDUP_ENABLED,
     PARSER_INTERVAL_MIN,
     PARSER_ROLLING_LOOKBACK,
@@ -129,6 +130,17 @@ async def run_parser_cycle(
         from parser.storage.connection import parser_db_cycle
 
         async def notify_callback(item_data: dict):
+            if PARSER_AUTO_APPROVE_ENABLED:
+                try:
+                    from parser.moderation.auto_approve import maybe_auto_approve_and_notify
+
+                    if await maybe_auto_approve_and_notify(aiogram_bot, item_data):
+                        return
+                except Exception:
+                    logger.exception(
+                        "auto-approve parse-time failed parsed_item %s",
+                        item_data.get("id"),
+                    )
             await notify_admin_group(aiogram_bot, item_data)
 
         run_cfg = None
@@ -192,6 +204,18 @@ async def run_parser_cycle(
                             )
                     except Exception as cleanup_err:
                         logger.warning("Не вдалося очистити parsed_photos: %s", cleanup_err)
+                if PARSER_AUTO_APPROVE_ENABLED:
+                    try:
+                        from parser.moderation.auto_approve import run_auto_approve_drain
+
+                        drain_stats = await run_auto_approve_drain(aiogram_bot)
+                        if drain_stats.get("approved"):
+                            logger.info(
+                                "🤖 auto-approve після циклу: +%s",
+                                drain_stats["approved"],
+                            )
+                    except Exception as drain_err:
+                        logger.warning("auto-approve drain після циклу: %s", drain_err)
         except RuntimeError as e:
             logger.error("Сесія парсера зайнята: %s", e, exc_info=True)
             await _notify_error("сесія зайнята", str(e))
@@ -249,6 +273,12 @@ def register_parser_job(scheduler):
         kwargs={"scheduled": True},
     )
     logger.info(f"✅ Parser scheduler зареєстровано (усі групи, інтервал: {PARSER_INTERVAL_MIN} хв)")
+    try:
+        from parser.moderation.auto_approve import register_auto_approve_job
+
+        register_auto_approve_job(scheduler)
+    except Exception:
+        logger.exception("Не вдалося зареєструвати auto-approve job")
 
 
 def register_services_ai_parser_job(scheduler):

@@ -9,7 +9,9 @@ from aiogram.types import CallbackQuery
 from parser.moderation.approve_routing import is_services_moderation_chat
 from parser.moderation.formatting import edit_group_message
 from parser.storage.parsed_items import (
+    get_mod_path_status,
     resolve_parsed_item_for_moderation,
+    update_mod_path_status,
     update_parsed_item_status,
 )
 
@@ -42,14 +44,41 @@ async def handle_parser_reject(callback: CallbackQuery, bot: Bot):
         await callback.answer(f"ℹ️ Оголошення вже {item['status']}", show_alert=True)
         return
 
-    update_parsed_item_status(item_id, "rejected", moderated_by=moderator_id)
-
     group_id = callback.message.chat.id
     msg_id = callback.message.message_id
     if callback.from_user.username:
         mod_mention = "@" + html.escape(callback.from_user.username)
     else:
         mod_mention = f"<code>{moderator_id}</code>"
+
+    # Автопідтверджений маркетплейс: ❌ лише скасовує публікацію в канал
+    if item.get("marketplace_listing_id") and int(item.get("auto_approved") or 0) == 1:
+        if get_mod_path_status(item, "channel") == "rejected":
+            await callback.answer("ℹ️ Канал уже відхилено", show_alert=True)
+            return
+        update_mod_path_status(
+            item_id, "channel", "rejected", moderated_by=moderator_id
+        )
+        await edit_group_message(
+            bot,
+            group_id,
+            msg_id,
+            (
+                f"❌ <b>Канал не публікуємо</b> (модератор {mod_mention})\n"
+                "Маркетплейс лишається — оголошення вже було автопідтверджене."
+            ),
+            parse_mode="HTML",
+            message=callback.message,
+        )
+        await callback.answer("❌ Канал відхилено, маркетплейс лишається", show_alert=False)
+        logger.info(
+            "parsed_item %s: канал відхилено після auto-approve (мод. %s)",
+            item_id,
+            moderator_id,
+        )
+        return
+
+    update_parsed_item_status(item_id, "rejected", moderated_by=moderator_id)
 
     stream = " (послуги)" if is_services_moderation_chat(chat_id) else " (товари)"
     await edit_group_message(

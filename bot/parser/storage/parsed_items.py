@@ -268,6 +268,16 @@ def ensure_parsed_items_table():
     col_names7 = {row[1] for row in cursor.fetchall()}
     if "msg_link" not in col_names7:
         cursor.execute("ALTER TABLE parsed_items ADD COLUMN msg_link TEXT")
+    cursor.execute("PRAGMA table_info(parsed_items)")
+    col_names8 = {row[1] for row in cursor.fetchall()}
+    if "auto_approved" not in col_names8:
+        cursor.execute(
+            "ALTER TABLE parsed_items ADD COLUMN auto_approved INTEGER DEFAULT 0"
+        )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_parsed_items_auto_approved "
+        "ON parsed_items(auto_approved, moderated_at) WHERE auto_approved = 1"
+    )
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_parsed_items_admin_msg_channel "
         "ON parsed_items(admin_message_id_channel) WHERE admin_message_id_channel IS NOT NULL"
@@ -605,9 +615,16 @@ def get_parsed_item_by_admin_msg(admin_message_id: int) -> Optional[dict]:
     return dict(row) if row else None
 
 
+def uses_dual_mod_status(item: dict) -> bool:
+    """Послуги: маркетплейс і Telegram-канал модеруються окремо."""
+    if (item.get("parser_type") or "default") == "services_channel":
+        return True
+    return (item.get("category") or "").strip().lower() == "services_work"
+
+
 def get_mod_path_status(item: dict, path: str) -> str:
     """path: marketplace | channel"""
-    if (item.get("parser_type") or "default") == "services_channel":
+    if uses_dual_mod_status(item):
         if path == "marketplace":
             return (item.get("marketplace_mod_status") or item.get("status") or "pending").lower()
         return (item.get("channel_mod_status") or item.get("status") or "pending").lower()
@@ -630,7 +647,7 @@ def update_mod_path_status(
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT marketplace_mod_status, channel_mod_status, parser_type
+        SELECT marketplace_mod_status, channel_mod_status, parser_type, category
         FROM parsed_items WHERE id = ?
         """,
         (item_id,),
@@ -638,7 +655,7 @@ def update_mod_path_status(
     row = cursor.fetchone()
     if row:
         data = dict(row)
-        if (data.get("parser_type") or "default") == "services_channel":
+        if uses_dual_mod_status(data):
             mp = (data.get("marketplace_mod_status") or "pending").lower()
             ch = (data.get("channel_mod_status") or "pending").lower()
             if mp == "rejected" and ch == "rejected":
@@ -755,3 +772,157 @@ def set_marketplace_listing_id(item_id: int, listing_id: int, moderated_by: Opti
     conn.commit()
     conn.close()
     update_mod_path_status(item_id, "marketplace", "approved", moderated_by=moderated_by)
+
+
+# auto_approved: 0 = ні, 1 = опубліковано автоматом, 2 = claim у процесі
+AUTO_APPROVE_NONE = 0
+AUTO_APPROVE_DONE = 1
+AUTO_APPROVE_CLAIMED = 2
+
+
+def parsed_item_image_refs(item: dict) -> list[str]:
+    images = item.get("images")
+    if isinstance(images, list) and images:
+        return [str(x) for x in images if x]
+    raw = item.get("images_json") or "[]"
+    try:
+        refs = json.loads(raw)
+    except Exception:
+        return []
+    if not isinstance(refs, list):
+        return []
+    return [str(x) for x in refs if x]
+
+
+def hydrate_parsed_item(item: dict) -> dict:
+    """Додає images і notify_chat_id для notify / auto-approve з рядка БД."""
+    out = dict(item)
+    out["images"] = parsed_item_image_refs(out)
+    if out.get("notify_chat_id") in (None, "", 0):
+        stored = out.get("moderation_chat_id")
+        if stored:
+            try:
+                out["notify_chat_id"] = int(stored)
+            except (TypeError, ValueError):
+                pass
+        if out.get("notify_chat_id") in (None, "", 0):
+            from parser.moderation.approve_routing import notify_chat_for_parsed_item
+
+            out["notify_chat_id"] = notify_chat_for_parsed_item(out)
+    return out
+
+
+def try_claim_auto_approve(item_id: int) -> bool:
+    """Атомарний claim, щоб drain і parse-callback не опублікували двічі."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE parsed_items
+        SET auto_approved = ?
+        WHERE id = ?
+          AND status = 'pending'
+          AND marketplace_listing_id IS NULL
+          AND IFNULL(auto_approved, 0) = 0
+        """,
+        (AUTO_APPROVE_CLAIMED, item_id),
+    )
+    claimed = cursor.rowcount == 1
+    conn.commit()
+    conn.close()
+    return claimed
+
+
+def unclaim_auto_approve(item_id: int) -> None:
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE parsed_items
+        SET auto_approved = ?
+        WHERE id = ? AND auto_approved = ?
+        """,
+        (AUTO_APPROVE_NONE, item_id, AUTO_APPROVE_CLAIMED),
+    )
+    conn.commit()
+    conn.close()
+
+
+def mark_auto_approved(item_id: int) -> None:
+    conn = get_connection()
+    conn.execute(
+        "UPDATE parsed_items SET auto_approved = ? WHERE id = ?",
+        (AUTO_APPROVE_DONE, item_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def count_auto_approve_in_flight() -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM parsed_items WHERE auto_approved = ?",
+        (AUTO_APPROVE_CLAIMED,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return int(row[0] or 0) if row else 0
+
+
+def reset_stale_auto_approve_claims() -> int:
+    """Знімає завислі claim після рестарту процесу."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE parsed_items
+        SET auto_approved = ?
+        WHERE auto_approved = ?
+          AND marketplace_listing_id IS NULL
+        """,
+        (AUTO_APPROVE_NONE, AUTO_APPROVE_CLAIMED),
+    )
+    n = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return n
+
+
+def list_auto_approved_since(iso_start: str) -> list[dict]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, source_channel, category, subcategory, moderation_chat_id,
+               moderated_at, auto_approved, parser_type
+        FROM parsed_items
+        WHERE auto_approved = ?
+          AND moderated_at IS NOT NULL
+          AND moderated_at >= ?
+        """,
+        (AUTO_APPROVE_DONE, iso_start),
+    )
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def list_pending_for_auto_approve(max_age_hours: int, limit: int = 400) -> list[dict]:
+    hours = max(1, int(max_age_hours))
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        f"""
+        SELECT * FROM parsed_items
+        WHERE status = 'pending'
+          AND marketplace_listing_id IS NULL
+          AND IFNULL(auto_approved, 0) = 0
+          AND datetime(created_at) >= datetime('now', ?)
+        ORDER BY datetime(created_at) ASC
+        LIMIT ?
+        """,
+        (f"-{hours} hours", int(limit)),
+    )
+    rows = [hydrate_parsed_item(dict(r)) for r in cursor.fetchall()]
+    conn.close()
+    return rows

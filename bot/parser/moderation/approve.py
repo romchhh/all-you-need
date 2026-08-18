@@ -2,7 +2,6 @@
 
 import asyncio
 import html
-import json
 import logging
 
 from aiogram import Bot
@@ -22,7 +21,6 @@ from parser.marketplace_categories import (
 )
 from parser.core.parse_pipeline import finalize_listing_item_for_publish, ensure_parsed_item_ai_screened
 from parser.moderation.author_notify import schedule_author_notify
-from parser.core.account_pool import list_parser_accounts
 from parser.core.location import resolve_parsed_location
 from parser.moderation.formatting import (
     build_marketplace_description,
@@ -31,22 +29,22 @@ from parser.moderation.formatting import (
     format_listing_open_links_html,
     preserve_parsed_source_fields,
 )
+from parser.moderation.marketplace_publish import (
+    MarketplacePublishError,
+    publish_parsed_item_marketplace,
+)
 from parser.moderation.services_publish import (
     format_services_channels_labels,
     publish_services_listing_to_channel,
 )
-from parser.storage.marketplace import (
-    copy_parser_images_to_public,
-    create_marketplace_listing,
-    get_or_create_bot_user,
-)
+from parser.storage.marketplace import copy_parser_images_to_public
 from utils.location_normalization import normalize_city_name
 from parser.storage.parsed_items import (
-    fingerprint_title_desc,
+    get_mod_path_status,
+    parsed_item_image_refs,
     resolve_parsed_item_for_moderation,
-    set_marketplace_listing_id,
+    update_mod_path_status,
 )
-from parser.storage.listing_dedup import active_listing_duplicate
 from utils.city_digest_notify import enqueue_city_digest_listing
 
 logger = logging.getLogger(__name__)
@@ -130,12 +128,12 @@ async def _approve_services_both(
     item: dict,
     moderator_id: int,
 ):
-    """Послуги: маркетплейс + відповідний Telegram-канал (Hamburg / Germany)."""
-    images_raw = item.get("images_json") or "[]"
+    """Послуги: маркетплейс (якщо ще немає) + відповідний Telegram-канал."""
+    existing_listing_id = item.get("marketplace_listing_id")
     try:
-        images: list[str] = json.loads(images_raw)
-    except Exception:
-        images = []
+        existing_listing_id = int(existing_listing_id) if existing_listing_id else 0
+    except (TypeError, ValueError):
+        existing_listing_id = 0
 
     await _ack_processing(callback)
     listing_item = await _prepare_listing_for_publish_or_alert(callback, dict(item), item)
@@ -148,65 +146,31 @@ async def _approve_services_both(
         listing_item = force_services_marketplace_categories(listing_item)
         listing_item["condition"] = "new"
 
-    pool = list_parser_accounts()
-    seller = pool[1] if len(pool) > 1 else (pool[0] if pool else None)
-    if seller and seller.telegram_id:
-        user_id = get_or_create_bot_user(
-            seller.telegram_id,
-            seller.username or "parser_bot",
-            "TradeGround Seller",
-        )
-    else:
-        user_id = get_or_create_bot_user(8590825131, "parser_bot", "Parser Bot")
-
+    images = parsed_item_image_refs(item)
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
     description = ensure_marketplace_description_has_source(
         build_marketplace_description(listing_item),
         listing_item,
     )
 
-    dedup_key = fingerprint_title_desc(
-        str(listing_item.get("title") or ""),
-        str(listing_item.get("description") or ""),
-        price=str(listing_item.get("price") or ""),
-        is_free=bool(listing_item.get("is_free")),
-    )
-    if active_listing_duplicate(
-        dedup_key,
-        str(listing_item.get("title") or ""),
-        description,
-    ):
-        await callback.answer(
-            "❌ Таке оголошення вже є на маркетплейсі (дублікат)",
-            show_alert=True,
-        )
-        return
-
-    try:
-        listing_id = create_marketplace_listing(
-            user_id=user_id,
-            title=listing_item["title"],
-            description=description,
-            price=listing_item.get("price"),
-            currency=listing_item.get("currency"),
-            is_free=bool(listing_item.get("is_free")),
-            category=listing_item.get("category", "services_work"),
-            subcategory=listing_item.get("subcategory"),
-            condition=listing_item.get("condition"),
-            location=listing_item.get("location", "Germany"),
-            images=images_web,
-        )
-    except Exception as e:
-        logger.error(
-            "Помилка створення Listing для parsed_item %s: %s",
-            item_id,
-            e,
-            exc_info=True,
-        )
-        await callback.answer("❌ Помилка при додаванні в маркетплейс", show_alert=True)
-        return
-
-    set_marketplace_listing_id(item_id, listing_id, moderated_by=moderator_id)
+    listing_id = existing_listing_id
+    if not listing_id:
+        try:
+            listing_id, description, images_web = publish_parsed_item_marketplace(
+                item_id,
+                listing_item,
+                item,
+                moderated_by=moderator_id,
+            )
+        except MarketplacePublishError as e:
+            if str(e) == "duplicate":
+                await callback.answer(
+                    "❌ Таке оголошення вже є на маркетплейсі (дублікат)",
+                    show_alert=True,
+                )
+                return
+            await callback.answer("❌ Помилка при додаванні в маркетплейс", show_alert=True)
+            return
 
     group_id = callback.message.chat.id
     msg_id = callback.message.message_id
@@ -218,24 +182,27 @@ async def _approve_services_both(
     loc_raw = str(listing_item.get("location") or listing_item.get("source_city") or "")
     location_label = html.escape(normalize_city_name(loc_raw) or loc_raw)
     force_channels = force_services_channel_ids_for_mod_chat(group_id, listing_item)
+    already_on_mp = bool(existing_listing_id)
     status_text = (
         f"✅ <b>Підтверджено</b> модератором {mod_mention}\n"
         f"📌 Listing #{listing_id}\n"
         f"{open_links}\n"
-        f"📣 Публікуємо в Telegram-канал послуг\n"
+        f"📣 Публікуємо в Telegram-канал послуг"
+        f"{' (маркетплейс уже був автопідтверджений)' if already_on_mp else ''}\n"
         f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
         f"📍 {location_label}"
     )
 
     async def _followup():
-        try:
-            enqueue_city_digest_listing(listing_id)
-        except Exception as notify_err:
-            logger.warning(
-                "Не вдалося поставити Listing %s в city-digest чергу: %s",
-                listing_id,
-                notify_err,
-            )
+        if not existing_listing_id:
+            try:
+                enqueue_city_digest_listing(listing_id)
+            except Exception as notify_err:
+                logger.warning(
+                    "Не вдалося поставити Listing %s в city-digest чергу: %s",
+                    listing_id,
+                    notify_err,
+                )
         published_chats = await publish_services_listing_to_channel(
             bot,
             listing_item,
@@ -245,6 +212,10 @@ async def _approve_services_both(
             marketplace_listing_id=listing_id,
             force_channel_ids=force_channels,
         )
+        if published_chats:
+            update_mod_path_status(
+                item_id, "channel", "approved", moderated_by=moderator_id
+            )
         final_status = status_text
         if published_chats:
             final_status += (
@@ -262,17 +233,26 @@ async def _approve_services_both(
         )
 
     asyncio.create_task(_followup())
-    schedule_author_notify(
-        listing_item,
-        listing_id,
-        use_services_sender=True,
-        channel_only=False,
-    )
+    if not existing_listing_id:
+        schedule_author_notify(
+            listing_item,
+            listing_id,
+            use_services_sender=True,
+            channel_only=False,
+        )
+    elif int(item.get("auto_approved") or 0) == 1:
+        schedule_author_notify(
+            listing_item,
+            listing_id,
+            use_services_sender=True,
+            channel_only=True,
+        )
     logger.info(
-        "parsed_item %s → Listing %s + канал послуг (підтв. %s)",
+        "parsed_item %s → Listing %s + канал послуг (підтв. %s, mp_existed=%s)",
         item_id,
         listing_id,
         moderator_id,
+        already_on_mp,
     )
 
 
@@ -283,80 +263,36 @@ async def _approve_marketplace(
     item: dict,
     moderator_id: int,
 ):
-    images_raw = item.get("images_json") or "[]"
-    try:
-        images: list[str] = json.loads(images_raw)
-    except Exception:
-        images = []
-
     await _ack_processing(callback)
     listing_item = await _prepare_listing_for_publish_or_alert(callback, dict(item), item)
     if not listing_item:
         return
 
     item_category = (listing_item.get("category") or "").strip().lower()
-    # Послуги (у т.ч. з сервіс-каналів / дублікати) — валідна підкатегорія services_work
     if item_category == "services_work" or (item.get("parser_type") or "") == "services_channel":
         listing_item = force_services_marketplace_categories(listing_item)
         listing_item["condition"] = "new"
         item_category = "services_work"
 
-    pool = list_parser_accounts()
-    seller = pool[0] if pool else None
-    if item_category == "services_work" and len(pool) > 1:
-        seller = pool[1]
-    if seller and seller.telegram_id:
-        user_id = get_or_create_bot_user(
-            seller.telegram_id,
-            seller.username or "parser_bot",
-            "TradeGround Seller" if item_category == "services_work" else "Parser Bot",
-        )
-    else:
-        user_id = get_or_create_bot_user(8590825131, "parser_bot", "Parser Bot")
-
-    images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
-    description = ensure_marketplace_description_has_source(
-        build_marketplace_description(listing_item),
-        listing_item,
-    )
-
-    dedup_key = fingerprint_title_desc(
-        str(listing_item.get("title") or ""),
-        str(listing_item.get("description") or ""),
-        price=str(listing_item.get("price") or ""),
-        is_free=bool(listing_item.get("is_free")),
-    )
-    if active_listing_duplicate(
-        dedup_key,
-        str(listing_item.get("title") or ""),
-        description,
-    ):
-        await callback.answer(
-            "❌ Таке оголошення вже є на маркетплейсі (дублікат)",
-            show_alert=True,
-        )
-        return
-
     try:
-        listing_id = create_marketplace_listing(
-            user_id=user_id,
-            title=listing_item["title"],
-            description=description,
-            price=listing_item.get("price"),
-            currency=listing_item.get("currency"),
-            is_free=bool(listing_item.get("is_free")),
-            category=listing_item.get("category", "fashion"),
-            subcategory=listing_item.get("subcategory"),
-            condition=listing_item.get("condition"),
-            location=listing_item.get("location", "Germany"),
-            images=images_web,
+        listing_id, _, _ = publish_parsed_item_marketplace(
+            item_id,
+            listing_item,
+            item,
+            moderated_by=moderator_id,
         )
-    except Exception as e:
-        logger.error("Помилка створення Listing для parsed_item %s: %s", item_id, e, exc_info=True)
+    except MarketplacePublishError as e:
+        if str(e) == "duplicate":
+            await callback.answer(
+                "❌ Таке оголошення вже є на маркетплейсі (дублікат)",
+                show_alert=True,
+            )
+            return
+        if str(e) == "already_listed":
+            await callback.answer("ℹ️ Вже на маркетплейсі", show_alert=True)
+            return
         await callback.answer("❌ Помилка при додаванні в маркетплейс", show_alert=True)
         return
-
-    set_marketplace_listing_id(item_id, listing_id, moderated_by=moderator_id)
 
     group_id = callback.message.chat.id
     msg_id = callback.message.message_id
@@ -423,11 +359,11 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
 
     item_id = int(item["id"])
 
-    if item.get("status") == "approved":
-        await callback.answer("ℹ️ Оголошення вже підтверджено", show_alert=True)
-        return
     if item.get("status") == "rejected":
         await callback.answer("ℹ️ Оголошення вже відхилено", show_alert=True)
+        return
+    if item.get("status") == "approved":
+        await callback.answer("ℹ️ Оголошення вже підтверджено", show_alert=True)
         return
 
     err = validate_parser_approve_context(chat_id, item)
@@ -437,16 +373,31 @@ async def handle_parser_approve(callback: CallbackQuery, bot: Bot):
 
     target = resolve_parser_approve_target(chat_id, item)
     logger.info(
-        "parsed_item %s approve: chat_id=%s target=%s parser_type=%s",
+        "parsed_item %s approve: chat_id=%s target=%s parser_type=%s mp=%s",
         item_id,
         chat_id,
         target,
         item.get("parser_type"),
+        item.get("marketplace_listing_id"),
     )
 
     if target == APPROVE_TARGET_SERVICES_BOTH:
+        if get_mod_path_status(item, "channel") == "approved":
+            await callback.answer("ℹ️ Канал уже опубліковано", show_alert=True)
+            return
+        if get_mod_path_status(item, "channel") == "rejected":
+            await callback.answer(
+                "ℹ️ Канал відхилено (маркетплейс лишається)",
+                show_alert=True,
+            )
+            return
         await _approve_services_both(callback, bot, item_id, item, moderator_id)
     else:
+        if get_mod_path_status(item, "marketplace") == "approved" or item.get(
+            "marketplace_listing_id"
+        ):
+            await callback.answer("ℹ️ Вже на маркетплейсі", show_alert=True)
+            return
         await _approve_marketplace(callback, bot, item_id, item, moderator_id)
 
     try:
