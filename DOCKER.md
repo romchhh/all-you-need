@@ -63,7 +63,12 @@ TOKEN=...
 BOT_USERNAME=your_bot
 ADMINISTRATORS=[123456789]
 WEBAPP_URL=https://your-domain.com
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your_secure_password
 ```
+
+`ADMINISTRATORS` — Telegram user ID для бота.  
+`ADMIN_USERNAME` / `ADMIN_PASSWORD` — логін **веб-панелі** `/admin/login`.
 
 `WEBAPP_URL` має бути **публічним HTTPS** (не `http://localhost`), інакше Telegram Mini App і платежі не зійдуться.
 

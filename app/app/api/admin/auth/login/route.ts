@@ -1,23 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import {
+  ADMIN_CREDENTIALS_ENV_HINT,
+  resolveAdminCredentials,
+} from '@/lib/adminCredentials';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { username, password } = body;
 
-    const adminUsername = process.env.ADMIN_USERNAME;
-    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminCreds = resolveAdminCredentials();
 
-    if (!adminUsername || !adminPassword) {
+    if (!adminCreds) {
       return NextResponse.json(
-        { error: 'Admin credentials not configured' },
+        {
+          error: 'Admin credentials not configured',
+          hint: ADMIN_CREDENTIALS_ENV_HINT,
+        },
         { status: 500 }
       );
     }
 
-    if (username !== adminUsername || password !== adminPassword) {
+    if (username !== adminCreds.username || password !== adminCreds.password) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }

@@ -43,7 +43,10 @@ export default function AdminLoginPage() {
       if (response.ok) {
         router.push('/admin');
       } else {
-        setError(data.error || 'Невірні облікові дані');
+        setError(
+          [data.error, data.hint].filter(Boolean).join('. ') ||
+            'Невірні облікові дані'
+        );
       }
     } catch (err) {
       setError('Помилка підключення до сервера');

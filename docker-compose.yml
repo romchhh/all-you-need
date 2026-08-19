@@ -18,6 +18,8 @@ services:
       - "${APP_PORT:-3000}:3000"
     env_file:
       - ./bot/.env
+      - path: ./app/.env
+        required: false
     environment:
       DATABASE_URL: file:///app/database/ayn_marketplace.db
       NODE_OPTIONS: --max-old-space-size=384
