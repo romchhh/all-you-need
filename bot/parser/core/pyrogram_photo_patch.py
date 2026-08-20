@@ -189,7 +189,7 @@ def apply_pyrogram_photo_size_patch() -> None:
     Thumbnail._parse = staticmethod(_safe_thumbnail_parse)  # type: ignore[method-assign]
 
     # Animation._parse / _parse_chat_animation — є не в усіх форках Pyrogram
-    # (2.0.106 у Docker немає _parse_chat_animation; 2.1+ має).
+    # (офіційний 2.0.106 / kurigram 2.2 — без _parse_chat_animation).
     _orig_anim = getattr(Animation, "_parse", None)
     if callable(_orig_anim):
 

@@ -2,7 +2,9 @@ aiogram==3.18.0
 pandas==2.2.3
 openpyxl==3.1.5
 python-dotenv==1.0.0
-pyrogram==2.0.106
+# Офіційний pyrogram 2.0.106 ламає .session (peers.username).
+# kurigram — підтримуваний форк, імпортується як pyrogram (сумісний зі сесіями акаунтів).
+kurigram==2.2.24
 tgcrypto==1.2.5
 apscheduler==3.10.4
 openai>=1.40.0
