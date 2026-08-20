@@ -262,16 +262,36 @@ def apply_pyrogram_photo_size_patch() -> None:
         )
 
     # Якщо одне повідомлення в batch падає — парсимо по одному.
+    # kurigram: parse_messages(client, messages, replies=1) — БЕЗ business_connection_id.
+    # Старий патч завжди передавав business_connection_id=… і валив усі канали.
+    import inspect
+
     _orig_parse_messages = utils.parse_messages
 
-    async def _safe_parse_messages(client, messages, replies=1, business_connection_id=None):
+    def _callable_param_names(fn) -> set[str] | None:
         try:
-            return await _orig_parse_messages(
-                client,
-                messages,
-                replies=replies,
-                business_connection_id=business_connection_id,
-            )
+            params = inspect.signature(fn).parameters
+        except (TypeError, ValueError):
+            return None
+        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+            return None  # приймає будь-які kwargs
+        return set(params)
+
+    _parse_messages_params = _callable_param_names(_orig_parse_messages)
+
+    async def _safe_parse_messages(client, messages, replies=1, **extra):
+        kwargs: dict = {}
+        if _parse_messages_params is None or "replies" in _parse_messages_params:
+            kwargs["replies"] = replies
+        if _parse_messages_params is None:
+            kwargs.update(extra)
+        else:
+            for key, value in extra.items():
+                if key in _parse_messages_params:
+                    kwargs[key] = value
+
+        try:
+            return await _orig_parse_messages(client, messages, **kwargs)
         except TypeError as e:
             if not _is_media_sort_typeerror(e):
                 raise
@@ -283,18 +303,24 @@ def apply_pyrogram_photo_size_patch() -> None:
             users = {i.id: i for i in getattr(messages, "users", [])}
             chats = {i.id: i for i in getattr(messages, "chats", [])}
             topics = {i.id: i for i in getattr(messages, "topics", [])}
+            msg_parse_params = _callable_param_names(types.Message._parse)
             parsed = []
             for message in getattr(messages, "messages", None) or []:
                 try:
-                    m = await types.Message._parse(
-                        client=client,
-                        message=message,
-                        users=users,
-                        chats=chats,
-                        topics=topics,
-                        replies=0,
-                        business_connection_id=business_connection_id,
-                    )
+                    parse_kwargs = {
+                        "client": client,
+                        "message": message,
+                        "users": users,
+                        "chats": chats,
+                        "topics": topics,
+                        "replies": 0,
+                        **extra,
+                    }
+                    if msg_parse_params is not None:
+                        parse_kwargs = {
+                            k: v for k, v in parse_kwargs.items() if k in msg_parse_params
+                        }
+                    m = await types.Message._parse(**parse_kwargs)
                     if m is not None:
                         parsed.append(m)
                 except TypeError as msg_err:
