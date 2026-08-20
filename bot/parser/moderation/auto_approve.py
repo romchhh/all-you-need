@@ -25,6 +25,7 @@ from parser.config.settings import (
     PARSER_AUTO_APPROVE_MAX_AGE_HOURS,
     PARSER_AUTO_APPROVE_MAX_PER_CATEGORY,
     PARSER_AUTO_APPROVE_MAX_PER_CHANNEL,
+    PARSER_AUTO_APPROVE_SERVICES_CHANNEL,
 )
 from parser.core.parse_pipeline import (
     ensure_parsed_item_ai_screened,
@@ -61,6 +62,7 @@ from parser.storage.parsed_items import (
     reset_stale_auto_approve_claims,
     try_claim_auto_approve,
     unclaim_auto_approve,
+    update_mod_path_status,
 )
 
 logger = logging.getLogger(__name__)
@@ -374,7 +376,7 @@ async def _publish_and_notify(
 
     item_id = int(item["id"])
     try:
-        listing_id, _, _ = publish_parsed_item_marketplace(
+        listing_id, description, images_web = publish_parsed_item_marketplace(
             item_id,
             listing_item,
             item,
@@ -391,6 +393,46 @@ async def _publish_and_notify(
     item["marketplace_listing_id"] = listing_id
     item["auto_approved"] = 1
 
+    channel_published: list[int] = []
+    if (
+        PARSER_AUTO_APPROVE_SERVICES_CHANNEL
+        and _is_service_item(listing_item)
+    ):
+        try:
+            from parser.moderation.services_publish import (
+                format_services_channels_labels,
+                publish_services_listing_to_channel,
+                resolve_services_trade_channel_ids,
+            )
+
+            force_ids = resolve_services_trade_channel_ids(listing_item)
+            channel_published = await publish_services_listing_to_channel(
+                bot,
+                listing_item,
+                item_id,
+                description,
+                images_web,
+                marketplace_listing_id=listing_id,
+                force_channel_ids=force_ids,
+            )
+            if channel_published:
+                update_mod_path_status(item_id, "channel", "approved", moderated_by=None)
+                logger.info(
+                    "🤖 auto-approve channel: parsed_item %s → %s",
+                    item_id,
+                    format_services_channels_labels(channel_published),
+                )
+            else:
+                logger.warning(
+                    "🤖 auto-approve: канал не опубліковано для parsed_item %s (targets=%s)",
+                    item_id,
+                    force_ids,
+                )
+        except Exception:
+            logger.exception(
+                "auto-approve channel publish failed parsed_item %s", item_id
+            )
+
     try:
         enqueue_city_digest_listing(listing_id)
     except Exception as notify_err:
@@ -402,10 +444,17 @@ async def _publish_and_notify(
         listing_item,
         listing_id,
         use_services_sender=_is_service_item(listing_item),
+        channel_only=False,
     )
 
     try:
-        await notify_auto_approved_marketplace(bot, item, listing_id, listing_item)
+        await notify_auto_approved_marketplace(
+            bot,
+            item,
+            listing_id,
+            listing_item,
+            channel_chat_ids=channel_published,
+        )
     except Exception:
         logger.exception(
             "auto-approve notify failed parsed_item %s listing %s",
@@ -414,11 +463,12 @@ async def _publish_and_notify(
         )
 
     logger.info(
-        "🤖 auto-approve parsed_item %s → Listing %s (%s / %s)",
+        "🤖 auto-approve parsed_item %s → Listing %s (%s / %s, channels=%s)",
         item_id,
         listing_id,
         listing_item.get("category"),
         item.get("source_channel"),
+        channel_published,
     )
     return True
 

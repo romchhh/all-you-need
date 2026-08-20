@@ -117,7 +117,7 @@ PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS: int = max(0, _env_int("PARSER_PHOTOS_PUBLIC_OR
 # public/listings/originals — важкий прохід на малому VPS; за замовчуванням вимкнено в авто-режимі
 PARSER_PHOTOS_CLEANUP_PUBLIC: bool = _env_bool("PARSER_PHOTOS_CLEANUP_PUBLIC", False)
 
-# Автопідтвердження релевантних оголошень лише на маркетплейс (не в Telegram-канал)
+# Автопідтвердження релевантних оголошень (маркетплейс; послуги — також у Telegram-канал)
 PARSER_AUTO_APPROVE_ENABLED: bool = _env_bool("PARSER_AUTO_APPROVE_ENABLED", True)
 PARSER_AUTO_APPROVE_DAILY_LIMIT: int = max(1, min(200, _env_int("PARSER_AUTO_APPROVE_DAILY_LIMIT", 50)))
 PARSER_AUTO_APPROVE_INTERVAL_MIN: float = float(os.getenv("PARSER_AUTO_APPROVE_INTERVAL_MIN", "12"))
@@ -125,6 +125,10 @@ PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = max(1, _env_int("PARSER_AUTO_APPROVE_
 PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = max(1, _env_int("PARSER_AUTO_APPROVE_MAX_PER_CATEGORY", 10))
 PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = max(1, _env_int("PARSER_AUTO_APPROVE_MAX_AGE_HOURS", 48))
 PARSER_AUTO_APPROVE_BATCH: int = max(1, min(50, _env_int("PARSER_AUTO_APPROVE_BATCH", 12)))
+# Послуги після авто-approve також публікувати в TRADE_SERVICES_CHANNEL_* (Hamburg/Germany)
+PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = _env_bool(
+    "PARSER_AUTO_APPROVE_SERVICES_CHANNEL", True
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 PHOTOS_DIR = REPO_ROOT / "database" / "parsed_photos"

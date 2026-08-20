@@ -211,11 +211,12 @@ def _format_admin_message(item: dict) -> str:
     return "\n".join(lines)
 
 
-def _make_keyboard(item_id: int) -> InlineKeyboardMarkup:
+def _make_keyboard(item_id: int, *, channel_only: bool = False) -> InlineKeyboardMarkup:
+    confirm = "✅ У канал" if channel_only else "✅ Підтвердити"
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text="✅ Підтвердити",
+                text=confirm,
                 callback_data=f"parser_approve:{item_id}",
             ),
             InlineKeyboardButton(
@@ -230,6 +231,8 @@ def _format_auto_approved_message(
     item: dict,
     listing_id: int,
     listing_item: dict | None = None,
+    *,
+    channel_chat_ids: list[int] | None = None,
 ) -> str:
     src = listing_item or item
     category_label = get_category_label(
@@ -243,30 +246,45 @@ def _format_auto_approved_message(
     city_de = normalize_city_name(loc_raw) if loc_raw else ""
     city_display = CITY_FLAG.get(city_de, f"🇩🇪 {city_de}" if city_de else "—")
     is_services = _is_services_item(item) or _is_services_item(src)
+    channel_chat_ids = list(channel_chat_ids or [])
 
     lines = [
-        "🤖 <b>АВТОПІДТВЕРДЖЕНО</b> (маркетплейс)",
+        "🤖 <b>АВТОПІДТВЕРДЖЕНО</b>",
         "",
         "Оголошення опубліковано на маркетплейсі автоматично.",
-        "📣 <b>Telegram-канал не публікувався.</b>",
-        "",
-        f"📋 <b>{title}</b>",
-        f"{cat_emoji} {html.escape(category_label)}",
-        f"📍 {html.escape(city_display)}",
-        f"📢 @{channel}" if channel else "📢 —",
-        f"📌 Listing #{listing_id}",
-        open_links,
     ]
-    if is_services:
+    if channel_chat_ids:
+        try:
+            from parser.moderation.services_publish import format_services_channels_labels
+
+            labels = html.escape(format_services_channels_labels(channel_chat_ids))
+        except Exception:
+            labels = ", ".join(str(x) for x in channel_chat_ids)
+        lines.append(f"📣 Telegram-канал: <b>{labels}</b>")
+    elif is_services:
+        lines.append("📣 <b>Telegram-канал не опубліковано</b> (потрібне підтвердження).")
+    else:
+        lines.append("📣 Telegram-канал не публікувався (товари → лише маркетплейс).")
+
+    lines.extend(
+        [
+            "",
+            f"📋 <b>{title}</b>",
+            f"{cat_emoji} {html.escape(category_label)}",
+            f"📍 {html.escape(city_display)}",
+            f"📢 @{channel}" if channel else "📢 —",
+            f"📌 Listing #{listing_id}",
+            open_links,
+        ]
+    )
+    if is_services and not channel_chat_ids:
         lines.extend(
             [
                 "",
-                "<i>✅ — опублікувати в Telegram-канал послуг</i>",
+                "<i>✅ У канал — опублікувати в Telegram-канал послуг</i>",
                 "<i>❌ — канал не публікувати (маркетплейс лишається)</i>",
             ]
         )
-    else:
-        lines.extend(["", "<i>Товари: лише маркетплейс, без каналу.</i>"])
     return "\n".join(lines)
 
 
@@ -439,17 +457,28 @@ async def notify_auto_approved_marketplace(
     item: dict,
     listing_id: int,
     listing_item: dict | None = None,
+    *,
+    channel_chat_ids: list[int] | None = None,
 ) -> Optional[int]:
     """
-    Картка в групі модерації: оголошення вже на маркетплейсі (авто).
-    Товари — без кнопок. Послуги — ✅ лише в Telegram-канал.
-    Якщо картка вже була (drain) — редагуємо її.
+    Картка в групі модерації після автопідтвердження.
+    Товари / послуги з уже опублікованим каналом — без кнопок.
+    Послуги без каналу — кнопка «У канал».
     """
-    text = _format_auto_approved_message(item, listing_id, listing_item)
-    keep_keyboard = _is_services_item(item) or (
-        listing_item and _is_services_item(listing_item)
+    channel_chat_ids = list(channel_chat_ids or [])
+    text = _format_auto_approved_message(
+        item,
+        listing_id,
+        listing_item,
+        channel_chat_ids=channel_chat_ids,
     )
-    keyboard = _make_keyboard(int(item["id"])) if keep_keyboard else None
+    is_services = _is_services_item(item) or (
+        listing_item is not None and _is_services_item(listing_item)
+    )
+    keep_keyboard = is_services and not channel_chat_ids
+    keyboard = (
+        _make_keyboard(int(item["id"]), channel_only=True) if keep_keyboard else None
+    )
 
     admin_msg_id = item.get("admin_message_id")
     group_id = _resolve_notify_group_id(item)

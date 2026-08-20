@@ -62,10 +62,15 @@ _GERMANY_WIDE_LOCATION = frozenset({
 })
 
 _ONLINE_OR_REMOTE_RE = re.compile(
-    r"\bonline\b|\bонлайн\b|\bremote\b|\bвіддален\w*|\bдистанц\w*|"
+    # НЕ матчимо голе «онлайн» / «online» — «запись онлайн» у beauty ламало dual → Germany.
+    r"\bremote\b|\bвіддален\w*|\bдистанц\w*|"
     r"\bzoom\b|\bskype\b|\bteams\b|"
-    r"онлайн[\s-]?(?:услуг|сервис|консультац|урок|школ)|"
-    r"online[\s-]?(?:service|consult|lesson|school)",
+    r"онлайн[\s-]?(?:услуг|послуг|сервис|сервіс|консультац|урок|школ|занят)|"
+    r"online[\s-]?(?:service|consult|lesson|school|class|tutor)|"
+    r"(?:услуг|послуг|сервис|сервіс|консультац)\w*\s+онлайн|"
+    r"(?:service|consult)\w*\s+online|"
+    r"работаю\s+онлайн|працюю\s+онлайн|работаю\s+online|працюю\s+online|"
+    r"провожу\s+онлайн|веду\s+онлайн",
     re.IGNORECASE,
 )
 
