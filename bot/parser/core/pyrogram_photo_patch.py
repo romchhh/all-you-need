@@ -188,68 +188,78 @@ def apply_pyrogram_photo_size_patch() -> None:
     Photo._parse = staticmethod(_safe_photo_parse)  # type: ignore[method-assign]
     Thumbnail._parse = staticmethod(_safe_thumbnail_parse)  # type: ignore[method-assign]
 
-    # Animation._parse: сигнатура залежить від версії Pyrogram (3 або 4 args).
-    _orig_anim = Animation._parse
+    # Animation._parse / _parse_chat_animation — є не в усіх форках Pyrogram
+    # (2.0.106 у Docker немає _parse_chat_animation; 2.1+ має).
+    _orig_anim = getattr(Animation, "_parse", None)
+    if callable(_orig_anim):
 
-    def _safe_anim_parse(*args, **kwargs):
-        try:
-            return _orig_anim(*args, **kwargs)
-        except TypeError as e:
-            if _is_media_sort_typeerror(e):
-                logger.warning("Animation._parse skipped: %s", e)
-                return None
-            raise
+        def _safe_anim_parse(*args, **kwargs):
+            try:
+                return _orig_anim(*args, **kwargs)
+            except TypeError as e:
+                if _is_media_sort_typeerror(e):
+                    logger.warning("Animation._parse skipped: %s", e)
+                    return None
+                raise
 
-    Animation._parse = staticmethod(_safe_anim_parse)  # type: ignore[method-assign]
+        Animation._parse = staticmethod(_safe_anim_parse)  # type: ignore[method-assign]
+    else:
+        logger.debug("Animation._parse absent — skip animation patch")
 
     # Chat animation (video_sizes) — окремий код-шлях з videos.sort(key=size).
-    _orig_chat_anim = Animation._parse_chat_animation
+    _orig_chat_anim = getattr(Animation, "_parse_chat_animation", None)
+    if callable(_orig_chat_anim):
 
-    def _safe_chat_anim_parse(client, video, file_name):
-        try:
-            if isinstance(video, raw.types.Photo) and getattr(video, "video_sizes", None):
-                safe_sizes = []
-                for v in video.video_sizes or []:
-                    if not isinstance(v, raw.types.VideoSize):
-                        continue
-                    try:
-                        safe_sizes.append(
-                            raw.types.VideoSize(
-                                type=getattr(v, "type", "") or "",
-                                w=_int_or_zero(getattr(v, "w", None)),
-                                h=_int_or_zero(getattr(v, "h", None)),
-                                size=_int_or_zero(getattr(v, "size", None)),
-                                video_start_ts=getattr(v, "video_start_ts", None),
+        def _safe_chat_anim_parse(client, video, file_name):
+            try:
+                if isinstance(video, raw.types.Photo) and getattr(video, "video_sizes", None):
+                    safe_sizes = []
+                    for v in video.video_sizes or []:
+                        if not isinstance(v, raw.types.VideoSize):
+                            continue
+                        try:
+                            safe_sizes.append(
+                                raw.types.VideoSize(
+                                    type=getattr(v, "type", "") or "",
+                                    w=_int_or_zero(getattr(v, "w", None)),
+                                    h=_int_or_zero(getattr(v, "h", None)),
+                                    size=_int_or_zero(getattr(v, "size", None)),
+                                    video_start_ts=getattr(v, "video_start_ts", None),
+                                )
                             )
-                        )
-                    except TypeError:
-                        safe_sizes.append(
-                            raw.types.VideoSize(
-                                type=getattr(v, "type", "") or "",
-                                w=_int_or_zero(getattr(v, "w", None)),
-                                h=_int_or_zero(getattr(v, "h", None)),
-                                size=_int_or_zero(getattr(v, "size", None)),
+                        except TypeError:
+                            safe_sizes.append(
+                                raw.types.VideoSize(
+                                    type=getattr(v, "type", "") or "",
+                                    w=_int_or_zero(getattr(v, "w", None)),
+                                    h=_int_or_zero(getattr(v, "h", None)),
+                                    size=_int_or_zero(getattr(v, "size", None)),
+                                )
                             )
-                        )
-                # Підміняємо на копію з валідними size, щоб stock-код не падав.
-                video = raw.types.Photo(
-                    id=video.id,
-                    access_hash=video.access_hash,
-                    file_reference=video.file_reference,
-                    date=video.date,
-                    sizes=video.sizes or [],
-                    dc_id=video.dc_id,
-                    has_stickers=getattr(video, "has_stickers", None),
-                    video_sizes=safe_sizes or None,
-                )
-            return _orig_chat_anim(client, video, file_name)
-        except TypeError as e:
-            if _is_media_sort_typeerror(e):
-                logger.warning("Animation._parse_chat_animation skipped: %s", e)
-                return None
-            raise
+                    # Підміняємо на копію з валідними size, щоб stock-код не падав.
+                    video = raw.types.Photo(
+                        id=video.id,
+                        access_hash=video.access_hash,
+                        file_reference=video.file_reference,
+                        date=video.date,
+                        sizes=video.sizes or [],
+                        dc_id=video.dc_id,
+                        has_stickers=getattr(video, "has_stickers", None),
+                        video_sizes=safe_sizes or None,
+                    )
+                return _orig_chat_anim(client, video, file_name)
+            except TypeError as e:
+                if _is_media_sort_typeerror(e):
+                    logger.warning("Animation._parse_chat_animation skipped: %s", e)
+                    return None
+                raise
 
-    Animation._parse_chat_animation = staticmethod(_safe_chat_anim_parse)  # type: ignore[method-assign]
+        Animation._parse_chat_animation = staticmethod(_safe_chat_anim_parse)  # type: ignore[method-assign]
+    else:
+        logger.debug(
+            "Animation._parse_chat_animation absent (Pyrogram %s) — skip chat-anim patch",
+            getattr(__import__("pyrogram"), "__version__", "?"),
+        )
 
     # Якщо одне повідомлення в batch падає — парсимо по одному.
     _orig_parse_messages = utils.parse_messages
