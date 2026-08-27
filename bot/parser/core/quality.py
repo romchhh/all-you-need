@@ -48,6 +48,10 @@ def is_wanted_only_post(text: str = "") -> bool:
 
 
 def is_quality(text: str, has_photo: bool, relaxed: bool = False) -> tuple[bool, str]:
+    """
+    Барахолка: короткі пости з ціною/офером і без фото — валідні.
+    Жорстко ріжемо лише спам / не-оголошення / «куплю».
+    """
     t = text.strip()
     if SPAM_RE.search(t) or VACANCY_RE.search(t) or TEMPLATE_POST_RE.search(t):
         return False, "спам"
@@ -55,27 +59,36 @@ def is_quality(text: str, has_photo: bool, relaxed: bool = False) -> tuple[bool,
         return False, "не оголошення"
     if is_wanted_only_post(t):
         return False, "пошук/куплю"
+
+    has_offer = has_listing_offer_signal(t)
+
     if relaxed:
-        if len(t) < 20:
+        if len(t) < 16:
             return False, "замало тексту"
-        if not has_photo and len(t) < 40:
+        if not has_photo and len(t) < 28 and not has_offer:
             return False, "замало тексту без фото"
         return True, ""
-    if not has_photo:
-        # Товар з ціною/офером без фото — ок при нормальному тексті
-        if len(t) < 45 and not (has_listing_offer_signal(t) and len(t) >= 28):
-            return False, "немає фото"
-    elif len(t) < 15:
+
+    if has_photo:
+        if len(t) < 8:
+            return False, "замало тексту"
+        return True, ""
+
+    # Без фото: достатньо оферу/ціни + мінімум тексту
+    if has_offer and len(t) >= 16:
+        return True, ""
+    if len(t) >= 32:
+        return True, ""
+    if has_offer:
         return False, "замало тексту"
-    if len(t) < 12:
-        return False, "замало тексту"
-    return True, ""
+    return False, "немає фото"
 
 
 def has_too_many_emojis(description: str) -> bool:
+    """Барахолки люблять емодзі — ріжемо лише явні стікер-стіни."""
     if TOO_MANY_EMOJI_RE.search(description or ""):
         return True
-    return len(ONE_EMOJI_RE.findall(description or "")) > 10
+    return len(ONE_EMOJI_RE.findall(description or "")) > 28
 
 
 def is_likely_not_listing(

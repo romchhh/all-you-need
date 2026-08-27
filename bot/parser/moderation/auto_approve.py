@@ -200,7 +200,7 @@ def is_auto_approve_eligible(item: dict) -> tuple[bool, str]:
     category = str(item.get("category") or "").strip().lower()
     subcategory = item.get("subcategory")
 
-    if not title or len(title) < 8 or title.lower() in _STUB_TITLES:
+    if not title or len(title) < 6 or title.lower() in _STUB_TITLES:
         return False, "bad_title"
     if GENERIC_LISTING_TITLE_RE.match(title):
         return False, "generic_title"
@@ -223,8 +223,10 @@ def is_auto_approve_eligible(item: dict) -> tuple[bool, str]:
         return False, "no_offer"
 
     images = parsed_item_image_refs(item)
+    # Товари без фото — ок, якщо є ціна/офер і нормальний текст (як у is_quality)
     if not _is_service_item(item) and not images:
-        return False, "no_photos"
+        if len(blob.strip()) < 28:
+            return False, "no_photos"
 
     dedup_key = fingerprint_title_desc(
         title,

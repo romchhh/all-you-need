@@ -57,9 +57,9 @@ PARSER_SERVICES_FETCH_LIMIT: int = max(
 PARSER_SERVICES_IGNORE_CURSOR: bool = _env_bool("PARSER_SERVICES_IGNORE_CURSOR", False)
 # Скільки останніх message_id перечитати поверх cursor (пропущені через збій / гонки).
 PARSER_CURSOR_OVERLAP: int = max(0, _env_int("PARSER_CURSOR_OVERLAP", 25))
-# Звичайний /parse і шедулер: завжди останні N постів (ignore cursor).
-# 0 = режим cursor+overlap (лише нові message_id після cursor).
-PARSER_ROLLING_LOOKBACK: int = max(0, _env_int("PARSER_ROLLING_LOOKBACK", 100))
+# Звичайний /parse і шедулер: 0 = cursor+overlap (лише нові пости — рекомендовано).
+# >0 = завжди останні N (ignore cursor) — багато «дублікат (оголошення)» на кожному циклі.
+PARSER_ROLLING_LOOKBACK: int = max(0, _env_int("PARSER_ROLLING_LOOKBACK", 0))
 
 PARSER_DEDUP_ENABLED: bool = _env_bool("PARSER_DEDUP_ENABLED", False)
 PARSER_SERVICES_DEDUP_ENABLED: bool = _env_bool("PARSER_SERVICES_DEDUP_ENABLED", True)
@@ -72,12 +72,12 @@ PARSER_TEXT_DEDUP_DAYS: int = max(
 # Pending у модерації блокує повтор лише N годин (repost з новим message_id проходить швидше)
 PARSER_PENDING_DEDUP_HOURS: int = max(
     1,
-    _env_int("PARSER_PENDING_DEDUP_HOURS", 36),
+    _env_int("PARSER_PENDING_DEDUP_HOURS", 12),
 )
 
-PARSER_FUZZY_DEDUP_ENABLED: bool = _env_bool("PARSER_FUZZY_DEDUP", True)
+PARSER_FUZZY_DEDUP_ENABLED: bool = _env_bool("PARSER_FUZZY_DEDUP", False)
 PARSER_FUZZY_DEDUP_SAME_CHANNEL: bool = _env_bool("PARSER_FUZZY_DEDUP_SAME_CHANNEL", True)
-PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.94"))
+PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.96"))
 PARSER_EMBEDDING_MODEL: str = (_env_str("PARSER_EMBEDDING_MODEL") or "text-embedding-3-small")
 
 # ── Групи модерації парсера (3 потоки) ─────────
@@ -119,12 +119,18 @@ PARSER_PHOTOS_CLEANUP_PUBLIC: bool = _env_bool("PARSER_PHOTOS_CLEANUP_PUBLIC", F
 
 # Автопідтвердження релевантних оголошень (маркетплейс; послуги — також у Telegram-канал)
 PARSER_AUTO_APPROVE_ENABLED: bool = _env_bool("PARSER_AUTO_APPROVE_ENABLED", True)
-PARSER_AUTO_APPROVE_DAILY_LIMIT: int = max(1, min(200, _env_int("PARSER_AUTO_APPROVE_DAILY_LIMIT", 50)))
-PARSER_AUTO_APPROVE_INTERVAL_MIN: float = float(os.getenv("PARSER_AUTO_APPROVE_INTERVAL_MIN", "12"))
-PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = max(1, _env_int("PARSER_AUTO_APPROVE_MAX_PER_CHANNEL", 6))
-PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = max(1, _env_int("PARSER_AUTO_APPROVE_MAX_PER_CATEGORY", 10))
+PARSER_AUTO_APPROVE_DAILY_LIMIT: int = max(
+    1, min(500, _env_int("PARSER_AUTO_APPROVE_DAILY_LIMIT", 200))
+)
+PARSER_AUTO_APPROVE_INTERVAL_MIN: float = float(os.getenv("PARSER_AUTO_APPROVE_INTERVAL_MIN", "8"))
+PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = max(
+    1, _env_int("PARSER_AUTO_APPROVE_MAX_PER_CHANNEL", 20)
+)
+PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = max(
+    1, _env_int("PARSER_AUTO_APPROVE_MAX_PER_CATEGORY", 40)
+)
 PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = max(1, _env_int("PARSER_AUTO_APPROVE_MAX_AGE_HOURS", 48))
-PARSER_AUTO_APPROVE_BATCH: int = max(1, min(50, _env_int("PARSER_AUTO_APPROVE_BATCH", 12)))
+PARSER_AUTO_APPROVE_BATCH: int = max(1, min(80, _env_int("PARSER_AUTO_APPROVE_BATCH", 30)))
 # Послуги після авто-approve також публікувати в TRADE_SERVICES_CHANNEL_* (Hamburg/Germany)
 PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = _env_bool(
     "PARSER_AUTO_APPROVE_SERVICES_CHANNEL", True
