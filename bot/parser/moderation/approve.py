@@ -36,6 +36,8 @@ from parser.moderation.marketplace_publish import (
 from parser.moderation.services_publish import (
     format_services_channels_labels,
     publish_services_listing_to_channel,
+    services_channel_quiet_hours_active,
+    services_channel_quiet_hours_message,
 )
 from parser.storage.marketplace import copy_parser_images_to_public
 from utils.location_normalization import normalize_city_name
@@ -183,15 +185,26 @@ async def _approve_services_both(
     location_label = html.escape(normalize_city_name(loc_raw) or loc_raw)
     force_channels = force_services_channel_ids_for_mod_chat(group_id, listing_item)
     already_on_mp = bool(existing_listing_id)
-    status_text = (
-        f"✅ <b>Підтверджено</b> модератором {mod_mention}\n"
-        f"📌 Listing #{listing_id}\n"
-        f"{open_links}\n"
-        f"📣 Публікуємо в Telegram-канал послуг"
-        f"{' (маркетплейс уже був автопідтверджений)' if already_on_mp else ''}\n"
-        f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
-        f"📍 {location_label}"
-    )
+    quiet = services_channel_quiet_hours_active()
+    if quiet:
+        status_text = (
+            f"✅ <b>Маркетплейс</b> модератором {mod_mention}\n"
+            f"📌 Listing #{listing_id}\n"
+            f"{open_links}\n"
+            f"🌙 {html.escape(services_channel_quiet_hours_message())}\n"
+            f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
+            f"📍 {location_label}"
+        )
+    else:
+        status_text = (
+            f"✅ <b>Підтверджено</b> модератором {mod_mention}\n"
+            f"📌 Listing #{listing_id}\n"
+            f"{open_links}\n"
+            f"📣 Публікуємо в Telegram-канал послуг"
+            f"{' (маркетплейс уже був автопідтверджений)' if already_on_mp else ''}\n"
+            f"📂 {html.escape(get_category_label(listing_item.get('category', 'services_work'), listing_item.get('subcategory')))}\n"
+            f"📍 {location_label}"
+        )
 
     async def _followup():
         if not existing_listing_id:
@@ -203,21 +216,25 @@ async def _approve_services_both(
                     listing_id,
                     notify_err,
                 )
-        published_chats = await publish_services_listing_to_channel(
-            bot,
-            listing_item,
-            item_id,
-            description,
-            images_web,
-            marketplace_listing_id=listing_id,
-            force_channel_ids=force_channels,
-        )
-        if published_chats:
-            update_mod_path_status(
-                item_id, "channel", "approved", moderated_by=moderator_id
+        published_chats: list[int] = []
+        if not quiet:
+            published_chats = await publish_services_listing_to_channel(
+                bot,
+                listing_item,
+                item_id,
+                description,
+                images_web,
+                marketplace_listing_id=listing_id,
+                force_channel_ids=force_channels,
             )
+            if published_chats:
+                update_mod_path_status(
+                    item_id, "channel", "approved", moderated_by=moderator_id
+                )
         final_status = status_text
-        if published_chats:
+        if quiet:
+            pass
+        elif published_chats:
             final_status += (
                 f"\n📢 {html.escape(format_services_channels_labels(published_chats))}"
             )
@@ -233,6 +250,11 @@ async def _approve_services_both(
         )
 
     asyncio.create_task(_followup())
+    if quiet and already_on_mp:
+        try:
+            await callback.answer(services_channel_quiet_hours_message(), show_alert=True)
+        except TelegramBadRequest:
+            pass
     if not existing_listing_id:
         schedule_author_notify(
             listing_item,
@@ -240,7 +262,7 @@ async def _approve_services_both(
             use_services_sender=True,
             channel_only=False,
         )
-    elif int(item.get("auto_approved") or 0) == 1:
+    elif int(item.get("auto_approved") or 0) == 1 and not quiet:
         schedule_author_notify(
             listing_item,
             listing_id,
@@ -248,11 +270,12 @@ async def _approve_services_both(
             channel_only=True,
         )
     logger.info(
-        "parsed_item %s → Listing %s + канал послуг (підтв. %s, mp_existed=%s)",
+        "parsed_item %s → Listing %s + канал послуг (підтв. %s, mp_existed=%s, quiet=%s)",
         item_id,
         listing_id,
         moderator_id,
         already_on_mp,
+        quiet,
     )
 
 

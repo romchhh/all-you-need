@@ -83,12 +83,11 @@ def notify_chat_for_parsed_item(item: dict) -> int:
             is_hamburg_service_item,
         )
 
-        # Локальний Hamburg завжди в Hamburg-мод (інакше «запись онлайн» тікав у Germany).
-        if is_hamburg_service_item(item):
-            return PARSER_MOD_SERVICES_HAMBURG_ID
-        # Онлайн / перевезення / Germany-wide → Germany-мод (approve публікує в обидва)
+        # Dual / онлайн / тури / перевезення → Germany (не засмічуємо Hamburg)
         if is_dual_channel_service(item):
             return PARSER_MOD_SERVICES_GERMANY_ID
+        if is_hamburg_service_item(item):
+            return PARSER_MOD_SERVICES_HAMBURG_ID
     except Exception:
         pass
     return PARSER_MOD_SERVICES_GERMANY_ID
@@ -96,23 +95,17 @@ def notify_chat_for_parsed_item(item: dict) -> int:
 
 def force_services_channel_ids_for_mod_chat(chat_id: int, item: dict) -> list[int]:
     """
-    Які Telegram-канали послуг публікувати при approve з цієї групи.
-    Hamburg-група → Hamburg (+ Germany якщо dual).
-    Germany-група → Germany (+ Hamburg якщо dual).
+    Hamburg-група → лише Hamburg-канал (лише локальні послуги).
+    Germany-група → лише Germany-канал (dual / інші міста).
     """
     from parser.moderation.services_publish import (
         TRADE_SERVICES_CHANNEL_GERMANY_ID,
         TRADE_SERVICES_CHANNEL_HAMBURG_ID,
-        is_dual_channel_service,
         resolve_services_trade_channel_ids,
     )
 
     if chat_id == PARSER_MOD_SERVICES_HAMBURG_ID:
-        if is_dual_channel_service(item):
-            return [TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID]
         return [TRADE_SERVICES_CHANNEL_HAMBURG_ID]
     if chat_id == PARSER_MOD_SERVICES_GERMANY_ID:
-        if is_dual_channel_service(item):
-            return [TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID]
         return [TRADE_SERVICES_CHANNEL_GERMANY_ID]
     return resolve_services_trade_channel_ids(item)

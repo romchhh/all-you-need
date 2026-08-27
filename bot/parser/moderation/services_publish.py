@@ -15,14 +15,20 @@ from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarku
 from dotenv import load_dotenv
 
 from parser.category_keywords import get_category_label
-from parser.config.settings import BOT_USERNAME, PARSER_MAX_PHOTOS, WEBAPP_URL
+from parser.config.settings import (
+    BOT_USERNAME,
+    PARSER_CHANNEL_QUIET_END_HOUR,
+    PARSER_CHANNEL_QUIET_START_HOUR,
+    PARSER_CHANNEL_QUIET_TZ,
+    PARSER_MAX_PHOTOS,
+    WEBAPP_URL,
+)
 from parser.core.telegram_meta import parsed_item_message_link
 from parser.core.text import detect_lang
 from parser.moderation.formatting import (
     assemble_telegram_caption,
     build_channel_hashtags,
     format_original_post_link_html,
-    listing_bot_url,
     listing_miniapp_url,
     resolved_author_username,
     strip_original_post_link_block,
@@ -47,6 +53,39 @@ TRADE_SERVICES_CHANNEL_GERMANY_ID: int = int(
     or os.getenv("TRADE_GERMANY_CHANNEL_ID")
     or "-1003857694156"
 )
+
+
+def services_channel_quiet_hours_active() -> bool:
+    """
+    True якщо зараз тихі години для каналів послуг (за замовчуванням 22:00–06:00 Europe/Kyiv).
+    Вікно [start, end) через північ: start=22, end=6 → 22:00..05:59.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+
+        now = datetime.now(ZoneInfo(PARSER_CHANNEL_QUIET_TZ))
+    except Exception:
+        from datetime import datetime, timezone, timedelta
+
+        now = datetime.now(timezone(timedelta(hours=3)))
+
+    start = PARSER_CHANNEL_QUIET_START_HOUR
+    end = PARSER_CHANNEL_QUIET_END_HOUR
+    hour = now.hour
+    if start == end:
+        return False
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
+
+
+def services_channel_quiet_hours_message() -> str:
+    return (
+        f"🌙 Канали послуг: тиша {PARSER_CHANNEL_QUIET_START_HOUR:02d}:00"
+        f"–{PARSER_CHANNEL_QUIET_END_HOUR:02d}:00 ({PARSER_CHANNEL_QUIET_TZ}). "
+        f"Маркетплейс ок; у канал — після {PARSER_CHANNEL_QUIET_END_HOUR:02d}:00."
+    )
 
 _HAMBURG_RE = re.compile(r"\bhamburg\b|\bгамбург\b", re.IGNORECASE)
 
@@ -320,14 +359,12 @@ def is_hamburg_service_item(item: dict) -> bool:
 
 def resolve_services_trade_channel_ids(item: dict) -> list[int]:
     """
-    Аудиторія вся Німеччина (онлайн, тури, перевезення) → обидва канали.
     Локальний Hamburg → лише Hamburg.
-    Інше місто (Wuppertal, Berlin, …) → лише Germany.
+    Dual / онлайн / тури / перевезення / інше місто → лише Germany.
+    (Dual більше не дублюємо в Hamburg — там сипалось «чуже».)
     """
-    # Dual перевіряємо ПЕРЕД pin на local Hamburg — інакше онлайн з HamburgBeauty
-    # ніколи не потрапить у Germany-канал.
     if is_dual_channel_service(item):
-        return [TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID]
+        return [TRADE_SERVICES_CHANNEL_GERMANY_ID]
     if is_hamburg_service_item(item):
         return [TRADE_SERVICES_CHANNEL_HAMBURG_ID]
     return [TRADE_SERVICES_CHANNEL_GERMANY_ID]
@@ -561,7 +598,16 @@ async def publish_services_listing_to_channel(
     listing_id — id parsed_items (для логів).
     marketplace_listing_id — id Listing на маркетплейсі (deep link); якщо None — channel-only.
     force_channel_ids — якщо задано, публікуємо лише в ці канали (група модерації).
+    У тихі години (за замовчуванням 22:00–06:00 Kyiv) нічого не публікує — повертає [].
     """
+    if services_channel_quiet_hours_active():
+        logger.info(
+            "Listing %s: пропуск публікації в канал послуг — тихі години (%s)",
+            listing_id,
+            services_channel_quiet_hours_message(),
+        )
+        return []
+
     channel_ids = list(force_channel_ids) if force_channel_ids else resolve_services_trade_channel_ids(item)
     logger.info(
         "Listing %s → канали послуг %s (location=%r, source_city=%r)",
@@ -635,9 +681,6 @@ async def publish_services_listing_to_channel(
     listing_open_url = (
         listing_miniapp_url(marketplace_listing_id) if marketplace_listing_id else None
     )
-    listing_bot_open_url = (
-        listing_bot_url(marketplace_listing_id) if marketplace_listing_id else None
-    )
 
     if author_username:
         seller_full_name = f"@{author_username}"
@@ -686,10 +729,6 @@ async def publish_services_listing_to_channel(
     if listing_open_url:
         view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
         keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=listing_open_url)])
-    if listing_bot_open_url and listing_bot_open_url != listing_open_url:
-        lang = detect_lang(f"{item.get('title') or ''}\n{item.get('description') or ''}")
-        bot_view = "🤖 Відкрити в боті" if lang == "uk" else "🤖 Открыть в боте"
-        keyboard_rows.append([InlineKeyboardButton(text=bot_view, url=listing_bot_open_url)])
     if not listing_open_url and msg_link and not author_username:
         view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
         keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=msg_link)])
