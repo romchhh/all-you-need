@@ -323,27 +323,20 @@ const FavoritesPage = () => {
       try {
         setLoading(true);
         const favoriteIds = Array.from(favorites);
-        
-        // Завантажуємо кожен товар окремо
-        const promises = favoriteIds.map(id => 
-          fetch(`/api/listings/${id}`)
-            .then(res => res.ok ? res.json() : null)
-            .catch(() => null)
-        );
-        
-        const results = await Promise.all(promises);
-        const validListings = results.filter((listing): listing is Listing => 
-          listing !== null && listing.id
-        );
-        
-        // Сортуємо по даті створення (новіші спочатку)
+        const res = await fetch(`/api/favorites/listings?ids=${favoriteIds.join(',')}`);
+        const data = res.ok ? await res.json() : { listings: [] };
+        const validListings = (data.listings || []).filter(
+          (listing: Listing) => listing && listing.id
+        ) as Listing[];
+
         validListings.sort((a, b) => {
           const dateA = new Date(a.createdAt || 0).getTime();
           const dateB = new Date(b.createdAt || 0).getTime();
           return dateB - dateA;
         });
-        
+
         setListings(validListings);
+        prefetchListingsImages(validListings);
       } catch (error) {
         console.error('Error fetching favorite listings:', error);
         setListings([]);
@@ -699,7 +692,7 @@ const FavoritesPage = () => {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden max-w-full pb-20">
+    <div className="min-h-screen overflow-x-hidden max-w-full pb-20 animate-content-crossfade">
       {!selectedListing && !selectedSeller && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (

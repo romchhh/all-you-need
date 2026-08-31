@@ -514,7 +514,7 @@ const ProfilePage = () => {
   }, [tg, selectedListing, selectedSeller]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden max-w-full pb-20">
+    <div className="min-h-screen overflow-x-hidden max-w-full pb-20 animate-content-crossfade">
       {!selectedListing && !selectedSeller && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (

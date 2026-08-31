@@ -505,7 +505,7 @@ export function useBazaarPage() {
     } else if (userParam) {
       const telegramId = userParam;
       if (!selectedSeller || selectedSeller.telegramId !== telegramId) {
-        showPageLoader({ minMs: 280 });
+        showPageLoader({ minMs: 400 });
         fetch(`/api/user/profile?telegramId=${telegramId}`)
           .then(res => res.json())
           .then(data => {
@@ -855,18 +855,16 @@ export function useBazaarPage() {
       });
 
       const delta = isFavorite ? -1 : 1;
-      startTransition(() => {
-        setListings((prev) => {
-          const idx = prev.findIndex((l) => l.id === id);
-          if (idx < 0) return prev;
-          const listing = prev[idx];
-          const next = prev.slice();
-          next[idx] = {
-            ...listing,
-            favoritesCount: Math.max(0, (listing.favoritesCount || 0) + delta),
-          };
-          return next;
-        });
+      setListings((prev) => {
+        const idx = prev.findIndex((l) => l.id === id);
+        if (idx < 0) return prev;
+        const listing = prev[idx];
+        const next = prev.slice();
+        next[idx] = {
+          ...listing,
+          favoritesCount: Math.max(0, (listing.favoritesCount || 0) + delta),
+        };
+        return next;
       });
       setSelectedListing((prev) =>
         prev && prev.id === id
@@ -1003,25 +1001,6 @@ export function useBazaarPage() {
     void hidePageLoader({ minMs: 220 });
   }, [saveCatalogScrollPosition, showPageLoader, hidePageLoader]);
 
-  const handleCloseListing = useCallback(() => {
-    showPageLoader({ minMs: 220 });
-    setSelectedListing(null);
-    listingHistoryStack.current = [];
-    void hidePageLoader({ minMs: 220 });
-  }, [showPageLoader, hidePageLoader]);
-
-  const handleListingBack = useCallback(() => {
-    if (listingHistoryStack.current.length > 0) {
-      const previousListing = listingHistoryStack.current.pop()!;
-      setSelectedListing(previousListing);
-      return;
-    }
-    showPageLoader({ minMs: 220 });
-    setSelectedListing(null);
-    listingHistoryStack.current = [];
-    void hidePageLoader({ minMs: 220 });
-  }, [showPageLoader, hidePageLoader]);
-
   const handleBazaarStateChange = useCallback((next: Partial<BazaarTabPersistedState>) => {
     startTransition(() => {
       setBazaarTabState((prev) => {
@@ -1056,6 +1035,25 @@ export function useBazaarPage() {
     [showToast]
   );
 
+  const handleCloseListing = useCallback(() => {
+    showPageLoader({ minMs: 280 });
+    setSelectedListing(null);
+    listingHistoryStack.current = [];
+    void hidePageLoader({ minMs: 280 });
+  }, [showPageLoader, hidePageLoader]);
+
+  const handleListingBack = useCallback(() => {
+    if (listingHistoryStack.current.length > 0) {
+      const previousListing = listingHistoryStack.current.pop()!;
+      setSelectedListing(previousListing);
+      return;
+    }
+    showPageLoader({ minMs: 280 });
+    setSelectedListing(null);
+    listingHistoryStack.current = [];
+    void hidePageLoader({ minMs: 280 });
+  }, [showPageLoader, hidePageLoader]);
+
   const handleSelectRelatedListing = useCallback((listing: Listing) => {
     setSelectedListing((current) => {
       if (current) {
@@ -1075,7 +1073,7 @@ export function useBazaarPage() {
       username?: string,
       phone?: string
     ) => {
-      showPageLoader({ minMs: 280 });
+      showPageLoader({ minMs: 400 });
       setSelectedListing((current) => {
         previousListingRef.current = current;
         return null;
@@ -1096,24 +1094,24 @@ export function useBazaarPage() {
   }, []);
 
   const handleCloseSeller = useCallback(() => {
-    showPageLoader({ minMs: 220 });
+    showPageLoader({ minMs: 300 });
     previousListingRef.current = null;
     setSelectedSeller(null);
-    void hidePageLoader({ minMs: 220 });
+    void hidePageLoader({ minMs: 300 });
   }, [showPageLoader, hidePageLoader]);
 
   const handleBackToPreviousListing = useCallback(() => {
-    showPageLoader({ minMs: 220 });
+    showPageLoader({ minMs: 280 });
     if (previousListingRef.current) {
       setSelectedListing(previousListingRef.current);
       previousListingRef.current = null;
       setSelectedSeller(null);
-      void hidePageLoader({ minMs: 220 });
+      void hidePageLoader({ minMs: 280 });
       return;
     }
     previousListingRef.current = null;
     setSelectedSeller(null);
-    void hidePageLoader({ minMs: 220 });
+    void hidePageLoader({ minMs: 280 });
   }, [showPageLoader, hidePageLoader]);
 
   const handleSelectListingFromSeller = useCallback((listing: Listing) => {

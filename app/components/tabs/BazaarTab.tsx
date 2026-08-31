@@ -122,7 +122,6 @@ const BazaarTabComponent = ({
   const ac = getAppearanceClasses(isLight);
 
   useEffect(() => {
-    // Prefetch статистики одразу — не чекаємо idle
     void import('@/utils/homeActivityClient').then((m) => m.fetchHomeActivity());
   }, []);
 
@@ -581,7 +580,7 @@ const BazaarTabComponent = ({
               <HomePlatformTicker isLight={isLight} onOnboardingAction={handleOnboardingAction} />
             </div>
           </div>
-          <div className="overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
+          <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
             <div className="w-full max-w-full overflow-visible lg:max-w-xl xl:max-w-2xl">
               <HomeActivityStats isLight={isLight} />
             </div>
@@ -742,7 +741,7 @@ const BazaarTabComponent = ({
             {isRefreshing && <ListingsRefreshOverlay />}
             {viewMode === 'grid' ? (
               <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
                   {filteredAndSortedListings.map((listing, index) => (
                     <ListingCard
                       key={listing.id}
