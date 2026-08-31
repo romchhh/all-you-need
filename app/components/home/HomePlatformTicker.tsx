@@ -174,10 +174,10 @@ export const HomePlatformTicker = memo(function HomePlatformTicker({
   const displayMessage = current ?? welcomeMessage;
 
   const barClass = isLight
-    ? 'flex w-full items-center gap-2 rounded-lg border border-[#3F5331]/20 bg-[#C8E6A0]/70 px-2.5 py-1 text-[11px] sm:text-xs'
+    ? 'flex w-full items-center gap-2 rounded-xl border border-[#3F5331]/15 bg-[#E8F0E0]/85 px-2.5 py-1.5 text-[11px] sm:text-xs'
     : 'flex w-full items-center gap-2 rounded-lg bg-[#C8E6A0]/95 px-2.5 py-1 text-[11px] sm:text-xs';
 
-  const textClass = isLight ? 'text-[#1e2e18] font-medium' : 'text-[#0f1408] font-medium';
+  const textClass = isLight ? 'text-[#2D3E28] font-medium' : 'text-[#0f1408] font-medium';
   const infoButtonClass = isLight
     ? 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#3F5331]/80 transition-opacity hover:opacity-80'
     : 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#0f1408]/75 transition-opacity hover:opacity-80';

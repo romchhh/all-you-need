@@ -159,13 +159,13 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
   const pillOnline = useMemo(
     () =>
       isLight
-        ? 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-2.5 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3 sm:py-2'
+        ? 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-[#3F5331]/12 bg-[#E8F0E0]/95 px-2.5 py-2 text-xs shadow-sm sm:text-sm sm:px-3 sm:py-2'
         : 'flex shrink-0 max-w-[min(11.5rem,calc(50%-6px))] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-2.5 py-2 text-xs text-white shadow-sm sm:text-sm sm:px-3 sm:py-2',
     [isLight]
   );
 
   const pillListingsBase = isLight
-    ? 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200/90 bg-white/90 px-3 py-2 text-xs shadow-sm ring-1 ring-black/[0.03] sm:text-sm sm:px-3.5'
+    ? 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[#3F5331]/12 bg-[#E8F0E0]/95 px-3 py-2 text-xs shadow-sm sm:text-sm sm:px-3.5'
     : 'flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-transparent px-1 py-2 text-xs text-white sm:text-sm sm:px-2';
 
   const pillListingsIdle = pillListingsBase;
@@ -244,7 +244,7 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
         <span
           className={
             isLight
-              ? 'h-2.5 w-2.5 shrink-0 rounded-full bg-[#22e078] shadow-[0_0_10px_3px_rgba(34,224,120,0.55),0_0_20px_4px_rgba(34,224,120,0.25)] ring-2 ring-[#22e078]/35'
+              ? 'h-2.5 w-2.5 shrink-0 rounded-full bg-[#5C8A47] shadow-[0_0_8px_2px_rgba(92,138,71,0.45)] ring-2 ring-[#5C8A47]/30'
               : 'h-2.5 w-2.5 shrink-0 rounded-full bg-[#C8E6A0] shadow-[0_0_12px_4px_rgba(200,230,160,0.75),0_0_28px_6px_rgba(200,230,160,0.38)] ring-2 ring-[#C8E6A0]/50'
           }
           aria-hidden

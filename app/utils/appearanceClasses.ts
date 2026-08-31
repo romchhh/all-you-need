@@ -55,39 +55,39 @@ export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
       segmentedActive: 'bg-[#3F5331] text-white shadow-sm',
       formMenuRowSelected: 'bg-[#3F5331]/20 text-[#3F5331] font-semibold',
       formAccentFg: 'text-[#3F5331]',
-      toggleGroup: 'bg-black/[0.05] ring-1 ring-gray-900/[0.06]',
-      toggleInactive: 'text-gray-500 hover:text-gray-900',
-      pageHeading: 'text-gray-900',
-      mutedText: 'text-gray-600',
+      toggleGroup: 'bg-[#3F5331]/8 ring-1 ring-[#3F5331]/12',
+      toggleInactive: 'text-[#5A6B52] hover:text-[#3F5331]',
+      pageHeading: 'text-[#2D3E28]',
+      mutedText: 'text-[#5A6B52]',
       suggestionDropdown:
         'rounded-2xl border border-gray-200/90 bg-white/95 shadow-lg shadow-gray-900/10 backdrop-blur-md ring-1 ring-black/[0.03]',
       suggestionRow:
         'flex w-full items-center gap-2 border-b border-gray-100/80 px-4 py-3 text-left text-gray-900 transition-colors last:border-b-0 hover:bg-gray-50/90',
       suggestionIcon: 'text-gray-400',
       ghostIconButton:
-        'relative flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200/90 bg-white/80 shadow-sm transition-colors hover:border-gray-300 hover:bg-white',
-      ghostIconButtonActiveBorder: 'border-[#3F5331]/35 bg-[#3F5331]/15 ring-1 ring-[#3F5331]/20',
-      ghostIconButtonInactiveIcon: 'text-gray-700',
+        'relative flex h-12 w-12 items-center justify-center rounded-xl border border-[#3F5331]/15 bg-white shadow-sm transition-colors hover:border-[#3F5331]/30 hover:bg-[#E8F0E0]/50',
+      ghostIconButtonActiveBorder: 'border-[#3F5331]/40 bg-[#E8F0E0] ring-1 ring-[#3F5331]/20',
+      ghostIconButtonInactiveIcon: 'text-[#3F5331]',
       ghostIconButtonActiveIcon: 'text-[#3F5331]',
-      categoryRowLabel: 'text-gray-800',
+      categoryRowLabel: 'text-[#3F5331]',
       outlineButton:
-        'rounded-xl border border-gray-200/90 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50/90 hover:shadow',
+        'rounded-xl border border-[#3F5331]/20 bg-white px-4 py-2 text-sm font-medium text-[#2D3E28] shadow-sm transition-colors hover:border-[#3F5331]/35 hover:bg-[#E8F0E0]/60 hover:shadow',
       subcategoryIdle:
-        'rounded-xl border border-gray-200/90 bg-white/60 text-gray-800 shadow-sm transition-colors hover:border-gray-300 hover:bg-white',
-      nothingFound: 'text-gray-600',
+        'rounded-xl border border-[#3F5331]/15 bg-[#E8F0E0]/70 text-[#2D3E28] shadow-sm transition-colors hover:border-[#3F5331]/30 hover:bg-[#E8F0E0]',
+      nothingFound: 'text-[#5A6B52]',
       profileCard:
         'flex flex-1 items-center justify-between rounded-xl border border-gray-200/80 bg-white px-3 py-2.5 text-sm shadow-sm transition-all hover:border-gray-300/90 hover:shadow-md',
       profileCardText: 'text-gray-900',
       profileCardChevron: 'text-gray-500',
       salesFilterBar:
-        'w-full rounded-2xl bg-gray-100/95 py-4 font-semibold text-gray-900 shadow-sm ring-1 ring-gray-900/[0.04] transition-colors hover:bg-gray-200/75',
-      salesFilterBarText: 'text-gray-900',
-      salesFilterChevron: 'text-gray-500',
-      salesEmptyHint: 'text-gray-600',
-      listRowHover: 'text-gray-900 hover:bg-gray-50/90',
+        'w-full rounded-2xl bg-[#E8F0E0]/90 py-4 font-semibold text-[#2D3E28] shadow-sm ring-1 ring-[#3F5331]/10 transition-colors hover:bg-[#E8F0E0]',
+      salesFilterBarText: 'text-[#2D3E28]',
+      salesFilterChevron: 'text-[#5A6B52]',
+      salesEmptyHint: 'text-[#5A6B52]',
+      listRowHover: 'text-[#2D3E28] hover:bg-[#E8F0E0]/55',
       pageBackground:
-        'radial-gradient(ellipse 90% 120% at 14% -8%, rgba(63, 83, 49, 0.1) 0%, transparent 52%), linear-gradient(180deg, #ffffff 0%, #f5f6f3 100%)',
-      overlayShell: 'bg-[#f3f4f0]',
+        'radial-gradient(ellipse 100% 80% at 50% -20%, rgba(63, 83, 49, 0.08) 0%, transparent 55%), linear-gradient(180deg, #fafbf8 0%, #f5f7f2 100%)',
+      overlayShell: 'bg-[#f5f7f2]',
     };
   }
   // Dark accents: BRAND_GREEN_ON_DARK (#C8E6A0) — same as primary CTA on listing page (ListingDetail listingPrimaryCtaClass).

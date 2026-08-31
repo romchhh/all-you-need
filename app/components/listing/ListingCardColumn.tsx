@@ -1,4 +1,4 @@
-import { Eye, Heart, Package, MapPin } from 'lucide-react';
+import { Eye, Heart, MapPin } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, memo } from 'react';
@@ -9,6 +9,7 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
+import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
 import { shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingViews } from '@/lib/listings/displayStats';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -45,7 +46,7 @@ const ListingCardColumnComponent = ({
   
   // Визначаємо стилі в залежності від типу реклами
   // Лаймова рамка тільки для VIP, не для TOP
-  const defaultPromoBorder = isLight ? 'border border-gray-200' : 'border border-white/20';
+  const defaultPromoBorder = isLight ? 'border border-[#3F5331]/15' : 'border border-white/20';
 
   const getPromotionStyles = () => {
     if (promotionTypes.length === 0) return defaultPromoBorder;
@@ -133,7 +134,7 @@ const ListingCardColumnComponent = ({
         {/* Фото */}
         <div
           className={`relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden ${
-            isLight ? 'bg-gray-100' : 'bg-[#1A1A1A]'
+            isLight ? 'bg-white' : 'bg-[#1A1A1A]'
           }`}
         >
           {/* Бейдж реклами */}
@@ -149,13 +150,7 @@ const ListingCardColumnComponent = ({
               style={{ width: '100%', height: '100%' }}
             />
           ) : (
-            <div
-              className={`absolute inset-0 w-full h-full flex items-center justify-center ${
-                isLight ? 'text-gray-300 bg-gray-100' : 'text-white/10 bg-[#1A1A1A]'
-              }`}
-            >
-              <Package size={32} />
-            </div>
+            <ListingImagePlaceholder isLight={isLight} size="sm" />
           )}
         </div>
 
@@ -237,7 +232,7 @@ const ListingCardColumnComponent = ({
           <div className={`flex-1 min-w-0 ${favCount > 0 ? 'pr-[4.5rem]' : 'pr-10'}`}>
             <div
               className={`font-semibold text-base line-clamp-2 leading-snug mb-1.5 ${
-                isLight ? 'text-gray-900' : 'text-white'
+                isLight ? 'text-[#2D3E28]' : 'text-white'
               }`}
             >
               {listing.title}
@@ -299,7 +294,7 @@ const ListingCardColumnComponent = ({
               {listing.condition && (
                 <span
                   className={`inline-flex max-w-full flex-shrink-0 self-start rounded px-2.5 py-1 text-[11px] font-semibold leading-tight ${
-                    isLight ? 'bg-gray-200 text-gray-800' : 'bg-[#2A2A2A] text-white'
+                    isLight ? 'bg-[#E8F0E0] text-[#3F5331]' : 'bg-[#2A2A2A] text-white'
                   }`}
                 >
                   {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
@@ -312,7 +307,7 @@ const ListingCardColumnComponent = ({
           <div className="flex flex-col gap-1 text-[10px] min-w-0 mb-1">
             {listing.location && (
               <div
-                className={`flex items-center gap-1.5 ${isLight ? 'text-gray-600' : 'text-white/80'}`}
+                className={`flex items-center gap-1.5 ${isLight ? 'text-[#5A6B52]' : 'text-white/80'}`}
               >
                 <MapPin
                   size={10}
@@ -325,7 +320,7 @@ const ListingCardColumnComponent = ({
               <div
                 className={`flex min-w-0 items-center gap-2 tabular-nums ${
                   formattedTime ? 'justify-between' : 'justify-end'
-                } ${isLight ? 'text-gray-500' : 'text-white/60'}`}
+                } ${isLight ? 'text-[#5A6B52]' : 'text-white/60'}`}
               >
                 {formattedTime ? <span className="min-w-0 truncate">{formattedTime}</span> : null}
                 {shouldShowListingViews(shownViews) ? (

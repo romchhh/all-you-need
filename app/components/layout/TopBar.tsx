@@ -54,16 +54,16 @@ export const TopBar = ({
 
   if (variant === 'main') {
     const inputClass = isLight
-      ? 'w-full rounded-2xl border border-gray-200/90 bg-white py-3 pr-10 text-gray-900 shadow-sm ring-1 ring-black/[0.03] transition-all placeholder:text-gray-500 focus:border-[#3F5331]/30 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/20'
+      ? 'w-full rounded-2xl border border-[#3F5331]/15 bg-white py-3 pr-10 text-[#2D3E28] shadow-sm transition-all placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
       : 'w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30 focus:border-[#C8E6A0]/50 transition-all text-white placeholder:text-white/60';
     const searchIconClass = isLight
-      ? 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-gray-600'
+      ? 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-[#3F5331]/70'
       : 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-white/80';
     const clearBtnClass = isLight
-      ? 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition-colors'
+      ? 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-[#E8F0E0] flex items-center justify-center hover:bg-[#dce8d4] transition-colors'
       : 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors';
     const filterBtnClass = isLight
-      ? 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gray-200/90 bg-white shadow-sm ring-1 ring-black/[0.03] transition-colors hover:border-gray-300 hover:bg-gray-50/80'
+      ? 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#3F5331]/15 bg-white shadow-sm transition-colors hover:border-[#3F5331]/30 hover:bg-[#E8F0E0]/60'
       : 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white bg-transparent transition-colors hover:bg-white/10';
 
     return (

@@ -26,7 +26,7 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
               ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
               : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
             : isLight
-              ? 'border-2 border-[#3F5331] bg-white'
+              ? 'border-2 border-[#3F5331]/20 bg-[#E8F0E0]'
               : 'border border-white/25 bg-[#1C1C1C]'
         }`}
       >
@@ -34,7 +34,7 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
       </div>
       <span
         className={`text-xs font-medium text-center whitespace-normal leading-tight px-0.5 ${
-          isActive ? (isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]') : isLight ? 'text-gray-800' : 'text-white'
+          isActive ? (isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]') : isLight ? 'text-[#3F5331]/85' : 'text-white'
         }`}
       >
         {category.name}

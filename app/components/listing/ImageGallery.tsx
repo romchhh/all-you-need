@@ -1,9 +1,9 @@
 'use client';
 
-import { Image as ImageIcon } from 'lucide-react';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
+import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface ImageGalleryProps {
@@ -49,17 +49,15 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   if (!images.length) {
     const placeholderHeight = typeof window !== 'undefined' && window.innerWidth < 768 ? '280px' : '360px';
     return (
-      <div
-        className={`flex items-center justify-center ${slideBgClass}`}
-        style={{ height: placeholderHeight, width: '100%' }}
-      >
-        <div className="text-center">
-          <ImageIcon
-            size={window.innerWidth < 768 ? 48 : 64}
-            className={`mx-auto mb-2 ${isLight ? 'text-gray-300' : 'text-white/40'}`}
-          />
-          <p className={`text-sm ${isLight ? 'text-gray-500' : 'text-white/70'}`}>Немає фото</p>
-        </div>
+      <div className="relative w-full" style={{ height: placeholderHeight }}>
+        <ListingImagePlaceholder isLight={isLight} size="lg" />
+        <p
+          className={`absolute bottom-8 left-0 right-0 text-center text-sm ${
+            isLight ? 'text-gray-500' : 'text-white/70'
+          }`}
+        >
+          Немає фото
+        </p>
       </div>
     );
   }
@@ -101,13 +99,17 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
               />
             ) : null}
             <div
-              className={`error-placeholder absolute inset-0 flex items-center justify-center ${slideBgClass}`}
+              className="error-placeholder absolute inset-0"
               style={{ display: src ? 'none' : 'flex' }}
             >
-              <div className="text-center">
-                <ImageIcon size={64} className={`mx-auto mb-2 ${isLight ? 'text-gray-300' : 'text-white/40'}`} />
-                <p className={`text-sm ${isLight ? 'text-gray-500' : 'text-white/70'}`}>Помилка завантаження</p>
-              </div>
+              <ListingImagePlaceholder isLight={isLight} size="lg" />
+              <p
+                className={`absolute bottom-8 left-0 right-0 text-center text-sm ${
+                  isLight ? 'text-gray-500' : 'text-white/70'
+                }`}
+              >
+                Помилка завантаження
+              </p>
             </div>
           </div>
         ))}

@@ -1,4 +1,4 @@
-import { Eye, Heart, Edit2, Check, Megaphone, Package, DollarSign, Loader2 } from 'lucide-react';
+import { Eye, Heart, Edit2, Check, Megaphone, DollarSign, Loader2 } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, useState, useEffect } from 'react';
@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
+import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
 import { ListingAutoRenewSection } from '@/components/listing/ListingAutoRenewSection';
@@ -279,7 +280,7 @@ export const ProfileListingCard = ({
         {/* Фото + перегляди / лайки під фото */}
         <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
         <div 
-          className={`relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer ${isLight ? 'bg-gray-200' : 'bg-[#2A2A2A]'}`}
+          className={`relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer ${isLight ? 'bg-white' : 'bg-[#2A2A2A]'}`}
           onClick={() => {
             if (!isPendingModeration && !isDeactivated && !isSold) {
               onSelect(listing);
@@ -297,9 +298,7 @@ export const ProfileListingCard = ({
               style={{ width: '100%', height: '100%' }}
             />
           ) : (
-            <div className={`absolute inset-0 w-full h-full flex items-center justify-center ${isLight ? 'text-gray-400' : 'text-white/20'}`}>
-              <Package size={32} />
-            </div>
+            <ListingImagePlaceholder isLight={isLight} size="sm" />
           )}
           
           {/* Бейдж реклами - справа знизу на фото (тільки якщо реклама ще активна) */}

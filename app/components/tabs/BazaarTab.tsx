@@ -530,7 +530,7 @@ const BazaarTabComponent = ({
                       ? 'border-[#3F5331] bg-transparent'
                       : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
                     : isLight
-                      ? 'border-gray-300 bg-transparent hover:bg-gray-100'
+                      ? 'border-[#3F5331]/20 bg-[#E8F0E0]/70 hover:bg-[#E8F0E0]'
                       : 'border-white bg-transparent hover:bg-white/10'
                 }`}
               >
@@ -542,7 +542,7 @@ const BazaarTabComponent = ({
                         ? 'text-[#3F5331]'
                         : 'text-[#C8E6A0]'
                       : isLight
-                        ? 'text-gray-700'
+                        ? 'text-[#5A6B52]'
                         : 'text-white'
                   }
                 />
@@ -626,7 +626,7 @@ const BazaarTabComponent = ({
               >
                 <div
                   className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden ${
-                    isLight ? 'border-2 border-[#3F5331] bg-white' : 'border border-white/25 bg-[#1C1C1C]'
+                    isLight ? 'border-2 border-[#3F5331]/20 bg-[#E8F0E0]' : 'border border-white/25 bg-[#1C1C1C]'
                   }`}
                 >
                   <CategoryIcon categoryId="all_categories" isActive={false} size={32} />

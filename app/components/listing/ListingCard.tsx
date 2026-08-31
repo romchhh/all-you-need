@@ -1,4 +1,4 @@
-import { Heart, Image as ImageIcon, Eye } from 'lucide-react';
+import { Heart, Eye } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useState, useMemo, useEffect, memo } from 'react';
@@ -9,6 +9,7 @@ import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
+import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
 import { shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -192,11 +193,7 @@ const ListingCardComponent = ({
         
         {/* Placeholder або зображення */}
         {imageError || !imageUrl ? (
-          <div className={`absolute inset-0 flex items-center justify-center w-full h-full ${isLight ? 'bg-gray-100' : 'bg-[#1A1A1A]'}`}>
-            <div className="text-center">
-              <ImageIcon size={48} className={`mx-auto ${isLight ? 'text-gray-300' : 'text-white/10'}`} />
-            </div>
-          </div>
+          <ListingImagePlaceholder isLight={isLight} size="lg" />
         ) : (
           <CachedListingImage
             src={imageUrl}
@@ -381,7 +378,7 @@ const ListingCardComponent = ({
           {listing.condition && (
             <span
               className={`inline-flex max-w-full flex-shrink-0 self-start rounded px-2.5 py-1 text-[11px] font-semibold leading-tight lg:self-start ${
-                isLight ? 'bg-gray-200 text-gray-800' : 'bg-[#2A2A2A] text-white'
+                isLight ? 'bg-[#E8F0E0] text-[#3F5331]' : 'bg-[#2A2A2A] text-white'
               }`}
             >
               {listing.condition === 'new' ? t('listing.condition.new') : t('listing.condition.used')}
@@ -393,14 +390,14 @@ const ListingCardComponent = ({
         <p
           className={`text-sm line-clamp-2 mb-0.5 font-medium leading-snug ${
             isStacked ? '' : 'lg:text-[15px]'
-          } ${isLight ? 'text-gray-900' : 'text-white'}`}
+          } ${isLight ? 'text-[#2D3E28]' : 'text-white'}`}
         >
           {listing.title}
         </p>
 
         <div
           className={`flex flex-col gap-0.5 text-[10px] mt-0.5 mb-0 ${
-            isLight ? 'text-gray-500' : 'text-white/60'
+            isLight ? 'text-[#5A6B52]' : 'text-white/60'
           }`}
         >
           <div className="flex items-center gap-1 min-w-0">

@@ -218,7 +218,7 @@ export const BottomNavigation = ({
       data-bottom-nav
       className={`fixed bottom-0 left-0 right-0 z-[1000] border-t pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] pt-1.5 transition-transform duration-150 ${
         isLight
-          ? 'border-gray-200/80 bg-white/95 shadow-[0_-6px_32px_-8px_rgba(0,0,0,0.08)] backdrop-blur-md'
+          ? 'border-[#3F5331]/12 bg-[#E8F0E0]/95 shadow-[0_-4px_24px_-6px_rgba(63,83,49,0.12)]'
           : 'border-white/10 bg-[#000000] shadow-[0_-8px_40px_-6px_rgba(0,0,0,0.45)]'
       }`}
       style={{
@@ -236,7 +236,7 @@ export const BottomNavigation = ({
                 ? 'font-semibold text-[#3F5331]'
                 : 'font-semibold text-[#C8E6A0]'
               : isLight
-                ? 'text-gray-600 hover:text-[#3F5331]'
+                ? 'text-[#5A6B52] hover:text-[#3F5331]'
                 : 'text-white hover:text-[#C8E6A0]'
           }`}
         >
@@ -255,7 +255,7 @@ export const BottomNavigation = ({
             tg?.HapticFeedback.impactOccurred('medium');
           }}
           className={`group flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-1 ${
-            isLight ? 'text-gray-600 hover:text-[#3F5331]' : 'text-white hover:text-[#C8E6A0]'
+            isLight ? 'text-[#5A6B52] hover:text-[#3F5331]' : 'text-white hover:text-[#C8E6A0]'
           }`}
         >
           <div className="shrink-0">
@@ -275,7 +275,7 @@ export const BottomNavigation = ({
                 ? 'font-semibold text-[#3F5331]'
                 : 'font-semibold text-[#C8E6A0]'
               : isLight
-                ? 'text-gray-600 hover:text-[#3F5331]'
+                ? 'text-[#5A6B52] hover:text-[#3F5331]'
                 : 'text-white hover:text-[#C8E6A0]'
           }`}
         >
@@ -296,7 +296,7 @@ export const BottomNavigation = ({
                 ? 'font-semibold text-[#3F5331]'
                 : 'font-semibold text-[#C8E6A0]'
               : isLight
-                ? 'text-gray-600 hover:text-[#3F5331]'
+                ? 'text-[#5A6B52] hover:text-[#3F5331]'
                 : 'text-white hover:text-[#C8E6A0]'
           }`}
         >

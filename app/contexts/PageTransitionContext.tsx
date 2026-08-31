@@ -50,7 +50,7 @@ function PageTransitionOverlay({ visible }: { visible: boolean }) {
   return createPortal(
     <div
       className={`fixed inset-0 z-[3000] flex items-center justify-center transition-opacity duration-200 ${
-        isLight ? 'bg-white/72' : 'bg-black/70'
+        isLight ? 'bg-[#f5f7f2]/88' : 'bg-black/70'
       } backdrop-blur-[3px]`}
       role="status"
       aria-live="polite"

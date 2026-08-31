@@ -1,26 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { TradeGroundLogo } from '@/components/layout/TradeGroundLogo';
 import { useTheme } from '@/contexts/ThemeContext';
-
-const MOBILE_MAX_LG = '(max-width: 1023px)';
-
-function subscribeMobileMaxLg(onStoreChange: () => void) {
-  if (typeof window === 'undefined') return () => {};
-  const mq = window.matchMedia(MOBILE_MAX_LG);
-  mq.addEventListener('change', onStoreChange);
-  return () => mq.removeEventListener('change', onStoreChange);
-}
-
-function getMobileMaxLgSnapshot() {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia(MOBILE_MAX_LG).matches;
-}
-
-function getServerSnapshotMobileMaxLg() {
-  return false;
-}
 
 /**
  * Висота блоку шапки = safe-top + внутрішній відступ (моб pt-9) + ряд лого + pb.
@@ -40,7 +22,7 @@ export const OVERLAY_BACK_BUTTON_TOP_CLASS =
 /** Напівпрозорий стиль круглої кнопки «Назад» (як на сторінці товару). */
 export const overlayHeaderActionClass = (isLight: boolean) =>
   isLight
-    ? 'border-gray-300/90 bg-white/95 text-gray-900 shadow-sm hover:bg-white'
+    ? 'border-[#3F5331]/20 bg-white/95 text-[#3F5331] shadow-sm hover:bg-[#E8F0E0]/80'
     : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
 
 /** Safe area окремо — щоб не покладатися на вкладений max() у calc() у arbitrary-класах */
@@ -49,7 +31,7 @@ const safeTopShellClass =
 
 /** Ті ж градієнти, що у `globals.css` для `body`, щоб шапка при скролі не «перефарбовувалась» суцільним тлом. */
 const HEADER_PATTERN_LIGHT =
-  'radial-gradient(ellipse 90% 120% at 15% -10%, rgba(63, 83, 49, 0.12) 0%, transparent 52%), radial-gradient(ellipse 80% 100% at 90% 100%, rgba(63, 83, 49, 0.08) 0%, transparent 48%), linear-gradient(180deg, #ffffff 0%, #f7f8f5 45%, #f3f4f0 100%)';
+  'radial-gradient(ellipse 100% 80% at 50% -20%, rgba(63, 83, 49, 0.08) 0%, transparent 55%), radial-gradient(ellipse 70% 60% at 100% 100%, rgba(63, 83, 49, 0.06) 0%, transparent 50%), linear-gradient(180deg, #fafbf8 0%, #f5f7f2 55%, #eff3ea 100%)';
 const HEADER_PATTERN_DARK =
   'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.20) 0%, transparent 40%), #000000';
 
@@ -76,13 +58,8 @@ export function FixedLogoHeader({
   scrollParent,
 }: FixedLogoHeaderProps) {
   const { isLight, theme } = useTheme();
-  const isMobileViewport = useSyncExternalStore(
-    subscribeMobileMaxLg,
-    getMobileMaxLgSnapshot,
-    getServerSnapshotMobileMaxLg
-  );
-  /** На мобільному світла тема: той самий фон шапки, що й у темній (темне тло + акцентні радіали). */
-  const useDarkHeaderShell = !isLight || (isLight && isMobileViewport);
+  /** Світла тема: світлий sage-фон шапки на всіх екранах */
+  const useDarkHeaderShell = !isLight;
   const [scrollProgress, setScrollProgress] = useState(0);
   const spacerRef = useRef<HTMLDivElement | null>(null);
   const spacerBaselineRef = useRef<number | null>(null);
@@ -208,7 +185,7 @@ export function FixedLogoHeader({
   const veilA = p <= 0 ? 0 : useDarkHeaderShell ? Math.min(0.16, p * 0.18) : Math.min(0.2, p * 0.22);
   const veil = useDarkHeaderShell
     ? `linear-gradient(180deg, rgba(0,0,0,${veilA}) 0%, rgba(0,0,0,${veilA * 0.75}) 100%)`
-    : `linear-gradient(180deg, rgba(255,255,255,${veilA}) 0%, rgba(247,248,245,${veilA * 0.92}) 100%)`;
+    : `linear-gradient(180deg, rgba(250,251,248,${veilA}) 0%, rgba(245,247,242,${veilA * 0.92}) 100%)`;
   const blurPx = p < 0.08 ? 0 : Math.round(2 + p * 8);
   const borderAlpha = useDarkHeaderShell ? p * 0.14 : p * 0.12;
 
