@@ -10,6 +10,8 @@ import { SubcategoryList } from '@/components/listing/SubcategoryList';
 import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
 import { TopBar } from '@/components/layout/TopBar';
 import type { PlatformOnboardingActionId } from '@/utils/platformTickerMessages';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingsRefreshOverlay } from '@/components/ui/ListingsRefreshOverlay';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { HomeActivityStats } from '@/components/home/HomeActivityStats';
@@ -339,7 +341,7 @@ const BazaarTabComponent = ({
           router.push(`/${lang}/favorites`);
           break;
         case 'promotion':
-          router.push(`/${lang}/ads-rules`);
+          router.push(`/${lang}/profile`);
           break;
         case 'referral':
           router.push(`/${lang}/referral`);
@@ -644,6 +646,12 @@ const BazaarTabComponent = ({
                   category={category}
                   isActive={false}
                   onClick={() => {
+                    trackAnalytics({
+                      eventName: ANALYTICS_EVENTS.categoryClick,
+                      eventGroup: ANALYTICS_EVENT_GROUPS.navigation,
+                      entityType: 'category',
+                      entityId: category.id,
+                    });
                     commitCatalogState({
                       selectedCategory: category.id,
                       selectedSubcategory: null,
@@ -717,6 +725,13 @@ const BazaarTabComponent = ({
             subcategories={selectedCategoryData.subcategories}
             selectedSubcategory={selectedSubcategory}
             onSelect={(subcategoryId) => {
+              trackAnalytics({
+                eventName: ANALYTICS_EVENTS.subcategoryClick,
+                eventGroup: ANALYTICS_EVENT_GROUPS.navigation,
+                entityType: 'category',
+                entityId: subcategoryId,
+                metadata: { parentCategory: selectedCategory },
+              });
               commitCatalogState({ selectedSubcategory: subcategoryId });
               tg?.HapticFeedback.impactOccurred('light');
             }}

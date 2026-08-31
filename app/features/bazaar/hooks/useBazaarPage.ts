@@ -11,6 +11,8 @@ import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
 import { useUser } from '@/features/user/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePageTransition } from '@/contexts/PageTransitionContext';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { useActivityHeartbeat } from '@/features/user/hooks/useActivityHeartbeat';
 import { usePullToRefresh } from '@/features/ui/hooks/usePullToRefresh';
 import { useDebounce } from '@/features/ui/hooks/useDebounce';
@@ -873,6 +875,14 @@ export function useBazaarPage() {
       );
 
       tg?.HapticFeedback.notificationOccurred('success');
+
+      trackAnalytics({
+        eventName: isFavorite ? ANALYTICS_EVENTS.favoriteRemove : ANALYTICS_EVENTS.favoriteAdd,
+        eventGroup: ANALYTICS_EVENT_GROUPS.engagement,
+        telegramId: profile?.telegramId,
+        entityType: 'listing',
+        entityId: String(id),
+      });
 
       if (isFavorite) {
         await removeFavoriteFromStorage(id, profile?.telegramId);

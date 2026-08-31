@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 
 interface Promotion {
   type: string;
@@ -74,6 +76,17 @@ export default function PromotionModal({
       setActivePromotionEnds(null);
     }
   }, [isOpen, listingId, currentPromotion, promotionEnds]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    trackAnalytics({
+      eventName: ANALYTICS_EVENTS.promotionView,
+      eventGroup: ANALYTICS_EVENT_GROUPS.monetization,
+      telegramId: telegramId,
+      entityType: 'listing',
+      entityId: listingId ? String(listingId) : undefined,
+    });
+  }, [isOpen, listingId, telegramId]);
 
   // Перевіряємо чи активна реклама (для сумісності зі старим кодом)
   const isPromotionActive = currentPromotion && promotionEnds 
@@ -149,6 +162,15 @@ export default function PromotionModal({
 
   const handleSelectPromotion = async () => {
     if (!selectedPromotion) return;
+
+    trackAnalytics({
+      eventName: ANALYTICS_EVENTS.promotionSelect,
+      eventGroup: ANALYTICS_EVENT_GROUPS.monetization,
+      telegramId: telegramId,
+      entityType: 'listing',
+      entityId: listingId ? String(listingId) : undefined,
+      metadata: { promotionType: selectedPromotion },
+    });
 
     setLoading(true);
     // Не передаємо paymentMethod - він буде вибраний в PaymentSummaryModal

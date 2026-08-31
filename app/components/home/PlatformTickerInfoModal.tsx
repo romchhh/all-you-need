@@ -11,6 +11,7 @@ import {
   type PlatformOnboardingActionId,
   type TickerMessageType,
 } from '@/utils/platformTickerMessages';
+import { PromotionTypeCards } from '@/components/promotions/PromotionTypeCards';
 
 type PlatformTickerInfoModalProps = {
   isOpen: boolean;
@@ -22,7 +23,6 @@ type PlatformTickerInfoModalProps = {
 export function PlatformTickerInfoModal({
   isOpen,
   onClose,
-  highlightType: _highlightType,
   onAction,
 }: PlatformTickerInfoModalProps) {
   const { t } = useLanguage();
@@ -66,6 +66,10 @@ export function PlatformTickerInfoModal({
     onAction(action);
     onClose();
   };
+
+  const sectionButtonClass = isLight
+    ? 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-[#3F5331]/20 bg-white px-3.5 py-2 text-xs font-semibold text-[#2D3E28] transition-colors hover:border-[#3F5331]/35 hover:bg-[#E8F0E0]/60'
+    : 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-white/30 bg-transparent px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/10';
 
   return createPortal(
     <>
@@ -116,6 +120,41 @@ export function PlatformTickerInfoModal({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
           <ul className="space-y-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {ONBOARDING_SECTIONS.map((section) => {
+              if (section.id === 'promotion') {
+                return (
+                  <li
+                    key={section.id}
+                    className={`rounded-2xl px-3.5 py-3 ${
+                      isLight ? 'bg-gray-50/80' : 'bg-white/[0.04]'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 text-xl leading-none" aria-hidden>
+                        {section.emoji}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-semibold leading-snug ${ac.pageHeading}`}>
+                          {t('promotions.title')}
+                        </p>
+                        <p className={`mt-1 text-xs leading-relaxed ${ac.mutedText}`}>
+                          {t('promotions.description')}
+                        </p>
+                        <div className="mt-3">
+                          <PromotionTypeCards isLight={isLight} compact />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAction(section.id)}
+                          className={sectionButtonClass}
+                        >
+                          {t(section.buttonKey)}
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              }
+
               return (
                 <li
                   key={section.id}
@@ -131,13 +170,13 @@ export function PlatformTickerInfoModal({
                       <p className={`text-sm font-semibold leading-snug ${ac.pageHeading}`}>
                         {t(section.titleKey)}
                       </p>
-                      <p className={`mt-1 text-xs leading-relaxed ${ac.mutedText}`}>
+                      <p className={`mt-1 whitespace-pre-line text-xs leading-relaxed ${ac.mutedText}`}>
                         {t(section.descriptionKey)}
                       </p>
                       <button
                         type="button"
                         onClick={() => handleAction(section.id)}
-                        className="mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl bg-[#3F5331] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#344728] active:scale-[0.98]"
+                        className={sectionButtonClass}
                       >
                         {t(section.buttonKey)}
                       </button>

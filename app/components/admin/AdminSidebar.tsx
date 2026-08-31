@@ -20,6 +20,9 @@ const menuItems: MenuItem[] = [
   { href: '/admin/listings/import', label: 'Імпорт оголошень', icon: '📥' },
   { href: '/admin/users', label: 'Користувачі', icon: '👥' },
   { href: '/admin/finances', label: 'Фінанси', icon: '💰' },
+  { href: '/admin/analytics', label: 'Аналітика', icon: '📈' },
+  { href: '/admin/monitoring', label: 'Моніторинг', icon: '🛰️' },
+  { href: '/admin/testing', label: 'Тестування', icon: '🧪' },
   { href: '/admin/settings', label: 'Налаштування', icon: '⚙️' },
 ];
 

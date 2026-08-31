@@ -17,6 +17,8 @@ import {
   openSellerTelegramChat,
   resolveSellerContactLang,
 } from '@/utils/sellerContact';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { expandTelegramViewportIfMobile } from '@/lib/telegram/telegramViewport';
 import { useUser } from '@/features/user/hooks/useUser';
@@ -119,6 +121,16 @@ export const ListingDetail = ({
   useEffect(() => {
     setListing(initialListing);
   }, [initialListing]);
+
+  useEffect(() => {
+    trackAnalytics({
+      eventName: ANALYTICS_EVENTS.listingView,
+      eventGroup: ANALYTICS_EVENT_GROUPS.listing,
+      entityType: 'listing',
+      entityId: String(initialListing.id),
+      metadata: { category: initialListing.category },
+    });
+  }, [initialListing.id, initialListing.category]);
 
   const sellerUsername = listing.seller.username;
   const sellerPhone = listing.seller.phone;
@@ -264,8 +276,15 @@ export const ListingDetail = ({
       getListingContactUrl(listing.id),
       resolveSellerContactLang(language),
     );
+    trackAnalytics({
+      eventName: ANALYTICS_EVENTS.contactSeller,
+      eventGroup: ANALYTICS_EVENT_GROUPS.engagement,
+      telegramId: currentUser?.id || profile?.telegramId || undefined,
+      entityType: 'listing',
+      entityId: String(listing.id),
+    });
     openSellerTelegramChat(username, message, tg ?? undefined);
-  }, [isOwnListing, listing.id, listing.title, listing.seller.username, listing.seller.phone, language, tg, showToast, t]);
+  }, [isOwnListing, listing.id, listing.title, listing.seller.username, listing.seller.phone, language, tg, showToast, t, currentUser?.id, profile?.telegramId]);
 
   const viewerTelegramIdStr = String(currentUser?.id || profile?.telegramId || '');
 

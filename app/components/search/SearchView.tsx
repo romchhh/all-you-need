@@ -23,6 +23,8 @@ import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
 
 const SEARCH_DEBOUNCE_MS = 800;
@@ -183,7 +185,7 @@ export function SearchView({
   const [searchResults, setSearchResults] = useState<Listing[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
   const [loadingResults, setLoadingResults] = useState(false);
-  const [previewResults, setPreviewResults] = useState<Listing[]>([]);
+  const suppressAutoResultsRef = useRef(false);
 
   const [recentQueries, setRecentQueries] = useState<string[]>([]);
   const [recentSearchListings, setRecentSearchListings] = useState<Listing[]>([]);
@@ -213,10 +215,10 @@ export function SearchView({
     searchRequestRef.current += 1;
     setActiveQuery('');
     setSearchResults([]);
-    setPreviewResults([]);
     setSearchTotal(0);
     setLoadingResults(false);
     lastFetchKeyRef.current = '';
+    suppressAutoResultsRef.current = false;
   }, []);
 
   const goToDiscoverHome = useCallback(() => {
@@ -228,9 +230,9 @@ export function SearchView({
     tg?.HapticFeedback?.impactOccurred?.('light');
   }, [resetSearchState, tg]);
 
-  /** З екрана результатів — на головну сторінку пошуку (залишаємо текст у полі). */
   const openMainSearchPage = useCallback(() => {
     if (screenMode !== 'results') return;
+    suppressAutoResultsRef.current = true;
     setScreenMode('discover');
     setActiveQuery('');
     setSearchResults([]);
@@ -257,25 +259,21 @@ export function SearchView({
         saveHistory?: boolean;
         force?: boolean;
         category?: string | null;
-        previewOnly?: boolean;
       }
     ) => {
       const trimmed = query.trim();
       if (trimmed.length < MIN_QUERY_LENGTH) return;
 
       const category = options?.category !== undefined ? options.category : selectedCategory;
-      const previewOnly = options?.previewOnly === true;
-      const fetchKey = `${previewOnly ? 'preview' : 'commit'}|${buildFetchKey(trimmed, category)}|${sortBy}|${showFreeOnly}`;
+      const fetchKey = `commit|${buildFetchKey(trimmed, category)}|${sortBy}|${showFreeOnly}`;
       if (!options?.force && fetchKey === lastFetchKeyRef.current) return;
 
       lastFetchKeyRef.current = fetchKey;
       const requestId = ++searchRequestRef.current;
-      if (!previewOnly) {
-        setLoadingResults(true);
-        setActiveQuery(trimmed);
-      }
+      setLoadingResults(true);
+      setActiveQuery(trimmed);
 
-      if (!previewOnly && options?.saveHistory !== false) {
+      if (options?.saveHistory !== false) {
         addToSearchHistory(trimmed);
         refreshLocalHistory();
       }
@@ -285,7 +283,7 @@ export function SearchView({
 
       try {
         const params = new URLSearchParams({
-          limit: previewOnly ? '12' : '24',
+          limit: '24',
           offset: '0',
           sortBy,
           search: trimmed,
@@ -306,33 +304,23 @@ export function SearchView({
         if (res.ok) {
           const data = await res.json();
           const list = (data.listings || []) as Listing[];
-          if (previewOnly) {
-            setPreviewResults(list);
-          } else {
-            setSearchResults(list);
-            setSearchTotal(data.total ?? list.length);
-            if (list.length > 0) {
-              updateSearchHistoryListings(trimmed, list.slice(0, 6).map(listingToSearchPreview));
-            }
+          setSearchResults(list);
+          setSearchTotal(data.total ?? list.length);
+          if (list.length > 0) {
+            updateSearchHistoryListings(trimmed, list.slice(0, 6).map(listingToSearchPreview));
           }
-        } else if (previewOnly) {
-          setPreviewResults([]);
         } else {
           setSearchResults([]);
           setSearchTotal(0);
         }
       } catch {
         if (requestId === searchRequestRef.current) {
-          if (previewOnly) {
-            setPreviewResults([]);
-          } else {
-            setSearchResults([]);
-            setSearchTotal(0);
-          }
+          setSearchResults([]);
+          setSearchTotal(0);
           lastFetchKeyRef.current = '';
         }
       } finally {
-        if (!previewOnly && requestId === searchRequestRef.current) {
+        if (requestId === searchRequestRef.current) {
           setLoadingResults(false);
         }
       }
@@ -344,6 +332,14 @@ export function SearchView({
     (query: string, options?: { haptic?: boolean; saveHistory?: boolean; category?: string | null }) => {
       const trimmed = query.trim();
       if (trimmed.length < MIN_QUERY_LENGTH) return;
+
+      trackAnalytics({
+        eventName: ANALYTICS_EVENTS.searchSubmit,
+        eventGroup: ANALYTICS_EVENT_GROUPS.search,
+        entityType: 'query',
+        entityId: trimmed,
+        metadata: { category: options?.category ?? selectedCategory },
+      });
 
       setScreenMode('results');
       setLocalQuery(trimmed);
@@ -363,6 +359,15 @@ export function SearchView({
   const handleCategorySelect = useCallback(
     (categoryId: string | null) => {
       const next = selectedCategory === categoryId ? null : categoryId;
+      if (next) {
+        trackAnalytics({
+          eventName: ANALYTICS_EVENTS.categoryClick,
+          eventGroup: ANALYTICS_EVENT_GROUPS.navigation,
+          entityType: 'category',
+          entityId: next,
+          metadata: { source: 'search' },
+        });
+      }
       setSelectedCategory(next);
       onCategoryChangeRef.current?.(next);
       lastFetchKeyRef.current = '';
@@ -439,6 +444,20 @@ export function SearchView({
     }
   }, [debouncedQuery, screenMode]);
 
+  // Під час набору на головній сторінці пошуку — одразу екран результатів (без проміжного discover)
+  useEffect(() => {
+    if (screenMode !== 'discover') return;
+    if (suppressAutoResultsRef.current) return;
+
+    const trimmed = debouncedQuery.trim();
+    if (trimmed.length < MIN_QUERY_LENGTH) return;
+
+    setScreenMode('results');
+    onQueryChangeRef.current?.(trimmed);
+    lastFetchKeyRef.current = '';
+    void fetchSearchResults(trimmed, { saveHistory: true, force: true });
+  }, [debouncedQuery, screenMode, fetchSearchResults]);
+
   const activeQueryRef = useRef(activeQuery);
   activeQueryRef.current = activeQuery;
 
@@ -511,7 +530,7 @@ export function SearchView({
   }, [profileTelegramId]);
 
   const inputClass = isLight
-    ? 'w-full rounded-xl border border-gray-300 bg-white py-3 pr-10 text-gray-900 placeholder:text-gray-500 focus:border-[#3F5331]/30 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/20'
+    ? 'w-full rounded-xl border border-[#3F5331]/15 bg-white py-3 pr-10 text-[#2D3E28] placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
     : 'w-full rounded-xl border border-white bg-transparent py-3 pr-10 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30';
 
   const popularQueries = POPULAR_SEARCH_QUERY_KEYS.map((key) =>
@@ -523,7 +542,7 @@ export function SearchView({
     trimmedLocal.length >= MIN_QUERY_LENGTH && trimmedLocal !== debouncedQuery.trim();
 
   const stickySearchBg = isLight
-    ? 'border-b border-gray-200/80 bg-white/95 backdrop-blur-md'
+    ? 'border-b border-[#3F5331]/10 bg-[#f5f7f2]/95 backdrop-blur-md'
     : 'border-b border-white/10 bg-[var(--tg-theme-bg-color,#111111)]/95 backdrop-blur-md';
 
   const catalogListingsProps = {
@@ -647,7 +666,7 @@ export function SearchView({
   );
 
   const backBtnClass = isLight
-    ? 'border-gray-300/90 bg-white/95 text-gray-900 shadow-sm hover:bg-white'
+    ? 'border-[#3F5331]/20 bg-white/95 text-[#3F5331] shadow-sm hover:bg-[#E8F0E0]/80'
     : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
 
   const categoriesRow = (
@@ -713,14 +732,25 @@ export function SearchView({
       />
       <input
         ref={inputRef}
-        type="search"
+        type="text"
+        inputMode="search"
         enterKeyHint="search"
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}
         placeholder={searchPlaceholder || t('bazaar.whatInterestsYou')}
         value={localQuery}
-        onChange={(e) => setLocalQuery(e.target.value)}
+        onChange={(e) => {
+          suppressAutoResultsRef.current = false;
+          const next = e.target.value;
+          setLocalQuery(next);
+          const trimmed = next.trim();
+          if (trimmed.length >= MIN_QUERY_LENGTH && screenMode === 'discover') {
+            setScreenMode('results');
+            onQueryChangeRef.current?.(trimmed);
+            setLoadingResults(true);
+          }
+        }}
         onFocus={() => {
           if (screenMode === 'results') {
             openMainSearchPage();
@@ -757,26 +787,28 @@ export function SearchView({
     <>
       {screenMode === 'discover' ? (
         <>
-          <div className="flex items-center justify-between gap-3 px-4 pb-4 pt-0">
-            <h1 className={`min-w-0 flex-1 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
+          <div className="px-4 pt-0">
+            <div className="flex justify-end pb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  tg?.HapticFeedback?.impactOccurred?.('light');
+                  onBack();
+                }}
+                aria-label={t('common.close')}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <h1 className={`min-w-0 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
               {t('bazaar.search.pageTitle')}
             </h1>
-            <button
-              type="button"
-              onClick={() => {
-                tg?.HapticFeedback?.impactOccurred?.('light');
-                onBack();
-              }}
-              aria-label={t('common.close')}
-              className={`-mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
-            >
-              <X size={20} />
-            </button>
           </div>
 
           {categoriesRow}
 
-          <div className="mx-auto w-full max-w-xl space-y-2 px-4 pb-2 pt-1 xl:max-w-2xl lg:mx-auto">
+          <div className="mx-auto w-full max-w-xl space-y-2 px-4 pb-2 pt-2 xl:max-w-2xl lg:mx-auto">
             {searchField}
           </div>
 
@@ -784,7 +816,7 @@ export function SearchView({
         </>
       ) : (
         <>
-          <div className={`${STICKY_BELOW_APP_HEADER_CLASS} ${stickySearchBg}`}>
+          <div className={`${STICKY_BELOW_APP_HEADER_CLASS} z-[42] ${stickySearchBg}`}>
             <div className="mx-auto flex w-full max-w-xl items-center gap-2 px-4 py-2 xl:max-w-2xl lg:mx-auto">
               <button
                 type="button"

@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { usePageTransition } from '@/contexts/PageTransitionContext';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 
 interface BottomNavigationProps {
   activeTab?: string;
@@ -175,6 +177,12 @@ export const BottomNavigation = ({
     }
 
     tg?.HapticFeedback.impactOccurred('light');
+    trackAnalytics({
+      eventName: ANALYTICS_EVENTS.navTabClick,
+      eventGroup: ANALYTICS_EVENT_GROUPS.navigation,
+      entityType: 'tab',
+      entityId: tab,
+    });
     pendingTabNavRef.current = true;
     showPageLoader({ minMs: 350 });
 

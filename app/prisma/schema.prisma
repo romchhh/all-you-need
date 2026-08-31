@@ -283,6 +283,37 @@ model Admin {
   @@index([isSuperadmin])
 }
 
+// Події аналітики (кліки, дії користувачів)
+model AnalyticsEvent {
+  id         Int      @id @default(autoincrement())
+  eventName  String
+  eventGroup String?
+  userId     Int?
+  telegramId String?
+  entityType String?
+  entityId   String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([eventName])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+// Журнал моніторингу систем
+model SystemMonitorLog {
+  id          Int      @id @default(autoincrement())
+  serviceName String
+  status      String
+  message     String
+  latencyMs   Int?
+  details     String?
+  checkedAt   DateTime @default(now())
+
+  @@index([serviceName])
+  @@index([checkedAt])
+}
+
 // Налаштування системи
 model SystemSettings {
   id                Int      @id @default(autoincrement())
