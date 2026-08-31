@@ -130,8 +130,8 @@ export const FavoritesTab = ({
         <h2 className={`text-2xl font-bold mb-2 ${ac.pageHeading}`}>Обране</h2>
         <p className={`text-sm mb-4 ${ac.nothingFound}`}>Тут товари, які вам сподобалися</p>
         
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          {favoritedListings.map(listing => (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
+          {favoritedListings.map((listing, index) => (
             <ListingCard 
               key={listing.id} 
               listing={listing}
@@ -139,6 +139,8 @@ export const FavoritesTab = ({
               onSelect={onSelectListing}
               onToggleFavorite={onToggleFavorite}
               tg={tg}
+              priority={index < 4}
+              layout="stacked"
             />
           ))}
         </div>

@@ -10,6 +10,7 @@ import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorag
 import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
 import { useUser } from '@/features/user/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 import { useActivityHeartbeat } from '@/features/user/hooks/useActivityHeartbeat';
 import { usePullToRefresh } from '@/features/ui/hooks/usePullToRefresh';
 import { useDebounce } from '@/features/ui/hooks/useDebounce';
@@ -49,6 +50,7 @@ export function useBazaarPage() {
   const lang = (params?.lang as string) || 'uk';
   const { t, setLanguage } = useLanguage();
   const { profile, isBlocked } = useUser();
+  const { show: showPageLoader, hide: hidePageLoader } = usePageTransition();
 
   const showBlockedScreen = isBlocked && !profile;
 
@@ -503,6 +505,7 @@ export function useBazaarPage() {
     } else if (userParam) {
       const telegramId = userParam;
       if (!selectedSeller || selectedSeller.telegramId !== telegramId) {
+        showPageLoader({ minMs: 280 });
         fetch(`/api/user/profile?telegramId=${telegramId}`)
           .then(res => res.json())
           .then(data => {
@@ -517,11 +520,12 @@ export function useBazaarPage() {
                 phone: data.phone || undefined
               });
             } else {
-              /* profile not found */
+              void hidePageLoader();
             }
           })
           .catch(err => {
             console.error('Error fetching user profile:', err);
+            void hidePageLoader();
           });
       }
     }
@@ -988,6 +992,7 @@ export function useBazaarPage() {
   }, []);
 
   const handleSelectListingFromCatalog = useCallback((listing: Listing) => {
+    showPageLoader({ minMs: 220 });
     saveCatalogScrollPosition();
     listingHistoryStack.current = [];
     viewModeRef.current = 'listing';
@@ -995,12 +1000,15 @@ export function useBazaarPage() {
     lastViewedListingIdRef.current = listing.id;
     persistBazaarReturnListingId(listing.id);
     setSelectedListing(listing);
-  }, [saveCatalogScrollPosition]);
+    void hidePageLoader({ minMs: 220 });
+  }, [saveCatalogScrollPosition, showPageLoader, hidePageLoader]);
 
   const handleCloseListing = useCallback(() => {
+    showPageLoader({ minMs: 220 });
     setSelectedListing(null);
     listingHistoryStack.current = [];
-  }, []);
+    void hidePageLoader({ minMs: 220 });
+  }, [showPageLoader, hidePageLoader]);
 
   const handleListingBack = useCallback(() => {
     if (listingHistoryStack.current.length > 0) {
@@ -1008,9 +1016,11 @@ export function useBazaarPage() {
       setSelectedListing(previousListing);
       return;
     }
+    showPageLoader({ minMs: 220 });
     setSelectedListing(null);
     listingHistoryStack.current = [];
-  }, []);
+    void hidePageLoader({ minMs: 220 });
+  }, [showPageLoader, hidePageLoader]);
 
   const handleBazaarStateChange = useCallback((next: Partial<BazaarTabPersistedState>) => {
     startTransition(() => {
@@ -1065,6 +1075,7 @@ export function useBazaarPage() {
       username?: string,
       phone?: string
     ) => {
+      showPageLoader({ minMs: 280 });
       setSelectedListing((current) => {
         previousListingRef.current = current;
         return null;
@@ -1077,7 +1088,7 @@ export function useBazaarPage() {
         phone: phone || undefined,
       });
     },
-    []
+    [showPageLoader]
   );
 
   const handleAutoRenewPersist = useCallback((id: number, autoRenew: boolean) => {
@@ -1085,27 +1096,34 @@ export function useBazaarPage() {
   }, []);
 
   const handleCloseSeller = useCallback(() => {
+    showPageLoader({ minMs: 220 });
     previousListingRef.current = null;
     setSelectedSeller(null);
-  }, []);
+    void hidePageLoader({ minMs: 220 });
+  }, [showPageLoader, hidePageLoader]);
 
   const handleBackToPreviousListing = useCallback(() => {
+    showPageLoader({ minMs: 220 });
     if (previousListingRef.current) {
       setSelectedListing(previousListingRef.current);
       previousListingRef.current = null;
       setSelectedSeller(null);
+      void hidePageLoader({ minMs: 220 });
       return;
     }
     previousListingRef.current = null;
     setSelectedSeller(null);
-  }, []);
+    void hidePageLoader({ minMs: 220 });
+  }, [showPageLoader, hidePageLoader]);
 
   const handleSelectListingFromSeller = useCallback((listing: Listing) => {
+    showPageLoader({ minMs: 220 });
     lastViewedListingIdRef.current = listing.id;
     previousListingRef.current = null;
     setSelectedSeller(null);
     setSelectedListing(listing);
-  }, []);
+    void hidePageLoader({ minMs: 220 });
+  }, [showPageLoader, hidePageLoader]);
 
   const overlayOpen = Boolean(selectedListing || selectedSeller);
 

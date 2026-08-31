@@ -12,6 +12,7 @@ import { TopBar } from '@/components/layout/TopBar';
 import type { PlatformOnboardingActionId } from '@/utils/platformTickerMessages';
 import { ListingsRefreshOverlay } from '@/components/ui/ListingsRefreshOverlay';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
+import { HomeActivityStats } from '@/components/home/HomeActivityStats';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -33,13 +34,6 @@ const HomePlatformTicker = dynamic(
   () =>
     import('@/components/home/HomePlatformTicker').then((m) => ({
       default: m.HomePlatformTicker,
-    })),
-  { ssr: false }
-);
-const HomeActivityStats = dynamic(
-  () =>
-    import('@/components/home/HomeActivityStats').then((m) => ({
-      default: m.HomeActivityStats,
     })),
   { ssr: false }
 );
@@ -126,25 +120,10 @@ const BazaarTabComponent = ({
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
   const ac = getAppearanceClasses(isLight);
-  const [showHomeWidgets, setShowHomeWidgets] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    const show = () => {
-      if (!cancelled) setShowHomeWidgets(true);
-    };
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      const id = window.requestIdleCallback(show, { timeout: 1200 });
-      return () => {
-        cancelled = true;
-        window.cancelIdleCallback(id);
-      };
-    }
-    const timer = setTimeout(show, 800);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
+    // Prefetch статистики одразу — не чекаємо idle
+    void import('@/utils/homeActivityClient').then((m) => m.fetchHomeActivity());
   }, []);
 
   const deferredListings = useDeferredValue(listings);
@@ -595,14 +574,14 @@ const BazaarTabComponent = ({
         </div>
       </div>
 
-      {!searchQuery.trim() && showHomeWidgets && (
+      {!searchQuery.trim() && (
         <>
           <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
             <div className="w-full max-w-full lg:max-w-xl xl:max-w-2xl">
               <HomePlatformTicker isLight={isLight} onOnboardingAction={handleOnboardingAction} />
             </div>
           </div>
-          <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
+          <div className="overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
             <div className="w-full max-w-full overflow-visible lg:max-w-xl xl:max-w-2xl">
               <HomeActivityStats isLight={isLight} />
             </div>
