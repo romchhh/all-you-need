@@ -15,16 +15,16 @@ PARSER_DEDUP_ENABLED: bool = False
 PARSER_AI_ENABLED: bool = True
 PARSER_AI_SCREEN_ENABLED: bool = True
 
-# ── Автопублікація на маркетплейс (~300/день) ─────────────────
+# ── Автопублікація на маркетплейс (~450/день) ─────────────────
 # Канали послуг — вручну (✅ «У канал» у Telegram), не автоматично.
 PARSER_AUTO_APPROVE_ENABLED: bool = True
-PARSER_AUTO_APPROVE_DAILY_LIMIT: int = 300
-PARSER_AUTO_APPROVE_INTERVAL_MIN: float = 5.0
-PARSER_AUTO_APPROVE_BATCH: int = 50
-PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = 35
-PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = 60
+PARSER_AUTO_APPROVE_DAILY_LIMIT: int = 450
+PARSER_AUTO_APPROVE_INTERVAL_MIN: float = 4.0
+PARSER_AUTO_APPROVE_BATCH: int = 70
+PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = 50
+PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = 90
 PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = 72
-PARSER_AUTO_APPROVE_WAVE_MINUTES: int = 15
+PARSER_AUTO_APPROVE_WAVE_MINUTES: int = 12
 PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = False
 
 # Жорсткі межі (не змінювати без потреби)

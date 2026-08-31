@@ -202,7 +202,7 @@ def is_auto_approve_eligible(item: dict) -> tuple[bool, str]:
     category = str(item.get("category") or "").strip().lower()
     subcategory = item.get("subcategory")
 
-    if not title or len(title) < 6 or title.lower() in _STUB_TITLES:
+    if not title or len(title) < 5 or title.lower() in _STUB_TITLES:
         return False, "bad_title"
     if GENERIC_LISTING_TITLE_RE.match(title):
         return False, "generic_title"
@@ -273,7 +273,7 @@ def _under_soft_caps(item: dict, counts: dict[str, Counter]) -> bool:
         return False
     if cat and counts["category"][cat] >= PARSER_AUTO_APPROVE_MAX_PER_CATEGORY:
         return False
-    max_per_group = max(12, PARSER_AUTO_APPROVE_DAILY_LIMIT // 3)
+    max_per_group = max(20, PARSER_AUTO_APPROVE_DAILY_LIMIT // 2)
     if gid and counts["group"][gid] >= max_per_group:
         return False
     return True
