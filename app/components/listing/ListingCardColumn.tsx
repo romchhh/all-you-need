@@ -123,7 +123,7 @@ const ListingCardColumnComponent = ({
   return (
     <div 
       data-listing-id={listing.id}
-      className={`listing-card-optimized ${getCardBackgroundStyles()} rounded-2xl overflow-hidden transition-all cursor-pointer relative ${getPromotionStyles()}`}
+      className={`${getCardBackgroundStyles()} rounded-2xl overflow-hidden transition-all cursor-pointer relative ${getPromotionStyles()}`}
       onClick={() => {
         onSelect(listing);
         tg?.HapticFeedback.impactOccurred('light');

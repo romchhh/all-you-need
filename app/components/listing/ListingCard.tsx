@@ -165,10 +165,10 @@ const ListingCardComponent = ({
   return (
     <div 
       data-listing-id={listing.id}
-      className={`listing-card-optimized ${getCardBackgroundStyles()} rounded-2xl transition-all cursor-pointer relative select-none flex h-full min-h-0 ${
+      className={`${getCardBackgroundStyles()} rounded-2xl transition-all cursor-pointer relative select-none flex flex-col h-auto ${
         isStacked
-          ? 'flex-col overflow-hidden'
-          : 'flex-col lg:flex-row lg:items-stretch lg:overflow-hidden'
+          ? ''
+          : 'lg:h-full lg:min-h-0 lg:flex-row lg:items-stretch lg:overflow-hidden'
       } ${isSold || isDeactivated ? 'opacity-60' : ''} ${getPromotionStyles()}`}
       onClick={() => {
         if (!isSold && !isDeactivated) {
@@ -181,8 +181,8 @@ const ListingCardComponent = ({
       <div
         className={
           isStacked
-            ? 'relative z-[1] h-[220px] w-full shrink-0 overflow-hidden rounded-t-2xl sm:h-[240px]'
-            : 'relative z-[1] h-[220px] w-full shrink-0 overflow-hidden rounded-t-2xl sm:h-[240px] lg:h-full lg:min-h-[220px] lg:w-52 lg:self-stretch lg:rounded-l-2xl lg:rounded-t-none lg:rounded-tr-none xl:w-56'
+            ? 'relative z-[1] aspect-[4/5] w-full shrink-0 overflow-hidden rounded-t-2xl sm:aspect-square sm:h-auto sm:max-h-[240px]'
+            : 'relative z-[1] aspect-[4/5] w-full shrink-0 overflow-hidden rounded-t-2xl sm:aspect-square sm:h-auto sm:max-h-[240px] lg:aspect-auto lg:h-full lg:max-h-none lg:min-h-[220px] lg:w-52 lg:self-stretch lg:rounded-l-2xl lg:rounded-t-none lg:rounded-tr-none xl:w-56'
         }
       >
         {/* Бейдж реклами (VIP/TOP) - лівий верхній кут */}
@@ -310,14 +310,14 @@ const ListingCardComponent = ({
       
       {/* Інфо-блок: знизу на мобільному, справа на десктопі */}
       <div
-        className={`relative z-30 flex min-h-0 flex-1 flex-col px-3 pb-2 pt-3 -mt-5 rounded-t-3xl rounded-b-2xl sm:px-4 ${
+        className={`relative z-30 flex w-full shrink-0 flex-col px-3 pb-3 pt-3 -mt-5 rounded-t-3xl rounded-b-2xl sm:px-4 ${
           isStacked
             ? ''
-            : 'lg:mt-0 lg:rounded-none lg:rounded-r-2xl lg:rounded-bl-2xl lg:justify-center lg:py-4 lg:pl-5'
+            : 'lg:mt-0 lg:min-h-0 lg:flex-1 lg:rounded-none lg:rounded-r-2xl lg:rounded-bl-2xl lg:justify-center lg:py-4 lg:pl-5'
         } ${
           isLight
             ? 'bg-gradient-to-b from-white to-gray-50'
-            : 'bg-gradient-to-b from-[#1A1A1A]/95 to-[#0A0A0A]/95'
+            : 'bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A]'
         }`}
       >
         {/* Ціна + стан: в ряд на мобільних; з lg (горизонтальна картка) — колонка, щоб бейдж не стискав ціну */}
@@ -391,11 +391,11 @@ const ListingCardComponent = ({
         
         {/* Назва товару */}
         <p
-          className={`text-sm line-clamp-2 mb-0.5 font-medium leading-snug ${
+          className={`relative z-[1] mb-0.5 shrink-0 text-sm font-medium leading-snug break-words [overflow-wrap:anywhere] line-clamp-2 ${
             isStacked ? '' : 'lg:text-[15px]'
           } ${isLight ? 'text-gray-900' : 'text-white'}`}
         >
-          {listing.title}
+          {listing.title || '\u00A0'}
         </p>
 
         <div

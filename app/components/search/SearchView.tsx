@@ -113,7 +113,7 @@ function CatalogListings({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
       {slice.map((listing) => (
         <div key={listing.id} data-listing-id={listing.id}>
           <ListingCard
@@ -131,7 +131,7 @@ function CatalogListings({
 
 function CatalogListingsSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
       {Array.from({ length: count }).map((_, i) => (
         <ListingCardSkeleton key={i} />
       ))}

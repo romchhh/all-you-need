@@ -397,11 +397,6 @@ div {
   will-change: transform;
 }
 
-.listing-card-optimized {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 280px;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .animate-tg-logo-spin,
   .animate-content-in,
