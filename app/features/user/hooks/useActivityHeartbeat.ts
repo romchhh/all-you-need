@@ -49,25 +49,11 @@ export function useActivityHeartbeat(telegramIdRaw?: string | number | null) {
 
     intervalRef.current = setInterval(updateActivity, 60 * 1000);
 
-    // Оновлюємо активність при взаємодії користувача зі сторінкою
-    const events = ['mousedown', 'keydown', 'touchstart'];
-    const handleUserActivity = () => {
-      updateActivity();
-    };
-
-    events.forEach(event => {
-      document.addEventListener(event, handleUserActivity, { passive: true });
-    });
-
-    // Cleanup
     return () => {
       clearTimeout(initialTimer);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      events.forEach(event => {
-        document.removeEventListener(event, handleUserActivity);
-      });
     };
   }, [telegramIdRaw]);
 }

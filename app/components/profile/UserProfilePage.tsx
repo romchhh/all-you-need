@@ -23,7 +23,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
-import { usePageTransition } from '@/contexts/PageTransitionContext';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import {
   FixedLogoHeader,
@@ -80,7 +79,6 @@ export const UserProfilePage = ({
   const { user: currentUser } = useTelegram();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  const { hide: hidePageLoader } = usePageTransition();
 
   const avatarLongPress = useLongPress({
     onLongPress: () => {
@@ -160,12 +158,6 @@ export const UserProfilePage = ({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  useEffect(() => {
-    if (!loading) {
-      void hidePageLoader();
-    }
-  }, [loading, hidePageLoader]);
 
   const handleContactSeller = useCallback(() => {
     const username = userData?.username || sellerUsername;

@@ -86,6 +86,7 @@ export function FixedLogoHeader({
   const [scrollProgress, setScrollProgress] = useState(0);
   const spacerRef = useRef<HTMLDivElement | null>(null);
   const spacerBaselineRef = useRef<number | null>(null);
+  const lastProgressRef = useRef(0);
 
   useEffect(() => {
     const readYFromChain = () => {
@@ -129,11 +130,14 @@ export function FixedLogoHeader({
 
     let raf = 0;
     const onScroll = () => {
-      if (raf) cancelAnimationFrame(raf);
+      if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
         const y = readY();
-        setScrollProgress(Math.min(1, y / 32));
+        const p = Math.min(1, y / 32);
+        if (Math.abs(p - lastProgressRef.current) < 0.06) return;
+        lastProgressRef.current = p;
+        setScrollProgress(p);
       });
     };
 
@@ -177,7 +181,7 @@ export function FixedLogoHeader({
     }
 
     for (const el of targets) {
-      el.addEventListener('scroll', onScroll, { passive: true, capture: true });
+      el.addEventListener('scroll', onScroll, { passive: true });
     }
 
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
@@ -188,39 +192,32 @@ export function FixedLogoHeader({
     const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
     tg?.onEvent?.('viewportChanged', onScroll);
 
-    const poll = window.setInterval(onScroll, 120);
-
     return () => {
       for (const el of targets) {
-        el.removeEventListener('scroll', onScroll, true);
+        el.removeEventListener('scroll', onScroll);
       }
       vv?.removeEventListener('scroll', onScroll);
       vv?.removeEventListener('resize', onScroll);
       window.removeEventListener('resize', initBaseline);
       tg?.offEvent?.('viewportChanged', onScroll);
-      window.clearInterval(poll);
       if (raf) cancelAnimationFrame(raf);
     };
   }, [mode, scrollParent]);
 
   const p = scrollProgress;
   const pattern = useDarkHeaderShell ? HEADER_PATTERN_DARK : HEADER_PATTERN_LIGHT;
-  const veilA = p <= 0 ? 0 : useDarkHeaderShell ? Math.min(0.16, p * 0.18) : Math.min(0.2, p * 0.22);
+  const veilA = p <= 0 ? 0 : useDarkHeaderShell ? Math.min(0.12, p * 0.14) : Math.min(0.14, p * 0.16);
   const veil = useDarkHeaderShell
     ? `linear-gradient(180deg, rgba(0,0,0,${veilA}) 0%, rgba(0,0,0,${veilA * 0.75}) 100%)`
     : `linear-gradient(180deg, rgba(255,255,255,${veilA}) 0%, rgba(247,248,245,${veilA * 0.92}) 100%)`;
-  const blurPx = p < 0.08 ? 0 : Math.round(2 + p * 8);
-  const borderAlpha = useDarkHeaderShell ? p * 0.14 : p * 0.12;
+  const borderAlpha = useDarkHeaderShell ? p * 0.12 : p * 0.1;
 
   const shellStyle: React.CSSProperties = {
     backgroundColor: 'transparent',
     backgroundImage: `${veil}, ${pattern}`,
     backgroundRepeat: 'no-repeat',
     backgroundSize: 'auto',
-    backdropFilter: blurPx > 0 ? `saturate(160%) blur(${blurPx}px)` : 'none',
-    WebkitBackdropFilter: blurPx > 0 ? `saturate(160%) blur(${blurPx}px)` : 'none',
-    boxShadow: p > 0.12 ? `0 1px 0 0 rgba(0, 0, 0, ${borderAlpha})` : 'none',
-    transition: 'box-shadow 0.2s ease-out',
+    boxShadow: p > 0.15 ? `0 1px 0 0 rgba(0, 0, 0, ${borderAlpha})` : 'none',
   };
 
   const innerClasses = `${innerContentClass} ${outerClassName}`.trim();

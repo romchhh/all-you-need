@@ -8,7 +8,6 @@ import { dispatchBazaarRestoreListingScroll } from '@/lib/bazaar/bazaarScrollSto
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '@/contexts/ThemeContext';
-import { usePageTransition } from '@/contexts/PageTransitionContext';
 
 interface BottomNavigationProps {
   activeTab?: string;
@@ -28,7 +27,6 @@ export const BottomNavigation = ({
 }: BottomNavigationProps) => {
   const { t } = useLanguage();
   const { isLight } = useTheme();
-  const { show: showPageLoader, hide: hidePageLoader } = usePageTransition();
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
@@ -37,18 +35,11 @@ export const BottomNavigation = ({
   const [hiddenByOverlay, setHiddenByOverlay] = useState(false);
   const [hiddenByKeyboard, setHiddenByKeyboard] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const pendingTabNavRef = useRef(false);
   const isSearchPage = Boolean(pathname?.includes('/search'));
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!pendingTabNavRef.current) return;
-    pendingTabNavRef.current = false;
-    void hidePageLoader({ minMs: 350 });
-  }, [pathname, hidePageLoader]);
 
   useEffect(() => {
     const syncHiddenState = () => {
@@ -175,8 +166,6 @@ export const BottomNavigation = ({
     }
 
     tg?.HapticFeedback.impactOccurred('light');
-    pendingTabNavRef.current = true;
-    showPageLoader({ minMs: 350 });
 
     if (typeof window !== 'undefined') {
       const currentScrollKey = `${currentActiveTab}ScrollPosition`;
@@ -200,13 +189,6 @@ export const BottomNavigation = ({
       const route = routeMap[tab] || 'bazaar';
       router.push(`/${lang}/${route}`);
     }
-
-    // Якщо pathname не зміниться (напр. закрили оверлей на тому ж табі) — ховаємо лоадер самі
-    window.setTimeout(() => {
-      if (!pendingTabNavRef.current) return;
-      pendingTabNavRef.current = false;
-      void hidePageLoader();
-    }, 450);
   };
 
   if (!mounted || hiddenByOverlay || (!isSearchPage && hiddenByKeyboard) || typeof document === 'undefined') {
@@ -218,7 +200,7 @@ export const BottomNavigation = ({
       data-bottom-nav
       className={`fixed bottom-0 left-0 right-0 z-[1000] border-t pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] pt-1.5 transition-transform duration-150 ${
         isLight
-          ? 'border-gray-200/80 bg-white/95 shadow-[0_-6px_32px_-8px_rgba(0,0,0,0.08)] backdrop-blur-md'
+          ? 'border-gray-200/80 bg-white shadow-[0_-6px_32px_-8px_rgba(0,0,0,0.08)]'
           : 'border-white/10 bg-[#000000] shadow-[0_-8px_40px_-6px_rgba(0,0,0,0.45)]'
       }`}
       style={{

@@ -96,7 +96,7 @@ def format_parser_stats(
                 lines.append("")
                 lines.append(
                     "ℹ️ Багато «дублікат (оголошення)» — увімкнено text-dedup "
-                    "(<code>PARSER_DEDUP_ENABLED=1</code>). За замовч. він вимкнений."
+                    "(tuning.py: <code>PARSER_DEDUP_ENABLED=True</code>). За замовч. вимкнено."
                 )
             elif "дублікат" in top_reason:
                 lines.append("")

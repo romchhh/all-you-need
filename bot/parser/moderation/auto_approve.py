@@ -26,6 +26,7 @@ from parser.config.settings import (
     PARSER_AUTO_APPROVE_MAX_PER_CATEGORY,
     PARSER_AUTO_APPROVE_MAX_PER_CHANNEL,
     PARSER_AUTO_APPROVE_SERVICES_CHANNEL,
+    PARSER_AUTO_APPROVE_WAVE_MINUTES,
 )
 from parser.core.parse_pipeline import (
     ensure_parsed_item_ai_screened,
@@ -146,10 +147,11 @@ def remaining_auto_approve_slots() -> int:
     return max(0, PARSER_AUTO_APPROVE_DAILY_LIMIT - used)
 
 
-def _recent_auto_approved_count(minutes: int = 20) -> int:
+def _recent_auto_approved_count(minutes: int | None = None) -> int:
     """Скільки автопідтверджень за останні N хвилин (анти-флуд)."""
     ensure_parsed_items_table()
-    since = datetime.now(timezone.utc) - timedelta(minutes=max(1, minutes))
+    window = max(5, int(minutes or PARSER_AUTO_APPROVE_WAVE_MINUTES))
+    since = datetime.now(timezone.utc) - timedelta(minutes=window)
     rows = list_auto_approved_since(since.isoformat())
     n = 0
     for row in rows:
@@ -247,6 +249,20 @@ def is_auto_approve_eligible(item: dict) -> tuple[bool, str]:
         return False, "needs_ai"
 
     return True, ""
+
+
+def explain_manual_review(item: dict) -> str:
+    """Коротка причина, чому оголошення не автопублікувалось одразу."""
+    if not PARSER_AUTO_APPROVE_ENABLED:
+        return "auto_approve_disabled"
+    if remaining_auto_approve_wave_slots() <= 0:
+        return "wave_limit_or_daily_cap"
+    if not _under_soft_caps(hydrate_parsed_item(item), _today_counts()):
+        return "diversity_cap"
+    ok, reason = is_auto_approve_eligible(hydrate_parsed_item(item))
+    if not ok:
+        return reason or "not_eligible"
+    return "prepare_failed"
 
 
 def _under_soft_caps(item: dict, counts: dict[str, Counter]) -> bool:
@@ -559,7 +575,7 @@ async def run_auto_approve_drain(bot: Bot | None = None) -> dict:
     try:
         pending = list_pending_for_auto_approve(
             PARSER_AUTO_APPROVE_MAX_AGE_HOURS,
-            limit=500,
+            limit=800,
         )
         eligible: list[dict] = []
         for item in pending:
@@ -615,7 +631,7 @@ async def run_auto_approve_drain(bot: Bot | None = None) -> dict:
 
 def register_auto_approve_job(scheduler) -> None:
     if not PARSER_AUTO_APPROVE_ENABLED:
-        logger.info("auto-approve вимкнено (PARSER_AUTO_APPROVE_ENABLED=0)")
+        logger.info("auto-approve вимкнено (tuning.py: PARSER_AUTO_APPROVE_ENABLED=False)")
         return
 
     try:

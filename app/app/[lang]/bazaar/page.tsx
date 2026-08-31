@@ -101,7 +101,7 @@ const BazaarPage = () => {
   }
 
   return (
-    <div className="min-h-screen max-w-full overflow-x-clip pb-20 animate-content-crossfade">
+    <div className="min-h-screen max-w-full overflow-x-clip pb-20">
       {!selectedListing && !selectedSeller && <AppHeader />}
       <BazaarPullToRefreshIndicator
         isPulling={isPulling}

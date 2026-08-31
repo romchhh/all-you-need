@@ -397,6 +397,21 @@ div {
   will-change: transform;
 }
 
+.listing-card-optimized {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tg-logo-spin,
+  .animate-content-in,
+  .animate-content-crossfade,
+  .animate-ticker-in,
+  .animate-ticker-out {
+    animation: none !important;
+  }
+}
+
 /* Smooth scrolling - але можемо вимкнути програмно для миттєвого скролу */
 html.no-smooth-scroll {
   scroll-behavior: auto !important;

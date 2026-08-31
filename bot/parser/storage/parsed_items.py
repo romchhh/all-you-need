@@ -274,6 +274,10 @@ def ensure_parsed_items_table():
         cursor.execute(
             "ALTER TABLE parsed_items ADD COLUMN auto_approved INTEGER DEFAULT 0"
         )
+    cursor.execute("PRAGMA table_info(parsed_items)")
+    col_names9 = {row[1] for row in cursor.fetchall()}
+    if "review_note" not in col_names9:
+        cursor.execute("ALTER TABLE parsed_items ADD COLUMN review_note TEXT")
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_parsed_items_auto_approved "
         "ON parsed_items(auto_approved, moderated_at) WHERE auto_approved = 1"
@@ -926,3 +930,19 @@ def list_pending_for_auto_approve(max_age_hours: int, limit: int = 400) -> list[
     rows = [hydrate_parsed_item(dict(r)) for r in cursor.fetchall()]
     conn.close()
     return rows
+
+
+def set_parsed_item_review_note(item_id: int, note: str) -> None:
+    """Причина, чому оголошення пішло на ручну модерацію (не автопублікація)."""
+    ensure_parsed_items_table()
+    text = (note or "").strip()[:500]
+    if not text:
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE parsed_items SET review_note = ? WHERE id = ?",
+        (text, int(item_id)),
+    )
+    conn.commit()
+    conn.close()

@@ -68,11 +68,9 @@ export const CategoriesTab = ({
   useLayoutEffect(() => {
     if (!selectedCategory) return;
     const button = categoryButtonRefs.current.get(selectedCategory);
-    button?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    button?.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'nearest' });
   }, [selectedCategory, selectedSubcategory]);
-  
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
-  
+
   // Зберігаємо стан при зміні
   useEffect(() => {
     if (onStateChange) {
@@ -85,23 +83,6 @@ export const CategoriesTab = ({
   }, [selectedCategory, selectedSubcategory, showFreeOnly, onStateChange]);
 
   const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
-
-  // Підраховуємо кількість товарів для кожної категорії
-  useEffect(() => {
-    const counts: Record<string, number> = {};
-    
-    // Підрахунок для безкоштовних товарів
-    const freeCount = listings.filter(listing => listing.isFree || listing.price.toLowerCase().includes('безкоштовно')).length;
-    counts['free'] = freeCount;
-    
-    // Підрахунок для кожної категорії
-    categories.forEach(category => {
-      const categoryListings = listings.filter(listing => listing.category === category.id);
-      counts[category.id] = categoryListings.length;
-    });
-    
-    setCategoryCounts(counts);
-  }, [listings, categories]);
 
   // Додаємо категорію "Безкоштовні товари"
   const allCategories = [
@@ -133,8 +114,8 @@ export const CategoriesTab = ({
       <div
         className={`${STICKY_BELOW_APP_HEADER_CLASS} border-b px-4 pb-3 pt-2 lg:px-6 ${
           isLight
-            ? 'border-gray-200/80 bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/75'
-            : 'border-gray-800/50 bg-black/30 backdrop-blur-md'
+            ? 'border-gray-200/80 bg-white'
+            : 'border-gray-800/50 bg-black'
         }`}
       >
         <h1 className={`text-2xl font-bold ${ac.pageHeading}`}>{t('common.sections')}</h1>

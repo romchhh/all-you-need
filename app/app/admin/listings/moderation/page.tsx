@@ -73,8 +73,8 @@ export default function ModerationPage() {
           <p className="text-gray-600">Всі оголошення перевірено</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {/* Маркетплейс */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Маркетплейс (користувацькі) */}
           <Link
             href="/admin/listings/moderation/marketplace"
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 hover:shadow-md transition-shadow"
@@ -92,6 +92,23 @@ export default function ModerationPage() {
             </p>
             <div className="text-blue-600 font-medium">
               Перейти до модерації →
+            </div>
+          </Link>
+
+          {/* Парсер */}
+          <Link
+            href="/admin/parser/queue"
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-5xl">🔍</div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Парсер — черга</h2>
+            <p className="text-gray-600 mb-4">
+              Автопублікація на МП, ручна перевірка, AI-відхилення, канали
+            </p>
+            <div className="text-emerald-700 font-medium">
+              Відкрити чергу парсера →
             </div>
           </Link>
         </div>

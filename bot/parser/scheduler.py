@@ -132,10 +132,18 @@ async def run_parser_cycle(
         async def notify_callback(item_data: dict):
             if PARSER_AUTO_APPROVE_ENABLED:
                 try:
-                    from parser.moderation.auto_approve import maybe_auto_approve_and_notify
+                    from parser.moderation.auto_approve import (
+                        explain_manual_review,
+                        maybe_auto_approve_and_notify,
+                    )
 
                     if await maybe_auto_approve_and_notify(aiogram_bot, item_data):
                         return
+                    note = explain_manual_review(item_data)
+                    if note:
+                        from parser.storage.parsed_items import set_parsed_item_review_note
+
+                        set_parsed_item_review_note(int(item_data["id"]), note)
                 except Exception:
                     logger.exception(
                         "auto-approve parse-time failed parsed_item %s",

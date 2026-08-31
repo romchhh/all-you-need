@@ -43,6 +43,7 @@ from parser.core.text import (
     to_plain_str,
 )
 from parser.core.parse_pipeline import run_ai_screen_and_dedup
+from parser.core.parse_skip import log_parse_skip
 from parser.core.dedup import parser_dedup_override
 from parser.storage.parsed_items import (
     ensure_parsed_items_table,
@@ -151,6 +152,14 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
         if not ok:
             stats["skipped"] += 1
             stats["reasons"][reason] = stats["reasons"].get(reason, 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason=reason,
+                raw_text=text[:4000],
+                parser_type="default",
+            )
             continue
 
         price_str, currency, is_free = parse_price(text)
@@ -160,11 +169,31 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
         if is_likely_not_listing(title, description, text):
             stats["skipped"] += 1
             stats["reasons"]["не оголошення"] = stats["reasons"].get("не оголошення", 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason="не оголошення",
+                title=title,
+                description=description,
+                raw_text=text[:4000],
+                parser_type="default",
+            )
             continue
 
         if not relaxed_quality and has_too_many_emojis(description):
             stats["skipped"] += 1
             stats["reasons"]["багато емоджі"] = stats["reasons"].get("багато емоджі", 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason="багато емоджі",
+                title=title,
+                description=description,
+                raw_text=text[:4000],
+                parser_type="default",
+            )
             continue
 
         dedup_key = fingerprint_title_desc(
@@ -219,6 +248,17 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
         if not ok:
             stats["skipped"] += 1
             stats["reasons"][skip_reason] = stats["reasons"].get(skip_reason, 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason=skip_reason,
+                title=title,
+                description=description,
+                category=category,
+                raw_text=text[:4000],
+                parser_type=item_parser_type,
+            )
             continue
 
         source_city = city  # завжди місто каналу з CHANNELS

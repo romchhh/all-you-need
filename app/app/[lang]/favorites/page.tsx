@@ -103,18 +103,10 @@ const FavoritesPage = () => {
   // Завантажуємо обране з localStorage та товари
   useEffect(() => {
     const loadFavoritesAndListings = async () => {
-      // Діагностика
-      console.log('[Favorites] Starting to load favorites and listings');
-      console.log('[Favorites] window type:', typeof window);
-      
-      // Спочатку завантажуємо favorites з localStorage
       const loadedFavorites = getFavoritesFromStorage();
-      console.log('[Favorites] Loaded from localStorage:', Array.from(loadedFavorites));
       setFavorites(loadedFavorites);
       
-      // Якщо немає обраних - показуємо порожній стан
       if (loadedFavorites.size === 0) {
-        console.log('[Favorites] No favorites found, showing empty state');
         setListings([]);
         setLoading(false);
         return;
@@ -124,35 +116,18 @@ const FavoritesPage = () => {
       try {
         setLoading(true);
         const favoriteIds = Array.from(loadedFavorites);
-        console.log('[Favorites] Fetching listings for IDs:', favoriteIds);
-        
-        // Завантажуємо кожен товар окремо
-        const promises = favoriteIds.map(id => 
-          fetch(`/api/listings/${id}`)
-            .then(res => {
-              console.log(`[Favorites] Response for listing ${id}:`, res.ok, res.status);
-              return res.ok ? res.json() : null;
-            })
-            .catch(error => {
-              console.error(`[Favorites] Error fetching listing ${id}:`, error);
-              return null;
-            })
-        );
-        
-        const results = await Promise.all(promises);
-        const validListings = results.filter((listing): listing is Listing => 
-          listing !== null && listing.id
-        );
-        
-        console.log('[Favorites] Valid listings loaded:', validListings.length);
-        
-        // Сортуємо по даті створення (новіші спочатку)
+        const res = await fetch(`/api/favorites/listings?ids=${favoriteIds.join(',')}`);
+        const data = res.ok ? await res.json() : { listings: [] };
+        const validListings = (data.listings || []).filter(
+          (listing: Listing) => listing && listing.id
+        ) as Listing[];
+
         validListings.sort((a, b) => {
           const dateA = new Date(a.createdAt || 0).getTime();
           const dateB = new Date(b.createdAt || 0).getTime();
           return dateB - dateA;
         });
-        
+
         setListings(validListings);
         prefetchListingsImages(validListings);
       } catch (error) {
@@ -724,7 +699,7 @@ const FavoritesPage = () => {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden max-w-full pb-20 animate-content-crossfade">
+    <div className="min-h-screen overflow-x-hidden max-w-full pb-20">
       {!selectedListing && !selectedSeller && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (

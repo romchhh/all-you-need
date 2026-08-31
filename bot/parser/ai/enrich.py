@@ -8,10 +8,11 @@ AI-збагачення парсованих оголошень при підт�
   - місто
   - стан (new/used)
 
-.env:
+.env (лише секрети):
   OPENAI_API_KEY    — обовʼязково для AI
   OPENAI_MODEL      — за замовч. gpt-4o-mini
-  PARSER_AI_ENABLED — 1/0 (за замовч. 1 якщо є ключ)
+
+Прапорці AI — bot/parser/config/tuning.py (PARSER_AI_ENABLED, PARSER_AI_SCREEN_ENABLED).
 """
 
 from __future__ import annotations
@@ -126,8 +127,9 @@ class AiEnrichmentResult:
 def is_ai_enrich_enabled() -> bool:
     if not OPENAI_API_KEY:
         return False
-    raw = (os.getenv("PARSER_AI_ENABLED") or "1").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    from parser.config.tuning import PARSER_AI_ENABLED
+
+    return PARSER_AI_ENABLED
 
 
 def _normalize_price_fields(

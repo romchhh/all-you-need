@@ -14,20 +14,26 @@ import { createPortal } from 'react-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const DEFAULT_MIN_MS = 320;
+/** Мінімальний час показу — лише для явних довгих операцій (run). */
+const DEFAULT_MIN_MS = 0;
 
 const LOGO_SRC_DARK = '/images/Group%201000007086.svg';
 const LOGO_SRC_LIGHT = '/images/Group-1000007086-light.svg';
 
-type PageTransitionContextValue = {
-  visible: boolean;
-  show: (options?: { minMs?: number }) => void;
+type ShowOptions = { minMs?: number; blocking?: boolean };
+
+type PageTransitionActions = {
+  show: (options?: ShowOptions) => void;
   hide: (options?: { minMs?: number }) => Promise<void>;
-  /** Показати лоадер на час роботи; ховає з урахуванням minMs. */
-  run: <T>(work: () => T | Promise<T>, options?: { minMs?: number }) => Promise<T>;
+  run: <T>(work: () => T | Promise<T>, options?: ShowOptions) => Promise<T>;
 };
 
-const PageTransitionContext = createContext<PageTransitionContextValue | null>(null);
+type PageTransitionContextValue = PageTransitionActions & {
+  visible: boolean;
+};
+
+const PageTransitionActionsContext = createContext<PageTransitionActions | null>(null);
+const PageTransitionVisibleContext = createContext(false);
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => {
@@ -49,39 +55,26 @@ function PageTransitionOverlay({ visible }: { visible: boolean }) {
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[3000] flex items-center justify-center transition-opacity duration-200 ${
-        isLight ? 'bg-white/72' : 'bg-black/70'
-      } backdrop-blur-[3px]`}
+      className={`fixed inset-0 z-[3000] flex items-center justify-center pointer-events-none transition-opacity duration-150 ${
+        isLight ? 'bg-white/85' : 'bg-black/80'
+      }`}
       role="status"
       aria-live="polite"
       aria-busy="true"
       aria-label={t('common.loading')}
     >
-      <div className="flex flex-col items-center gap-4 px-6">
-        <div
-          className="flex h-36 w-36 items-center justify-center"
-          style={{
-            animation: 'tg-logo-spin 1.05s linear infinite',
-            transformOrigin: 'center center',
-          }}
-        >
+      <div className="flex flex-col items-center gap-3 px-6">
+        <div className="flex h-14 w-14 items-center justify-center animate-tg-logo-spin">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={logoSrc}
             alt=""
             width={408}
             height={129}
-            className="h-12 w-auto max-w-[9.5rem] object-contain select-none pointer-events-none"
+            className="h-10 w-auto max-w-[8rem] object-contain select-none pointer-events-none"
             draggable={false}
           />
         </div>
-        <p
-          className={`text-sm font-medium tracking-wide ${
-            isLight ? 'text-gray-600' : 'text-white/75'
-          }`}
-        >
-          {t('common.loading')}
-        </p>
       </div>
     </div>,
     document.body
@@ -98,11 +91,12 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
     if (!visible) return;
     const safety = window.setTimeout(() => {
       setVisible(false);
-    }, 12000);
+    }, 8000);
     return () => window.clearTimeout(safety);
   }, [visible]);
 
-  const show = useCallback((options?: { minMs?: number }) => {
+  const show = useCallback((options?: ShowOptions) => {
+    if (options?.blocking === false) return;
     minMsRef.current = options?.minMs ?? DEFAULT_MIN_MS;
     shownAtRef.current = Date.now();
     hideTokenRef.current += 1;
@@ -120,33 +114,36 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const run = useCallback(
-    async <T,>(work: () => T | Promise<T>, options?: { minMs?: number }) => {
-      show(options);
+    async <T,>(work: () => T | Promise<T>, options?: ShowOptions) => {
+      show({ ...options, blocking: true, minMs: options?.minMs ?? 180 });
       try {
         return await work();
       } finally {
-        await hide(options);
+        await hide({ minMs: options?.minMs ?? 180 });
       }
     },
     [show, hide]
   );
 
-  const value = useMemo(
-    () => ({ visible, show, hide, run }),
-    [visible, show, hide, run]
+  const actions = useMemo<PageTransitionActions>(
+    () => ({ show, hide, run }),
+    [show, hide, run]
   );
 
   return (
-    <PageTransitionContext.Provider value={value}>
-      {children}
-      <PageTransitionOverlay visible={visible} />
-    </PageTransitionContext.Provider>
+    <PageTransitionActionsContext.Provider value={actions}>
+      <PageTransitionVisibleContext.Provider value={visible}>
+        {children}
+        <PageTransitionOverlay visible={visible} />
+      </PageTransitionVisibleContext.Provider>
+    </PageTransitionActionsContext.Provider>
   );
 }
 
 export function usePageTransition(): PageTransitionContextValue {
-  const ctx = useContext(PageTransitionContext);
-  if (!ctx) {
+  const actions = useContext(PageTransitionActionsContext);
+  const visible = useContext(PageTransitionVisibleContext);
+  if (!actions) {
     return {
       visible: false,
       show: () => {},
@@ -154,5 +151,5 @@ export function usePageTransition(): PageTransitionContextValue {
       run: async (work) => work(),
     };
   }
-  return ctx;
+  return { ...actions, visible };
 }

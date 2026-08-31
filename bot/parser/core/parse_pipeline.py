@@ -253,7 +253,7 @@ async def ensure_parsed_item_ai_screened(item: dict) -> dict:
 
     if not is_ai_screen_enabled():
         raise RuntimeError(
-            "AI вимкнено — потрібні OPENAI_API_KEY та PARSER_AI_ENABLED=1"
+            "AI вимкнено — потрібен OPENAI_API_KEY у .env та PARSER_AI_ENABLED у tuning.py"
         )
 
     logger.info("parsed_item %s: AI enrich перед публікацією", item_id)

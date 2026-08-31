@@ -305,7 +305,7 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen pb-20 animate-content-crossfade">
+    <div className="min-h-screen pb-20">
       <AppHeader />
       <SearchView
           initialQuery={initialQuery}

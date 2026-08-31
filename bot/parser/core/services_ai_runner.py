@@ -43,6 +43,7 @@ from parser.core.text import (
     to_plain_str,
 )
 from parser.core.parse_pipeline import run_ai_screen_and_dedup
+from parser.core.parse_skip import log_parse_skip
 from parser.marketplace_categories import (
     force_services_marketplace_categories,
     should_treat_as_service,
@@ -148,6 +149,14 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         if not is_service:
             stats["skipped"] += 1
             stats["reasons"]["не послуга"] = stats["reasons"].get("не послуга", 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason="не послуга",
+                raw_text=text[:4000],
+                parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            )
             continue
 
         relaxed_quality = force_service_channel or is_service
@@ -155,6 +164,14 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         if not ok:
             stats["skipped"] += 1
             stats["reasons"][reason] = stats["reasons"].get(reason, 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason=reason,
+                raw_text=text[:4000],
+                parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            )
             continue
 
         price_str, currency, is_free = parse_price(text)
@@ -165,11 +182,31 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         if is_likely_not_listing(title, description, text):
             stats["skipped"] += 1
             stats["reasons"]["не оголошення"] = stats["reasons"].get("не оголошення", 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason="не оголошення",
+                title=title,
+                description=description,
+                raw_text=text[:4000],
+                parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            )
             continue
 
         if not force_service_channel and has_too_many_emojis(description):
             stats["skipped"] += 1
             stats["reasons"]["багато емоджі"] = stats["reasons"].get("багато емоджі", 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason="багато емоджі",
+                title=title,
+                description=description,
+                raw_text=text[:4000],
+                parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            )
             continue
 
         dedup_key = fingerprint_title_desc(
@@ -215,6 +252,17 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         if not ok:
             stats["skipped"] += 1
             stats["reasons"][skip_reason] = stats["reasons"].get(skip_reason, 0) + 1
+            log_parse_skip(
+                source_channel=channel,
+                source_city=city,
+                message_id=effective_message_id,
+                skip_reason=skip_reason,
+                title=title,
+                description=description,
+                category=category,
+                raw_text=text[:4000],
+                parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            )
             continue
 
         source_city = city

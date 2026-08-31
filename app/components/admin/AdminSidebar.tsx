@@ -16,6 +16,7 @@ const menuItems: MenuItem[] = [
   { href: '/admin', label: 'Статистика', icon: '📊' },
   { href: '/admin/listings?source=marketplace', label: 'Оголошення маркетплейсу', icon: '🌐' },
   { href: '/admin/listings/moderation', label: 'На модерації', icon: '⏳', badge: undefined },
+  { href: '/admin/parser/queue', label: 'Парсер — черга', icon: '🔍', badge: undefined },
   { href: '/admin/listings/import', label: 'Імпорт оголошень', icon: '📥' },
   { href: '/admin/users', label: 'Користувачі', icon: '👥' },
   { href: '/admin/finances', label: 'Фінанси', icon: '💰' },
@@ -28,6 +29,7 @@ export default function AdminSidebar() {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const [parserPendingCount, setParserPendingCount] = useState<number | null>(null);
 
   // Закриваємо меню при переході на іншу сторінку
   useEffect(() => {
@@ -39,13 +41,22 @@ export default function AdminSidebar() {
     fetch('/api/admin/stats')
       .then((res) => res.json())
       .then((data) => {
-        if (data.listings?.byStatus?.pending) {
-          setPendingCount(data.listings.byStatus.pending);
+        if (data.listings?.byStatus?.pending_moderation) {
+          setPendingCount(data.listings.byStatus.pending_moderation);
         }
       })
       .catch(() => {
         // Ігноруємо помилки
       });
+
+    fetch('/api/admin/parser/queue', { method: 'POST' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (typeof data.pendingManual === 'number') {
+          setParserPendingCount(data.pendingManual);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleLogout = async () => {
@@ -152,7 +163,12 @@ export default function AdminSidebar() {
               } else {
                 isActive = pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href));
               }
-              const badgeCount = item.href === '/admin/listings/moderation' ? pendingCount : item.badge;
+              const badgeCount =
+                item.href === '/admin/listings/moderation'
+                  ? pendingCount
+                  : item.href === '/admin/parser/queue'
+                    ? parserPendingCount
+                    : item.badge;
               return (
                 <Link
                   key={item.href}

@@ -165,7 +165,7 @@ const ListingCardComponent = ({
   return (
     <div 
       data-listing-id={listing.id}
-      className={`${getCardBackgroundStyles()} rounded-2xl transition-all cursor-pointer relative select-none flex h-full min-h-0 ${
+      className={`listing-card-optimized ${getCardBackgroundStyles()} rounded-2xl transition-all cursor-pointer relative select-none flex h-full min-h-0 ${
         isStacked
           ? 'flex-col overflow-hidden'
           : 'flex-col lg:flex-row lg:items-stretch lg:overflow-hidden'

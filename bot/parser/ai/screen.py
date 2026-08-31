@@ -45,8 +45,9 @@ class AiScreenResult:
 def is_ai_screen_enabled() -> bool:
     if not is_ai_enrich_enabled():
         return False
-    raw = (os.getenv("PARSER_AI_SCREEN_ENABLED") or "1").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    from parser.config.tuning import PARSER_AI_SCREEN_ENABLED
+
+    return PARSER_AI_SCREEN_ENABLED
 
 
 def _title_quality_score(title: str, raw_text: str = "") -> int:

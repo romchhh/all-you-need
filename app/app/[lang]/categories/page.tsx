@@ -872,7 +872,7 @@ const CategoriesPage = () => {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden max-w-full pb-20 animate-content-crossfade">
+    <div className="min-h-screen overflow-x-hidden max-w-full pb-20">
       {!selectedListing && !selectedSeller && <AppHeader />}
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (

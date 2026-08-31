@@ -1,4 +1,4 @@
-"""Налаштування парсера з .env."""
+"""Налаштування парсера: секрети з .env, обсяг/авто — tuning.py."""
 
 from __future__ import annotations
 
@@ -46,6 +46,8 @@ def _env_bool(key: str, default: bool = True) -> bool:
 
 load_dotenv_once()
 
+from parser.config import tuning as _tuning
+
 WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://allyouneed.de")
 BOT_USERNAME: str = (os.getenv("BOT_USERNAME") or "").lstrip("@")
 
@@ -59,9 +61,31 @@ PARSER_SERVICES_IGNORE_CURSOR: bool = _env_bool("PARSER_SERVICES_IGNORE_CURSOR",
 PARSER_CURSOR_OVERLAP: int = max(0, _env_int("PARSER_CURSOR_OVERLAP", 25))
 # Звичайний /parse і шедулер: 0 = cursor+overlap (лише нові пости — рекомендовано).
 # >0 = завжди останні N (ignore cursor) — багато «дублікат (оголошення)» на кожному циклі.
-PARSER_ROLLING_LOOKBACK: int = max(0, _env_int("PARSER_ROLLING_LOOKBACK", 0))
 
-PARSER_DEDUP_ENABLED: bool = _env_bool("PARSER_DEDUP_ENABLED", False)
+# ── Обсяг парсера / автопублікація (bot/parser/config/tuning.py) ──
+PARSER_INTERVAL_MIN: float = _tuning.PARSER_INTERVAL_MIN
+PARSER_ROLLING_LOOKBACK: int = max(0, _tuning.PARSER_ROLLING_LOOKBACK)
+PARSER_DEDUP_ENABLED: bool = _tuning.PARSER_DEDUP_ENABLED
+
+PARSER_AUTO_APPROVE_ENABLED: bool = _tuning.PARSER_AUTO_APPROVE_ENABLED
+PARSER_AUTO_APPROVE_DAILY_LIMIT: int = max(
+    1,
+    min(_tuning.PARSER_AUTO_APPROVE_DAILY_LIMIT_MAX, _tuning.PARSER_AUTO_APPROVE_DAILY_LIMIT),
+)
+PARSER_AUTO_APPROVE_INTERVAL_MIN: float = _tuning.PARSER_AUTO_APPROVE_INTERVAL_MIN
+PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = max(1, _tuning.PARSER_AUTO_APPROVE_MAX_PER_CHANNEL)
+PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = max(1, _tuning.PARSER_AUTO_APPROVE_MAX_PER_CATEGORY)
+PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = max(1, _tuning.PARSER_AUTO_APPROVE_MAX_AGE_HOURS)
+PARSER_AUTO_APPROVE_BATCH: int = max(
+    1,
+    min(_tuning.PARSER_AUTO_APPROVE_BATCH_MAX, _tuning.PARSER_AUTO_APPROVE_BATCH),
+)
+PARSER_AUTO_APPROVE_WAVE_MINUTES: int = max(
+    _tuning.PARSER_AUTO_APPROVE_WAVE_MINUTES_MIN,
+    min(_tuning.PARSER_AUTO_APPROVE_WAVE_MINUTES_MAX, _tuning.PARSER_AUTO_APPROVE_WAVE_MINUTES),
+)
+PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = _tuning.PARSER_AUTO_APPROVE_SERVICES_CHANNEL
+
 PARSER_SERVICES_DEDUP_ENABLED: bool = _env_bool("PARSER_SERVICES_DEDUP_ENABLED", True)
 PARSER_DEDUP_DAYS: int = max(1, _env_int("PARSER_DEDUP_DAYS", 14))
 # Вікно dedup_key (title+desc+price) для services_channel approved без MP
@@ -102,10 +126,7 @@ SERVICES_MODERATION_CHANNEL_ID: int = PARSER_MOD_SERVICES_GERMANY_ID
 SERVICES_AI_MODERATION_CHANNEL_ID: int = PARSER_MOD_SERVICES_HAMBURG_ID
 PARSER_GROUP_ID_DEFAULT: int = PARSER_MOD_GOODS_ID
 
-PARSER_INTERVAL_MIN: float = float(os.getenv("PARSER_INTERVAL_MIN", "30"))
-PARSER_SERVICES_AI_INTERVAL_MIN: float = float(
-    os.getenv("PARSER_SERVICES_AI_INTERVAL_MIN", os.getenv("PARSER_INTERVAL_MIN", "30"))
-)
+PARSER_SERVICES_AI_INTERVAL_MIN: float = _tuning.PARSER_INTERVAL_MIN
 
 # Максимум фото на одне parsed_items (жорстко не більше 3)
 PARSER_MAX_PHOTOS: int = min(3, max(1, _env_int("PARSER_MAX_PHOTOS", 3)))
@@ -116,25 +137,6 @@ PARSER_PHOTOS_CLEANUP_DAYS: int = max(1, _env_int("PARSER_PHOTOS_CLEANUP_DAYS", 
 PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS: int = max(0, _env_int("PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS", 7))
 # public/listings/originals — важкий прохід на малому VPS; за замовчуванням вимкнено в авто-режимі
 PARSER_PHOTOS_CLEANUP_PUBLIC: bool = _env_bool("PARSER_PHOTOS_CLEANUP_PUBLIC", False)
-
-# Автопідтвердження лише на маркетплейс (канали послуг — вручну ✅ «У канал»)
-PARSER_AUTO_APPROVE_ENABLED: bool = _env_bool("PARSER_AUTO_APPROVE_ENABLED", True)
-PARSER_AUTO_APPROVE_DAILY_LIMIT: int = max(
-    1, min(500, _env_int("PARSER_AUTO_APPROVE_DAILY_LIMIT", 200))
-)
-PARSER_AUTO_APPROVE_INTERVAL_MIN: float = float(os.getenv("PARSER_AUTO_APPROVE_INTERVAL_MIN", "8"))
-PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = max(
-    1, _env_int("PARSER_AUTO_APPROVE_MAX_PER_CHANNEL", 20)
-)
-PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = max(
-    1, _env_int("PARSER_AUTO_APPROVE_MAX_PER_CATEGORY", 40)
-)
-PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = max(1, _env_int("PARSER_AUTO_APPROVE_MAX_AGE_HOURS", 48))
-PARSER_AUTO_APPROVE_BATCH: int = max(1, min(80, _env_int("PARSER_AUTO_APPROVE_BATCH", 30)))
-# 0 = авто лише маркетплейс; канали послуг тільки після ручного підтвердження
-PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = _env_bool(
-    "PARSER_AUTO_APPROVE_SERVICES_CHANNEL", False
-)
 
 # Тиша для Telegram-каналів послуг (Europe/Kyiv): з quiet_start до quiet_end не публікуємо
 PARSER_CHANNEL_QUIET_START_HOUR: int = max(0, min(23, _env_int("PARSER_CHANNEL_QUIET_START_HOUR", 22)))
