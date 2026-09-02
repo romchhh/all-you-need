@@ -212,6 +212,112 @@
             "stroller": "Коляска",
             "laptop": "Ноутбук",
             "cleaning": "Прибирання"
+          },
+          "queriesByCategory": {
+            "services_work": {
+              "cleaning": "Прибирання",
+              "repair": "Ремонт",
+              "vacancy": "Вакансія",
+              "beauty": "Манікюр",
+              "moving": "Переїзд",
+              "tutor": "Репетитор"
+            },
+            "fashion": {
+              "dress": "Сукня",
+              "sneakers": "Кросівки",
+              "jacket": "Куртка",
+              "jeans": "Джинси",
+              "bag": "Сумка",
+              "boots": "Черевики"
+            },
+            "furniture": {
+              "sofa": "Диван",
+              "bed": "Ліжко",
+              "wardrobe": "Шафа",
+              "table": "Стіл",
+              "chair": "Стілець",
+              "mattress": "Матрац"
+            },
+            "electronics": {
+              "iphone": "iPhone",
+              "laptop": "Ноутбук",
+              "tv": "Телевізор",
+              "playstation": "PlayStation",
+              "headphones": "Навушники",
+              "tablet": "Планшет"
+            },
+            "appliances": {
+              "washing": "Пральна машина",
+              "fridge": "Холодильник",
+              "vacuum": "Пилосос",
+              "microwave": "Мікрохвильовка",
+              "dishwasher": "Посудомийка",
+              "coffee": "Кавомашина"
+            },
+            "kids": {
+              "stroller": "Коляска",
+              "toys": "Іграшки",
+              "carseat": "Автокрісло",
+              "crib": "Ліжечко",
+              "clothes": "Дитячий одяг",
+              "bike": "Дитячий велосипед"
+            },
+            "home": {
+              "dishes": "Посуд",
+              "lamp": "Лампа",
+              "decor": "Декор",
+              "tools": "Інструменти",
+              "textile": "Текстиль",
+              "plants": "Рослини"
+            },
+            "beauty_wellness": {
+              "cosmetics": "Косметика",
+              "perfume": "Парфум",
+              "skincare": "Догляд за шкірою",
+              "hairdryer": "Фен",
+              "cream": "Крем",
+              "makeup": "Макіяж"
+            },
+            "auto": {
+              "tires": "Шини",
+              "parts": "Запчастини",
+              "childseat": "Дитяче крісло",
+              "winter": "Зимова гума",
+              "oil": "Моторна олива",
+              "rims": "Диски"
+            },
+            "hobby_sports": {
+              "bicycle": "Велосипед",
+              "scooter": "Самокат",
+              "guitar": "Гітара",
+              "dumbbells": "Гантелі",
+              "tent": "Намет",
+              "skis": "Лижі"
+            },
+            "pets": {
+              "dog": "Собака",
+              "cat": "Кішка",
+              "food": "Корм",
+              "carrier": "Переноска",
+              "aquarium": "Акваріум",
+              "walking": "Вигул собак"
+            },
+            "realestate": {
+              "rent": "Оренда квартири",
+              "room": "Кімната",
+              "apartment": "Квартира",
+              "house": "Будинок",
+              "garage": "Гараж",
+              "wg": "WG / підселення"
+            },
+            "free": {
+              "giveaway": "Віддам безкоштовно",
+              "furniture": "Меблі безкоштовно",
+              "clothes": "Одяг безкоштовно",
+              "appliances": "Техніка безкоштовно",
+              "kids": "Дитячі речі",
+              "books": "Книги безкоштовно"
+            }
           }
         },
         "sort": {
@@ -1012,7 +1118,7 @@
         },
         "promotion": {
           "title": "Просування в маркетплейсі",
-          "description": "",
+          "description": "HIGHLIGHT, TOP і VIP — платні інструменти, які збільшують видимість оголошення.",
           "button": "Докладніше"
         },
         "referral": {

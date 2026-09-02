@@ -28,7 +28,7 @@ import { usePullToRefresh } from '@/features/ui/hooks/usePullToRefresh';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
-import { useState, useEffect, useMemo, useLayoutEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo, useLayoutEffect, useCallback, useRef } from 'react';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
@@ -117,10 +117,12 @@ export const ListingDetail = ({
   onAutoRenewPersist,
 }: ListingDetailProps) => {
   const [listing, setListing] = useState(initialListing);
+  const favoriteCountDeltaRef = useRef(0);
 
   useEffect(() => {
+    favoriteCountDeltaRef.current = 0;
     setListing(initialListing);
-  }, [initialListing]);
+  }, [initialListing.id]);
 
   useEffect(() => {
     trackAnalytics({
@@ -418,7 +420,14 @@ export const ListingDetail = ({
         const response = await fetch(url, { method: 'GET' });
         if (response.ok) {
           const data = (await response.json()) as Listing;
-          setListing((prev) => ({ ...prev, ...data }));
+          setListing((prev) => ({
+            ...prev,
+            ...data,
+            favoritesCount: Math.max(
+              0,
+              (data.favoritesCount ?? 0) + favoriteCountDeltaRef.current
+            ),
+          }));
         }
       } catch (error) {
         console.error('Error loading listing details:', error);
@@ -932,6 +941,12 @@ export const ListingDetail = ({
                   <button
                     type="button"
                     onClick={() => {
+                      const delta = isFavorite ? -1 : 1;
+                      favoriteCountDeltaRef.current += delta;
+                      setListing((prev) => ({
+                        ...prev,
+                        favoritesCount: Math.max(0, (prev.favoritesCount ?? 0) + delta),
+                      }));
                       onToggleFavorite(listing.id);
                       tg?.HapticFeedback.impactOccurred('light');
                     }}

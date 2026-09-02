@@ -1,7 +1,8 @@
 'use client';
 
-import { ArrowLeft, Clock, Flame, Search, Sparkles, TrendingUp, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { ArrowLeft, Clock, Flame, MapPin, Search, SlidersHorizontal, Sparkles, TrendingUp, X } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category, Listing } from '@/types';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -9,7 +10,10 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { dismissMobileKeyboard } from '@/utils/dismissMobileKeyboard';
 import { useDebounce } from '@/features/ui/hooks/useDebounce';
-import { POPULAR_SEARCH_QUERY_KEYS } from '@/constants/popularSearchQueries';
+import {
+  CATEGORY_POPULAR_QUERY_KEYS,
+  POPULAR_SEARCH_QUERY_KEYS,
+} from '@/constants/popularSearchQueries';
 import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
 import {
   addToSearchHistory,
@@ -19,6 +23,11 @@ import {
   listingToSearchPreview,
   updateSearchHistoryListings,
 } from '@/utils/searchHistory';
+import {
+  loadBazaarTabStateFromStorage,
+  persistBazaarTabState,
+} from '@/lib/bazaar/bazaarTabStateStorage';
+import type { Currency } from '@/utils/currency';
 import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { ListingCard } from '@/components/listing/ListingCard';
@@ -26,6 +35,15 @@ import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
+
+const SortModal = dynamic(
+  () => import('@/components/modals/SortModal').then((m) => ({ default: m.SortModal })),
+  { ssr: false }
+);
+const CityModal = dynamic(
+  () => import('@/components/modals/CityModal').then((m) => ({ default: m.CityModal })),
+  { ssr: false }
+);
 
 const SEARCH_DEBOUNCE_MS = 800;
 const MIN_QUERY_LENGTH = 2;
@@ -178,8 +196,20 @@ export function SearchView({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
   const [localCities, setLocalCities] = useState<string[]>(selectedCities);
   const citiesKey = localCities.join(',');
-  const [sortBy] = useState<SortOption>('newest');
-  const [showFreeOnly] = useState(false);
+  const savedFilters = useMemo(() => loadBazaarTabStateFromStorage(), []);
+  const [sortBy, setSortBy] = useState<SortOption>(savedFilters.sortBy ?? 'newest');
+  const [showFreeOnly, setShowFreeOnly] = useState(savedFilters.showFreeOnly ?? false);
+  const [minPrice, setMinPrice] = useState<number | null>(savedFilters.minPrice ?? null);
+  const [maxPrice, setMaxPrice] = useState<number | null>(savedFilters.maxPrice ?? null);
+  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(
+    savedFilters.selectedCondition ?? null
+  );
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(
+    (savedFilters.selectedCurrency as Currency | null) ?? null
+  );
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const debouncedQuery = useDebounce(localQuery, SEARCH_DEBOUNCE_MS);
   const [activeQuery, setActiveQuery] = useState(initialCommitted ? initialQuery.trim() : '');
   const [searchResults, setSearchResults] = useState<Listing[]>([]);
@@ -247,8 +277,8 @@ export function SearchView({
 
   const buildFetchKey = useCallback(
     (query: string, category: string | null) =>
-      `${query.trim()}|${category ?? ''}|${citiesKey}`,
-    [citiesKey]
+      `${query.trim()}|${category ?? ''}|${citiesKey}|${sortBy}|${showFreeOnly}|${minPrice ?? ''}|${maxPrice ?? ''}|${selectedCondition ?? ''}|${selectedCurrency ?? ''}|${selectedSubcategory ?? ''}`,
+    [citiesKey, sortBy, showFreeOnly, minPrice, maxPrice, selectedCondition, selectedCurrency, selectedSubcategory]
   );
 
   const fetchSearchResults = useCallback(
@@ -265,7 +295,7 @@ export function SearchView({
       if (trimmed.length < MIN_QUERY_LENGTH) return;
 
       const category = options?.category !== undefined ? options.category : selectedCategory;
-      const fetchKey = `commit|${buildFetchKey(trimmed, category)}|${sortBy}|${showFreeOnly}`;
+      const fetchKey = `commit|${buildFetchKey(trimmed, category)}`;
       if (!options?.force && fetchKey === lastFetchKeyRef.current) return;
 
       lastFetchKeyRef.current = fetchKey;
@@ -294,8 +324,23 @@ export function SearchView({
         if (category) {
           params.set('category', category);
         }
+        if (selectedSubcategory) {
+          params.set('subcategory', selectedSubcategory);
+        }
         if (showFreeOnly) {
           params.set('isFree', 'true');
+        }
+        if (minPrice != null) {
+          params.set('minPrice', String(minPrice));
+        }
+        if (maxPrice != null) {
+          params.set('maxPrice', String(maxPrice));
+        }
+        if (selectedCondition) {
+          params.set('condition', selectedCondition);
+        }
+        if (selectedCurrency) {
+          params.set('currency', selectedCurrency);
         }
 
         const res = await fetch(`/api/listings?${params.toString()}`, { cache: 'no-store' });
@@ -325,7 +370,20 @@ export function SearchView({
         }
       }
     },
-    [buildFetchKey, citiesKey, refreshLocalHistory, selectedCategory, showFreeOnly, sortBy, tg]
+    [
+      buildFetchKey,
+      citiesKey,
+      refreshLocalHistory,
+      selectedCategory,
+      selectedSubcategory,
+      showFreeOnly,
+      sortBy,
+      minPrice,
+      maxPrice,
+      selectedCondition,
+      selectedCurrency,
+      tg,
+    ]
   );
 
   const commitSearch = useCallback(
@@ -369,6 +427,7 @@ export function SearchView({
         });
       }
       setSelectedCategory(next);
+      setSelectedSubcategory(null);
       onCategoryChangeRef.current?.(next);
       lastFetchKeyRef.current = '';
       tg?.HapticFeedback?.impactOccurred?.('light');
@@ -533,9 +592,86 @@ export function SearchView({
     ? 'w-full rounded-xl border border-[#3F5331]/15 bg-white py-3 pr-10 text-[#2D3E28] placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
     : 'w-full rounded-xl border border-white bg-transparent py-3 pr-10 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30';
 
-  const popularQueries = POPULAR_SEARCH_QUERY_KEYS.map((key) =>
-    t(`bazaar.search.queries.${key}`)
+  const popularQueries = useMemo(() => {
+    const categoryKeys =
+      selectedCategory && CATEGORY_POPULAR_QUERY_KEYS[selectedCategory]
+        ? CATEGORY_POPULAR_QUERY_KEYS[selectedCategory]
+        : null;
+
+    if (categoryKeys) {
+      return categoryKeys.map((key) =>
+        t(`bazaar.search.queriesByCategory.${selectedCategory}.${key}`)
+      );
+    }
+
+    return POPULAR_SEARCH_QUERY_KEYS.map((key) => t(`bazaar.search.queries.${key}`));
+  }, [selectedCategory, t]);
+
+  const hasActiveFilters = Boolean(
+    sortBy !== 'newest' ||
+      showFreeOnly ||
+      minPrice != null ||
+      maxPrice != null ||
+      selectedCondition != null ||
+      selectedCurrency != null ||
+      selectedSubcategory != null ||
+      (screenMode === 'results' && selectedCategory)
   );
+
+  const persistFilters = useCallback(
+    (patch: Partial<{
+      selectedCities: string[];
+      sortBy: SortOption;
+      showFreeOnly: boolean;
+      minPrice: number | null;
+      maxPrice: number | null;
+      selectedCondition: 'new' | 'used' | null;
+      selectedCurrency: Currency | null;
+    }>) => {
+      const current = loadBazaarTabStateFromStorage();
+      persistBazaarTabState({
+        ...current,
+        selectedCities: patch.selectedCities ?? localCities,
+        sortBy: patch.sortBy ?? sortBy,
+        showFreeOnly: patch.showFreeOnly ?? showFreeOnly,
+        minPrice: patch.minPrice !== undefined ? patch.minPrice : minPrice,
+        maxPrice: patch.maxPrice !== undefined ? patch.maxPrice : maxPrice,
+        selectedCondition:
+          patch.selectedCondition !== undefined ? patch.selectedCondition : selectedCondition,
+        selectedCurrency:
+          patch.selectedCurrency !== undefined ? patch.selectedCurrency : selectedCurrency,
+      });
+    },
+    [localCities, sortBy, showFreeOnly, minPrice, maxPrice, selectedCondition, selectedCurrency]
+  );
+
+  // Перезавантаження результатів при зміні фільтрів / міста (не на першому вході в results)
+  const filtersReadyRef = useRef(false);
+  useEffect(() => {
+    if (screenMode !== 'results') {
+      filtersReadyRef.current = false;
+      return;
+    }
+    if (!filtersReadyRef.current) {
+      filtersReadyRef.current = true;
+      return;
+    }
+    const q = activeQuery.trim();
+    if (q.length < MIN_QUERY_LENGTH) return;
+    lastFetchKeyRef.current = '';
+    void fetchSearchResults(q, { force: true, saveHistory: false, haptic: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- лише фільтри/місто
+  }, [
+    citiesKey,
+    sortBy,
+    showFreeOnly,
+    minPrice,
+    maxPrice,
+    selectedCondition,
+    selectedCurrency,
+    selectedSubcategory,
+    screenMode,
+  ]);
 
   const trimmedLocal = localQuery.trim();
   const isTypingPending =
@@ -579,7 +715,13 @@ export function SearchView({
   const discoverContent = (
     <div className="space-y-6 px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
       <SearchSection
-        title={t('bazaar.search.popularQueries')}
+        title={
+          selectedCategory
+            ? `${t('bazaar.search.popularQueries')}: ${
+                categories.find((c) => c.id === selectedCategory)?.name ?? ''
+              }`
+            : t('bazaar.search.popularQueries')
+        }
         icon={<Flame size={16} />}
         isLight={isLight}
       >
@@ -817,7 +959,7 @@ export function SearchView({
       ) : (
         <>
           <div className={`${STICKY_BELOW_APP_HEADER_CLASS} z-[42] ${stickySearchBg}`}>
-            <div className="mx-auto flex w-full max-w-xl items-center gap-2 px-4 py-2 xl:max-w-2xl lg:mx-auto">
+            <div className="mx-auto flex w-full max-w-xl items-center gap-1.5 px-4 py-2 xl:max-w-2xl lg:mx-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -830,12 +972,144 @@ export function SearchView({
                 <ArrowLeft size={20} />
               </button>
               <div className="min-w-0 flex-1">{searchField}</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSortModal(true);
+                  tg?.HapticFeedback?.impactOccurred?.('light');
+                }}
+                aria-label={t('common.filter')}
+                className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+                  hasActiveFilters
+                    ? isLight
+                      ? 'border-[#3F5331] bg-white'
+                      : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
+                    : isLight
+                      ? 'border-[#3F5331]/15 bg-white shadow-sm hover:bg-[#E8F0E0]/60'
+                      : 'border-white bg-transparent hover:bg-white/10'
+                }`}
+              >
+                <SlidersHorizontal
+                  size={18}
+                  className={
+                    hasActiveFilters
+                      ? isLight
+                        ? 'text-[#3F5331]'
+                        : 'text-[#C8E6A0]'
+                      : isLight
+                        ? 'text-gray-800'
+                        : 'text-white'
+                  }
+                />
+                {hasActiveFilters && (
+                  <span
+                    className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
+                      isLight
+                        ? 'bg-[#3F5331] ring-gray-100'
+                        : 'bg-[#C8E6A0] ring-black/50'
+                    }`}
+                    aria-hidden
+                  />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCityModalOpen(true);
+                  tg?.HapticFeedback?.impactOccurred?.('light');
+                }}
+                aria-label={t('bazaar.selectCity') || t('common.city') || 'City'}
+                className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+                  localCities.length > 0
+                    ? isLight
+                      ? 'border-[#3F5331] bg-transparent'
+                      : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
+                    : isLight
+                      ? 'border-[#3F5331]/20 bg-[#E8F0E0]/70 hover:bg-[#E8F0E0]'
+                      : 'border-white bg-transparent hover:bg-white/10'
+                }`}
+              >
+                <MapPin
+                  size={18}
+                  className={
+                    localCities.length > 0
+                      ? isLight
+                        ? 'text-[#3F5331]'
+                        : 'text-[#C8E6A0]'
+                      : isLight
+                        ? 'text-[#5A6B52]'
+                        : 'text-white'
+                  }
+                />
+                {localCities.length > 0 && (
+                  <span
+                    className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
+                      isLight
+                        ? 'bg-[#3F5331] ring-gray-100'
+                        : 'bg-[#C8E6A0] ring-black/50'
+                    }`}
+                    aria-hidden
+                  />
+                )}
+              </button>
             </div>
           </div>
 
           {resultsContent}
         </>
       )}
+
+      <SortModal
+        isOpen={showSortModal}
+        currentSort={sortBy}
+        showFreeOnly={showFreeOnly}
+        minPrice={minPrice}
+        maxPrice={maxPrice}
+        selectedCategory={selectedCategory}
+        selectedSubcategory={selectedSubcategory}
+        selectedCondition={selectedCondition}
+        selectedCurrency={selectedCurrency}
+        onClose={() => setShowSortModal(false)}
+        onSelect={(sort) => {
+          setSortBy(sort);
+          persistFilters({ sortBy: sort });
+        }}
+        onToggleFreeOnly={(value) => {
+          setShowFreeOnly(value);
+          persistFilters({ showFreeOnly: value });
+        }}
+        onPriceRangeChange={(min, max) => {
+          setMinPrice(min);
+          setMaxPrice(max);
+          persistFilters({ minPrice: min, maxPrice: max });
+        }}
+        onCategoryChange={(categoryId, subcategoryId) => {
+          setSelectedCategory(categoryId);
+          setSelectedSubcategory(subcategoryId);
+          onCategoryChangeRef.current?.(categoryId);
+        }}
+        onConditionChange={(condition) => {
+          setSelectedCondition(condition);
+          persistFilters({ selectedCondition: condition });
+        }}
+        onCurrencyChange={(currency) => {
+          setSelectedCurrency(currency);
+          persistFilters({ selectedCurrency: currency });
+        }}
+        tg={tg}
+      />
+
+      <CityModal
+        isOpen={isCityModalOpen}
+        selectedCities={localCities}
+        onClose={() => setIsCityModalOpen(false)}
+        onSelect={(cities) => {
+          setLocalCities(cities);
+          persistFilters({ selectedCities: cities });
+        }}
+        tg={tg}
+        profileTelegramId={profileTelegramId}
+      />
     </>
   );
 }

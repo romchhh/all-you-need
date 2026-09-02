@@ -699,7 +699,7 @@ const BazaarTabComponent = ({
           {/* Заголовок підкатегорії та кнопка очищення */}
           {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
             <div className="flex items-center justify-between mt-3 mb-3">
-              <h3 className={`text-base font-semibold ${ac.pageHeading}`}>Підкатегорії</h3>
+              <h3 className={`text-base font-semibold ${ac.pageHeading}`}>{t('common.subcategories')}</h3>
               <button
                 onClick={() => {
                   commitCatalogState({

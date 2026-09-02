@@ -224,7 +224,7 @@ export const CategoriesTab = ({
       {selectedCategoryData?.subcategories && selectedCategoryData.subcategories.length > 0 && (
         <div className={`border-t px-4 pb-3 pt-2 lg:px-6 ${isLight ? 'border-gray-200' : 'border-gray-800/50'}`}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className={`text-base font-semibold ${ac.pageHeading}`}>{t('categories.subcategories') || 'Підкатегорії'}</h3>
+            <h3 className={`text-base font-semibold ${ac.pageHeading}`}>{t('common.subcategories')}</h3>
             <button
               onClick={() => {
                 setSelectedCategory(null);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
@@ -20,6 +20,8 @@ type PlatformTickerInfoModalProps = {
   onAction: (action: PlatformOnboardingActionId) => void;
 };
 
+type ModalView = 'sections' | 'promotion';
+
 export function PlatformTickerInfoModal({
   isOpen,
   onClose,
@@ -29,21 +31,33 @@ export function PlatformTickerInfoModal({
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const [mounted, setMounted] = useState(false);
+  const [view, setView] = useState<ModalView>('sections');
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    if (!isOpen) {
+      setView('sections');
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      if (view === 'promotion') {
+        setView('sections');
+        return;
+      }
+      onClose();
     };
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, view]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -63,6 +77,10 @@ export function PlatformTickerInfoModal({
     : 'bg-[#121212] border-t border-white/10 shadow-[0_-8px_40px_rgba(0,0,0,0.55)]';
 
   const handleAction = (action: PlatformOnboardingActionId) => {
+    if (action === 'promotion') {
+      setView('promotion');
+      return;
+    }
     onAction(action);
     onClose();
   };
@@ -70,6 +88,13 @@ export function PlatformTickerInfoModal({
   const sectionButtonClass = isLight
     ? 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-[#3F5331]/20 bg-white px-3.5 py-2 text-xs font-semibold text-[#2D3E28] transition-colors hover:border-[#3F5331]/35 hover:bg-[#E8F0E0]/60'
     : 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-white/30 bg-transparent px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/10';
+
+  const headerTitle =
+    view === 'promotion' ? t('promotions.title') : t('platformTicker.onboarding.brandTitle');
+  const headerSubtitle =
+    view === 'promotion'
+      ? t('promotions.description')
+      : t('platformTicker.onboarding.intro');
 
   return createPortal(
     <>
@@ -92,16 +117,30 @@ export function PlatformTickerInfoModal({
             isLight ? 'border-gray-100' : 'border-white/10'
           }`}
         >
-          <div className="min-w-0 pr-1">
-            <h2
-              id="platform-ticker-info-title"
-              className={`text-base font-bold ${ac.pageHeading}`}
-            >
-              {t('platformTicker.onboarding.brandTitle')}
-            </h2>
-            <p className={`mt-1 text-sm leading-relaxed ${ac.mutedText}`}>
-              {t('platformTicker.onboarding.intro')}
-            </p>
+          <div className="flex min-w-0 flex-1 items-start gap-2 pr-1">
+            {view === 'promotion' && (
+              <button
+                type="button"
+                onClick={() => setView('sections')}
+                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                  isLight
+                    ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
+                    : 'text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+                aria-label={t('common.back')}
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <div className="min-w-0">
+              <h2
+                id="platform-ticker-info-title"
+                className={`text-base font-bold ${ac.pageHeading}`}
+              >
+                {headerTitle}
+              </h2>
+              <p className={`mt-1 text-sm leading-relaxed ${ac.mutedText}`}>{headerSubtitle}</p>
+            </div>
           </div>
           <button
             type="button"
@@ -118,44 +157,13 @@ export function PlatformTickerInfoModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-          <ul className="space-y-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            {ONBOARDING_SECTIONS.map((section) => {
-              if (section.id === 'promotion') {
-                return (
-                  <li
-                    key={section.id}
-                    className={`rounded-2xl px-3.5 py-3 ${
-                      isLight ? 'bg-gray-50/80' : 'bg-white/[0.04]'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 text-xl leading-none" aria-hidden>
-                        {section.emoji}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-semibold leading-snug ${ac.pageHeading}`}>
-                          {t('promotions.title')}
-                        </p>
-                        <p className={`mt-1 text-xs leading-relaxed ${ac.mutedText}`}>
-                          {t('promotions.description')}
-                        </p>
-                        <div className="mt-3">
-                          <PromotionTypeCards isLight={isLight} compact />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleAction(section.id)}
-                          className={sectionButtonClass}
-                        >
-                          {t(section.buttonKey)}
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                );
-              }
-
-              return (
+          {view === 'promotion' ? (
+            <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <PromotionTypeCards isLight={isLight} />
+            </div>
+          ) : (
+            <ul className="space-y-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {ONBOARDING_SECTIONS.map((section) => (
                 <li
                   key={section.id}
                   className={`rounded-2xl px-3.5 py-3 ${
@@ -183,9 +191,9 @@ export function PlatformTickerInfoModal({
                     </div>
                   </div>
                 </li>
-              );
-            })}
-          </ul>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </>,

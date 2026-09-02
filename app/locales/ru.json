@@ -212,6 +212,112 @@
             "stroller": "Коляска",
             "laptop": "Ноутбук",
             "cleaning": "Уборка"
+          },
+          "queriesByCategory": {
+            "services_work": {
+              "cleaning": "Уборка",
+              "repair": "Ремонт",
+              "vacancy": "Вакансия",
+              "beauty": "Маникюр",
+              "moving": "Переезд",
+              "tutor": "Репетитор"
+            },
+            "fashion": {
+              "dress": "Платье",
+              "sneakers": "Кроссовки",
+              "jacket": "Куртка",
+              "jeans": "Джинсы",
+              "bag": "Сумка",
+              "boots": "Ботинки"
+            },
+            "furniture": {
+              "sofa": "Диван",
+              "bed": "Кровать",
+              "wardrobe": "Шкаф",
+              "table": "Стол",
+              "chair": "Стул",
+              "mattress": "Матрас"
+            },
+            "electronics": {
+              "iphone": "iPhone",
+              "laptop": "Ноутбук",
+              "tv": "Телевизор",
+              "playstation": "PlayStation",
+              "headphones": "Наушники",
+              "tablet": "Планшет"
+            },
+            "appliances": {
+              "washing": "Стиральная машина",
+              "fridge": "Холодильник",
+              "vacuum": "Пылесос",
+              "microwave": "Микроволновка",
+              "dishwasher": "Посудомойка",
+              "coffee": "Кофемашина"
+            },
+            "kids": {
+              "stroller": "Коляска",
+              "toys": "Игрушки",
+              "carseat": "Автокресло",
+              "crib": "Кроватка",
+              "clothes": "Детская одежда",
+              "bike": "Детский велосипед"
+            },
+            "home": {
+              "dishes": "Посуда",
+              "lamp": "Лампа",
+              "decor": "Декор",
+              "tools": "Инструменты",
+              "textile": "Текстиль",
+              "plants": "Растения"
+            },
+            "beauty_wellness": {
+              "cosmetics": "Косметика",
+              "perfume": "Парфюм",
+              "skincare": "Уход за кожей",
+              "hairdryer": "Фен",
+              "cream": "Крем",
+              "makeup": "Макияж"
+            },
+            "auto": {
+              "tires": "Шины",
+              "parts": "Запчасти",
+              "childseat": "Детское кресло",
+              "winter": "Зимняя резина",
+              "oil": "Масло моторное",
+              "rims": "Диски"
+            },
+            "hobby_sports": {
+              "bicycle": "Велосипед",
+              "scooter": "Самокат",
+              "guitar": "Гитара",
+              "dumbbells": "Гантели",
+              "tent": "Палатка",
+              "skis": "Лыжи"
+            },
+            "pets": {
+              "dog": "Собака",
+              "cat": "Кошка",
+              "food": "Корм",
+              "carrier": "Переноска",
+              "aquarium": "Аквариум",
+              "walking": "Выгул собак"
+            },
+            "realestate": {
+              "rent": "Аренда квартиры",
+              "room": "Комната",
+              "apartment": "Квартира",
+              "house": "Дом",
+              "garage": "Гараж",
+              "wg": "WG / подселение"
+            },
+            "free": {
+              "giveaway": "Отдам бесплатно",
+              "furniture": "Мебель бесплатно",
+              "clothes": "Одежда бесплатно",
+              "appliances": "Техника бесплатно",
+              "kids": "Детские вещи",
+              "books": "Книги бесплатно"
+            }
           }
         },
         "sort": {
@@ -1010,7 +1116,7 @@
         },
         "promotion": {
           "title": "Продвижение в маркетплейсе",
-          "description": "",
+          "description": "HIGHLIGHT, TOP и VIP — платные инструменты, которые увеличивают видимость объявления.",
           "button": "Подробнее"
         },
         "referral": {

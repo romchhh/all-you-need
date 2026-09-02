@@ -244,7 +244,7 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
         <span
           className={
             isLight
-              ? 'h-2.5 w-2.5 shrink-0 rounded-full bg-[#5C8A47] shadow-[0_0_8px_2px_rgba(92,138,71,0.45)] ring-2 ring-[#5C8A47]/30'
+              ? 'h-2.5 w-2.5 shrink-0 rounded-full bg-[#C8E6A0] shadow-[0_0_8px_2px_rgba(200,230,160,0.55)] ring-2 ring-[#C8E6A0]/40'
               : 'h-2.5 w-2.5 shrink-0 rounded-full bg-[#C8E6A0] shadow-[0_0_12px_4px_rgba(200,230,160,0.75),0_0_28px_6px_rgba(200,230,160,0.38)] ring-2 ring-[#C8E6A0]/50'
           }
           aria-hidden
