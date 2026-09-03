@@ -52,7 +52,7 @@ def is_ai_screen_enabled() -> bool:
 
 def _title_quality_score(title: str, raw_text: str = "") -> int:
     """Вищий бал = кращий marketplace title."""
-    from parser.core.patterns import GENERIC_LISTING_TITLE_RE, GREETING_TITLE_RE, PRICE_RE
+    from parser.core.patterns import GENERIC_LISTING_TITLE_RE, GREETING_TITLE_RE, PRICE_RE, is_greeting_only
 
     t = (title or "").strip()
     if not t or len(t) < 4:
@@ -62,7 +62,7 @@ def _title_quality_score(title: str, raw_text: str = "") -> int:
         score -= 25
     if PRICE_RE.search(t):
         score -= 12
-    if GREETING_TITLE_RE.match(t) or re.search(
+    if GREETING_TITLE_RE.match(t) or is_greeting_only(t) or re.search(
         r"(?i)^(меня\s+зовут|мене\s+звати|здравствуй|добр|привет|вітаю)", t
     ):
         score -= 15

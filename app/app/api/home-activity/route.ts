@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { loadHomeActivityStats } from '@/lib/stats/loadHomeActivityStats';
 import { displayOnlineSynced } from '@/lib/stats/homeActivityOnline';
 
-export const revalidate = 300;
+export const revalidate = 60;
 
 const CACHE_HEADERS = {
-  'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+  'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
 };
 
 // Публічна статистика для головної / базару (без аутентифікації)

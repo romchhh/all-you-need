@@ -6,7 +6,7 @@ let serverCache: {
   expiresAt: number;
 } | null = null;
 
-export const HOME_ACTIVITY_SERVER_CACHE_TTL_MS = 300_000;
+export const HOME_ACTIVITY_SERVER_CACHE_TTL_MS = 60_000;
 
 export function getHomeActivityServerCache(windowKey: string): Record<string, unknown> | null {
   if (

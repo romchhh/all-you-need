@@ -771,7 +771,7 @@ def clean_title(title: str, raw_text: str = "") -> str:
     """
     Заголовок без префіксів «продам», привітань, ціни та міста.
     """
-    from parser.core.patterns import GREETING_TITLE_RE, GENERIC_LISTING_TITLE_RE, PRICE_RE
+    from parser.core.patterns import GREETING_TITLE_RE, GENERIC_LISTING_TITLE_RE, PRICE_RE, is_greeting_only
 
     def _clean_once(src: str) -> str:
         t = (src or "").strip()
@@ -853,7 +853,7 @@ def clean_title(title: str, raw_text: str = "") -> str:
 
     t = _clean_once(title)
 
-    if GENERIC_LISTING_TITLE_RE.match(t) or len(t) < 4 or not t:
+    if GENERIC_LISTING_TITLE_RE.match(t) or len(t) < 4 or not t or is_greeting_only(t):
         if raw_text:
             best = ""
             best_score = -1
@@ -862,13 +862,18 @@ def clean_title(title: str, raw_text: str = "") -> str:
                 if not line:
                     continue
                 # Пропустити рядки = лише ціна / привітання
-                if PRICE_RE.fullmatch(line.strip()) or len(PRICE_RE.sub("", line).strip()) < 3:
+                if (
+                    PRICE_RE.fullmatch(line.strip())
+                    or len(PRICE_RE.sub("", line).strip()) < 3
+                    or is_greeting_only(line)
+                ):
                     continue
                 candidate = _clean_once(line)
                 if (
                     not candidate
                     or len(candidate) < 4
                     or GENERIC_LISTING_TITLE_RE.match(candidate)
+                    or is_greeting_only(candidate)
                 ):
                     continue
                 score = len(candidate)
@@ -887,7 +892,7 @@ def clean_title(title: str, raw_text: str = "") -> str:
             if best:
                 t = best
 
-    if not t or len(t) < 4 or GENERIC_LISTING_TITLE_RE.match(t):
+    if not t or len(t) < 4 or GENERIC_LISTING_TITLE_RE.match(t) or is_greeting_only(t):
         # Останній шанс: бренд із сильного сигналу
         strong = detect_strong_item_category(raw_text or title or "")
         blob = raw_text or title or ""
@@ -963,8 +968,46 @@ def clean_title(title: str, raw_text: str = "") -> str:
         ):
             t = "Тату-мастер"
 
+    if (not t or is_greeting_only(t) or GENERIC_LISTING_TITLE_RE.match(t or "")) and blob:
+        m = re.search(
+            r"(?is)(?:предлагаю|пропоную|оказываю|надаю|выполняю|виконую)\s+"
+            r"(.{12,90}?)(?:[.!?\n]|$)",
+            blob,
+        )
+        if m:
+            clause = m.group(1).strip()
+            if len(clause) > 72 and "," in clause:
+                clause = clause.split(",", 1)[0].strip()
+            recovered = _clean_once(clause)
+            if recovered and len(recovered) >= 8 and not is_greeting_only(recovered):
+                t = recovered
+        if not t or is_greeting_only(t):
+            m = re.search(
+                r"(?i)(индивидуальн\w*\s+(?:мастер[\s\-]?класс\w*|урок\w*|занят\w*|"
+                r"репетиторств\w*|обучени\w*)[^\n.]{0,60}|"
+                r"мастер[\s\-]?класс\w*[^\n.]{0,60}|"
+                r"репетитор\w*[^\n.]{0,50}|"
+                r"урок[иі]\s+[^\n.]{5,60})",
+                blob,
+            )
+            if m:
+                recovered = _clean_once(m.group(0).strip())
+                if recovered and len(recovered) >= 8 and not is_greeting_only(recovered):
+                    t = recovered
+
     if t and t[0].islower():
         t = t[0].upper() + t[1:]
+
+    if t:
+        for sep in (". ", "! ", "? "):
+            idx = t.find(sep)
+            if 12 <= idx <= 80:
+                t = t[:idx].strip()
+                break
+        if len(t) > 80:
+            cut = t[:80].rsplit(" ", 1)[0].strip()
+            if len(cut) >= 12:
+                t = cut
 
     return t[:100] if t and len(t) >= 4 else ""
 

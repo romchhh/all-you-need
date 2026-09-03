@@ -30,6 +30,7 @@ def format_parser_stats(
 
     added = int(stats.get("added") or 0)
     skipped = int(stats.get("skipped") or 0)
+    auto_approved = int(stats.get("auto_approved") or 0)
     channels = stats.get("channels")
     errors = stats.get("errors") or []
     reasons = stats.get("reasons") or {}
@@ -47,6 +48,8 @@ def format_parser_stats(
             f"⏭ Пропущено: <b>{skipped}</b>",
         ]
     )
+    if auto_approved > 0:
+        lines.append(f"🤖 Автопідтверджено на маркетплейс: <b>{auto_approved}</b>")
     if effective_lookback:
         lines.append(f"📥 Останні <b>{effective_lookback}</b> постів на канал")
     else:

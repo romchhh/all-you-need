@@ -213,11 +213,20 @@ async def run_ai_screen_and_dedup(
         )
 
     check_title = str(fields.get("title") or "").strip()
-    if not check_title or len(check_title) < 4 or check_title.lower() in {
-        "объявление",
-        "оголошення",
-        "listing",
-    }:
+    from parser.core.patterns import is_greeting_only
+
+    if (
+        not check_title
+        or len(check_title) < 4
+        or is_greeting_only(check_title)
+        or check_title.lower() in {
+            "объявление",
+            "оголошення",
+            "listing",
+            "мої вітання",
+            "мое приветствие",
+        }
+    ):
         return False, "поганий заголовок", None, {}
 
     junk, junk_reason = is_junk_for_marketplace(

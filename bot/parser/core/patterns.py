@@ -109,16 +109,36 @@ CHAT_OR_META_RE = re.compile(
     re.IGNORECASE,
 )
 
-GREETING_TITLE_RE = re.compile(
-    r"^[\s\U0001F300-\U0001F9FF\u2600-\u27BF]*"
-    r"(?:"
+_GREETING_PHRASES = (
     r"здравствуй(?:те)?|добр(?:ый|ий)\s+(?:день|вечер|вечір|утро|ранок)|"
-    r"доброго\s+(?:дня|вечора|ранку)|привет(?:ик|ствую)?|вітаю|привіт|"
+    r"доброго\s+(?:дня|вечора|ранку|часу\s+доб)|"
+    r"привет(?:ик|ствую)?|вітаю(?:\s+в(?:ас|сіх))?|привіт(?:аю)?|"
+    r"мої\s+вітання|моє\s+привітання|мо[её]\s+приветствие|"
     r"hello|hi\b|guten\s+(?:tag|morgen|abend)|hallo"
-    r")"
-    r"[\s!,.…:—\-]*",
+)
+
+GREETING_TITLE_RE = re.compile(
+    rf"^[\s\U0001F300-\U0001F9FF\u2600-\u27BF]*(?:{_GREETING_PHRASES})[\s!,.…:—\-]*",
     re.IGNORECASE,
 )
+
+GREETING_ONLY_RE = re.compile(
+    rf"^[\s\U0001F300-\U0001F9FF\u2600-\u27BF]*(?:{_GREETING_PHRASES})[\s!,.…:—\-]*$",
+    re.IGNORECASE,
+)
+
+
+def is_greeting_only(text: str) -> bool:
+    """Чи є рядок лише привітанням (не назвою оголошення)."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if GREETING_ONLY_RE.match(t):
+        return True
+    remainder = GREETING_TITLE_RE.sub("", t).strip(" ,.;!—-")
+    if not remainder or len(remainder) < 4:
+        return True
+    return bool(GREETING_ONLY_RE.match(remainder))
 
 NOT_LISTING_RE = re.compile(
     r"набір\s+на\s+урок|урок[иі]\s+німецької|індивідуальні\s+урок|1\s*:\s*1\s+онлайн|онлайн-школа"
@@ -158,7 +178,7 @@ GENERIC_TITLE_RE = re.compile(
     r"^[\s\U0001F300-\U0001F9FF\u2600-\u27BF]*"
     r"(продам|продаю|куплю|продажа|продаж|verkaufe|sell|"
     r"здравствуй(?:те)?|добр(?:ый|ий)\s+(?:день|вечер|вечір|утро|ранок)|"
-    r"привет|вітаю|привіт|hello|hallo|"
+    r"привет|вітаю|привіт|мої\s+вітання|моє\s+привітання|hello|hallo|"
     r"акційн\w*\s+товар\w*|акционн\w*\s+товар\w*|товар\s+дня|sale|hot\s+deal)\s*$",
     re.IGNORECASE,
 )

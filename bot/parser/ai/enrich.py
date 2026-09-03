@@ -417,7 +417,7 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
 def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict:
     """Повертає копію item з полями після AI; кращий title з парсера не затираємо."""
     from parser.core.location import resolve_parsed_location
-    from parser.core.patterns import GREETING_TITLE_RE, PRICE_RE
+    from parser.core.patterns import GREETING_TITLE_RE, PRICE_RE, is_greeting_only
     from parser.marketplace_categories import clean_title
     from parser.core.text import format_listing_description
 
@@ -430,7 +430,7 @@ def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict
         score = 5
         if PRICE_RE.search(t):
             score -= 8
-        if GREETING_TITLE_RE.match(t) or re.search(
+        if GREETING_TITLE_RE.match(t) or is_greeting_only(t) or re.search(
             r"(?i)^(меня\s+зовут|мене\s+звати|здравствуй|добр)", t
         ):
             score -= 6

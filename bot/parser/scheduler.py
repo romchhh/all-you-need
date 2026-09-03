@@ -43,6 +43,7 @@ async def run_parser_cycle(
     fetch_limit: int | None = None,
     ignore_cursor: bool = False,
     scheduled: bool = False,
+    manual_parse: bool = False,
 ) -> dict | None:
     """Один повний цикл парсингу всіх каналів. Повертає stats або None при помилці."""
     if not BOT_TOKEN:
@@ -129,7 +130,10 @@ async def run_parser_cycle(
         from parser.core.services_ai_runner import ServicesParseRunConfig, services_parse_run
         from parser.storage.connection import parser_db_cycle
 
+        auto_approved_inline = 0
+
         async def notify_callback(item_data: dict):
+            nonlocal auto_approved_inline
             if PARSER_AUTO_APPROVE_ENABLED:
                 try:
                     from parser.moderation.auto_approve import (
@@ -137,7 +141,12 @@ async def run_parser_cycle(
                         maybe_auto_approve_and_notify,
                     )
 
-                    if await maybe_auto_approve_and_notify(aiogram_bot, item_data):
+                    if await maybe_auto_approve_and_notify(
+                        aiogram_bot,
+                        item_data,
+                        aggressive=manual_parse,
+                    ):
+                        auto_approved_inline += 1
                         return
                     note = explain_manual_review(item_data)
                     if note:
@@ -216,7 +225,17 @@ async def run_parser_cycle(
                     try:
                         from parser.moderation.auto_approve import run_auto_approve_drain
 
-                        drain_stats = await run_auto_approve_drain(aiogram_bot)
+                        drain_stats = await run_auto_approve_drain(
+                            aiogram_bot,
+                            aggressive=manual_parse,
+                        )
+                        if stats is not None:
+                            stats["auto_approved"] = auto_approved_inline + int(
+                                drain_stats.get("approved") or 0
+                            )
+                            stats["auto_approve_skipped"] = int(
+                                drain_stats.get("skipped") or 0
+                            )
                         if drain_stats.get("approved"):
                             logger.info(
                                 "🤖 auto-approve після циклу: +%s",
@@ -224,6 +243,8 @@ async def run_parser_cycle(
                             )
                     except Exception as drain_err:
                         logger.warning("auto-approve drain після циклу: %s", drain_err)
+                        if stats is not None and auto_approved_inline:
+                            stats["auto_approved"] = auto_approved_inline
         except RuntimeError as e:
             logger.error("Сесія парсера зайнята: %s", e, exc_info=True)
             await _notify_error("сесія зайнята", str(e))

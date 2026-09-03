@@ -176,7 +176,7 @@ def parsed_item_needs_ai_screen(item: dict) -> bool:
     Чи потрібен AI screen перед публікацією (parse пропустив enrich або fail-open).
     """
     from parser.ai.screen import is_ai_screen_enabled
-    from parser.core.patterns import GENERIC_LISTING_TITLE_RE, GREETING_TITLE_RE
+    from parser.core.patterns import GENERIC_LISTING_TITLE_RE, GREETING_TITLE_RE, is_greeting_only
     from parser.marketplace_categories import MARKETPLACE_TAXONOMY
 
     if not is_ai_screen_enabled():
@@ -191,7 +191,7 @@ def parsed_item_needs_ai_screen(item: dict) -> bool:
 
     if not title or len(title) < 4 or GENERIC_LISTING_TITLE_RE.match(title):
         return True
-    if GREETING_TITLE_RE.search(title):
+    if GREETING_TITLE_RE.search(title) or is_greeting_only(title):
         return True
     if re.search(r"(?i)^(продам|продаю|продаётся|продается|отдам|віддам|🚨)", title):
         return True

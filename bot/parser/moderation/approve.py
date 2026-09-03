@@ -216,6 +216,12 @@ async def _approve_services_both(
                     listing_id,
                     notify_err,
                 )
+            try:
+                from parser.notify.home_activity import schedule_home_activity_revalidate
+
+                schedule_home_activity_revalidate()
+            except Exception:
+                pass
         published_chats: list[int] = []
         if not quiet:
             published_chats = await publish_services_listing_to_channel(
@@ -341,6 +347,12 @@ async def _approve_marketplace(
                 listing_id,
                 notify_err,
             )
+        try:
+            from parser.notify.home_activity import schedule_home_activity_revalidate
+
+            schedule_home_activity_revalidate()
+        except Exception:
+            pass
         await edit_group_message(
             bot,
             group_id,

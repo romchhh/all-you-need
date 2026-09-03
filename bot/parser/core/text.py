@@ -9,6 +9,7 @@ from parser.core.patterns import (
     GENERIC_TITLE_RE,
     ONE_EMOJI_RE,
     PRICE_RE,
+    is_greeting_only,
 )
 
 
@@ -69,18 +70,22 @@ def extract_title(text: str) -> str:
     candidates.extend(lines[:8])
 
     for cand in candidates:
+        if is_greeting_only(cand):
+            continue
         stripped = GREETING_TITLE_RE.sub("", cand).strip()
-        if not stripped or _is_generic_title(stripped) or _is_generic_title(cand):
+        if not stripped or is_greeting_only(stripped) or _is_generic_title(stripped) or _is_generic_title(cand):
             continue
         # Рядок = майже лише ціна
         without_price = PRICE_RE.sub("", stripped).strip(" -–—,.")
         if len(without_price) < 4:
             continue
         cleaned = clean_title(cand, text)
-        if cleaned and len(cleaned) >= 4:
+        if cleaned and len(cleaned) >= 4 and not is_greeting_only(cleaned):
             return cleaned[:97].rstrip() + "…" if len(cleaned) > 100 else cleaned
 
     cleaned = clean_title(first or (lines[0] if lines else ""), text)
+    if cleaned and is_greeting_only(cleaned):
+        cleaned = clean_title("", text)
     if cleaned and len(cleaned) >= 4:
         return cleaned[:97].rstrip() + "…" if len(cleaned) > 100 else cleaned
     return cleaned or ""

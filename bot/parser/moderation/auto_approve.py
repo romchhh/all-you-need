@@ -22,6 +22,7 @@ from parser.config.settings import (
     PARSER_AUTO_APPROVE_DAILY_LIMIT,
     PARSER_AUTO_APPROVE_ENABLED,
     PARSER_AUTO_APPROVE_INTERVAL_MIN,
+    PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS,
     PARSER_AUTO_APPROVE_MAX_AGE_HOURS,
     PARSER_AUTO_APPROVE_MAX_PER_CATEGORY,
     PARSER_AUTO_APPROVE_MAX_PER_CHANNEL,
@@ -78,6 +79,8 @@ _STUB_TITLES = frozenset({
     "товар",
     "послуга",
     "услуга",
+    "мої вітання",
+    "мое приветствие",
 })
 
 
@@ -161,10 +164,13 @@ def _recent_auto_approved_count(minutes: int | None = None) -> int:
     return n + count_auto_approve_in_flight()
 
 
-def remaining_auto_approve_wave_slots() -> int:
+def remaining_auto_approve_wave_slots(*, aggressive: bool = False) -> int:
+    daily = remaining_auto_approve_slots()
+    if aggressive:
+        return daily
     return max(
         0,
-        min(remaining_auto_approve_slots(), PARSER_AUTO_APPROVE_BATCH - _recent_auto_approved_count()),
+        min(daily, PARSER_AUTO_APPROVE_BATCH - _recent_auto_approved_count()),
     )
 
 
@@ -188,7 +194,7 @@ def _is_service_item(item: dict) -> bool:
     return (item.get("parser_type") or "") == "services_channel"
 
 
-def is_auto_approve_eligible(item: dict) -> tuple[bool, str]:
+def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[bool, str]:
     if not item:
         return False, "empty"
     if item.get("marketplace_listing_id"):
@@ -202,7 +208,8 @@ def is_auto_approve_eligible(item: dict) -> tuple[bool, str]:
     category = str(item.get("category") or "").strip().lower()
     subcategory = item.get("subcategory")
 
-    if not title or len(title) < 5 or title.lower() in _STUB_TITLES:
+    min_title_len = 4 if aggressive else 5
+    if not title or len(title) < min_title_len or title.lower() in _STUB_TITLES:
         return False, "bad_title"
     if GENERIC_LISTING_TITLE_RE.match(title):
         return False, "generic_title"
@@ -215,7 +222,7 @@ def is_auto_approve_eligible(item: dict) -> tuple[bool, str]:
         raw_text,
         category,
         subcategory,
-        require_offer=True,
+        require_offer=not aggressive,
     )
     if junk:
         return False, reason or "junk"
@@ -227,7 +234,8 @@ def is_auto_approve_eligible(item: dict) -> tuple[bool, str]:
     images = parsed_item_image_refs(item)
     # Товари без фото — ок, якщо є ціна/офер і нормальний текст (як у is_quality)
     if not _is_service_item(item) and not images:
-        if len(blob.strip()) < 28:
+        min_blob = 16 if aggressive else 28
+        if len(blob.strip()) < min_blob:
             return False, "no_photos"
 
     dedup_key = fingerprint_title_desc(
@@ -488,18 +496,29 @@ async def _publish_and_notify(
         item.get("source_channel"),
         channel_published,
     )
+    _schedule_home_activity_revalidate()
     return True
 
 
-async def _auto_approve_one(bot: Bot, item: dict) -> bool:
+def _schedule_home_activity_revalidate() -> None:
+    """Фоново оновити кеш «+N сьогодні / по містах» на вебі."""
+    try:
+        from parser.notify.home_activity import schedule_home_activity_revalidate
+
+        schedule_home_activity_revalidate()
+    except Exception:
+        logger.debug("home-activity revalidate schedule skipped", exc_info=True)
+
+
+async def _auto_approve_one(bot: Bot, item: dict, *, aggressive: bool = False) -> bool:
     item = hydrate_parsed_item(item)
     item_id = int(item.get("id") or 0)
     if not item_id:
         return False
-    if remaining_auto_approve_wave_slots() <= 0:
+    if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
         return False
 
-    ok, reason = is_auto_approve_eligible(item)
+    ok, reason = is_auto_approve_eligible(item, aggressive=aggressive)
     if not ok:
         logger.debug("auto-approve ineligible %s: %s", item_id, reason)
         return False
@@ -521,7 +540,7 @@ async def _auto_approve_one(bot: Bot, item: dict) -> bool:
             "is_free": listing_item.get("is_free"),
             "status": "pending",
         })
-        ok, reason = is_auto_approve_eligible(check)
+        ok, reason = is_auto_approve_eligible(check, aggressive=aggressive)
         if not ok:
             logger.info(
                 "auto-approve skip after prepare %s: %s", item_id, reason
@@ -537,27 +556,36 @@ async def _auto_approve_one(bot: Bot, item: dict) -> bool:
             unclaim_auto_approve(item_id)
 
 
-async def maybe_auto_approve_and_notify(bot: Bot, item_data: dict) -> bool:
+async def maybe_auto_approve_and_notify(
+    bot: Bot,
+    item_data: dict,
+    *,
+    aggressive: bool = False,
+) -> bool:
     """
     Parse-time: автопідтвердити, якщо є слот і м'які ліміти різноманітності.
     True — картку pending слати не треба.
     """
     if not PARSER_AUTO_APPROVE_ENABLED:
         return False
-    if remaining_auto_approve_wave_slots() <= 0:
+    if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
         return False
     item = hydrate_parsed_item(item_data)
-    if not _under_soft_caps(item, _today_counts()):
+    if not aggressive and not _under_soft_caps(item, _today_counts()):
         return False
-    ok, _reason = is_auto_approve_eligible(item)
+    ok, _reason = is_auto_approve_eligible(item, aggressive=aggressive)
     if not ok:
         return False
-    return await _auto_approve_one(bot, item)
+    return await _auto_approve_one(bot, item, aggressive=aggressive)
 
 
-async def run_auto_approve_drain(bot: Bot | None = None) -> dict:
+async def run_auto_approve_drain(
+    bot: Bot | None = None,
+    *,
+    aggressive: bool = False,
+) -> dict:
     """Добирає різноманітну пачку з pending до денного ліміту."""
-    stats = {"approved": 0, "skipped": 0, "slots": 0}
+    stats = {"approved": 0, "skipped": 0, "slots": 0, "rounds": 0}
     if not PARSER_AUTO_APPROVE_ENABLED:
         return stats
 
@@ -573,56 +601,72 @@ async def run_auto_approve_drain(bot: Bot | None = None) -> dict:
         close_bot = True
 
     try:
-        pending = list_pending_for_auto_approve(
-            PARSER_AUTO_APPROVE_MAX_AGE_HOURS,
-            limit=800,
-        )
-        eligible: list[dict] = []
-        for item in pending:
-            ok, _reason = is_auto_approve_eligible(item)
-            if ok:
-                eligible.append(item)
-            else:
-                stats["skipped"] += 1
-
-        async with _LOCK:
-            slots = remaining_auto_approve_wave_slots()
-            stats["slots"] = slots
-            if slots <= 0:
-                return stats
-            batch = pick_auto_approve_batch(
-                eligible,
-                slots=slots,
-                enforce_soft_caps=True,
-            )
-            leftover = slots - len(batch)
-            if leftover > 0:
-                taken_ids = {int(x["id"]) for x in batch}
-                extra = pick_auto_approve_batch(
-                    [x for x in eligible if int(x["id"]) not in taken_ids],
-                    slots=leftover,
-                    enforce_soft_caps=False,
-                )
-                batch.extend(extra)
-
         from parser.notify.admin import SEND_DELAY_SEC
 
-        for item in batch:
-            if remaining_auto_approve_wave_slots() <= 0:
+        max_rounds = PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS if aggressive else 1
+        for _round in range(max_rounds):
+            if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
                 break
-            if await _auto_approve_one(bot, item):
-                stats["approved"] += 1
-                await asyncio.sleep(SEND_DELAY_SEC)
-            else:
-                stats["skipped"] += 1
+
+            pending = list_pending_for_auto_approve(
+                PARSER_AUTO_APPROVE_MAX_AGE_HOURS,
+                limit=1200 if aggressive else 800,
+            )
+            eligible: list[dict] = []
+            for item in pending:
+                ok, _reason = is_auto_approve_eligible(item, aggressive=aggressive)
+                if ok:
+                    eligible.append(item)
+                else:
+                    stats["skipped"] += 1
+
+            async with _LOCK:
+                slots = remaining_auto_approve_wave_slots(aggressive=aggressive)
+                stats["slots"] = max(stats["slots"], slots)
+                if slots <= 0:
+                    break
+                batch = pick_auto_approve_batch(
+                    eligible,
+                    slots=slots,
+                    enforce_soft_caps=not aggressive,
+                )
+                leftover = slots - len(batch)
+                if leftover > 0:
+                    taken_ids = {int(x["id"]) for x in batch}
+                    extra = pick_auto_approve_batch(
+                        [x for x in eligible if int(x["id"]) not in taken_ids],
+                        slots=leftover,
+                        enforce_soft_caps=False,
+                    )
+                    batch.extend(extra)
+
+            if not batch:
+                break
+
+            stats["rounds"] += 1
+            round_approved = 0
+            for item in batch:
+                if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
+                    break
+                if await _auto_approve_one(bot, item, aggressive=aggressive):
+                    stats["approved"] += 1
+                    round_approved += 1
+                    await asyncio.sleep(SEND_DELAY_SEC)
+                else:
+                    stats["skipped"] += 1
+
+            if round_approved == 0:
+                break
 
         if stats["approved"]:
             logger.info(
-                "🤖 auto-approve drain: +%s (ліміт %s/день, залишок %s)",
+                "🤖 auto-approve drain: +%s (ліміт %s/день, залишок %s, rounds=%s)",
                 stats["approved"],
                 PARSER_AUTO_APPROVE_DAILY_LIMIT,
                 remaining_auto_approve_slots(),
+                stats["rounds"],
             )
+            _schedule_home_activity_revalidate()
         return stats
     finally:
         if close_bot:

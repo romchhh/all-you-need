@@ -83,7 +83,12 @@ def _format_parser_stats(stats: dict | None) -> str:
     return format_parser_stats(stats, scheduled=False)
 
 
-async def _run_unified_parser(message: types.Message, *, lookback: int | None):
+async def _run_unified_parser(
+    message: types.Message,
+    *,
+    lookback: int | None,
+    manual_parse: bool = True,
+):
     if not _has_parser_accounts():
         await message.answer(
             "❌ <b>Парсер не налаштовано</b>\n\n"
@@ -103,7 +108,7 @@ async def _run_unified_parser(message: types.Message, *, lookback: int | None):
     if lookback:
         status_text = (
             f"🔍 <b>Парсинг усіх груп: останні {lookback} постів</b>\n\n"
-            "Унікальні оголошення → групи модерації (дедуп увімкнено)."
+            "Унікальні оголошення → автопідтвердження / групи модерації."
         )
     else:
         from parser.config.settings import PARSER_ROLLING_LOOKBACK
@@ -112,6 +117,7 @@ async def _run_unified_parser(message: types.Message, *, lookback: int | None):
         status_text = (
             f"🔍 <b>Запускаю парсинг усіх груп…</b>\n\n"
             f"Останні <b>{lb}</b> постів на канал (нові message_id → модерація).\n"
+            "🤖 Після парсингу — автопідтвердження на маркетплейс.\n"
             "💡 <code>/parse200</code> — глибший catch-up"
         )
     status_msg = await message.answer(status_text, parse_mode="HTML")
@@ -120,7 +126,10 @@ async def _run_unified_parser(message: types.Message, *, lookback: int | None):
         try:
             from parser.scheduler import run_parser_cycle
 
-            stats = await run_parser_cycle(fetch_limit=lookback)
+            stats = await run_parser_cycle(
+                fetch_limit=lookback,
+                manual_parse=manual_parse,
+            )
             await status_msg.edit_text(
                 _format_parser_stats(stats),
                 parse_mode="HTML",
