@@ -288,13 +288,13 @@ export default function ParserQueuePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
-            {statCards.map((card) => (
+            {statCards.map(({ key: cardKey, tab: cardTab, ...card }) => (
               <StatCard
-                key={card.key}
+                key={cardKey}
                 {...card}
-                active={tab === card.tab}
+                active={tab === cardTab}
                 showDescription={showGuide}
-                onClick={() => setTab(card.tab)}
+                onClick={() => setTab(cardTab)}
               />
             ))}
           </div>
