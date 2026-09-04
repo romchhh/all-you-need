@@ -9,7 +9,11 @@ import {
   getHomeActivityServerCache,
   setHomeActivityServerCache,
 } from '@/lib/stats/homeActivityCache';
-import { NEW_LISTINGS_IN_KYIV_WINDOW_SQL } from '@/lib/stats/homeActivitySql';
+import { ensureListingStatsColumns } from '@/lib/stats/ensureListingStatsColumns';
+import {
+  LISTING_EFFECTIVE_CITY_SQL,
+  newListingsInKyivWindowSql,
+} from '@/lib/stats/homeActivitySql';
 import { listingCityKeyFromLocation } from '@/lib/city/cityNormalization';
 
 export type HomeActivityStatsPayload = {
@@ -19,26 +23,35 @@ export type HomeActivityStatsPayload = {
   windowKey: string;
 };
 
-const CITY_LISTINGS_SQL = `
-  SELECT location, COUNT(*) AS count
-  FROM Listing
-  WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}
-  GROUP BY location
+const FALLBACK_CITY_LABEL = 'Germany';
+
+function buildCityListingsSql(): string {
+  const windowSql = newListingsInKyivWindowSql('l');
+  return `
+  SELECT ${LISTING_EFFECTIVE_CITY_SQL} AS location, COUNT(*) AS count
+  FROM Listing l
+  LEFT JOIN parsed_items pi ON pi.marketplace_listing_id = l.id
+  WHERE ${windowSql}
+  GROUP BY ${LISTING_EFFECTIVE_CITY_SQL}
   HAVING COUNT(*) > 0
-  ORDER BY count DESC
+  ORDER BY 2 DESC
   LIMIT 80
 `;
+}
 
-const CATEGORY_LISTINGS_SQL = `
-  SELECT category, COUNT(*) AS count
-  FROM Listing
-  WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}
-    AND category IS NOT NULL AND TRIM(category) != ''
-  GROUP BY category
+function buildCategoryListingsSql(): string {
+  const windowSql = newListingsInKyivWindowSql('l');
+  return `
+  SELECT l.category, COUNT(*) AS count
+  FROM Listing l
+  WHERE ${windowSql}
+    AND l.category IS NOT NULL AND TRIM(l.category) != ''
+  GROUP BY l.category
   HAVING COUNT(*) > 0
-  ORDER BY count DESC
+  ORDER BY 2 DESC
   LIMIT 8
 `;
+}
 
 function mergeCityRows(
   rows: Array<{ location: string; count: bigint | number }>
@@ -47,8 +60,7 @@ function mergeCityRows(
   for (const row of rows) {
     const raw = (row.location || '').trim();
     const cityKey = listingCityKeyFromLocation(raw);
-    const label = cityKey || raw || '';
-    if (!label) continue;
+    const label = cityKey || raw || FALLBACK_CITY_LABEL;
     merged.set(label, (merged.get(label) || 0) + Number(row.count ?? 0));
   }
   return [...merged.entries()]
@@ -61,42 +73,62 @@ async function queryHomeActivityStats(
   dayStartStr: string,
   nowStr: string
 ): Promise<Omit<HomeActivityStatsPayload, 'windowKey'>> {
+  await ensureListingStatsColumns();
+
+  const windowSql = newListingsInKyivWindowSql('l');
+  const countSql = `SELECT COUNT(*) AS count FROM Listing l WHERE ${windowSql}`;
+  const citySql = buildCityListingsSql();
+  const categorySql = buildCategoryListingsSql();
+
   const [countRows, cityRows, categoryRows] = await Promise.all([
     executeWithRetry(
       () =>
-        prisma.$queryRawUnsafe(
-          `SELECT COUNT(*) AS count FROM Listing WHERE ${NEW_LISTINGS_IN_KYIV_WINDOW_SQL}`,
-          dayStartStr,
-          nowStr
-        ) as Promise<Array<{ count: bigint | number }>>
+        prisma.$queryRawUnsafe(countSql, dayStartStr, nowStr) as Promise<
+          Array<{ count: bigint | number }>
+        >
     ),
     executeWithRetry(
       () =>
-        prisma.$queryRawUnsafe(
-          CITY_LISTINGS_SQL,
-          dayStartStr,
-          nowStr
-        ) as Promise<Array<{ location: string; count: bigint | number }>>
-    ).catch((err) => {
-      console.error('[home-activity] city breakdown failed:', err);
-      return [] as Array<{ location: string; count: bigint | number }>;
+        prisma.$queryRawUnsafe(citySql, dayStartStr, nowStr) as Promise<
+          Array<{ location: string; count: bigint | number }>
+        >
+    ).catch(async (err) => {
+      console.error('[home-activity] city breakdown failed, fallback without join:', err);
+      const fallbackSql = `
+        SELECT COALESCE(NULLIF(TRIM(l.location), ''), '${FALLBACK_CITY_LABEL}') AS location,
+               COUNT(*) AS count
+        FROM Listing l
+        WHERE ${windowSql}
+        GROUP BY COALESCE(NULLIF(TRIM(l.location), ''), '${FALLBACK_CITY_LABEL}')
+        ORDER BY 2 DESC
+        LIMIT 80
+      `;
+      return prisma.$queryRawUnsafe(fallbackSql, dayStartStr, nowStr) as Promise<
+        Array<{ location: string; count: bigint | number }>
+      >;
     }),
     executeWithRetry(
       () =>
-        prisma.$queryRawUnsafe(
-          CATEGORY_LISTINGS_SQL,
-          dayStartStr,
-          nowStr
-        ) as Promise<Array<{ category: string; count: bigint | number }>>
+        prisma.$queryRawUnsafe(categorySql, dayStartStr, nowStr) as Promise<
+          Array<{ category: string; count: bigint | number }>
+        >
     ).catch((err) => {
       console.error('[home-activity] category breakdown failed:', err);
       return [] as Array<{ category: string; count: bigint | number }>;
     }),
   ]);
 
+  const newListingsToday = Number(countRows[0]?.count ?? 0);
+  const newListingsByCity = mergeCityRows(cityRows);
+
+  // Якщо загальний лічильник > 0, а міст немає — показуємо хоча б один bucket
+  if (newListingsToday > 0 && newListingsByCity.length === 0) {
+    newListingsByCity.push({ city: FALLBACK_CITY_LABEL, count: newListingsToday });
+  }
+
   return {
-    newListingsToday: Number(countRows[0]?.count ?? 0),
-    newListingsByCity: mergeCityRows(cityRows),
+    newListingsToday,
+    newListingsByCity,
     newListingsByCategory: categoryRows.map((row) => ({
       category: (row.category || '').trim(),
       count: Number(row.count ?? 0),
@@ -104,18 +136,17 @@ async function queryHomeActivityStats(
   };
 }
 
-/** Next.js Data Cache — переживає cold start (60 с). */
-const getCachedStatsForWindow = unstable_cache(
-  async (_windowKey: string) => {
-    const now = new Date();
-    const dayStart = startOfKyivListingsReportingWindow(now);
-    const dayStartStr = toSQLiteDate(dayStart);
-    const nowStr = toSQLiteDate(now);
-    return queryHomeActivityStats(dayStartStr, nowStr);
-  },
-  ['home-activity-stats-v2'],
-  { revalidate: 60, tags: ['home-activity'] }
-);
+/** Next.js Data Cache — ключ включає windowKey. */
+async function getCachedStatsForWindow(windowKey: string, now: Date) {
+  return unstable_cache(
+    async () => {
+      const dayStart = startOfKyivListingsReportingWindow(now);
+      return queryHomeActivityStats(toSQLiteDate(dayStart), toSQLiteDate(now));
+    },
+    ['home-activity-stats-v3', windowKey],
+    { revalidate: 60, tags: ['home-activity'] }
+  )();
+}
 
 export async function loadHomeActivityStats(
   now: Date = new Date()
@@ -129,15 +160,20 @@ export async function loadHomeActivityStats(
     Array.isArray(mem.newListingsByCity) &&
     Array.isArray(mem.newListingsByCategory)
   ) {
+    const cities = mem.newListingsByCity as HomeActivityStatsPayload['newListingsByCity'];
+    const today = mem.newListingsToday as number;
     return {
-      newListingsToday: mem.newListingsToday as number,
-      newListingsByCity: mem.newListingsByCity as HomeActivityStatsPayload['newListingsByCity'],
+      newListingsToday: today,
+      newListingsByCity:
+        today > 0 && cities.length === 0
+          ? [{ city: FALLBACK_CITY_LABEL, count: today }]
+          : cities,
       newListingsByCategory: mem.newListingsByCategory as HomeActivityStatsPayload['newListingsByCategory'],
       windowKey,
     };
   }
 
-  const stats = await getCachedStatsForWindow(windowKey);
+  const stats = await getCachedStatsForWindow(windowKey, now);
   const payload: HomeActivityStatsPayload = { ...stats, windowKey };
   setHomeActivityServerCache(windowKey, payload);
   return payload;
