@@ -146,7 +146,9 @@ def _today_counts() -> dict[str, Counter]:
 def remaining_auto_approve_slots() -> int:
     ensure_parsed_items_table()
     counts = _today_counts()
-    used = int(counts["total"].get("_", 0)) + count_auto_approve_in_flight()
+    in_flight = count_auto_approve_in_flight()
+    # Активні claim не повинні блокувати весь денний ліміт (завислі скидає drain).
+    used = int(counts["total"].get("_", 0)) + min(in_flight, 5)
     return max(0, PARSER_AUTO_APPROVE_DAILY_LIMIT - used)
 
 
@@ -161,7 +163,30 @@ def _recent_auto_approved_count(minutes: int | None = None) -> int:
         dt = _parse_moderated_at(row.get("moderated_at"))
         if dt is not None and dt >= since:
             n += 1
-    return n + count_auto_approve_in_flight()
+    return n
+
+
+def _ensure_auto_approve_unblocked(*, reset_claims: bool = False) -> None:
+    """Скинути завислі claim і залогувати, якщо ліміти вичерпані."""
+    ensure_parsed_items_table()
+    if reset_claims:
+        reset = reset_stale_auto_approve_claims()
+        if reset:
+            logger.warning("auto-approve: скинуто %s завислих claim", reset)
+    in_flight = count_auto_approve_in_flight()
+    if in_flight:
+        logger.warning("auto-approve: %s claim у процесі", in_flight)
+    daily_left = remaining_auto_approve_slots()
+    wave_left = remaining_auto_approve_wave_slots()
+    if daily_left <= 0:
+        logger.info("auto-approve: денний ліміт вичерпано (%s/день)", PARSER_AUTO_APPROVE_DAILY_LIMIT)
+    elif wave_left <= 0 and daily_left > 0:
+        logger.info(
+            "auto-approve: хвиля %s хв заповнена (%s за вікно, batch=%s)",
+            PARSER_AUTO_APPROVE_WAVE_MINUTES,
+            _recent_auto_approved_count(),
+            PARSER_AUTO_APPROVE_BATCH,
+        )
 
 
 def remaining_auto_approve_wave_slots(*, aggressive: bool = False) -> int:
@@ -330,7 +355,7 @@ def pick_auto_approve_batch(
         return None
 
     while slots > 0 and remaining:
-        picked = _take(remaining, require_caps=True)
+        picked = _take(remaining, require_caps=enforce_soft_caps)
         if picked is None and not enforce_soft_caps:
             picked = _take(remaining, require_caps=False)
         if picked is None:
@@ -357,15 +382,22 @@ async def _prepare_listing(item: dict) -> Optional[dict]:
     from parser.ai.screen import is_ai_screen_enabled
     from parser.core.location import resolve_parsed_location
 
+    force_service = _is_service_item(item)
     try:
+        working = dict(item)
         if is_ai_screen_enabled() and parsed_item_needs_ai_screen(item):
-            working = await ensure_parsed_item_ai_screened(dict(item))
-        else:
-            working = dict(item)
+            try:
+                working = await ensure_parsed_item_ai_screened(dict(item))
+            except RuntimeError as e:
+                logger.info(
+                    "auto-approve parsed_item %s: AI re-screen failed, fallback to parser fields: %s",
+                    item.get("id"),
+                    e,
+                )
         listing_item = preserve_parsed_source_fields(working, item)
-        force_service = _is_service_item(listing_item) or _is_service_item(item)
         listing_item = finalize_listing_item_for_publish(
-            listing_item, force_service=force_service
+            listing_item,
+            force_service=force_service or _is_service_item(listing_item),
         )
         listing_item["location"] = resolve_parsed_location(
             channel_city=str(listing_item.get("source_city") or ""),
@@ -377,7 +409,7 @@ async def _prepare_listing(item: dict) -> Optional[dict]:
                 f"{listing_item.get('raw_text') or ''}"
             ),
         )
-        if force_service:
+        if force_service or _is_service_item(listing_item):
             listing_item = force_services_marketplace_categories(listing_item)
             listing_item["condition"] = "new"
         else:
@@ -520,7 +552,7 @@ async def _auto_approve_one(bot: Bot, item: dict, *, aggressive: bool = False) -
 
     ok, reason = is_auto_approve_eligible(item, aggressive=aggressive)
     if not ok:
-        logger.debug("auto-approve ineligible %s: %s", item_id, reason)
+        logger.info("auto-approve ineligible %s: %s", item_id, reason)
         return False
 
     if not try_claim_auto_approve(item_id):
@@ -568,13 +600,19 @@ async def maybe_auto_approve_and_notify(
     """
     if not PARSER_AUTO_APPROVE_ENABLED:
         return False
+    _ensure_auto_approve_unblocked(reset_claims=False)
     if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
         return False
     item = hydrate_parsed_item(item_data)
     if not aggressive and not _under_soft_caps(item, _today_counts()):
         return False
-    ok, _reason = is_auto_approve_eligible(item, aggressive=aggressive)
+    ok, reason = is_auto_approve_eligible(item, aggressive=aggressive)
     if not ok:
+        logger.info(
+            "auto-approve skip parsed_item %s at parse-time: %s",
+            item.get("id"),
+            reason,
+        )
         return False
     return await _auto_approve_one(bot, item, aggressive=aggressive)
 
@@ -588,6 +626,8 @@ async def run_auto_approve_drain(
     stats = {"approved": 0, "skipped": 0, "slots": 0, "rounds": 0}
     if not PARSER_AUTO_APPROVE_ENABLED:
         return stats
+
+    _ensure_auto_approve_unblocked(reset_claims=True)
 
     close_bot = False
     if bot is None:
@@ -613,12 +653,23 @@ async def run_auto_approve_drain(
                 limit=1200 if aggressive else 800,
             )
             eligible: list[dict] = []
+            skip_reasons: Counter = Counter()
             for item in pending:
-                ok, _reason = is_auto_approve_eligible(item, aggressive=aggressive)
+                ok, reason = is_auto_approve_eligible(item, aggressive=aggressive)
                 if ok:
                     eligible.append(item)
                 else:
                     stats["skipped"] += 1
+                    if reason:
+                        skip_reasons[reason] += 1
+
+            if skip_reasons and not eligible:
+                top = skip_reasons.most_common(5)
+                logger.info(
+                    "auto-approve drain: 0 eligible з %s pending (top: %s)",
+                    len(pending),
+                    ", ".join(f"{k}={v}" for k, v in top),
+                )
 
             async with _LOCK:
                 slots = remaining_auto_approve_wave_slots(aggressive=aggressive)

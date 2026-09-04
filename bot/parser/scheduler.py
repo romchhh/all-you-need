@@ -132,6 +132,11 @@ async def run_parser_cycle(
 
         auto_approved_inline = 0
 
+        if PARSER_AUTO_APPROVE_ENABLED:
+            from parser.moderation.auto_approve import _ensure_auto_approve_unblocked
+
+            _ensure_auto_approve_unblocked(reset_claims=True)
+
         async def notify_callback(item_data: dict):
             nonlocal auto_approved_inline
             if PARSER_AUTO_APPROVE_ENABLED:
@@ -144,7 +149,7 @@ async def run_parser_cycle(
                     if await maybe_auto_approve_and_notify(
                         aiogram_bot,
                         item_data,
-                        aggressive=manual_parse,
+                        aggressive=True,
                     ):
                         auto_approved_inline += 1
                         return
@@ -227,7 +232,7 @@ async def run_parser_cycle(
 
                         drain_stats = await run_auto_approve_drain(
                             aiogram_bot,
-                            aggressive=manual_parse,
+                            aggressive=True,
                         )
                         if stats is not None:
                             stats["auto_approved"] = auto_approved_inline + int(

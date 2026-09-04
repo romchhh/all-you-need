@@ -91,9 +91,14 @@ export async function insertAnalyticsEvent(input: AnalyticsEventInput): Promise<
 export type AnalyticsSummary = {
   totalEvents: number;
   periodDays: number;
+  uniqueUsers: number;
+  avgEventsPerDay: number;
   byEvent: Array<{ eventName: string; count: number }>;
+  byEventGroup: Array<{ eventGroup: string; count: number }>;
   topCategories: Array<{ category: string; count: number }>;
-  topContactListings: Array<{ listingId: string; count: number }>;
+  topContactListings: Array<{ listingId: string; title: string | null; count: number }>;
+  topViewedListings: Array<{ listingId: string; title: string | null; count: number }>;
+  topSearches: Array<{ query: string; count: number }>;
   dailyEvents: Array<{ date: string; count: number }>;
   recentEvents: Array<{
     id: number;
@@ -118,6 +123,42 @@ export async function getAnalyticsSummary(days = 30): Promise<AnalyticsSummary> 
       sinceIso
     )
   )) as Array<{ count: number }>;
+
+  const uniqueRows = (await executeWithRetry(() =>
+    prisma.$queryRawUnsafe(
+      `SELECT COUNT(DISTINCT COALESCE(telegramId, 'uid:' || userId)) as count
+       FROM AnalyticsEvent
+       WHERE datetime(createdAt) >= datetime(?)
+         AND (telegramId IS NOT NULL OR userId IS NOT NULL)`,
+      sinceIso
+    )
+  ).catch(() => [{ count: 0 }])) as Array<{ count: number }>;
+
+  const byEventGroup = (await executeWithRetry(() =>
+    prisma.$queryRawUnsafe(
+      `SELECT COALESCE(eventGroup, 'other') as eventGroup, COUNT(*) as count
+       FROM AnalyticsEvent
+       WHERE datetime(createdAt) >= datetime(?)
+       GROUP BY eventGroup
+       ORDER BY count DESC`,
+      sinceIso
+    )
+  ).catch(() => [])) as Array<{ eventGroup: string; count: number }>;
+
+  const topSearches = (await executeWithRetry(() =>
+    prisma.$queryRawUnsafe(
+      `SELECT entityId as query, COUNT(*) as count
+       FROM AnalyticsEvent
+       WHERE datetime(createdAt) >= datetime(?)
+         AND eventName = 'search_submit'
+         AND entityType = 'query'
+         AND entityId IS NOT NULL AND TRIM(entityId) != ''
+       GROUP BY entityId
+       ORDER BY count DESC
+       LIMIT 15`,
+      sinceIso
+    )
+  ).catch(() => [])) as Array<{ query: string; count: number }>;
 
   const byEvent = (await executeWithRetry(() =>
     prisma.$queryRawUnsafe(
@@ -147,17 +188,37 @@ export async function getAnalyticsSummary(days = 30): Promise<AnalyticsSummary> 
 
   const topContactListings = (await executeWithRetry(() =>
     prisma.$queryRawUnsafe(
-      `SELECT entityId as listingId, COUNT(*) as count
-       FROM AnalyticsEvent
-       WHERE datetime(createdAt) >= datetime(?)
-         AND eventName = 'contact_seller'
-         AND entityType = 'listing'
-       GROUP BY entityId
+      `SELECT ae.entityId as listingId,
+              l.title as title,
+              COUNT(*) as count
+       FROM AnalyticsEvent ae
+       LEFT JOIN Listing l ON l.id = CAST(ae.entityId AS INTEGER)
+       WHERE datetime(ae.createdAt) >= datetime(?)
+         AND ae.eventName = 'contact_seller'
+         AND ae.entityType = 'listing'
+       GROUP BY ae.entityId
        ORDER BY count DESC
        LIMIT 15`,
       sinceIso
     )
-  )) as Array<{ listingId: string; count: number }>;
+  )) as Array<{ listingId: string; title: string | null; count: number }>;
+
+  const topViewedListings = (await executeWithRetry(() =>
+    prisma.$queryRawUnsafe(
+      `SELECT ae.entityId as listingId,
+              l.title as title,
+              COUNT(*) as count
+       FROM AnalyticsEvent ae
+       LEFT JOIN Listing l ON l.id = CAST(ae.entityId AS INTEGER)
+       WHERE datetime(ae.createdAt) >= datetime(?)
+         AND ae.eventName = 'listing_view'
+         AND ae.entityType = 'listing'
+       GROUP BY ae.entityId
+       ORDER BY count DESC
+       LIMIT 15`,
+      sinceIso
+    )
+  ).catch(() => [])) as Array<{ listingId: string; title: string | null; count: number }>;
 
   const dailyEvents = (await executeWithRetry(() =>
     prisma.$queryRawUnsafe(
@@ -179,11 +240,19 @@ export async function getAnalyticsSummary(days = 30): Promise<AnalyticsSummary> 
     )
   )) as AnalyticsSummary['recentEvents'];
 
+  const totalEvents = Number(totalRows[0]?.count ?? 0);
+
   return {
-    totalEvents: Number(totalRows[0]?.count ?? 0),
+    totalEvents,
     periodDays: days,
+    uniqueUsers: Number(uniqueRows[0]?.count ?? 0),
+    avgEventsPerDay: days > 0 ? Math.round((totalEvents / days) * 10) / 10 : 0,
     byEvent: byEvent.map((row) => ({
       eventName: row.eventName,
+      count: Number(row.count),
+    })),
+    byEventGroup: byEventGroup.map((row) => ({
+      eventGroup: row.eventGroup,
       count: Number(row.count),
     })),
     topCategories: topCategories.map((row) => ({
@@ -192,6 +261,16 @@ export async function getAnalyticsSummary(days = 30): Promise<AnalyticsSummary> 
     })),
     topContactListings: topContactListings.map((row) => ({
       listingId: row.listingId,
+      title: row.title,
+      count: Number(row.count),
+    })),
+    topViewedListings: topViewedListings.map((row) => ({
+      listingId: row.listingId,
+      title: row.title,
+      count: Number(row.count),
+    })),
+    topSearches: topSearches.map((row) => ({
+      query: row.query,
       count: Number(row.count),
     })),
     dailyEvents: dailyEvents.map((row) => ({

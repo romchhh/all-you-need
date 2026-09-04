@@ -874,7 +874,7 @@ def count_auto_approve_in_flight() -> int:
 
 
 def reset_stale_auto_approve_claims() -> int:
-    """Знімає завислі claim після рестарту процесу."""
+    """Знімає завислі claim (auto_approved=2 без listing)."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
