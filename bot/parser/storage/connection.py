@@ -10,14 +10,55 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 DB_PATH = BASE_DIR / "database" / "ayn_marketplace.db"
+_PARSER_CYCLE_LOCK_PATH = DB_PATH.parent / ".parser_cycle.lock"
 
 _DB_LOCK = threading.RLock()
 _CONNECT_RETRIES = 12
 _EXECUTE_RETRIES = 15
+_CROSS_PROCESS_LOCK_TIMEOUT = 180.0
+
+
+class _CrossProcessParserLock:
+    """Блокування між процесами (bot + next / другий парсер на хості)."""
+
+    def __init__(self) -> None:
+        self._fp = None
+
+    def acquire(self, timeout: float = _CROSS_PROCESS_LOCK_TIMEOUT) -> None:
+        if fcntl is None:
+            return
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        self._fp = open(_PARSER_CYCLE_LOCK_PATH, "a+")
+        deadline = time.time() + timeout
+        while True:
+            try:
+                fcntl.flock(self._fp.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return
+            except BlockingIOError:
+                if time.time() >= deadline:
+                    raise sqlite3.OperationalError(
+                        "parser cross-process lock timeout "
+                        "(можливо два парсери або bot на хості + Docker)"
+                    )
+                time.sleep(0.3)
+
+    def release(self) -> None:
+        if fcntl is None or self._fp is None:
+            return
+        try:
+            fcntl.flock(self._fp.fileno(), fcntl.LOCK_UN)
+        finally:
+            self._fp.close()
+            self._fp = None
 
 # Одне з'єднання на весь цикл /parse — менше «database is locked»
 _cycle_conn: sqlite3.Connection | None = None
@@ -133,8 +174,11 @@ def parser_db_cycle() -> Iterator[None]:
         yield
         return
 
+    cross_lock = _CrossProcessParserLock()
+    cross_lock.acquire()
     acquired = _DB_LOCK.acquire(timeout=120.0)
     if not acquired:
+        cross_lock.release()
         raise sqlite3.OperationalError("parser DB lock timeout (cycle start)")
 
     try:
@@ -151,6 +195,7 @@ def parser_db_cycle() -> Iterator[None]:
             _cycle_conn = None
         _cycle_depth = 0
         _DB_LOCK.release()
+        cross_lock.release()
         logger.debug("parser_db_cycle: closed shared connection")
 
 

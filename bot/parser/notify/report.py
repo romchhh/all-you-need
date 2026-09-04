@@ -69,12 +69,25 @@ def format_parser_stats(
             lines.append(f"• {html.escape(reason)}: {count}")
 
     if errors:
+        account_errors = [e for e in errors if str(e.get("channel", "")).strip() in ("—", "-", "")]
+        channel_errors = [e for e in errors if e not in account_errors]
         lines.append("")
-        lines.append(f"⚠️ Помилок каналів: <b>{len(errors)}</b>")
-        for err in errors[:3]:
-            ch = html.escape(str(err.get("channel", "?")))
-            msg = html.escape(str(err.get("error", ""))[:120])
-            lines.append(f"• {ch}: <code>{msg}</code>")
+        if account_errors:
+            lines.append(f"⚠️ Збої акаунтів: <b>{len(account_errors)}</b>")
+            for err in account_errors[:3]:
+                msg = html.escape(str(err.get("error", ""))[:140])
+                lines.append(f"• <code>{msg}</code>")
+            if any("database is locked" in str(e.get("error", "")).lower() for e in account_errors):
+                lines.append(
+                    "ℹ️ <i>database is locked</i> — зазвичай два процеси чіпають SQLite "
+                    "(bot на хості + Docker, або два /parse). Залиште один bot і один Next.js."
+                )
+        if channel_errors:
+            lines.append(f"⚠️ Помилок каналів: <b>{len(channel_errors)}</b>")
+            for err in channel_errors[:3]:
+                ch = html.escape(str(err.get("channel", "?")))
+                msg = html.escape(str(err.get("error", ""))[:120])
+                lines.append(f"• {ch}: <code>{msg}</code>")
 
     if scheduled:
         from parser.config.settings import PARSER_INTERVAL_MIN

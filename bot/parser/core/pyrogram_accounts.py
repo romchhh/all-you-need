@@ -23,8 +23,10 @@ logger = logging.getLogger(__name__)
 ParseChannelFn = Callable[..., Awaitable[dict]]
 
 PYROGRAM_SLEEP_THRESHOLD = 0
-_DB_LOCKED_RETRIES = 8
-_CLIENT_START_RETRIES = 5
+_DB_LOCKED_RETRIES = 10
+_CLIENT_START_RETRIES = 6
+_ACCOUNT_BUCKET_RETRIES = 3
+_INTER_ACCOUNT_SLEEP_SEC = 2.5
 
 
 def _ensure_pyrogram_patched() -> None:
@@ -186,6 +188,77 @@ async def _run_bucket_on_account(
     return local, errors
 
 
+async def _run_bucket_resilient(
+    acc: PyrogramAccount,
+    bucket: list[tuple[str, str]],
+    parse_fn: ParseChannelFn,
+    notify_callback: Callable[..., Awaitable[Any]],
+    *,
+    log_prefix: str,
+) -> tuple[dict, list[dict], PyrogramAccount]:
+    """Retry + резервний акаунт, якщо Pyrogram/.session або SQLite тимчасово зайняті."""
+    last_err: BaseException | None = None
+    tried: set[int] = set()
+
+    def _candidates() -> list[PyrogramAccount]:
+        chain = [acc, *fallback_accounts_after(acc)]
+        out: list[PyrogramAccount] = []
+        for candidate in chain:
+            if candidate.id in tried:
+                continue
+            tried.add(candidate.id)
+            out.append(candidate)
+        return out
+
+    for candidate in _candidates():
+        for attempt in range(_ACCOUNT_BUCKET_RETRIES):
+            try:
+                local, errors = await _run_bucket_on_account(
+                    candidate,
+                    bucket,
+                    parse_fn,
+                    notify_callback,
+                    log_prefix=log_prefix,
+                )
+                if candidate.id != acc.id:
+                    logger.warning(
+                        "%s — bucket %s канал(ів) з %s оброблено резервом %s",
+                        log_prefix,
+                        len(bucket),
+                        acc.label,
+                        candidate.label,
+                    )
+                return local, errors, candidate
+            except Exception as e:
+                last_err = e
+                if is_sqlite_locked_error(e) and attempt < _ACCOUNT_BUCKET_RETRIES - 1:
+                    wait = min(2.0 * (2**attempt), 12.0)
+                    logger.warning(
+                        "%s — SQLite/session locked для %s (bucket retry %s/%s, %.1fs)",
+                        log_prefix,
+                        candidate.label,
+                        attempt + 1,
+                        _ACCOUNT_BUCKET_RETRIES,
+                        wait,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                logger.warning(
+                    "%s — bucket на %s не вдався: %s",
+                    log_prefix,
+                    candidate.label,
+                    e,
+                )
+                break
+        if last_err is None or not is_sqlite_locked_error(last_err):
+            break
+        await asyncio.sleep(_INTER_ACCOUNT_SLEEP_SEC)
+
+    if last_err:
+        raise last_err
+    raise RuntimeError(f"bucket failed for {acc.label}")
+
+
 async def _run_parse_on_account(
     acc: PyrogramAccount,
     parse_fn: ParseChannelFn,
@@ -293,9 +366,11 @@ async def run_channels_with_accounts(
         ", ".join(f"{a.label}(…{a.phone_tail})" for a in accounts),
     )
 
-    for acc, bucket in zip(accounts, buckets):
+    for idx, (acc, bucket) in enumerate(zip(accounts, buckets)):
         if not bucket:
             continue
+        if idx > 0:
+            await asyncio.sleep(_INTER_ACCOUNT_SLEEP_SEC)
         logger.info(
             "%s — основний акаунт %s (…%s): %s канал(ів)",
             log_prefix,
@@ -303,8 +378,9 @@ async def run_channels_with_accounts(
             acc.phone_tail,
             len(bucket),
         )
+        used_acc = acc
         try:
-            local, errors = await _run_bucket_on_account(
+            local, errors, used_acc = await _run_bucket_resilient(
                 acc,
                 bucket,
                 parse_fn,
@@ -313,17 +389,38 @@ async def run_channels_with_accounts(
             )
             merge_channel_stats(total, local, channel="", city="")
             total["errors"].extend(errors)
-            accounts_db.mark_parse_result(acc.id, ok=True)
+            try:
+                accounts_db.mark_parse_result(acc.id, ok=True)
+                if used_acc.id != acc.id:
+                    accounts_db.mark_parse_result(used_acc.id, ok=True)
+            except Exception as mark_err:
+                logger.warning(
+                    "%s — не вдалось оновити статистику акаунта %s: %s",
+                    log_prefix,
+                    acc.label,
+                    mark_err,
+                )
         except Exception as e:
             logger.exception("%s — збій акаунта %s: %s", log_prefix, acc.label, e)
-            accounts_db.mark_parse_result(acc.id, ok=False, error=str(e))
+            try:
+                accounts_db.mark_parse_result(acc.id, ok=False, error=str(e))
+            except Exception as mark_err:
+                logger.warning("mark_parse_result(%s): %s", acc.label, mark_err)
             wait_sec = extract_flood_wait_seconds(e)
             if wait_sec > 0:
                 import time as _time
 
                 accounts_db.set_flood_until(acc.id, _time.time() + wait_sec)
+            hint = ""
+            if is_sqlite_locked_error(e):
+                hint = " (SQLite зайнята — перевірте, чи не запущено два bot/parse одночасно)"
             total["errors"].append(
-                {"channel": "—", "city": "—", "error": f"{acc.label}: {e}"}
+                {
+                    "channel": "—",
+                    "city": "—",
+                    "error": f"{acc.label}: {e}{hint}",
+                    "account": acc.label,
+                }
             )
 
     return total
