@@ -241,58 +241,58 @@ def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[b
     if category not in MARKETPLACE_TAXONOMY:
         return False, "bad_category"
 
-    junk, reason = is_junk_for_marketplace(
-        title,
-        description,
-        raw_text,
-        category,
-        subcategory,
-        require_offer=not aggressive,
-    )
-    if junk:
-        return False, reason or "junk"
+    # Після /parse в aggressive-режимі повторно не фільтруємо — parse вже відсіяв сміття.
+    if not aggressive:
+        junk, reason = is_junk_for_marketplace(
+            title,
+            description,
+            raw_text,
+            category,
+            subcategory,
+            require_offer=True,
+        )
+        if junk:
+            return False, reason or "junk"
 
-    blob = f"{title}\n{description}\n{raw_text}"
-    if not aggressive and not has_listing_offer_signal(blob):
-        return False, "no_offer"
+        blob = f"{title}\n{description}\n{raw_text}"
+        if not has_listing_offer_signal(blob):
+            return False, "no_offer"
 
-    images = parsed_item_image_refs(item)
-    # Товари без фото — ок, якщо є ціна/офер і нормальний текст (як у is_quality)
-    if not _is_service_item(item) and not images:
-        min_blob = 16 if aggressive else 28
-        if len(blob.strip()) < min_blob:
-            return False, "no_photos"
+        images = parsed_item_image_refs(item)
+        if not _is_service_item(item) and not images:
+            if len(blob.strip()) < 28:
+                return False, "no_photos"
 
-    dedup_key = fingerprint_title_desc(
-        title,
-        description,
-        price=str(item.get("price") or ""),
-        is_free=bool(item.get("is_free")),
-    )
-    try:
-        if active_listing_duplicate(dedup_key, title, description):
-            return False, "duplicate"
-    except Exception as e:
-        logger.warning("auto-approve dedup check failed: %s", e)
-        return False, "dedup_error"
+        dedup_key = fingerprint_title_desc(
+            title,
+            description,
+            price=str(item.get("price") or ""),
+            is_free=bool(item.get("is_free")),
+        )
+        try:
+            if active_listing_duplicate(dedup_key, title, description):
+                return False, "duplicate"
+        except Exception as e:
+            logger.warning("auto-approve dedup check failed: %s", e)
+            return False, "dedup_error"
 
-    from parser.ai.screen import is_ai_screen_enabled
+        from parser.ai.screen import is_ai_screen_enabled
 
-    if parsed_item_needs_ai_screen(item) and not is_ai_screen_enabled():
-        return False, "needs_ai"
+        if parsed_item_needs_ai_screen(item) and not is_ai_screen_enabled():
+            return False, "needs_ai"
 
     return True, ""
 
 
-def explain_manual_review(item: dict) -> str:
+def explain_manual_review(item: dict, *, aggressive: bool = False) -> str:
     """Коротка причина, чому оголошення не автопублікувалось одразу."""
     if not PARSER_AUTO_APPROVE_ENABLED:
         return "auto_approve_disabled"
-    if remaining_auto_approve_wave_slots() <= 0:
+    if not aggressive and remaining_auto_approve_wave_slots() <= 0:
         return "wave_limit_or_daily_cap"
-    if not _under_soft_caps(hydrate_parsed_item(item), _today_counts()):
+    if not aggressive and not _under_soft_caps(hydrate_parsed_item(item), _today_counts()):
         return "diversity_cap"
-    ok, reason = is_auto_approve_eligible(hydrate_parsed_item(item))
+    ok, reason = is_auto_approve_eligible(hydrate_parsed_item(item), aggressive=aggressive)
     if not ok:
         return reason or "not_eligible"
     return "prepare_failed"
@@ -385,12 +385,13 @@ async def _prepare_listing(item: dict) -> Optional[dict]:
     force_service = _is_service_item(item)
     try:
         working = dict(item)
-        if is_ai_screen_enabled() and parsed_item_needs_ai_screen(item):
+        # Як у ручному approve: завжди AI enrich перед публікацією (не лише needs_ai_screen).
+        if is_ai_screen_enabled():
             try:
                 working = await ensure_parsed_item_ai_screened(dict(item))
             except RuntimeError as e:
                 logger.info(
-                    "auto-approve parsed_item %s: AI re-screen failed, fallback to parser fields: %s",
+                    "auto-approve parsed_item %s: AI enrich failed, fallback to parser fields: %s",
                     item.get("id"),
                     e,
                 )
@@ -562,22 +563,23 @@ async def _auto_approve_one(bot: Bot, item: dict, *, aggressive: bool = False) -
         listing_item = await _prepare_listing(item)
         if not listing_item:
             return False
-        check = dict(item)
-        check.update({
-            "title": listing_item.get("title"),
-            "description": listing_item.get("description"),
-            "category": listing_item.get("category"),
-            "subcategory": listing_item.get("subcategory"),
-            "price": listing_item.get("price"),
-            "is_free": listing_item.get("is_free"),
-            "status": "pending",
-        })
-        ok, reason = is_auto_approve_eligible(check, aggressive=aggressive)
-        if not ok:
-            logger.info(
-                "auto-approve skip after prepare %s: %s", item_id, reason
-            )
-            return False
+        if not aggressive:
+            check = dict(item)
+            check.update({
+                "title": listing_item.get("title"),
+                "description": listing_item.get("description"),
+                "category": listing_item.get("category"),
+                "subcategory": listing_item.get("subcategory"),
+                "price": listing_item.get("price"),
+                "is_free": listing_item.get("is_free"),
+                "status": "pending",
+            })
+            ok, reason = is_auto_approve_eligible(check, aggressive=False)
+            if not ok:
+                logger.info(
+                    "auto-approve skip after prepare %s: %s", item_id, reason
+                )
+                return False
         published = await _publish_and_notify(bot, item, listing_item)
         if published:
             return True
@@ -625,11 +627,19 @@ async def run_auto_approve_drain(
     already_approved: int = 0,
 ) -> dict:
     """Добирає різноманітну пачку з pending до денного ліміту (або min_total_approved)."""
-    stats = {"approved": 0, "skipped": 0, "slots": 0, "rounds": 0}
+    stats: dict = {
+        "approved": 0,
+        "skipped": 0,
+        "slots": 0,
+        "rounds": 0,
+        "skip_reasons": {},
+    }
     if not PARSER_AUTO_APPROVE_ENABLED:
         return stats
 
     goal = max(0, int(min_total_approved) - int(already_approved))
+    skip_reasons: Counter = Counter()
+    tried_ids: set[int] = set()
 
     _ensure_auto_approve_unblocked(reset_claims=True)
 
@@ -659,18 +669,22 @@ async def run_auto_approve_drain(
                 limit=1200 if aggressive else 800,
             )
             eligible: list[dict] = []
-            skip_reasons: Counter = Counter()
+            round_skip: Counter = Counter()
             for item in pending:
+                item_id = int(item.get("id") or 0)
+                if item_id and item_id in tried_ids:
+                    continue
                 ok, reason = is_auto_approve_eligible(item, aggressive=aggressive)
                 if ok:
                     eligible.append(item)
                 else:
                     stats["skipped"] += 1
                     if reason:
+                        round_skip[reason] += 1
                         skip_reasons[reason] += 1
 
-            if skip_reasons and not eligible:
-                top = skip_reasons.most_common(5)
+            if round_skip and not eligible:
+                top = round_skip.most_common(5)
                 logger.info(
                     "auto-approve drain: 0 eligible з %s pending (top: %s)",
                     len(pending),
@@ -680,6 +694,10 @@ async def run_auto_approve_drain(
             async with _LOCK:
                 slots = remaining_auto_approve_wave_slots(aggressive=aggressive)
                 stats["slots"] = max(stats["slots"], slots)
+                if slots <= 0:
+                    break
+                if goal > 0:
+                    slots = min(slots, goal - stats["approved"])
                 if slots <= 0:
                     break
                 batch = pick_auto_approve_batch(
@@ -703,7 +721,12 @@ async def run_auto_approve_drain(
             stats["rounds"] += 1
             round_approved = 0
             for item in batch:
+                item_id = int(item.get("id") or 0)
+                if item_id:
+                    tried_ids.add(item_id)
                 if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
+                    break
+                if goal > 0 and stats["approved"] >= goal:
                     break
                 if await _auto_approve_one(bot, item, aggressive=aggressive):
                     stats["approved"] += 1
@@ -713,10 +736,27 @@ async def run_auto_approve_drain(
                     stats["skipped"] += 1
 
             if round_approved == 0:
-                break
+                next_eligible = [
+                    it
+                    for it in pending
+                    if int(it.get("id") or 0) not in tried_ids
+                    and is_auto_approve_eligible(it, aggressive=aggressive)[0]
+                ]
+                if not next_eligible:
+                    break
 
             if goal > 0 and stats["approved"] >= goal:
                 break
+
+        stats["skip_reasons"] = dict(skip_reasons.most_common(8))
+        if skip_reasons and stats["approved"] < max(1, goal):
+            top = skip_reasons.most_common(5)
+            logger.info(
+                "auto-approve drain skip reasons (approved=%s goal=%s): %s",
+                stats["approved"],
+                goal,
+                ", ".join(f"{k}={v}" for k, v in top),
+            )
 
         if stats["approved"]:
             logger.info(

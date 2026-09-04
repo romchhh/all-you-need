@@ -142,9 +142,10 @@ async def run_parser_cycle(
         async def notify_callback(item_data: dict):
             nonlocal auto_approved_inline, new_item_counter
             new_item_counter += 1
-            # Кожне друге нове оголошення — спочатку автопідтвердження (≈50% потоку)
-            try_auto = new_item_counter % 2 == 0
-            if PARSER_AUTO_APPROVE_ENABLED and try_auto:
+            # Тримаємо ~50% потоку: пробуємо auto, поки inline < ціль для поточної кількості нових.
+            target_so_far = int(round(new_item_counter * PARSER_AUTO_APPROVE_TARGET_RATIO))
+            try_auto = PARSER_AUTO_APPROVE_ENABLED and auto_approved_inline < target_so_far
+            if try_auto:
                 try:
                     from parser.moderation.auto_approve import (
                         explain_manual_review,
@@ -158,7 +159,7 @@ async def run_parser_cycle(
                     ):
                         auto_approved_inline += 1
                         return
-                    note = explain_manual_review(item_data)
+                    note = explain_manual_review(item_data, aggressive=True)
                     if note:
                         from parser.storage.parsed_items import set_parsed_item_review_note
 
@@ -239,12 +240,13 @@ async def run_parser_cycle(
                         target = int(round(added * PARSER_AUTO_APPROVE_TARGET_RATIO))
                         total_approved = auto_approved_inline
 
-                        drain_stats = await run_auto_approve_drain(
-                            aiogram_bot,
-                            aggressive=True,
-                            min_total_approved=target,
-                            already_approved=total_approved,
-                        )
+                        with parser_db_cycle():
+                            drain_stats = await run_auto_approve_drain(
+                                aiogram_bot,
+                                aggressive=True,
+                                min_total_approved=target,
+                                already_approved=total_approved,
+                            )
                         total_approved += int(drain_stats.get("approved") or 0)
 
                         if stats is not None:
@@ -254,6 +256,9 @@ async def run_parser_cycle(
                             stats["auto_approve_skipped"] = int(
                                 drain_stats.get("skipped") or 0
                             )
+                            skip_reasons = drain_stats.get("skip_reasons") or {}
+                            if isinstance(skip_reasons, dict) and skip_reasons:
+                                stats["auto_approve_skip_reasons"] = skip_reasons
                         if drain_stats.get("approved"):
                             logger.info(
                                 "🤖 auto-approve після циклу: +%s (разом %s/%s нових, ціль %s)",

@@ -852,10 +852,16 @@ def unclaim_auto_approve(item_id: int) -> None:
 
 
 def mark_auto_approved(item_id: int) -> None:
+    now = datetime.now(timezone.utc).isoformat()
     conn = get_connection()
     conn.execute(
-        "UPDATE parsed_items SET auto_approved = ? WHERE id = ?",
-        (AUTO_APPROVE_DONE, item_id),
+        """
+        UPDATE parsed_items
+        SET auto_approved = ?,
+            moderated_at = COALESCE(moderated_at, ?)
+        WHERE id = ?
+        """,
+        (AUTO_APPROVE_DONE, now, item_id),
     )
     conn.commit()
     conn.close()

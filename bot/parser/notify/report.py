@@ -63,6 +63,12 @@ def format_parser_stats(
             f"({pct}% · ціль ~{target_pct}%)"
         )
         lines.append(f"🕐 На модерацію: <b>{manual_review}</b>")
+        auto_skip = stats.get("auto_approve_skip_reasons") or {}
+        if auto_approved < int(stats.get("auto_approve_target") or 0) and auto_skip:
+            lines.append("")
+            lines.append("<b>Чому не автопідтверджено (top):</b>")
+            for reason, count in sorted(auto_skip.items(), key=lambda x: -x[1])[:5]:
+                lines.append(f"• {html.escape(str(reason))}: {count}")
     elif auto_approved > 0:
         lines.append(f"🤖 Автопідтверджено на МП: <b>{auto_approved}</b>")
     if effective_lookback:
