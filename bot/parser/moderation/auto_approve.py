@@ -236,7 +236,7 @@ def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[b
     min_title_len = 4 if aggressive else 5
     if not title or len(title) < min_title_len or title.lower() in _STUB_TITLES:
         return False, "bad_title"
-    if GENERIC_LISTING_TITLE_RE.match(title):
+    if not aggressive and GENERIC_LISTING_TITLE_RE.match(title):
         return False, "generic_title"
     if category not in MARKETPLACE_TAXONOMY:
         return False, "bad_category"
@@ -253,7 +253,7 @@ def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[b
         return False, reason or "junk"
 
     blob = f"{title}\n{description}\n{raw_text}"
-    if not has_listing_offer_signal(blob):
+    if not aggressive and not has_listing_offer_signal(blob):
         return False, "no_offer"
 
     images = parsed_item_image_refs(item)
@@ -621,11 +621,15 @@ async def run_auto_approve_drain(
     bot: Bot | None = None,
     *,
     aggressive: bool = False,
+    min_total_approved: int = 0,
+    already_approved: int = 0,
 ) -> dict:
-    """Добирає різноманітну пачку з pending до денного ліміту."""
+    """Добирає різноманітну пачку з pending до денного ліміту (або min_total_approved)."""
     stats = {"approved": 0, "skipped": 0, "slots": 0, "rounds": 0}
     if not PARSER_AUTO_APPROVE_ENABLED:
         return stats
+
+    goal = max(0, int(min_total_approved) - int(already_approved))
 
     _ensure_auto_approve_unblocked(reset_claims=True)
 
@@ -646,6 +650,8 @@ async def run_auto_approve_drain(
         max_rounds = PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS if aggressive else 1
         for _round in range(max_rounds):
             if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
+                break
+            if goal > 0 and stats["approved"] >= goal:
                 break
 
             pending = list_pending_for_auto_approve(
@@ -707,6 +713,9 @@ async def run_auto_approve_drain(
                     stats["skipped"] += 1
 
             if round_approved == 0:
+                break
+
+            if goal > 0 and stats["approved"] >= goal:
                 break
 
         if stats["approved"]:

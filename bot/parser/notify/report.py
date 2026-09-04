@@ -31,6 +31,11 @@ def format_parser_stats(
     added = int(stats.get("added") or 0)
     skipped = int(stats.get("skipped") or 0)
     auto_approved = int(stats.get("auto_approved") or 0)
+    manual_review = stats.get("manual_review")
+    if manual_review is None and added > 0:
+        manual_review = max(0, added - auto_approved)
+    else:
+        manual_review = int(manual_review or 0)
     channels = stats.get("channels")
     errors = stats.get("errors") or []
     reasons = stats.get("reasons") or {}
@@ -48,8 +53,18 @@ def format_parser_stats(
             f"⏭ Пропущено: <b>{skipped}</b>",
         ]
     )
-    if auto_approved > 0:
-        lines.append(f"🤖 Автопідтверджено на маркетплейс: <b>{auto_approved}</b>")
+    if added > 0:
+        from parser.config.settings import PARSER_AUTO_APPROVE_TARGET_RATIO
+
+        target_pct = int(round(PARSER_AUTO_APPROVE_TARGET_RATIO * 100))
+        pct = round((auto_approved / added) * 1000) / 10 if added else 0
+        lines.append(
+            f"🤖 Автопідтверджено на МП: <b>{auto_approved}</b> "
+            f"({pct}% · ціль ~{target_pct}%)"
+        )
+        lines.append(f"🕐 На модерацію: <b>{manual_review}</b>")
+    elif auto_approved > 0:
+        lines.append(f"🤖 Автопідтверджено на МП: <b>{auto_approved}</b>")
     if effective_lookback:
         lines.append(f"📥 Останні <b>{effective_lookback}</b> постів на канал")
     else:

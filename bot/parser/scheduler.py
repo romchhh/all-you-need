@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 from parser.config.settings import (
     FETCH_LIMIT,
     PARSER_AUTO_APPROVE_ENABLED,
+    PARSER_AUTO_APPROVE_TARGET_RATIO,
     PARSER_DEDUP_ENABLED,
     PARSER_INTERVAL_MIN,
     PARSER_ROLLING_LOOKBACK,
@@ -131,6 +132,7 @@ async def run_parser_cycle(
         from parser.storage.connection import parser_db_cycle
 
         auto_approved_inline = 0
+        new_item_counter = 0
 
         if PARSER_AUTO_APPROVE_ENABLED:
             from parser.moderation.auto_approve import _ensure_auto_approve_unblocked
@@ -138,8 +140,11 @@ async def run_parser_cycle(
             _ensure_auto_approve_unblocked(reset_claims=True)
 
         async def notify_callback(item_data: dict):
-            nonlocal auto_approved_inline
-            if PARSER_AUTO_APPROVE_ENABLED:
+            nonlocal auto_approved_inline, new_item_counter
+            new_item_counter += 1
+            # Кожне друге нове оголошення — спочатку автопідтвердження (≈50% потоку)
+            try_auto = new_item_counter % 2 == 0
+            if PARSER_AUTO_APPROVE_ENABLED and try_auto:
                 try:
                     from parser.moderation.auto_approve import (
                         explain_manual_review,
@@ -230,26 +235,44 @@ async def run_parser_cycle(
                     try:
                         from parser.moderation.auto_approve import run_auto_approve_drain
 
+                        added = int(stats.get("added") or 0) if stats else 0
+                        target = int(round(added * PARSER_AUTO_APPROVE_TARGET_RATIO))
+                        total_approved = auto_approved_inline
+
                         drain_stats = await run_auto_approve_drain(
                             aiogram_bot,
                             aggressive=True,
+                            min_total_approved=target,
+                            already_approved=total_approved,
                         )
+                        total_approved += int(drain_stats.get("approved") or 0)
+
                         if stats is not None:
-                            stats["auto_approved"] = auto_approved_inline + int(
-                                drain_stats.get("approved") or 0
-                            )
+                            stats["auto_approved"] = total_approved
+                            stats["manual_review"] = max(0, added - total_approved)
+                            stats["auto_approve_target"] = target
                             stats["auto_approve_skipped"] = int(
                                 drain_stats.get("skipped") or 0
                             )
                         if drain_stats.get("approved"):
                             logger.info(
-                                "🤖 auto-approve після циклу: +%s",
+                                "🤖 auto-approve після циклу: +%s (разом %s/%s нових, ціль %s)",
                                 drain_stats["approved"],
+                                total_approved,
+                                added,
+                                target,
                             )
                     except Exception as drain_err:
                         logger.warning("auto-approve drain після циклу: %s", drain_err)
-                        if stats is not None and auto_approved_inline:
+                        if stats is not None:
                             stats["auto_approved"] = auto_approved_inline
+                            stats["manual_review"] = max(
+                                0,
+                                int(stats.get("added") or 0) - auto_approved_inline,
+                            )
+                elif stats is not None:
+                    stats["auto_approved"] = 0
+                    stats["manual_review"] = int(stats.get("added") or 0)
         except RuntimeError as e:
             logger.error("Сесія парсера зайнята: %s", e, exc_info=True)
             await _notify_error("сесія зайнята", str(e))

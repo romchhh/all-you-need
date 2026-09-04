@@ -23,7 +23,7 @@ _PARSER_CYCLE_LOCK_PATH = DB_PATH.parent / ".parser_cycle.lock"
 
 _DB_LOCK = threading.RLock()
 _CONNECT_RETRIES = 12
-_EXECUTE_RETRIES = 15
+_EXECUTE_RETRIES = 20
 _CROSS_PROCESS_LOCK_TIMEOUT = 180.0
 
 
@@ -136,6 +136,10 @@ class ParserConnection:
     def __getattr__(self, name: str):
         return getattr(self._conn, name)
 
+    def cursor(self):
+        raw = self._conn.cursor()
+        return _RetryCursor(raw)
+
     def execute(self, *args, **kwargs):
         return _retry_execute(lambda: self._conn.execute(*args, **kwargs), op="execute")
 
@@ -154,6 +158,24 @@ class ParserConnection:
             self._conn.close()
         finally:
             _DB_LOCK.release()
+
+
+class _RetryCursor:
+    """cursor.execute() теж проходить через retry — parsed_items часто використовує cursor()."""
+
+    def __init__(self, cursor: sqlite3.Cursor):
+        self._cursor = cursor
+
+    def __getattr__(self, name: str):
+        return getattr(self._cursor, name)
+
+    def execute(self, *args, **kwargs):
+        return _retry_execute(lambda: self._cursor.execute(*args, **kwargs), op="cursor.execute")
+
+    def executemany(self, *args, **kwargs):
+        return _retry_execute(
+            lambda: self._cursor.executemany(*args, **kwargs), op="cursor.executemany"
+        )
 
 
 class ParserCycleConnection(ParserConnection):

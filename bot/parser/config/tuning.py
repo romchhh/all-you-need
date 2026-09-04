@@ -28,6 +28,8 @@ PARSER_AUTO_APPROVE_WAVE_MINUTES: int = 5
 PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = False
 # Ручний /parse: без хвильових лімітів, добираємо pending до денної квоти
 PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS: int = 12
+# Цільова частка нових parsed_items, що йдуть на МП автоматом (0.5 = кожне друге)
+PARSER_AUTO_APPROVE_TARGET_RATIO: float = 0.5
 
 # Жорсткі межі (не змінювати без потреби)
 PARSER_AUTO_APPROVE_DAILY_LIMIT_MAX: int = 500
