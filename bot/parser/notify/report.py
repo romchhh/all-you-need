@@ -58,11 +58,16 @@ def format_parser_stats(
 
         target_pct = int(round(PARSER_AUTO_APPROVE_TARGET_RATIO * 100))
         pct = round((auto_approved / added) * 1000) / 10 if added else 0
+        target_label = "макс." if target_pct >= 100 else f"~{target_pct}%"
         lines.append(
             f"🤖 Автопідтверджено на МП: <b>{auto_approved}</b> "
-            f"({pct}% · ціль ~{target_pct}%)"
+            f"({pct}% · ціль {target_label})"
         )
         lines.append(f"🕐 На модерацію: <b>{manual_review}</b>")
+        if auto_approved > 0:
+            lines.append(
+                "⚡ <i>Товари → маркетплейс одразу; послуги → канал + маркетплейс</i>"
+            )
         auto_skip = stats.get("auto_approve_skip_reasons") or {}
         if auto_approved < int(stats.get("auto_approve_target") or 0) and auto_skip:
             lines.append("")
@@ -119,9 +124,9 @@ def format_parser_stats(
         lines.append("")
         lines.append(
             "Модерація (3 групи):\n"
-            "• Hamburg послуги → канал Hamburg + маркетплейс\n"
-            "• Germany послуги → канал Germany + маркетплейс\n"
-            "• Товари → лише маркетплейс\n\n"
+            "• Hamburg послуги → канал Hamburg + маркетплейс (авто)\n"
+            "• Germany послуги → канал Germany + маркетплейс (авто)\n"
+            "• Товари → маркетплейс одразу (авто)\n\n"
             "💡 <code>/parse</code> — останні 100 постів на канал\n"
             "💡 <code>/parse200</code> — глибший catch-up"
         )

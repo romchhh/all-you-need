@@ -1,9 +1,8 @@
 """
-Автопідтвердження релевантних parsed_items лише на маркетплейс.
+Автопідтвердження parsed_items на маркетплейс (real-time після parse).
 
-Ліміт на календарний день (Europe/Kyiv), різноманітність:
-джерела (канали/групи), категорії, групи модерації.
-Telegram-канали послуг НЕ публікуються.
+Товари → лише маркетплейс. Послуги → маркетплейс + Telegram-канал (Hamburg/Germany).
+Дублікати на МП прибирає окремий job (marketplace_dedup_cleanup).
 """
 
 from __future__ import annotations
@@ -428,6 +427,8 @@ async def _publish_and_notify(
     bot: Bot,
     item: dict,
     listing_item: dict,
+    *,
+    aggressive: bool = False,
 ) -> bool:
     from parser.notify.admin import notify_auto_approved_marketplace
     from utils.city_digest_notify import enqueue_city_digest_listing
@@ -440,6 +441,7 @@ async def _publish_and_notify(
             listing_item,
             item,
             moderated_by=None,
+            skip_duplicate_check=aggressive,
         )
     except MarketplacePublishError as e:
         logger.info("auto-approve publish skip parsed_item %s: %s", item_id, e)
@@ -580,7 +582,9 @@ async def _auto_approve_one(bot: Bot, item: dict, *, aggressive: bool = False) -
                     "auto-approve skip after prepare %s: %s", item_id, reason
                 )
                 return False
-        published = await _publish_and_notify(bot, item, listing_item)
+        published = await _publish_and_notify(
+            bot, item, listing_item, aggressive=aggressive
+        )
         if published:
             return True
         return False
@@ -597,8 +601,8 @@ async def maybe_auto_approve_and_notify(
     aggressive: bool = False,
 ) -> bool:
     """
-    Parse-time: автопідтвердити, якщо є слот і м'які ліміти різноманітності.
-    True — картку pending слати не треба.
+    Parse-time: одразу після insert — автопублікація (real-time).
+    True — картку pending у групу модерації слати не треба.
     """
     if not PARSER_AUTO_APPROVE_ENABLED:
         return False

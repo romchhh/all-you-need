@@ -92,6 +92,14 @@ PARSER_AUTO_APPROVE_TARGET_RATIO: float = max(
     0.0, min(1.0, float(_tuning.PARSER_AUTO_APPROVE_TARGET_RATIO))
 )
 
+PARSER_MP_DEDUP_CLEANUP_ENABLED: bool = _tuning.PARSER_MP_DEDUP_CLEANUP_ENABLED
+PARSER_MP_DEDUP_CLEANUP_INTERVAL_MIN: float = max(
+    15.0, float(_tuning.PARSER_MP_DEDUP_CLEANUP_INTERVAL_MIN)
+)
+PARSER_MP_DEDUP_CLEANUP_LOOKBACK_DAYS: int = max(
+    7, int(_tuning.PARSER_MP_DEDUP_CLEANUP_LOOKBACK_DAYS)
+)
+
 PARSER_SERVICES_DEDUP_ENABLED: bool = _env_bool("PARSER_SERVICES_DEDUP_ENABLED", True)
 PARSER_DEDUP_DAYS: int = max(1, _env_int("PARSER_DEDUP_DAYS", 14))
 # Вікно dedup_key (title+desc+price) для services_channel approved без MP

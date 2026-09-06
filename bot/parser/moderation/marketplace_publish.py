@@ -48,6 +48,7 @@ def publish_parsed_item_marketplace(
     source: dict,
     *,
     moderated_by: int | None = None,
+    skip_duplicate_check: bool = False,
 ) -> tuple[int, str, list[str]]:
     """
     Створює Listing на маркетплейсі.
@@ -71,7 +72,7 @@ def publish_parsed_item_marketplace(
         price=str(listing_item.get("price") or ""),
         is_free=bool(listing_item.get("is_free")),
     )
-    if active_listing_duplicate(
+    if not skip_duplicate_check and active_listing_duplicate(
         dedup_key,
         str(listing_item.get("title") or ""),
         description,

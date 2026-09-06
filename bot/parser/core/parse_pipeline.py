@@ -15,7 +15,6 @@ from parser.marketplace_categories import (
     should_treat_as_service,
 )
 from parser.storage.listing_dedup import active_listing_duplicate
-from parser.storage.parsed_items import fingerprint_title_desc
 
 logger = logging.getLogger(__name__)
 
@@ -239,19 +238,6 @@ async def run_ai_screen_and_dedup(
     )
     if junk:
         return False, f"{junk_reason} (ai)", None, {}
-
-    final_dedup = fingerprint_title_desc(
-        check_title,
-        str(fields.get("description") or description),
-        price=str(fields.get("price") or price or ""),
-        is_free=bool(fields.get("is_free", is_free)),
-    )
-    if active_listing_duplicate(
-        final_dedup or dedup_key,
-        check_title,
-        str(fields.get("description") or description),
-    ):
-        return False, "дублікат (маркетплейс)", None, {}
 
     fields["title"] = check_title
     logger.info(

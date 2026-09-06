@@ -22,7 +22,6 @@ from dotenv import load_dotenv
 from parser.config.settings import (
     FETCH_LIMIT,
     PARSER_AUTO_APPROVE_ENABLED,
-    PARSER_AUTO_APPROVE_TARGET_RATIO,
     PARSER_DEDUP_ENABLED,
     PARSER_INTERVAL_MIN,
     PARSER_ROLLING_LOOKBACK,
@@ -132,7 +131,6 @@ async def run_parser_cycle(
         from parser.storage.connection import parser_db_cycle
 
         auto_approved_inline = 0
-        new_item_counter = 0
 
         if PARSER_AUTO_APPROVE_ENABLED:
             from parser.moderation.auto_approve import _ensure_auto_approve_unblocked
@@ -140,12 +138,9 @@ async def run_parser_cycle(
             _ensure_auto_approve_unblocked(reset_claims=True)
 
         async def notify_callback(item_data: dict):
-            nonlocal auto_approved_inline, new_item_counter
-            new_item_counter += 1
-            # Тримаємо ~50% потоку: пробуємо auto, поки inline < ціль для поточної кількості нових.
-            target_so_far = int(round(new_item_counter * PARSER_AUTO_APPROVE_TARGET_RATIO))
-            try_auto = PARSER_AUTO_APPROVE_ENABLED and auto_approved_inline < target_so_far
-            if try_auto:
+            nonlocal auto_approved_inline
+            # Real-time: одразу після parse пробуємо автопублікацію (товари → МП, послуги → МП+канал).
+            if PARSER_AUTO_APPROVE_ENABLED:
                 try:
                     from parser.moderation.auto_approve import (
                         explain_manual_review,
@@ -237,7 +232,8 @@ async def run_parser_cycle(
                         from parser.moderation.auto_approve import run_auto_approve_drain
 
                         added = int(stats.get("added") or 0) if stats else 0
-                        target = int(round(added * PARSER_AUTO_APPROVE_TARGET_RATIO))
+                        # Добираємо все, що не встигло опублікуватись inline (real-time fallback).
+                        target = added
                         total_approved = auto_approved_inline
 
                         with parser_db_cycle():
@@ -341,6 +337,14 @@ def register_parser_job(scheduler):
         register_auto_approve_job(scheduler)
     except Exception:
         logger.exception("Не вдалося зареєструвати auto-approve job")
+    try:
+        from parser.storage.marketplace_dedup_cleanup import (
+            register_marketplace_dedup_cleanup_job,
+        )
+
+        register_marketplace_dedup_cleanup_job(scheduler)
+    except Exception:
+        logger.exception("Не вдалося зареєструвати MP dedup cleanup job")
 
 
 def register_services_ai_parser_job(scheduler):

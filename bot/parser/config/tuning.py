@@ -15,8 +15,8 @@ PARSER_DEDUP_ENABLED: bool = False
 PARSER_AI_ENABLED: bool = True
 PARSER_AI_SCREEN_ENABLED: bool = True
 
-# ── Автопублікація на маркетплейс (~450/день) ─────────────────
-# Канали послуг — вручну (✅ «У канал» у Telegram), не автоматично.
+# ── Автопублікація (~450/день) ────────────────────────────────
+# Товари → маркетплейс одразу після parse. Послуги → канал + маркетплейс.
 PARSER_AUTO_APPROVE_ENABLED: bool = True
 PARSER_AUTO_APPROVE_DAILY_LIMIT: int = 450
 PARSER_AUTO_APPROVE_INTERVAL_MIN: float = 3.0
@@ -25,11 +25,16 @@ PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = 250
 PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = 250
 PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = 72
 PARSER_AUTO_APPROVE_WAVE_MINUTES: int = 5
-PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = False
+PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = True
 # Ручний /parse: без хвильових лімітів, добираємо pending до денної квоти
 PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS: int = 12
-# Цільова частка нових parsed_items, що йдуть на МП автоматом (0.5 = кожне друге)
-PARSER_AUTO_APPROVE_TARGET_RATIO: float = 0.5
+# 1.0 = усі нові parsed_items одразу на МП (real-time), не 50%
+PARSER_AUTO_APPROVE_TARGET_RATIO: float = 1.0
+
+# ── Очищення дублікатів на маркетплейсі ───────────────────────
+PARSER_MP_DEDUP_CLEANUP_ENABLED: bool = True
+PARSER_MP_DEDUP_CLEANUP_INTERVAL_MIN: float = 60.0
+PARSER_MP_DEDUP_CLEANUP_LOOKBACK_DAYS: int = 30
 
 # Жорсткі межі (не змінювати без потреби)
 PARSER_AUTO_APPROVE_DAILY_LIMIT_MAX: int = 500
