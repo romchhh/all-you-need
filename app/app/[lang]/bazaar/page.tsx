@@ -82,6 +82,7 @@ const BazaarPage = () => {
     handleNavigateToCategories,
     handleBazaarStateChange,
     bazaarTabState,
+    catalogPersonalized,
     isPulling,
     pullDistance,
     pullProgress,
@@ -135,6 +136,7 @@ const BazaarPage = () => {
             onStateChange={handleBazaarStateChange}
             tg={tg}
             profileTelegramId={profile?.telegramId != null ? String(profile.telegramId) : null}
+            catalogPersonalized={catalogPersonalized}
             onToast={handleToast}
           />
         </div>

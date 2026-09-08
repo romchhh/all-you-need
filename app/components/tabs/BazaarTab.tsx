@@ -86,6 +86,8 @@ interface BazaarTabProps {
   tg: TelegramWebApp | null;
   /** Telegram ID залогіненого користувача (міні-ап) — для підписок на місто */
   profileTelegramId?: string | null;
+  /** Каталог підлаштовано під інтереси користувача */
+  catalogPersonalized?: boolean;
   onToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
@@ -114,6 +116,7 @@ const BazaarTabComponent = ({
   onStateChange,
   tg,
   profileTelegramId,
+  catalogPersonalized = false,
   onToast
 }: BazaarTabProps) => {
   const { t } = useLanguage();
@@ -651,6 +654,7 @@ const BazaarTabComponent = ({
                       eventGroup: ANALYTICS_EVENT_GROUPS.navigation,
                       entityType: 'category',
                       entityId: category.id,
+                      telegramId: profileTelegramId,
                     });
                     commitCatalogState({
                       selectedCategory: category.id,
@@ -730,6 +734,7 @@ const BazaarTabComponent = ({
                 eventGroup: ANALYTICS_EVENT_GROUPS.navigation,
                 entityType: 'category',
                 entityId: subcategoryId,
+                telegramId: profileTelegramId,
                 metadata: { parentCategory: selectedCategory },
               });
               commitCatalogState({ selectedSubcategory: subcategoryId });
@@ -740,6 +745,28 @@ const BazaarTabComponent = ({
           />
         </div>
       )}
+
+      {catalogPersonalized &&
+        !selectedCategory &&
+        !searchQuery.trim() &&
+        sortBy === 'newest' &&
+        filteredAndSortedListings.length > 0 && (
+          <div className="animate-content-in px-4 pb-2 sm:px-6">
+            <div
+              className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-xs ${
+                isLight
+                  ? 'bg-[#3F5331]/10 text-[#3F5331] border border-[#3F5331]/15'
+                  : 'bg-[#C8E6A0]/10 text-[#C8E6A0] border border-[#C8E6A0]/20'
+              }`}
+            >
+              <span aria-hidden>✨</span>
+              <span className="font-medium">{t('bazaar.personalizedFeed')}</span>
+              <span className={`truncate ${isLight ? 'text-[#5A6B52]/80' : 'text-white/60'}`}>
+                · {t('bazaar.personalizedFeedHint')}
+              </span>
+            </div>
+          </div>
+        )}
 
       {/* Сітка або список оголошень */}
       {initialLoading && filteredAndSortedListings.length === 0 ? (
@@ -910,6 +937,7 @@ export const BazaarTab = memo(BazaarTabComponent, (prevProps, nextProps) => {
     prevProps.savedState?.showFreeOnly === nextProps.savedState?.showFreeOnly &&
     prevProps.initialSelectedCategory === nextProps.initialSelectedCategory &&
     prevProps.profileTelegramId === nextProps.profileTelegramId &&
+    prevProps.catalogPersonalized === nextProps.catalogPersonalized &&
     prevProps.initialLoading === nextProps.initialLoading &&
     prevProps.isRefreshing === nextProps.isRefreshing &&
     prevProps.loadError === nextProps.loadError &&

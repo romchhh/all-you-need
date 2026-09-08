@@ -82,13 +82,23 @@ export function appendCatalogFiltersToWhere(
   return where;
 }
 
-export function catalogOrderByClause(sortBy: string): string {
+export function catalogOrderByClause(
+  sortBy: string,
+  personalization?: { sql: string; params: unknown[] } | null
+): { clause: string; params: unknown[] } {
   let orderByClause = 'ORDER BY';
   orderByClause +=
     " CASE WHEN l.promotionType = 'vip' AND (l.promotionEnds IS NULL OR datetime(l.promotionEnds) > datetime('now')) THEN 0";
   orderByClause +=
     " WHEN l.promotionType = 'top' AND (l.promotionEnds IS NULL OR datetime(l.promotionEnds) > datetime('now')) THEN 1";
   orderByClause += ' ELSE 2 END,';
+
+  const orderParams: unknown[] = [];
+
+  if (personalization?.sql && sortBy === 'newest') {
+    orderByClause += ` (${personalization.sql}) DESC,`;
+    orderParams.push(...personalization.params);
+  }
 
   switch (sortBy) {
     case 'price_low':
@@ -103,5 +113,5 @@ export function catalogOrderByClause(sortBy: string): string {
     default:
       orderByClause += ' l.createdAt DESC';
   }
-  return orderByClause;
+  return { clause: orderByClause, params: orderParams };
 }

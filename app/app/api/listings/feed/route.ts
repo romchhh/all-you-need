@@ -25,6 +25,11 @@ import {
   normalizeCyrillicToLower,
   generateSearchVariants,
 } from '@/lib/listings/searchVariants';
+import {
+  buildPersonalizationOrderBoost,
+  loadUserPersonalizationProfile,
+  shouldPersonalizeCatalogFeed,
+} from '@/lib/listings/personalization';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -73,6 +78,8 @@ export async function GET(request: NextRequest) {
     const maxPrice = parseOptionalInt(sp.get('maxPrice'));
     const condition = parseConditionParam(sp.get('condition'));
     const currency = sp.get('currency')?.trim().toUpperCase() || null;
+    const viewerId =
+      sp.get('viewerId')?.trim() || sp.get('telegramId')?.trim() || null;
 
     const filters: CatalogFilterParams = {
       category,
@@ -88,7 +95,14 @@ export async function GET(request: NextRequest) {
       currencyColumnExists,
     };
 
-    const isServerCacheable = !search && cities.length === 0 && offset === 0;
+    const personalize = shouldPersonalizeCatalogFeed({
+      viewerId,
+      sortBy,
+      search,
+    });
+
+    const isServerCacheable =
+      !personalize && !search && cities.length === 0 && offset === 0;
     const serverCacheKey = isServerCacheable
       ? buildBazaarCatalogCacheKey({
           category,
@@ -134,7 +148,18 @@ export async function GET(request: NextRequest) {
     whereClause +=
       " AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))";
 
-    const orderByClause = catalogOrderByClause(sortBy);
+    let personalizationBoost = null;
+    let personalized = false;
+    if (personalize && viewerId) {
+      const profile = await loadUserPersonalizationProfile(viewerId);
+      personalizationBoost = buildPersonalizationOrderBoost(profile);
+      personalized = Boolean(personalizationBoost);
+    }
+
+    const { clause: orderByClause, params: orderParams } = catalogOrderByClause(
+      sortBy,
+      personalizationBoost
+    );
 
     const listingsQuery = `
       SELECT
@@ -183,7 +208,7 @@ export async function GET(request: NextRequest) {
 
     try {
       const [data, countRows] = await Promise.all([
-        prisma.$queryRawUnsafe(listingsQuery, ...params, limit, offset) as Promise<any[]>,
+        prisma.$queryRawUnsafe(listingsQuery, ...params, ...orderParams, limit, offset) as Promise<any[]>,
         prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>,
       ]);
       listingsData = data;
@@ -198,7 +223,7 @@ export async function GET(request: NextRequest) {
         .replace(`, ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount`, '')
         .replace(LISTING_FAVORITES_JOIN_SQL, '');
       const [data, countRows] = await Promise.all([
-        prisma.$queryRawUnsafe(fallback, ...params, limit, offset) as Promise<any[]>,
+        prisma.$queryRawUnsafe(fallback, ...params, ...orderParams, limit, offset) as Promise<any[]>,
         prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>,
       ]);
       listingsData = data.map((l) => ({ ...l, favoritesCount: 0 }));
@@ -285,7 +310,14 @@ export async function GET(request: NextRequest) {
     });
 
     const hasMore = offset + formatted.length < total;
-    const payload = { listings: formatted, total, limit, offset, hasMore };
+    const payload = {
+      listings: formatted,
+      total,
+      limit,
+      offset,
+      hasMore,
+      personalized,
+    };
     const response = NextResponse.json(payload);
 
     if (isServerCacheable && serverCacheKey) {

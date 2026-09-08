@@ -337,6 +337,7 @@ export function useBazaarPage() {
   });
   const [isListingsRefreshing, setIsListingsRefreshing] = useState(false);
   const [listingsLoadError, setListingsLoadError] = useState(false);
+  const [catalogPersonalized, setCatalogPersonalized] = useState(false);
   const [hasMore, setHasMore] = useState(() => {
     if (typeof window === 'undefined') return false;
     const cached = getCachedData('bazaarListingsState');
@@ -402,11 +403,15 @@ export function useBazaarPage() {
       if (searchTrimmed) {
         params.set('search', searchTrimmed);
       }
+      if (profile?.telegramId) {
+        params.set('viewerId', String(profile.telegramId));
+      }
       return `/api/listings/feed?${params.toString()}`;
     },
     [
       bazaarTabState,
       debouncedSearchQuery,
+      profile?.telegramId,
     ]
   );
   const { toast, showToast, hideToast } = useToast();
@@ -588,8 +593,14 @@ export function useBazaarPage() {
       const searchForRequest = (initialSearch ?? debouncedSearchQuery ?? '').trim();
       const useSearch = Boolean(searchForRequest);
 
-      // Кеш тільки без фільтрів, без пошуку і без примусового оновлення
-      if (!forceRefresh && !requestHasActiveFilters && !useSearch && typeof window !== 'undefined') {
+      // Кеш тільки без фільтрів, без пошуку, без персоналізації і без примусового оновлення
+      if (
+        !forceRefresh &&
+        !requestHasActiveFilters &&
+        !useSearch &&
+        !profile?.telegramId &&
+        typeof window !== 'undefined'
+      ) {
         const cached = getCachedData('bazaarListingsState');
         if (cached?.listings?.length) {
           const cacheAge = Date.now() - (cached.timestamp || 0);
@@ -627,6 +638,7 @@ export function useBazaarPage() {
           setTotalListings(total);
           setHasMore(more);
           setListingsOffset(list.length);
+          setCatalogPersonalized(Boolean(data.personalized));
         });
         schedulePrefetchListingsImages(list);
 
@@ -637,7 +649,23 @@ export function useBazaarPage() {
           );
         }
 
-        if (!requestHasActiveFilters && !useSearch && typeof window !== 'undefined') {
+        if (useSearch && searchForRequest?.trim()) {
+          trackAnalytics({
+            eventName: ANALYTICS_EVENTS.searchSubmit,
+            eventGroup: ANALYTICS_EVENT_GROUPS.search,
+            entityType: 'query',
+            entityId: searchForRequest.trim().slice(0, 80),
+            telegramId: profile?.telegramId,
+            metadata: { source: 'bazaar' },
+          });
+        }
+
+        if (
+          !requestHasActiveFilters &&
+          !useSearch &&
+          !profile?.telegramId &&
+          typeof window !== 'undefined'
+        ) {
           setCachedData('bazaarListingsState', {
             listings: list,
             total,
@@ -655,6 +683,7 @@ export function useBazaarPage() {
         setHasMore(false);
         setListingsOffset(0);
         setListingsLoadError(true);
+        setCatalogPersonalized(false);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -674,7 +703,7 @@ export function useBazaarPage() {
         setIsListingsRefreshing(false);
       }
     }
-  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages]);
+  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages, profile?.telegramId]);
 
   // Ключ фільтрів (категорія, міста, ціна, пошук тощо) — однаковий формат для першого завантаження та рефетчу
   const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${bazaarTabState.minPrice ?? ''}|${bazaarTabState.maxPrice ?? ''}|${bazaarTabState.selectedCondition ?? ''}|${bazaarTabState.selectedCurrency ?? ''}|${(debouncedSearchQuery ?? '').trim()}`;
@@ -1184,6 +1213,7 @@ export function useBazaarPage() {
     handleNavigateToCategories,
     handleBazaarStateChange,
     bazaarTabState,
+    catalogPersonalized,
     isPulling,
     pullDistance,
     pullProgress,
