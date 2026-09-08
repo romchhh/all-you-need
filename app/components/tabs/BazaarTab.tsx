@@ -590,6 +590,26 @@ const BazaarTabComponent = ({
               <HomeActivityStats isLight={isLight} />
             </div>
           </div>
+          {(catalogPersonalized || profileTelegramId) &&
+            !selectedCategory &&
+            sortBy === 'newest' &&
+            !hasActiveFilters && (
+              <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
+                <div
+                  className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-xs ${
+                    isLight
+                      ? 'bg-[#3F5331]/10 text-[#3F5331] border border-[#3F5331]/15'
+                      : 'bg-[#C8E6A0]/10 text-[#C8E6A0] border border-[#C8E6A0]/20'
+                  }`}
+                >
+                  <span aria-hidden>✨</span>
+                  <span className="font-medium">{t('bazaar.personalizedFeed')}</span>
+                  <span className={`truncate ${isLight ? 'text-[#5A6B52]/80' : 'text-white/60'}`}>
+                    · {t('bazaar.personalizedFeedHint')}
+                  </span>
+                </div>
+              </div>
+            )}
         </>
       )}
 
@@ -745,28 +765,6 @@ const BazaarTabComponent = ({
           />
         </div>
       )}
-
-      {catalogPersonalized &&
-        !selectedCategory &&
-        !searchQuery.trim() &&
-        sortBy === 'newest' &&
-        filteredAndSortedListings.length > 0 && (
-          <div className="animate-content-in px-4 pb-2 sm:px-6">
-            <div
-              className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-xs ${
-                isLight
-                  ? 'bg-[#3F5331]/10 text-[#3F5331] border border-[#3F5331]/15'
-                  : 'bg-[#C8E6A0]/10 text-[#C8E6A0] border border-[#C8E6A0]/20'
-              }`}
-            >
-              <span aria-hidden>✨</span>
-              <span className="font-medium">{t('bazaar.personalizedFeed')}</span>
-              <span className={`truncate ${isLight ? 'text-[#5A6B52]/80' : 'text-white/60'}`}>
-                · {t('bazaar.personalizedFeedHint')}
-              </span>
-            </div>
-          </div>
-        )}
 
       {/* Сітка або список оголошень */}
       {initialLoading && filteredAndSortedListings.length === 0 ? (

@@ -23,6 +23,7 @@ import {
   type BazaarTabPersistedState,
 } from '@/lib/bazaar/bazaarTabStateStorage';
 import { listingToSearchPreview, updateSearchHistoryListings } from '@/utils/searchHistory';
+import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
 import { prefetchListingsImages } from '@/lib/media/listingMediaCache';
 import {
   consumePendingListingCategory,
@@ -354,7 +355,7 @@ export function useBazaarPage() {
     const cached = getCachedData('bazaarListingsState');
     return cached?.offset ?? (cached?.listings?.length ? cached.listings.length : 0);
   });
-  const { tg } = useTelegram();
+  const { tg, user: telegramUser } = useTelegram();
 
   useEffect(() => {
     listingsCountRef.current = listings.length;
@@ -376,6 +377,11 @@ export function useBazaarPage() {
       }
     }
   }, [tg, lang, router]);
+
+  const viewerTelegramId = useMemo(
+    () => resolveViewerTelegramId(profile?.telegramId, telegramUser?.id),
+    [profile?.telegramId, telegramUser?.id]
+  );
 
   const buildListingsUrl = useCallback(
     (
@@ -403,15 +409,15 @@ export function useBazaarPage() {
       if (searchTrimmed) {
         params.set('search', searchTrimmed);
       }
-      if (profile?.telegramId) {
-        params.set('viewerId', String(profile.telegramId));
+      if (viewerTelegramId) {
+        params.set('viewerId', viewerTelegramId);
       }
       return `/api/listings/feed?${params.toString()}`;
     },
     [
       bazaarTabState,
       debouncedSearchQuery,
-      profile?.telegramId,
+      viewerTelegramId,
     ]
   );
   const { toast, showToast, hideToast } = useToast();
@@ -599,6 +605,7 @@ export function useBazaarPage() {
         !requestHasActiveFilters &&
         !useSearch &&
         !profile?.telegramId &&
+        !viewerTelegramId &&
         typeof window !== 'undefined'
       ) {
         const cached = getCachedData('bazaarListingsState');
@@ -664,6 +671,7 @@ export function useBazaarPage() {
           !requestHasActiveFilters &&
           !useSearch &&
           !profile?.telegramId &&
+        !viewerTelegramId &&
           typeof window !== 'undefined'
         ) {
           setCachedData('bazaarListingsState', {
@@ -703,10 +711,10 @@ export function useBazaarPage() {
         setIsListingsRefreshing(false);
       }
     }
-  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages, profile?.telegramId]);
+  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages, profile?.telegramId, viewerTelegramId]);
 
   // Ключ фільтрів (категорія, міста, ціна, пошук тощо) — однаковий формат для першого завантаження та рефетчу
-  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${bazaarTabState.minPrice ?? ''}|${bazaarTabState.maxPrice ?? ''}|${bazaarTabState.selectedCondition ?? ''}|${bazaarTabState.selectedCurrency ?? ''}|${(debouncedSearchQuery ?? '').trim()}`;
+  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${bazaarTabState.minPrice ?? ''}|${bazaarTabState.maxPrice ?? ''}|${bazaarTabState.selectedCondition ?? ''}|${bazaarTabState.selectedCurrency ?? ''}|${(debouncedSearchQuery ?? '').trim()}|${viewerTelegramId ?? ''}`;
 
   // Перше завантаження (без фільтрів і без пошуку — можна з кешу; якщо є пошук — одразу з пошуком)
   useEffect(() => {
@@ -714,7 +722,14 @@ export function useBazaarPage() {
 
     const searchTrimmed = (searchQuery || '').trim();
     const cached = getCachedData('bazaarListingsState');
-    if (cached && cached.listings && cached.listings.length > 0 && !hasActiveFilters && !searchTrimmed) {
+    if (
+      cached &&
+      cached.listings &&
+      cached.listings.length > 0 &&
+      !hasActiveFilters &&
+      !searchTrimmed &&
+      !viewerTelegramId
+    ) {
       setListings(cached.listings || []);
       setTotalListings(cached.total || 0);
       setHasMore((cached.listings?.length ?? 0) < (cached.total ?? 0));
@@ -733,7 +748,7 @@ export function useBazaarPage() {
       // Якщо в полі пошуку вже є текст (наприклад з localStorage) — одразу завантажуємо з пошуком
       fetchListings(false, searchTrimmed || undefined);
     }
-  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery, schedulePrefetchListingsImages]);
+  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery, schedulePrefetchListingsImages, viewerTelegramId]);
 
   // Після перезавантаження / лого — повернутися до товару в стрічці
   useEffect(() => {
@@ -1169,6 +1184,7 @@ export function useBazaarPage() {
     lang,
     t,
     profile,
+    viewerTelegramId,
     categories,
     tg,
     toast,

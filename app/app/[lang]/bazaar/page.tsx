@@ -38,6 +38,7 @@ const BazaarPage = () => {
     lang,
     t,
     profile,
+    viewerTelegramId,
     categories,
     tg,
     toast,
@@ -135,7 +136,7 @@ const BazaarPage = () => {
             savedState={bazaarTabState}
             onStateChange={handleBazaarStateChange}
             tg={tg}
-            profileTelegramId={profile?.telegramId != null ? String(profile.telegramId) : null}
+            profileTelegramId={profile?.telegramId != null ? String(profile.telegramId) : viewerTelegramId}
             catalogPersonalized={catalogPersonalized}
             onToast={handleToast}
           />

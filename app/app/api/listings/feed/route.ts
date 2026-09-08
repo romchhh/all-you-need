@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
     if (personalize && viewerId) {
       const profile = await loadUserPersonalizationProfile(viewerId);
       personalizationBoost = buildPersonalizationOrderBoost(profile);
-      personalized = Boolean(personalizationBoost);
+      personalized = true;
     }
 
     const { clause: orderByClause, params: orderParams } = catalogOrderByClause(
