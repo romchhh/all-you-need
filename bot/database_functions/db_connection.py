@@ -191,11 +191,7 @@ def quote_pg_identifiers(sql: str) -> str:
         s = re.sub(rf"\bON {table}\(", f'ON "{table}"(', s, flags=re.IGNORECASE)
     for col in PRISMA_PG_COLUMNS:
         s = re.sub(rf"\.{col}\b", f'."{col}"', s)
-        s = re.sub(
-            rf'(?<![."\\w]){col}(?=\s*(?:=|,|\)|$|\s+IS\b|\s+DESC\b|\s+ASC\b))',
-            f'"{col}"',
-            s,
-        )
+        s = re.sub(rf'(?<![."\\w]){col}\b', f'"{col}"', s)
     for col in BOOLEAN_PG_COLUMNS:
         s = re.sub(rf'"{col}"\s*=\s*1\b', f'"{col}" = true', s, flags=re.IGNORECASE)
         s = re.sub(rf'"{col}"\s*=\s*0\b', f'"{col}" = false', s, flags=re.IGNORECASE)
@@ -203,6 +199,12 @@ def quote_pg_identifiers(sql: str) -> str:
         s = re.sub(rf'(?<![."\\w]){col}\s*=\s*1\b', f'"{col}" = true', s, flags=re.IGNORECASE)
         s = re.sub(rf'\."{col}"\s*=\s*0\b', f'."{col}" = false', s, flags=re.IGNORECASE)
         s = re.sub(rf'(?<![."\\w]){col}\s*=\s*0\b', f'"{col}" = false', s, flags=re.IGNORECASE)
+        s = re.sub(
+            rf'COALESCE\s*\(\s*"{col}"\s*,\s*0\s*\)',
+            f'COALESCE("{col}", false)',
+            s,
+            flags=re.IGNORECASE,
+        )
     # INSERT ... isActive/isSuperadmin ... VALUES (..., 1, CURRENT_TIMESTAMP|NOW())
     s = re.sub(
         r',\s*1\s*,\s*(CURRENT_TIMESTAMP|NOW\(\))',
@@ -261,6 +263,8 @@ def adapt_sql(sql: str) -> str:
     s = re.sub(r"INSERT OR IGNORE INTO", "INSERT INTO", s, flags=re.IGNORECASE)
     s = re.sub(r"ON CONFLICT\s*\(", "ON CONFLICT (", s, flags=re.IGNORECASE)
     s = re.sub(r"CAST\(([^)]+)\s+AS\s+INTEGER\)", r"(\1)::bigint", s, flags=re.IGNORECASE)
+    s = re.sub(r"\bIFNULL\s*\(", "COALESCE(", s, flags=re.IGNORECASE)
+    s = re.sub(r"\bINSTR\s*\(", "STRPOS(", s, flags=re.IGNORECASE)
     s = re.sub(
         r"SELECT name FROM sqlite_master WHERE type='table' AND name='([^']+)'",
         r"SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' AND tablename = '\1'",

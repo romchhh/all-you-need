@@ -174,6 +174,10 @@ function quotePgIdentifiers(sql: string): string {
   let s = sql;
 
   for (const table of PRISMA_PG_TABLES) {
+    s = s.replace(
+      new RegExp(`\\bCREATE TABLE IF NOT EXISTS ${table}\\b`, 'gi'),
+      `CREATE TABLE IF NOT EXISTS "${table}"`
+    );
     s = s.replace(new RegExp(`\\bFROM ${table}\\b`, 'gi'), `FROM "${table}"`);
     s = s.replace(new RegExp(`\\bJOIN ${table}\\b`, 'gi'), `JOIN "${table}"`);
     s = s.replace(new RegExp(`\\bUPDATE ${table}\\b`, 'gi'), `UPDATE "${table}"`);
@@ -184,10 +188,7 @@ function quotePgIdentifiers(sql: string): string {
 
   for (const col of PRISMA_PG_COLUMNS) {
     s = s.replace(new RegExp(`\\.${col}\\b`, 'g'), `."${col}"`);
-    s = s.replace(
-      new RegExp(`(?<![."\\w])${col}(?=\\s*(?:=|,|\\)|$|\\s+IS\\b|\\s+DESC\\b|\\s+ASC\\b))`, 'g'),
-      `"${col}"`
-    );
+    s = s.replace(new RegExp(`(?<![."\\w])${col}\\b`, 'g'), `"${col}"`);
   }
 
   const BOOLEAN_PG_COLUMNS = [
@@ -206,6 +207,10 @@ function quotePgIdentifiers(sql: string): string {
     s = s.replace(new RegExp(`"${col}"\\s*=\\s*0\\b`, 'gi'), `"${col}" = false`);
     s = s.replace(new RegExp(`\\."${col}"\\s*=\\s*0\\b`, 'gi'), `."${col}" = false`);
     s = s.replace(new RegExp(`(?<![."\\w])${col}\\s*=\\s*0\\b`, 'gi'), `"${col}" = false`);
+    s = s.replace(
+      new RegExp(`COALESCE\\s*\\(\\s*"${col}"\\s*,\\s*0\\s*\\)`, 'gi'),
+      `COALESCE("${col}", false)`
+    );
   }
   s = s.replace(/,\s*1\s*,\s*(CURRENT_TIMESTAMP|NOW\(\))/gi, ', true, $1');
   s = s.replace(/VALUES\s*\(([^)]*),\s*1\s*\)/gi, 'VALUES ($1, true)');
@@ -246,6 +251,8 @@ export function adaptSql(sql: string): string {
   s = s.replace(/datetime\(([^)]+)\)\s*>\s*NOW\(\)/gi, '$1 > NOW()');
   s = s.replace(/datetime\(([^)]+)\)\s*>\s*datetime\('now'\)/gi, '$1 > NOW()');
   s = s.replace(/datetime\(([^)]+)\)/gi, '$1::timestamp');
+  s = s.replace(/\bIFNULL\s*\(/gi, 'COALESCE(');
+  s = s.replace(/\bINSTR\s*\(/gi, 'STRPOS(');
 
   s = quotePgIdentifiers(s);
 

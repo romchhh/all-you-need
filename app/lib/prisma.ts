@@ -23,12 +23,29 @@ export const prisma =
 function patchRawSql(client: PrismaClient) {
   const origQuery = client.$queryRawUnsafe.bind(client);
   const origExecute = client.$executeRawUnsafe.bind(client);
+
+  function templateToParams(strings: TemplateStringsArray, values: unknown[]) {
+    let sql = strings[0];
+    for (let i = 0; i < values.length; i++) {
+      sql += '?' + strings[i + 1];
+    }
+    return toPgParams(sql, values);
+  }
+
   (client as any).$queryRawUnsafe = (sql: string, ...params: unknown[]) => {
     const { sql: q, params: p } = toPgParams(sql, params);
     return origQuery(q, ...p);
   };
   (client as any).$executeRawUnsafe = (sql: string, ...params: unknown[]) => {
     const { sql: q, params: p } = toPgParams(sql, params);
+    return origExecute(q, ...p);
+  };
+  (client as any).$queryRaw = (strings: TemplateStringsArray, ...values: unknown[]) => {
+    const { sql: q, params: p } = templateToParams(strings, values);
+    return origQuery(q, ...p);
+  };
+  (client as any).$executeRaw = (strings: TemplateStringsArray, ...values: unknown[]) => {
+    const { sql: q, params: p } = templateToParams(strings, values);
     return origExecute(q, ...p);
   };
 }
