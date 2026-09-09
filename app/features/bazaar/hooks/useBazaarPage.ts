@@ -25,6 +25,26 @@ import {
 import { listingToSearchPreview, updateSearchHistoryListings } from '@/utils/searchHistory';
 import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
 import { prefetchListingsImages } from '@/lib/media/listingMediaCache';
+
+/** Збільшуйте після змін логіки каталогу — скидає застарілий localStorage-кеш. */
+const BAZAAR_LISTINGS_CACHE_VERSION = 2;
+const BAZAAR_LISTINGS_CACHE_KEY = 'bazaarListingsState';
+
+function readBazaarListingsCache() {
+  const cached = getCachedData(BAZAAR_LISTINGS_CACHE_KEY);
+  if (!cached || cached.cacheVersion !== BAZAAR_LISTINGS_CACHE_VERSION) {
+    if (cached) invalidateCache(BAZAAR_LISTINGS_CACHE_KEY);
+    return null;
+  }
+  return cached;
+}
+
+function writeBazaarListingsCache(data: Record<string, unknown>) {
+  setCachedData(BAZAAR_LISTINGS_CACHE_KEY, {
+    ...data,
+    cacheVersion: BAZAAR_LISTINGS_CACHE_VERSION,
+  });
+}
 import {
   consumePendingListingCategory,
   resolveListingCategoryFilter,
@@ -228,7 +248,7 @@ export function useBazaarPage() {
     forceListingsReloadRef.current = true;
 
     if (typeof window !== 'undefined') {
-      invalidateCache('bazaarListingsState');
+      invalidateCache(BAZAAR_LISTINGS_CACHE_KEY);
       localStorage.removeItem('bazaarSearchQuery');
       const url = new URL(window.location.href);
       url.searchParams.delete('category');
@@ -328,12 +348,12 @@ export function useBazaarPage() {
 
   const [listings, setListings] = useState<Listing[]>(() => {
     if (typeof window === 'undefined') return [];
-    const cached = getCachedData('bazaarListingsState');
+    const cached = readBazaarListingsCache();
     return cached?.listings?.length ? (cached.listings as Listing[]) : [];
   });
   const [initialLoading, setInitialLoading] = useState(() => {
     if (typeof window === 'undefined') return true;
-    const cached = getCachedData('bazaarListingsState');
+    const cached = readBazaarListingsCache();
     return !(cached?.listings?.length);
   });
   const [isListingsRefreshing, setIsListingsRefreshing] = useState(false);
@@ -341,18 +361,18 @@ export function useBazaarPage() {
   const [catalogPersonalized, setCatalogPersonalized] = useState(false);
   const [hasMore, setHasMore] = useState(() => {
     if (typeof window === 'undefined') return false;
-    const cached = getCachedData('bazaarListingsState');
+    const cached = readBazaarListingsCache();
     if (!cached?.listings?.length) return false;
     return (cached.listings.length ?? 0) < (cached.total ?? 0);
   });
   const [totalListings, setTotalListings] = useState(() => {
     if (typeof window === 'undefined') return 0;
-    const cached = getCachedData('bazaarListingsState');
+    const cached = readBazaarListingsCache();
     return cached?.total ?? 0;
   });
   const [listingsOffset, setListingsOffset] = useState(() => {
     if (typeof window === 'undefined') return 0;
-    const cached = getCachedData('bazaarListingsState');
+    const cached = readBazaarListingsCache();
     return cached?.offset ?? (cached?.listings?.length ? cached.listings.length : 0);
   });
   const { tg, user: telegramUser } = useTelegram();
@@ -563,7 +583,7 @@ export function useBazaarPage() {
   const hasSearchQuery = Boolean((debouncedSearchQuery ?? '').trim());
 
   const hasLoadedListings = useRef(
-    typeof window !== 'undefined' && Boolean(getCachedData('bazaarListingsState')?.listings?.length)
+    typeof window !== 'undefined' && Boolean(readBazaarListingsCache()?.listings?.length)
   );
 
   const schedulePrefetchListingsImages = useCallback((items: Listing[]) => {
@@ -608,7 +628,7 @@ export function useBazaarPage() {
         !viewerTelegramId &&
         typeof window !== 'undefined'
       ) {
-        const cached = getCachedData('bazaarListingsState');
+        const cached = readBazaarListingsCache();
         if (cached?.listings?.length) {
           const cacheAge = Date.now() - (cached.timestamp || 0);
           if (cacheAge < 5 * 60 * 1000) {
@@ -619,9 +639,8 @@ export function useBazaarPage() {
               setListingsOffset(cached.offset ?? PAGE_SIZE);
             });
             setInitialLoading(false);
-            setIsListingsRefreshing(false);
+            setIsListingsRefreshing(true);
             schedulePrefetchListingsImages(cached.listings || []);
-            return;
           }
         }
       }
@@ -674,12 +693,12 @@ export function useBazaarPage() {
         !viewerTelegramId &&
           typeof window !== 'undefined'
         ) {
-          setCachedData('bazaarListingsState', {
+          writeBazaarListingsCache({
             listings: list,
             total,
             hasMore: more,
             offset: list.length,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
         }
       } else {
@@ -721,7 +740,7 @@ export function useBazaarPage() {
     if (listings.length > 0 && hasLoadedListings.current) return;
 
     const searchTrimmed = (searchQuery || '').trim();
-    const cached = getCachedData('bazaarListingsState');
+    const cached = readBazaarListingsCache();
     if (
       cached &&
       cached.listings &&
@@ -738,6 +757,7 @@ export function useBazaarPage() {
       hasLoadedListings.current = true;
       previousFilterKey.current = filterKey;
       schedulePrefetchListingsImages(cached.listings || []);
+      void fetchListings(false, searchTrimmed || undefined);
       return;
     }
 
@@ -774,7 +794,7 @@ export function useBazaarPage() {
       forceListingsReloadRef.current = false;
       previousFilterKey.current = key;
       if (typeof window !== 'undefined') {
-        invalidateCache('bazaarListingsState');
+        invalidateCache(BAZAAR_LISTINGS_CACHE_KEY);
       }
       setListings([]);
       setHasMore(false);
@@ -790,7 +810,7 @@ export function useBazaarPage() {
     if (previousFilterKey.current === key) return;
     previousFilterKey.current = key;
     if (typeof window !== 'undefined') {
-      invalidateCache('bazaarListingsState');
+      invalidateCache(BAZAAR_LISTINGS_CACHE_KEY);
     }
     setListingsOffset(0);
     fetchListings(true);
@@ -813,7 +833,7 @@ export function useBazaarPage() {
   const handleRefresh = async () => {
     // Очищаємо весь кеш при оновленні
     if (typeof window !== 'undefined') {
-      invalidateCache('bazaarListingsState');
+      invalidateCache(BAZAAR_LISTINGS_CACHE_KEY);
     }
     
     // Примусово оновлюємо дані
@@ -852,7 +872,7 @@ export function useBazaarPage() {
         setListings((prev) => {
           const merged = [...prev, ...appended];
           if (!hasActiveFilters && !hasSearchQuery && typeof window !== 'undefined') {
-            setCachedData('bazaarListingsState', {
+            writeBazaarListingsCache({
               listings: merged,
               total,
               hasMore: newHasMore,

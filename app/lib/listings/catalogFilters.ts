@@ -82,16 +82,22 @@ export function appendCatalogFiltersToWhere(
   return where;
 }
 
+/** Активна платна реклама: потрібна дата закінчення в майбутньому (NULL ≠ вічний VIP). */
+export function catalogPromotionPriorityCaseSql(): string {
+  return `CASE
+    WHEN l.promotionType = 'vip' AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 0
+    WHEN l.promotionType = 'top' AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 1
+    WHEN l.promotionType = 'top_category' AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 1
+    ELSE 2
+  END`;
+}
+
 export function catalogOrderByClause(
   sortBy: string,
   personalization?: { sql: string; params: unknown[] } | null
 ): { clause: string; params: unknown[] } {
   let orderByClause = 'ORDER BY';
-  orderByClause +=
-    " CASE WHEN l.promotionType = 'vip' AND (l.promotionEnds IS NULL OR datetime(l.promotionEnds) > datetime('now')) THEN 0";
-  orderByClause +=
-    " WHEN l.promotionType = 'top' AND (l.promotionEnds IS NULL OR datetime(l.promotionEnds) > datetime('now')) THEN 1";
-  orderByClause += ' ELSE 2 END,';
+  orderByClause += ` ${catalogPromotionPriorityCaseSql()},`;
 
   const orderParams: unknown[] = [];
 

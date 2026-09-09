@@ -42,6 +42,7 @@ export function buildBazaarCatalogCacheKey(params: {
   feed?: boolean;
 }): string {
   return [
+    'v2',
     params.feed ? 'feed' : 'full',
     params.category ?? '',
     params.subcategory ?? '',

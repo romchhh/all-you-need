@@ -32,22 +32,22 @@ export function listingStatsPublishedAtSql(tableAlias?: string): string {
 export const LISTING_STATS_PUBLISHED_AT_SQL = listingStatsPublishedAtSql();
 
 export function newListingsInKyivWindowSql(tableAlias?: string): string {
-  const statsAt = listingStatsPublishedAtSql(tableAlias);
+  const p = tableAlias ? `${tableAlias}.` : '';
+  // Лічильник «нових сьогодні» — за createdAt (не updatedAt), щоб міграція БД не
+  // занижувала/завищувала статистику через масове оновлення updatedAt.
   if (isPostgres()) {
     return `
-  ${tableAlias ? `${tableAlias}.` : ''}status = 'active'
-  AND ${statsAt} IS NOT NULL
-  AND ${statsAt} > TIMESTAMP '1970-01-01 00:00:01'
-  AND ${statsAt} >= ?::timestamp
-  AND ${statsAt} <= ?::timestamp
+  ${p}status = 'active'
+  AND ${p}"createdAt" IS NOT NULL
+  AND ${p}"createdAt" >= ?::timestamp
+  AND ${p}"createdAt" <= ?::timestamp
 `;
   }
   return `
-  ${tableAlias ? `${tableAlias}.` : ''}status = 'active'
-  AND ${statsAt} IS NOT NULL
-  AND ${statsAt} > datetime('1970-01-01 00:00:01')
-  AND ${statsAt} >= datetime(?)
-  AND ${statsAt} <= datetime(?)
+  ${p}status = 'active'
+  AND ${p}createdAt IS NOT NULL
+  AND datetime(${p}createdAt) >= datetime(?)
+  AND datetime(${p}createdAt) <= datetime(?)
 `;
 }
 

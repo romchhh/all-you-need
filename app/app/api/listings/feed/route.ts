@@ -219,7 +219,12 @@ export async function GET(request: NextRequest) {
       const favBroken =
         msg.includes('no such table: Favorite') ||
         (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
-      if (!favBroken) throw error;
+      const sqlCompatBroken =
+        favBroken ||
+        msg.includes('COALESCE types boolean') ||
+        msg.includes('DatatypeMismatch') ||
+        msg.includes('does not exist');
+      if (!sqlCompatBroken) throw error;
       const fallback = listingsQuery
         .replace(`, ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount`, '')
         .replace(LISTING_FAVORITES_JOIN_SQL, '');

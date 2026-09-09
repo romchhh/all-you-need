@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sqlDatetimeCompare } from '@/lib/dbSql';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
@@ -561,7 +562,7 @@ export async function GET(request: NextRequest) {
       }
       
       // Фільтруємо тільки активні оголошення (не закінчені)
-      whereClause += " AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))";
+      whereClause += ` AND (l.expiresAt IS NULL OR ${sqlDatetimeCompare('l.expiresAt')})`;
       
       
       // Правильне сортування з урахуванням реклами
@@ -572,10 +573,10 @@ export async function GET(request: NextRequest) {
       const hasCategoryFilter = !!(category || subcategory);
       let orderByClause = `ORDER BY 
         CASE 
-          WHEN (l.promotionType = 'vip' OR l.promotionType LIKE '%vip%') AND datetime(l.promotionEnds) > datetime('now') THEN 1
+          WHEN (l.promotionType = 'vip' OR l.promotionType LIKE '%vip%') AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 1
           ${hasCategoryFilter 
-            ? "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND datetime(l.promotionEnds) > datetime('now') THEN 2"
-            : "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND datetime(l.promotionEnds) > datetime('now') THEN 4"
+            ? "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 2"
+            : "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 4"
           }
           ELSE 4
         END,`;
