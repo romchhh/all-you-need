@@ -1,5 +1,6 @@
 import sqlite3
 from database_functions.db_config import DATABASE_PATH
+from database_functions.db_connection import is_postgres
 
 def get_optimized_connection():
     conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False, timeout=30.0)
@@ -11,6 +12,10 @@ def get_optimized_connection():
     return conn
 
 def init_prisma_tables():
+    if is_postgres():
+        print("Prisma таблиці вже в PostgreSQL (Prisma migrate)")
+        return
+
     conn = get_optimized_connection()
     cursor = conn.cursor()
     

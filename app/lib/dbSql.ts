@@ -105,7 +105,6 @@ const PRISMA_PG_TABLES = [
   'Referral',
   'UserSession',
   'CityDigestQueue',
-  'LinkVisit',
 ];
 
 /** Prisma columns stored as quoted camelCase in PostgreSQL. */

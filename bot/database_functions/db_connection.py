@@ -99,7 +99,6 @@ PRISMA_PG_TABLES = (
     "Referral",
     "UserSession",
     "CityDigestQueue",
-    "LinkVisit",
 )
 
 PRISMA_PG_COLUMNS = (
@@ -168,6 +167,12 @@ PRISMA_PG_COLUMNS = (
 def quote_pg_identifiers(sql: str) -> str:
     s = sql
     for table in PRISMA_PG_TABLES:
+        s = re.sub(
+            rf"\bCREATE TABLE IF NOT EXISTS {table}\b",
+            f'CREATE TABLE IF NOT EXISTS "{table}"',
+            s,
+            flags=re.IGNORECASE,
+        )
         s = re.sub(rf"\bFROM {table}\b", f'FROM "{table}"', s, flags=re.IGNORECASE)
         s = re.sub(rf"\bJOIN {table}\b", f'JOIN "{table}"', s, flags=re.IGNORECASE)
         s = re.sub(rf"\bUPDATE {table}\b", f'UPDATE "{table}"', s, flags=re.IGNORECASE)

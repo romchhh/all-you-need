@@ -1,35 +1,44 @@
 import sqlite3
 from datetime import datetime
-from database_functions.db_connection import get_connection
+from database_functions.db_connection import get_connection, is_postgres
 
 def get_optimized_connection():
     return get_connection()
 
+def create_table_links():
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        if not is_postgres():
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS Link (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    linkName TEXT,
+                    linkUrl TEXT,
+                    linkCount INTEGER DEFAULT 0
+                )
+            ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS LinkVisit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_type TEXT NOT NULL,
+                source_id INTEGER NOT NULL,
+                visitor_user_id TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_link_visit_source ON LinkVisit(source_type, source_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_link_visit_visitor ON LinkVisit(visitor_user_id)')
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 conn = get_optimized_connection()
 cursor = conn.cursor()
-
-
-def create_table_links():
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Link (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            linkName TEXT,
-            linkUrl TEXT,
-            linkCount INTEGER DEFAULT 0
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS LinkVisit (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source_type TEXT NOT NULL,
-            source_id INTEGER NOT NULL,
-            visitor_user_id TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-    ''')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_link_visit_source ON LinkVisit(source_type, source_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_link_visit_visitor ON LinkVisit(visitor_user_id)')
-    conn.commit()
 
 
 def add_link(link_name: str, link_url: str = None):
