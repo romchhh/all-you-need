@@ -20,7 +20,7 @@ export const getBotBaseUrl = (): string => {
   
   // Fallback для розробки
   console.warn('NEXT_PUBLIC_BOT_URL or NEXT_PUBLIC_BOT_USERNAME not configured');
-  return 'https://t.me/your_bot';
+  return 'https://t.me/TradeGroundBot';
 };
 
 /**

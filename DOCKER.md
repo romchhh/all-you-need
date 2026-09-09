@@ -60,7 +60,7 @@ cp .env.example .env
 
 ```env
 TOKEN=...
-BOT_USERNAME=your_bot
+BOT_USERNAME=TradeGroundBot
 ADMINISTRATORS=[123456789]
 WEBAPP_URL=https://your-domain.com
 ADMIN_USERNAME=admin

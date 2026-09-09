@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     ? process.env.NEXT_PUBLIC_BOT_URL.replace(/\/$/, '')
     : process.env.NEXT_PUBLIC_BOT_USERNAME 
       ? `https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME}` 
-      : 'https://t.me/your_bot';
+      : 'https://t.me/TradeGroundBot';
   
   // Повертаємо HTML сторінку з JavaScript редиректом в бот
   // Після успішної оплати завжди повертаємося в бот, а не на маркетплейс
