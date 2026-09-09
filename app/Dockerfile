@@ -38,7 +38,6 @@ COPY --from=deps /app/app/node_modules ./node_modules
 COPY app/ ./
 
 RUN npx prisma generate \
- && npx prisma db push --skip-generate \
  && npm run build \
  && npm prune --omit=dev \
  && npm install prisma@6.19.3 --omit=dev --no-audit --no-fund \
@@ -52,7 +51,7 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     TZ=Europe/Kyiv \
-    DATABASE_URL="file:///app/database/ayn_marketplace.db" \
+    DATABASE_URL="postgresql://ayn:ayn_dev_password@postgres:5432/ayn_marketplace?schema=public" \
     PRISMA_CLI_BINARY_TARGETS="debian-openssl-3.0.x"
 
 RUN apt-get update \

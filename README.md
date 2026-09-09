@@ -36,8 +36,8 @@ Telegram маркетплейс для продажу та покупки тов
 Коротко:
 
 ```bash
-ln -sf bot/.env .env
-docker compose up -d --build
+./docker/up.sh
+# або: ./docker/prepare-env.sh && docker compose up -d --build
 docker compose logs -f
 ```
 

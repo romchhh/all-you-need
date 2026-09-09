@@ -5,17 +5,10 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
+from database_functions.db_connection import get_connection
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DB_PATH = BASE_DIR / "database" / "ayn_marketplace.db"
-
-
-def get_connection():
-    conn = sqlite3.connect(str(DB_PATH), timeout=30.0)
-    conn.execute('PRAGMA journal_mode = WAL;')
-    conn.execute('PRAGMA busy_timeout = 30000;')
-    conn.execute('PRAGMA foreign_keys = ON;')
-    return conn
 
 
 def get_user_id_by_telegram_id(telegram_id: int) -> Optional[int]:

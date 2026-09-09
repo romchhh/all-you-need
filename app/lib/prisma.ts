@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getDatabaseConfigError, isPostgres, tableExistsQuery, tableInfoQuery, toPgParams } from './dbSql';
 
 // Глобальна змінна для відстеження чи таблиця Favorite вже перевірена
 let favoriteTableInitialized = false;
@@ -17,6 +18,22 @@ export const prisma =
     // Це приховує помилки "Execute returned results" для SQLite DDL команд
     log: [],
   });
+
+/** Автоматично адаптує raw SQL (? → $n, datetime('now') → NOW()) для PostgreSQL. */
+function patchRawSql(client: PrismaClient) {
+  const origQuery = client.$queryRawUnsafe.bind(client);
+  const origExecute = client.$executeRawUnsafe.bind(client);
+  (client as any).$queryRawUnsafe = (sql: string, ...params: unknown[]) => {
+    const { sql: q, params: p } = toPgParams(sql, params);
+    return origQuery(q, ...p);
+  };
+  (client as any).$executeRawUnsafe = (sql: string, ...params: unknown[]) => {
+    const { sql: q, params: p } = toPgParams(sql, params);
+    return origExecute(q, ...p);
+  };
+}
+
+patchRawSql(prisma);
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
@@ -70,9 +87,9 @@ async function createAdditionalIndexes(): Promise<void> {
   await createIndexSafely('idx_viewhistory_listing_viewer', `CREATE UNIQUE INDEX IF NOT EXISTS idx_viewhistory_listing_viewer ON ViewHistory(listingId, viewerTelegramId)`);
   
   // Transaction індекси
-  await createIndexSafely('idx_transaction_status', `CREATE INDEX IF NOT EXISTS idx_transaction_status ON [Transaction](status)`);
-  await createIndexSafely('idx_transaction_createdAt', `CREATE INDEX IF NOT EXISTS idx_transaction_createdAt ON [Transaction](createdAt)`);
-  await createIndexSafely('idx_transaction_type_status', `CREATE INDEX IF NOT EXISTS idx_transaction_type_status ON [Transaction](type, status)`);
+  await createIndexSafely('idx_transaction_status', `CREATE INDEX IF NOT EXISTS idx_transaction_status ON ${isPostgres() ? '"Transaction"' : '[Transaction]'}(status)`);
+  await createIndexSafely('idx_transaction_createdAt', `CREATE INDEX IF NOT EXISTS idx_transaction_createdAt ON ${isPostgres() ? '"Transaction"' : '[Transaction]'}(createdAt)`);
+  await createIndexSafely('idx_transaction_type_status', `CREATE INDEX IF NOT EXISTS idx_transaction_type_status ON ${isPostgres() ? '"Transaction"' : '[Transaction]'}(type, status)`);
   
   // Review індекси
   await createIndexSafely('idx_review_targetId', `CREATE INDEX IF NOT EXISTS idx_review_targetId ON Review(targetId)`);
@@ -105,47 +122,20 @@ async function optimizeDatabase(): Promise<void> {
     return;
   }
 
-  try {
-    // Увімкнути WAL mode (Write-Ahead Logging) - дозволяє одночасні читання та запис
-    await executeDDLSafely(`PRAGMA journal_mode = WAL;`);
-    
-    // Збільшити timeout для запитів (30 секунд)
-    await executeDDLSafely(`PRAGMA busy_timeout = 30000;`);
-    
-    // Увімкнути foreign keys
-    await executeDDLSafely(`PRAGMA foreign_keys = ON;`);
-    
-    // Оптимізувати для швидших запитів
-    await executeDDLSafely(`PRAGMA synchronous = NORMAL;`);
-    
-    // Кешувати сторінки в пам'яті (16MB)
-    await executeDDLSafely(`PRAGMA cache_size = -16384;`);
-    
-    // Налаштування для правильної обробки UTF-8 (кирилиця та інші спеціальні символи)
-    // SQLite за замовчуванням використовує UTF-8, але явно вказуємо для надійності
-    await executeDDLSafely(`PRAGMA encoding = 'UTF-8';`);
-    
-    // Створюємо додаткові індекси для оптимізації (якщо їх немає)
-    await createAdditionalIndexes();
-    
-    // PRAGMA optimize повертає результати, тому не використовуємо executeRaw
-    // Це не критично для роботи бази даних - SQLite автоматично оптимізує запити
-    
-    dbOptimized = true;
-    globalForPrisma.dbOptimized = true;
+  dbOptimized = true;
+  globalForPrisma.dbOptimized = true;
+
+  const configError = getDatabaseConfigError();
+  if (configError) {
     if (process.env.NODE_ENV === 'development') {
-      console.log('Database optimized: WAL mode enabled, timeout set to 30s, indexes created');
+      console.error('[db]', configError);
     }
-  } catch (error: any) {
-    // Ігноруємо помилки про "Execute returned results" - це нормально для SQLite
-    if (!error.message?.includes('Execute returned results')) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Note: Could not optimize database:', error.message);
-      }
-    }
-    // Відмічаємо як оптимізовану, щоб не повторювати
-    dbOptimized = true;
-    globalForPrisma.dbOptimized = true;
+    return;
+  }
+
+  if (isPostgres()) {
+    // Індекси та схема — через prisma migrate deploy (Docker / entrypoint).
+    return;
   }
 }
 
@@ -208,6 +198,14 @@ let optimizedImagesColumnChecked = false;
 let optimizedImagesColumnExists = false;
 let viewHistoryTableChecked = false;
 
+export async function queryRawUnsafe<T>(sql: string, ...params: unknown[]): Promise<T> {
+  return executeWithRetry(() => prisma.$queryRawUnsafe(sql, ...params) as Promise<T>);
+}
+
+export async function executeRawUnsafe(sql: string, ...params: unknown[]): Promise<number> {
+  return executeWithRetry(() => prisma.$executeRawUnsafe(sql, ...params));
+}
+
 export async function ensureCurrencyColumn(): Promise<boolean> {
   // Якщо вже перевіряли - повертаємо кешований результат
   if (currencyColumnChecked) {
@@ -216,9 +214,7 @@ export async function ensureCurrencyColumn(): Promise<boolean> {
 
   try {
     // Перевіряємо, чи існує колонка currency
-    const tableInfo = await prisma.$queryRawUnsafe(`
-      PRAGMA table_info(Listing)
-    `) as Array<{ name: string; type: string }>;
+    const tableInfo = await queryRawUnsafe<Array<{ name: string; type: string }>>(tableInfoQuery('Listing'));
     
     currencyColumnExists = tableInfo.some(col => col.name === 'currency');
     currencyColumnChecked = true;
@@ -271,9 +267,7 @@ export async function ensureOptimizedImagesColumn(): Promise<boolean> {
 
   try {
     // Перевіряємо, чи існує колонка optimizedImages
-    const tableInfo = await prisma.$queryRawUnsafe(`
-      PRAGMA table_info(Listing)
-    `) as Array<{ name: string; type: string }>;
+    const tableInfo = await queryRawUnsafe<Array<{ name: string; type: string }>>(tableInfoQuery('Listing'));
     
     optimizedImagesColumnExists = tableInfo.some(col => col.name === 'optimizedImages');
     optimizedImagesColumnChecked = true;
@@ -318,8 +312,8 @@ let listingApiRawColumnsReady = false;
 export async function ensureListingApiRawColumns(): Promise<void> {
   if (listingApiRawColumnsReady) return;
   try {
-    const tableInfo = (await prisma.$queryRawUnsafe(
-      `PRAGMA table_info(Listing)`
+    const tableInfo = (await queryRawUnsafe<Array<{ name: string }>>(
+      tableInfoQuery('Listing')
     )) as Array<{ name: string }>;
     const names = new Set(tableInfo.map((c) => c.name));
 
@@ -381,8 +375,8 @@ let userApiRawColumnsReady = false;
 export async function ensureUserApiRawColumns(): Promise<void> {
   if (userApiRawColumnsReady) return;
   try {
-    const tableInfo = (await prisma.$queryRawUnsafe(
-      `PRAGMA table_info(User)`
+    const tableInfo = (await queryRawUnsafe<Array<{ name: string }>>(
+      tableInfoQuery('User')
     )) as Array<{ name: string }>;
     const names = new Set(tableInfo.map((c) => c.name));
 
@@ -440,9 +434,7 @@ export async function ensureViewHistoryTable(): Promise<void> {
   try {
     // Перевіряємо, чи таблиця існує (з retry)
     const tableInfo = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(`
-        SELECT name FROM sqlite_master WHERE type='table' AND name='ViewHistory'
-      `) as Promise<Array<{ name: string }>>
+      queryRawUnsafe<Array<{ name: string }>>(tableExistsQuery('ViewHistory'))
     );
     
     if (tableInfo.length === 0) {
@@ -474,9 +466,9 @@ export async function ensureViewHistoryTable(): Promise<void> {
     } else {
       // Перевіряємо, чи є колонка viewerTelegramId
       try {
-        const columns = await prisma.$queryRawUnsafe(`
-          PRAGMA table_info(ViewHistory)
-        `) as Array<{ name: string; type: string }>;
+        const columns = await queryRawUnsafe<Array<{ name: string; type: string }>>(
+          tableInfoQuery('ViewHistory')
+        );
         
         const hasViewerTelegramId = columns.some(col => col.name === 'viewerTelegramId');
         if (!hasViewerTelegramId) {
@@ -548,9 +540,7 @@ export async function ensureFavoriteTable(): Promise<void> {
   try {
     // Перевіряємо, чи таблиця існує (з retry)
     const tableInfo = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(`
-        SELECT name FROM sqlite_master WHERE type='table' AND name='Favorite'
-      `) as Promise<Array<{ name: string }>>
+      queryRawUnsafe<Array<{ name: string }>>(tableExistsQuery('Favorite'))
     );
     
     if (tableInfo.length === 0) {
@@ -624,9 +614,7 @@ export async function ensureCitySubscriptionTable(): Promise<void> {
 
   try {
     const tableInfo = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(`
-        SELECT name FROM sqlite_master WHERE type='table' AND name='CitySubscription'
-      `) as Promise<Array<{ name: string }>>
+      queryRawUnsafe<Array<{ name: string }>>(tableExistsQuery('CitySubscription'))
     );
 
     if (tableInfo.length === 0) {
@@ -691,9 +679,7 @@ export async function ensurePromotionPurchaseTable(): Promise<void> {
 
   try {
     const tableInfo = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(`
-        SELECT name FROM sqlite_master WHERE type='table' AND name='PromotionPurchase'
-      `) as Promise<Array<{ name: string }>>
+      queryRawUnsafe<Array<{ name: string }>>(tableExistsQuery('PromotionPurchase'))
     );
 
     if (tableInfo.length === 0) {
@@ -778,9 +764,7 @@ export async function ensureUserSessionTable(): Promise<void> {
   try {
     // Перевіряємо, чи таблиця існує
     const tableInfo = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(`
-        SELECT name FROM sqlite_master WHERE type='table' AND name='UserSession'
-      `) as Promise<Array<{ name: string }>>
+      queryRawUnsafe<Array<{ name: string }>>(tableExistsQuery('UserSession'))
     );
     
     if (tableInfo.length === 0) {

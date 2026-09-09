@@ -28,7 +28,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 
-from database_functions.db_config import DATABASE_PATH
+from database_functions.db_connection import get_connection
 
 VIEW_BOOST_ENABLED: bool = True
 VIEW_BOOST_INTERVAL_MINUTES: int = 5
@@ -140,9 +140,7 @@ def run_view_boost_cycle_sync() -> dict:
         return {"skipped": True, "updated": 0, "rows": 0}
 
     now = datetime.now()
-    conn = sqlite3.connect(DATABASE_PATH, timeout=60.0)
-    conn.execute("PRAGMA journal_mode = WAL;")
-    conn.execute("PRAGMA busy_timeout = 60000;")
+    conn = get_connection()
     cur = conn.cursor()
     try:
         try:

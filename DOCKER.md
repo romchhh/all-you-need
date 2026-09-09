@@ -1,13 +1,12 @@
 # Docker — запуск All You Need
 
-Два контейнери на одній машині:
+Вони ділять **PostgreSQL** (контейнер `postgres`) і фото через bind-mount. Файл SQLite `database/ayn_marketplace.db` лишається на диску хоста як джерело для **одноразової міграції** при першому запуску (бекап у `database/backups/`).
 
 | Сервіс | Образ | Що робить | Порт |
 |--------|--------|-----------|------|
+| `postgres` | `postgres:16-alpine` | PostgreSQL | `5432` (внутрішній) |
 | `app` | `allyouneed-app` | Next.js міні-ап + API | `3000` |
 | `bot` | `allyouneed-bot` | Telegram-бот + парсер | — |
-
-Вони ділять SQLite і фото через bind-mount. Існуючі `database/`, оголошення і сесії парсера **не копіюються в образ** — лишаються на диску хоста.
 
 ---
 
@@ -31,32 +30,24 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 ## 2. Підготовка (один раз)
 
-З кореня репозиторію (`~/all-you-need` або локально):
+З кореня репозиторію:
 
 ```bash
 cd ~/all-you-need   # або шлях до клону
 git pull
 ```
 
-### Змінні середовища
+### Змінні середовища (автоматично)
 
-Compose читає **кореневий `.env`** для підстановки `WEBAPP_URL` / `BOT_USERNAME` **під час build**.
-Контейнери в runtime беруть секрети з **`bot/.env`**.
-
-Найпростіше — симлінк:
+Скрипт створює `.env`, `bot/.env`, `app/.env` з прикладів, **якщо їх ще немає** (існуючі не перезаписуються). Якщо є лише `bot/.env`, створюється симлінк `.env → bot/.env` для build-аргументів Compose.
 
 ```bash
-ln -sf bot/.env .env
+./docker/prepare-env.sh
+# або одразу збірка + запуск:
+./docker/up.sh
 ```
 
-Або скопіюй приклад і заповни:
-
-```bash
-cp .env.example .env
-# відредагуй TOKEN, WEBAPP_URL, BOT_USERNAME, ADMINISTRATORS
-```
-
-Обов’язкові поля в `bot/.env`:
+Після першого запуску відредагуй **`bot/.env`** (якщо скопіювався з example):
 
 ```env
 TOKEN=...
@@ -67,6 +58,8 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your_secure_password
 ```
 
+`DATABASE_URL` у Docker **не потрібно** міняти вручну — `docker-compose.yml` підставляє PostgreSQL URL для `app` і `bot`.
+
 `ADMINISTRATORS` — Telegram user ID для бота.  
 `ADMIN_USERNAME` / `ADMIN_PASSWORD` — логін **веб-панелі** `/admin/login`.
 
@@ -74,7 +67,19 @@ ADMIN_PASSWORD=your_secure_password
 
 ### Зупини старий бот / Next.js
 
-Якщо зараз крутиться `python main.py`, venv, pm2, systemd або `npm start` — зупини. Інакше конфлікт по токену бота і блокування SQLite.
+Якщо зараз крутиться `python main.py`, venv, pm2, systemd або `npm start` — зупини. Інакше конфлікт по токену бота.
+
+### Міграція SQLite → PostgreSQL (автоматично при старті)
+
+При **`docker compose up --build`** (або `./docker/up.sh`):
+
+1. **`app`** — `prisma migrate deploy`: схема Prisma + таблиці bot/parser (`app/prisma/migrations/`).
+2. **`bot`** (після healthcheck app) — якщо є `database/ayn_marketplace.db` і немає маркера `.postgres_migrated`:
+   - бекап → `database/backups/ayn_marketplace_YYYYMMDD_HHMMSS.db`
+   - копія даних SQLite → PostgreSQL
+   - маркер `database/.postgres_migrated` (повторно не мігрує)
+
+SQLite-файл **не видаляється** — лишається як архів.
 
 ```bash
 # приклади
@@ -103,7 +108,9 @@ mv bot/parser/*.session bot/parser/sessions/ 2>/dev/null || true
 
 ```bash
 cd ~/all-you-need
-docker compose up -d --build
+./docker/up.sh
+# те саме, що:
+# ./docker/prepare-env.sh && docker compose up -d --build
 ```
 
 Перша збірка Next.js довга (5–15 хв). Бот стартує **після** healthcheck `app`.

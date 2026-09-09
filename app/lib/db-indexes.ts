@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { executeWithRetry } from './prisma';
+import { getDatabaseConfigError, isPostgres } from './dbSql';
 
 // Кешуємо результат, щоб не викликати повторно
 let indexesCreated = false;
@@ -25,10 +26,16 @@ async function executeDDLSafely(sql: string): Promise<void> {
 }
 
 export async function createDatabaseIndexes(): Promise<void> {
-  // Якщо індекси вже створені, не повторюємо
   if (indexesCreated) {
     return;
   }
+  indexesCreated = true;
+
+  // Runtime index creation is SQLite-only; PostgreSQL indexes come from prisma migrate deploy.
+  if (getDatabaseConfigError() || isPostgres()) {
+    return;
+  }
+
   try {
     // Індекс для пошуку користувачів за telegramId
     await executeDDLSafely(`
@@ -96,13 +103,10 @@ export async function createDatabaseIndexes(): Promise<void> {
       console.log('Database indexes created successfully');
     }
   } catch (error: any) {
-    // Ігноруємо помилки "Execute returned results" - це нормально для SQLite
-    if (!error.message?.includes('Execute returned results')) {
+    if (!error.message?.includes('already exists')) {
       if (process.env.NODE_ENV === 'development') {
         console.log('Note: Error creating database indexes:', error.message);
       }
     }
-    // Відмічаємо як створені навіть при помилці, щоб не повторювати
-    indexesCreated = true;
   }
 }

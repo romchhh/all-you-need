@@ -1,4 +1,4 @@
-"""Підключення до SQLite маркетплейсу (серіалізація + retry для парсера)."""
+"""Підключення до БД маркетплейсу (SQLite або PostgreSQL)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,13 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
+
+from database_functions.db_connection import (
+    db_cycle as _db_cycle,
+    get_connection as _shared_get_connection,
+    is_postgres,
+    is_sqlite_locked_error,
+)
 
 try:
     import fcntl
@@ -63,19 +70,6 @@ class _CrossProcessParserLock:
 # Одне з'єднання на весь цикл /parse — менше «database is locked»
 _cycle_conn: sqlite3.Connection | None = None
 _cycle_depth = 0
-
-
-def is_sqlite_locked_error(err: BaseException) -> bool:
-    cur: BaseException | None = err
-    while cur is not None:
-        if isinstance(cur, sqlite3.OperationalError):
-            msg = str(cur).lower()
-            if "locked" in msg or "busy" in msg:
-                return True
-        elif "database is locked" in str(cur).lower():
-            return True
-        cur = cur.__cause__ or cur.__context__  # type: ignore[assignment]
-    return False
 
 
 def _raw_connect() -> sqlite3.Connection:
@@ -192,6 +186,10 @@ def parser_db_cycle() -> Iterator[None]:
     Тримає одне з'єднання на весь цикл парсингу (sync + async awaits у тій самій task).
     """
     global _cycle_conn, _cycle_depth
+    if is_postgres():
+        with _db_cycle():
+            yield
+        return
     if _cycle_conn is not None:
         yield
         return
@@ -221,7 +219,10 @@ def parser_db_cycle() -> Iterator[None]:
         logger.debug("parser_db_cycle: closed shared connection")
 
 
-def get_connection() -> sqlite3.Connection:
+def get_connection():
+    if is_postgres():
+        return _shared_get_connection()
+
     if _cycle_conn is not None:
         global _cycle_depth
         _cycle_depth += 1

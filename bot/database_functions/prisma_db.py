@@ -5,9 +5,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 import json
 
-
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DB_PATH = BASE_DIR / "database" / "ayn_marketplace.db"
+from database_functions.db_connection import get_connection, DB_PATH
 
 
 class PrismaDB:
@@ -20,14 +18,8 @@ class PrismaDB:
         if not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
     
-    def get_connection(self):               
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
-        conn.execute('PRAGMA journal_mode = WAL;')
-        conn.execute('PRAGMA busy_timeout = 30000;')
-        conn.execute('PRAGMA foreign_keys = ON;')
-        conn.execute('PRAGMA synchronous = NORMAL;')
-        conn.execute('PRAGMA cache_size = -16384;')
-        return conn
+    def get_connection(self):
+        return get_connection()
     
     def get_user_by_telegram_id(self, telegram_id: int) -> Optional[Dict[str, Any]]:
         conn = self.get_connection()

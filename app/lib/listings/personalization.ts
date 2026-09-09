@@ -4,6 +4,8 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { queryRawUnsafe } from '@/lib/prisma';
+import { isPostgres } from '@/lib/dbSql';
 
 export type UserPersonalizationProfile = {
   categoryScores: Record<string, number>;
@@ -83,18 +85,22 @@ export async function loadUserPersonalizationProfile(
   const profile = emptyProfile();
 
   try {
-    const userRows = (await prisma.$queryRawUnsafe(
+    const userRows = (await queryRawUnsafe(
       `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ? LIMIT 1`,
       tid
     )) as Array<{ id: number }>;
     const userId = userRows[0]?.id;
 
-    const views = (await prisma.$queryRawUnsafe(
+    const viewedSince = isPostgres()
+      ? `vh."viewedAt" >= NOW() - INTERVAL '60 days'`
+      : `datetime(vh.viewedAt) >= datetime('now', '-60 days')`;
+
+    const views = (await queryRawUnsafe(
       `SELECT vh.listingId as listingId, l.category, l.subcategory, l.location
        FROM ViewHistory vh
        JOIN Listing l ON l.id = vh.listingId
        WHERE vh.viewerTelegramId = ?
-         AND datetime(vh.viewedAt) >= datetime('now', '-60 days')
+         AND ${viewedSince}
        ORDER BY vh.viewedAt DESC
        LIMIT 100`,
       viewerNum
@@ -113,7 +119,7 @@ export async function loadUserPersonalizationProfile(
     }
 
     if (userId) {
-      const favorites = (await prisma.$queryRawUnsafe(
+      const favorites = (await queryRawUnsafe(
         `SELECT l.category, l.subcategory, l.location
          FROM Favorite f
          JOIN Listing l ON l.id = f.listingId
@@ -133,7 +139,7 @@ export async function loadUserPersonalizationProfile(
         bumpScore(profile.cityScores, row.location, 4);
       }
 
-      const subs = (await prisma.$queryRawUnsafe(
+      const subs = (await queryRawUnsafe(
         `SELECT cityKey FROM CitySubscription WHERE userId = ?`,
         userId
       )) as Array<{ cityKey: string }>;
@@ -143,10 +149,14 @@ export async function loadUserPersonalizationProfile(
       }
     }
 
-    const events = (await prisma.$queryRawUnsafe(
+    const eventsSince = isPostgres()
+      ? `createdAt >= NOW() - INTERVAL '45 days'`
+      : `createdAt >= datetime('now', '-45 days')`;
+
+    const events = (await queryRawUnsafe(
       `SELECT eventName, entityId, metadata
        FROM AnalyticsEvent
-       WHERE createdAt >= datetime('now', '-45 days')
+       WHERE ${eventsSince}
          AND (
            telegramId = ?
            ${userId ? 'OR userId = ?' : ''}

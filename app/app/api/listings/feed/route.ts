@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sqlDatetimeCompare } from '@/lib/dbSql';
 import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
     }
 
     whereClause +=
-      " AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))";
+      ` AND (l.expiresAt IS NULL OR ${sqlDatetimeCompare('l.expiresAt')})`;
 
     let personalizationBoost = null;
     let personalized = false;

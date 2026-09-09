@@ -4,10 +4,6 @@ import json
 import os
 from datetime import datetime, timedelta
 from typing import List, Dict
-from database_functions.db_config import DATABASE_PATH
-from utils.translations import t, get_user_lang
-from aiogram import Bot
-from config import token
 from database_functions.telegram_listing_db import get_connection, get_telegram_listing_by_id
 from utils.moderation_manager import ModerationManager
 
@@ -18,7 +14,7 @@ async def deactivate_old_listings(bot: Bot = None):
     - платформенні (parser bot / parsed_items) → sold
     - користувацькі → expired (+ notify)
     """
-    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+    conn = get_connection()
     cursor = conn.cursor()
 
     try:

@@ -1,4 +1,35 @@
+# Запуск:  ./docker/up.sh
+# або:     docker compose up -d --build  (після ./docker/prepare-env.sh)
+#
+# При старті автоматично:
+#   1. app  → prisma migrate deploy (PostgreSQL схема + bot/parser таблиці)
+#   2. bot  → backup SQLite + копія даних у PostgreSQL (один раз, якщо є ayn_marketplace.db)
+#
+# DATABASE_URL для контейнерів задається нижче; секрети — з bot/.env та кореневого .env
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: allyouneed-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ayn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ayn_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ayn_marketplace}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-ayn} -d ${POSTGRES_DB:-ayn_marketplace}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   app:
     build:
       context: .
@@ -17,16 +48,27 @@ services:
     ports:
       - "${APP_PORT:-3000}:3000"
     env_file:
-      - ./bot/.env
+      - path: ./.env
+        required: false
+      - path: ./bot/.env
+        required: false
       - path: ./app/.env
         required: false
     environment:
-      DATABASE_URL: file:///app/database/ayn_marketplace.db
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@postgres:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-ayn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ayn_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ayn_marketplace}
       NODE_OPTIONS: --max-old-space-size=384
     volumes:
       - ./database:/app/database
       - ./app/public/listings:/app/app/public/listings
       - ./app/public/avatars:/app/app/public/avatars
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -38,7 +80,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 12
-      start_period: 90s
+      start_period: 120s
 
   bot:
     build:
@@ -49,7 +91,17 @@ services:
     restart: unless-stopped
     init: true
     env_file:
-      - ./bot/.env
+      - path: ./.env
+        required: false
+      - path: ./bot/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@postgres:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-ayn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ayn_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ayn_marketplace}
     volumes:
       - ./database:/app/database
       - ./app/public/listings:/app/app/public/listings
@@ -57,5 +109,10 @@ services:
       - ./bot/parser/sessions:/app/bot/parser/sessions
       - ./bot/logs:/app/bot/logs
     depends_on:
+      postgres:
+        condition: service_healthy
       app:
-        condition: service_started
+        condition: service_healthy
+
+volumes:
+  postgres_data:

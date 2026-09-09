@@ -1,16 +1,7 @@
 import sqlite3
 from datetime import datetime
 from typing import Optional, Dict, Any
-from database_functions.db_config import DATABASE_PATH
-
-def get_connection():
-    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False, timeout=30.0)
-    conn.execute('PRAGMA journal_mode = WAL;')
-    conn.execute('PRAGMA busy_timeout = 30000;')
-    conn.execute('PRAGMA foreign_keys = ON;')
-    conn.execute('PRAGMA synchronous = NORMAL;')
-    conn.execute('PRAGMA cache_size = -16384;')
-    return conn
+from database_functions.db_connection import get_connection
 
 conn = get_connection()
 cursor = conn.cursor()

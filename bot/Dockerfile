@@ -27,6 +27,7 @@ RUN pip install -r requirements.txt \
  && rm -rf /var/lib/apt/lists/*
 
 COPY bot/ ./
+COPY scripts/ /app/scripts/
 COPY docker/bot-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
  && mkdir -p \
