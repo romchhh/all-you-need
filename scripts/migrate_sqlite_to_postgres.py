@@ -273,7 +273,43 @@ def normalize_integer_value(value):
     return None
 
 
-def is_timestamp_type(pg_type: str) -> bool:
+def is_float_type(pg_type: str) -> bool:
+    t = (pg_type or "").lower()
+    return t in ("double precision", "real", "numeric")
+
+
+def normalize_double_value(value, col_name: str = ""):
+    """REAL/double columns: unix float; SQLite may store datetime strings."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return float(int(value))
+    if isinstance(value, (int, float)):
+        num = float(value)
+        if num > 1e11:
+            num /= 1000
+        return num
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        try:
+            num = float(s)
+            if num > 1e11:
+                num /= 1000
+            return num
+        except ValueError:
+            pass
+        dt_str = normalize_datetime_value(s, col_name)
+        if isinstance(dt_str, str):
+            for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+                try:
+                    dt = datetime.strptime(dt_str[:26], fmt)
+                    return dt.replace(tzinfo=timezone.utc).timestamp()
+                except ValueError:
+                    continue
+    return None
+
     t = (pg_type or "").lower()
     return "timestamp" in t or t == "date"
 
@@ -368,11 +404,13 @@ def coerce_cell(
     if is_integer_type(pg_type):
         normalized = normalize_integer_value(value)
         if normalized is not None:
-            # PostgreSQL INTEGER max; large Telegram IDs need BIGINT columns
-            if pg_type == "integer" and abs(normalized) > 2147483647:
-                return normalized
             return normalized
         return None if nullable else 0
+    if is_float_type(pg_type):
+        normalized = normalize_double_value(value, col_name)
+        if normalized is not None:
+            return normalized
+        return None if nullable else 0.0
     if is_timestamp_type(pg_type) or col_name.endswith("At") or col_name.endswith("_at"):
         normalized = normalize_datetime_value(value, col_name)
         if normalized is not None:
@@ -467,14 +505,20 @@ def upgrade_pg_integer_columns(sqlite_conn: sqlite3.Connection, pg_cur, table: s
 
 
 def insert_batch(pg_cur, insert_sql: str, batch: list[tuple], cols: list[str], table: str, copied: int) -> None:
+    pg_cur.execute("SAVEPOINT migrate_batch")
     try:
         pg_cur.executemany(insert_sql, batch)
+        pg_cur.execute("RELEASE SAVEPOINT migrate_batch")
     except Exception as exc:
+        pg_cur.execute("ROLLBACK TO SAVEPOINT migrate_batch")
         for i, vals in enumerate(batch):
+            pg_cur.execute("SAVEPOINT migrate_row")
             try:
                 pg_cur.execute(insert_sql, vals)
+                pg_cur.execute("RELEASE SAVEPOINT migrate_row")
             except Exception as row_exc:
-                preview = ", ".join(f"{c}={vals[j]!r}" for j, c in enumerate(cols[:8]))
+                pg_cur.execute("ROLLBACK TO SAVEPOINT migrate_row")
+                preview = ", ".join(f"{c}={vals[j]!r}" for j, c in enumerate(cols[:12]))
                 raise RuntimeError(
                     f"{table} row ~{copied + i}: {preview}: {row_exc}"
                 ) from row_exc
