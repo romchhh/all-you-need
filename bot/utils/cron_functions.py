@@ -1,14 +1,16 @@
-import sqlite3
 import asyncio
 import json
 import os
 from datetime import datetime, timedelta
-from typing import List, Dict
+from typing import Dict, List, Optional
+
+from aiogram import Bot
+
 from database_functions.telegram_listing_db import get_connection, get_telegram_listing_by_id
 from utils.moderation_manager import ModerationManager
 
 
-async def deactivate_old_listings(bot: Bot = None):
+async def deactivate_old_listings(bot: Optional[Bot] = None):
     """
     active старше 30 днів:
     - платформенні (parser bot / parsed_items) → sold
@@ -135,7 +137,7 @@ async def deactivate_old_listings(bot: Bot = None):
             pass
 
 
-async def deactivate_old_telegram_listings(bot: Bot = None):
+async def deactivate_old_telegram_listings(bot: Optional[Bot] = None):
     if not bot:
         bot = Bot(token=token)
     
@@ -221,7 +223,7 @@ async def deactivate_old_telegram_listings(bot: Bot = None):
             await bot.session.close()
 
 
-async def unpin_expired_pinned_telegram_listings(bot: Bot = None):
+async def unpin_expired_pinned_telegram_listings(bot: Optional[Bot] = None):
     """
     Знімає закріплення з оголошень у каналі після завершення терміну дії тарифів pinned_12h / pinned_24h.
     Повідомлення в каналі не видаляються, лише відкріплюються.

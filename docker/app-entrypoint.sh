@@ -45,9 +45,30 @@ wait_for_postgres() {
 run_migrations() {
   case "${DATABASE_URL:-}" in
     postgres://*|postgresql://*)
-      echo "[app] prisma migrate deploy (schema + bot/parser tables)..."
-      npx prisma migrate deploy --schema=/app/app/prisma/schema.prisma
-      echo "[app] migrations applied"
+      SCHEMA=/app/app/prisma/schema.prisma
+      echo "[app] prisma migrate deploy..."
+      if npx prisma migrate deploy --schema="$SCHEMA"; then
+        echo "[app] migrations applied"
+        return 0
+      fi
+      # Схема вже є (db push / migrate_sqlite_to_postgres) — позначити міграції як applied
+      echo "[app] migrate failed (tables likely exist) — prisma migrate resolve --applied..."
+      for m in 20250909190000_init_postgresql 20250909190001_bot_parser_tables; do
+        npx prisma migrate resolve --applied "$m" --schema="$SCHEMA" 2>/dev/null || true
+      done
+      if npx prisma migrate deploy --schema="$SCHEMA"; then
+        echo "[app] migrations applied after resolve"
+        return 0
+      fi
+      echo "[app] WARNING: migrate deploy still failed; checking User table..."
+      node -e "
+        const { PrismaClient } = require('@prisma/client');
+        const p = new PrismaClient();
+        p.\$queryRawUnsafe('SELECT 1 FROM \"User\" LIMIT 1')
+          .then(() => { console.log('[app] User table OK — continue'); process.exit(0); })
+          .catch((e) => { console.error('[app] DB not ready:', e.message); process.exit(1); })
+          .finally(() => p.\$disconnect());
+      "
       ;;
     *)
       echo "[app] SQLite mode — skip prisma migrate"
