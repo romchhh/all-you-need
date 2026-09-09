@@ -185,15 +185,31 @@ function quotePgIdentifiers(sql: string): string {
   for (const col of PRISMA_PG_COLUMNS) {
     s = s.replace(new RegExp(`\\.${col}\\b`, 'g'), `."${col}"`);
     s = s.replace(
-      new RegExp(`(?<![."\\w])${col}(?=\\s*(?:=|,|\\)|$))`, 'g'),
+      new RegExp(`(?<![."\\w])${col}(?=\\s*(?:=|,|\\)|$|\\s+IS\\b|\\s+DESC\\b|\\s+ASC\\b))`, 'g'),
       `"${col}"`
     );
   }
 
-  s = s.replace(/\."isFree"\s*=\s*1\b/gi, '."isFree" = true');
-  s = s.replace(/\bisFree\s*=\s*1\b/gi, '"isFree" = true');
-  s = s.replace(/\."isFree"\s*=\s*0\b/gi, '."isFree" = false');
-  s = s.replace(/\bisFree\s*=\s*0\b/gi, '"isFree" = false');
+  const BOOLEAN_PG_COLUMNS = [
+    'isFree',
+    'isActive',
+    'isSuperadmin',
+    'hasUsedFreeAd',
+    'agreementAccepted',
+    'autoRenew',
+    'rewardPaid',
+  ];
+  for (const col of BOOLEAN_PG_COLUMNS) {
+    s = s.replace(new RegExp(`"${col}"\\s*=\\s*1\\b`, 'gi'), `"${col}" = true`);
+    s = s.replace(new RegExp(`\\."${col}"\\s*=\\s*1\\b`, 'gi'), `."${col}" = true`);
+    s = s.replace(new RegExp(`(?<![."\\w])${col}\\s*=\\s*1\\b`, 'gi'), `"${col}" = true`);
+    s = s.replace(new RegExp(`"${col}"\\s*=\\s*0\\b`, 'gi'), `"${col}" = false`);
+    s = s.replace(new RegExp(`\\."${col}"\\s*=\\s*0\\b`, 'gi'), `."${col}" = false`);
+    s = s.replace(new RegExp(`(?<![."\\w])${col}\\s*=\\s*0\\b`, 'gi'), `"${col}" = false`);
+  }
+  s = s.replace(/,\s*1\s*,\s*(CURRENT_TIMESTAMP|NOW\(\))/gi, ', true, $1');
+  s = s.replace(/VALUES\s*\(([^)]*),\s*1\s*\)/gi, 'VALUES ($1, true)');
+
   s = s.replace(/\bAS REAL\b/gi, 'AS DOUBLE PRECISION');
   s = s.replace(/CAST\(([^)]+)\s+AS\s+INTEGER\)/gi, '($1)::bigint');
 

@@ -44,7 +44,7 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
             0.0,  # balance
             5.0,  # rating
             0,    # reviewsCount
-            1,    # isActive
+            True,    # isActive
             current_date_str,
             current_date_str
         ))

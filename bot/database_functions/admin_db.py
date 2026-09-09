@@ -450,8 +450,8 @@ def init_superadmin(telegram_superadmin_id):
         username = get_username_by_user_id(telegram_superadmin_id)
         
         cursor.execute(
-            "INSERT OR IGNORE INTO Admin (userId, username, addedBy, addedDate, isSuperadmin) VALUES (?, ?, ?, ?, 1)",
-            (user_internal_id, username, user_internal_id, current_date)
+            "INSERT OR IGNORE INTO Admin (userId, username, addedBy, addedDate, isSuperadmin) VALUES (?, ?, ?, ?, ?)",
+            (user_internal_id, username, user_internal_id, current_date, True)
         )
         conn.commit()
         return True

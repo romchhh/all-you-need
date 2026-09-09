@@ -83,9 +83,9 @@ def apply_new_categories() -> None:
         cursor.execute(
             """
             INSERT INTO Category (name, icon, parentId, sortOrder, isActive, createdAt)
-            VALUES (?, ?, NULL, ?, 1, CURRENT_TIMESTAMP)
+            VALUES (?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)
             """,
-            (name, icon, sort_order),
+            (name, icon, sort_order, True),
         )
 
     conn.commit()
@@ -123,9 +123,9 @@ def ensure_categories_exist() -> None:
             cursor.execute(
                 """
                 INSERT INTO Category (name, icon, parentId, sortOrder, isActive, createdAt)
-                VALUES (?, ?, NULL, ?, 1, CURRENT_TIMESTAMP)
+                VALUES (?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)
                 """,
-                (name, icon, sort_order),
+                (name, icon, sort_order, True),
             )
             print(f"Додано нову категорію: {name}")
 

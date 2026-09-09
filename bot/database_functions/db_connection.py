@@ -163,6 +163,16 @@ PRISMA_PG_COLUMNS = (
     "sellerTelegramId",
 )
 
+BOOLEAN_PG_COLUMNS = (
+    "isFree",
+    "isActive",
+    "isSuperadmin",
+    "hasUsedFreeAd",
+    "agreementAccepted",
+    "autoRenew",
+    "rewardPaid",
+)
+
 
 def quote_pg_identifiers(sql: str) -> str:
     s = sql
@@ -186,10 +196,26 @@ def quote_pg_identifiers(sql: str) -> str:
             f'"{col}"',
             s,
         )
-    s = re.sub(r'\."isFree"\s*=\s*1\b', '."isFree" = true', s, flags=re.IGNORECASE)
-    s = re.sub(r"\bisFree\s*=\s*1\b", '"isFree" = true', s, flags=re.IGNORECASE)
-    s = re.sub(r'\."isFree"\s*=\s*0\b', '."isFree" = false', s, flags=re.IGNORECASE)
-    s = re.sub(r"\bisFree\s*=\s*0\b", '"isFree" = false', s, flags=re.IGNORECASE)
+    for col in BOOLEAN_PG_COLUMNS:
+        s = re.sub(rf'"{col}"\s*=\s*1\b', f'"{col}" = true', s, flags=re.IGNORECASE)
+        s = re.sub(rf'"{col}"\s*=\s*0\b', f'"{col}" = false', s, flags=re.IGNORECASE)
+        s = re.sub(rf'\."{col}"\s*=\s*1\b', f'."{col}" = true', s, flags=re.IGNORECASE)
+        s = re.sub(rf'(?<![."\\w]){col}\s*=\s*1\b', f'"{col}" = true', s, flags=re.IGNORECASE)
+        s = re.sub(rf'\."{col}"\s*=\s*0\b', f'."{col}" = false', s, flags=re.IGNORECASE)
+        s = re.sub(rf'(?<![."\\w]){col}\s*=\s*0\b', f'"{col}" = false', s, flags=re.IGNORECASE)
+    # INSERT ... isActive/isSuperadmin ... VALUES (..., 1, CURRENT_TIMESTAMP|NOW())
+    s = re.sub(
+        r',\s*1\s*,\s*(CURRENT_TIMESTAMP|NOW\(\))',
+        r', true, \1',
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r'VALUES\s*\(([^)]*),\s*1\s*\)',
+        r'VALUES (\1, true)',
+        s,
+        flags=re.IGNORECASE,
+    )
     s = re.sub(r"\bAS REAL\b", "AS DOUBLE PRECISION", s, flags=re.IGNORECASE)
     return s
 

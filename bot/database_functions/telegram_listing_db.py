@@ -447,8 +447,8 @@ def init_categories_if_empty():
             # Вставляємо категорію
             cursor.execute("""
                 INSERT OR IGNORE INTO Category (name, icon, parentId, sortOrder, isActive, createdAt)
-                VALUES (?, ?, NULL, ?, 1, CURRENT_TIMESTAMP)
-            """, (cat_data['name'], cat_data['icon'], cat_data['sortOrder']))
+                VALUES (?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)
+            """, (cat_data['name'], cat_data['icon'], cat_data['sortOrder'], True))
             
             if cursor.lastrowid:
                 category_id = cursor.lastrowid
@@ -470,8 +470,8 @@ def init_categories_if_empty():
             if not existing_subcat:
                 cursor.execute("""
                     INSERT OR IGNORE INTO Category (name, icon, parentId, sortOrder, isActive, createdAt)
-                    VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-                """, (subcat_data['name'], '', category_id, subcat_data['sortOrder']))
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (subcat_data['name'], '', category_id, subcat_data['sortOrder'], True))
     
     conn.commit()
     conn.close()

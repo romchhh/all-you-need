@@ -99,8 +99,8 @@ def get_or_create_bot_user(
 
     cursor.execute("""
         INSERT INTO User (telegramId, username, firstName, isActive, agreementAccepted, createdAt, updatedAt)
-        VALUES (?, ?, ?, 1, 1, datetime('now'), datetime('now'))
-    """, (telegram_id, username or "parser_bot", first_name or "Parser Bot"))
+        VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    """, (telegram_id, username or "parser_bot", first_name or "Parser Bot", True, True))
     conn.commit()
     user_id = cursor.lastrowid
     conn.close()
