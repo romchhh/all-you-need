@@ -35,8 +35,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma
-/prisma/migrations
+# prisma — migrations are committed in prisma/migrations/
 
 # avatars
 /public/avatars/*.jpg

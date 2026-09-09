@@ -62,8 +62,7 @@ logs/
 Thumbs.db
 .DS_Store
 
-# Prisma
-prisma/migrations/
+# Prisma (migrations are versioned in app/prisma/migrations/)
 
 # Uploaded files
 app/public/avatars/*.jpg
