@@ -11,7 +11,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@host.docker.internal:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
       POSTGRES_HOST: host.docker.internal
-    depends_on: !reset []
+    depends_on: !reset
 
   bot:
     extra_hosts:
@@ -19,6 +19,6 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@host.docker.internal:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
       POSTGRES_HOST: host.docker.internal
-    depends_on:
+    depends_on: !reset
       app:
         condition: service_healthy
