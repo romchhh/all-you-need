@@ -1,24 +1,30 @@
 # PostgreSQL на хості (не в Docker) — після ручної міграції SQLite→PG.
-# Запуск:  docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
+#
+# Linux VPS: host Postgres слухає 127.0.0.1 — контейнерам потрібен network_mode: host,
+# інакше host.docker.internal:5432 не досяжний (listen_addresses = localhost).
+#
+# Запуск:
+#   docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.host-db.yml logs -f
 
 services:
   postgres:
     profiles: ["docker-postgres"]
 
   app:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    network_mode: host
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@host.docker.internal:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
-      POSTGRES_HOST: host.docker.internal
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@127.0.0.1:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
     depends_on: !reset
 
   bot:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    network_mode: host
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@host.docker.internal:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
-      POSTGRES_HOST: host.docker.internal
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@127.0.0.1:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
     depends_on: !reset
       app:
         condition: service_healthy
