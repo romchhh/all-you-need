@@ -181,7 +181,10 @@ export async function GET(request: NextRequest) {
       const favBroken =
         msg.includes('no such table: Favorite') ||
         (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
-      const arBroken = msg.includes('autoRenew');
+      const arBroken =
+        msg.includes('autoRenew') ||
+        msg.includes('COALESCE types boolean') ||
+        msg.includes('DatatypeMismatch');
       if (!favBroken && !arBroken) {
         throw error;
       }

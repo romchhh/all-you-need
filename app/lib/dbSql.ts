@@ -211,6 +211,22 @@ function quotePgIdentifiers(sql: string): string {
       new RegExp(`COALESCE\\s*\\(\\s*"${col}"\\s*,\\s*0\\s*\\)`, 'gi'),
       `COALESCE("${col}", false)`
     );
+    s = s.replace(
+      new RegExp(`COALESCE\\s*\\(\\s*((?:[a-zA-Z_]\\w*\\.)?"${col}")\\s*,\\s*0\\s*\\)`, 'gi'),
+      'COALESCE($1, false)'
+    );
+    s = s.replace(
+      new RegExp(`COALESCE\\s*\\(\\s*((?:[a-zA-Z_]\\w*\\.)?${col})\\s*,\\s*0\\s*\\)`, 'gi'),
+      'COALESCE($1, false)'
+    );
+    s = s.replace(
+      new RegExp(`COALESCE\\s*\\(\\s*((?:[a-zA-Z_]\\w*\\.)?"${col}")\\s*,\\s*false\\s*\\)\\s*=\\s*1\\b`, 'gi'),
+      'COALESCE($1, false) = true'
+    );
+    s = s.replace(
+      new RegExp(`COALESCE\\s*\\(\\s*((?:[a-zA-Z_]\\w*\\.)?"${col}")\\s*,\\s*false\\s*\\)\\s*=\\s*0\\b`, 'gi'),
+      'COALESCE($1, false) = false'
+    );
   }
   s = s.replace(/,\s*1\s*,\s*(CURRENT_TIMESTAMP|NOW\(\))/gi, ', true, $1');
   s = s.replace(/VALUES\s*\(([^)]*),\s*1\s*\)/gi, 'VALUES ($1, true)');

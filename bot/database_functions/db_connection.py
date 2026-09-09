@@ -205,6 +205,30 @@ def quote_pg_identifiers(sql: str) -> str:
             s,
             flags=re.IGNORECASE,
         )
+        s = re.sub(
+            rf'COALESCE\s*\(\s*((?:[a-zA-Z_]\w*\.)?"{col}")\s*,\s*0\s*\)',
+            r'COALESCE(\1, false)',
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(
+            rf'COALESCE\s*\(\s*((?:[a-zA-Z_]\w*\.)?{col})\s*,\s*0\s*\)',
+            r'COALESCE(\1, false)',
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(
+            rf'COALESCE\s*\(\s*((?:[a-zA-Z_]\w*\.)?"{col}")\s*,\s*false\s*\)\s*=\s*1\b',
+            r'COALESCE(\1, false) = true',
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(
+            rf'COALESCE\s*\(\s*((?:[a-zA-Z_]\w*\.)?"{col}")\s*,\s*false\s*\)\s*=\s*0\b',
+            r'COALESCE(\1, false) = false',
+            s,
+            flags=re.IGNORECASE,
+        )
     # INSERT ... isActive/isSuperadmin ... VALUES (..., 1, CURRENT_TIMESTAMP|NOW())
     s = re.sub(
         r',\s*1\s*,\s*(CURRENT_TIMESTAMP|NOW\(\))',
