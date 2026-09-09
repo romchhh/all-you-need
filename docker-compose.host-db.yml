@@ -1,0 +1,24 @@
+# PostgreSQL на хості (не в Docker) — після ручної міграції SQLite→PG.
+# Запуск:  docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
+
+services:
+  postgres:
+    profiles: ["docker-postgres"]
+
+  app:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@host.docker.internal:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
+      POSTGRES_HOST: host.docker.internal
+    depends_on: !reset []
+
+  bot:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ayn}:${POSTGRES_PASSWORD:-ayn_dev_password}@host.docker.internal:5432/${POSTGRES_DB:-ayn_marketplace}?schema=public
+      POSTGRES_HOST: host.docker.internal
+    depends_on:
+      app:
+        condition: service_healthy
