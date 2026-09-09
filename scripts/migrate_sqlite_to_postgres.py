@@ -17,6 +17,7 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SQLITE_PATH = BASE_DIR / "database" / "ayn_marketplace.db"
@@ -63,11 +64,21 @@ def log(msg: str) -> None:
     print(f"[migrate] {msg}", flush=True)
 
 
+def pg_dsn_for_psycopg2(url: str) -> str:
+    """Remove Prisma-only URI params (schema=public etc.) that psycopg2 rejects."""
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+    skip = frozenset({"schema", "connection_limit", "pool_timeout", "connect_timeout"})
+    kept = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k.lower() not in skip]
+    return urlunparse(parsed._replace(query=urlencode(kept)))
+
+
 def get_pg_url() -> str:
     url = os.environ.get("DATABASE_URL", "").strip()
     if not url.startswith("postgres"):
         raise SystemExit("DATABASE_URL must be a PostgreSQL connection string")
-    return url
+    return pg_dsn_for_psycopg2(url)
 
 
 def backup_sqlite() -> Path | None:

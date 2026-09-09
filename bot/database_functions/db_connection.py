@@ -10,6 +10,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Optional, Sequence, Union
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DB_PATH = BASE_DIR / "database" / "ayn_marketplace.db"
@@ -29,6 +30,16 @@ def _load_psycopg2():
         _psycopg2 = psycopg2
         _psycopg2_extras = psycopg2.extras
     return _psycopg2, _psycopg2_extras
+
+
+def pg_dsn_for_psycopg2(url: str) -> str:
+    """Strip Prisma-only URI params (schema=public) — psycopg2 does not accept them."""
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+    skip = frozenset({"schema", "connection_limit", "pool_timeout", "connect_timeout"})
+    kept = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k.lower() not in skip]
+    return urlunparse(parsed._replace(query=urlencode(kept)))
 
 
 def get_database_url() -> str:
@@ -398,7 +409,7 @@ def _connect_sqlite() -> DbConnection:
 
 def _connect_postgres() -> DbConnection:
     psycopg2, _ = _load_psycopg2()
-    conn = psycopg2.connect(get_database_url())
+    conn = psycopg2.connect(pg_dsn_for_psycopg2(get_database_url()))
     conn.autocommit = False
     return DbConnection(conn, managed_close=True, is_pg=True)
 
