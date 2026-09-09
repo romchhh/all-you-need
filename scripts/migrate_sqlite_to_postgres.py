@@ -177,7 +177,50 @@ def pg_column_types(cur, table: str) -> dict[str, str]:
     return {r[0]: r[1] for r in cur.fetchall()}
 
 
-def coerce_cell(value, pg_type: str):
+def is_timestamp_type(pg_type: str) -> bool:
+    t = (pg_type or "").lower()
+    return "timestamp" in t or t == "date"
+
+
+def normalize_datetime_value(value, col_name: str = ""):
+    """SQLite may store ms epoch, seconds epoch, or 'YYYY-MM-DD HH:mm:ss' strings."""
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+
+    if isinstance(value, (int, float)):
+        num = float(value)
+    elif isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        if re.fullmatch(r"\d+", s):
+            num = float(s)
+        elif re.match(r"^\d{4}-\d{2}-\d{2}", s):
+            if "T" in s:
+                return s.replace("Z", "+00:00") if s.endswith("Z") else s
+            return s.replace(" ", "T", 1)
+        else:
+            return value
+    else:
+        return value
+
+    # Epoch: ms (>1e11), seconds (>1e9), or invalid garbage
+    if num > 1e14:
+        num /= 1_000_000
+    elif num > 1e11:
+        num /= 1000
+
+    if num < 1e9 or num > 4e12:
+        return None
+
+    dt = datetime.fromtimestamp(num, tz=timezone.utc).replace(tzinfo=None)
+    return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+
+def coerce_cell(value, pg_type: str, col_name: str = ""):
     if value is None:
         return None
     if pg_type == "boolean":
@@ -187,6 +230,10 @@ def coerce_cell(value, pg_type: str):
             return bool(value)
         if isinstance(value, str):
             return value.strip().lower() in ("1", "true", "t", "yes")
+    if is_timestamp_type(pg_type) or col_name.endswith("At") or col_name.endswith("_at"):
+        normalized = normalize_datetime_value(value, col_name)
+        if normalized is not None:
+            return normalized
     return value
 
 
@@ -243,6 +290,7 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
             coerce_cell(
                 row[c] if isinstance(row, sqlite3.Row) else row[i],
                 col_types.get(c, ""),
+                c,
             )
             for i, c in enumerate(cols)
         )
