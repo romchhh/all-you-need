@@ -8,6 +8,8 @@ export type BazaarTabPersistedState = {
   selectedCurrency: string | null;
   sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
   showFreeOnly: boolean;
+  /** Персоналізована стрічка «Підібрано для вас» */
+  personalizedFeedEnabled: boolean;
 };
 
 export const DEFAULT_BAZAAR_TAB_STATE: BazaarTabPersistedState = {
@@ -20,6 +22,7 @@ export const DEFAULT_BAZAAR_TAB_STATE: BazaarTabPersistedState = {
   selectedCurrency: null,
   sortBy: 'newest',
   showFreeOnly: false,
+  personalizedFeedEnabled: true,
 };
 
 const STORAGE_KEY = 'bazaarTabState';
@@ -40,6 +43,7 @@ export function loadBazaarTabStateFromStorage(): BazaarTabPersistedState {
       ...parsed,
       selectedCategory: null,
       selectedSubcategory: null,
+      personalizedFeedEnabled: parsed.personalizedFeedEnabled !== false,
     };
   } catch {
     return { ...DEFAULT_BAZAAR_TAB_STATE };

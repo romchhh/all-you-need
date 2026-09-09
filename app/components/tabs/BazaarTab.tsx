@@ -15,6 +15,7 @@ import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsE
 import { ListingsRefreshOverlay } from '@/components/ui/ListingsRefreshOverlay';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { HomeActivityStats } from '@/components/home/HomeActivityStats';
+import { IosSwitch } from '@/components/ui/IosSwitch';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -69,6 +70,7 @@ interface BazaarTabProps {
     selectedCurrency: string | null;
     sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
     showFreeOnly: boolean;
+    personalizedFeedEnabled?: boolean;
     viewMode?: 'grid' | 'list';
   };
   onStateChange?: (state: {
@@ -81,12 +83,13 @@ interface BazaarTabProps {
     selectedCurrency: string | null;
     sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
     showFreeOnly: boolean;
+    personalizedFeedEnabled?: boolean;
     viewMode?: 'grid' | 'list';
   }) => void;
   tg: TelegramWebApp | null;
   /** Telegram ID залогіненого користувача (міні-ап) — для підписок на місто */
   profileTelegramId?: string | null;
-  /** Каталог підлаштовано під інтереси користувача */
+  /** Каталог підлаштовано під інтереси користувача (відповідь API) */
   catalogPersonalized?: boolean;
   onToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
@@ -590,23 +593,34 @@ const BazaarTabComponent = ({
               <HomeActivityStats isLight={isLight} />
             </div>
           </div>
-          {(catalogPersonalized || profileTelegramId) &&
+          {profileTelegramId &&
             !selectedCategory &&
             sortBy === 'newest' &&
             !hasActiveFilters && (
               <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
                 <div
-                  className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-xs ${
+                  className={`flex w-full max-w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 lg:max-w-xl xl:max-w-2xl ${
                     isLight
-                      ? 'bg-[#3F5331]/10 text-[#3F5331] border border-[#3F5331]/15'
-                      : 'bg-[#C8E6A0]/10 text-[#C8E6A0] border border-[#C8E6A0]/20'
+                      ? 'border border-[#3F5331]/12 bg-white/90 shadow-sm ring-1 ring-black/[0.03]'
+                      : 'border border-white/10 bg-white/[0.04]'
                   }`}
                 >
-                  <span aria-hidden>✨</span>
-                  <span className="font-medium">{t('bazaar.personalizedFeed')}</span>
-                  <span className={`truncate ${isLight ? 'text-[#5A6B52]/80' : 'text-white/60'}`}>
-                    · {t('bazaar.personalizedFeedHint')}
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold leading-tight ${ac.pageHeading}`}>
+                      {t('bazaar.personalizedFeed')}
+                    </p>
+                    <p className={`mt-0.5 text-xs leading-snug ${ac.mutedText}`}>
+                      {t('bazaar.personalizedFeedHint')}
+                    </p>
+                  </div>
+                  <IosSwitch
+                    checked={savedState?.personalizedFeedEnabled !== false}
+                    onChange={(next) => {
+                      onStateChange?.({ personalizedFeedEnabled: next });
+                      tg?.HapticFeedback?.impactOccurred('light');
+                    }}
+                    aria-label={t('bazaar.personalizedFeed')}
+                  />
                 </div>
               </div>
             )}
@@ -933,6 +947,7 @@ export const BazaarTab = memo(BazaarTabComponent, (prevProps, nextProps) => {
     prevProps.savedState?.selectedCurrency === nextProps.savedState?.selectedCurrency &&
     prevProps.savedState?.sortBy === nextProps.savedState?.sortBy &&
     prevProps.savedState?.showFreeOnly === nextProps.savedState?.showFreeOnly &&
+    prevProps.savedState?.personalizedFeedEnabled === nextProps.savedState?.personalizedFeedEnabled &&
     prevProps.initialSelectedCategory === nextProps.initialSelectedCategory &&
     prevProps.profileTelegramId === nextProps.profileTelegramId &&
     prevProps.catalogPersonalized === nextProps.catalogPersonalized &&

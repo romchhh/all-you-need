@@ -173,7 +173,7 @@ def create_marketplace_listing(
             datetime('now'), datetime('now'), datetime('now'), {expires_at_sql}
         )
     """, (
-        user_id, title, description, price_str, currency, int(is_free),
+        user_id, title, description, price_str, currency, bool(is_free),
         category, subcategory, condition or default_condition, loc,
         images_json,
     ))

@@ -403,6 +403,10 @@ export function useBazaarPage() {
     [profile?.telegramId, telegramUser?.id]
   );
 
+  const personalizedFeedEnabled = bazaarTabState.personalizedFeedEnabled !== false;
+  const sendPersonalizedFeed =
+    personalizedFeedEnabled && Boolean(viewerTelegramId);
+
   const buildListingsUrl = useCallback(
     (
       limit: number,
@@ -429,7 +433,7 @@ export function useBazaarPage() {
       if (searchTrimmed) {
         params.set('search', searchTrimmed);
       }
-      if (viewerTelegramId) {
+      if (sendPersonalizedFeed && viewerTelegramId) {
         params.set('viewerId', viewerTelegramId);
       }
       return `/api/listings/feed?${params.toString()}`;
@@ -438,6 +442,7 @@ export function useBazaarPage() {
       bazaarTabState,
       debouncedSearchQuery,
       viewerTelegramId,
+      sendPersonalizedFeed,
     ]
   );
   const { toast, showToast, hideToast } = useToast();
@@ -624,8 +629,7 @@ export function useBazaarPage() {
         !forceRefresh &&
         !requestHasActiveFilters &&
         !useSearch &&
-        !profile?.telegramId &&
-        !viewerTelegramId &&
+        !sendPersonalizedFeed &&
         typeof window !== 'undefined'
       ) {
         const cached = readBazaarListingsCache();
@@ -689,8 +693,7 @@ export function useBazaarPage() {
         if (
           !requestHasActiveFilters &&
           !useSearch &&
-          !profile?.telegramId &&
-        !viewerTelegramId &&
+          !sendPersonalizedFeed &&
           typeof window !== 'undefined'
         ) {
           writeBazaarListingsCache({
@@ -730,10 +733,10 @@ export function useBazaarPage() {
         setIsListingsRefreshing(false);
       }
     }
-  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages, profile?.telegramId, viewerTelegramId]);
+  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages, sendPersonalizedFeed]);
 
   // Ключ фільтрів (категорія, міста, ціна, пошук тощо) — однаковий формат для першого завантаження та рефетчу
-  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${bazaarTabState.minPrice ?? ''}|${bazaarTabState.maxPrice ?? ''}|${bazaarTabState.selectedCondition ?? ''}|${bazaarTabState.selectedCurrency ?? ''}|${(debouncedSearchQuery ?? '').trim()}|${viewerTelegramId ?? ''}`;
+  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${bazaarTabState.minPrice ?? ''}|${bazaarTabState.maxPrice ?? ''}|${bazaarTabState.selectedCondition ?? ''}|${bazaarTabState.selectedCurrency ?? ''}|${(debouncedSearchQuery ?? '').trim()}|${sendPersonalizedFeed ? viewerTelegramId ?? '' : ''}|${personalizedFeedEnabled ? '1' : '0'}`;
 
   // Перше завантаження (без фільтрів і без пошуку — можна з кешу; якщо є пошук — одразу з пошуком)
   useEffect(() => {
@@ -747,7 +750,7 @@ export function useBazaarPage() {
       cached.listings.length > 0 &&
       !hasActiveFilters &&
       !searchTrimmed &&
-      !viewerTelegramId
+      !sendPersonalizedFeed
     ) {
       setListings(cached.listings || []);
       setTotalListings(cached.total || 0);
@@ -768,7 +771,7 @@ export function useBazaarPage() {
       // Якщо в полі пошуку вже є текст (наприклад з localStorage) — одразу завантажуємо з пошуком
       fetchListings(false, searchTrimmed || undefined);
     }
-  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery, schedulePrefetchListingsImages, viewerTelegramId]);
+  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery, schedulePrefetchListingsImages, sendPersonalizedFeed]);
 
   // Після перезавантаження / лого — повернутися до товару в стрічці
   useEffect(() => {
@@ -1088,6 +1091,7 @@ export function useBazaarPage() {
           prev.maxPrice === merged.maxPrice &&
           prev.selectedCondition === merged.selectedCondition &&
           prev.selectedCurrency === merged.selectedCurrency &&
+          prev.personalizedFeedEnabled === merged.personalizedFeedEnabled &&
           JSON.stringify(prev.selectedCities) === JSON.stringify(merged.selectedCities)
         ) {
           return prev;

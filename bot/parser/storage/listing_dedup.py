@@ -6,6 +6,7 @@ import logging
 import re
 from typing import Optional
 
+from database_functions.db_connection import adapt_sql
 from parser.config.settings import PARSER_DEDUP_DAYS
 from parser.storage.connection import get_connection
 from parser.storage.parsed_items import fingerprint_title_desc
@@ -26,7 +27,8 @@ def active_listing_duplicate(dedup_key: Optional[str], title: str, description: 
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        """
+        adapt_sql(
+            """
         SELECT id, title, description, price, isFree
         FROM Listing
         WHERE status = 'active'
@@ -34,7 +36,8 @@ def active_listing_duplicate(dedup_key: Optional[str], title: str, description: 
           AND datetime(createdAt) >= datetime('now', ?)
         ORDER BY id DESC
         LIMIT 800
-        """,
+        """
+        ),
         (f"-{PARSER_DEDUP_DAYS} days",),
     )
     rows = cursor.fetchall()
@@ -78,7 +81,8 @@ def recent_listings_for_ai_context(
     params_active.append(limit_active)
 
     cursor.execute(
-        f"""
+        adapt_sql(
+            f"""
         SELECT id, title, location, price
         FROM Listing
         WHERE status = 'active'
@@ -87,7 +91,8 @@ def recent_listings_for_ai_context(
           {loc_clause}
         ORDER BY id DESC
         LIMIT ?
-        """,
+        """
+        ),
         params_active,
     )
     active = [dict(r) for r in cursor.fetchall()]

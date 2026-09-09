@@ -190,8 +190,8 @@ def quote_pg_identifiers(sql: str) -> str:
         s = re.sub(rf"\bDELETE FROM {table}\b", f'DELETE FROM "{table}"', s, flags=re.IGNORECASE)
         s = re.sub(rf"\bON {table}\(", f'ON "{table}"(', s, flags=re.IGNORECASE)
     for col in PRISMA_PG_COLUMNS:
-        s = re.sub(rf"\.{col}\b", f'."{col}"', s)
-        s = re.sub(rf'(?<![."\\w]){col}\b', f'"{col}"', s)
+        s = re.sub(rf"\.{col}\b", f'."{col}"', s, flags=re.IGNORECASE)
+        s = re.sub(rf'(?<![."\\w]){col}\b', f'"{col}"', s, flags=re.IGNORECASE)
     for col in BOOLEAN_PG_COLUMNS:
         s = re.sub(rf'"{col}"\s*=\s*1\b', f'"{col}" = true', s, flags=re.IGNORECASE)
         s = re.sub(rf'"{col}"\s*=\s*0\b', f'"{col}" = false', s, flags=re.IGNORECASE)
@@ -283,6 +283,12 @@ def adapt_sql(sql: str) -> str:
         s,
         flags=re.IGNORECASE,
     )
+    s = re.sub(
+        r"datetime\(([^,)]+)\)\s*>=\s*datetime\('now',\s*\?\)",
+        r"\1 >= NOW() + CAST(? AS INTERVAL)",
+        s,
+        flags=re.IGNORECASE,
+    )
     s = re.sub(r"INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY", s, flags=re.IGNORECASE)
     s = re.sub(r"INSERT OR IGNORE INTO", "INSERT INTO", s, flags=re.IGNORECASE)
     s = re.sub(r"ON CONFLICT\s*\(", "ON CONFLICT (", s, flags=re.IGNORECASE)
@@ -296,6 +302,8 @@ def adapt_sql(sql: str) -> str:
         flags=re.IGNORECASE,
     )
     s = quote_pg_identifiers(s)
+    # Залишки SQLite datetime() після quoting camelCase колонок
+    s = re.sub(r'\bdatetime\s*\(\s*"([^"]+)"\s*\)', r'"\1"', s, flags=re.IGNORECASE)
     return s
 
 

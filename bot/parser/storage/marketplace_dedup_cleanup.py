@@ -6,6 +6,7 @@ import logging
 from collections import defaultdict
 from typing import Any
 
+from database_functions.db_connection import adapt_sql
 from parser.storage.connection import get_connection
 from parser.storage.parsed_items import fingerprint_title_desc
 
@@ -25,14 +26,16 @@ def run_marketplace_duplicate_cleanup(
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        """
+        adapt_sql(
+            """
         SELECT id, title, description, price, isFree, createdAt
         FROM Listing
         WHERE status = 'active'
           AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
           AND datetime(createdAt) >= datetime('now', ?)
         ORDER BY id ASC
-        """,
+        """
+        ),
         (f"-{days} days",),
     )
     rows = [dict(r) for r in cursor.fetchall()]
@@ -68,13 +71,15 @@ def run_marketplace_duplicate_cleanup(
     if hide_ids and not dry_run:
         for lid in hide_ids:
             cursor.execute(
-                """
+                adapt_sql(
+                    """
                 UPDATE Listing
                 SET status = 'hidden',
                     updatedAt = datetime('now')
                 WHERE id = ?
                   AND status = 'active'
-                """,
+                """
+                ),
                 (lid,),
             )
             if cursor.rowcount:
