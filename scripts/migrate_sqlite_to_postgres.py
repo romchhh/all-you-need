@@ -380,6 +380,107 @@ def coerce_cell(
     return value
 
 
+PG_INT_MIN = -2_147_483_648
+PG_INT_MAX = 2_147_483_647
+
+# Columns that commonly store Telegram user/chat IDs (always BIGINT in PG)
+FORCE_BIGINT_COLUMNS: dict[str, frozenset[str]] = {
+    "payments": frozenset({"user_id"}),
+    "linkvisit": frozenset({"source_id"}),
+    "users_legacy": frozenset({"user_id"}),
+    "parser_accounts": frozenset({"telegram_id"}),
+    "parsed_items": frozenset({
+        "author_id",
+        "moderation_chat_id",
+        "moderation_chat_id_channel",
+        "admin_message_id",
+        "admin_message_id_channel",
+    }),
+    "User": frozenset({"telegramId"}),
+    "ViewHistory": frozenset({"viewerTelegramId"}),
+    "Referral": frozenset({"referrer_telegram_id", "referred_telegram_id"}),
+    "UserSession": frozenset({"telegramId"}),
+    "TelegramListing": frozenset({"channelMessageId", "marketplaceListingId"}),
+}
+
+
+def sqlite_col_ref(col: str) -> str:
+    if col[0].isupper() or col in ("Transaction",):
+        return f'"{col}"'
+    return col
+
+
+def pg_col_ref(col: str) -> str:
+    if col[0].isupper():
+        return f'"{col}"'
+    return col
+
+
+def value_outside_pg_int_range(value) -> bool:
+    if value is None:
+        return False
+    try:
+        n = int(value)
+        return n < PG_INT_MIN or n > PG_INT_MAX
+    except (ValueError, TypeError, OverflowError):
+        return False
+
+
+def upgrade_pg_integer_columns(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> None:
+    """Promote INTEGER → BIGINT when SQLite data exceeds int32 (Telegram IDs, chat IDs)."""
+    resolved = resolve_pg_table(pg_cur, table)
+    if not resolved:
+        return
+    qtable = pg_table_ref(resolved)
+    col_meta_map = pg_column_meta(pg_cur, table)
+    sq_cols = sqlite_columns(sqlite_conn, table)
+    force = FORCE_BIGINT_COLUMNS.get(table, frozenset()) | FORCE_BIGINT_COLUMNS.get(
+        resolved, frozenset()
+    )
+
+    for col in sq_cols:
+        meta = col_meta_map.get(col)
+        if not meta or meta.get("type") not in ("integer", "smallint"):
+            continue
+
+        needs_bigint = col in force or col.lower() in {c.lower() for c in force}
+        if not needs_bigint:
+            sq_ref = sqlite_col_ref(col)
+            try:
+                row = sqlite_conn.execute(
+                    f"SELECT MIN({sq_ref}), MAX({sq_ref}) FROM {sqlite_table_ref(table)} "
+                    f"WHERE {sq_ref} IS NOT NULL"
+                ).fetchone()
+                if row:
+                    needs_bigint = value_outside_pg_int_range(row[0]) or value_outside_pg_int_range(
+                        row[1]
+                    )
+            except sqlite3.Error:
+                continue
+
+        if needs_bigint:
+            pg_cur.execute(
+                f"ALTER TABLE {qtable} ALTER COLUMN {pg_col_ref(col)} TYPE BIGINT"
+            )
+            meta["type"] = "bigint"
+            log(f"  {table}.{col}: INTEGER → BIGINT")
+
+
+def insert_batch(pg_cur, insert_sql: str, batch: list[tuple], cols: list[str], table: str, copied: int) -> None:
+    try:
+        pg_cur.executemany(insert_sql, batch)
+    except Exception as exc:
+        for i, vals in enumerate(batch):
+            try:
+                pg_cur.execute(insert_sql, vals)
+            except Exception as row_exc:
+                preview = ", ".join(f"{c}={vals[j]!r}" for j, c in enumerate(cols[:8]))
+                raise RuntimeError(
+                    f"{table} row ~{copied + i}: {preview}: {row_exc}"
+                ) from row_exc
+        raise exc
+
+
 def sqlite_columns(conn: sqlite3.Connection, table: str) -> list[str]:
     cur = conn.execute(f"PRAGMA table_info({sqlite_table_ref(table)})")
     return [r[1] for r in cur.fetchall()]
@@ -413,6 +514,7 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
         return 0
 
     sq_cols = sqlite_columns(sqlite_conn, table)
+    upgrade_pg_integer_columns(sqlite_conn, pg_cur, table)
     pg_cols = set(pg_columns(pg_cur, table))
     col_meta_map = pg_column_meta(pg_cur, table)
     col_types = {k: v["type"] for k, v in col_meta_map.items()}  # type: ignore
@@ -428,7 +530,7 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
         return 0
 
     qtable = pg_table_ref(resolved)
-    col_sql = ", ".join(f'"{c}"' for c in cols)
+    col_sql = ", ".join(pg_col_ref(c) for c in cols)
     placeholders = ", ".join(["%s"] * len(cols))
     insert_sql = f"INSERT INTO {qtable} ({col_sql}) VALUES ({placeholders})"
 
@@ -452,11 +554,11 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
         )
         batch.append(values)
         if len(batch) >= 500:
-            pg_cur.executemany(insert_sql, batch)
+            insert_batch(pg_cur, insert_sql, batch, cols, table, copied)
             copied += len(batch)
             batch = []
     if batch:
-        pg_cur.executemany(insert_sql, batch)
+        insert_batch(pg_cur, insert_sql, batch, cols, table, copied)
         copied += len(batch)
 
     if "id" in cols and copied:
@@ -469,20 +571,8 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
 
 
 def ensure_pg_schema_fixes(pg_cur) -> None:
-    """One-off PG schema tweaks for legacy SQLite data (Telegram IDs > int32)."""
-    pg_cur.execute(
-        """
-        SELECT table_name, data_type FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND column_name = 'source_id'
-          AND table_name IN ('linkvisit', 'LinkVisit')
-        """
-    )
-    for table_name, data_type in pg_cur.fetchall():
-        if data_type == "integer":
-            qtable = pg_table_ref(table_name)
-            pg_cur.execute(f"ALTER TABLE {qtable} ALTER COLUMN source_id TYPE BIGINT")
-            log(f"Altered {table_name}.source_id INTEGER → BIGINT")
+    """Legacy hook — per-table upgrades run in copy_table via upgrade_pg_integer_columns."""
+    del pg_cur
 
 
 def apply_extra_sql(pg_conn) -> None:
