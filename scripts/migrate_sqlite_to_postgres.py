@@ -162,19 +162,76 @@ def pg_columns(cur, table: str) -> list[str]:
 
 
 def pg_column_types(cur, table: str) -> dict[str, str]:
+    return {name: meta["type"] for name, meta in pg_column_meta(cur, table).items()}
+
+
+def pg_column_meta(cur, table: str) -> dict[str, dict[str, str | bool | None]]:
     resolved = resolve_pg_table(cur, table)
     if not resolved:
         return {}
     cur.execute(
         """
-        SELECT column_name, data_type
+        SELECT column_name, data_type, is_nullable, column_default
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND (table_name = %s OR table_name = %s)
+        ORDER BY ordinal_position
         """,
         (resolved, resolved.lower()),
     )
-    return {r[0]: r[1] for r in cur.fetchall()}
+    out: dict[str, dict[str, str | bool | None]] = {}
+    for name, data_type, is_nullable, column_default in cur.fetchall():
+        out[name] = {
+            "type": data_type,
+            "nullable": is_nullable == "YES",
+            "default": column_default,
+        }
+    return out
+
+
+def parse_pg_default(default: str | None):
+    if not default:
+        return None
+    d = default.strip()
+    if d.startswith("'") and "::" in d:
+        return d.split("'")[1]
+    if d.startswith("(") and "':" in d:
+        inner = d.split("'")[1] if "'" in d else None
+        if inner is not None:
+            return inner
+    lowered = d.lower()
+    if lowered in ("false", "'f'::boolean"):
+        return False
+    if lowered in ("true", "'t'::boolean"):
+        return True
+    if lowered.endswith("::integer") or lowered.isdigit():
+        try:
+            return int(re.sub(r"[^0-9-]", "", d.split("::")[0]) or "0")
+        except ValueError:
+            pass
+    if "now()" in lowered:
+        return datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    return None
+
+
+# Fallbacks when SQLite has NULL but PostgreSQL column is NOT NULL
+FALLBACK_DEFAULTS: dict[tuple[str, str], object] = {
+    ("Listing", "moderationStatus"): "pending",
+    ("Listing", "status"): "pending_moderation",
+    ("TelegramListing", "moderationStatus"): "pending",
+    ("TelegramListing", "status"): "pending_moderation",
+    ("Transaction", "status"): "pending",
+    ("Payment", "status"): "created",
+    ("Payment", "currency"): "EUR",
+    ("Transaction", "currency"): "EUR",
+}
+
+
+def infer_moderation_status(listing_status: object) -> str:
+    st = str(listing_status or "").strip().lower()
+    if st in ("active", "sold", "approved", "expired", "deactivated", "hidden"):
+        return "approved"
+    return "pending"
 
 
 def is_timestamp_type(pg_type: str) -> bool:
@@ -220,7 +277,46 @@ def normalize_datetime_value(value, col_name: str = ""):
     return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
 
-def coerce_cell(value, pg_type: str, col_name: str = ""):
+def coerce_cell(
+    value,
+    pg_type: str,
+    col_name: str = "",
+    *,
+    table_name: str = "",
+    col_meta: dict | None = None,
+    row_values: dict | None = None,
+):
+    meta = col_meta or {}
+    nullable = meta.get("nullable", True)
+    pg_default = meta.get("default")
+
+    if isinstance(value, str) and not value.strip():
+        value = None
+
+    if value is None and not nullable:
+        if col_name == "moderationStatus" and row_values and row_values.get("status"):
+            value = infer_moderation_status(row_values.get("status"))
+        else:
+            fb = FALLBACK_DEFAULTS.get((table_name, col_name))
+            if fb is not None:
+                value = fb
+            else:
+                parsed = parse_pg_default(str(pg_default) if pg_default else None)
+                if parsed is not None:
+                    value = parsed
+                elif pg_type == "boolean":
+                    value = False
+                elif pg_type in ("integer", "bigint", "smallint"):
+                    value = 0
+                elif pg_type in ("double precision", "real", "numeric"):
+                    value = 0.0
+                elif pg_type == "text" or "character" in (pg_type or ""):
+                    value = ""
+                elif is_timestamp_type(pg_type) or col_name.endswith("At"):
+                    value = datetime.now(timezone.utc).replace(tzinfo=None).strftime(
+                        "%Y-%m-%d %H:%M:%S.%f"
+                    )[:-3]
+
     if value is None:
         return None
     if pg_type == "boolean":
@@ -266,7 +362,8 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
 
     sq_cols = sqlite_columns(sqlite_conn, table)
     pg_cols = set(pg_columns(pg_cur, table))
-    col_types = pg_column_types(pg_cur, table)
+    col_meta_map = pg_column_meta(pg_cur, table)
+    col_types = {k: v["type"] for k, v in col_meta_map.items()}  # type: ignore
     cols = [c for c in sq_cols if c in pg_cols]
     if not cols:
         log(f"  skip {table}: no matching columns")
@@ -286,13 +383,20 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
     copied = 0
     batch: list[tuple] = []
     for row in rows:
+        raw = {
+            c: (row[c] if isinstance(row, sqlite3.Row) else row[i])
+            for i, c in enumerate(cols)
+        }
         values = tuple(
             coerce_cell(
-                row[c] if isinstance(row, sqlite3.Row) else row[i],
-                col_types.get(c, ""),
+                raw[c],
+                str(col_types.get(c, "")),
                 c,
+                table_name=table,
+                col_meta=col_meta_map.get(c),
+                row_values=raw,
             )
-            for i, c in enumerate(cols)
+            for c in cols
         )
         batch.append(values)
         if len(batch) >= 500:
