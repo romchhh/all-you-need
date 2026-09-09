@@ -378,7 +378,7 @@ def coerce_cell(
 
 
 def sqlite_columns(conn: sqlite3.Connection, table: str) -> list[str]:
-    cur = conn.execute(f"PRAGMA table_info({table})")
+    cur = conn.execute(f"PRAGMA table_info({sqlite_table_ref(table)})")
     return [r[1] for r in cur.fetchall()]
 
 
