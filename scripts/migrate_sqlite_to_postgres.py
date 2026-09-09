@@ -310,6 +310,8 @@ def normalize_double_value(value, col_name: str = ""):
                     continue
     return None
 
+
+def is_timestamp_type(pg_type: str) -> bool:
     t = (pg_type or "").lower()
     return "timestamp" in t or t == "date"
 
