@@ -10,6 +10,7 @@ Idempotent: skips if marker file exists or PostgreSQL already has User rows.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -234,6 +235,44 @@ def infer_moderation_status(listing_status: object) -> str:
     return "pending"
 
 
+def is_integer_type(pg_type: str) -> bool:
+    return (pg_type or "").lower() in ("integer", "bigint", "smallint")
+
+
+def normalize_integer_value(value):
+    """SQLite may store JSON arrays like '[149]' in Int columns (channelMessageId)."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        if s.startswith("[") or s.startswith("{"):
+            try:
+                parsed = json.loads(s)
+                if isinstance(parsed, list) and parsed:
+                    return int(parsed[0])
+                if isinstance(parsed, dict):
+                    for key in ("id", "message_id", "messageId"):
+                        if key in parsed:
+                            return int(parsed[key])
+            except (json.JSONDecodeError, ValueError, TypeError):
+                pass
+        if re.fullmatch(r"-?\d+", s):
+            return int(s)
+        if "," in s:
+            first = s.split(",")[0].strip()
+            if re.fullmatch(r"-?\d+", first):
+                return int(first)
+    return None
+
+
 def is_timestamp_type(pg_type: str) -> bool:
     t = (pg_type or "").lower()
     return "timestamp" in t or t == "date"
@@ -257,8 +296,8 @@ def normalize_datetime_value(value, col_name: str = ""):
             num = float(s)
         elif re.match(r"^\d{4}-\d{2}-\d{2}", s):
             if "T" in s:
-                return s.replace("Z", "+00:00") if s.endswith("Z") else s
-            return s.replace(" ", "T", 1)
+                return s.replace("T", " ", 1).split("+")[0].split("Z")[0]
+            return s
         else:
             return value
     else:
@@ -326,6 +365,11 @@ def coerce_cell(
             return bool(value)
         if isinstance(value, str):
             return value.strip().lower() in ("1", "true", "t", "yes")
+    if is_integer_type(pg_type):
+        normalized = normalize_integer_value(value)
+        if normalized is not None:
+            return normalized
+        return None if nullable else 0
     if is_timestamp_type(pg_type) or col_name.endswith("At") or col_name.endswith("_at"):
         normalized = normalize_datetime_value(value, col_name)
         if normalized is not None:
@@ -358,6 +402,11 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
     resolved = resolve_pg_table(pg_cur, table)
     if not resolved:
         log(f"  skip {table}: not in PostgreSQL schema")
+        return 0
+
+    existing = pg_row_count(pg_cur, table)
+    if existing > 0:
+        log(f"  skip {table}: already has {existing} rows in PostgreSQL")
         return 0
 
     sq_cols = sqlite_columns(sqlite_conn, table)
@@ -433,10 +482,6 @@ def should_migrate(pg_cur) -> bool:
     if not SQLITE_PATH.exists():
         log("No SQLite database to migrate from")
         return False
-    if pg_row_count(pg_cur, "User") > 0:
-        log("PostgreSQL already has User data, skipping copy")
-        MARKER_PATH.write_text("skipped: pg already populated\n", encoding="utf-8")
-        return False
     return True
 
 
@@ -471,6 +516,7 @@ def main() -> int:
                         continue
                     try:
                         n = copy_table(sqlite_conn, cur, table)
+                        pg_conn.commit()
                     except Exception as exc:
                         pg_conn.rollback()
                         raise RuntimeError(f"failed copying table {table}: {exc}") from exc
