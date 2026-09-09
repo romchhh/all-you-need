@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE TABLE IF NOT EXISTS LinkVisit (
     id SERIAL PRIMARY KEY,
     source_type TEXT NOT NULL,
-    source_id INTEGER NOT NULL,
+    source_id BIGINT NOT NULL,
     visitor_user_id TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

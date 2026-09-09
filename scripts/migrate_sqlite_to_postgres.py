@@ -368,6 +368,9 @@ def coerce_cell(
     if is_integer_type(pg_type):
         normalized = normalize_integer_value(value)
         if normalized is not None:
+            # PostgreSQL INTEGER max; large Telegram IDs need BIGINT columns
+            if pg_type == "integer" and abs(normalized) > 2147483647:
+                return normalized
             return normalized
         return None if nullable else 0
     if is_timestamp_type(pg_type) or col_name.endswith("At") or col_name.endswith("_at"):
@@ -465,6 +468,23 @@ def copy_table(sqlite_conn: sqlite3.Connection, pg_cur, table: str) -> int:
     return copied
 
 
+def ensure_pg_schema_fixes(pg_cur) -> None:
+    """One-off PG schema tweaks for legacy SQLite data (Telegram IDs > int32)."""
+    pg_cur.execute(
+        """
+        SELECT table_name, data_type FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND column_name = 'source_id'
+          AND table_name IN ('linkvisit', 'LinkVisit')
+        """
+    )
+    for table_name, data_type in pg_cur.fetchall():
+        if data_type == "integer":
+            qtable = pg_table_ref(table_name)
+            pg_cur.execute(f"ALTER TABLE {qtable} ALTER COLUMN source_id TYPE BIGINT")
+            log(f"Altered {table_name}.source_id INTEGER → BIGINT")
+
+
 def apply_extra_sql(pg_conn) -> None:
     if not EXTRA_SQL.exists():
         return
@@ -511,6 +531,8 @@ def main() -> int:
 
             total = 0
             with pg_conn.cursor() as cur:
+                ensure_pg_schema_fixes(cur)
+                pg_conn.commit()
                 for table in ordered:
                     if table.startswith("sqlite_"):
                         continue
