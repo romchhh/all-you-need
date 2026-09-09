@@ -78,6 +78,117 @@ def _quote_pg_table(table: str) -> str:
     return table
 
 
+PRISMA_PG_TABLES = (
+    "User",
+    "Listing",
+    "Favorite",
+    "ViewHistory",
+    "Transaction",
+    "Payment",
+    "Review",
+    "Category",
+    "Admin",
+    "Link",
+    "TelegramListing",
+    "CitySubscription",
+    "AnalyticsEvent",
+    "SystemMonitorLog",
+    "SystemSettings",
+    "ListingPackagePurchase",
+    "PromotionPurchase",
+    "Referral",
+    "UserSession",
+    "CityDigestQueue",
+    "LinkVisit",
+)
+
+PRISMA_PG_COLUMNS = (
+    "userId",
+    "telegramId",
+    "firstName",
+    "lastName",
+    "createdAt",
+    "updatedAt",
+    "publishedAt",
+    "moderatedAt",
+    "moderatedBy",
+    "optimizedImages",
+    "promotionType",
+    "promotionEnds",
+    "isFree",
+    "previousPrice",
+    "priceChangedAt",
+    "favoriteBoost",
+    "subcategory",
+    "moderationStatus",
+    "rejectionReason",
+    "listingId",
+    "viewerTelegramId",
+    "viewedAt",
+    "targetId",
+    "eventName",
+    "eventGroup",
+    "entityType",
+    "entityId",
+    "lastActiveAt",
+    "sortOrder",
+    "parentId",
+    "isActive",
+    "linkName",
+    "linkUrl",
+    "linkCount",
+    "hasUsedFreeAd",
+    "agreementAccepted",
+    "listingPackagesBalance",
+    "autoRenew",
+    "expiresAt",
+    "priceDisplay",
+    "channelMessageId",
+    "marketplaceListingId",
+    "reviewsCount",
+    "paymentMethod",
+    "completedAt",
+    "invoiceId",
+    "amountEur",
+    "pageUrl",
+    "webhookData",
+    "packageType",
+    "listingsCount",
+    "paidAt",
+    "cityKey",
+    "processedAt",
+    "referrerTelegramId",
+    "referredTelegramId",
+    "rewardPaid",
+    "rewardPaidAt",
+    "sellerTelegramId",
+)
+
+
+def quote_pg_identifiers(sql: str) -> str:
+    s = sql
+    for table in PRISMA_PG_TABLES:
+        s = re.sub(rf"\bFROM {table}\b", f'FROM "{table}"', s, flags=re.IGNORECASE)
+        s = re.sub(rf"\bJOIN {table}\b", f'JOIN "{table}"', s, flags=re.IGNORECASE)
+        s = re.sub(rf"\bUPDATE {table}\b", f'UPDATE "{table}"', s, flags=re.IGNORECASE)
+        s = re.sub(rf"\bINTO {table}\b", f'INTO "{table}"', s, flags=re.IGNORECASE)
+        s = re.sub(rf"\bDELETE FROM {table}\b", f'DELETE FROM "{table}"', s, flags=re.IGNORECASE)
+        s = re.sub(rf"\bON {table}\(", f'ON "{table}"(', s, flags=re.IGNORECASE)
+    for col in PRISMA_PG_COLUMNS:
+        s = re.sub(rf"\.{col}\b", f'."{col}"', s)
+        s = re.sub(
+            rf'(?<![."\\w]){col}(?=\s*(?:=|,|\)|$|\s+IS\b|\s+DESC\b|\s+ASC\b))',
+            f'"{col}"',
+            s,
+        )
+    s = re.sub(r'\."isFree"\s*=\s*1\b', '."isFree" = true', s, flags=re.IGNORECASE)
+    s = re.sub(r"\bisFree\s*=\s*1\b", '"isFree" = true', s, flags=re.IGNORECASE)
+    s = re.sub(r'\."isFree"\s*=\s*0\b', '."isFree" = false', s, flags=re.IGNORECASE)
+    s = re.sub(r"\bisFree\s*=\s*0\b", '"isFree" = false', s, flags=re.IGNORECASE)
+    s = re.sub(r"\bAS REAL\b", "AS DOUBLE PRECISION", s, flags=re.IGNORECASE)
+    return s
+
+
 def adapt_sql(sql: str) -> str:
     if not is_postgres():
         return sql
@@ -125,6 +236,7 @@ def adapt_sql(sql: str) -> str:
         s,
         flags=re.IGNORECASE,
     )
+    s = quote_pg_identifiers(s)
     return s
 
 
@@ -147,9 +259,10 @@ def fetch_table_columns(cursor, table: str) -> set[str]:
             """
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = %s
+            WHERE table_schema = 'public'
+              AND (table_name = %s OR table_name = %s)
             """,
-            (table,),
+            (table, table.lower()),
         )
         rows = cursor.fetchall()
         names: set[str] = set()
@@ -176,10 +289,11 @@ def fetch_pragma_table_info(cursor, table: str) -> list[tuple[Any, ...]]:
                    column_default AS dflt_value,
                    0 AS pk
             FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = %s
+            WHERE table_schema = 'public'
+              AND (table_name = %s OR table_name = %s)
             ORDER BY ordinal_position
             """,
-            (table,),
+            (table, table.lower()),
         )
         rows = cursor.fetchall()
         out: list[tuple[Any, ...]] = []
@@ -208,10 +322,11 @@ def table_exists(cursor, table: str) -> bool:
         cursor.execute(
             """
             SELECT 1 FROM pg_tables
-            WHERE schemaname = 'public' AND tablename = %s
+            WHERE schemaname = 'public'
+              AND (tablename = %s OR tablename = %s)
             LIMIT 1
             """,
-            (table,),
+            (table, table.lower()),
         )
         return cursor.fetchone() is not None
 
