@@ -22,7 +22,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useState, useMemo, useRef, useEffect, useCallback, memo, useDeferredValue } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { pickBazaarTabField } from '@/lib/bazaar/bazaarTabStateStorage';
+import { pickBazaarTabField, type BazaarTabPersistedState } from '@/lib/bazaar/bazaarTabStateStorage';
 import { Currency } from '@/utils/currency';
 
 const SortModal = dynamic(
@@ -60,32 +60,8 @@ interface BazaarTabProps {
   onNavigateToCategories?: () => void;
   onOpenCategoriesModal?: () => void;
   initialSelectedCategory?: string | null;
-  savedState?: {
-    selectedCategory: string | null;
-    selectedSubcategory: string | null;
-    selectedCities: string[];
-    minPrice: number | null;
-    maxPrice: number | null;
-    selectedCondition: 'new' | 'used' | null;
-    selectedCurrency: string | null;
-    sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
-    showFreeOnly: boolean;
-    personalizedFeedEnabled?: boolean;
-    viewMode?: 'grid' | 'list';
-  };
-  onStateChange?: (state: {
-    selectedCategory: string | null;
-    selectedSubcategory: string | null;
-    selectedCities: string[];
-    minPrice: number | null;
-    maxPrice: number | null;
-    selectedCondition: 'new' | 'used' | null;
-    selectedCurrency: string | null;
-    sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
-    showFreeOnly: boolean;
-    personalizedFeedEnabled?: boolean;
-    viewMode?: 'grid' | 'list';
-  }) => void;
+  savedState?: BazaarTabPersistedState & { viewMode?: 'grid' | 'list' };
+  onStateChange?: (state: Partial<BazaarTabPersistedState> & { viewMode?: 'grid' | 'list' }) => void;
   tg: TelegramWebApp | null;
   /** Telegram ID залогіненого користувача (міні-ап) — для підписок на місто */
   profileTelegramId?: string | null;
