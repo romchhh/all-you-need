@@ -1,161 +1,134 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { executeWithRetry, ensureUserSessionTable } from '@/lib/prisma';
+import { prisma, executeWithRetry, queryRawUnsafe } from '@/lib/prisma';
 import { requireAdminAuth } from '@/utils/adminAuth';
+
+function dateKey(d: Date): string {
+  return d.toISOString().split('T')[0];
+}
+
+function buildDailyChart(
+  days: string[],
+  rows: Array<{ day: string; count: number }>
+): Array<{ date: string; count: number }> {
+  const byDay = new Map(rows.map((r) => [r.day, r.count]));
+  return days.map((date) => ({
+    date,
+    count: byDay.get(date) ?? 0,
+  }));
+}
 
 export async function GET(request: NextRequest) {
   try {
     await requireAdminAuth();
-    
-    // Переконаємося, що таблиця UserSession існує
-    await ensureUserSessionTable();
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    // Статистика за останні 30 днів для графіка
-    const days30 = [];
+    const days30: string[] = [];
     for (let i = 29; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      days30.push(date.toISOString().split('T')[0]);
+      days30.push(dateKey(date));
     }
 
-    // Статистика за останні 30 днів
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoISO = thirtyDaysAgo.toISOString();
 
-    // Нові користувачі за останні 30 днів
-    const newUsersByDayRaw = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT 
-          DATE(createdAt) as date, 
-          COUNT(*) as count 
-        FROM User 
-        WHERE createdAt >= ?
-        GROUP BY DATE(createdAt)
-        ORDER BY date`,
-        thirtyDaysAgoISO
-      ) as Promise<Array<{ date: string; count: bigint }>>
-    );
+    const [newUsersByDayRaw, newListingsByDayRaw, activeUsersByDayRaw, listingsByCategory, topListingsRaw, topUsersRaw] =
+      await executeWithRetry(() =>
+        Promise.all([
+          queryRawUnsafe<Array<{ day: string; count: bigint | number }>>(
+            `SELECT TO_CHAR("createdAt"::date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS count
+             FROM "User"
+             WHERE "createdAt" >= ?
+             GROUP BY "createdAt"::date
+             ORDER BY day`,
+            thirtyDaysAgo
+          ),
+          queryRawUnsafe<Array<{ day: string; count: bigint | number }>>(
+            `SELECT TO_CHAR("createdAt"::date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS count
+             FROM "Listing"
+             WHERE "createdAt" >= ?
+             GROUP BY "createdAt"::date
+             ORDER BY day`,
+            thirtyDaysAgo
+          ),
+          queryRawUnsafe<Array<{ day: string; count: bigint | number }>>(
+            `SELECT TO_CHAR("lastActiveAt"::date, 'YYYY-MM-DD') AS day, COUNT(DISTINCT "userId")::int AS count
+             FROM "UserSession"
+             WHERE "lastActiveAt" >= ?
+             GROUP BY "lastActiveAt"::date
+             ORDER BY day`,
+            thirtyDaysAgo
+          ).catch(() => [] as Array<{ day: string; count: bigint | number }>),
+          prisma.listing.groupBy({
+            by: ['category'],
+            _count: { _all: true },
+            orderBy: { _count: { category: 'desc' } },
+            take: 10,
+          }),
+          prisma.listing.findMany({
+            take: 10,
+            orderBy: { views: 'desc' },
+            select: {
+              id: true,
+              title: true,
+              views: true,
+              status: true,
+              createdAt: true,
+              user: {
+                select: { firstName: true, lastName: true, username: true },
+              },
+            },
+          }),
+          prisma.user.findMany({
+            take: 10,
+            where: { listings: { some: {} } },
+            orderBy: { listings: { _count: 'desc' } },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true,
+              avatar: true,
+              telegramId: true,
+              _count: { select: { listings: true } },
+              listings: { select: { views: true } },
+            },
+          }),
+        ])
+      );
 
-    // Нові оголошення за останні 30 днів
-    const newListingsByDayRaw = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT 
-          DATE(createdAt) as date, 
-          COUNT(*) as count 
-        FROM Listing 
-        WHERE createdAt >= ?
-        GROUP BY DATE(createdAt)
-        ORDER BY date`,
-        thirtyDaysAgoISO
-      ) as Promise<Array<{ date: string; count: bigint }>>
-    );
+    const mapDayRows = (rows: Array<{ day: string; count: bigint | number }>) =>
+      rows.map((row) => ({
+        day: String(row.day).split('T')[0],
+        count: Number(row.count ?? 0),
+      }));
 
-    // Активні користувачі за останні 30 днів
-    const activeUsersByDayRaw = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT 
-          DATE(lastActiveAt) as date, 
-          COUNT(DISTINCT userId) as count 
-        FROM UserSession 
-        WHERE lastActiveAt >= ?
-        GROUP BY DATE(lastActiveAt)
-        ORDER BY date`,
-        thirtyDaysAgoISO
-      ) as Promise<Array<{ date: string; count: bigint }>>
-    ).catch(() => []);
+    const usersChart = buildDailyChart(days30, mapDayRows(newUsersByDayRaw));
+    const listingsChart = buildDailyChart(days30, mapDayRows(newListingsByDayRaw));
+    const activeUsersChart = buildDailyChart(days30, mapDayRows(activeUsersByDayRaw));
 
-    // Конвертуємо дати в формат YYYY-MM-DD для коректного порівняння
-    const newUsersByDay = (newUsersByDayRaw || []).map((row: any) => ({
-      date: typeof row.date === 'string' ? row.date.split('T')[0] : row.date,
-      count: row.count
+    const topListings = topListingsRaw.map((listing) => ({
+      id: listing.id,
+      title: listing.title,
+      views: listing.views ?? 0,
+      status: listing.status,
+      createdAt: listing.createdAt,
+      seller: listing.user.firstName || listing.user.username || 'Користувач',
     }));
 
-    const newListingsByDay = (newListingsByDayRaw || []).map((row: any) => ({
-      date: typeof row.date === 'string' ? row.date.split('T')[0] : row.date,
-      count: row.count
+    const topUsers = topUsersRaw.map((user) => ({
+      id: user.id,
+      name:
+        user.firstName && user.lastName
+          ? `${user.firstName} ${user.lastName}`.trim()
+          : user.firstName || user.username || 'Користувач',
+      username: user.username,
+      avatar: user.avatar,
+      telegramId: user.telegramId?.toString() ?? '',
+      listingsCount: user._count.listings,
+      totalViews: user.listings.reduce((sum, l) => sum + (l.views ?? 0), 0),
     }));
-
-    const activeUsersByDay = (activeUsersByDayRaw || []).map((row: any) => ({
-      date: typeof row.date === 'string' ? row.date.split('T')[0] : row.date,
-      count: row.count
-    }));
-
-    // Статистика по категоріях
-    const listingsByCategory = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT category, COUNT(*) as count 
-        FROM Listing 
-        GROUP BY category 
-        ORDER BY count DESC 
-        LIMIT 10`
-      ) as Promise<Array<{ category: string; count: bigint }>>
-    );
-
-    // Топ оголошень за переглядами
-    const topListings = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT l.id, l.title, l.views, l.status, l.createdAt,
-         u.firstName, u.lastName, u.username
-        FROM Listing l
-        JOIN User u ON l.userId = u.id
-        ORDER BY l.views DESC
-        LIMIT 10`
-      ) as Promise<Array<any>>
-    );
-
-    // Топ користувачі за кількістю оголошень
-    const topUsers = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT u.id, u.firstName, u.lastName, u.username, u.avatar,
-         CAST(u.telegramId AS INTEGER) as telegramId,
-         COUNT(l.id) as listingsCount,
-         SUM(l.views) as totalViews
-        FROM User u
-        LEFT JOIN Listing l ON u.id = l.userId
-        GROUP BY u.id, u.firstName, u.lastName, u.username, u.avatar, u.telegramId
-        HAVING COUNT(l.id) > 0
-        ORDER BY listingsCount DESC
-        LIMIT 10`
-      ) as Promise<Array<any>>
-    );
-
-    // Форматуємо дані для графіків
-    const usersChart = days30.map((date) => {
-      const day = newUsersByDay.find((d: any) => {
-        const dayDate = typeof d.date === 'string' ? d.date.split('T')[0] : d.date;
-        return dayDate === date;
-      });
-      return {
-        date,
-        count: day ? Number(day.count) : 0,
-      };
-    });
-
-    const listingsChart = days30.map((date) => {
-      const day = newListingsByDay.find((d: any) => {
-        const dayDate = typeof d.date === 'string' ? d.date.split('T')[0] : d.date;
-        return dayDate === date;
-      });
-      return {
-        date,
-        count: day ? Number(day.count) : 0,
-      };
-    });
-
-    const activeUsersChart = days30.map((date) => {
-      const day = activeUsersByDay.find((d: any) => {
-        const dayDate = typeof d.date === 'string' ? d.date.split('T')[0] : d.date;
-        return dayDate === date;
-      });
-      return {
-        date,
-        count: day ? Number(day.count) : 0,
-      };
-    });
 
     return NextResponse.json({
       charts: {
@@ -165,39 +138,16 @@ export async function GET(request: NextRequest) {
       },
       categories: listingsByCategory.map((item) => ({
         category: item.category,
-        count: Number(item.count),
+        count: item._count._all,
       })),
-      topListings: topListings.map((listing) => ({
-        id: listing.id,
-        title: listing.title,
-        views: listing.views || 0,
-        status: listing.status,
-        createdAt: listing.createdAt,
-        seller: listing.firstName || listing.username || 'Користувач',
-      })),
-      topUsers: topUsers.map((user) => ({
-        id: user.id,
-        name: user.firstName && user.lastName
-          ? `${user.firstName} ${user.lastName}`.trim()
-          : user.firstName || user.username || 'Користувач',
-        username: user.username,
-        avatar: user.avatar,
-        telegramId: user.telegramId?.toString() || '',
-        listingsCount: Number(user.listingsCount || 0),
-        totalViews: Number(user.totalViews || 0),
-      })),
+      topListings,
+      topUsers,
     });
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     console.error('Error fetching detailed stats:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch detailed stats' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch detailed stats' }, { status: 500 });
   }
 }

@@ -17,11 +17,11 @@ export async function GET(request: NextRequest) {
     const raw = await queryRawUnsafe<Array<{ city: string; count: number | bigint }>>(
       `SELECT 
         ${cityExpr} AS city,
-        COUNT(*) AS count
+        COUNT(*)::int AS count
        FROM ${listingTable} l
        WHERE l.location IS NOT NULL AND TRIM(l.location) != ''
-       GROUP BY ${cityExpr}
-       ORDER BY count DESC
+       GROUP BY 1
+       ORDER BY 2 DESC
        LIMIT 20`
     );
 

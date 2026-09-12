@@ -60,8 +60,12 @@ export default function AdminDashboardPage() {
       if (response.ok) {
         const data = await response.json();
         setStats(data);
+      } else if (response.status === 401) {
+        router.push('/admin/login');
       } else {
-        setError('Помилка завантаження статистики');
+        const body = await response.json().catch(() => ({}));
+        console.error('[admin stats]', response.status, body);
+        setError(body.error || 'Помилка завантаження статистики');
       }
     } catch (err) {
       setError('Помилка підключення до сервера');
