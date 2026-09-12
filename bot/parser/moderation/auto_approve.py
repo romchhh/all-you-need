@@ -455,10 +455,7 @@ async def _publish_and_notify(
     item["auto_approved"] = 1
 
     channel_published: list[int] = []
-    if (
-        PARSER_AUTO_APPROVE_SERVICES_CHANNEL
-        and _is_service_item(listing_item)
-    ):
+    if PARSER_AUTO_APPROVE_SERVICES_CHANNEL and _is_service_item(listing_item):
         try:
             from parser.moderation.services_publish import (
                 format_services_channels_labels,
