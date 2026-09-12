@@ -31,6 +31,7 @@ from parser.moderation.formatting import (
     edit_group_message,
     format_listing_open_links_html,
     resolved_author_username,
+    truncate_telegram_html,
 )
 from parser.moderation.approve_routing import (
     is_services_moderation_chat,
@@ -148,7 +149,9 @@ def _format_admin_message(item: dict) -> str:
     elif price_str == "Договірна":
         price_display = "🤝 Договірна"
     elif price_str:
-        price_display = f"💰 {price_str} {currency}".strip()
+        safe_price = html.escape(str(price_str))
+        safe_currency = html.escape(str(currency)).strip()
+        price_display = f"💰 {safe_price} {safe_currency}".strip()
     else:
         price_display = "❓ Не вказана"
 
@@ -182,7 +185,7 @@ def _format_admin_message(item: dict) -> str:
         "new": "✨ Нове",
         "used": "♻️ Б/у",
         None: "—",
-    }.get(condition, condition or "—")
+    }.get(condition, html.escape(str(condition)) if condition else "—")
 
     lines = [
         f"🆕 <b>{header}</b>",
@@ -360,13 +363,14 @@ async def _send_moderation_card(
     item_id = item["id"]
     abs_images = _absolute_item_images(item)
     followup = followup_text or (f"⬆️ Оголошення #{item_id} — оберіть дію:" if keyboard else None)
+    safe_text = truncate_telegram_html(text, 1024)
 
     try:
         if len(abs_images) == 0:
             sent = await _send_with_retry(
                 bot.send_message,
                 chat_id=group_id,
-                text=text,
+                text=truncate_telegram_html(text, 4096),
                 parse_mode="HTML",
                 reply_markup=keyboard,
                 disable_web_page_preview=True,
@@ -379,7 +383,7 @@ async def _send_moderation_card(
                 bot.send_photo,
                 chat_id=group_id,
                 photo=photo,
-                caption=text[:1024],
+                caption=safe_text,
                 parse_mode="HTML",
                 reply_markup=keyboard,
             )
@@ -391,7 +395,7 @@ async def _send_moderation_card(
                 media_group.append(
                     InputMediaPhoto(
                         media=FSInputFile(path),
-                        caption=text[:1024] if i == 0 else None,
+                        caption=safe_text if i == 0 else None,
                         parse_mode="HTML" if i == 0 else None,
                     )
                 )

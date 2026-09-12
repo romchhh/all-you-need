@@ -288,6 +288,21 @@ async def _send_offer_instruction_videos(chat_id: int, user_id: int):
 async def start_command(message: types.Message):
     user = message.from_user
     user_id = user.id
+    try:
+        await _handle_start_command(message, user, user_id)
+    except Exception as e:
+        import logging
+        logging.exception("start_command failed for user %s: %s", user_id, e)
+        try:
+            await message.answer(
+                "⚠️ Тимчасова помилка. Спробуйте /start ще раз через кілька секунд.",
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
+
+async def _handle_start_command(message: types.Message, user: types.User, user_id: int):
     username = user.username
     args = message.text.split()
 

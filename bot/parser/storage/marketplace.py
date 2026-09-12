@@ -109,7 +109,9 @@ def get_or_create_bot_user(
     conn.commit()
     user_id = cursor.lastrowid
     conn.close()
-    return user_id
+    if not user_id:
+        raise RuntimeError("INSERT User did not return id (PostgreSQL RETURNING)")
+    return int(user_id)
 
 
 def create_marketplace_listing(
@@ -173,4 +175,6 @@ def create_marketplace_listing(
     conn.commit()
     listing_id = cursor.lastrowid
     conn.close()
-    return listing_id
+    if not listing_id:
+        raise RuntimeError("INSERT Listing did not return id (PostgreSQL RETURNING)")
+    return int(listing_id)

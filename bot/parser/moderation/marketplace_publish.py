@@ -103,4 +103,6 @@ def publish_parsed_item_marketplace(
         raise MarketplacePublishError("create_failed") from e
 
     set_marketplace_listing_id(item_id, listing_id, moderated_by=moderated_by)
+    if listing_id is None:
+        raise MarketplacePublishError("create_failed")
     return int(listing_id), description, images_web

@@ -1,9 +1,18 @@
 import sqlite3
 from datetime import datetime
-from database_functions.db_connection import get_connection
+from database_functions.db_connection import get_connection, is_postgres
 
 conn = get_connection()
 cursor = conn.cursor()
+
+
+def _rollback_on_error() -> None:
+    if not is_postgres():
+        return
+    try:
+        conn.rollback()
+    except Exception:
+        pass
 
 
 def create_table():
@@ -130,12 +139,20 @@ def check_user(user_id: str):
 
 
 def is_user_active(user_id):
-    """Повертає True якщо користувач існує і не заблокований (isActive=1)."""
+    """Повертає True якщо користувач існує і не заблокований (isActive)."""
     cursor.execute('SELECT isActive FROM User WHERE telegramId = ?', (int(user_id),))
     row = cursor.fetchone()
     if not row:
         return False
-    return row[0] == 1    
+    val = row[0]
+    if val is None:
+        return True
+    if isinstance(val, bool):
+        return val
+    try:
+        return int(val) != 0
+    except (TypeError, ValueError):
+        return bool(val)
 
 
 def update_user_activity(user_id: str):
@@ -150,6 +167,7 @@ def update_user_activity(user_id: str):
         conn.commit()
     except Exception as e:
         print(f"Error updating legacy activity: {e}")
+        _rollback_on_error()
     
     try:
         cursor.execute("SELECT id FROM User WHERE telegramId = ?", (int(user_id),))
@@ -174,6 +192,7 @@ def update_user_activity(user_id: str):
             conn.commit()
     except Exception as e:
         print(f"Error updating UserSession activity: {e}")
+        _rollback_on_error()
 
 
 def get_user_id_by_username(username: str):
@@ -275,23 +294,7 @@ def set_user_phone(user_id: str, phone: str):
 
 
 def get_user_language(user_id: int) -> str:
-    """Отримує мову користувача (telegram id).
-
-    Пріоритет: User.language (маркетплейс / міні-ап) → users_legacy (бот) → uk.
-    """
-    # 1. Маркетплейс — мова з веб-додатку
-    try:
-        cursor.execute(
-            'SELECT language FROM User WHERE CAST(telegramId AS INTEGER) = ?',
-            (int(user_id),),
-        )
-        row = cursor.fetchone()
-        if row and row[0] in ('uk', 'ru'):
-            return row[0]
-    except Exception as e:
-        print(f"Error getting language from User table: {e}")
-
-    # 2. Legacy-таблиця бота
+    """Мова інтерфейсу бота з users_legacy (User.language у Prisma немає)."""
     try:
         cursor.execute('SELECT language FROM users_legacy WHERE user_id = ?', (str(user_id),))
         result = cursor.fetchone()
@@ -299,54 +302,49 @@ def get_user_language(user_id: int) -> str:
             return result[0]
     except Exception as e:
         print(f"Error getting language from users_legacy table: {e}")
+        _rollback_on_error()
 
     return 'uk'
 
 
 def set_user_language(user_id: int, language: str):
-    """Встановлює мову користувача в User та users_legacy."""
+    """Встановлює мову користувача в users_legacy."""
     if language not in ['uk', 'ru']:
         print(f"Invalid language: {language}")
         return
 
-    # User (маркетплейс)
     try:
-        cursor.execute(
-            'UPDATE User SET language = ? WHERE CAST(telegramId AS INTEGER) = ?',
-            (language, int(user_id)),
-        )
+        cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
+        result = cursor.fetchone()
+
+        if result:
+            cursor.execute(
+                '''
+                UPDATE users_legacy
+                SET language = ?
+                WHERE user_id = ?
+            ''',
+                (language, str(user_id)),
+            )
+        else:
+            cursor.execute(
+                '''
+                INSERT INTO users_legacy (user_id, language, join_date, last_activity)
+                VALUES (?, ?, ?, ?)
+            ''',
+                (
+                    str(user_id),
+                    language,
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                ),
+            )
+
+        conn.commit()
+        print(f"Language {language} set for user {user_id}")
     except Exception as e:
-        print(f"Error setting language on User table: {e}")
-
-    # users_legacy (бот)
-    cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
-    result = cursor.fetchone()
-
-    if result:
-        cursor.execute(
-            '''
-            UPDATE users_legacy
-            SET language = ?
-            WHERE user_id = ?
-        ''',
-            (language, str(user_id)),
-        )
-    else:
-        cursor.execute(
-            '''
-            INSERT INTO users_legacy (user_id, language, join_date, last_activity)
-            VALUES (?, ?, ?, ?)
-        ''',
-            (
-                str(user_id),
-                language,
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            ),
-        )
-
-    conn.commit()
-    print(f"Language {language} set for user {user_id}")
+        print(f"Error setting language for user {user_id}: {e}")
+        _rollback_on_error()
 
 
 def get_user_balance(telegram_id: int) -> float:

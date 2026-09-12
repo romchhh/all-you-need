@@ -509,30 +509,28 @@ class DbCursor:
             return self
 
         upper = adapted_sql.strip().upper()
-        if (
-            is_postgres()
-            and upper.startswith("INSERT")
-            and "RETURNING" not in upper
-            and " ON CONFLICT " not in upper
-        ):
-            insert_cols = re.search(r"INSERT\s+INTO\s+\S+\s*\(([^)]+)\)", adapted_sql, re.I)
-            has_id_col = bool(
-                insert_cols
-                and "id" in [c.strip().strip('"').lower() for c in insert_cols.group(1).split(",")]
-            )
+        if is_postgres() and upper.startswith("INSERT") and "RETURNING" not in upper:
             if "INSERT OR IGNORE" in sql.upper():
                 adapted_sql += " ON CONFLICT DO NOTHING"
-            elif has_id_col:
+            elif " ON CONFLICT " not in upper:
                 adapted_sql += " RETURNING id"
 
         def _run():
-            if adapted_params is None:
-                self._cursor.execute(adapted_sql)
-            else:
-                self._cursor.execute(adapted_sql, adapted_params)
+            try:
+                if adapted_params is None:
+                    self._cursor.execute(adapted_sql)
+                else:
+                    self._cursor.execute(adapted_sql, adapted_params)
+            except Exception:
+                if is_postgres():
+                    try:
+                        self._conn._conn.rollback()
+                    except Exception:
+                        pass
+                raise
             if is_postgres():
                 self._columns = [d[0] for d in (self._cursor.description or [])]
-            if is_postgres() and upper.startswith("INSERT") and "RETURNING id" in adapted_sql:
+            if is_postgres() and upper.startswith("INSERT") and "RETURNING" in adapted_sql.upper():
                 row = self._cursor.fetchone()
                 if row:
                     self._lastrowid = row[0]
@@ -548,7 +546,15 @@ class DbCursor:
         adapted_sql, _ = _convert_placeholders(sql, None)
 
         def _run():
-            return self._cursor.executemany(adapted_sql, params_seq)
+            try:
+                return self._cursor.executemany(adapted_sql, params_seq)
+            except Exception:
+                if is_postgres():
+                    try:
+                        self._conn._conn.rollback()
+                    except Exception:
+                        pass
+                raise
 
         if is_postgres():
             return _run()
