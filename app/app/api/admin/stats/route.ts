@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { executeWithRetry, ensureUserSessionTable } from '@/lib/prisma';
+import { prisma, executeWithRetry, ensureUserSessionTable, queryRawUnsafe } from '@/lib/prisma';
 import { requireAdminAuth } from '@/utils/adminAuth';
 
 export async function GET(request: NextRequest) {
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     // Загальна кількість користувачів
     const totalUsersResult = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM User`) as Promise<Array<{ count: bigint }>>
+      queryRawUnsafe<Array<{ count: bigint }>>(`SELECT COUNT(*) as count FROM User`)
     );
     const totalUsers = Number(totalUsersResult[0]?.count || 0);
 

@@ -67,7 +67,8 @@ export function tableInfoQuery(table: string): string {
     return `
       SELECT column_name AS name, data_type AS type
       FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = '${table}'
+      WHERE table_schema = 'public'
+        AND (table_name = '${table}' OR table_name = lower('${table}'))
     `;
   }
   return `PRAGMA table_info(${table})`;
@@ -77,10 +78,19 @@ export function tableExistsQuery(table: string): string {
   if (isPostgres()) {
     return `
       SELECT tablename AS name FROM pg_tables
-      WHERE schemaname = 'public' AND tablename = '${table}'
+      WHERE schemaname = 'public'
+        AND (tablename = '${table}' OR tablename = lower('${table}'))
     `;
   }
   return `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}'`;
+}
+
+/** Місто з Listing.location: частина до першої коми. */
+export function listingCityExtractExpr(column = 'location'): string {
+  if (isPostgres()) {
+    return `TRIM(SPLIT_PART(${column} || ',', ',', 1))`;
+  }
+  return `TRIM(SUBSTR(${column} || ',', 1, INSTR(${column} || ',', ',') - 1))`;
 }
 
 /** Prisma PG tables (PascalCase, quoted in DDL). */
@@ -170,6 +180,32 @@ const PRISMA_PG_COLUMNS = [
   'sellerTelegramId',
 ];
 
+/** SELECT-аліаси, які не можна брати в лапки в ORDER BY / HAVING (PostgreSQL). */
+const PG_SELECT_OUTPUT_ALIASES = [
+  'listingsCount',
+  'activeListingsCount',
+  'totalViews',
+  'totalPurchases',
+  'totalRevenue',
+  'totalAmount',
+  'totalTopUps',
+  'balanceRevenue',
+  'directRevenue',
+  'count',
+];
+
+function fixPgAggregateAliases(sql: string): string {
+  let s = sql;
+  for (const alias of PG_SELECT_OUTPUT_ALIASES) {
+    s = s.replace(new RegExp(`\\bas\\s+"${alias}"(?=\\s|,|$|\\))`, 'gi'), `as ${alias}`);
+    s = s.replace(new RegExp(`\\bORDER BY\\s+"${alias}"\\s+(ASC|DESC)\\b`, 'gi'), `ORDER BY ${alias} $1`);
+    s = s.replace(new RegExp(`\\bORDER BY\\s+"${alias}"\\b`, 'gi'), `ORDER BY ${alias}`);
+  }
+  s = s.replace(/\bHAVING\s+"listingsCount"\s*>\s*0\b/gi, 'HAVING COUNT(l.id) > 0');
+  s = s.replace(/\bHAVING\s+listingsCount\s*>\s*0\b/gi, 'HAVING COUNT(l.id) > 0');
+  return s;
+}
+
 function quotePgIdentifiers(sql: string): string {
   let s = sql;
 
@@ -243,11 +279,18 @@ export function adaptSql(sql: string): string {
   let s = sql;
   s = s.replace(/\[Transaction\]/g, '"Transaction"');
   s = s.replace(/datetime\('now'\)/gi, 'NOW()');
+  s = s.replace(/datetime\('now',\s*'-(\d+)\s+hours'\)/gi, "NOW() - INTERVAL '$1 hours'");
   s = s.replace(/datetime\('now',\s*'-(\d+)\s+days'\)/gi, "NOW() - INTERVAL '$1 days'");
+  s = s.replace(/datetime\('now',\s*'\+(\d+)\s+days'\)/gi, "NOW() + INTERVAL '$1 days'");
   s = s.replace(
     /datetime\('now',\s*'start of day',\s*'localtime'\)/gi,
     "DATE_TRUNC('day', NOW())"
   );
+  s = s.replace(/datetime\(([^,)]+),\s*'-(\d+)\s+days'\)/gi, "$1 - INTERVAL '$2 days'");
+  s = s.replace(/datetime\(([^,)]+),\s*'-(\d+)\s+hours'\)/gi, "$1 - INTERVAL '$2 hours'");
+  s = s.replace(/datetime\(([^,)]+),\s*'\+(\d+)\s+days'\)/gi, "$1 + INTERVAL '$2 days'");
+  s = s.replace(/datetime\(([^,)]+),\s*\?\)/gi, '$1 + CAST(? AS INTERVAL)');
+  s = s.replace(/datetime\(\?\)/gi, '?::timestamp');
   s = s.replace(/INSERT OR IGNORE INTO/gi, 'INSERT INTO');
   s = s.replace(/INTEGER PRIMARY KEY AUTOINCREMENT/gi, 'SERIAL PRIMARY KEY');
   s = s.replace(/datetime\('now',\s*\?\)/gi, 'NOW() + CAST(? AS INTERVAL)');
@@ -261,7 +304,8 @@ export function adaptSql(sql: string): string {
     return `
       SELECT column_name AS name, data_type AS type
       FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = '${t}'
+      WHERE table_schema = 'public'
+        AND (table_name = '${t}' OR table_name = lower('${t}'))
     `;
   });
   s = s.replace(/datetime\(([^)]+)\)\s*>\s*NOW\(\)/gi, '$1 > NOW()');
@@ -269,8 +313,13 @@ export function adaptSql(sql: string): string {
   s = s.replace(/datetime\(([^)]+)\)/gi, '$1::timestamp');
   s = s.replace(/\bIFNULL\s*\(/gi, 'COALESCE(');
   s = s.replace(/\bINSTR\s*\(/gi, 'STRPOS(');
+  s = s.replace(
+    /\bSUBSTR\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\)/gi,
+    'SUBSTRING($1 FROM $2 FOR $3)'
+  );
 
   s = quotePgIdentifiers(s);
+  s = fixPgAggregateAliases(s);
 
   // CREATE INDEX ON "Listing"("publishedAt", "createdAt" DESC)
   s = s.replace(/\bON "([A-Z][a-zA-Z]+)"\(([^)]+)\)/g, (_m, table, colList: string) => {

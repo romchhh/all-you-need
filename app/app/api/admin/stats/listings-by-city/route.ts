@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { listingCityExtractExpr, quoteTable } from '@/lib/dbSql';
+import { queryRawUnsafe } from '@/lib/prisma';
 import { requireAdminAuth } from '@/utils/adminAuth';
 
 /**
@@ -10,16 +11,19 @@ export async function GET(request: NextRequest) {
   try {
     await requireAdminAuth();
 
-    const raw = await prisma.$queryRawUnsafe(
+    const cityExpr = listingCityExtractExpr('l.location');
+    const listingTable = quoteTable('Listing');
+
+    const raw = await queryRawUnsafe<Array<{ city: string; count: number | bigint }>>(
       `SELECT 
-        TRIM(SUBSTR(location || ',', 1, INSTR(location || ',', ',') - 1)) AS city,
+        ${cityExpr} AS city,
         COUNT(*) AS count
-       FROM Listing
-       WHERE location IS NOT NULL AND TRIM(location) != ''
-       GROUP BY TRIM(SUBSTR(location || ',', 1, INSTR(location || ',', ',') - 1))
+       FROM ${listingTable} l
+       WHERE l.location IS NOT NULL AND TRIM(l.location) != ''
+       GROUP BY ${cityExpr}
        ORDER BY count DESC
        LIMIT 20`
-    ) as Array<{ city: string; count: number | bigint }>;
+    );
 
     const list = raw.map((row) => ({
       city: row.city || '—',
@@ -27,7 +31,10 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({ cities: list });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('[Admin stats listings-by-city]', error);
     return NextResponse.json(
       { error: 'Помилка завантаження статистики' },

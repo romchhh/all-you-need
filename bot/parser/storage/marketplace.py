@@ -10,6 +10,11 @@ from typing import Optional
 
 from parser.config.settings import PARSER_MAX_PHOTOS
 from parser.storage.connection import BASE_DIR, get_connection
+from parser.storage.listing_sql import (
+    bot_user_insert_sql,
+    bot_user_select_by_telegram_sql,
+    create_listing_insert_sql,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,16 +96,16 @@ def get_or_create_bot_user(
 ) -> int:
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM User WHERE telegramId = ?", (telegram_id,))
+    cursor.execute(bot_user_select_by_telegram_sql(), (telegram_id,))
     row = cursor.fetchone()
     if row:
         conn.close()
         return row["id"]
 
-    cursor.execute("""
-        INSERT INTO User (telegramId, username, firstName, isActive, agreementAccepted, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    """, (telegram_id, username or "parser_bot", first_name or "Parser Bot", True, True))
+    cursor.execute(
+        bot_user_insert_sql(),
+        (telegram_id, username or "parser_bot", first_name or "Parser Bot", True, True),
+    )
     conn.commit()
     user_id = cursor.lastrowid
     conn.close()
@@ -155,28 +160,16 @@ def create_marketplace_listing(
         # ще раз: послуги майже ніколи не Free без явного маркера (вже знято вище)
         pass
     images_json = json.dumps(images, ensure_ascii=False)
-    expires_at_sql = "datetime('now', '+30 days')"
     default_condition = "new" if cat == "services_work" else "used"
 
-    cursor.execute(f"""
-        INSERT INTO Listing (
-            userId, title, description, price, currency, isFree,
-            category, subcategory, condition, location,
-            status, moderationStatus,
-            images, optimizedImages,
-            createdAt, updatedAt, publishedAt, expiresAt
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?,
-            'active', 'approved',
-            ?, NULL,
-            datetime('now'), datetime('now'), datetime('now'), {expires_at_sql}
-        )
-    """, (
-        user_id, title, description, price_str, currency, bool(is_free),
-        category, subcategory, condition or default_condition, loc,
-        images_json,
-    ))
+    cursor.execute(
+        create_listing_insert_sql(),
+        (
+            user_id, title, description, price_str, currency, bool(is_free),
+            category, subcategory, condition or default_condition, loc,
+            images_json,
+        ),
+    )
     conn.commit()
     listing_id = cursor.lastrowid
     conn.close()

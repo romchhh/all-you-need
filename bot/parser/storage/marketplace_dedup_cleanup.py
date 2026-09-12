@@ -6,11 +6,19 @@ import logging
 from collections import defaultdict
 from typing import Any
 
-from database_functions.db_connection import adapt_sql
 from parser.storage.connection import get_connection
+from parser.storage.listing_sql import mp_dedup_cleanup_select_sql, mp_dedup_hide_sql
 from parser.storage.parsed_items import fingerprint_title_desc
 
 logger = logging.getLogger(__name__)
+
+
+def _row_dict(row: Any) -> dict[str, Any]:
+    if isinstance(row, dict):
+        return row
+    if hasattr(row, "keys"):
+        return {k: row[k] for k in row.keys()}
+    return dict(row)
 
 
 def run_marketplace_duplicate_cleanup(
@@ -26,19 +34,10 @@ def run_marketplace_duplicate_cleanup(
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        adapt_sql(
-            """
-        SELECT id, title, description, price, isFree, createdAt
-        FROM Listing
-        WHERE status = 'active'
-          AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
-          AND datetime(createdAt) >= datetime('now', ?)
-        ORDER BY id ASC
-        """
-        ),
+        mp_dedup_cleanup_select_sql(),
         (f"-{days} days",),
     )
-    rows = [dict(r) for r in cursor.fetchall()]
+    rows = [_row_dict(r) for r in cursor.fetchall()]
 
     groups: dict[str, list[dict]] = defaultdict(list)
     no_fp = 0
@@ -69,19 +68,9 @@ def run_marketplace_duplicate_cleanup(
 
     hidden = 0
     if hide_ids and not dry_run:
+        hide_sql = mp_dedup_hide_sql()
         for lid in hide_ids:
-            cursor.execute(
-                adapt_sql(
-                    """
-                UPDATE Listing
-                SET status = 'hidden',
-                    updatedAt = datetime('now')
-                WHERE id = ?
-                  AND status = 'active'
-                """
-                ),
-                (lid,),
-            )
+            cursor.execute(hide_sql, (lid,))
             if cursor.rowcount:
                 hidden += 1
         conn.commit()

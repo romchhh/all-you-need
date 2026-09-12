@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         SUM(CASE WHEN paymentMethod = 'balance' THEN price ELSE 0 END) as balanceRevenue,
         SUM(CASE WHEN paymentMethod = 'direct' AND status = 'completed' THEN price ELSE 0 END) as directRevenue,
         SUM(price) as totalRevenue
-      FROM PackagePurchase
+      FROM ListingPackagePurchase
       WHERE createdAt >= ?
     `, startDateStr) as Array<{
       totalPurchases: number;
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
         DATE(createdAt) as date,
         SUM(price) as amount,
         'package' as type
-      FROM PackagePurchase
+      FROM ListingPackagePurchase
       WHERE createdAt >= ?
       GROUP BY DATE(createdAt)
       

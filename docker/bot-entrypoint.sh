@@ -68,5 +68,5 @@ run_sqlite_migration() {
 wait_for_postgres
 run_sqlite_migration
 
-echo "[bot] start"
+echo "[bot] start (parser listing_sql: explicit PostgreSQL)"
 exec python main.py

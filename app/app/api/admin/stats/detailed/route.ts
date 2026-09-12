@@ -116,8 +116,8 @@ export async function GET(request: NextRequest) {
          SUM(l.views) as totalViews
         FROM User u
         LEFT JOIN Listing l ON u.id = l.userId
-        GROUP BY u.id
-        HAVING listingsCount > 0
+        GROUP BY u.id, u.firstName, u.lastName, u.username, u.avatar, u.telegramId
+        HAVING COUNT(l.id) > 0
         ORDER BY listingsCount DESC
         LIMIT 10`
       ) as Promise<Array<any>>

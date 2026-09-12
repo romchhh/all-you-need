@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from parser.storage.connection import BASE_DIR, get_connection
+from parser.storage.listing_sql import listing_images_select_sql
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ def _build_listing_image_basenames(cursor) -> frozenset[str]:
     basenames: set[str] = set()
     for row in _iter_query_rows(
         cursor,
-        "SELECT images FROM Listing WHERE images IS NOT NULL AND TRIM(images) NOT IN ('', '[]')",
+        listing_images_select_sql(),
     ):
         for ref in _load_images_json(row["images"]):
             bn = _basename_from_image_ref(ref)

@@ -14,6 +14,11 @@ from parser.config.settings import (
     PARSER_TEXT_DEDUP_DAYS,
 )
 from parser.storage.connection import get_connection
+from parser.storage.listing_sql import (
+    is_created_at_within_dedup_window_sql,
+    listing_is_live_sql,
+    parsed_item_blocks_duplicates_sql,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +35,7 @@ def marketplace_listing_is_live(listing_id: int) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        """
-        SELECT 1 FROM Listing
-        WHERE id = ?
-          AND status = 'active'
-          AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
-        LIMIT 1
-        """,
+        listing_is_live_sql(),
         (int(listing_id),),
     )
     live = cursor.fetchone() is not None
@@ -50,7 +49,7 @@ def _is_within_dedup_window(created_at: Optional[str]) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT 1 WHERE datetime(?) >= datetime('now', ?)",
+        is_created_at_within_dedup_window_sql(),
         (created_at, _DEDUP_WINDOW),
     )
     within = cursor.fetchone() is not None
@@ -102,26 +101,7 @@ def parsed_item_row_blocks_duplicate(item: dict) -> bool:
 
 def _sql_parsed_item_blocks_duplicates(alias: str = "pi") -> str:
     """SQL-фрагмент: запис ще блокує повтор (clear_repostable, cross-parser)."""
-    return f"""(
-        {alias}.marketplace_listing_id IS NOT NULL
-        AND EXISTS (
-            SELECT 1 FROM Listing l
-            WHERE l.id = {alias}.marketplace_listing_id
-              AND l.status = 'active'
-              AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))
-        )
-    )
-    OR (
-        {alias}.marketplace_listing_id IS NULL
-        AND {alias}.status = 'pending'
-        AND datetime({alias}.created_at) >= datetime('now', ?)
-    )
-    OR (
-        {alias}.marketplace_listing_id IS NULL
-        AND {alias}.status = 'approved'
-        AND COALESCE({alias}.parser_type, 'default') = 'services_channel'
-        AND datetime({alias}.created_at) >= datetime('now', ?)
-    )"""
+    return parsed_item_blocks_duplicates_sql(alias)
 
 
 def _sql_semantic_dedup_blocks(alias: str = "pi") -> str:
@@ -131,26 +111,7 @@ def _sql_semantic_dedup_blocks(alias: str = "pi") -> str:
     - pending — лише коротке вікно (repost з новим message_id не висить днями);
     - services approved без MP — коротке вікно TEXT_DEDUP.
     """
-    return f"""(
-        {alias}.marketplace_listing_id IS NOT NULL
-        AND EXISTS (
-            SELECT 1 FROM Listing l
-            WHERE l.id = {alias}.marketplace_listing_id
-              AND l.status = 'active'
-              AND (l.expiresAt IS NULL OR datetime(l.expiresAt) > datetime('now'))
-        )
-    )
-    OR (
-        {alias}.marketplace_listing_id IS NULL
-        AND {alias}.status = 'pending'
-        AND datetime({alias}.created_at) >= datetime('now', ?)
-    )
-    OR (
-        {alias}.marketplace_listing_id IS NULL
-        AND {alias}.status = 'approved'
-        AND COALESCE({alias}.parser_type, 'default') = 'services_channel'
-        AND datetime({alias}.created_at) >= datetime('now', ?)
-    )"""
+    return parsed_item_blocks_duplicates_sql(alias)
 
 
 def clear_repostable_parsed_item(source_channel: str, message_id: int) -> bool:

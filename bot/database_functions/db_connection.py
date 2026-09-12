@@ -246,6 +246,36 @@ def quote_pg_identifiers(sql: str) -> str:
     return s
 
 
+PG_SELECT_OUTPUT_ALIASES = (
+    "listingsCount",
+    "activeListingsCount",
+    "totalViews",
+    "totalPurchases",
+    "totalRevenue",
+    "totalAmount",
+    "totalTopUps",
+    "balanceRevenue",
+    "directRevenue",
+    "count",
+)
+
+
+def fix_pg_aggregate_aliases(sql: str) -> str:
+    s = sql
+    for alias in PG_SELECT_OUTPUT_ALIASES:
+        s = re.sub(rf'\bas\s+"{alias}"(?=\s|,|$|\))', f"as {alias}", s, flags=re.IGNORECASE)
+        s = re.sub(
+            rf'\bORDER BY\s+"{alias}"\s+(ASC|DESC)\b',
+            rf"ORDER BY {alias} \1",
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(rf'\bORDER BY\s+"{alias}"\b', f"ORDER BY {alias}", s, flags=re.IGNORECASE)
+    s = re.sub(r'\bHAVING\s+"listingsCount"\s*>\s*0\b', "HAVING COUNT(l.id) > 0", s, flags=re.IGNORECASE)
+    s = re.sub(r"\bHAVING\s+listingsCount\s*>\s*0\b", "HAVING COUNT(l.id) > 0", s, flags=re.IGNORECASE)
+    return s
+
+
 def adapt_sql(sql: str) -> str:
     if not is_postgres():
         return sql
@@ -260,8 +290,20 @@ def adapt_sql(sql: str) -> str:
         flags=re.IGNORECASE,
     )
     s = re.sub(
+        r"datetime\('now',\s*'-(\d+)\s+hours'\)",
+        r"NOW() - INTERVAL '\1 hours'",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
         r"datetime\('now',\s*'-(\d+)\s+days'\)",
         r"NOW() - INTERVAL '\1 days'",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r"datetime\('now',\s*'\+(\d+)\s+days'\)",
+        r"NOW() + INTERVAL '\1 days'",
         s,
         flags=re.IGNORECASE,
     )
@@ -271,6 +313,31 @@ def adapt_sql(sql: str) -> str:
         s,
         flags=re.IGNORECASE,
     )
+    s = re.sub(
+        r"datetime\(([^,)]+),\s*'-(\d+)\s+days'\)",
+        r"\1 - INTERVAL '\2 days'",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r"datetime\(([^,)]+),\s*'-(\d+)\s+hours'\)",
+        r"\1 - INTERVAL '\2 hours'",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r"datetime\(([^,)]+),\s*'\+(\d+)\s+days'\)",
+        r"\1 + INTERVAL '\2 days'",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r"datetime\(([^,)]+),\s*\?\)",
+        r"\1 + CAST(? AS INTERVAL)",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(r"datetime\(\?\)", "?::timestamp", s, flags=re.IGNORECASE)
     s = re.sub(
         r"datetime\(([^,)]+)\)\s*>\s*datetime\('now'\)",
         r"\1 > NOW()",
@@ -296,12 +363,27 @@ def adapt_sql(sql: str) -> str:
     s = re.sub(r"\bIFNULL\s*\(", "COALESCE(", s, flags=re.IGNORECASE)
     s = re.sub(r"\bINSTR\s*\(", "STRPOS(", s, flags=re.IGNORECASE)
     s = re.sub(
+        r"\bSUBSTR\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\)",
+        r"SUBSTRING(\1 FROM \2 FOR \3)",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
         r"SELECT name FROM sqlite_master WHERE type='table' AND name='([^']+)'",
         r"SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' AND tablename = '\1'",
         s,
         flags=re.IGNORECASE,
     )
     s = quote_pg_identifiers(s)
+    s = fix_pg_aggregate_aliases(s)
+    s = re.sub(r"datetime\(([^)]+)\)\s*>\s*NOW\(\)", r"\1 > NOW()", s, flags=re.IGNORECASE)
+    s = re.sub(
+        r"datetime\(([^)]+)\)\s*>\s*datetime\('now'\)",
+        r"\1 > NOW()",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(r"datetime\(([^)]+)\)", r"\1::timestamp", s, flags=re.IGNORECASE)
     # Залишки SQLite datetime() після quoting camelCase колонок
     s = re.sub(r'\bdatetime\s*\(\s*"([^"]+)"\s*\)', r'"\1"', s, flags=re.IGNORECASE)
     return s

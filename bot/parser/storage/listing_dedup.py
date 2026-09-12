@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Optional
+from typing import Any, Optional
 
 from database_functions.db_connection import adapt_sql
 from parser.config.settings import PARSER_DEDUP_DAYS
 from parser.storage.connection import get_connection
+from parser.storage.listing_sql import (
+    active_listings_context_sql,
+    active_listings_dedup_sql,
+    location_filter_clause,
+)
 from parser.storage.parsed_items import fingerprint_title_desc
 
 logger = logging.getLogger(__name__)
@@ -20,6 +25,14 @@ def _norm_token(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+def _row_dict(row: Any) -> dict[str, Any]:
+    if isinstance(row, dict):
+        return row
+    if hasattr(row, "keys"):
+        return {k: row[k] for k in row.keys()}
+    return dict(row)
+
+
 def active_listing_duplicate(dedup_key: Optional[str], title: str, description: str) -> bool:
     """Чи є активне оголошення з тим самим dedup_key."""
     if not dedup_key:
@@ -27,23 +40,13 @@ def active_listing_duplicate(dedup_key: Optional[str], title: str, description: 
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        adapt_sql(
-            """
-        SELECT id, title, description, price, isFree
-        FROM Listing
-        WHERE status = 'active'
-          AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
-          AND datetime(createdAt) >= datetime('now', ?)
-        ORDER BY id DESC
-        LIMIT 800
-        """
-        ),
+        active_listings_dedup_sql(),
         (f"-{PARSER_DEDUP_DAYS} days",),
     )
     rows = cursor.fetchall()
     conn.close()
     for row in rows:
-        data = dict(row)
+        data = _row_dict(row)
         row_free = data.get("isFree") in (1, True, "1")
         existing = fingerprint_title_desc(
             str(data.get("title") or ""),
@@ -76,41 +79,32 @@ def recent_listings_for_ai_context(
     loc_clause = ""
     params_active: list = [f"-{PARSER_DEDUP_DAYS} days"]
     if loc and loc.lower() not in ("germany", "deutschland"):
-        loc_clause = " AND (location LIKE ? OR location IS NULL OR location = '')"
+        loc_clause = location_filter_clause()
         params_active.append(f"%{loc}%")
     params_active.append(limit_active)
 
     cursor.execute(
-        adapt_sql(
-            f"""
-        SELECT id, title, location, price
-        FROM Listing
-        WHERE status = 'active'
-          AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
-          AND datetime(createdAt) >= datetime('now', ?)
-          {loc_clause}
-        ORDER BY id DESC
-        LIMIT ?
-        """
-        ),
+        active_listings_context_sql(loc_clause),
         params_active,
     )
-    active = [dict(r) for r in cursor.fetchall()]
+    active = [_row_dict(r) for r in cursor.fetchall()]
 
     title_token = _norm_token(title).split()[:3]
     like = f"%{title_token[0]}%" if title_token else "%"
     cursor.execute(
-        """
+        adapt_sql(
+            """
         SELECT title FROM parsed_items
         WHERE status = 'pending'
           AND datetime(created_at) >= datetime('now', '-7 days')
           AND title LIKE ?
         ORDER BY id DESC
         LIMIT ?
-        """,
+        """
+        ),
         (like, limit_pending),
     )
-    pending = [str(dict(r).get("title") or "") for r in cursor.fetchall() if r]
+    pending = [str(_row_dict(r).get("title") or "") for r in cursor.fetchall() if r]
     conn.close()
 
     return {"active_listings": active, "pending_titles": pending}
