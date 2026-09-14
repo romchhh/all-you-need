@@ -61,6 +61,7 @@ export const PaymentSummaryModal = ({
   const [fetchedBalance, setFetchedBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   useHideBottomNav(isOpen);
   useBodyScrollLock(isOpen);
@@ -83,31 +84,43 @@ export const PaymentSummaryModal = ({
       setFetchedBalance(null);
       setBalanceLoading(false);
       setConfirming(false);
+      setConfirmError(null);
       return;
     }
 
     setPaymentMethod('balance');
+    setConfirmError(null);
 
-    if (!paymentTelegramId) return;
+    if (!paymentTelegramId) {
+      setBalanceLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setBalanceLoading(true);
 
-    fetch(`/api/user/balance?telegramId=${paymentTelegramId}`)
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+
+    fetch(`/api/user/balance?telegramId=${paymentTelegramId}`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || data?.balance == null) return;
         setFetchedBalance(normalizeBalance(data.balance));
       })
       .catch((error) => {
+        if (cancelled || error?.name === 'AbortError') return;
         console.error('[PaymentSummaryModal] Failed to fetch balance:', error);
       })
       .finally(() => {
+        window.clearTimeout(timeoutId);
         if (!cancelled) setBalanceLoading(false);
       });
 
     return () => {
       cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeoutId);
     };
   }, [isOpen, paymentTelegramId]);
 
@@ -121,17 +134,22 @@ export const PaymentSummaryModal = ({
   const confirmDisabled = useMemo(() => {
     if (confirming || totalPrice <= 0) return true;
     if (paymentMethod === 'direct') return false;
-    if (balanceLoading) return true;
     return !canPayWithBalance;
-  }, [confirming, totalPrice, paymentMethod, balanceLoading, canPayWithBalance]);
+  }, [confirming, totalPrice, paymentMethod, canPayWithBalance]);
 
   const handleConfirm = async () => {
     if (confirmDisabled) return;
     setConfirming(true);
+    setConfirmError(null);
     try {
       await onConfirm(paymentMethod);
     } catch (error) {
       console.error('[PaymentSummaryModal] Payment confirm failed:', error);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : t('payments.purchaseError') || 'Помилка при покупці';
+      setConfirmError(message);
     } finally {
       setConfirming(false);
     }
@@ -343,6 +361,11 @@ export const PaymentSummaryModal = ({
           </div>
 
           <div className={footerBar}>
+            {confirmError && (
+              <p className={`text-sm text-center ${isLight ? 'text-red-600' : 'text-red-400'}`}>
+                {confirmError}
+              </p>
+            )}
             <button
               type="button"
               onClick={handleConfirm}

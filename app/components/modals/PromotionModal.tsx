@@ -138,12 +138,21 @@ export default function PromotionModal({
     });
 
     setLoading(true);
-    // Не передаємо paymentMethod - він буде вибраний в PaymentSummaryModal
-    onSelectPromotion(selectedPromotion);
+    try {
+      await Promise.resolve(onSelectPromotion(selectedPromotion));
+    } catch {
+      setLoading(false);
+    }
   };
 
-  const handleSkip = () => {
-    onSelectPromotion(null);
+  const handleSkip = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await Promise.resolve(onSelectPromotion(null));
+    } catch {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -406,6 +415,7 @@ export default function PromotionModal({
           }}
         >
           <button
+            type="button"
             onClick={handleSelectPromotion}
             disabled={!selectedPromotion || loading}
             className={`w-full py-4 rounded-xl font-semibold transition-all ${
@@ -421,7 +431,12 @@ export default function PromotionModal({
           
           {showSkipButton && (
             <button
-              onClick={handleSkip}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleSkip();
+              }}
               disabled={loading}
               className={
                 isLight
@@ -429,6 +444,10 @@ export default function PromotionModal({
                   : 'w-full py-3 rounded-xl font-semibold text-white bg-transparent border border-white/20 hover:bg-white/10 transition-all flex items-center justify-center gap-2'
               }
             >
+              {loading ? (
+                <span>{t('common.loading')}</span>
+              ) : (
+                <>
               <span>{t('promotions.noPromotion')}</span>
               <span 
                 className="px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap inline-block"
@@ -436,6 +455,8 @@ export default function PromotionModal({
               >
                 {t('common.free') || 'Free'}
               </span>
+                </>
+              )}
             </button>
           )}
         </div>

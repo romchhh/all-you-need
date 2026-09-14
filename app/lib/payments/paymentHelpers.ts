@@ -1,6 +1,7 @@
 import { prisma, ensurePromotionPurchaseTable } from '@/lib/prisma';
 import { nowSQLite } from '@/utils/dateHelpers';
 import { createTransaction } from '@/utils/dbHelpers';
+import { sqlDatetimeCompare } from '@/lib/dbSql';
 import { 
   PACKAGE_PRICES, 
   PROMOTION_PRICES, 
@@ -94,7 +95,7 @@ export async function applyPromotionPurchaseToListing(
       `SELECT promotionType FROM PromotionPurchase 
        WHERE listingId = ? 
          AND status IN ('active', 'paid', 'completed')
-         AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))`,
+         AND (endsAt IS NULL OR ${sqlDatetimeCompare('endsAt')})`,
       listingId
     ) as Array<{ promotionType: string }>;
 
@@ -139,7 +140,9 @@ export async function applyPromotionPurchaseToListing(
 
     try {
       const { submitListingToModeration } = await import('@/lib/listings/helpers');
-      await submitListingToModeration(listingId, currentStatus === 'rejected');
+      void submitListingToModeration(listingId, currentStatus === 'rejected').catch((error) => {
+        console.error('[applyPromotionPurchaseToListing] Error sending listing to moderation:', error);
+      });
     } catch (error) {
       console.error('[applyPromotionPurchaseToListing] Error sending listing to moderation:', error);
     }
@@ -148,7 +151,7 @@ export async function applyPromotionPurchaseToListing(
       `SELECT promotionType FROM PromotionPurchase 
        WHERE listingId = ? 
          AND status IN ('active', 'paid', 'completed')
-         AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))`,
+         AND (endsAt IS NULL OR ${sqlDatetimeCompare('endsAt')})`,
       listingId
     ) as Array<{ promotionType: string }>;
 
@@ -164,7 +167,7 @@ export async function applyPromotionPurchaseToListing(
         `SELECT endsAt FROM PromotionPurchase 
          WHERE listingId = ? 
            AND status IN ('active', 'paid', 'completed')
-           AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))
+           AND (endsAt IS NULL OR ${sqlDatetimeCompare('endsAt')})
          ORDER BY endsAt DESC LIMIT 1`,
         listingId
       ) as Array<{ endsAt: string | null }>;

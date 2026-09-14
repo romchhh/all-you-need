@@ -1427,6 +1427,7 @@ export const ListingDetail = ({
           onConfirm={handlePaymentConfirm}
           promotionType={selectedPromotionType}
           userBalance={userBalance}
+          telegramId={String(currentUser?.id || profile?.telegramId || '')}
           tg={tg}
         />
       )}

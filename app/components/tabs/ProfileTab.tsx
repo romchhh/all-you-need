@@ -370,35 +370,37 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   // Обробка пропуску реклами
   const handlePromotionSkipped = async () => {
     if (!selectedListingForPromotion) return;
-    
+
+    const listingId = selectedListingForPromotion.id;
+    const telegramId = resolvePaymentTelegramId(tg, profile?.telegramId);
+    if (!telegramId) {
+      showToast(t('common.error'), 'error');
+      return;
+    }
+
     try {
-      const listingId = selectedListingForPromotion.id;
-      
-      // Перевіряємо чи оголошення потребує відправки на модерацію
       const listingResponse = await fetch(`/api/listings/${listingId}`);
-      if (listingResponse.ok) {
-        const listing = await listingResponse.json();
-        
-        // Якщо оголошення НЕ в статусі active або pending_moderation, відправляємо на модерацію
-        if (listing.status !== 'active' && listing.status !== 'pending_moderation') {
-          const submitResponse = await fetch(`/api/listings/${listingId}/submit-moderation`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegramId: profile?.telegramId,
-            }),
-          });
-
-          const submitData = await submitResponse.json();
-
-          if (!submitResponse.ok) {
-            throw new Error(submitData.error || 'Failed to submit listing for moderation');
-          }
-
-          showToast(t('editListing.sentToModeration'), 'success');
-        }
+      if (!listingResponse.ok) {
+        throw new Error(t('common.error'));
       }
-      
+
+      const listing = await listingResponse.json();
+
+      if (listing.status !== 'active' && listing.status !== 'pending_moderation') {
+        const submitResponse = await fetch(`/api/listings/${listingId}/submit-moderation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId }),
+        });
+
+        const submitData = await submitResponse.json().catch(() => ({}));
+        if (!submitResponse.ok) {
+          throw new Error(submitData.error || 'Failed to submit listing for moderation');
+        }
+
+        showToast(t('editListing.sentToModeration'), 'success');
+      }
+
       tg?.HapticFeedback.notificationOccurred('success');
       await fetchListingsWithFilters(0, true);
       setShowPromotionModal(false);
@@ -408,6 +410,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       console.error('Error skipping promotion:', error);
       showToast(error.message || t('common.error'), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
+      throw error;
     }
   };
 
@@ -1553,6 +1556,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           onConfirm={handlePaymentConfirm}
           promotionType={selectedPromotionType}
           userBalance={userBalance}
+          telegramId={String(profile?.telegramId || '')}
           tg={tg}
         />
       )}

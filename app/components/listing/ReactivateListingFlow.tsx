@@ -508,6 +508,7 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
           packageType={selectedPackageType}
           promotionType={selectedPromotionType}
           userBalance={userBalance}
+          telegramId={getTelegramId() || undefined}
           tg={tg}
         />
       )}

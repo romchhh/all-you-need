@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/features/ui/hooks/useToast';
+import { Toast } from '@/components/ui/Toast';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { compressImageOnClient } from '@/utils/imageUtils';
+import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 
 // Динамічні імпорти для оптимізації
 const ListingPackageModal = dynamic(() => import('@/components/modals/ListingPackageModal'), { ssr: false });
@@ -32,12 +34,13 @@ interface UserStatus {
 
 export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: CreateListingFlowProps) {
   const { t } = useLanguage();
-  const { showToast } = useToast();
+  const { toast, showToast, hideToast } = useToast();
   const [step, setStep] = useState<Step>('create_listing');
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
   const [createdListingId, setCreatedListingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingListingData, setPendingListingData] = useState<any>(null);
+  const pendingListingDataRef = useRef<any>(null);
   const [selectedPackageType, setSelectedPackageType] = useState<string | null>(null);
   const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'balance' | 'direct'>('balance');
@@ -48,9 +51,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
 
   // Хелпер для отримання telegramId з різних джерел
   const getTelegramId = (): string | null => {
-    return tg?.initDataUnsafe?.user?.id?.toString()
-      || (typeof window !== 'undefined' ? sessionStorage.getItem('telegramId') : null)
-      || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('telegramId') : null);
+    return resolvePaymentTelegramId(tg, null);
   };
 
   // Блокуємо скрол при відкритті модального вікна
@@ -60,11 +61,13 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       console.log('[CreateListingFlow] Modal opened, starting with create_listing form');
       setStep('create_listing');
       setPendingListingData(null);
+      pendingListingDataRef.current = null;
       setCreatedListingId(null);
     } else {
       console.log('[CreateListingFlow] Modal closed, resetting state');
       setStep('create_listing');
       setPendingListingData(null);
+      pendingListingDataRef.current = null;
       setCreatedListingId(null);
     }
   }, [isOpen]);
@@ -144,7 +147,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
 
       console.log('[CreateListingFlow] User submitted listing form, checking if package needed...');
       
-      // Зберігаємо дані оголошення
+      pendingListingDataRef.current = data;
       setPendingListingData(data);
       
       // Перевіряємо, чи потрібно купити пакет
@@ -178,8 +181,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       // Показуємо індикатор завантаження одразу
       tg?.HapticFeedback.impactOccurred('light');
       
-      // Показуємо індикатор завантаження при списанні коштів
-      if (paymentMethod === 'balance') {
+      if (promotionType && paymentMethod === 'balance') {
         showToast(t('payments.processing') || 'Списання коштів з балансу...', 'info');
       }
       
@@ -427,26 +429,36 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
   const handlePromotionSelect = async (promotionType: string | null, paymentMethod?: 'balance' | 'direct') => {
     console.log('[CreateListingFlow] Promotion selected:', promotionType, 'paymentMethod:', paymentMethod);
     setSelectedPromotionType(promotionType);
-    
-    // Якщо обрано промо, показуємо фінальне вікно оплати
-    // (paymentMethod ігноруємо тут, бо він вибирається в PaymentSummaryModal)
+
     if (promotionType) {
       setStep('payment_summary');
-    } else {
-      // Якщо промо не обрано, одразу створюємо оголошення без реклами
-      const telegramId = getTelegramId();
-      if (pendingListingData && telegramId) {
-        console.log('[CreateListingFlow] No promotion selected, creating listing without ads');
-        await createListingWithData(pendingListingData, telegramId, null);
-      }
+      return;
     }
+
+    const telegramId = getTelegramId();
+    const data = pendingListingDataRef.current || pendingListingData;
+    if (!telegramId) {
+      console.error('[CreateListingFlow] Skip create: no telegramId');
+      showToast(t('common.error'), 'error');
+      throw new Error(t('common.error') || 'Missing telegramId');
+    }
+    if (!data) {
+      console.error('[CreateListingFlow] Skip create: no pending listing data');
+      showToast(t('createListing.fillAllFields') || t('common.error'), 'error');
+      setStep('create_listing');
+      throw new Error('Missing listing data');
+    }
+
+    console.log('[CreateListingFlow] No promotion selected, creating listing without ads');
+    await createListingWithData(data, telegramId, null);
   };
 
   const handlePaymentConfirm = async (paymentMethod: 'balance' | 'direct') => {
     const telegramId = getTelegramId();
-    if (!telegramId || !pendingListingData) {
+    const data = pendingListingDataRef.current || pendingListingData;
+    if (!telegramId || !data) {
       showToast(t('common.error'), 'error');
-      return;
+      throw new Error(t('common.error') || 'Missing telegramId');
     }
 
     // Зберігаємо обраний метод оплати
@@ -484,11 +496,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       }
 
       // Створюємо оголошення з обраною промо та методом оплати
-      await createListingWithData(pendingListingData, telegramId, selectedPromotionType, paymentMethod);
+      await createListingWithData(data, telegramId, selectedPromotionType, paymentMethod);
     } catch (error: any) {
       console.error('[CreateListingFlow] Error in payment flow:', error);
       showToast(error.message || t('payments.purchaseError'), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
+      throw error;
     }
   };
 
@@ -504,7 +517,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
     console.log('[CreateListingFlow] Showing loading screen');
     return (
       <div 
-        className="fixed inset-0 z-[70] flex items-center justify-center"
+        className="fixed inset-0 z-[100001] flex items-center justify-center"
         style={{
           background: 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63, 83, 49, 0.15) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63, 83, 49, 0.15) 0%, transparent 40%), #000000'
         }}
@@ -603,9 +616,18 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
           packageType={selectedPackageType}
           promotionType={selectedPromotionType}
           userBalance={userBalance}
+          telegramId={getTelegramId() || undefined}
           tg={tg}
         />
       )}
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+        layerClassName="fixed inset-x-0 top-[max(4.5rem,env(safe-area-inset-top))] z-[100050] flex justify-center px-3 pointer-events-none animate-slide-down"
+      />
     </>
   );
 }

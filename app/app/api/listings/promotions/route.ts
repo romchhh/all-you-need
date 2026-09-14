@@ -13,6 +13,7 @@ import {
 } from '@/lib/businessProfileHelpers';
 import type { PromotionType } from '@/lib/payments/paymentConstants';
 import { createMonobankInvoice } from '@/lib/monobank';
+import { sqlDatetimeCompare } from '@/lib/dbSql';
 
 // Купити рекламу для оголошення
 export async function POST(request: NextRequest) {
@@ -238,7 +239,7 @@ export async function GET(request: NextRequest) {
          FROM PromotionPurchase 
          WHERE listingId = ? 
            AND status IN ('active', 'paid', 'completed')
-           AND (endsAt IS NULL OR datetime(endsAt) > datetime('now'))
+           AND (endsAt IS NULL OR ${sqlDatetimeCompare('endsAt')})
          ORDER BY createdAt DESC`,
         parsedListingId
       ) as Array<{ promotionType: string; endsAt: string | null }>;
