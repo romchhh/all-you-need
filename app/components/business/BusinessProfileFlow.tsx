@@ -158,8 +158,7 @@ type ImageUploadBoxProps = {
   emptyLabel: string;
   changeLabel: string;
   emptyIcon: ReactNode;
-  heightClass?: string;
-  fit?: 'contain' | 'cover';
+  variant?: 'logo' | 'cover';
   isLight: boolean;
 };
 
@@ -170,33 +169,32 @@ function ImageUploadBox({
   emptyLabel,
   changeLabel,
   emptyIcon,
-  heightClass = 'h-28',
-  fit = 'contain',
+  variant = 'logo',
   isLight,
 }: ImageUploadBoxProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const borderCls = isLight ? 'border-gray-300 bg-gray-50' : 'border-white/20 bg-white/5';
+  const isLogo = variant === 'logo';
+  const borderCls = isLight ? 'border-gray-300 bg-gray-50' : 'border-white/20 bg-white/[0.04]';
+  const boxCls = isLogo
+    ? 'mx-auto h-36 w-36 rounded-[1.35rem]'
+    : 'w-full aspect-[16/9] rounded-[1.35rem]';
 
   return (
-    <div
-      className={`relative w-full overflow-hidden rounded-2xl border-2 border-dashed ${heightClass} ${borderCls}`}
-    >
+    <div className={`relative overflow-hidden border-2 border-dashed ${boxCls} ${borderCls}`}>
       {preview ? (
         <>
           <img
             src={resolveSrc(preview)}
             alt=""
             draggable={false}
-            className={`pointer-events-none absolute inset-0 h-full w-full select-none ${
-              fit === 'cover' ? 'object-cover' : 'object-contain p-2'
-            }`}
+            className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain p-2"
           />
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="absolute inset-0 flex touch-manipulation items-end justify-center bg-gradient-to-t from-black/45 via-black/10 to-transparent pb-2"
+            className="absolute inset-0 flex touch-manipulation items-end justify-center bg-gradient-to-t from-black/50 via-transparent to-transparent pb-2.5"
           >
-            <span className="rounded-full bg-black/50 px-3 py-1 text-xs font-medium text-white">
+            <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white">
               {changeLabel}
             </span>
           </button>
@@ -205,10 +203,10 @@ function ImageUploadBox({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="absolute inset-0 flex touch-manipulation flex-col items-center justify-center gap-1 px-3"
+          className="absolute inset-0 flex touch-manipulation flex-col items-center justify-center gap-1.5 px-3"
         >
           {emptyIcon}
-          <span className="text-center text-sm opacity-70">{emptyLabel}</span>
+          <span className="px-2 text-center text-sm leading-snug opacity-70">{emptyLabel}</span>
         </button>
       )}
       <input
@@ -247,7 +245,11 @@ export default function BusinessProfileFlow({
   const [loading, setLoading] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
   const [flowError, setFlowError] = useState<string | null>(null);
+  const [cityQuery, setCityQuery] = useState('');
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const openedRef = useRef(false);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
+  const uploadingRef = useRef(false);
 
   const paymentTelegramId = useMemo(
     () => resolvePaymentTelegramId(tg, telegramId) || telegramId,
@@ -270,8 +272,8 @@ export default function BusinessProfileFlow({
   );
 
   const saveDraftToServer = useCallback(
-    async (currentForm: FormState) => {
-      if (renewMode || !paymentTelegramId) return;
+    async (currentForm: FormState): Promise<{ logo?: string; coverImage?: string } | null> => {
+      if (renewMode || !paymentTelegramId) return null;
 
       const hasAnyData = [
         currentForm.businessName,
@@ -291,10 +293,11 @@ export default function BusinessProfileFlow({
         !currentForm.logoFile &&
         !currentForm.coverFile
       ) {
-        return;
+        return null;
       }
 
       try {
+        let res: Response;
         if (currentForm.logoFile || currentForm.coverFile) {
           const fd = new FormData();
           fd.append('partial', 'true');
@@ -316,9 +319,9 @@ export default function BusinessProfileFlow({
           fd.append('listingIds', JSON.stringify(currentForm.selectedListingIds));
           if (currentForm.logoFile) fd.append('logo', currentForm.logoFile);
           if (currentForm.coverFile) fd.append('coverImage', currentForm.coverFile);
-          await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
+          res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
         } else {
-          await fetch('/api/user/business-profile', {
+          res = await fetch('/api/user/business-profile', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -340,22 +343,65 @@ export default function BusinessProfileFlow({
               workingHours: currentForm.workingHours,
               plan: currentForm.selectedPlan,
               listingIds: currentForm.selectedListingIds,
-              logo: currentForm.savedLogoPath,
-              coverImage: currentForm.savedCoverPath,
+              ...(currentForm.savedLogoPath ? { logo: currentForm.savedLogoPath } : {}),
+              ...(currentForm.savedCoverPath ? { coverImage: currentForm.savedCoverPath } : {}),
             }),
           });
         }
+        if (!res.ok) return null;
+        const data = await res.json();
+        return {
+          logo: data.profile?.logo || undefined,
+          coverImage: data.profile?.coverImage || undefined,
+        };
       } catch {
-        // silent autosave
+        return null;
       }
     },
     [paymentTelegramId, renewMode]
   );
 
+  const applySavedMedia = useCallback(
+    (saved: { logo?: string; coverImage?: string } | null, currentStep: WizardStep, currentForm: FormState) => {
+      if (!saved?.logo && !saved?.coverImage) return currentForm;
+      const nextLogo = saved.logo || currentForm.savedLogoPath;
+      const nextCover = saved.coverImage || currentForm.savedCoverPath;
+      const samePaths =
+        nextLogo === currentForm.savedLogoPath && nextCover === currentForm.savedCoverPath;
+      const filesCleared = !currentForm.logoFile && !currentForm.coverFile;
+      if (samePaths && filesCleared) return currentForm;
+
+      const next: FormState = {
+        ...currentForm,
+        savedLogoPath: nextLogo,
+        savedCoverPath: nextCover,
+        logoPreview: saved.logo || currentForm.logoPreview,
+        coverPreview: saved.coverImage || currentForm.coverPreview,
+        logoFile: saved.logo ? null : currentForm.logoFile,
+        coverFile: saved.coverImage ? null : currentForm.coverFile,
+      };
+      setForm(next);
+      saveDraftToLocal(currentStep, next);
+      return next;
+    },
+    [saveDraftToLocal]
+  );
+
   const handleClose = useCallback(() => {
     if (!renewMode) {
       saveDraftToLocal(step, form);
-      void saveDraftToServer(form);
+      void saveDraftToServer(form).then((saved) => {
+        if (!saved) return;
+        saveDraftToLocal(step, {
+          ...form,
+          savedLogoPath: saved.logo || form.savedLogoPath,
+          savedCoverPath: saved.coverImage || form.savedCoverPath,
+          logoPreview: saved.logo || form.logoPreview,
+          coverPreview: saved.coverImage || form.coverPreview,
+          logoFile: null,
+          coverFile: null,
+        });
+      });
     }
     onClose();
   }, [form, onClose, renewMode, saveDraftToLocal, saveDraftToServer, step]);
@@ -417,12 +463,20 @@ export default function BusinessProfileFlow({
         : 0;
       const useLocalDraft = Boolean(localDraft && (!serverTime || localDraft.savedAt > serverTime));
 
+      const mergePhotos = (base: FormState): FormState => ({
+        ...base,
+        savedLogoPath: base.savedLogoPath || existingProfile?.logo || null,
+        savedCoverPath: base.savedCoverPath || existingProfile?.coverImage || null,
+        logoPreview: base.logoPreview || existingProfile?.logo || null,
+        coverPreview: base.coverPreview || existingProfile?.coverImage || null,
+      });
+
       if (useLocalDraft && localDraft) {
-        setForm(storedToForm(localDraft.form, { telegram: defaultTelegram, phone: defaultPhone }));
+        setForm(mergePhotos(storedToForm(localDraft.form, { telegram: defaultTelegram, phone: defaultPhone })));
         setStep(restoreStep(localDraft.step));
-      } else if (existingProfile?.businessName) {
+      } else if (existingProfile?.businessName || existingProfile?.logo || existingProfile?.coverImage) {
         setForm(prefillFromExisting(existingProfile));
-        setStep('step1');
+        setStep(existingProfile.businessName ? 'step1' : 'step1');
       } else {
         setStep('step1');
         setForm(initialForm({ telegram: defaultTelegram, phone: defaultPhone }));
@@ -431,13 +485,20 @@ export default function BusinessProfileFlow({
   }, [isOpen, defaultTelegram, defaultPhone, renewMode, existingProfile, paymentTelegramId]);
 
   useEffect(() => {
-    if (!isOpen || renewMode) return;
+    if (!isOpen || renewMode || uploadingRef.current) return;
     const timer = setTimeout(() => {
+      if (uploadingRef.current) return;
       saveDraftToLocal(step, form);
-      void saveDraftToServer(form);
+      void saveDraftToServer(form).then((saved) => applySavedMedia(saved, step, form));
     }, 800);
     return () => clearTimeout(timer);
-  }, [isOpen, renewMode, step, form, saveDraftToLocal, saveDraftToServer]);
+  }, [isOpen, renewMode, step, form, saveDraftToLocal, saveDraftToServer, applySavedMedia]);
+
+  useEffect(() => {
+    bodyScrollRef.current?.scrollTo({ top: 0 });
+    setCityQuery('');
+    setCityPickerOpen(step === 'step2');
+  }, [step]);
 
   useEffect(() => {
     if (!isOpen || step !== 'step5') return;
@@ -654,11 +715,28 @@ export default function BusinessProfileFlow({
     }
   };
 
+  const filteredCities = useMemo(() => {
+    const query = cityQuery.trim().toLowerCase();
+    const list = query
+      ? majorGermanCities.filter((city) => city.toLowerCase().includes(query))
+      : majorGermanCities;
+    return list.slice(0, 16);
+  }, [cityQuery]);
+
   const handleImagePick = (file: File | null, kind: 'logo' | 'cover') => {
     if (!file) return;
     const preview = URL.createObjectURL(file);
-    if (kind === 'logo') patch({ logoFile: file, logoPreview: preview });
-    else patch({ coverFile: file, coverPreview: preview });
+    const next =
+      kind === 'logo'
+        ? { logoFile: file, logoPreview: preview }
+        : { coverFile: file, coverPreview: preview };
+    const merged = { ...form, ...next };
+    setForm(merged);
+    uploadingRef.current = true;
+    void saveDraftToServer(merged).then((saved) => {
+      uploadingRef.current = false;
+      applySavedMedia(saved, step, merged);
+    });
   };
 
   const toggleListing = (id: number) => {
@@ -782,7 +860,7 @@ export default function BusinessProfileFlow({
             </div>
           )}
 
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 pb-8">
+          <div ref={bodyScrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 pb-8">
           {step === 'step1' && (
             <>
               {renderStepHeader(t('businessProfile.steps.step1.title'), renderBusinessIcon())}
@@ -796,6 +874,7 @@ export default function BusinessProfileFlow({
                     emptyLabel={t('businessProfile.fields.uploadLogo')}
                     changeLabel={t('businessProfile.fields.changePhoto')}
                     emptyIcon={<Upload size={22} className="opacity-60" />}
+                    variant="logo"
                     isLight={isLight}
                   />
                 </div>
@@ -832,35 +911,151 @@ export default function BusinessProfileFlow({
           {step === 'step2' && (
             <>
               {renderStepHeader(t('businessProfile.steps.step2.title'), <MapPin size={22} className={accentIcon} />)}
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.city')} *</label>
-                  <select className={inputCls} value={form.city} onChange={(e) => patch({ city: e.target.value })}>
-                    <option value="">{t('businessProfile.fields.selectCity')}</option>
-                    {majorGermanCities.map((city) => (
-                      <option key={city} value={city}>{city}</option>
-                    ))}
-                  </select>
+                  {form.city ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        patch({ city: '' });
+                        setCityQuery('');
+                        setCityPickerOpen(true);
+                      }}
+                      className={`mb-2 flex w-full items-center gap-2 rounded-2xl border px-4 py-3 text-left ${
+                        isLight ? 'border-[#3F5331]/30 bg-[#3F5331]/5' : 'border-[#C8E6A0]/30 bg-white/5'
+                      }`}
+                    >
+                      <MapPin size={18} className={accentIcon} />
+                      <span className="flex-1 font-medium">{form.city}</span>
+                      <span className={`text-xs ${ac.mutedText}`}>{t('businessProfile.fields.searchCity')}</span>
+                    </button>
+                  ) : (
+                    <input
+                      className={inputCls}
+                      value={cityQuery}
+                      placeholder={t('businessProfile.fields.searchCity')}
+                      onFocus={() => setCityPickerOpen(true)}
+                      onChange={(e) => {
+                        setCityQuery(e.target.value);
+                        setCityPickerOpen(true);
+                      }}
+                    />
+                  )}
+                  {!form.city && cityPickerOpen && (
+                    <div
+                      className={`mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-2xl border ${
+                        isLight ? 'border-gray-200 bg-white' : 'border-white/15 bg-[#141414]'
+                      }`}
+                    >
+                      {filteredCities.length === 0 ? (
+                        <p className={`px-4 py-3 text-sm ${ac.mutedText}`}>{t('businessProfile.fields.selectCity')}</p>
+                      ) : (
+                        filteredCities.map((city) => (
+                          <button
+                            type="button"
+                            key={city}
+                            onClick={() => {
+                              patch({ city });
+                              setCityQuery('');
+                              setCityPickerOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-2 px-4 py-3 text-left text-sm touch-manipulation ${
+                              isLight ? 'hover:bg-gray-50' : 'hover:bg-white/5'
+                            }`}
+                          >
+                            <MapPin size={16} className={accentIcon} />
+                            {city}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.address')}</label>
-                  <input className={inputCls} value={form.address} onChange={(e) => patch({ address: e.target.value })} />
+                  <input
+                    className={inputCls}
+                    value={form.address}
+                    placeholder={t('businessProfile.fields.addressPlaceholder')}
+                    onChange={(e) => patch({ address: e.target.value })}
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.serviceArea')}</label>
                   <div className="space-y-2">
-                    {(['city_only', 'city_radius', 'all_germany'] as ServiceArea[]).map((area) => (
-                      <label key={area} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${form.serviceArea === area ? (isLight ? 'border-[#3F5331] bg-[#3F5331]/5' : 'border-[#C8E6A0]/50 bg-white/5') : (isLight ? 'border-gray-200' : 'border-white/15')}`}>
-                        <input type="radio" name="serviceArea" checked={form.serviceArea === area} onChange={() => patch({ serviceArea: area })} />
-                        <span className="text-sm">{t(`businessProfile.serviceArea.${area}`)}</span>
-                      </label>
-                    ))}
+                    {(['city_only', 'city_radius', 'all_germany'] as ServiceArea[]).map((area) => {
+                      const selected = form.serviceArea === area;
+                      return (
+                        <button
+                          type="button"
+                          key={area}
+                          onClick={() => patch({ serviceArea: area })}
+                          className={`flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left touch-manipulation ${
+                            selected
+                              ? isLight
+                                ? 'border-[#3F5331] bg-[#3F5331]/8'
+                                : 'border-[#C8E6A0]/60 bg-white/8'
+                              : isLight
+                                ? 'border-gray-200 bg-white'
+                                : 'border-white/15 bg-white/[0.03]'
+                          }`}
+                        >
+                          <span
+                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                              selected
+                                ? isLight
+                                  ? 'border-[#3F5331] bg-[#3F5331] text-white'
+                                  : 'border-[#C8E6A0] bg-[#C8E6A0] text-[#141414]'
+                                : isLight
+                                  ? 'border-gray-300'
+                                  : 'border-white/30'
+                            }`}
+                          >
+                            {selected ? <Check size={12} strokeWidth={3} /> : null}
+                          </span>
+                          <span>
+                            <span className="block text-sm font-medium">{t(`businessProfile.serviceArea.${area}`)}</span>
+                            <span className={`mt-0.5 block text-xs ${ac.mutedText}`}>
+                              {t(`businessProfile.serviceArea.${area}Hint`)}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 {form.serviceArea === 'city_radius' && (
                   <div>
                     <label className={labelCls}>{t('businessProfile.fields.radiusKm')}</label>
-                    <input type="number" className={inputCls} value={form.serviceRadiusKm} onChange={(e) => patch({ serviceRadiusKm: e.target.value })} />
+                    <div className="mb-2 flex gap-2">
+                      {['10', '25', '50', '100'].map((km) => (
+                        <button
+                          type="button"
+                          key={km}
+                          onClick={() => patch({ serviceRadiusKm: km })}
+                          className={`flex-1 rounded-xl border py-2 text-sm font-medium touch-manipulation ${
+                            form.serviceRadiusKm === km
+                              ? isLight
+                                ? 'border-[#3F5331] bg-[#3F5331] text-white'
+                                : 'border-[#C8E6A0] bg-[#C8E6A0] text-[#141414]'
+                              : isLight
+                                ? 'border-gray-200'
+                                : 'border-white/15'
+                          }`}
+                        >
+                          {km}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      className={inputCls}
+                      value={form.serviceRadiusKm}
+                      onChange={(e) => patch({ serviceRadiusKm: e.target.value })}
+                    />
                   </div>
                 )}
               </div>
@@ -895,8 +1090,7 @@ export default function BusinessProfileFlow({
                     emptyLabel={t('businessProfile.fields.uploadCover')}
                     changeLabel={t('businessProfile.fields.changePhoto')}
                     emptyIcon={<ImageIcon size={22} className="opacity-60" />}
-                    heightClass="h-32"
-                    fit="cover"
+                    variant="cover"
                     isLight={isLight}
                   />
                 </div>
@@ -921,19 +1115,35 @@ export default function BusinessProfileFlow({
                 ) : (
                   userListings.map((listing) => {
                   const checked = form.selectedListingIds.includes(listing.id);
+                  const thumb = listing.images?.[0] || listing.image || '';
                   return (
                     <label
                       key={listing.id}
-                      className={`flex min-h-[3.25rem] cursor-pointer touch-manipulation items-center gap-3 rounded-xl border p-3 ${
+                      className={`flex min-h-[3.75rem] cursor-pointer touch-manipulation items-center gap-3 rounded-2xl border p-2.5 ${
                         checked
                           ? isLight
-                            ? 'border-[#3F5331]'
-                            : 'border-[#C8E6A0]/50'
+                            ? 'border-[#3F5331] bg-[#3F5331]/5'
+                            : 'border-[#C8E6A0]/50 bg-white/5'
                           : isLight
                             ? 'border-gray-200'
                             : 'border-white/15'
                       }`}
                     >
+                      <div
+                        className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-xl ${
+                          isLight ? 'bg-gray-100' : 'bg-white/10'
+                        }`}
+                      >
+                        {thumb ? (
+                          <img
+                            src={getResolvedImageUrl(thumb)}
+                            alt=""
+                            className="h-full w-full object-contain"
+                          />
+                        ) : (
+                          <ImageIcon size={18} className={`m-auto mt-4 opacity-40`} />
+                        )}
+                      </div>
                       <input
                         type="checkbox"
                         checked={checked}
@@ -958,9 +1168,9 @@ export default function BusinessProfileFlow({
               {renderStepHeader(t('businessProfile.preview.title'), renderBusinessIcon())}
               <p className={`text-sm mb-5 -mt-2 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.preview.subtitle')}</p>
               <div className={`overflow-hidden rounded-2xl border ${isLight ? 'border-gray-200' : 'border-white/15'}`}>
-                <div className="relative h-32 bg-[#3F5331]/30">
+                <div className="relative h-36 overflow-hidden bg-[#3F5331]/20">
                   {form.coverPreview ? (
-                    <img src={previewSrc(form.coverPreview)} alt="" className="h-full w-full object-cover" />
+                    <img src={previewSrc(form.coverPreview)} alt="" className="h-full w-full object-contain" />
                   ) : (
                     <div className={`h-full w-full ${isLight ? 'bg-[#3F5331]/15' : 'bg-[#3F5331]/25'}`} />
                   )}
@@ -970,7 +1180,7 @@ export default function BusinessProfileFlow({
                     }`}
                   >
                     {form.logoPreview ? (
-                      <img src={previewSrc(form.logoPreview)} alt="" className="h-full w-full object-contain bg-white/5 p-1" />
+                      <img src={previewSrc(form.logoPreview)} alt="" className="h-full w-full object-contain p-1" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xl font-bold bg-[#3F5331]/30 text-[#C8E6A0]">
                         {form.businessName.charAt(0).toUpperCase() || '?'}

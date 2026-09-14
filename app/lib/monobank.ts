@@ -164,25 +164,28 @@ export async function createMonobankInvoice(params: CreateInvoiceParams): Promis
     throw new Error('Invalid response from Monobank API');
   }
 
-  // Зберігаємо платіж в базу даних (для всіх типів)
   console.log('[Monobank] Saving payment record to database');
-  const createTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
   const { executeWithRetry } = await import('@/lib/prisma');
 
-  await executeWithRetry(() =>
-    prisma.$executeRawUnsafe(
-      `INSERT INTO Payment (userId, invoiceId, amount, amountEur, currency, status, pageUrl, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, 'created', ?, ?, ?)`,
-      userId,
-      invoiceId,
-      amountInCents,
-      amount,
-      'EUR',
-      pageUrl,
-      createTime,
-      createTime
-    )
-  );
+  await executeWithRetry(async () => {
+    try {
+      await prisma.payment.create({
+        data: {
+          userId,
+          invoiceId,
+          amount: amountInCents,
+          amountEur: amount,
+          currency: 'EUR',
+          status: 'created',
+          pageUrl,
+        },
+      });
+    } catch (error: unknown) {
+      const code = typeof error === 'object' && error && 'code' in error ? (error as { code?: string }).code : undefined;
+      if (code === 'P2002') return;
+      throw error;
+    }
+  });
 
   console.log('[Monobank] Returning success response');
 

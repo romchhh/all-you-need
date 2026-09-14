@@ -103,8 +103,12 @@ export async function PUT(request: NextRequest) {
       const json = await request.json();
       telegramIdRaw = String(json.telegramId || '');
       body = json;
-      logoPath = json.logo ?? undefined;
-      coverPath = json.coverImage ?? undefined;
+      logoPath =
+        typeof json.logo === 'string' && json.logo.trim() ? json.logo.trim() : undefined;
+      coverPath =
+        typeof json.coverImage === 'string' && json.coverImage.trim()
+          ? json.coverImage.trim()
+          : undefined;
     }
 
     if (!telegramIdRaw) {
@@ -173,8 +177,8 @@ export async function PUT(request: NextRequest) {
         instagram: body.instagram ? String(body.instagram) : null,
         website: body.website ? String(body.website) : null,
         workingHours: body.workingHours ? String(body.workingHours) : null,
-        logo: logoPath ?? null,
-        coverImage: coverPath ?? null,
+        logo: logoPath,
+        coverImage: coverPath,
         plan: plan as 'business' | 'business_pro' | null | undefined,
         listingIds,
       },

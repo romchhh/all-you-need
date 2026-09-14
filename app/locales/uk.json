@@ -1214,7 +1214,9 @@
       "description": "Опис",
       "city": "Місто",
       "selectCity": "Оберіть місто",
+      "searchCity": "Пошук міста...",
       "address": "Адреса",
+      "addressPlaceholder": "Вулиця, будинок (необовʼязково)",
       "serviceArea": "Зона обслуговування",
       "radiusKm": "Радіус (км)",
       "telegram": "Telegram",
@@ -1228,8 +1230,11 @@
     },
     "serviceArea": {
       "city_only": "Лише по місту",
+      "city_onlyHint": "Клієнти з вашого міста",
       "city_radius": "Місто + радіус",
-      "all_germany": "По всій Німеччині"
+      "city_radiusHint": "Місто і населені пункти поруч",
+      "all_germany": "По всій Німеччині",
+      "all_germanyHint": "Приймаєте замовлення з усієї країни"
     },
     "suspended": {
       "title": "Business-профіль приостановлено",

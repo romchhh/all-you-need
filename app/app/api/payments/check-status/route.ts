@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     if (payments[0]) {
       const payment = payments[0];
-      const updateTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      const updateTime = new Date();
       const status = statusData.status || statusData.invoiceStatus;
 
       // Оновлюємо статус платежу

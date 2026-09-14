@@ -1,6 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+type PaymentRow = { id: number; userId: number; status: string; amountEur: number };
+
+function parseReferenceUserId(reference: unknown): number | null {
+  if (typeof reference !== 'string') return null;
+  const match = reference.match(/^(?:balance|promo|package|business)-(\d+)-/);
+  if (!match) return null;
+  const userId = Number(match[1]);
+  return Number.isFinite(userId) ? userId : null;
+}
+
+async function findPaymentByInvoiceId(invoiceId: string, attempts = 4): Promise<PaymentRow | null> {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const payments = (await prisma.$queryRawUnsafe(
+      `SELECT id, userId, status, amountEur FROM Payment WHERE invoiceId = ?`,
+      invoiceId
+    )) as PaymentRow[];
+    if (payments[0]) return payments[0];
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 120 * (attempt + 1)));
+    }
+  }
+  return null;
+}
+
+async function ensurePaymentFromWebhook(webhookData: {
+  invoiceId: string;
+  amount?: number;
+  reference?: string;
+  pageUrl?: string;
+}): Promise<PaymentRow | null> {
+  const existing = await findPaymentByInvoiceId(webhookData.invoiceId);
+  if (existing) return existing;
+
+  const userId = parseReferenceUserId(webhookData.reference);
+  if (!userId || !webhookData.amount || webhookData.amount <= 0) return null;
+
+  const users = (await prisma.$queryRawUnsafe(
+    `SELECT id FROM User WHERE id = ?`,
+    userId
+  )) as Array<{ id: number }>;
+  if (!users[0]) return null;
+
+  const amountEur = webhookData.amount / 100;
+  try {
+    const created = await prisma.payment.create({
+      data: {
+        userId,
+        invoiceId: webhookData.invoiceId,
+        amount: webhookData.amount,
+        amountEur,
+        currency: 'EUR',
+        status: 'created',
+        pageUrl: webhookData.pageUrl || null,
+        webhookData: JSON.stringify(webhookData),
+      },
+    });
+    return {
+      id: created.id,
+      userId: created.userId,
+      status: created.status,
+      amountEur: created.amountEur,
+    };
+  } catch (error: unknown) {
+    const code = typeof error === 'object' && error && 'code' in error ? (error as { code?: string }).code : undefined;
+    if (code === 'P2002') {
+      return findPaymentByInvoiceId(webhookData.invoiceId);
+    }
+    throw error;
+  }
+}
+
 /**
  * Webhook для обробки статусів платежів від Monobank
  * POST /api/payments/webhook
@@ -31,19 +102,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Знаходимо платіж в базі даних
-    const payments = await prisma.$queryRawUnsafe(
-      `SELECT id, userId, status, amountEur FROM Payment WHERE invoiceId = ?`,
-      invoiceId
-    ) as Array<{ id: number; userId: number; status: string; amountEur: number }>;
+    // Знаходимо платіж в базі даних (інвойс у Monobank з'являється раніше, ніж INSERT у нас)
+    const payment = await ensurePaymentFromWebhook(webhookData);
 
-    if (!payments[0]) {
+    if (!payment) {
+      const statusForMissing = String(webhookData.status || '');
+      if (statusForMissing === 'created' || statusForMissing === 'processing') {
+        console.warn(`Payment not ready yet for invoiceId: ${invoiceId} (${statusForMissing})`);
+        return NextResponse.json({ success: true, pending: true });
+      }
       console.warn(`Payment not found for invoiceId: ${invoiceId}`);
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
 
-    const payment = payments[0];
-    const updateTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const updateTime = new Date();
 
     // Оновлюємо статус платежу
     await prisma.$executeRawUnsafe(
@@ -86,7 +158,7 @@ export async function POST(request: NextRequest) {
         const isRejected = currentStatus === 'rejected';
         
         // Оновлюємо оголошення
-        const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const nowStr = new Date();
         const endsAt = new Date();
         endsAt.setDate(endsAt.getDate() + (promotion.promotionType === 'vip' ? 7 : promotion.promotionType === 'top_category' ? 3 : 1));
         
@@ -278,7 +350,7 @@ export async function POST(request: NextRequest) {
     // Якщо платіж успішний (status === 'success') і це НЕ оплата реклами/пакету, поповнюємо баланс
     if (status === 'success' && payment.status !== 'success' && !isPromotionOrPackagePayment) {
       // Використовуємо суму в EUR (збережену в amountEur)
-      const amountInEur = payment.amountEur;
+      const amountInEur = Number(payment.amountEur);
 
       // Оновлюємо баланс користувача (атомарно)
       await prisma.$executeRawUnsafe(

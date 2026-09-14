@@ -1212,7 +1212,9 @@
       "description": "Описание",
       "city": "Город",
       "selectCity": "Выберите город",
+      "searchCity": "Поиск города...",
       "address": "Адрес",
+      "addressPlaceholder": "Улица, дом (необязательно)",
       "serviceArea": "Зона обслуживания",
       "radiusKm": "Радиус (км)",
       "telegram": "Telegram",
@@ -1226,8 +1228,11 @@
     },
     "serviceArea": {
       "city_only": "Только по городу",
+      "city_onlyHint": "Клиенты из вашего города",
       "city_radius": "Город + радиус",
-      "all_germany": "По всей Германии"
+      "city_radiusHint": "Город и населённые пункты рядом",
+      "all_germany": "По всей Германии",
+      "all_germanyHint": "Принимаете заказы со всей страны"
     },
     "suspended": {
       "title": "Business-профиль приостановлен",

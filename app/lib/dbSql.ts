@@ -70,6 +70,137 @@ export function usersLegacyTelegramIdWhere(param = '?'): string {
   return `user_id = ${param}`;
 }
 
+/** SQLite stores booleans as 0/1; PostgreSQL uses true/false. */
+export function normalizePgBoolean(value: unknown): boolean {
+  return value === true || value === 1 || value === '1' || value === 'true';
+}
+
+const PG_TIMESTAMP_COLUMNS = [
+  'updatedAt',
+  'createdAt',
+  'publishedAt',
+  'moderatedAt',
+  'viewedAt',
+  'expiresAt',
+  'paidAt',
+  'startsAt',
+  'endsAt',
+  'completedAt',
+  'lastActiveAt',
+  'priceChangedAt',
+  'subscriptionEndsAt',
+  'processedAt',
+  'rewardPaidAt',
+  'promotionEnds',
+];
+
+const PG_TIMESTAMP_COLUMN_SET = new Set(PG_TIMESTAMP_COLUMNS);
+
+function findMatchingParen(sql: string, openIndex: number): number {
+  let depth = 0;
+  let inQuote = false;
+  for (let i = openIndex; i < sql.length; i++) {
+    const ch = sql[i];
+    if (ch === "'" && sql[i - 1] !== '\\') inQuote = !inQuote;
+    if (inQuote) continue;
+    if (ch === '(') depth += 1;
+    else if (ch === ')') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+function splitSqlList(list: string): string[] {
+  const out: string[] = [];
+  let buf = '';
+  let depth = 0;
+  let inQuote = false;
+  for (let i = 0; i < list.length; i++) {
+    const ch = list[i];
+    if (ch === "'" && list[i - 1] !== '\\') inQuote = !inQuote;
+    if (!inQuote) {
+      if (ch === '(') depth += 1;
+      else if (ch === ')') depth -= 1;
+      else if (ch === ',' && depth === 0) {
+        out.push(buf);
+        buf = '';
+        continue;
+      }
+    }
+    buf += ch;
+  }
+  if (buf.length > 0 || out.length > 0) out.push(buf);
+  return out;
+}
+
+function castPgTimestampAssignments(sql: string): string {
+  let s = sql;
+  for (const col of PG_TIMESTAMP_COLUMNS) {
+    s = s.replace(new RegExp(`"${col}"\\s*=\\s*\\?(?!::)`, 'gi'), `"${col}" = ?::timestamp`);
+  }
+  return s;
+}
+
+/** Cast `?` placeholders that correspond to timestamp columns in INSERT ... VALUES. */
+function castPgTimestampInserts(sql: string): string {
+  const re = /INSERT\s+INTO\s+(?:"[A-Za-z_]+"|[A-Za-z_]+)\s*\(/gi;
+  let result = '';
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = re.exec(sql))) {
+    const colsOpen = re.lastIndex - 1;
+    const colsClose = findMatchingParen(sql, colsOpen);
+    if (colsClose < 0) continue;
+
+    const afterCols = sql.slice(colsClose + 1);
+    const valuesKw = afterCols.match(/^\s*VALUES\s*\(/i);
+    if (!valuesKw) continue;
+
+    const valuesOpen = colsClose + 1 + valuesKw[0].lastIndexOf('(');
+    const valuesClose = findMatchingParen(sql, valuesOpen);
+    if (valuesClose < 0) continue;
+
+    const cols = splitSqlList(sql.slice(colsOpen + 1, colsClose)).map((c) =>
+      c.trim().replace(/"/g, '')
+    );
+    const values = splitSqlList(sql.slice(valuesOpen + 1, valuesClose));
+    if (cols.length !== values.length) {
+      re.lastIndex = valuesClose + 1;
+      continue;
+    }
+
+    const nextValues = values.map((value, i) => {
+      const trimmed = value.trim();
+      if (PG_TIMESTAMP_COLUMN_SET.has(cols[i]) && trimmed === '?') {
+        return `${value.replace('?', '?::timestamp')}`;
+      }
+      return value;
+    });
+
+    result += sql.slice(lastIndex, valuesOpen + 1) + nextValues.join(',') + ')';
+    lastIndex = valuesClose + 1;
+    re.lastIndex = valuesClose + 1;
+  }
+
+  return result + sql.slice(lastIndex);
+}
+
+function coercePgDatetimeParam(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    const parsed = new Date(`${value.replace(' ', 'T')}Z`);
+    return Number.isNaN(parsed.getTime()) ? value : parsed;
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?$/.test(value)) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed;
+  }
+  return value;
+}
+
 export function tableInfoQuery(table: string): string {
   if (isPostgres()) {
     return `
@@ -343,6 +474,8 @@ export function adaptSql(sql: string): string {
   );
 
   s = quotePgIdentifiers(s);
+  s = castPgTimestampAssignments(s);
+  s = castPgTimestampInserts(s);
   s = fixPgAggregateAliases(s);
 
   // CREATE INDEX ON "Listing"("publishedAt", "createdAt" DESC)
@@ -366,7 +499,7 @@ export function toPgParams(sql: string, params: unknown[]): { sql: string; param
   if (!isPostgres()) return { sql: adapted, params };
   let i = 0;
   const pgSql = adapted.replace(/\?/g, () => `$${++i}`);
-  return { sql: pgSql, params };
+  return { sql: pgSql, params: params.map(coercePgDatetimeParam) };
 }
 
 export async function rawQuery<T>(

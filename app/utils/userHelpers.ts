@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { normalizePgBoolean } from '@/lib/dbSql';
 import { executeWithRetry, ensureUserApiRawColumns } from '@/lib/prisma';
 
 export interface UserBalance {
@@ -223,6 +224,6 @@ export async function getUserIdAndActive(telegramId: number): Promise<{ userId: 
   if (rows.length === 0) return null;
   return {
     userId: rows[0].id,
-    isActive: rows[0].isActive === 1,
+    isActive: normalizePgBoolean(rows[0].isActive),
   };
 }

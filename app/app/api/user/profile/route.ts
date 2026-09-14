@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizePgBoolean } from '@/lib/dbSql';
 import { executeWithRetry, ensureUserSessionTable, updateUserActivity } from '@/lib/prisma';
 import {
   getUserLanguageForTelegramId,
@@ -174,7 +175,7 @@ export async function POST(request: NextRequest) {
       `
     );
     user = fullUsers[0];
-    if (user && !user.isActive) {
+    if (user && !normalizePgBoolean(user.isActive)) {
       return NextResponse.json(
         { error: 'blocked' },
         { status: 403 }
@@ -216,8 +217,7 @@ export async function POST(request: NextRequest) {
       const updateFirstName = firstName !== undefined ? firstName : user.firstName;
       const updateLastName = lastName !== undefined ? lastName : user.lastName;
       const updateAvatar = avatarPath || user.avatar;
-      const updateTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      
+
       await executeWithRetry(() =>
         prisma.$executeRaw`
           UPDATE User 
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
             firstName = ${updateFirstName},
             lastName = ${updateLastName},
             avatar = ${updateAvatar},
-            updatedAt = ${updateTime}
+            updatedAt = ${new Date()}
           WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
         `
       );

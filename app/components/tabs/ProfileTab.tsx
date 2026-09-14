@@ -1551,6 +1551,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         onClose={() => {
           setShowBusinessFlow(false);
           setBusinessRenewMode(false);
+          fetchBusinessProfile();
         }}
         onSuccess={() => {
           fetchBusinessProfile();

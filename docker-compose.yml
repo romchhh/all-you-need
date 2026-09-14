@@ -66,6 +66,7 @@ services:
       - ./database:/app/database
       - ./app/public/listings:/app/app/public/listings
       - ./app/public/avatars:/app/app/public/avatars
+      - ./app/public/business:/app/app/public/business
     depends_on:
       postgres:
         condition: service_healthy
