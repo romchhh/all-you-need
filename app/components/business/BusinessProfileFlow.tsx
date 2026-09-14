@@ -43,6 +43,7 @@ interface BusinessProfileFlowProps {
   defaultTelegram?: string;
   defaultPhone?: string;
   renewMode?: boolean;
+  editMode?: boolean;
   existingProfile?: {
     businessName?: string;
     category?: string;
@@ -232,6 +233,7 @@ export default function BusinessProfileFlow({
   defaultTelegram = '',
   defaultPhone = '',
   renewMode = false,
+  editMode = false,
   existingProfile = null,
 }: BusinessProfileFlowProps) {
   const { t } = useLanguage();
@@ -261,19 +263,19 @@ export default function BusinessProfileFlow({
 
   const saveDraftToLocal = useCallback(
     (currentStep: WizardStep, currentForm: FormState) => {
-      if (renewMode || !paymentTelegramId) return;
+      if (renewMode || editMode || !paymentTelegramId) return;
       saveBusinessWizardState(paymentTelegramId, {
         step: currentStep,
         form: formToStored(currentForm),
         savedAt: Date.now(),
       });
     },
-    [paymentTelegramId, renewMode]
+    [paymentTelegramId, renewMode, editMode]
   );
 
   const saveDraftToServer = useCallback(
     async (currentForm: FormState): Promise<{ logo?: string; coverImage?: string } | null> => {
-      if (renewMode || !paymentTelegramId) return null;
+      if (renewMode || editMode || !paymentTelegramId) return null;
 
       const hasAnyData = [
         currentForm.businessName,
@@ -358,7 +360,7 @@ export default function BusinessProfileFlow({
         return null;
       }
     },
-    [paymentTelegramId, renewMode]
+    [paymentTelegramId, renewMode, editMode]
   );
 
   const applySavedMedia = useCallback(
@@ -388,7 +390,7 @@ export default function BusinessProfileFlow({
   );
 
   const handleClose = useCallback(() => {
-    if (!renewMode) {
+    if (!renewMode && !editMode) {
       saveDraftToLocal(step, form);
       void saveDraftToServer(form).then((saved) => {
         if (!saved) return;
@@ -404,7 +406,7 @@ export default function BusinessProfileFlow({
       });
     }
     onClose();
-  }, [form, onClose, renewMode, saveDraftToLocal, saveDraftToServer, step]);
+  }, [form, onClose, renewMode, editMode, saveDraftToLocal, saveDraftToServer, step]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -453,7 +455,10 @@ export default function BusinessProfileFlow({
       };
     };
 
-    if (renewMode && existingProfile) {
+    if (editMode && existingProfile) {
+      setForm(prefillFromExisting(existingProfile));
+      setStep('step1');
+    } else if (renewMode && existingProfile) {
       setForm(prefillFromExisting(existingProfile));
       setStep('tariff');
     } else {
@@ -482,17 +487,17 @@ export default function BusinessProfileFlow({
         setForm(initialForm({ telegram: defaultTelegram, phone: defaultPhone }));
       }
     }
-  }, [isOpen, defaultTelegram, defaultPhone, renewMode, existingProfile, paymentTelegramId]);
+  }, [isOpen, defaultTelegram, defaultPhone, renewMode, editMode, existingProfile, paymentTelegramId]);
 
   useEffect(() => {
-    if (!isOpen || renewMode || uploadingRef.current) return;
+    if (!isOpen || renewMode || editMode || uploadingRef.current) return;
     const timer = setTimeout(() => {
       if (uploadingRef.current) return;
       saveDraftToLocal(step, form);
       void saveDraftToServer(form).then((saved) => applySavedMedia(saved, step, form));
     }, 800);
     return () => clearTimeout(timer);
-  }, [isOpen, renewMode, step, form, saveDraftToLocal, saveDraftToServer, applySavedMedia]);
+  }, [isOpen, renewMode, editMode, step, form, saveDraftToLocal, saveDraftToServer, applySavedMedia]);
 
   useEffect(() => {
     bodyScrollRef.current?.scrollTo({ top: 0 });
@@ -638,6 +643,55 @@ export default function BusinessProfileFlow({
     };
   }, [form, paymentTelegramId]);
 
+  const handleEditSave = async () => {
+    const requiredSteps: WizardStep[] = ['step1', 'step2', 'step3'];
+    for (const s of requiredSteps) {
+      if (!validateStep(s)) {
+        setStep(s);
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append('telegramId', paymentTelegramId);
+      fd.append('businessName', form.businessName);
+      fd.append('category', form.category);
+      fd.append('subcategory', form.subcategory);
+      fd.append('description', form.description);
+      fd.append('city', form.city);
+      fd.append('address', form.address);
+      fd.append('serviceArea', form.serviceArea);
+      if (form.serviceRadiusKm) fd.append('serviceRadiusKm', form.serviceRadiusKm);
+      fd.append('telegram', form.telegram);
+      fd.append('phone', form.phone);
+      fd.append('instagram', form.instagram);
+      fd.append('website', form.website);
+      fd.append('workingHours', form.workingHours);
+      fd.append('listingIds', JSON.stringify(form.selectedListingIds));
+      if (form.logoFile) fd.append('logo', form.logoFile);
+      if (form.coverFile) fd.append('coverImage', form.coverFile);
+
+      const res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || t('common.error'), 'error');
+        return;
+      }
+
+      showToast(t('businessProfile.updated'), 'success');
+      tg?.HapticFeedback.notificationOccurred('success');
+      onSuccess();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      showToast(t('common.error'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePayment = async (paymentMethod: 'balance' | 'direct') => {
     if (!form.selectedPlan) return;
     setLoading(true);
@@ -776,13 +830,19 @@ export default function BusinessProfileFlow({
   );
 
   const continueLabel =
-    step === 'step5'
+    editMode && step === 'preview'
+      ? t('common.save')
+      : step === 'step5'
       ? t('businessProfile.preview.continue')
       : step === 'preview'
         ? t('businessProfile.preview.toTariff')
         : `${t('businessProfile.continue')} →`;
 
   const handleContinue = () => {
+    if (editMode && step === 'preview') {
+      void handleEditSave();
+      return;
+    }
     if (step === 'tariff') {
       if (!validateStep('tariff')) return;
       setStep('payment');
@@ -817,7 +877,7 @@ export default function BusinessProfileFlow({
             </button>
             <span className="flex items-center gap-1.5 font-semibold text-sm">
               <BusinessBrandIcon size={20} className={accentIcon} />
-              <span>{renewMode ? t('businessProfile.suspended.renewTitle') : 'TradeGround Business'}</span>
+              <span>{editMode ? t('businessProfile.editTitle') : renewMode ? t('businessProfile.suspended.renewTitle') : 'TradeGround Business'}</span>
               <BusinessBetaBadge />
             </span>
             <div className="w-10" />
@@ -1248,7 +1308,11 @@ export default function BusinessProfileFlow({
               className={`shrink-0 border-t px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] ${headerBorder} ${shell}`}
             >
               <button type="button" onClick={handleContinue} disabled={loading} className={primaryBtnClass}>
-                {step === 'tariff' ? t('businessProfile.continue') : continueLabel}
+                {loading && editMode && step === 'preview'
+                  ? t('common.saving')
+                  : step === 'tariff'
+                    ? t('businessProfile.continue')
+                    : continueLabel}
               </button>
             </div>
           )}

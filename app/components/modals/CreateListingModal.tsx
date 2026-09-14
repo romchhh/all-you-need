@@ -1,4 +1,4 @@
-import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Sparkles, Wrench, Info } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Sparkles, Wrench, Info, User, Briefcase } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category } from '@/types';
 import { useState, useRef, useEffect, useMemo, type CSSProperties } from 'react';
@@ -24,6 +24,7 @@ import {
 } from '@/features/listing-form/lib/constants';
 import { useListingImageUpload } from '@/features/listing-form/hooks/useListingImageUpload';
 import { ListingFormPhotoGrid } from '@/features/listing-form/components/ListingFormPhotoGrid';
+import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -68,6 +69,8 @@ export const CreateListingModal = ({
   } = imageUpload;
   const categories = getCategories(t);
   const [autoRenew, setAutoRenew] = useState(false);
+  const [profileType, setProfileType] = useState<'personal' | 'business'>('personal');
+  const [hasActiveBusiness, setHasActiveBusiness] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -159,6 +162,43 @@ export const CreateListingModal = ({
   ];
 
   const selectedCondition = conditionOptions.find(opt => opt.value === condition);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setHasActiveBusiness(false);
+      setProfileType('personal');
+      return;
+    }
+
+    const telegramId =
+      tg?.initDataUnsafe?.user?.id?.toString() ||
+      (typeof window !== 'undefined' ? sessionStorage.getItem('telegramId') : null) ||
+      (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('telegramId') : null);
+
+    if (!telegramId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/user/business-profile?telegramId=${telegramId}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const active = Boolean(data.isActive);
+        setHasActiveBusiness(active);
+        if (!active) setProfileType('personal');
+      } catch {
+        if (!cancelled) {
+          setHasActiveBusiness(false);
+          setProfileType('personal');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, tg]);
 
   // Автоматично встановлюємо isFree при виборі категорії "Безкоштовно"
   useEffect(() => {
@@ -542,6 +582,7 @@ export const CreateListingModal = ({
         condition,
         images,
         autoRenew,
+        profileType: hasActiveBusiness && profileType === 'business' ? 'business' : 'personal',
       });
       tg?.HapticFeedback.notificationOccurred('success');
       
@@ -587,6 +628,75 @@ export const CreateListingModal = ({
           <div className="flex items-center justify-center px-4 pb-2 max-lg:pb-3">
             <h2 className={`text-xl font-bold ${ac.pageHeading}`}>{t('createListing.title')}</h2>
           </div>
+          {hasActiveBusiness && (
+            <div
+              className={`rounded-2xl border p-4 sm:p-5 ${
+                isLight
+                  ? 'border-gray-200/90 bg-white/90 shadow-sm ring-1 ring-black/[0.03]'
+                  : 'border-white/12 bg-white/[0.04]'
+              }`}
+            >
+              <div className="mb-3">
+                <h3 className={`text-sm font-semibold sm:text-base ${ac.pageHeading}`}>
+                  {t('createListing.publishAs.title')}
+                </h3>
+                <p className={`mt-1 text-xs leading-relaxed sm:text-sm ${ac.mutedText}`}>
+                  {t('createListing.publishAs.hint')}
+                </p>
+              </div>
+              <div
+                className={`flex gap-1 rounded-xl p-1 ${
+                  isLight ? 'bg-gray-100/90' : 'border border-white/10 bg-black/30'
+                }`}
+                role="tablist"
+                aria-label={t('createListing.publishAs.title')}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={profileType === 'personal'}
+                  className={`flex-1 min-h-[2.75rem] px-2 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 touch-manipulation ${
+                    profileType === 'personal'
+                      ? isLight
+                        ? 'bg-[#3F5331] text-white shadow-sm'
+                        : 'bg-[#C8E6A0] text-[#1a1a1a]'
+                      : isLight
+                        ? 'bg-transparent text-gray-700 hover:bg-gray-200/80'
+                        : 'bg-transparent text-white/80 hover:bg-white/10'
+                  }`}
+                  onClick={() => {
+                    setProfileType('personal');
+                    tg?.HapticFeedback?.impactOccurred('light');
+                  }}
+                >
+                  <User size={14} className="shrink-0" />
+                  <span>{t('createListing.publishAs.personal')}</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={profileType === 'business'}
+                  className={`flex-1 min-h-[2.75rem] px-2 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 touch-manipulation ${
+                    profileType === 'business'
+                      ? isLight
+                        ? 'bg-[#3F5331] text-white shadow-sm'
+                        : 'bg-[#C8E6A0] text-[#1a1a1a]'
+                      : isLight
+                        ? 'bg-transparent text-gray-700 hover:bg-gray-200/80'
+                        : 'bg-transparent text-white/80 hover:bg-white/10'
+                  }`}
+                  onClick={() => {
+                    setProfileType('business');
+                    tg?.HapticFeedback?.impactOccurred('light');
+                  }}
+                >
+                  <Briefcase size={14} className="shrink-0" />
+                  <span>{t('createListing.publishAs.business')}</span>
+                  <BusinessBetaBadge />
+                </button>
+              </div>
+            </div>
+          )}
           {/* Фото */}
           <div>
             <label className={`block text-sm font-medium mb-2 ${ac.pageHeading}`}>

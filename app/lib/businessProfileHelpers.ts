@@ -85,9 +85,8 @@ export async function upsertBusinessProfileDraft(
     instagram: data.instagram?.trim() || (partial ? existing?.instagram ?? null : null),
     website: data.website?.trim() || (partial ? existing?.website ?? null : null),
     workingHours: data.workingHours?.trim() || (partial ? existing?.workingHours ?? null : null),
-    logo: data.logo !== undefined ? data.logo : partial ? (existing?.logo ?? null) : null,
-    coverImage:
-      data.coverImage !== undefined ? data.coverImage : partial ? (existing?.coverImage ?? null) : null,
+    logo: data.logo !== undefined ? data.logo : existing?.logo ?? null,
+    coverImage: data.coverImage !== undefined ? data.coverImage : existing?.coverImage ?? null,
     plan: data.plan !== undefined ? data.plan : existing?.plan ?? null,
     linkedListingIds: listingIdsJson,
     updatedAt: new Date(),
@@ -135,6 +134,39 @@ export async function assignListingsToProfile(
       userId
     );
   }
+}
+
+/** Позначає нове оголошення як business і додає його до вітрини, якщо підписка активна. */
+export async function linkListingToBusinessIfAllowed(
+  userId: number,
+  listingId: number
+): Promise<boolean> {
+  if (!listingId) return false;
+
+  await expireBusinessProfileIfNeeded(userId);
+  const profile = await prisma.businessProfile.findUnique({ where: { userId } });
+  if (!profile || !isBusinessProfileActive(profile)) return false;
+
+  const nowStr = nowSQLite();
+  await prisma.$executeRawUnsafe(
+    `UPDATE Listing SET profileType = 'business', updatedAt = ? WHERE id = ? AND userId = ?`,
+    nowStr,
+    listingId,
+    userId
+  );
+
+  const ids = parseLinkedListingIds(profile.linkedListingIds);
+  if (!ids.includes(listingId)) {
+    await prisma.businessProfile.update({
+      where: { id: profile.id },
+      data: {
+        linkedListingIds: JSON.stringify([...ids, listingId]),
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  return true;
 }
 
 export async function deactivateBusinessProfile(

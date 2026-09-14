@@ -125,6 +125,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [hasBusinessProfile, setHasBusinessProfile] = useState(false);
   const [isBusinessSuspended, setIsBusinessSuspended] = useState(false);
   const [businessRenewMode, setBusinessRenewMode] = useState(false);
+  const [businessEditMode, setBusinessEditMode] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -143,7 +144,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   const avatarLongPress = useLongPress({
     onLongPress: () => {
-      if (profile?.avatar) {
+      const photo =
+        profileViewMode === 'business' && isBusinessActive
+          ? businessProfile?.logo
+          : profile?.avatar;
+      if (photo) {
         setShowAvatarModal(true);
         tg?.HapticFeedback.impactOccurred('medium');
       }
@@ -594,27 +599,56 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     return t('common.user');
   })();
   const displayUsername = profile.username ? `@${profile.username}` : '';
+  const isBusinessView = profileViewMode === 'business' && isBusinessActive;
+  const headerPhoto = isBusinessView ? businessProfile?.logo || null : profile.avatar || null;
+  const headerPhotoUrl = headerPhoto ? getResolvedImageUrl(headerPhoto) : null;
+  const headerCoverUrl =
+    isBusinessView && businessProfile?.coverImage
+      ? getResolvedImageUrl(businessProfile.coverImage)
+      : null;
+  const headerInitial = (
+    isBusinessView && businessProfile?.businessName
+      ? businessProfile.businessName
+      : displayName
+  )
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <>
     <div className="min-h-screen pb-24">
       {/* Профіль хедер */}
-      <div className="px-4 pt-1 pb-4 max-lg:-mt-0.5">
+      <div className="pb-4 max-lg:-mt-0.5">
+        {isBusinessView && (
+          <div className={`relative h-36 overflow-hidden ${headerCoverUrl ? '' : isLight ? 'bg-[#3F5331]/15' : 'bg-[#3F5331]/30'}`}>
+            {headerCoverUrl ? (
+              <img
+                src={headerCoverUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : null}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+          </div>
+        )}
+        <div className={`px-4 ${isBusinessView ? 'relative z-10' : 'pt-1'}`}>
         <div className="flex items-start gap-4">
           {/* Фото профілю */}
           <div 
-            className={`w-16 h-16 rounded-full overflow-hidden flex-shrink-0 relative cursor-pointer select-none border-2 ${
-              isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white'
+            className={`overflow-hidden flex-shrink-0 relative cursor-pointer select-none border-2 ${
+              isBusinessView
+                ? `-mt-8 h-20 w-20 rounded-2xl border-4 shadow-lg ${isLight ? 'bg-white border-white' : 'bg-[#1C1C1C] border-[#0a0a0a]'}`
+                : `w-16 h-16 rounded-full ${isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white'}`
             }`}
             {...avatarLongPress}
           >
-            {profile.avatar ? (
+            {headerPhotoUrl ? (
               <>
                 <div className={`absolute inset-0 animate-pulse ${isLight ? 'bg-gray-200' : 'bg-[#2A2A2A]'}`} />
                 <img 
-                  src={getResolvedImageUrl(profile.avatar)}
+                  src={headerPhotoUrl}
                   alt={displayName}
-                  className="w-full h-full object-cover relative z-10"
+                  className={`w-full h-full relative z-10 ${isBusinessView ? 'object-contain p-1' : 'object-cover'}`}
                   loading="eager"
                   decoding="async"
                   onError={(e) => {
@@ -630,12 +664,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   }}
                 />
                 <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gray-800 text-white text-xl font-bold relative z-10`}>
-                  {displayName.charAt(0).toUpperCase()}
+                  {headerInitial}
                 </div>
               </>
             ) : (
               <div className={`w-full h-full flex items-center justify-center bg-gray-800 text-white text-xl font-bold`}>
-                {displayName.charAt(0).toUpperCase()}
+                {headerInitial}
               </div>
             )}
           </div>
@@ -679,7 +713,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 </button>
                 <button
                   onClick={() => {
-                    setIsEditModalOpen(true);
+                    if (isBusinessView) {
+                      setBusinessRenewMode(false);
+                      setBusinessEditMode(true);
+                      setShowBusinessFlow(true);
+                    } else {
+                      setIsEditModalOpen(true);
+                    }
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
                   className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
@@ -711,6 +751,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       <div className="px-4 pb-2">
@@ -727,6 +768,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         {isBusinessSuspended && (
           <BusinessSuspendedCard
             onRenew={() => {
+              setBusinessEditMode(false);
               setBusinessRenewMode(true);
               setShowBusinessFlow(true);
               tg?.HapticFeedback.impactOccurred('medium');
@@ -737,6 +779,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           <BusinessPromoCard
             variant={hasBusinessProfile ? 'continue' : 'create'}
             onCreate={() => {
+              setBusinessEditMode(false);
               setBusinessRenewMode(false);
               setShowBusinessFlow(true);
               tg?.HapticFeedback.impactOccurred('medium');
@@ -1202,12 +1245,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       </div>
 
       {/* Модальне вікно перегляду аватара */}
-      {showAvatarModal && profile?.avatar && getResolvedImageUrl(profile.avatar) && (
+      {showAvatarModal && headerPhotoUrl && (
         <ImageViewModal
           isOpen={showAvatarModal}
-          images={[getResolvedImageUrl(profile.avatar)!]}
+          images={[headerPhotoUrl]}
           initialIndex={0}
-          alt={t('profile.avatar')}
+          alt={isBusinessView ? (businessProfile?.businessName || t('profile.avatar')) : t('profile.avatar')}
           onClose={() => setShowAvatarModal(false)}
         />
       )}
@@ -1551,6 +1594,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         onClose={() => {
           setShowBusinessFlow(false);
           setBusinessRenewMode(false);
+          setBusinessEditMode(false);
           fetchBusinessProfile();
         }}
         onSuccess={() => {
@@ -1558,12 +1602,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           fetchListingsWithFilters(0, true);
           refetch();
           setBusinessRenewMode(false);
+          setBusinessEditMode(false);
         }}
         tg={tg}
         telegramId={String(profile?.telegramId || '')}
         defaultTelegram={profile?.username ? `@${profile.username}` : ''}
         defaultPhone={profile?.phone || ''}
         renewMode={businessRenewMode}
+        editMode={businessEditMode}
         existingProfile={businessProfile}
       />
 

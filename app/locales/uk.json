@@ -481,6 +481,12 @@
     "fields": {
       "selectCondition": "Оберіть стан",
       "free": "Безкоштовно"
+    },
+    "publishAs": {
+      "title": "Опублікувати як",
+      "hint": "У Business-профілі або як звичайний користувач",
+      "personal": "Особистий",
+      "business": "Business"
     }
   },
   "editListing": {
@@ -1154,6 +1160,8 @@
     "stepOf": "Крок {current} з {total}",
     "continue": "Продовжити",
     "success": "Business-профіль успішно активовано!",
+    "editTitle": "Редагувати Business",
+    "updated": "Business-профіль оновлено",
     "validation": {
       "required": "Заповніть усі обов'язкові поля",
       "businessName": "Вкажіть назву бізнесу",

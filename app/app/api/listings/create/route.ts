@@ -10,6 +10,7 @@ import {
 import { getUserIdAndActive } from '@/utils/userHelpers';
 import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
+import { linkListingToBusinessIfAllowed } from '@/lib/businessProfileHelpers';
 
 // Збільшуємо максимальний час виконання до 5 хвилин для обробки великих файлів
 export const maxDuration = 300; // 5 хвилин
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
     const location = formData.get('location') as string;
     const condition = formData.get('condition') as string;
     const autoRenew = formData.get('autoRenew') === 'true';
+    const requestedProfileType = formData.get('profileType') === 'business' ? 'business' : 'personal';
     const allImages = formData.getAll('images') as File[];
     const MAX_PHOTOS = 10;
 
@@ -191,6 +193,11 @@ export async function POST(request: NextRequest) {
         savedImageUrls
       );
       console.log('[Create Listing API] Listing created with ID:', listingId);
+
+      if (requestedProfileType === 'business' && listingId) {
+        const linked = await linkListingToBusinessIfAllowed(user.id, listingId);
+        console.log('[Create Listing API] Business profileType:', linked ? 'linked' : 'skipped (no active business)');
+      }
     } catch (createError) {
       console.error('[Create Listing API] Failed to create listing:', createError);
       

@@ -479,6 +479,12 @@
     "fields": {
       "selectCondition": "Выберите состояние",
       "free": "Free"
+    },
+    "publishAs": {
+      "title": "Опубликовать как",
+      "hint": "В Business-профиле или как обычный пользователь",
+      "personal": "Личный",
+      "business": "Business"
     }
   },
   "editListing": {
@@ -1152,6 +1158,8 @@
     "stepOf": "Шаг {current} из {total}",
     "continue": "Продолжить",
     "success": "Business-профиль успешно активирован!",
+    "editTitle": "Редактировать Business",
+    "updated": "Business-профиль обновлён",
     "validation": {
       "required": "Заполните все обязательные поля",
       "businessName": "Укажите название бизнеса",

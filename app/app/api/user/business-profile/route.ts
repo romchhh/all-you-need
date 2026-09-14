@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
-import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive } from '@/lib/businessProfileHelpers';
+import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile } from '@/lib/businessProfileHelpers';
 
 async function saveUploadedFile(file: File, prefix: string): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
@@ -186,6 +186,10 @@ export async function PUT(request: NextRequest) {
     );
 
     const profile = await prisma.businessProfile.findUnique({ where: { id: profileId } });
+
+    if (profile && listingIds !== undefined && isBusinessProfileActive(profile)) {
+      await assignListingsToProfile(user.id, listingIds);
+    }
 
     return NextResponse.json({ success: true, profile });
   } catch (error) {
