@@ -216,7 +216,7 @@ def bot_user_insert_sql() -> str:
     if is_postgres():
         return """
 INSERT INTO "User" ("telegramId", username, "firstName", "isActive", "agreementAccepted", "createdAt", "updatedAt")
-VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+VALUES (?, ?, ?, ?::boolean, ?::boolean, NOW(), NOW())
 """
     return """
 INSERT INTO User (telegramId, username, firstName, isActive, agreementAccepted, createdAt, updatedAt)

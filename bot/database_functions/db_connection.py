@@ -54,6 +54,21 @@ def is_postgres() -> bool:
     return url.startswith("postgres://") or url.startswith("postgresql://")
 
 
+def bool_param(value: bool | int | None) -> bool | int:
+    """Значення для boolean-колонок: PostgreSQL — bool, SQLite — 0/1."""
+    accepted = bool(value)
+    if is_postgres():
+        return accepted
+    return 1 if accepted else 0
+
+
+def bool_assign_placeholder() -> str:
+    """Placeholder для boolean-колонки з урахуванням діалекту БД."""
+    if is_postgres():
+        return "?::boolean"
+    return "?"
+
+
 def is_sqlite_locked_error(err: BaseException) -> bool:
     if is_postgres():
         psycopg2, _ = _load_psycopg2()

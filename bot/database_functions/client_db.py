@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from database_functions.db_connection import get_connection, is_postgres
+from database_functions.db_connection import get_connection, is_postgres, bool_param, bool_assign_placeholder
 
 conn = get_connection()
 cursor = conn.cursor()
@@ -62,8 +62,8 @@ def ensure_bot_user_record(
                 0.0,
                 5.0,
                 0,
-                True,
-                False,
+                bool_param(True),
+                bool_param(False),
                 current_date_str,
                 current_date_str,
             ),
@@ -115,8 +115,8 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
                 0.0,  # balance
                 5.0,  # rating
                 0,    # reviewsCount
-                True,    # isActive
-                False,
+                bool_param(True),    # isActive
+                bool_param(False),
                 current_date_str,
                 current_date_str
             ))
@@ -332,12 +332,13 @@ def set_user_agreement_status(user_id: str, accepted: bool) -> bool:
             print(f"User {user_id} not found when setting agreement status")
             return False
 
-        accepted_val = True if accepted else False
+        accepted_val = bool_param(accepted)
         current_date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        assign = bool_assign_placeholder()
         cursor.execute(
-            '''
+            f'''
             UPDATE User
-            SET agreementAccepted = ?, updatedAt = ?
+            SET agreementAccepted = {assign}, updatedAt = ?
             WHERE telegramId = ?
             ''',
             (accepted_val, current_date_str, uid),
