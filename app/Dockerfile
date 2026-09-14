@@ -68,7 +68,7 @@ COPY --from=builder /app/app/next.config.ts ./
 COPY --from=builder /app/app/lib/media/listingMediaConstants.ts ./lib/media/listingMediaConstants.ts
 COPY docker/app-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
- && mkdir -p /app/database /app/app/public/listings/originals /app/app/public/avatars \
+ && mkdir -p /app/database /app/app/public/listings/originals /app/app/public/avatars /app/app/public/business \
  && npx prisma generate --schema=/app/app/prisma/schema.prisma
 
 EXPOSE 3000

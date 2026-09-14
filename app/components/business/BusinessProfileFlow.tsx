@@ -23,7 +23,7 @@ import { getCategories } from '@/constants/categories';
 import { majorGermanCities } from '@/constants/major-german-cities';
 import { BUSINESS_PLANS, type BusinessPlanId, type ServiceArea } from '@/lib/businessProfileConstants';
 import { Listing } from '@/types';
-import { getResolvedImageUrl } from '@/utils/imageUtils';
+import { getResolvedImageUrl, compressImageOnClient } from '@/utils/imageUtils';
 import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
 import { BusinessBrandIcon } from '@/components/business/BusinessBrandIcon';
 
@@ -224,6 +224,19 @@ function ImageUploadBox({
   );
 }
 
+async function readApiError(res: Response, fallback: string): Promise<string> {
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text) as { error?: string; details?: string };
+    if (data.error === 'FILE_TOO_LARGE' || res.status === 413) return fallback;
+    const msg = [data.error, data.details].filter(Boolean).join(' — ');
+    return msg || `${fallback} (${res.status})`;
+  } catch {
+    if (res.status === 413) return fallback;
+    return `${fallback} (${res.status})`;
+  }
+}
+
 export default function BusinessProfileFlow({
   isOpen,
   onClose,
@@ -275,7 +288,8 @@ export default function BusinessProfileFlow({
 
   const saveDraftToServer = useCallback(
     async (currentForm: FormState): Promise<{ logo?: string; coverImage?: string } | null> => {
-      if (renewMode || editMode || !paymentTelegramId) return null;
+      if (renewMode || !paymentTelegramId) return null;
+      if (editMode && !currentForm.logoFile && !currentForm.coverFile) return null;
 
       const hasAnyData = [
         currentForm.businessName,
@@ -350,17 +364,35 @@ export default function BusinessProfileFlow({
             }),
           });
         }
-        if (!res.ok) return null;
-        const data = await res.json();
+        const payloadText = await res.text();
+        let data: { profile?: { logo?: string | null; coverImage?: string | null }; error?: string; details?: string } | null =
+          null;
+        try {
+          data = payloadText ? JSON.parse(payloadText) : null;
+        } catch {
+          data = null;
+        }
+        if (!res.ok) {
+          if (data?.error === 'FILE_TOO_LARGE' || res.status === 413) {
+            throw new Error(t('businessProfile.validation.photoTooLarge'));
+          }
+          const message =
+            [data?.error, data?.details].filter(Boolean).join(' — ') ||
+            `${t('businessProfile.validation.photoUploadFailed')} (${res.status})`;
+          throw new Error(message);
+        }
         return {
-          logo: data.profile?.logo || undefined,
-          coverImage: data.profile?.coverImage || undefined,
+          logo: data?.profile?.logo || undefined,
+          coverImage: data?.profile?.coverImage || undefined,
         };
-      } catch {
+      } catch (error) {
+        if (error instanceof Error && error.message) {
+          throw error;
+        }
         return null;
       }
     },
-    [paymentTelegramId, renewMode, editMode]
+    [paymentTelegramId, renewMode, editMode, t]
   );
 
   const applySavedMedia = useCallback(
@@ -403,7 +435,7 @@ export default function BusinessProfileFlow({
           logoFile: null,
           coverFile: null,
         });
-      });
+      }).catch(() => null);
     }
     onClose();
   }, [form, onClose, renewMode, editMode, saveDraftToLocal, saveDraftToServer, step]);
@@ -494,7 +526,9 @@ export default function BusinessProfileFlow({
     const timer = setTimeout(() => {
       if (uploadingRef.current) return;
       saveDraftToLocal(step, form);
-      void saveDraftToServer(form).then((saved) => applySavedMedia(saved, step, form));
+      void saveDraftToServer(form)
+        .then((saved) => applySavedMedia(saved, step, form))
+        .catch(() => null);
     }, 800);
     return () => clearTimeout(timer);
   }, [isOpen, renewMode, editMode, step, form, saveDraftToLocal, saveDraftToServer, applySavedMedia]);
@@ -597,13 +631,13 @@ export default function BusinessProfileFlow({
     if (step === 'step5' && userListings.length === 0) {
       setStep('preview');
       saveDraftToLocal('preview', form);
-      void saveDraftToServer(form);
+      void saveDraftToServer(form).catch(() => null);
       return;
     }
     const nextStep = order[idx + 1];
     setStep(nextStep);
     saveDraftToLocal(nextStep, form);
-    void saveDraftToServer(form);
+    void saveDraftToServer(form).catch(() => null);
     tg?.HapticFeedback.impactOccurred('light');
   };
 
@@ -653,30 +687,64 @@ export default function BusinessProfileFlow({
     }
 
     setLoading(true);
+    setFlowError(null);
     try {
-      const fd = new FormData();
-      fd.append('telegramId', paymentTelegramId);
-      fd.append('businessName', form.businessName);
-      fd.append('category', form.category);
-      fd.append('subcategory', form.subcategory);
-      fd.append('description', form.description);
-      fd.append('city', form.city);
-      fd.append('address', form.address);
-      fd.append('serviceArea', form.serviceArea);
-      if (form.serviceRadiusKm) fd.append('serviceRadiusKm', form.serviceRadiusKm);
-      fd.append('telegram', form.telegram);
-      fd.append('phone', form.phone);
-      fd.append('instagram', form.instagram);
-      fd.append('website', form.website);
-      fd.append('workingHours', form.workingHours);
-      fd.append('listingIds', JSON.stringify(form.selectedListingIds));
-      if (form.logoFile) fd.append('logo', form.logoFile);
-      if (form.coverFile) fd.append('coverImage', form.coverFile);
+      const hasNewFiles = Boolean(form.logoFile || form.coverFile);
+      let res: Response;
+      if (hasNewFiles) {
+        const fd = new FormData();
+        fd.append('telegramId', paymentTelegramId);
+        fd.append('businessName', form.businessName);
+        fd.append('category', form.category);
+        fd.append('subcategory', form.subcategory);
+        fd.append('description', form.description);
+        fd.append('city', form.city);
+        fd.append('address', form.address);
+        fd.append('serviceArea', form.serviceArea);
+        if (form.serviceRadiusKm) fd.append('serviceRadiusKm', form.serviceRadiusKm);
+        fd.append('telegram', form.telegram);
+        fd.append('phone', form.phone);
+        fd.append('instagram', form.instagram);
+        fd.append('website', form.website);
+        fd.append('workingHours', form.workingHours);
+        fd.append('listingIds', JSON.stringify(form.selectedListingIds));
+        if (form.logoFile) fd.append('logo', form.logoFile);
+        if (form.coverFile) fd.append('coverImage', form.coverFile);
+        res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
+      } else {
+        res = await fetch('/api/user/business-profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId: paymentTelegramId,
+            businessName: form.businessName,
+            category: form.category,
+            subcategory: form.subcategory,
+            description: form.description,
+            city: form.city,
+            address: form.address,
+            serviceArea: form.serviceArea,
+            serviceRadiusKm: form.serviceArea === 'city_radius' ? form.serviceRadiusKm : null,
+            telegram: form.telegram,
+            phone: form.phone,
+            instagram: form.instagram,
+            website: form.website,
+            workingHours: form.workingHours,
+            listingIds: form.selectedListingIds,
+            ...(form.savedLogoPath ? { logo: form.savedLogoPath } : {}),
+            ...(form.savedCoverPath ? { coverImage: form.savedCoverPath } : {}),
+          }),
+        });
+      }
 
-      const res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        showToast(data.error || t('common.error'), 'error');
+        const tooLargeFallback = t('businessProfile.validation.photoTooLarge');
+        const message = await readApiError(
+          res,
+          res.status === 413 ? tooLargeFallback : t('businessProfile.validation.photoUploadFailed')
+        );
+        setFlowError(message);
+        showToast(message, 'error');
         return;
       }
 
@@ -686,7 +754,12 @@ export default function BusinessProfileFlow({
       onClose();
     } catch (e) {
       console.error(e);
-      showToast(t('common.error'), 'error');
+      const message =
+        e instanceof Error && e.message
+          ? e.message
+          : t('businessProfile.validation.photoUploadFailed');
+      setFlowError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -777,20 +850,51 @@ export default function BusinessProfileFlow({
     return list.slice(0, 16);
   }, [cityQuery]);
 
-  const handleImagePick = (file: File | null, kind: 'logo' | 'cover') => {
+  const handleImagePick = async (file: File | null, kind: 'logo' | 'cover') => {
     if (!file) return;
-    const preview = URL.createObjectURL(file);
+    setFlowError(null);
+
+    let prepared = file;
+    try {
+      prepared = await compressImageOnClient(file, kind === 'logo' ? 1.2 : 2);
+    } catch (compressError) {
+      console.warn('[BusinessProfile] compress failed', compressError);
+      const type = (file.type || '').toLowerCase();
+      const name = (file.name || '').toLowerCase();
+      const looksHeic = type.includes('heic') || type.includes('heif') || name.endsWith('.heic') || name.endsWith('.heif');
+      if (looksHeic || file.size > 6 * 1024 * 1024) {
+        const msg = looksHeic
+          ? t('businessProfile.validation.photoUnsupported')
+          : t('businessProfile.validation.photoTooLarge');
+        setFlowError(msg);
+        showToast(msg, 'error');
+        return;
+      }
+    }
+
+    const preview = URL.createObjectURL(prepared);
     const next =
       kind === 'logo'
-        ? { logoFile: file, logoPreview: preview }
-        : { coverFile: file, coverPreview: preview };
+        ? { logoFile: prepared, logoPreview: preview }
+        : { coverFile: prepared, coverPreview: preview };
     const merged = { ...form, ...next };
     setForm(merged);
+
     uploadingRef.current = true;
-    void saveDraftToServer(merged).then((saved) => {
-      uploadingRef.current = false;
+    try {
+      const saved = await saveDraftToServer(merged);
       applySavedMedia(saved, step, merged);
-    });
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : '';
+      const msg =
+        !raw || /failed to fetch|networkerror|load failed/i.test(raw)
+          ? t('businessProfile.validation.photoUploadFailed')
+          : raw;
+      setFlowError(msg);
+      showToast(msg, 'error');
+    } finally {
+      uploadingRef.current = false;
+    }
   };
 
   const toggleListing = (id: number) => {

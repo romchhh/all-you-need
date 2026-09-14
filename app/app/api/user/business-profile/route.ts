@@ -6,10 +6,30 @@ import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
 import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile } from '@/lib/businessProfileHelpers';
 
-async function saveUploadedFile(file: File, prefix: string): Promise<string> {
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg';
-  const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}.${safeExt}`;
+export const dynamic = 'force-dynamic';
+export const maxDuration = 120;
+
+const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+
+function isUploadBlob(value: FormDataEntryValue | null): value is Blob {
+  return typeof Blob !== 'undefined' && value instanceof Blob && value.size > 0;
+}
+
+async function saveUploadedFile(file: Blob, prefix: string): Promise<string> {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error('FILE_TOO_LARGE');
+  }
+
+  const named = file as File;
+  const name = typeof named.name === 'string' ? named.name : '';
+  const type = file.type || '';
+  let ext = name.split('.').pop()?.toLowerCase() || '';
+  if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+    if (type.includes('png')) ext = 'png';
+    else if (type.includes('webp')) ext = 'webp';
+    else ext = 'jpg';
+  }
+  const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   const uploadsDir = join(process.cwd(), 'public', 'business');
   if (!existsSync(uploadsDir)) {
     mkdirSync(uploadsDir, { recursive: true });
@@ -71,7 +91,16 @@ export async function PUT(request: NextRequest) {
     let coverPath: string | null | undefined;
 
     if (contentType.includes('multipart/form-data')) {
-      const form = await request.formData();
+      let form: FormData;
+      try {
+        form = await request.formData();
+      } catch (parseError) {
+        console.error('[BusinessProfile PUT] formData parse failed', parseError);
+        return NextResponse.json(
+          { error: 'FILE_TOO_LARGE', details: 'Request body is too large' },
+          { status: 413 }
+        );
+      }
       telegramIdRaw = String(form.get('telegramId') || '');
       body = {
         partial: form.get('partial'),
@@ -93,11 +122,29 @@ export async function PUT(request: NextRequest) {
       };
       const logoFile = form.get('logo');
       const coverFile = form.get('coverImage');
-      if (logoFile instanceof File && logoFile.size > 0) {
-        logoPath = await saveUploadedFile(logoFile, 'logo');
-      }
-      if (coverFile instanceof File && coverFile.size > 0) {
-        coverPath = await saveUploadedFile(coverFile, 'cover');
+      try {
+        if (isUploadBlob(logoFile)) {
+          logoPath = await saveUploadedFile(logoFile, 'logo');
+        }
+        if (isUploadBlob(coverFile)) {
+          coverPath = await saveUploadedFile(coverFile, 'cover');
+        }
+      } catch (uploadError) {
+        const code = uploadError instanceof Error ? uploadError.message : '';
+        if (code === 'FILE_TOO_LARGE') {
+          return NextResponse.json(
+            { error: 'FILE_TOO_LARGE', details: 'Image exceeds 12MB' },
+            { status: 413 }
+          );
+        }
+        console.error('[BusinessProfile PUT] image save failed', uploadError);
+        return NextResponse.json(
+          {
+            error: 'Failed to save image',
+            details: uploadError instanceof Error ? uploadError.message : String(uploadError),
+          },
+          { status: 500 }
+        );
       }
     } else {
       const json = await request.json();
@@ -188,12 +235,20 @@ export async function PUT(request: NextRequest) {
     const profile = await prisma.businessProfile.findUnique({ where: { id: profileId } });
 
     if (profile && listingIds !== undefined && isBusinessProfileActive(profile)) {
-      await assignListingsToProfile(user.id, listingIds);
+      try {
+        await assignListingsToProfile(user.id, listingIds);
+      } catch (assignError) {
+        console.error('[BusinessProfile PUT] assign listings failed', assignError);
+      }
     }
 
     return NextResponse.json({ success: true, profile });
   } catch (error) {
     console.error('[BusinessProfile PUT]', error);
-    return NextResponse.json({ error: 'Failed to save business profile' }, { status: 500 });
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json(
+      { error: 'Failed to save business profile', details },
+      { status: 500 }
+    );
   }
 }
