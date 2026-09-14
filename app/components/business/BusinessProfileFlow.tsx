@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { X, Upload, Check, ChevronLeft, Briefcase, MapPin, Phone, Image as ImageIcon, Package, AlertCircle } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
@@ -15,6 +15,7 @@ import { majorGermanCities } from '@/constants/major-german-cities';
 import { BUSINESS_PLANS, type BusinessPlanId, type ServiceArea } from '@/lib/businessProfileConstants';
 import { Listing } from '@/types';
 import { getResolvedImageUrl } from '@/utils/imageUtils';
+import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
 
 const PaymentSummaryModal = dynamic(
   () => import('@/components/modals/PaymentSummaryModal').then((m) => ({ default: m.PaymentSummaryModal })),
@@ -101,6 +102,80 @@ const initialForm = (defaults: { telegram?: string; phone?: string }): FormState
   savedLogoPath: null,
   savedCoverPath: null,
 });
+
+type ImageUploadBoxProps = {
+  preview: string | null;
+  resolveSrc: (src: string | null) => string;
+  onPick: (file: File | null) => void;
+  emptyLabel: string;
+  changeLabel: string;
+  emptyIcon: ReactNode;
+  heightClass?: string;
+  fit?: 'contain' | 'cover';
+  isLight: boolean;
+};
+
+function ImageUploadBox({
+  preview,
+  resolveSrc,
+  onPick,
+  emptyLabel,
+  changeLabel,
+  emptyIcon,
+  heightClass = 'h-28',
+  fit = 'contain',
+  isLight,
+}: ImageUploadBoxProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const borderCls = isLight ? 'border-gray-300 bg-gray-50' : 'border-white/20 bg-white/5';
+
+  return (
+    <div
+      className={`relative w-full overflow-hidden rounded-2xl border-2 border-dashed ${heightClass} ${borderCls}`}
+    >
+      {preview ? (
+        <>
+          <img
+            src={resolveSrc(preview)}
+            alt=""
+            draggable={false}
+            className={`pointer-events-none absolute inset-0 h-full w-full select-none ${
+              fit === 'cover' ? 'object-cover' : 'object-contain p-2'
+            }`}
+          />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="absolute inset-0 flex touch-manipulation items-end justify-center bg-gradient-to-t from-black/45 via-black/10 to-transparent pb-2"
+          >
+            <span className="rounded-full bg-black/50 px-3 py-1 text-xs font-medium text-white">
+              {changeLabel}
+            </span>
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="absolute inset-0 flex touch-manipulation flex-col items-center justify-center gap-1 px-3"
+        >
+          {emptyIcon}
+          <span className="text-center text-sm opacity-70">{emptyLabel}</span>
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(e) => {
+          onPick(e.target.files?.[0] || null);
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+}
 
 export default function BusinessProfileFlow({
   isOpen,
@@ -483,8 +558,9 @@ export default function BusinessProfileFlow({
             >
               {step === 'step1' || (renewMode && step === 'tariff') ? <X size={22} /> : <ChevronLeft size={22} />}
             </button>
-            <span className="font-semibold text-sm">
+            <span className="flex items-center gap-1.5 font-semibold text-sm">
               {renewMode ? t('businessProfile.suspended.renewTitle') : 'TradeGround Business'}
+              <BusinessBetaBadge />
             </span>
             <div className="w-10" />
           </div>
@@ -526,24 +602,22 @@ export default function BusinessProfileFlow({
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 pb-8">
           {step === 'step1' && (
             <>
               {renderStepHeader(t('businessProfile.steps.step1.title'), <Briefcase size={20} className={accentIcon} />)}
               <div className="space-y-4">
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.logo')} *</label>
-                  <label className={`flex flex-col items-center justify-center h-28 rounded-2xl border-2 border-dashed cursor-pointer ${isLight ? 'border-gray-300 bg-gray-50' : 'border-white/20 bg-white/5'}`}>
-                    {form.logoPreview ? (
-                      <img src={previewSrc(form.logoPreview)} alt="" className="h-full w-full object-contain rounded-2xl p-2" />
-                    ) : (
-                      <>
-                        <Upload size={24} className="mb-1 opacity-60" />
-                        <span className="text-sm opacity-70">{t('businessProfile.fields.uploadLogo')}</span>
-                      </>
-                    )}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImagePick(e.target.files?.[0] || null, 'logo')} />
-                  </label>
+                  <ImageUploadBox
+                    preview={form.logoPreview}
+                    resolveSrc={previewSrc}
+                    onPick={(file) => handleImagePick(file, 'logo')}
+                    emptyLabel={t('businessProfile.fields.uploadLogo')}
+                    changeLabel={t('businessProfile.fields.changePhoto')}
+                    emptyIcon={<Upload size={22} className="opacity-60" />}
+                    isLight={isLight}
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.businessName')} *</label>
@@ -634,14 +708,17 @@ export default function BusinessProfileFlow({
               <div className="space-y-4">
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.coverImage')}</label>
-                  <label className={`flex flex-col items-center justify-center h-32 rounded-2xl border-2 border-dashed cursor-pointer ${isLight ? 'border-gray-300 bg-gray-50' : 'border-white/20 bg-white/5'}`}>
-                    {form.coverPreview ? (
-                      <img src={previewSrc(form.coverPreview)} alt="" className="h-full w-full object-cover rounded-2xl" />
-                    ) : (
-                      <span className="text-sm opacity-70">{t('businessProfile.fields.uploadCover')}</span>
-                    )}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImagePick(e.target.files?.[0] || null, 'cover')} />
-                  </label>
+                  <ImageUploadBox
+                    preview={form.coverPreview}
+                    resolveSrc={previewSrc}
+                    onPick={(file) => handleImagePick(file, 'cover')}
+                    emptyLabel={t('businessProfile.fields.uploadCover')}
+                    changeLabel={t('businessProfile.fields.changePhoto')}
+                    emptyIcon={<ImageIcon size={22} className="opacity-60" />}
+                    heightClass="h-32"
+                    fit="cover"
+                    isLight={isLight}
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.workingHours')}</label>
@@ -665,8 +742,24 @@ export default function BusinessProfileFlow({
                   userListings.map((listing) => {
                   const checked = form.selectedListingIds.includes(listing.id);
                   return (
-                    <label key={listing.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${checked ? (isLight ? 'border-[#3F5331]' : 'border-[#C8E6A0]/50') : (isLight ? 'border-gray-200' : 'border-white/15')}`}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleListing(listing.id)} className="w-5 h-5 rounded" />
+                    <label
+                      key={listing.id}
+                      className={`flex min-h-[3.25rem] cursor-pointer touch-manipulation items-center gap-3 rounded-xl border p-3 ${
+                        checked
+                          ? isLight
+                            ? 'border-[#3F5331]'
+                            : 'border-[#C8E6A0]/50'
+                          : isLight
+                            ? 'border-gray-200'
+                            : 'border-white/15'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleListing(listing.id)}
+                        className="h-5 w-5 shrink-0 rounded accent-[#3F5331]"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate text-sm">{listing.title}</p>
                         <p className={`text-xs truncate ${isLight ? 'text-gray-500' : 'text-white/50'}`}>{listing.location}</p>
@@ -684,16 +777,20 @@ export default function BusinessProfileFlow({
             <>
               {renderStepHeader(t('businessProfile.preview.title'), <Briefcase size={20} className={accentIcon} />)}
               <p className={`text-sm mb-5 -mt-2 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.preview.subtitle')}</p>
-              <div className={`rounded-2xl overflow-hidden border ${isLight ? 'border-gray-200' : 'border-white/15'}`}>
-                <div className="h-32 bg-[#3F5331]/30 relative">
+              <div className={`overflow-hidden rounded-2xl border ${isLight ? 'border-gray-200' : 'border-white/15'}`}>
+                <div className="relative h-32 bg-[#3F5331]/30">
                   {form.coverPreview ? (
-                    <img src={previewSrc(form.coverPreview)} alt="" className="w-full h-full object-cover" />
+                    <img src={previewSrc(form.coverPreview)} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <div className={`w-full h-full ${isLight ? 'bg-[#3F5331]/15' : 'bg-[#3F5331]/25'}`} />
+                    <div className={`h-full w-full ${isLight ? 'bg-[#3F5331]/15' : 'bg-[#3F5331]/25'}`} />
                   )}
-                  <div className={`absolute -bottom-8 left-4 w-16 h-16 rounded-xl border-4 overflow-hidden ${isLight ? 'border-white bg-white' : 'border-[#0a0a0a] bg-[#1C1C1C]'}`}>
+                  <div
+                    className={`absolute -bottom-8 left-4 h-16 w-16 overflow-hidden rounded-xl border-4 ${
+                      isLight ? 'border-white bg-white' : 'border-[#0a0a0a] bg-[#1C1C1C]'
+                    }`}
+                  >
                     {form.logoPreview ? (
-                      <img src={previewSrc(form.logoPreview)} alt="" className="w-full h-full object-cover" />
+                      <img src={previewSrc(form.logoPreview)} alt="" className="h-full w-full object-contain bg-white/5 p-1" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xl font-bold bg-[#3F5331]/30 text-[#C8E6A0]">
                         {form.businessName.charAt(0).toUpperCase() || '?'}

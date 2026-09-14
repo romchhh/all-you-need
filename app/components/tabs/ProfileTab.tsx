@@ -713,7 +713,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         </div>
       </div>
 
-      <div className="px-4 pb-3">
+      <div className="px-4 pb-2">
         {isBusinessActive && (
         <ProfileModeSwitcher
           mode={profileViewMode}

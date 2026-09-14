@@ -2,6 +2,7 @@
 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
 
 export type ProfileViewMode = 'personal' | 'business';
 
@@ -18,18 +19,18 @@ export function ProfileModeSwitcher({ mode, onChange, hasBusinessProfile }: Prof
   if (!hasBusinessProfile) return null;
 
   const base =
-    'flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold transition-colors text-center';
+    'flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-colors text-center touch-manipulation min-h-[2.5rem] flex items-center justify-center gap-1';
   const active = isLight
     ? 'bg-[#3F5331] text-white shadow-sm'
     : 'bg-[#C8E6A0] text-[#1a1a1a]';
   const idle = isLight
-    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-    : 'bg-white/10 text-white/80 hover:bg-white/15';
+    ? 'bg-transparent text-gray-700 hover:bg-gray-200/80'
+    : 'bg-transparent text-white/80 hover:bg-white/10';
 
   return (
     <div
-      className={`flex gap-2 p-1 rounded-2xl mb-4 ${
-        isLight ? 'bg-gray-100/80' : 'bg-black/30 border border-white/10'
+      className={`mb-2 flex gap-1 rounded-xl p-1 ${
+        isLight ? 'bg-gray-100/90' : 'border border-white/10 bg-black/30'
       }`}
     >
       <button
@@ -44,7 +45,8 @@ export function ProfileModeSwitcher({ mode, onChange, hasBusinessProfile }: Prof
         className={`${base} ${mode === 'business' ? active : idle}`}
         onClick={() => onChange('business')}
       >
-        {t('businessProfile.switcher.business')}
+        <span>{t('businessProfile.switcher.business')}</span>
+        <BusinessBetaBadge />
       </button>
     </div>
   );
