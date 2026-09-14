@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from main import bot
 from config import bot_username
-from database_functions.client_db import check_user, add_user, is_user_active, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar, update_user_activity, get_username_by_user_id, update_user_username
+from database_functions.client_db import check_user, add_user, is_user_active, get_user_agreement_status, set_user_agreement_status, get_user_phone, set_user_phone, get_user_avatar, update_user_activity, get_username_by_user_id, update_user_username, ensure_bot_user_record
 from database_functions.create_dbs import create_dbs
 from database_functions.links_db import increment_link_count, record_link_visit
 from database_functions.prisma_db import PrismaDB
@@ -84,6 +84,13 @@ async def send_shared_start_link_content(chat_id: int, user_id: int, param: str)
             if listing_data:
                 shared_item = {"type": "listing", "id": listing_id}
                 shared_data = listing_data
+            else:
+                await bot.send_message(
+                    chat_id,
+                    t(user_id, "shared.listing.not_found"),
+                    parse_mode="HTML",
+                )
+                return True
         except (ValueError, IndexError):
             return False
     elif p.startswith("user_"):
@@ -109,8 +116,11 @@ async def send_shared_start_link_content(chat_id: int, user_id: int, param: str)
         listing = shared_data
         user_lang = get_user_lang(user_id)
 
-        is_free = listing.get("isFree") or (
-            isinstance(listing.get("isFree"), int) and listing.get("isFree") == 1
+        is_free_val = listing.get("isFree")
+        is_free = (
+            is_free_val is True
+            or is_free_val == 1
+            or (isinstance(is_free_val, str) and is_free_val.strip() in ("1", "true", "True"))
         )
         price_value = listing.get("price", "N/A")
         negotiable_text = t(user_id, "moderation.negotiable")
@@ -469,20 +479,39 @@ async def agree_agreement(callback: types.CallbackQuery):
             await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
             return
 
+        user = callback.from_user
+        if not ensure_bot_user_record(user_id, user.username, user.first_name, user.last_name):
+            await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
+            return
+
         user_exists = check_user(user_id)
         if not user_exists:
-            user = callback.from_user
             avatar_path = None
             try:
                 avatar_path = await download_user_avatar(user_id, user.username)
             except Exception as e:
                 print(f"Error downloading avatar: {e}")
             
-            add_user(user_id, user.username, user.first_name, user.last_name, user.language_code, None, avatar_path)
+            try:
+                add_user(user_id, user.username, user.first_name, user.last_name, user.language_code, None, avatar_path)
+            except Exception as e:
+                print(f"add_user failed in agree_agreement for {user_id}: {e}")
         
-        set_user_agreement_status(user_id, True)
+        if not set_user_agreement_status(user_id, True):
+            await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
+            return
+
+        if not get_user_agreement_status(user_id):
+            print(f"Agreement verify failed for user {user_id} after update")
+            await callback.answer(t(user_id, 'agreement.error'), show_alert=True)
+            return
         
-        await callback.message.delete()
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest as e:
+            print(f"Could not delete agreement message for user {user_id}: {e}")
+        
+        chat_id = callback.message.chat.id
         
         # Перевіряємо наявність username
         current_username = (callback.from_user.username or "").strip()
@@ -490,44 +519,46 @@ async def agree_agreement(callback: types.CallbackQuery):
         # Якщо немає юзернейму — просимо номер (якщо ще не поділилися), інакше головне меню
         if not current_username:
             if not get_user_phone(user_id):
-                await callback.message.answer(
+                await bot.send_message(
+                    chat_id,
                     f"{t(user_id, 'agreement.agreed')}\n\n{t(user_id, 'phone.request_no_username')}",
                     reply_markup=get_phone_share_keyboard(user_id),
                     parse_mode="HTML"
                 )
             else:
-                await callback.message.answer(t(user_id, 'agreement.agreed'), parse_mode="HTML")
-                # Після повного доступу до бота надсилаємо медіагрупу з вітальним фото та відео-інструкціями
-                await _send_offer_instruction_videos(callback.message.chat.id, user_id)
-                # Окремо показуємо головне меню без дублювання вітального тексту
-                await callback.message.answer(
+                await bot.send_message(chat_id, t(user_id, 'agreement.agreed'), parse_mode="HTML")
+                await _send_offer_instruction_videos(chat_id, user_id)
+                await bot.send_message(
+                    chat_id,
                     f"<b>{t(user_id, 'menu.main_menu')}</b>",
                     reply_markup=get_main_menu_keyboard(user_id),
                     parse_mode="HTML"
                 )
-                await flush_pending_shared_link(callback.message.chat.id, user_id)
+                await flush_pending_shared_link(chat_id, user_id)
         else:
-            # Якщо є юзернейм - просто завершуємо реєстрацію
-            await callback.message.answer(
+            await bot.send_message(
+                chat_id,
                 t(user_id, 'agreement.agreed'),
                 parse_mode="HTML"
             )
-            # Після повного доступу до бота надсилаємо медіагрупу з вітальним фото та відео-інструкціями
-            await _send_offer_instruction_videos(callback.message.chat.id, user_id)
-            # Окремо показуємо головне меню без дублювання вітального тексту
-            await callback.message.answer(
+            await _send_offer_instruction_videos(chat_id, user_id)
+            await bot.send_message(
+                chat_id,
                 f"<b>{t(user_id, 'menu.main_menu')}</b>",
                 reply_markup=get_main_menu_keyboard(user_id),
                 parse_mode="HTML"
             )
-            await flush_pending_shared_link(callback.message.chat.id, user_id)
+            await flush_pending_shared_link(chat_id, user_id)
         
         await callback.answer()
     except Exception as e:
         print(f"Error in agree_agreement: {e}")
         import traceback
         traceback.print_exc()
-        await callback.answer("Помилка", show_alert=True)
+        try:
+            await callback.answer(t(callback.from_user.id, 'agreement.error'), show_alert=True)
+        except Exception:
+            await callback.answer("Помилка", show_alert=True)
 
 
 @router.callback_query(F.data == "decline_agreement")
@@ -619,6 +650,8 @@ async def handle_language_selection(callback: types.CallbackQuery):
     lang = callback.data.split("_")[-1]
     
     if lang in ['uk', 'ru']:
+        user = callback.from_user
+        ensure_bot_user_record(user.id, user.username, user.first_name, user.last_name)
         set_user_language(user_id, lang)
         
         try:

@@ -10,9 +10,10 @@ const WEBAPP_URL = process.env.WEBAPP_URL || BASE_URL;
 export interface CreateInvoiceParams {
   telegramId: string;
   amount: number;
-  type?: 'balance' | 'promotion' | 'package';
+  type?: 'balance' | 'promotion' | 'package' | 'business';
   promotionType?: string;
   packageType?: string;
+  businessPlan?: string;
   listingId?: number;
   description?: string;
 }
@@ -29,7 +30,7 @@ export interface InvoiceResult {
  * Створює інвойс через Monobank API
  */
 export async function createMonobankInvoice(params: CreateInvoiceParams): Promise<InvoiceResult> {
-  const { telegramId, amount, type = 'balance', promotionType, packageType, listingId, description } = params;
+  const { telegramId, amount, type = 'balance', promotionType, packageType, businessPlan, listingId, description } = params;
 
   console.log('[Monobank] Creating invoice:', { telegramId, amount, type, promotionType, packageType, listingId });
 
@@ -79,6 +80,12 @@ export async function createMonobankInvoice(params: CreateInvoiceParams): Promis
       destination = description || `Покупка пакету оголошень`;
       comment = `Пакет ${packageType} для користувача ${telegramId}`;
       itemName = description || `Пакет: ${packageType}`;
+      break;
+    case 'business':
+      reference = `business-${userId}-${Date.now()}`;
+      destination = description || `TradeGround Business підписка`;
+      comment = `Business ${businessPlan} для користувача ${telegramId}`;
+      itemName = description || `TradeGround Business ${businessPlan}`;
       break;
     case 'balance':
     default:

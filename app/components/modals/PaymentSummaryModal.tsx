@@ -13,9 +13,15 @@ interface PaymentSummaryModalProps {
   onConfirm: (paymentMethod: 'balance' | 'direct') => void | Promise<void>;
   packageType?: string | null;
   promotionType?: string | null;
+  businessPlan?: 'business' | 'business_pro' | null;
   userBalance?: number;
   tg: TelegramWebApp | null;
 }
+
+const BUSINESS_PLAN_PRICES: Record<string, number> = {
+  business: 9.9,
+  business_pro: 19.9,
+};
 
 const PACKAGE_PRICES: Record<string, number> = {
   pack_3: 5.0,
@@ -41,6 +47,7 @@ export const PaymentSummaryModal = ({
   onConfirm,
   packageType,
   promotionType,
+  businessPlan,
   userBalance = 0,
   tg,
 }: PaymentSummaryModalProps) => {
@@ -57,7 +64,8 @@ export const PaymentSummaryModal = ({
 
   const packagePrice = packageType ? PACKAGE_PRICES[packageType] || 0 : 0;
   const promotionPrice = promotionType ? PROMOTION_PRICES[promotionType] || 0 : 0;
-  const totalPrice = packagePrice + promotionPrice;
+  const businessPrice = businessPlan ? BUSINESS_PLAN_PRICES[businessPlan] || 0 : 0;
+  const totalPrice = packagePrice + promotionPrice + businessPrice;
   const canPayWithBalance = totalPrice > 0 && effectiveBalance >= totalPrice;
 
   useEffect(() => {
@@ -268,6 +276,17 @@ export const PaymentSummaryModal = ({
                     {t('payment.promotion') || 'Просування'}: {getPromotionName(promotionType)}
                   </span>
                   <span className={rowStrong}>{promotionPrice} €</span>
+                </div>
+              )}
+
+              {businessPlan && (
+                <div className="flex justify-between items-center">
+                  <span className={rowMuted}>
+                    {businessPlan === 'business_pro'
+                      ? t('businessProfile.plans.businessPro.name')
+                      : t('businessProfile.plans.business.name')}
+                  </span>
+                  <span className={rowStrong}>{businessPrice} €</span>
                 </div>
               )}
 

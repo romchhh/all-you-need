@@ -29,6 +29,9 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useRouter, useParams } from 'next/navigation';
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
+import { BusinessPromoCard } from '@/components/business/BusinessPromoCard';
+import { BusinessSuspendedCard } from '@/components/business/BusinessSuspendedCard';
+import { ProfileModeSwitcher, type ProfileViewMode } from '@/components/business/ProfileModeSwitcher';
 
 const EditListingModal = dynamic(
   () => import('@/components/modals/EditListingModal').then((m) => ({ default: m.EditListingModal })),
@@ -44,6 +47,7 @@ const PaymentSummaryModal = dynamic(() => import('@/components/modals/PaymentSum
 const ReactivateListingFlow = dynamic(() => import('@/components/listing/ReactivateListingFlow'), {
   ssr: false,
 });
+const BusinessProfileFlow = dynamic(() => import('@/components/business/BusinessProfileFlow'), { ssr: false });
 
 interface ProfileTabProps {
   tg: TelegramWebApp | null;
@@ -95,6 +99,32 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [promotionOpenSource, setPromotionOpenSource] = useState<'auto' | 'manual' | null>(null);
   const [showReactivateFlow, setShowReactivateFlow] = useState(false);
   const [selectedListingForReactivation, setSelectedListingForReactivation] = useState<number | null>(null);
+  const [showBusinessFlow, setShowBusinessFlow] = useState(false);
+  const [profileViewMode, setProfileViewMode] = useState<ProfileViewMode>('personal');
+  const [businessProfile, setBusinessProfile] = useState<{
+    businessName: string;
+    logo?: string | null;
+    coverImage?: string | null;
+    description?: string;
+    city?: string;
+    plan?: string | null;
+    linkedListingIds?: string | null;
+    category?: string;
+    subcategory?: string | null;
+    address?: string | null;
+    serviceArea?: string;
+    serviceRadiusKm?: number | null;
+    telegram?: string | null;
+    phone?: string | null;
+    instagram?: string | null;
+    website?: string | null;
+    workingHours?: string | null;
+    updatedAt?: string;
+  } | null>(null);
+  const [isBusinessActive, setIsBusinessActive] = useState(false);
+  const [hasBusinessProfile, setHasBusinessProfile] = useState(false);
+  const [isBusinessSuspended, setIsBusinessSuspended] = useState(false);
+  const [businessRenewMode, setBusinessRenewMode] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -230,6 +260,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       setTimeout(() => {
         if (profile?.telegramId) {
           fetchListingsWithFilters(0, true);
+          fetchBusinessProfile();
         }
       }, 1000);
     }
@@ -252,6 +283,24 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   const LISTINGS_PAGE_SIZE = 20;
 
+  const fetchBusinessProfile = async () => {
+    if (!profile?.telegramId) return;
+    try {
+      const res = await fetch(`/api/user/business-profile?telegramId=${profile.telegramId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setIsBusinessActive(Boolean(data.isActive));
+      setHasBusinessProfile(Boolean(data.hasProfile));
+      setIsBusinessSuspended(Boolean(data.isSuspended));
+      setBusinessProfile(data.profile || null);
+      if (!data.isActive) {
+        setProfileViewMode('personal');
+      }
+    } catch (e) {
+      console.error('Error fetching business profile:', e);
+    }
+  };
+
   // Функція для завантаження оголошень з фільтрами (20 за раз, коректний offset і hasMore)
   const fetchListingsWithFilters = async (offset = 0, reset = false) => {
     if (!profile?.telegramId) return;
@@ -262,6 +311,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     }
     if (selectedCategory !== 'all') {
       url += `&category=${selectedCategory}`;
+    }
+    if (isBusinessActive && profileViewMode === 'business') {
+      url += `&profileType=business`;
+    } else if (isBusinessActive && profileViewMode === 'personal') {
+      url += `&profileType=personal`;
     }
 
     try {
@@ -300,7 +354,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     if (profile?.telegramId) {
       fetchListingsWithFilters(0, true);
     }
-  }, [profile]);
+  }, [profile, selectedStatus, selectedCategory, profileViewMode, isBusinessActive]);
+
+  useEffect(() => {
+    if (profile?.telegramId) {
+      fetchBusinessProfile();
+    }
+  }, [profile?.telegramId]);
 
   // Обробка пропуску реклами
   const handlePromotionSkipped = async () => {
@@ -584,10 +644,21 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex-1 min-w-0">
-                <h2 className={`text-lg font-bold mb-1 truncate ${ac.pageHeading}`}>{displayName}</h2>
-                {displayUsername && (
+                <h2 className={`text-lg font-bold mb-1 truncate ${ac.pageHeading}`}>
+                  {profileViewMode === 'business' && businessProfile?.businessName
+                    ? businessProfile.businessName
+                    : displayName}
+                </h2>
+                {profileViewMode === 'business' && isBusinessActive ? (
+                  <p className={`text-sm truncate ${ac.mutedText}`}>
+                    <span className="inline-flex items-center gap-1 font-semibold text-[#C8E6A0]">
+                      BUSINESS{businessProfile?.plan === 'business_pro' ? ' PRO' : ''}
+                    </span>
+                    {businessProfile?.city ? ` · ${businessProfile.city}` : ''}
+                  </p>
+                ) : displayUsername ? (
                   <p className={`text-sm truncate ${ac.mutedText}`}>{displayUsername}</p>
-                )}
+                ) : null}
               </div>
               
               {/* Кнопки дій */}
@@ -640,6 +711,38 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="px-4 pb-3">
+        {isBusinessActive && (
+        <ProfileModeSwitcher
+          mode={profileViewMode}
+          onChange={(mode) => {
+            setProfileViewMode(mode);
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          hasBusinessProfile={isBusinessActive}
+        />
+        )}
+        {isBusinessSuspended && (
+          <BusinessSuspendedCard
+            onRenew={() => {
+              setBusinessRenewMode(true);
+              setShowBusinessFlow(true);
+              tg?.HapticFeedback.impactOccurred('medium');
+            }}
+          />
+        )}
+        {!isBusinessActive && !isBusinessSuspended && (
+          <BusinessPromoCard
+            variant={hasBusinessProfile ? 'continue' : 'create'}
+            onCreate={() => {
+              setBusinessRenewMode(false);
+              setShowBusinessFlow(true);
+              tg?.HapticFeedback.impactOccurred('medium');
+            }}
+          />
+        )}
       </div>
 
       {/* Кнопки дій */}
@@ -1443,6 +1546,26 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       )}
 
       {/* Toast сповіщення */}
+      <BusinessProfileFlow
+        isOpen={showBusinessFlow}
+        onClose={() => {
+          setShowBusinessFlow(false);
+          setBusinessRenewMode(false);
+        }}
+        onSuccess={() => {
+          fetchBusinessProfile();
+          fetchListingsWithFilters(0, true);
+          refetch();
+          setBusinessRenewMode(false);
+        }}
+        tg={tg}
+        telegramId={String(profile?.telegramId || '')}
+        defaultTelegram={profile?.username ? `@${profile.username}` : ''}
+        defaultPhone={profile?.phone || ''}
+        renewMode={businessRenewMode}
+        existingProfile={businessProfile}
+      />
+
       <Toast
         message={toast.message}
         type={toast.type}

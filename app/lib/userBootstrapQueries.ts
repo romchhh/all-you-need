@@ -8,24 +8,10 @@ export type UserListingStatsPayload = {
   createdAt: string;
 };
 
-/** Та сама логіка, що GET /api/user/language (legacy User, потім колонка User.language). */
+/** Мова інтерфейсу: users_legacy (Prisma User не має колонки language). */
 export async function getUserLanguageForTelegramId(telegramId: string): Promise<'uk' | 'ru'> {
   const telegramIdNum = parseInt(telegramId, 10);
   if (Number.isNaN(telegramIdNum)) return 'uk';
-
-  try {
-    const users = (await prisma.$queryRawUnsafe(
-      `SELECT language FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-      telegramIdNum
-    )) as Array<{ language: string | null }>;
-
-    if (users.length > 0 && users[0].language) {
-      const l = users[0].language;
-      if (l === 'uk' || l === 'ru') return l;
-    }
-  } catch {
-    // ignore
-  }
 
   try {
     const legacyUsers = (await prisma.$queryRawUnsafe(

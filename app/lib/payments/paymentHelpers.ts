@@ -234,13 +234,14 @@ export async function processPromotionPurchaseFromBalance(
   userId: number,
   currentBalance: number,
   promotionType: PromotionType,
-  listingId?: number
+  listingId?: number,
+  priceOverride?: number
 ): Promise<{ newBalance: number; promotionEnds: Date }> {
   const promotionInfo = PROMOTION_PRICES[promotionType];
-  const price = promotionInfo.price;
+  const price = priceOverride ?? promotionInfo.price;
   const balanceBefore = Number(currentBalance);
 
-  if (!Number.isFinite(balanceBefore) || balanceBefore < price) {
+  if (price > 0 && (!Number.isFinite(balanceBefore) || balanceBefore < price)) {
     throw new Error('Insufficient balance');
   }
 
@@ -251,13 +252,15 @@ export async function processPromotionPurchaseFromBalance(
   let newBalance = balanceBefore;
 
   try {
-    await prisma.$executeRawUnsafe(
-      `UPDATE User SET balance = balance - ?, updatedAt = ? WHERE id = ? AND balance >= ?`,
-      price,
-      nowStr,
-      userId,
-      price
-    );
+    if (price > 0) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE User SET balance = balance - ?, updatedAt = ? WHERE id = ? AND balance >= ?`,
+        price,
+        nowStr,
+        userId,
+        price
+      );
+    }
 
     const rows = await prisma.$queryRawUnsafe(
       `SELECT balance FROM User WHERE id = ?`,
@@ -269,18 +272,20 @@ export async function processPromotionPurchaseFromBalance(
     }
 
     newBalance = Number(rows[0].balance);
-    if (!Number.isFinite(newBalance) || balanceBefore - newBalance + 0.001 < price) {
+    if (price > 0 && (!Number.isFinite(newBalance) || balanceBefore - newBalance + 0.001 < price)) {
       throw new Error('Insufficient balance');
     }
 
-    await createTransaction({
-      userId,
-      type: 'payment',
-      amount: price,
-      currency: 'EUR',
-      status: 'completed',
-      description: `Реклама: ${promotionType}`,
-    });
+    if (price > 0) {
+      await createTransaction({
+        userId,
+        type: 'payment',
+        amount: price,
+        currency: 'EUR',
+        status: 'completed',
+        description: `Реклама: ${promotionType}`,
+      });
+    }
 
     await createPromotionPurchaseRecord(
       userId,
@@ -296,7 +301,7 @@ export async function processPromotionPurchaseFromBalance(
 
     return { newBalance, promotionEnds: endsAt };
   } catch (error) {
-    if (Number.isFinite(newBalance) && balanceBefore - newBalance + 0.001 >= price) {
+    if (price > 0 && Number.isFinite(newBalance) && balanceBefore - newBalance + 0.001 >= price) {
       try {
         await prisma.$executeRawUnsafe(
           `UPDATE User SET balance = balance + ?, updatedAt = ? WHERE id = ?`,

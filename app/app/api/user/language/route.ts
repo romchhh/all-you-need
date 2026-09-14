@@ -2,6 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserLanguageForTelegramId } from '@/lib/userBootstrapQueries';
 
+async function upsertLegacyLanguage(telegramId: string, language: 'uk' | 'ru') {
+  const now = new Date().toISOString();
+  const legacyRows = (await prisma.$queryRawUnsafe(
+    `SELECT id FROM users_legacy WHERE user_id = ?`,
+    telegramId
+  )) as Array<{ id: number }>;
+
+  if (legacyRows.length > 0) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE users_legacy SET language = ? WHERE user_id = ?`,
+      language,
+      telegramId
+    );
+    return;
+  }
+
+  const nextIdRows = (await prisma.$queryRawUnsafe(
+    `SELECT COALESCE(MAX(id), 0) + 1 as id FROM users_legacy`
+  )) as Array<{ id: number | bigint }>;
+  const nextId = Number(nextIdRows[0]?.id ?? 1);
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO users_legacy (id, user_id, language, join_date, last_activity) VALUES (?, ?, ?, ?, ?)`,
+    nextId,
+    telegramId,
+    language,
+    now,
+    now
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -21,54 +52,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const telegramIdNum = parseInt(telegramId);
+    const telegramIdNum = parseInt(telegramId, 10);
 
-    // Перевіряємо чи користувач існує
     const existingUsers = await prisma.$queryRaw<Array<{ id: number }>>`
       SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
     `;
 
     if (existingUsers.length === 0) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
+      const now = new Date().toISOString();
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO User (telegramId, username, firstName, lastName, balance, rating, reviewsCount, isActive, agreementAccepted, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, 0, 5, 0, true, false, ?, ?)`,
+        telegramIdNum,
+        null,
+        null,
+        null,
+        now,
+        now
       );
     }
 
-    // Оновлюємо мову в таблиці User (якщо поле існує)
-    // Спочатку перевіряємо чи поле language існує
-    try {
-      await prisma.$executeRaw`
-        UPDATE User 
-        SET language = ${language}
-        WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-      `;
-    } catch (error: any) {
-      // Якщо поле language не існує, додаємо його
-      if (error.message?.includes('no such column: language')) {
-        await prisma.$executeRawUnsafe(`
-          ALTER TABLE User ADD COLUMN language TEXT DEFAULT 'uk'
-        `);
-        await prisma.$executeRaw`
-          UPDATE User 
-          SET language = ${language}
-          WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
-        `;
-      } else {
-        throw error;
-      }
-    }
-
-    // Також оновлюємо в legacy таблиці для сумісності
-    try {
-      await prisma.$executeRawUnsafe(`
-        UPDATE users_legacy 
-        SET language = ?
-        WHERE user_id = ?
-      `, language, telegramId.toString());
-    } catch (error) {
-      // Якщо таблиці немає, це не критично
-    }
+    await upsertLegacyLanguage(String(telegramId), language);
 
     return NextResponse.json({ success: true, language });
   } catch (error) {
@@ -102,4 +106,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

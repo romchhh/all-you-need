@@ -6,6 +6,25 @@ export interface Seller {
   username?: string | null;
 }
 
+export interface BusinessSeller {
+  businessName: string;
+  logo: string | null;
+  category: string;
+  city: string;
+  rating: number;
+  reviewsCount: number;
+  activeListingsCount: number;
+  followersCount: number;
+  memberSince: string;
+  plan: string | null;
+  telegram?: string | null;
+  phone?: string | null;
+  instagram?: string | null;
+  website?: string | null;
+  sellerTelegramId: string;
+  sellerUsername?: string | null;
+}
+
 export interface Listing {
   id: number;
   title: string;
@@ -38,6 +57,8 @@ export interface Listing {
   /** Автопродовження активності ще на 30 днів при закінченні терміну (лише власник). */
   autoRenew?: boolean;
   favoritesCount?: number;
+  profileType?: 'personal' | 'business';
+  businessSeller?: BusinessSeller | null;
 }
 
 export interface Subcategory {

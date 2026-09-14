@@ -1,11 +1,10 @@
-import sqlite3
 import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import json
 
-from database_functions.db_connection import get_connection, DB_PATH
+from database_functions.db_connection import get_connection, DB_PATH, row_to_dict
 
 
 class PrismaDB:
@@ -23,33 +22,34 @@ class PrismaDB:
     
     def get_user_by_telegram_id(self, telegram_id: int) -> Optional[Dict[str, Any]]:
         conn = self.get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT * FROM User WHERE telegramId = ?
-        """, (telegram_id,))
-        
-        row = cursor.fetchone()
-        conn.close()
-        
-        return dict(row) if row else None
+        try:
+            cursor.execute("""
+                SELECT * FROM User WHERE telegramId = ?
+            """, (telegram_id,))
+            
+            row = cursor.fetchone()
+            return row_to_dict(row)
+        finally:
+            conn.close()
     
     def create_user(self, telegram_id: int, username: Optional[str] = None,
                    first_name: Optional[str] = None, last_name: Optional[str] = None) -> int:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            INSERT INTO User (telegramId, username, firstName, lastName, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (telegram_id, username, first_name, last_name, datetime.now(), datetime.now()))
-        
-        user_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        return user_id
+        try:
+            cursor.execute("""
+                INSERT INTO User (telegramId, username, firstName, lastName, createdAt, updatedAt)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (telegram_id, username, first_name, last_name, datetime.now(), datetime.now()))
+            
+            user_id = cursor.lastrowid
+            conn.commit()
+            return user_id
+        finally:
+            conn.close()
     
     def create_listing(self, user_id: int, title: str, description: str, price: str,
                       category: str, location: str, images: List[str],
@@ -61,69 +61,67 @@ class PrismaDB:
         images_json = json.dumps(images)
         tags_json = json.dumps(tags) if tags else None
         
-        cursor.execute("""
-            INSERT INTO Listing (
-                userId, title, description, price, isFree, category, subcategory,
-                condition, location, images, tags, status, createdAt, updatedAt
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id, title, description, price, is_free, category, subcategory,
-            condition, location, images_json, tags_json, 'pending',
-            datetime.now(), datetime.now()
-        ))
-        
-        listing_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        return listing_id
+        try:
+            cursor.execute("""
+                INSERT INTO Listing (
+                    userId, title, description, price, isFree, category, subcategory,
+                    condition, location, images, tags, status, createdAt, updatedAt
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                user_id, title, description, price, is_free, category, subcategory,
+                condition, location, images_json, tags_json, 'pending',
+                datetime.now(), datetime.now()
+            ))
+            
+            listing_id = cursor.lastrowid
+            conn.commit()
+            return listing_id
+        finally:
+            conn.close()
     
     def get_listing_by_id(self, listing_id: int) -> Optional[Dict[str, Any]]:
         conn = self.get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT l.*, u.username, u.firstName, u.lastName, CAST(u.telegramId AS INTEGER) as sellerTelegramId
-            FROM Listing l
-            JOIN User u ON l.userId = u.id
-            WHERE l.id = ?
-        """, (listing_id,))
-        
-        row = cursor.fetchone()
-        conn.close()
-        
-        return dict(row) if row else None
+        try:
+            cursor.execute("""
+                SELECT l.*, u.username, u.firstName, u.lastName, CAST(u.telegramId AS INTEGER) as sellerTelegramId
+                FROM Listing l
+                JOIN User u ON l.userId = u.id
+                WHERE l.id = ?
+            """, (listing_id,))
+            
+            return row_to_dict(cursor.fetchone())
+        finally:
+            conn.close()
     
     def get_user_by_telegram_id_with_profile(self, telegram_id: int) -> Optional[Dict[str, Any]]:
         conn = self.get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT 
-                u.*,
-                COUNT(DISTINCT l.id) as totalListings,
-                COUNT(DISTINCT CASE WHEN l.status = 'active' THEN l.id END) as activeListings,
-                COUNT(DISTINCT CASE WHEN l.status = 'sold' THEN l.id END) as soldListings
-            FROM User u
-            LEFT JOIN Listing l ON u.id = l.userId
-            WHERE CAST(u.telegramId AS INTEGER) = ?
-            GROUP BY u.id
-        """, (telegram_id,))
-        
-        row = cursor.fetchone()
-        conn.close()
-        
-        return dict(row) if row else None
+        try:
+            cursor.execute("""
+                SELECT 
+                    u.*,
+                    COUNT(DISTINCT l.id) as totalListings,
+                    COUNT(DISTINCT CASE WHEN l.status = 'active' THEN l.id END) as activeListings,
+                    COUNT(DISTINCT CASE WHEN l.status = 'sold' THEN l.id END) as soldListings
+                FROM User u
+                LEFT JOIN Listing l ON u.id = l.userId
+                WHERE CAST(u.telegramId AS INTEGER) = ?
+                GROUP BY u.id
+            """, (telegram_id,))
+            
+            return row_to_dict(cursor.fetchone())
+        finally:
+            conn.close()
     
     def get_listings(self, category: Optional[str] = None,
                     subcategory: Optional[str] = None,
                     is_free: Optional[bool] = None,
                     limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
         conn = self.get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
         query = "SELECT * FROM Listing WHERE status = 'active'"
@@ -144,24 +142,25 @@ class PrismaDB:
         query += " ORDER BY createdAt DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
         
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
-        
-        return [dict(row) for row in rows]
+        try:
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return [row_to_dict(row) for row in rows if row_to_dict(row)]
+        finally:
+            conn.close()
     
     def update_user_balance(self, user_id: int, amount: float) -> bool:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            UPDATE User SET balance = balance + ?, updatedAt = ?
-            WHERE id = ?
-        """, (amount, datetime.now(), user_id))
-        
-        success = cursor.rowcount > 0
-        conn.commit()
-        conn.close()
-        
-        return success
-
+        try:
+            cursor.execute("""
+                UPDATE User SET balance = balance + ?, updatedAt = ?
+                WHERE id = ?
+            """, (amount, datetime.now(), user_id))
+            
+            success = cursor.rowcount > 0
+            conn.commit()
+            return success
+        finally:
+            conn.close()

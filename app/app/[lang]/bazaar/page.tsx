@@ -18,7 +18,7 @@ const ListingDetail = dynamic(
   { ssr: false }
 );
 const UserProfilePage = dynamic(
-  () => import('@/components/profile/UserProfilePage').then((m) => ({ default: m.UserProfilePage })),
+  () => import('@/components/profile/SellerProfileRouter').then((m) => ({ default: m.SellerProfileRouter })),
   { ssr: false }
 );
 const CreateListingFlow = dynamic(() => import('@/components/listing/CreateListingFlow'), { ssr: false });

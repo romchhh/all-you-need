@@ -112,6 +112,8 @@ const PRISMA_PG_TABLES = [
   'SystemSettings',
   'ListingPackagePurchase',
   'PromotionPurchase',
+  'BusinessProfile',
+  'BusinessSubscriptionPurchase',
   'Referral',
   'UserSession',
   'CityDigestQueue',
@@ -178,6 +180,16 @@ const PRISMA_PG_COLUMNS = [
   'rewardPaid',
   'rewardPaidAt',
   'sellerTelegramId',
+  'profileType',
+  'businessProfileId',
+  'businessName',
+  'coverImage',
+  'serviceArea',
+  'serviceRadiusKm',
+  'workingHours',
+  'subscriptionStatus',
+  'subscriptionEndsAt',
+  'isPublished',
 ];
 
 /** SELECT-аліаси, які не можна брати в лапки в ORDER BY / HAVING (PostgreSQL). */

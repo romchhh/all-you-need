@@ -606,6 +606,22 @@ class HybridRow:
         return self._map.keys()
 
 
+def row_to_dict(row: Any) -> Optional[dict[str, Any]]:
+    """Convert sqlite3.Row, HybridRow, or mapping to a plain dict."""
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return row
+    if isinstance(row, HybridRow):
+        return dict(row._map)
+    if hasattr(row, "keys") and callable(row.keys):
+        try:
+            return {k: row[k] for k in row.keys()}
+        except Exception:
+            pass
+    return None
+
+
 class DbConnection:
     def __init__(self, conn, *, managed_close: bool = True, is_pg: bool = False):
         self._conn = conn

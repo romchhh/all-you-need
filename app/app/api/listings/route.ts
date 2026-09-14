@@ -188,6 +188,7 @@ export async function GET(request: NextRequest) {
       // Отримуємо параметри фільтрації
       const status = searchParams.get('status');
       const categoryFilter = searchParams.get('category');
+      const profileTypeFilter = searchParams.get('profileType');
       
       // Для користувача використовуємо raw query з даними про продавця
       // Якщо це не власний профіль, виключаємо продані оголошення
@@ -213,6 +214,10 @@ export async function GET(request: NextRequest) {
       if (categoryFilter && categoryFilter !== 'all') {
         whereClause += " AND l.category = ?";
         queryParams.push(categoryFilter);
+      }
+      if (profileTypeFilter && (profileTypeFilter === 'personal' || profileTypeFilter === 'business')) {
+        whereClause += " AND COALESCE(l.profileType, 'personal') = ?";
+        queryParams.push(profileTypeFilter);
       }
       
       const query = `SELECT 

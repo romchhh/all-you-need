@@ -226,6 +226,53 @@ export async function POST(request: NextRequest) {
 
         console.log(`Package added to user ${payment.userId}: +${pkg.listingsCount} listings`);
       }
+
+      // Business subscription
+      const businessSubs = await prisma.$queryRawUnsafe(
+        `SELECT id, businessProfileId, plan, metadata FROM BusinessSubscriptionPurchase WHERE invoiceId = ? AND status = 'pending'`,
+        invoiceId
+      ) as Array<{ id: number; businessProfileId: number; plan: string; metadata: string | null }>;
+
+      if (businessSubs.length > 0) {
+        isPromotionOrPackagePayment = true;
+        const sub = businessSubs[0];
+        const { activateBusinessSubscription } = await import('@/lib/businessProfileHelpers');
+        const { isValidBusinessPlan } = await import('@/lib/businessProfileConstants');
+
+        let listingIds: number[] = [];
+        if (sub.metadata) {
+          try {
+            const parsed = JSON.parse(sub.metadata) as { listingIds?: number[] };
+            listingIds = Array.isArray(parsed.listingIds) ? parsed.listingIds : [];
+          } catch {
+            listingIds = [];
+          }
+        }
+
+        const subStarts = new Date();
+        const subEnds = new Date(subStarts);
+        subEnds.setDate(subEnds.getDate() + 30);
+
+        await prisma.businessSubscriptionPurchase.update({
+          where: { id: sub.id },
+          data: {
+            status: 'active',
+            startsAt: subStarts,
+            endsAt: subEnds,
+          },
+        });
+
+        if (isValidBusinessPlan(sub.plan)) {
+          await activateBusinessSubscription(
+            payment.userId,
+            sub.businessProfileId,
+            sub.plan,
+            listingIds
+          );
+        }
+
+        console.log(`Business subscription activated for user ${payment.userId}, plan ${sub.plan}`);
+      }
     }
 
     // Якщо платіж успішний (status === 'success') і це НЕ оплата реклами/пакету, поповнюємо баланс

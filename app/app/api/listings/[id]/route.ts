@@ -5,6 +5,7 @@ import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
+import { getBusinessSellerSummaryForUser } from '@/lib/businessProfileHelpers';
 
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
@@ -57,7 +58,7 @@ export async function GET(
         l.tags,
         l.createdAt,
         l.publishedAt,
-        u.id as userId,
+        COALESCE(l.profileType, 'personal') as profileType,
         CAST(u.telegramId AS INTEGER) as telegramId,
         u.username,
         u.firstName,
@@ -105,6 +106,7 @@ export async function GET(
         (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
       const arBroken =
         msg.includes('autoRenew') ||
+        msg.includes('profileType') ||
         msg.includes('COALESCE types boolean') ||
         msg.includes('DatatypeMismatch');
       if (!favBroken && !arBroken) {
@@ -116,6 +118,7 @@ export async function GET(
       }
       if (arBroken) {
         q = q.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
+        q = q.replace(", COALESCE(l.profileType, 'personal') as profileType", ", 'personal' as profileType");
       }
       listings = (await prisma.$queryRawUnsafe(q, listingId)) as Array<any>;
       if (listings[0]) {
@@ -190,6 +193,14 @@ export async function GET(
       publishedAt: listing.publishedAt,
       createdAt: listing.createdAt,
     });
+
+    const profileType = (listing as { profileType?: string }).profileType === 'business' ? 'business' : 'personal';
+    const langParam = (searchParams.get('lang') || 'uk') as 'uk' | 'ru';
+    let businessSeller = null;
+    if (profileType === 'business') {
+      businessSeller = await getBusinessSellerSummaryForUser(listing.userId, langParam);
+    }
+
     const formattedListing = {
         id: listing.id,
         title: listing.title,
@@ -229,13 +240,15 @@ export async function GET(
           parseDbDate(listing.createdAt)?.toISOString() ?? listing.createdAt,
         condition: normalizeCondition(listing.condition),
         tags: listing.tags ? JSON.parse(listing.tags) : [],
-        isFree: listing.isFree === 1,
+        isFree: listing.isFree === true || listing.isFree === 1 || listing.isFree === '1',
         status: listing.status || 'active',
         promotionType: listing.promotionType || null,
         promotionEnds: listing.promotionEnds || null,
         autoRenew:
           (listing as any).autoRenew === true || Number((listing as any).autoRenew) === 1,
         favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
+        profileType,
+        businessSeller,
       };
 
     return NextResponse.json(formattedListing);

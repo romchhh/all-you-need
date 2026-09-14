@@ -7,7 +7,7 @@ import { Listing } from '@/types';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { expandTelegramViewportIfMobile } from '@/lib/telegram/telegramViewport';
 import { ListingDetail } from '@/components/listing/ListingDetail';
-import { UserProfilePage } from '@/components/profile/UserProfilePage';
+import { SellerProfileRouter } from '@/components/profile/SellerProfileRouter';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { ProfileTab } from '@/components/tabs/ProfileTab';
 import { Toast } from '@/components/ui/Toast';
@@ -333,7 +333,7 @@ const ProfilePage = () => {
   const renderContent = () => {
     if (selectedSeller) {
       return (
-        <UserProfilePage
+        <SellerProfileRouter
           sellerTelegramId={selectedSeller.telegramId}
           sellerName={selectedSeller.name}
           sellerAvatar={selectedSeller.avatar}

@@ -15,6 +15,67 @@ def _rollback_on_error() -> None:
         pass
 
 
+def _users_legacy_next_id() -> int:
+    cursor.execute('SELECT COALESCE(MAX(id), 0) + 1 FROM users_legacy')
+    row = cursor.fetchone()
+    return int(row[0]) if row and row[0] is not None else 1
+
+
+def _normalize_db_bool(value) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    try:
+        return int(value) != 0
+    except (TypeError, ValueError):
+        return bool(value)
+
+
+def ensure_bot_user_record(
+    user_id,
+    user_name: str | None = None,
+    user_first_name: str | None = None,
+    user_last_name: str | None = None,
+) -> bool:
+    """Створює мінімальний запис User, якщо його ще немає (реєстрація в боті)."""
+    try:
+        uid = int(user_id)
+        cursor.execute("SELECT id FROM User WHERE telegramId = ?", (uid,))
+        if cursor.fetchone():
+            return True
+
+        current_date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute(
+            '''
+            INSERT INTO User (
+                telegramId, username, firstName, lastName, balance, rating,
+                reviewsCount, isActive, agreementAccepted, createdAt, updatedAt
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                uid,
+                user_name,
+                user_first_name,
+                user_last_name,
+                0.0,
+                5.0,
+                0,
+                True,
+                False,
+                current_date_str,
+                current_date_str,
+            ),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"ensure_bot_user_record failed for user {user_id}: {e}")
+        _rollback_on_error()
+        return False
+
+
 def create_table():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users_legacy (
@@ -34,101 +95,108 @@ def create_table():
     
     
 def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name: str, language: str = None, ref_link: int = None, avatar_path: str = None):
-    cursor.execute("SELECT id FROM User WHERE telegramId = ?", (int(user_id),))
-    existing_user = cursor.fetchone()
-    
-    current_date = datetime.now()
-    current_date_str = current_date.strftime('%Y-%m-%d %H:%M:%S')
-    
-    if existing_user is None:
-        cursor.execute('''
-            INSERT INTO User (telegramId, username, firstName, lastName, avatar, balance, rating, reviewsCount, isActive, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            int(user_id), 
-            user_name, 
-            user_first_name, 
-            user_last_name,
-            avatar_path,
-            0.0,  # balance
-            5.0,  # rating
-            0,    # reviewsCount
-            True,    # isActive
-            current_date_str,
-            current_date_str
-        ))
-        conn.commit()
+    try:
+        cursor.execute("SELECT id FROM User WHERE telegramId = ?", (int(user_id),))
+        existing_user = cursor.fetchone()
         
-        user_language = 'uk'  # За замовчуванням
-        if language:
-            if language.startswith('ru'):
-                user_language = 'ru'
-            elif language.startswith('uk'):
-                user_language = 'uk'
+        current_date = datetime.now()
+        current_date_str = current_date.strftime('%Y-%m-%d %H:%M:%S')
         
-        cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
-        legacy_row = cursor.fetchone()
-        if legacy_row:
-            cursor.execute(
-                '''
-                UPDATE users_legacy
-                SET user_name = ?, user_first_name = ?, user_last_name = ?,
-                    last_activity = ?,
-                    ref_link = COALESCE(?, ref_link)
-                WHERE user_id = ?
-                ''',
-                (
-                    user_name or '',
-                    user_first_name or '',
-                    user_last_name or '',
-                    current_date.strftime('%Y-%m-%d %H:%M:%S'),
-                    ref_link,
-                    str(user_id),
-                ),
-            )
+        if existing_user is None:
+            cursor.execute('''
+                INSERT INTO User (telegramId, username, firstName, lastName, avatar, balance, rating, reviewsCount, isActive, agreementAccepted, createdAt, updatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                int(user_id), 
+                user_name, 
+                user_first_name, 
+                user_last_name,
+                avatar_path,
+                0.0,  # balance
+                5.0,  # rating
+                0,    # reviewsCount
+                True,    # isActive
+                False,
+                current_date_str,
+                current_date_str
+            ))
+            conn.commit()
+            
+            user_language = 'uk'  # За замовчуванням
+            if language:
+                if language.startswith('ru'):
+                    user_language = 'ru'
+                elif language.startswith('uk'):
+                    user_language = 'uk'
+            
+            cursor.execute('SELECT id FROM users_legacy WHERE user_id = ?', (str(user_id),))
+            legacy_row = cursor.fetchone()
+            if legacy_row:
+                cursor.execute(
+                    '''
+                    UPDATE users_legacy
+                    SET user_name = ?, user_first_name = ?, user_last_name = ?,
+                        last_activity = ?,
+                        ref_link = COALESCE(?, ref_link)
+                    WHERE user_id = ?
+                    ''',
+                    (
+                        user_name or '',
+                        user_first_name or '',
+                        user_last_name or '',
+                        current_date.strftime('%Y-%m-%d %H:%M:%S'),
+                        ref_link,
+                        str(user_id),
+                    ),
+                )
+            else:
+                legacy_id = _users_legacy_next_id()
+                cursor.execute(
+                    '''
+                    INSERT INTO users_legacy (id, user_id, user_name, user_first_name, user_last_name, language, join_date, last_activity, ref_link)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (
+                        legacy_id,
+                        str(user_id),
+                        user_name,
+                        user_first_name,
+                        user_last_name,
+                        user_language,
+                        current_date.strftime('%Y-%m-%d %H:%M:%S'),
+                        current_date.strftime('%Y-%m-%d %H:%M:%S'),
+                        ref_link,
+                    ),
+                )
+            conn.commit()
         else:
-            cursor.execute(
-                '''
-                INSERT INTO users_legacy (user_id, user_name, user_first_name, user_last_name, language, join_date, last_activity, ref_link)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
-                (
-                    str(user_id),
-                    user_name,
-                    user_first_name,
-                    user_last_name,
-                    user_language,
-                    current_date.strftime('%Y-%m-%d %H:%M:%S'),
-                    current_date.strftime('%Y-%m-%d %H:%M:%S'),
-                    ref_link,
-                ),
-            )
-        conn.commit()
-    else:
-        update_query = '''
-            UPDATE User 
-            SET username = ?, firstName = ?, lastName = ?, updatedAt = ?
-        '''
-        update_params = [
-            user_name,
-            user_first_name,
-            user_last_name,
-            current_date_str,
-        ]
-        
-        if avatar_path:
             update_query = '''
                 UPDATE User 
-                SET username = ?, firstName = ?, lastName = ?, avatar = ?, updatedAt = ?
+                SET username = ?, firstName = ?, lastName = ?, updatedAt = ?
             '''
-            update_params.insert(-1, avatar_path)
-        
-        update_params.append(int(user_id))
-        update_query += ' WHERE telegramId = ?'
-        
-        cursor.execute(update_query, tuple(update_params))
-        conn.commit()
-        
+            update_params = [
+                user_name,
+                user_first_name,
+                user_last_name,
+                current_date_str,
+            ]
+            
+            if avatar_path:
+                update_query = '''
+                    UPDATE User 
+                    SET username = ?, firstName = ?, lastName = ?, avatar = ?, updatedAt = ?
+                '''
+                update_params.insert(-1, avatar_path)
+            
+            update_params.append(int(user_id))
+            update_query += ' WHERE telegramId = ?'
+            
+            cursor.execute(update_query, tuple(update_params))
+            conn.commit()
+    except Exception as e:
+        print(f"add_user failed for {user_id}: {e}")
+        _rollback_on_error()
+        raise
 
 def check_user(user_id: str):
     cursor.execute('SELECT id FROM User WHERE telegramId = ?', (int(user_id),))
@@ -234,10 +302,13 @@ def get_user_avatar(user_id: str):
 
 def get_user_agreement_status(user_id: str) -> bool:
     try:
-        cursor.execute("SELECT agreementAccepted FROM User WHERE telegramId = ?", (int(user_id),))
+        cursor.execute(
+            "SELECT agreementAccepted FROM User WHERE telegramId = ?",
+            (int(user_id),),
+        )
         result = cursor.fetchone()
         if result is not None:
-            return bool(result[0])
+            return _normalize_db_bool(result[0])
     except sqlite3.OperationalError:
         try:
             cursor.execute("ALTER TABLE User ADD COLUMN agreementAccepted INTEGER DEFAULT 0")
@@ -245,31 +316,48 @@ def get_user_agreement_status(user_id: str) -> bool:
             print("Added agreementAccepted column to User table")
         except Exception as e:
             print(f"Error adding agreementAccepted column: {e}")
+            _rollback_on_error()
+    except Exception as e:
+        print(f"Error getting agreement status for user {user_id}: {e}")
+        _rollback_on_error()
     return False
 
 
-def set_user_agreement_status(user_id: str, accepted: bool):
+def set_user_agreement_status(user_id: str, accepted: bool) -> bool:
     try:
-        cursor.execute("SELECT agreementAccepted FROM User WHERE telegramId = ?", (int(user_id),))
+        uid = int(user_id)
+        cursor.execute("SELECT id FROM User WHERE telegramId = ?", (uid,))
         result = cursor.fetchone()
         if result is None:
             print(f"User {user_id} not found when setting agreement status")
-            return
+            return False
+
+        accepted_val = True if accepted else False
+        current_date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute(
+            '''
+            UPDATE User
+            SET agreementAccepted = ?, updatedAt = ?
+            WHERE telegramId = ?
+            ''',
+            (accepted_val, current_date_str, uid),
+        )
+        conn.commit()
+        print(f"User {user_id} agreement status set to {accepted}")
+        return True
     except sqlite3.OperationalError:
         try:
             cursor.execute("ALTER TABLE User ADD COLUMN agreementAccepted INTEGER DEFAULT 0")
             conn.commit()
-            print("Added agreementAccepted column to User table")
+            return set_user_agreement_status(user_id, accepted)
         except Exception as e:
             print(f"Error adding agreementAccepted column: {e}")
-            return
-    
-    cursor.execute(
-        "UPDATE User SET agreementAccepted = ? WHERE telegramId = ?",
-        (1 if accepted else 0, int(user_id))
-    )
-    conn.commit()
-    print(f"User {user_id} agreement status set to {accepted}")
+            _rollback_on_error()
+            return False
+    except Exception as e:
+        print(f"Error setting agreement status for user {user_id}: {e}")
+        _rollback_on_error()
+        return False
 
 
 def get_user_phone(user_id: str) -> str | None:
@@ -327,16 +415,19 @@ def set_user_language(user_id: int, language: str):
                 (language, str(user_id)),
             )
         else:
+            legacy_id = _users_legacy_next_id()
+            now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute(
                 '''
-                INSERT INTO users_legacy (user_id, language, join_date, last_activity)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO users_legacy (id, user_id, language, join_date, last_activity)
+                VALUES (?, ?, ?, ?, ?)
             ''',
                 (
+                    legacy_id,
                     str(user_id),
                     language,
-                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    now_str,
+                    now_str,
                 ),
             )
 

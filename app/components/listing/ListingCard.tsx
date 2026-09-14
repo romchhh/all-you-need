@@ -20,12 +20,12 @@ interface ListingCardProps {
   onSelect: (listing: Listing) => void;
   onToggleFavorite: (id: number) => void;
   tg: TelegramWebApp | null;
-  /** Перші картки above-the-fold — eager + high fetch priority */
   priority?: boolean;
   isSold?: boolean;
   isDeactivated?: boolean;
   /** `stacked` — завжди вертикальна картка як на мобільному (для горизонтальних каруселей на десктопі). */
   layout?: 'responsive' | 'stacked';
+  showBusinessBadge?: boolean;
 }
 
 const ListingCardComponent = ({
@@ -38,6 +38,7 @@ const ListingCardComponent = ({
   isDeactivated = false,
   layout = 'responsive',
   priority = false,
+  showBusinessBadge = false,
 }: ListingCardProps) => {
   const isStacked = layout === 'stacked';
   const { t, language } = useLanguage();
@@ -187,8 +188,13 @@ const ListingCardComponent = ({
         }
       >
         {/* Бейдж реклами (VIP/TOP) - лівий верхній кут */}
-        <div className="absolute top-3 left-3 z-10" style={{ width: 'auto', maxWidth: 'fit-content' }}>
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1" style={{ width: 'auto', maxWidth: 'fit-content' }}>
           {getPromotionBadge()}
+          {(showBusinessBadge || listing.profileType === 'business') && (
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-[#C8E6A0] text-[#0f1408] tracking-wide">
+              BUSINESS
+            </span>
+          )}
         </div>
         
         {/* Placeholder або зображення */}

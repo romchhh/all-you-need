@@ -9,7 +9,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { SearchView } from '@/components/search/SearchView';
 import { ListingDetail } from '@/components/listing/ListingDetail';
-import { UserProfilePage } from '@/components/profile/UserProfilePage';
+import { SellerProfileRouter } from '@/components/profile/SellerProfileRouter';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
@@ -232,7 +232,7 @@ export default function SearchPage() {
   if (selectedSeller) {
     return (
       <div className="min-h-screen overflow-x-hidden">
-        <UserProfilePage
+        <SellerProfileRouter
           sellerTelegramId={selectedSeller.telegramId}
           sellerName={selectedSeller.name}
           sellerAvatar={selectedSeller.avatar}

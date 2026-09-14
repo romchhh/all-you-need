@@ -117,7 +117,8 @@ TEXTS = {
             "location": "Место: {location}",
             "seller": "Продавец: {seller}",
             "button": "Открыть в Marketplace",
-            "instruction": "Нажмите кнопку ниже, чтобы посмотреть детали:"
+            "instruction": "Нажмите кнопку ниже, чтобы посмотреть детали:",
+            "not_found": "❌ Объявление не найдено или уже неактивно."
         },
         "user": {
             "title": "👤 <b>{name}</b> {username}",

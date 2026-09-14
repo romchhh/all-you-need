@@ -17,6 +17,8 @@ export type PackageType = keyof typeof PACKAGE_PRICES;
 export type PromotionType = keyof typeof PROMOTION_PRICES;
 export type PaymentMethod = 'balance' | 'direct';
 
+export { BUSINESS_PLANS, type BusinessPlanId } from '@/lib/businessProfileConstants';
+
 /**
  * Валідує тип пакету
  */

@@ -7,6 +7,10 @@ import {
   processPromotionPurchaseFromBalance,
   createPromotionPurchaseRecord,
 } from '@/lib/payments/paymentHelpers';
+import {
+  resolveBusinessPromotionPricing,
+  consumeBusinessPromotionCredit,
+} from '@/lib/businessProfileHelpers';
 import type { PromotionType } from '@/lib/payments/paymentConstants';
 import { createMonobankInvoice } from '@/lib/monobank';
 
@@ -59,16 +63,8 @@ export async function POST(request: NextRequest) {
       console.log('[Promotions API] Balance payment selected');
 
       const balance = Number(user.balance);
-      if (!Number.isFinite(balance) || balance < promotionInfo.price) {
-        console.error('[Promotions API] Insufficient balance:', { balance: user.balance, price: promotionInfo.price });
-        return NextResponse.json(
-          {
-            error: 'Insufficient balance',
-            balance,
-            required: promotionInfo.price,
-          },
-          { status: 400 }
-        );
+      if (!Number.isFinite(balance)) {
+        return NextResponse.json({ error: 'Invalid balance' }, { status: 400 });
       }
 
       if (parsedListingId) {
@@ -86,13 +82,48 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      let effectivePrice: number = promotionInfo.price;
+      let usedBusinessCredit = false;
+
+      if (
+        parsedListingId &&
+        (promotionType === 'highlighted' || promotionType === 'top_category' || promotionType === 'vip')
+      ) {
+        const businessPricing = await resolveBusinessPromotionPricing(
+          user.id,
+          promotionType as 'highlighted' | 'top_category' | 'vip'
+        );
+        if (businessPricing?.kind === 'credit') {
+          const consumed = await consumeBusinessPromotionCredit(user.id, businessPricing.creditType);
+          if (consumed) {
+            effectivePrice = 0;
+            usedBusinessCredit = true;
+          }
+        } else if (businessPricing?.kind === 'paid') {
+          effectivePrice = businessPricing.price;
+        }
+      }
+
+      if (!usedBusinessCredit && effectivePrice > 0 && (!Number.isFinite(balance) || balance < effectivePrice)) {
+        console.error('[Promotions API] Insufficient balance:', { balance: user.balance, price: effectivePrice });
+        return NextResponse.json(
+          {
+            error: 'Insufficient balance',
+            balance,
+            required: effectivePrice,
+          },
+          { status: 400 }
+        );
+      }
+
       // Списуємо з балансу
       try {
         const result = await processPromotionPurchaseFromBalance(
           user.id,
           balance,
           promotionType as PromotionType,
-          parsedListingId
+          parsedListingId,
+          effectivePrice
         );
 
         console.log('[Promotions API] Balance payment successful');

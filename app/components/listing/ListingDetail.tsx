@@ -34,6 +34,7 @@ import { formatTimeAgo } from '@/utils/formatTime';
 import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { descriptionWithLinks } from '@/utils/descriptionLinks';
 import { formatListingDescriptionForDisplay } from '@/utils/listingDescriptionDisplay';
+import { BusinessSellerBlock } from '@/components/business/BusinessSellerBlock';
 import { useRouter, useParams } from 'next/navigation';
 import { FixedLogoHeader } from '@/components/layout/FixedLogoHeader';
 import { getCategories } from '@/constants/categories';
@@ -1125,6 +1126,21 @@ export const ListingDetail = ({
           )}
 
         {/* Продавець */}
+        {listing.businessSeller && onViewSellerProfile && !isOwnListing ? (
+          <BusinessSellerBlock
+            business={listing.businessSeller}
+            tg={tg}
+            onViewProfile={() =>
+              onViewSellerProfile(
+                listing.businessSeller!.sellerTelegramId,
+                listing.businessSeller!.businessName,
+                listing.businessSeller!.logo || listing.seller.avatar,
+                listing.businessSeller!.sellerUsername || undefined,
+                listing.businessSeller!.phone || listing.seller.phone || undefined
+              )
+            }
+          />
+        ) : (
         <div
           className={`mb-6 rounded-2xl p-4 ${
             isLight ? 'bg-gray-50/90' : 'bg-[#141414]'
@@ -1212,6 +1228,7 @@ export const ListingDetail = ({
             </button>
           )}
         </div>
+        )}
 
         </div>
         </div>
