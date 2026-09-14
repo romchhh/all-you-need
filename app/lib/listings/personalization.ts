@@ -21,7 +21,7 @@ export type PersonalizationOrderBoost = {
   params: unknown[];
 };
 
-const PROFILE_CACHE_MS = 90_000;
+const PROFILE_CACHE_MS = 30 * 60 * 1000;
 const profileCache = new Map<string, { at: number; profile: UserPersonalizationProfile }>();
 
 function emptyProfile(): UserPersonalizationProfile {
@@ -62,10 +62,15 @@ export function shouldPersonalizeCatalogFeed(params: {
   viewerId: string | null;
   sortBy: string;
   search: string | null;
+  category: string | null;
+  subcategory: string | null;
+  feedMode: string | null;
 }): boolean {
-  if (!params.viewerId?.trim()) return false;
   if (params.sortBy !== 'newest') return false;
-  return true;
+  if (params.search?.trim()) return false;
+  if (params.category || params.subcategory) return false;
+  if (params.feedMode === 'new') return false;
+  return params.feedMode === 'forYou';
 }
 
 export async function loadUserPersonalizationProfile(
@@ -166,7 +171,8 @@ export async function loadUserPersonalizationProfile(
            'subcategory_click',
            'search_submit',
            'listing_view',
-           'favorite_add'
+           'favorite_add',
+           'contact_seller'
          )
        ORDER BY createdAt DESC
        LIMIT 150`,
@@ -201,6 +207,17 @@ export async function loadUserPersonalizationProfile(
             bumpScore(profile.categoryScores, meta.category, 4);
           }
           break;
+        case 'contact_seller':
+          if (typeof meta.category === 'string') {
+            bumpScore(profile.categoryScores, meta.category, 8);
+          }
+          if (typeof meta.subcategory === 'string') {
+            bumpScore(profile.subcategoryScores, meta.subcategory, 6);
+          }
+          if (typeof meta.location === 'string') {
+            bumpScore(profile.cityScores, meta.location, 5);
+          }
+          break;
         case 'search_submit': {
           const q = (ev.entityId || (meta.query as string) || '').trim().toLowerCase();
           if (q.length >= 2 && q.length <= 40) {
@@ -214,6 +231,35 @@ export async function loadUserPersonalizationProfile(
     }
 
     profile.searchTerms = [...termSet].slice(0, 6);
+
+    if (userId) {
+      const contactsSince = isPostgres()
+        ? `ae.createdAt >= NOW() - INTERVAL '60 days'`
+        : `ae.createdAt >= datetime('now', '-60 days')`;
+      const contacts = (await queryRawUnsafe(
+        `SELECT l.category, l.subcategory, l.location
+         FROM AnalyticsEvent ae
+         JOIN Listing l ON l.id = CAST(ae.entityId AS INTEGER)
+         WHERE ${contactsSince}
+           AND ae.eventName = 'contact_seller'
+           AND (ae.telegramId = ? OR ae.userId = ?)
+         ORDER BY ae.createdAt DESC
+         LIMIT 30`,
+        tid,
+        userId
+      )) as Array<{
+        category: string;
+        subcategory: string | null;
+        location: string;
+      }>;
+
+      for (const row of contacts) {
+        bumpScore(profile.categoryScores, row.category, 8);
+        bumpScore(profile.subcategoryScores, row.subcategory, 6);
+        bumpScore(profile.cityScores, row.location, 5);
+      }
+    }
+
     profile.hasSignals =
       views.length > 0 ||
       events.length > 0 ||
@@ -272,4 +318,38 @@ export function buildPersonalizationOrderBoost(
   }
 
   return { sql: parts.join(' + '), params };
+}
+
+/** Холодний старт для нових користувачів без сигналів інтересів. */
+export function buildColdStartOrderBoost(): PersonalizationOrderBoost {
+  const recent7 = isPostgres()
+    ? `COALESCE(l."publishedAt", l."createdAt") >= NOW() - INTERVAL '7 days'`
+    : `datetime(COALESCE(l.publishedAt, l.createdAt)) >= datetime('now', '-7 days')`;
+  const recent30 = isPostgres()
+    ? `COALESCE(l."publishedAt", l."createdAt") >= NOW() - INTERVAL '30 days'`
+    : `datetime(COALESCE(l.publishedAt, l.createdAt)) >= datetime('now', '-30 days')`;
+
+  const diversitySql = isPostgres()
+    ? `(ABS(hashtext(COALESCE(l.category, '') || CAST(l.id AS TEXT))) % 19)`
+    : `(ABS(CAST(substr(hex(l.id), 1, 8) AS INTEGER)) % 19)`;
+
+  const sql = [
+    '0',
+    `CASE WHEN ${recent7} THEN 14 WHEN ${recent30} THEN 7 ELSE 3 END`,
+    `CASE WHEN l.images IS NOT NULL AND l.images != '[]' AND l.images != '' THEN 8 ELSE 0 END`,
+    `CASE WHEN u.avatar IS NOT NULL AND u.avatar != '' AND u.avatar != '👤' THEN 5 ELSE 0 END`,
+    `CASE WHEN u.username IS NOT NULL AND TRIM(u.username) != '' THEN 4 ELSE 0 END`,
+    'CASE WHEN COALESCE(l.views, 0) >= 5 THEN LEAST(COALESCE(l.views, 0) / 8, 12) ELSE 0 END',
+    diversitySql,
+  ].join(' + ');
+
+  return { sql, params: [] };
+}
+
+export function invalidatePersonalizationProfileCache(telegramId?: string): void {
+  if (telegramId?.trim()) {
+    profileCache.delete(telegramId.trim());
+    return;
+  }
+  profileCache.clear();
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Star, MapPin, Users, Package, Calendar, ChevronRight, BadgeCheck } from 'lucide-react';
+import { MapPin, Users, Package, Calendar, ChevronRight, BadgeCheck } from 'lucide-react';
 import { BusinessSeller } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -64,13 +64,6 @@ export function BusinessSellerBlock({ business, onViewProfile, tg }: BusinessSel
             >
               BUSINESS{isPro ? ' PRO' : ''}
             </span>
-            <div className={`flex items-center gap-1 text-sm mb-1 ${ac.mutedText}`}>
-              <Star size={14} className="text-amber-400 fill-amber-400 shrink-0" />
-              <span>
-                {Number(business.rating ?? 0).toFixed(1)} ({business.reviewsCount}{' '}
-                {t('businessProfile.public.reviewsCountLabel')})
-              </span>
-            </div>
             <div className={`flex items-center gap-1 text-sm ${ac.mutedText}`}>
               <MapPin size={14} className="shrink-0" />
               <span>

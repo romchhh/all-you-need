@@ -27,6 +27,7 @@ import {
   generateSearchVariants,
 } from '@/lib/listings/searchVariants';
 import {
+  buildColdStartOrderBoost,
   buildPersonalizationOrderBoost,
   loadUserPersonalizationProfile,
   shouldPersonalizeCatalogFeed,
@@ -81,6 +82,7 @@ export async function GET(request: NextRequest) {
     const currency = sp.get('currency')?.trim().toUpperCase() || null;
     const viewerId =
       sp.get('viewerId')?.trim() || sp.get('telegramId')?.trim() || null;
+    const feedMode = sp.get('feedMode')?.trim() || 'forYou';
 
     const filters: CatalogFilterParams = {
       category,
@@ -100,6 +102,9 @@ export async function GET(request: NextRequest) {
       viewerId,
       sortBy,
       search,
+      category,
+      subcategory,
+      feedMode,
     });
 
     const isServerCacheable =
@@ -151,10 +156,15 @@ export async function GET(request: NextRequest) {
 
     let personalizationBoost = null;
     let personalized = false;
-    if (personalize && viewerId) {
-      const profile = await loadUserPersonalizationProfile(viewerId);
-      personalizationBoost = buildPersonalizationOrderBoost(profile);
+    if (personalize) {
       personalized = true;
+      if (viewerId) {
+        const profile = await loadUserPersonalizationProfile(viewerId);
+        personalizationBoost =
+          buildPersonalizationOrderBoost(profile) ?? buildColdStartOrderBoost();
+      } else {
+        personalizationBoost = buildColdStartOrderBoost();
+      }
     }
 
     const { clause: orderByClause, params: orderParams } = catalogOrderByClause(

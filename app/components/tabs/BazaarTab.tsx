@@ -15,7 +15,6 @@ import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsE
 import { ListingsRefreshOverlay } from '@/components/ui/ListingsRefreshOverlay';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { HomeActivityStats } from '@/components/home/HomeActivityStats';
-import { IosSwitch } from '@/components/ui/IosSwitch';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -129,47 +128,41 @@ const BazaarTabComponent = ({
 
   const lastSyncedCatalogKeyRef = useRef<string | null>(null);
 
-  // Синхронізуємо локальний стан з savedState при монтуванні та при зміні
+  // Синхронізуємо локальний стан з savedState (коли батько змінив каталог — deep link, modal тощо)
   useEffect(() => {
-    if (savedState) {
-      const catalogKey = `${savedState.selectedCategory ?? ''}|${savedState.selectedSubcategory ?? ''}`;
-      const catalogChanged = lastSyncedCatalogKeyRef.current !== catalogKey;
-      lastSyncedCatalogKeyRef.current = catalogKey;
+    if (!savedState) return;
+    const catalogKey = `${savedState.selectedCategory ?? ''}|${savedState.selectedSubcategory ?? ''}`;
+    const catalogChanged = lastSyncedCatalogKeyRef.current !== catalogKey;
+    if (!catalogChanged) return;
+    lastSyncedCatalogKeyRef.current = catalogKey;
 
-      // Оновлюємо стан тільки якщо він справді змінився
-      if (savedState.selectedCategory !== selectedCategory && savedState.selectedCategory !== undefined) {
-        setSelectedCategory(savedState.selectedCategory);
-      }
-      if (savedState.selectedSubcategory !== selectedSubcategory && savedState.selectedSubcategory !== undefined) {
-        setSelectedSubcategory(savedState.selectedSubcategory);
-      }
-      if (catalogChanged) {
-        setMinPrice(null);
-        setMaxPrice(null);
-        setSelectedCondition(null);
-        setSelectedCurrency(null);
-      }
-      if (savedState.showFreeOnly !== showFreeOnly && savedState.showFreeOnly !== undefined) {
-        setShowFreeOnly(savedState.showFreeOnly);
-      }
-      if (savedState.sortBy !== sortBy && savedState.sortBy !== undefined) {
-        setSortBy(savedState.sortBy);
-      }
-      if (savedState.selectedCities && JSON.stringify(savedState.selectedCities) !== JSON.stringify(selectedCities)) {
-        setSelectedCities(savedState.selectedCities);
-      }
-      if (savedState.minPrice !== minPrice && savedState.minPrice !== undefined) {
-        setMinPrice(savedState.minPrice);
-      }
-      if (savedState.maxPrice !== maxPrice && savedState.maxPrice !== undefined) {
-        setMaxPrice(savedState.maxPrice);
-      }
-      if (savedState.selectedCondition !== selectedCondition && savedState.selectedCondition !== undefined) {
-        setSelectedCondition(savedState.selectedCondition);
-      }
-      if (savedState.selectedCurrency !== selectedCurrency && savedState.selectedCurrency !== undefined) {
-        setSelectedCurrency(savedState.selectedCurrency as Currency | null);
-      }
+    setSelectedCategory(savedState.selectedCategory ?? null);
+    setSelectedSubcategory(savedState.selectedSubcategory ?? null);
+    setMinPrice(null);
+    setMaxPrice(null);
+    setSelectedCondition(null);
+    setSelectedCurrency(null);
+
+    if (savedState.showFreeOnly !== undefined) {
+      setShowFreeOnly(savedState.showFreeOnly);
+    }
+    if (savedState.sortBy !== undefined) {
+      setSortBy(savedState.sortBy);
+    }
+    if (savedState.selectedCities) {
+      setSelectedCities(savedState.selectedCities);
+    }
+    if (savedState.minPrice !== undefined) {
+      setMinPrice(savedState.minPrice);
+    }
+    if (savedState.maxPrice !== undefined) {
+      setMaxPrice(savedState.maxPrice);
+    }
+    if (savedState.selectedCondition !== undefined) {
+      setSelectedCondition(savedState.selectedCondition);
+    }
+    if (savedState.selectedCurrency !== undefined) {
+      setSelectedCurrency(savedState.selectedCurrency as Currency | null);
     }
   }, [savedState?.selectedCategory, savedState?.selectedSubcategory, savedState?.showFreeOnly, savedState?.sortBy, savedState?.selectedCities, savedState?.minPrice, savedState?.maxPrice, savedState?.selectedCondition, savedState?.selectedCurrency]);
   
@@ -569,37 +562,6 @@ const BazaarTabComponent = ({
               <HomeActivityStats isLight={isLight} />
             </div>
           </div>
-          {profileTelegramId &&
-            !selectedCategory &&
-            sortBy === 'newest' &&
-            !hasActiveFilters && (
-              <div className="animate-content-in px-4 pb-2 lg:flex lg:justify-center lg:px-6">
-                <div
-                  className={`flex w-full max-w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 lg:max-w-xl xl:max-w-2xl ${
-                    isLight
-                      ? 'border border-[#3F5331]/12 bg-white/90 shadow-sm ring-1 ring-black/[0.03]'
-                      : 'border border-white/10 bg-white/[0.04]'
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-semibold leading-tight ${ac.pageHeading}`}>
-                      {t('bazaar.personalizedFeed')}
-                    </p>
-                    <p className={`mt-0.5 text-xs leading-snug ${ac.mutedText}`}>
-                      {t('bazaar.personalizedFeedHint')}
-                    </p>
-                  </div>
-                  <IosSwitch
-                    checked={savedState?.personalizedFeedEnabled !== false}
-                    onChange={(next) => {
-                      onStateChange?.({ personalizedFeedEnabled: next });
-                      tg?.HapticFeedback?.impactOccurred('light');
-                    }}
-                    aria-label={t('bazaar.personalizedFeed')}
-                  />
-                </div>
-              </div>
-            )}
         </>
       )}
 
@@ -755,6 +717,49 @@ const BazaarTabComponent = ({
           />
         </div>
       )}
+
+      {/* Режим стрічки: Для Вас / Нове — між категоріями та картками */}
+      {!searchQuery.trim() &&
+        !selectedCategory &&
+        sortBy === 'newest' &&
+        !hasActiveFilters && (
+          <div className="animate-content-in px-4 pb-3 pt-1 lg:flex lg:justify-center lg:px-6">
+            <div className="flex w-full max-w-full gap-8 lg:max-w-xl xl:max-w-2xl">
+              {(['forYou', 'new'] as const).map((mode) => {
+                const active = pickBazaarTabField(savedState, 'feedMode') === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => {
+                      if (active) return;
+                      onStateChange?.({ feedMode: mode });
+                      trackAnalytics({
+                        eventName: ANALYTICS_EVENTS.navTabClick,
+                        eventGroup: ANALYTICS_EVENT_GROUPS.navigation,
+                        entityType: 'feed_mode',
+                        entityId: mode,
+                        telegramId: profileTelegramId,
+                      });
+                      tg?.HapticFeedback?.impactOccurred('light');
+                    }}
+                    className={`relative pb-2 text-sm font-semibold transition-colors ${
+                      active
+                        ? isLight
+                          ? 'text-[#3F5331] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-[#3F5331]'
+                          : 'text-[#C8E6A0] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-[#C8E6A0]'
+                        : isLight
+                          ? 'text-[#5A6B52] hover:text-[#3F5331]'
+                          : 'text-white/60 hover:text-[#C8E6A0]'
+                    }`}
+                  >
+                    {mode === 'forYou' ? t('bazaar.feedForYou') : t('bazaar.feedNew')}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
       {/* Сітка або список оголошень */}
       {initialLoading && filteredAndSortedListings.length === 0 ? (
@@ -923,7 +928,7 @@ export const BazaarTab = memo(BazaarTabComponent, (prevProps, nextProps) => {
     prevProps.savedState?.selectedCurrency === nextProps.savedState?.selectedCurrency &&
     prevProps.savedState?.sortBy === nextProps.savedState?.sortBy &&
     prevProps.savedState?.showFreeOnly === nextProps.savedState?.showFreeOnly &&
-    prevProps.savedState?.personalizedFeedEnabled === nextProps.savedState?.personalizedFeedEnabled &&
+    prevProps.savedState?.feedMode === nextProps.savedState?.feedMode &&
     prevProps.initialSelectedCategory === nextProps.initialSelectedCategory &&
     prevProps.profileTelegramId === nextProps.profileTelegramId &&
     prevProps.catalogPersonalized === nextProps.catalogPersonalized &&

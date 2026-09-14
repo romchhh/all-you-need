@@ -274,13 +274,11 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
   if (Number.isNaN(telegramIdNum)) return null;
 
   const users = (await prisma.$queryRawUnsafe(
-    `SELECT id, username, rating, reviewsCount, createdAt FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+    `SELECT id, username, createdAt FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
     telegramIdNum
   )) as Array<{
     id: number;
     username: string | null;
-    rating: number;
-    reviewsCount: number;
     createdAt: Date | string;
   }>;
 
@@ -303,23 +301,11 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
     user.id
   )) as Array<{ cnt: bigint | number }>;
 
-  const reviews = (await prisma.$queryRawUnsafe(
-    `SELECT id, rating, comment, createdAt, userId FROM Review WHERE targetId = ? ORDER BY createdAt DESC LIMIT 50`,
-    user.id
-  )) as Array<{
-    id: number;
-    rating: number;
-    comment: string | null;
-    createdAt: Date | string;
-    userId: number;
-  }>;
-
   return {
     profile,
     user,
     listingIds,
     activeListingsCount: Number(activeListingsCount[0]?.cnt ?? 0),
-    reviews,
   };
 }
 
@@ -350,13 +336,11 @@ export async function getBusinessSellerSummaryForUser(
   if (!profile || !isBusinessProfileActive(profile)) return null;
 
   const users = (await prisma.$queryRawUnsafe(
-    `SELECT CAST(telegramId AS INTEGER) as telegramId, username, rating, reviewsCount, createdAt FROM User WHERE id = ?`,
+    `SELECT CAST(telegramId AS INTEGER) as telegramId, username, createdAt FROM User WHERE id = ?`,
     userId
   )) as Array<{
     telegramId: number;
     username: string | null;
-    rating: number;
-    reviewsCount: number;
     createdAt: Date | string;
   }>;
 
@@ -373,8 +357,6 @@ export async function getBusinessSellerSummaryForUser(
     logo: profile.logo,
     category: profile.category,
     city: profile.city,
-    rating: user.rating,
-    reviewsCount: user.reviewsCount,
     activeListingsCount: Number(activeListingsCount[0]?.cnt ?? 0),
     followersCount: profile.followersCount,
     memberSince: formatBusinessMemberSince(user.createdAt, lang),

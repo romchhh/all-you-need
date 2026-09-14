@@ -48,6 +48,25 @@ function setLangCookie(lang: Language) {
   document.cookie = `${LANG_COOKIE_NAME}=${lang}; path=/; max-age=${LANG_COOKIE_MAX_AGE}; SameSite=Lax`;
 }
 
+function getLangFromPath(path: string | null | undefined): Language | null {
+  if (!path) return null;
+  if (path.startsWith('/ru')) return 'ru';
+  if (path.startsWith('/uk')) return 'uk';
+  return null;
+}
+
+async function persistLanguageToDb(telegramId: string, lang: Language) {
+  try {
+    await fetch('/api/user/language', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegramId, language: lang }),
+    });
+  } catch (error) {
+    console.error('Failed to save language to database:', error);
+  }
+}
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -93,13 +112,51 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
   const [isLoadingLanguage, setIsLoadingLanguage] = useState(false);
   // Не блокуємо рендер «через мову з БД»: на сервері window немає — початковий стан інакший би ламав гідратацію.
 
+  // URL — джерело правди при навігації (/uk/..., /ru/...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const path = pathname ?? window.location.pathname;
+    const urlLang = getLangFromPath(path);
+    if (!urlLang) return;
+    setLanguageState((prev) => (prev === urlLang ? prev : urlLang));
+    localStorage.setItem('language', urlLang);
+    setLangCookie(urlLang);
+  }, [pathname]);
+
   useEffect(() => {
     const loadLanguageFromDB = async () => {
       if (typeof window === 'undefined') return;
+      const path = pathname ?? window.location.pathname;
+      const urlLang = getLangFromPath(path);
       const telegramId = userTelegramId || (window as any).__userTelegramId || getTelegramIdSync();
       const urlParams = new URLSearchParams(window.location.search);
       const telegramIdFromUrl = urlParams.get('telegramId');
       const finalTelegramId = telegramId?.toString() ?? telegramIdFromUrl ?? null;
+
+      // Якщо в URL уже є мова — не перебиваємо її значенням з БД
+      if (urlLang) {
+        setLanguageState(urlLang);
+        localStorage.setItem('language', urlLang);
+        setLangCookie(urlLang);
+        if (finalTelegramId) {
+          setIsLoadingLanguage(true);
+          try {
+            const tid = parseInt(finalTelegramId, 10);
+            if (!Number.isNaN(tid)) {
+              const { res, data } = await loadProfileBundle(tid);
+              if (res.ok && data.language && data.language !== urlLang) {
+                await persistLanguageToDb(finalTelegramId, urlLang);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to load language from database:', error);
+          } finally {
+            setIsLoadingLanguage(false);
+          }
+        }
+        return;
+      }
+
       if (finalTelegramId) {
         setIsLoadingLanguage(true);
         try {
@@ -111,14 +168,10 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
               setLanguageState(dbLang);
               localStorage.setItem('language', dbLang);
               setLangCookie(dbLang);
-              const path = pathname ?? window.location.pathname;
-              const currentPrefix = path.startsWith('/ru') ? 'ru' : path.startsWith('/uk') ? 'uk' : null;
-              if (currentPrefix && currentPrefix !== dbLang) {
-                const pathWithoutLang = path.replace(/^\/(uk|ru)/, '') || '/';
-                const newPath = `/${dbLang}${pathWithoutLang.startsWith('/') ? pathWithoutLang : '/' + pathWithoutLang}`;
-                const search = window.location.search || '';
-                router.replace(newPath + search);
-              }
+              const pathWithoutLang = path.replace(/^\/(uk|ru)/, '') || '/';
+              const newPath = `/${dbLang}${pathWithoutLang.startsWith('/') ? pathWithoutLang : '/' + pathWithoutLang}`;
+              const search = window.location.search || '';
+              router.replace(newPath + search);
             }
           }
         } catch (error) {
@@ -158,18 +211,7 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
       setLangCookie(language);
       const telegramIdForSync = userTelegramId || getTelegramIdSync();
       if (telegramIdForSync) {
-        fetch('/api/user/language', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            telegramId: telegramIdForSync,
-            language: language,
-          }),
-        }).catch((error) => {
-          console.error('Failed to save language to database:', error);
-        });
+        void persistLanguageToDb(String(telegramIdForSync), language);
       }
 
       // URL оновлюється через router.push в LanguageSwitcher

@@ -9,7 +9,6 @@ import {
   MessageCircle,
   MoreHorizontal,
   Phone,
-  Star,
   Users,
   SlidersHorizontal,
 } from 'lucide-react';
@@ -36,7 +35,7 @@ import { PhoneModal } from '@/components/modals/PhoneModal';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { getProfileShareLink } from '@/utils/botLinks';
 
-type TabId = 'listings' | 'about' | 'reviews';
+type TabId = 'listings' | 'about';
 type ListingFilter = 'all' | 'services' | 'products';
 
 interface PublicBusinessProfile {
@@ -56,18 +55,9 @@ interface PublicBusinessProfile {
   plan: string | null;
   followersCount: number;
   activeListingsCount: number;
-  rating: number;
-  reviewsCount: number;
   memberSince: string;
   sellerTelegramId: string;
   sellerUsername: string | null;
-}
-
-interface ReviewItem {
-  id: number;
-  rating: number;
-  comment: string | null;
-  createdAt: string;
 }
 
 interface BusinessProfilePageProps {
@@ -103,7 +93,6 @@ export function BusinessProfilePage({
   const { hide: hidePageLoader } = usePageTransition();
 
   const [profile, setProfile] = useState<PublicBusinessProfile | null>(null);
-  const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -132,7 +121,6 @@ export function BusinessProfilePage({
       if (profileRes.ok) {
         const data = await profileRes.json();
         setProfile(data.profile);
-        setReviews(data.reviews || []);
         setLoadError(false);
       } else {
         setLoadError(true);
@@ -326,11 +314,6 @@ export function BusinessProfilePage({
 
         <div className={`flex items-center gap-3 text-sm mb-3 ${ac.mutedText}`}>
           <span className="flex items-center gap-1">
-            <Star size={14} className="text-amber-400 fill-amber-400" />
-            {Number(profile.rating ?? 0).toFixed(1)} ({profile.reviewsCount}{' '}
-            {t('businessProfile.public.reviewsCountLabel')})
-          </span>
-          <span className="flex items-center gap-1">
             <Users size={14} />
             {profile.followersCount} {t('businessProfile.public.followersLabel')}
           </span>
@@ -370,7 +353,6 @@ export function BusinessProfilePage({
             [
               ['listings', t('businessProfile.public.tabs.listings'), profile.activeListingsCount],
               ['about', t('businessProfile.public.tabs.about'), null],
-              ['reviews', t('businessProfile.public.tabs.reviews'), profile.reviewsCount],
             ] as const
           ).map(([id, label, count]) => (
             <button
@@ -470,31 +452,6 @@ export function BusinessProfilePage({
           </div>
         )}
 
-        {tab === 'reviews' && (
-          <div className="space-y-3">
-            {reviews.length === 0 ? (
-              <p className={`text-center py-8 text-sm ${ac.mutedText}`}>{t('businessProfile.public.noReviews')}</p>
-            ) : (
-              reviews.map((review) => (
-                <div
-                  key={review.id}
-                  className={`rounded-xl p-4 ${isLight ? 'bg-gray-50' : 'bg-[#1C1C1C] border border-white/10'}`}
-                >
-                  <div className="flex items-center gap-1 mb-2">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        size={14}
-                        className={i < review.rating ? 'text-amber-400 fill-amber-400' : 'text-white/20'}
-                      />
-                    ))}
-                  </div>
-                  {review.comment && <p className={`text-sm ${ac.mutedText}`}>{review.comment}</p>}
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </div>
 
       <PhoneModal

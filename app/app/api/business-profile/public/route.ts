@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Business profile not found' }, { status: 404 });
     }
 
-    const { profile, user, activeListingsCount, reviews } = data;
+    const { profile, user, activeListingsCount } = data;
 
     return NextResponse.json({
       isActive: isBusinessProfileActive(profile),
@@ -45,18 +45,10 @@ export async function GET(request: NextRequest) {
         plan: profile.plan,
         followersCount: profile.followersCount,
         activeListingsCount,
-        rating: user.rating,
-        reviewsCount: user.reviewsCount,
         memberSince: formatBusinessMemberSince(user.createdAt, lang),
         sellerTelegramId: telegramId,
         sellerUsername: user.username,
       },
-      reviews: reviews.map((r) => ({
-        id: r.id,
-        rating: r.rating,
-        comment: r.comment,
-        createdAt: r.createdAt,
-      })),
     });
   } catch (error) {
     console.error('[BusinessProfile public GET]', error);

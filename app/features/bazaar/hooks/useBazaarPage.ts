@@ -27,7 +27,7 @@ import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
 import { prefetchListingsImages } from '@/lib/media/listingMediaCache';
 
 /** Збільшуйте після змін логіки каталогу — скидає застарілий localStorage-кеш. */
-const BAZAAR_LISTINGS_CACHE_VERSION = 2;
+const BAZAAR_LISTINGS_CACHE_VERSION = 3;
 const BAZAAR_LISTINGS_CACHE_KEY = 'bazaarListingsState';
 
 function readBazaarListingsCache() {
@@ -403,9 +403,13 @@ export function useBazaarPage() {
     [profile?.telegramId, telegramUser?.id]
   );
 
-  const personalizedFeedEnabled = bazaarTabState.personalizedFeedEnabled !== false;
-  const sendPersonalizedFeed =
-    personalizedFeedEnabled && Boolean(viewerTelegramId);
+  const feedMode = bazaarTabState.feedMode === 'new' ? 'new' : 'forYou';
+  const isHomeFeedContext =
+    !bazaarTabState.selectedCategory &&
+    !bazaarTabState.selectedSubcategory &&
+    (bazaarTabState.sortBy || 'newest') === 'newest' &&
+    !Boolean((debouncedSearchQuery ?? '').trim());
+  const sendPersonalizedFeed = feedMode === 'forYou' && isHomeFeedContext;
 
   const buildListingsUrl = useCallback(
     (
@@ -433,7 +437,12 @@ export function useBazaarPage() {
       if (searchTrimmed) {
         params.set('search', searchTrimmed);
       }
-      if (sendPersonalizedFeed && viewerTelegramId) {
+      if (isHomeFeedContext) {
+        params.set('feedMode', feedMode);
+        if (feedMode === 'forYou' && viewerTelegramId) {
+          params.set('viewerId', viewerTelegramId);
+        }
+      } else if (sendPersonalizedFeed && viewerTelegramId) {
         params.set('viewerId', viewerTelegramId);
       }
       return `/api/listings/feed?${params.toString()}`;
@@ -443,6 +452,8 @@ export function useBazaarPage() {
       debouncedSearchQuery,
       viewerTelegramId,
       sendPersonalizedFeed,
+      feedMode,
+      isHomeFeedContext,
     ]
   );
   const { toast, showToast, hideToast } = useToast();
@@ -587,6 +598,8 @@ export function useBazaarPage() {
   const hasActiveFilters = hasActiveFiltersForState(bazaarTabState);
   const hasSearchQuery = Boolean((debouncedSearchQuery ?? '').trim());
 
+  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${bazaarTabState.minPrice ?? ''}|${bazaarTabState.maxPrice ?? ''}|${bazaarTabState.selectedCondition ?? ''}|${bazaarTabState.selectedCurrency ?? ''}|${(debouncedSearchQuery ?? '').trim()}|${feedMode}|${sendPersonalizedFeed ? viewerTelegramId ?? '' : ''}`;
+
   const hasLoadedListings = useRef(
     typeof window !== 'undefined' && Boolean(readBazaarListingsCache()?.listings?.length)
   );
@@ -624,18 +637,17 @@ export function useBazaarPage() {
       const searchForRequest = (initialSearch ?? debouncedSearchQuery ?? '').trim();
       const useSearch = Boolean(searchForRequest);
 
-      // Кеш тільки без фільтрів, без пошуку, без персоналізації і без примусового оновлення
+      // Кеш тільки без фільтрів, без пошуку і без примусового оновлення
       if (
         !forceRefresh &&
         !requestHasActiveFilters &&
         !useSearch &&
-        !sendPersonalizedFeed &&
         typeof window !== 'undefined'
       ) {
         const cached = readBazaarListingsCache();
-        if (cached?.listings?.length) {
+        if (cached?.listings?.length && cached.filterKey === filterKey) {
           const cacheAge = Date.now() - (cached.timestamp || 0);
-          if (cacheAge < 5 * 60 * 1000) {
+          if (cacheAge < 10 * 60 * 1000) {
             startTransition(() => {
               setListings(cached.listings || []);
               setTotalListings(cached.total || 0);
@@ -643,9 +655,19 @@ export function useBazaarPage() {
               setListingsOffset(cached.offset ?? PAGE_SIZE);
             });
             setInitialLoading(false);
-            setIsListingsRefreshing(true);
+            setIsListingsRefreshing(false);
             schedulePrefetchListingsImages(cached.listings || []);
+            return;
           }
+          startTransition(() => {
+            setListings(cached.listings || []);
+            setTotalListings(cached.total || 0);
+            setHasMore((cached.listings?.length ?? 0) < (cached.total ?? 0));
+            setListingsOffset(cached.offset ?? PAGE_SIZE);
+          });
+          setInitialLoading(false);
+          setIsListingsRefreshing(true);
+          schedulePrefetchListingsImages(cached.listings || []);
         }
       }
 
@@ -693,7 +715,6 @@ export function useBazaarPage() {
         if (
           !requestHasActiveFilters &&
           !useSearch &&
-          !sendPersonalizedFeed &&
           typeof window !== 'undefined'
         ) {
           writeBazaarListingsCache({
@@ -702,6 +723,7 @@ export function useBazaarPage() {
             hasMore: more,
             offset: list.length,
             timestamp: Date.now(),
+            filterKey,
           });
         }
       } else {
@@ -733,10 +755,7 @@ export function useBazaarPage() {
         setIsListingsRefreshing(false);
       }
     }
-  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages, sendPersonalizedFeed]);
-
-  // Ключ фільтрів (категорія, міста, ціна, пошук тощо) — однаковий формат для першого завантаження та рефетчу
-  const filterKey = `${bazaarTabState.selectedCategory}|${bazaarTabState.selectedSubcategory}|${bazaarTabState.sortBy}|${bazaarTabState.showFreeOnly}|${(bazaarTabState.selectedCities ?? []).join(',')}|${bazaarTabState.minPrice ?? ''}|${bazaarTabState.maxPrice ?? ''}|${bazaarTabState.selectedCondition ?? ''}|${bazaarTabState.selectedCurrency ?? ''}|${(debouncedSearchQuery ?? '').trim()}|${sendPersonalizedFeed ? viewerTelegramId ?? '' : ''}|${personalizedFeedEnabled ? '1' : '0'}`;
+  }, [showToast, t, buildListingsUrl, hasActiveFiltersForState, bazaarTabState, debouncedSearchQuery, PAGE_SIZE, schedulePrefetchListingsImages, filterKey]);
 
   // Перше завантаження (без фільтрів і без пошуку — можна з кешу; якщо є пошук — одразу з пошуком)
   useEffect(() => {
@@ -748,9 +767,9 @@ export function useBazaarPage() {
       cached &&
       cached.listings &&
       cached.listings.length > 0 &&
+      cached.filterKey === filterKey &&
       !hasActiveFilters &&
-      !searchTrimmed &&
-      !sendPersonalizedFeed
+      !searchTrimmed
     ) {
       setListings(cached.listings || []);
       setTotalListings(cached.total || 0);
@@ -760,7 +779,10 @@ export function useBazaarPage() {
       hasLoadedListings.current = true;
       previousFilterKey.current = filterKey;
       schedulePrefetchListingsImages(cached.listings || []);
-      void fetchListings(false, searchTrimmed || undefined);
+      const cacheAge = Date.now() - (cached.timestamp || 0);
+      if (cacheAge >= 10 * 60 * 1000) {
+        void fetchListings(false, searchTrimmed || undefined);
+      }
       return;
     }
 
@@ -771,24 +793,32 @@ export function useBazaarPage() {
       // Якщо в полі пошуку вже є текст (наприклад з localStorage) — одразу завантажуємо з пошуком
       fetchListings(false, searchTrimmed || undefined);
     }
-  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery, schedulePrefetchListingsImages, sendPersonalizedFeed]);
+  }, [fetchListings, hasActiveFilters, hasSearchQuery, bazaarTabState.selectedCategory, bazaarTabState.selectedSubcategory, bazaarTabState.sortBy, bazaarTabState.showFreeOnly, debouncedSearchQuery, filterKey, searchQuery, schedulePrefetchListingsImages]);
 
-  // Після перезавантаження / лого — повернутися до товару в стрічці
+  // Після повернення на головну — відновити скрол до товару або збережену позицію
   useEffect(() => {
     if (mountScrollRestoreDoneRef.current) return;
     if (selectedListing || selectedSeller) return;
     if (listings.length === 0) return;
+
+    mountScrollRestoreDoneRef.current = true;
     const targetId =
       pendingMountScrollListingIdRef.current ?? catalogOriginListingIdRef.current;
-    if (targetId == null) return;
-    mountScrollRestoreDoneRef.current = true;
-    pendingMountScrollListingIdRef.current = null;
-    catalogOriginListingIdRef.current = targetId;
-    scrollTimeoutRef.current = setTimeout(() => {
-      scrollToListing(targetId);
-      scrollTimeoutRef.current = null;
-    }, 200);
-  }, [listings.length, selectedListing, selectedSeller, scrollToListing]);
+
+    if (targetId != null) {
+      pendingMountScrollListingIdRef.current = null;
+      catalogOriginListingIdRef.current = targetId;
+      scrollTimeoutRef.current = setTimeout(() => {
+        scrollToListing(targetId);
+        scrollTimeoutRef.current = null;
+      }, 200);
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      restoreSavedScrollPosition();
+    });
+  }, [listings.length, selectedListing, selectedSeller, scrollToListing, restoreSavedScrollPosition]);
 
   // При зміні фільтрів (включно з ціною/станом/валютою) або пошуку — перезавантажити з offset 0
   useEffect(() => {
@@ -881,6 +911,7 @@ export function useBazaarPage() {
               hasMore: newHasMore,
               offset: newOffset,
               timestamp: Date.now(),
+              filterKey,
             });
           }
           return merged;
@@ -908,6 +939,7 @@ export function useBazaarPage() {
     buildListingsUrl,
     hasActiveFilters,
     hasSearchQuery,
+    filterKey,
     PAGE_SIZE,
     t,
   ]);
@@ -1079,25 +1111,31 @@ export function useBazaarPage() {
   }, [saveCatalogScrollPosition, showPageLoader, hidePageLoader]);
 
   const handleBazaarStateChange = useCallback((next: Partial<BazaarTabPersistedState>) => {
-    startTransition(() => {
-      setBazaarTabState((prev) => {
-        const merged = { ...prev, ...next };
-        if (
-          prev.selectedCategory === merged.selectedCategory &&
-          prev.selectedSubcategory === merged.selectedSubcategory &&
-          prev.showFreeOnly === merged.showFreeOnly &&
-          prev.sortBy === merged.sortBy &&
-          prev.minPrice === merged.minPrice &&
-          prev.maxPrice === merged.maxPrice &&
-          prev.selectedCondition === merged.selectedCondition &&
-          prev.selectedCurrency === merged.selectedCurrency &&
-          prev.personalizedFeedEnabled === merged.personalizedFeedEnabled &&
-          JSON.stringify(prev.selectedCities) === JSON.stringify(merged.selectedCities)
-        ) {
-          return prev;
+    setBazaarTabState((prev) => {
+      const merged = { ...prev, ...next };
+      if (
+        prev.selectedCategory === merged.selectedCategory &&
+        prev.selectedSubcategory === merged.selectedSubcategory &&
+        prev.showFreeOnly === merged.showFreeOnly &&
+        prev.sortBy === merged.sortBy &&
+        prev.minPrice === merged.minPrice &&
+        prev.maxPrice === merged.maxPrice &&
+        prev.selectedCondition === merged.selectedCondition &&
+        prev.selectedCurrency === merged.selectedCurrency &&
+        prev.feedMode === merged.feedMode &&
+        JSON.stringify(prev.selectedCities) === JSON.stringify(merged.selectedCities)
+      ) {
+        return prev;
+      }
+      if (
+        next.selectedCategory !== undefined ||
+        next.selectedSubcategory !== undefined
+      ) {
+        if (typeof window !== 'undefined') {
+          invalidateCache(BAZAAR_LISTINGS_CACHE_KEY);
         }
-        return merged;
-      });
+      }
+      return merged;
     });
   }, []);
 

@@ -8,8 +8,8 @@ export type BazaarTabPersistedState = {
   selectedCurrency: string | null;
   sortBy: 'newest' | 'price_low' | 'price_high' | 'popular';
   showFreeOnly: boolean;
-  /** Персоналізована стрічка «Підібрано для вас» */
-  personalizedFeedEnabled: boolean;
+  /** Режим головної стрічки: «Для Вас» або «Нове» */
+  feedMode: 'forYou' | 'new';
 };
 
 export const DEFAULT_BAZAAR_TAB_STATE: BazaarTabPersistedState = {
@@ -22,7 +22,7 @@ export const DEFAULT_BAZAAR_TAB_STATE: BazaarTabPersistedState = {
   selectedCurrency: null,
   sortBy: 'newest',
   showFreeOnly: false,
-  personalizedFeedEnabled: true,
+  feedMode: 'forYou',
 };
 
 const STORAGE_KEY = 'bazaarTabState';
@@ -37,13 +37,21 @@ export function loadBazaarTabStateFromStorage(): BazaarTabPersistedState {
     return { ...DEFAULT_BAZAAR_TAB_STATE };
   }
   try {
-    const parsed = JSON.parse(saved) as Partial<BazaarTabPersistedState>;
+    const parsed = JSON.parse(saved) as Partial<BazaarTabPersistedState> & {
+      personalizedFeedEnabled?: boolean;
+    };
+    let feedMode: BazaarTabPersistedState['feedMode'] = 'forYou';
+    if (parsed.feedMode === 'forYou' || parsed.feedMode === 'new') {
+      feedMode = parsed.feedMode;
+    } else if (parsed.personalizedFeedEnabled === false) {
+      feedMode = 'new';
+    }
     return {
       ...DEFAULT_BAZAAR_TAB_STATE,
       ...parsed,
       selectedCategory: null,
       selectedSubcategory: null,
-      personalizedFeedEnabled: parsed.personalizedFeedEnabled !== false,
+      feedMode,
     };
   } catch {
     return { ...DEFAULT_BAZAAR_TAB_STATE };

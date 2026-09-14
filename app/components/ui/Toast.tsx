@@ -9,9 +9,11 @@ interface ToastProps {
   isVisible: boolean;
   onClose: () => void;
   duration?: number;
+  /** Override positioning layer (e.g. modals above z-[99990]) */
+  layerClassName?: string;
 }
 
-export const Toast = ({ message, type, isVisible, onClose, duration = 3000 }: ToastProps) => {
+export const Toast = ({ message, type, isVisible, onClose, duration = 3000, layerClassName }: ToastProps) => {
   useEffect(() => {
     if (isVisible) {
       const timer = setTimeout(() => {
@@ -37,7 +39,10 @@ export const Toast = ({ message, type, isVisible, onClose, duration = 3000 }: To
 
   return (
     <div
-      className="fixed inset-x-0 z-[140] flex justify-center px-3 pointer-events-none max-lg:bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] max-lg:top-auto max-lg:animate-slide-up lg:top-[max(1rem,calc(env(safe-area-inset-top,0px)+1.25rem))] lg:bottom-auto lg:animate-slide-down"
+      className={
+        layerClassName ??
+        'fixed inset-x-0 z-[140] flex justify-center px-3 pointer-events-none max-lg:bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] max-lg:top-auto max-lg:animate-slide-up lg:top-[max(1rem,calc(env(safe-area-inset-top,0px)+1.25rem))] lg:bottom-auto lg:animate-slide-down'
+      }
     >
       <div
         className={`pointer-events-auto ${bgColors[type]} border rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-[90vw]`}

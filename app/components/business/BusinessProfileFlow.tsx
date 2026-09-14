@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { X, Upload, Check, ChevronLeft, Briefcase, MapPin, Phone, Image as ImageIcon, Package } from 'lucide-react';
+import { X, Upload, Check, ChevronLeft, Briefcase, MapPin, Phone, Image as ImageIcon, Package, AlertCircle } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import { useToast } from '@/features/ui/hooks/useToast';
+import { Toast } from '@/components/ui/Toast';
+import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { getCategories } from '@/constants/categories';
 import { majorGermanCities } from '@/constants/major-german-cities';
 import { BUSINESS_PLANS, type BusinessPlanId, type ServiceArea } from '@/lib/businessProfileConstants';
@@ -113,22 +115,30 @@ export default function BusinessProfileFlow({
 }: BusinessProfileFlowProps) {
   const { t } = useLanguage();
   const { isLight } = useTheme();
-  const { showToast } = useToast();
+  const ac = getAppearanceClasses(isLight);
+  const { toast, showToast, hideToast } = useToast();
   const categories = useMemo(() => getCategories(t), [t]);
   const [step, setStep] = useState<WizardStep>('step1');
   const [form, setForm] = useState<FormState>(() => initialForm({ telegram: defaultTelegram, phone: defaultPhone }));
   const [userListings, setUserListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
+  const [flowError, setFlowError] = useState<string | null>(null);
+  const openedRef = useRef(false);
 
   useHideBottomNav(isOpen);
 
   useEffect(() => {
     if (!isOpen) {
+      openedRef.current = false;
       setStep('step1');
       setForm(initialForm({ telegram: defaultTelegram, phone: defaultPhone }));
+      setFlowError(null);
       return;
     }
+
+    if (openedRef.current) return;
+    openedRef.current = true;
 
     const prefillFromExisting = (profile: NonNullable<BusinessProfileFlowProps['existingProfile']>) => {
       const linkedIds = (() => {
@@ -180,7 +190,7 @@ export default function BusinessProfileFlow({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen, defaultTelegram, defaultPhone, renewMode, existingProfile?.businessName, existingProfile?.updatedAt]);
+  }, [isOpen, defaultTelegram, defaultPhone, renewMode, existingProfile]);
 
   useEffect(() => {
     if (!isOpen || step !== 'step5') return;
@@ -210,7 +220,10 @@ export default function BusinessProfileFlow({
     return categories.find((c) => c.id === form.category)?.subcategories || [];
   }, [categories, form.category]);
 
-  const patch = (partial: Partial<FormState>) => setForm((prev) => ({ ...prev, ...partial }));
+  const patch = (partial: Partial<FormState>) => {
+    setFlowError(null);
+    setForm((prev) => ({ ...prev, ...partial }));
+  };
 
   const previewSrc = (src: string | null) => {
     if (!src) return '';
@@ -224,35 +237,42 @@ export default function BusinessProfileFlow({
 
   const labelCls = isLight ? 'text-sm font-medium text-gray-700 mb-1.5 block' : 'text-sm font-medium text-white/80 mb-1.5 block';
 
-  const validateStep = (s: WizardStep): boolean => {
+  const primaryBtnClass = isLight
+    ? 'w-full py-3.5 rounded-2xl font-semibold bg-[#3F5331] text-white hover:bg-[#344728] disabled:opacity-50 transition-colors'
+    : 'w-full py-3.5 rounded-2xl font-semibold bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0] disabled:opacity-50 transition-colors shadow-[0_0_20px_rgba(200,230,160,0.25)]';
+
+  const getStepValidationError = (s: WizardStep): string | null => {
     if (s === 'step1') {
       const hasLogo = Boolean(form.logoFile || form.logoPreview || form.savedLogoPath);
-      if (!form.businessName.trim() || !form.category || !form.subcategory || !form.description.trim() || !hasLogo) {
-        showToast(t('businessProfile.validation.required'), 'error');
-        return false;
-      }
+      if (!form.businessName.trim()) return t('businessProfile.validation.businessName');
+      if (!form.category) return t('businessProfile.validation.category');
+      if (!form.subcategory) return t('businessProfile.validation.subcategory');
+      if (!form.description.trim()) return t('businessProfile.validation.description');
+      if (!hasLogo) return t('businessProfile.validation.logo');
     }
     if (s === 'step2') {
-      if (!form.city.trim()) {
-        showToast(t('businessProfile.validation.cityRequired'), 'error');
-        return false;
-      }
+      if (!form.city.trim()) return t('businessProfile.validation.cityRequired');
       if (form.serviceArea === 'city_radius' && !form.serviceRadiusKm.trim()) {
-        showToast(t('businessProfile.validation.radiusRequired'), 'error');
-        return false;
+        return t('businessProfile.validation.radiusRequired');
       }
     }
     if (s === 'step3') {
       const hasContact = [form.telegram, form.phone, form.instagram, form.website].some((v) => v.trim());
-      if (!hasContact) {
-        showToast(t('businessProfile.validation.contactRequired'), 'error');
-        return false;
-      }
+      if (!hasContact) return t('businessProfile.validation.contactRequired');
     }
-    if (s === 'tariff' && !form.selectedPlan) {
-      showToast(t('businessProfile.validation.planRequired'), 'error');
+    if (s === 'tariff' && !form.selectedPlan) return t('businessProfile.validation.planRequired');
+    return null;
+  };
+
+  const validateStep = (s: WizardStep): boolean => {
+    const err = getStepValidationError(s);
+    if (err) {
+      setFlowError(err);
+      showToast(err, 'error');
+      tg?.HapticFeedback?.notificationOccurred('error');
       return false;
     }
+    setFlowError(null);
     return true;
   };
 
@@ -270,6 +290,7 @@ export default function BusinessProfileFlow({
   };
 
   const goBack = () => {
+    setFlowError(null);
     const order: WizardStep[] = ['step1', 'step2', 'step3', 'step4', 'step5', 'preview', 'tariff', 'payment'];
     const idx = order.indexOf(step);
     if (idx <= 0) return;
@@ -399,17 +420,25 @@ export default function BusinessProfileFlow({
 
   const shell = isLight ? 'bg-white text-gray-900' : 'bg-[#0a0a0a] text-white';
   const headerBorder = isLight ? 'border-gray-200' : 'border-white/10';
+  const wizardSteps: WizardStep[] = ['step1', 'step2', 'step3', 'step4', 'step5'];
+  const wizardIndex = wizardSteps.indexOf(step);
+  const showWizardProgress = wizardIndex >= 0;
+
+  const accentIcon = isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]';
+  const stepIconWrap = isLight ? 'bg-[#3F5331]/10' : 'bg-[#C8E6A0]/10';
 
   const renderStepHeader = (title: string, icon: React.ReactNode) => (
-    <div className="mb-6">
+    <div className="mb-5">
       {stepNumber != null && (
-        <p className={`text-sm mb-1 ${isLight ? 'text-gray-500' : 'text-white/50'}`}>
+        <p className={`text-xs uppercase tracking-wide mb-2 ${isLight ? 'text-gray-500' : 'text-white/45'}`}>
           {t('businessProfile.stepOf').replace('{current}', String(stepNumber)).replace('{total}', '5')}
         </p>
       )}
-      <div className="flex items-center gap-2">
-        {icon}
-        <h2 className="text-xl font-bold">{title}</h2>
+      <div className="flex items-center gap-2.5">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stepIconWrap}`}>
+          {icon}
+        </div>
+        <h2 className={`text-xl font-bold ${ac.pageHeading}`}>{title}</h2>
       </div>
     </div>
   );
@@ -417,36 +446,90 @@ export default function BusinessProfileFlow({
   const continueLabel =
     step === 'step5'
       ? t('businessProfile.preview.continue')
-      : `${t('businessProfile.continue')} →`;
+      : step === 'preview'
+        ? t('businessProfile.preview.toTariff')
+        : `${t('businessProfile.continue')} →`;
 
-  const continueBtn = (
-    <button
-      type="button"
-      onClick={goNext}
-      className="w-full py-3.5 rounded-2xl font-semibold bg-[#3F5331] text-white hover:bg-[#344728] transition-colors"
-    >
-      {continueLabel}
-    </button>
-  );
+  const handleContinue = () => {
+    if (step === 'tariff') {
+      if (!validateStep('tariff')) return;
+      setStep('payment');
+      tg?.HapticFeedback?.impactOccurred('light');
+      return;
+    }
+    goNext();
+  };
 
   return (
     <>
-      <div className="fixed inset-0 z-[99990] bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={`fixed inset-0 z-[99991] flex flex-col ${shell}`}>
-        <div className={`flex items-center justify-between px-4 py-3 border-b ${headerBorder} shrink-0`}>
-          <button type="button" onClick={step === 'step1' || (renewMode && step === 'tariff') ? onClose : goBack} className="p-2 -ml-2">
-            {step === 'step1' || (renewMode && step === 'tariff') ? <X size={22} /> : <ChevronLeft size={22} />}
-          </button>
-          <span className="font-semibold text-sm">
-            {renewMode ? t('businessProfile.suspended.renewTitle') : 'TradeGround Business'}
-          </span>
-          <div className="w-8" />
-        </div>
+      <div className="fixed inset-0 z-[99990] flex flex-col justify-end">
+        <button
+          type="button"
+          aria-label={t('common.close')}
+          className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+          onClick={onClose}
+        />
 
-        <div className="flex-1 overflow-y-auto px-4 py-5 pb-28">
+        <div
+          className={`relative z-10 flex flex-col w-full max-h-[min(92dvh,720px)] rounded-t-[1.75rem] overflow-hidden shadow-2xl ${shell}`}
+        >
+          <div
+            className={`shrink-0 flex items-center justify-between px-4 py-3 border-b ${headerBorder} pt-[max(0.75rem,env(safe-area-inset-top))]`}
+          >
+            <button
+              type="button"
+              onClick={step === 'step1' || (renewMode && step === 'tariff') ? onClose : goBack}
+              className={`p-2 -ml-2 rounded-full ${isLight ? 'hover:bg-gray-100' : 'hover:bg-white/10'}`}
+            >
+              {step === 'step1' || (renewMode && step === 'tariff') ? <X size={22} /> : <ChevronLeft size={22} />}
+            </button>
+            <span className="font-semibold text-sm">
+              {renewMode ? t('businessProfile.suspended.renewTitle') : 'TradeGround Business'}
+            </span>
+            <div className="w-10" />
+          </div>
+
+          {showWizardProgress && (
+            <div className={`shrink-0 px-4 py-3 border-b ${headerBorder}`}>
+              <div className="flex items-center gap-1.5">
+                {wizardSteps.map((s, i) => {
+                  const done = i < wizardIndex;
+                  const active = i === wizardIndex;
+                  return (
+                    <div key={s} className="flex-1 flex flex-col gap-1.5 min-w-0">
+                      <div
+                        className={`h-1.5 rounded-full transition-colors ${
+                          done || active
+                            ? isLight
+                              ? 'bg-[#3F5331]'
+                              : 'bg-[#C8E6A0]'
+                            : isLight
+                              ? 'bg-gray-200'
+                              : 'bg-white/10'
+                        }`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {flowError && (
+            <div
+              className={`mx-4 mt-3 shrink-0 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm ${
+                isLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-500/10 border-red-400/30 text-red-200'
+              }`}
+            >
+              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              <p>{flowError}</p>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 min-h-0">
           {step === 'step1' && (
             <>
-              {renderStepHeader(t('businessProfile.steps.step1.title'), <Briefcase size={22} className="text-[#C8E6A0]" />)}
+              {renderStepHeader(t('businessProfile.steps.step1.title'), <Briefcase size={20} className={accentIcon} />)}
               <div className="space-y-4">
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.logo')} *</label>
@@ -494,7 +577,7 @@ export default function BusinessProfileFlow({
 
           {step === 'step2' && (
             <>
-              {renderStepHeader(t('businessProfile.steps.step2.title'), <MapPin size={22} className="text-[#C8E6A0]" />)}
+              {renderStepHeader(t('businessProfile.steps.step2.title'), <MapPin size={22} className={accentIcon} />)}
               <div className="space-y-4">
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.city')} *</label>
@@ -532,7 +615,7 @@ export default function BusinessProfileFlow({
 
           {step === 'step3' && (
             <>
-              {renderStepHeader(t('businessProfile.steps.step3.title'), <Phone size={22} className="text-[#C8E6A0]" />)}
+              {renderStepHeader(t('businessProfile.steps.step3.title'), <Phone size={22} className={accentIcon} />)}
               <p className={`text-sm mb-4 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.steps.step3.subtitle')}</p>
               <div className="space-y-4">
                 {(['telegram', 'phone', 'instagram', 'website'] as const).map((field) => (
@@ -547,7 +630,7 @@ export default function BusinessProfileFlow({
 
           {step === 'step4' && (
             <>
-              {renderStepHeader(t('businessProfile.steps.step4.title'), <ImageIcon size={22} className="text-[#C8E6A0]" />)}
+              {renderStepHeader(t('businessProfile.steps.step4.title'), <ImageIcon size={22} className={accentIcon} />)}
               <div className="space-y-4">
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.coverImage')}</label>
@@ -570,10 +653,16 @@ export default function BusinessProfileFlow({
 
           {step === 'step5' && (
             <>
-              {renderStepHeader(t('businessProfile.steps.step5.title'), <Package size={22} className="text-[#C8E6A0]" />)}
+              {renderStepHeader(t('businessProfile.steps.step5.title'), <Package size={22} className={accentIcon} />)}
               <p className={`text-sm mb-4 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.steps.step5.subtitle')}</p>
               <div className="space-y-2">
-                {userListings.map((listing) => {
+                {userListings.length === 0 ? (
+                  <div className={`rounded-2xl border p-6 text-center ${isLight ? 'border-gray-200 bg-gray-50' : 'border-white/15 bg-white/5'}`}>
+                    <Package size={28} className={`mx-auto mb-2 ${isLight ? 'text-gray-400' : 'text-white/40'}`} />
+                    <p className={`text-sm ${ac.mutedText}`}>{t('businessProfile.steps.step5.empty')}</p>
+                  </div>
+                ) : (
+                  userListings.map((listing) => {
                   const checked = form.selectedListingIds.includes(listing.id);
                   return (
                     <label key={listing.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${checked ? (isLight ? 'border-[#3F5331]' : 'border-[#C8E6A0]/50') : (isLight ? 'border-gray-200' : 'border-white/15')}`}>
@@ -584,7 +673,8 @@ export default function BusinessProfileFlow({
                       </div>
                     </label>
                   );
-                })}
+                })
+                )}
               </div>
               <p className={`text-xs mt-3 ${isLight ? 'text-gray-500' : 'text-white/45'}`}>{t('businessProfile.steps.step5.hint')}</p>
             </>
@@ -592,16 +682,26 @@ export default function BusinessProfileFlow({
 
           {step === 'preview' && (
             <>
-              <h2 className="text-xl font-bold mb-2">{t('businessProfile.preview.title')}</h2>
-              <p className={`text-sm mb-4 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.preview.subtitle')}</p>
+              {renderStepHeader(t('businessProfile.preview.title'), <Briefcase size={20} className={accentIcon} />)}
+              <p className={`text-sm mb-5 -mt-2 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.preview.subtitle')}</p>
               <div className={`rounded-2xl overflow-hidden border ${isLight ? 'border-gray-200' : 'border-white/15'}`}>
-                <div className="h-28 bg-[#3F5331]/30 relative">
-                  {form.coverPreview && <img src={previewSrc(form.coverPreview)} alt="" className="w-full h-full object-cover" />}
-                  <div className="absolute -bottom-8 left-4 w-16 h-16 rounded-xl border-4 border-[#0a0a0a] overflow-hidden bg-[#1C1C1C]">
-                    {form.logoPreview && <img src={previewSrc(form.logoPreview)} alt="" className="w-full h-full object-cover" />}
+                <div className="h-32 bg-[#3F5331]/30 relative">
+                  {form.coverPreview ? (
+                    <img src={previewSrc(form.coverPreview)} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className={`w-full h-full ${isLight ? 'bg-[#3F5331]/15' : 'bg-[#3F5331]/25'}`} />
+                  )}
+                  <div className={`absolute -bottom-8 left-4 w-16 h-16 rounded-xl border-4 overflow-hidden ${isLight ? 'border-white bg-white' : 'border-[#0a0a0a] bg-[#1C1C1C]'}`}>
+                    {form.logoPreview ? (
+                      <img src={previewSrc(form.logoPreview)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xl font-bold bg-[#3F5331]/30 text-[#C8E6A0]">
+                        {form.businessName.charAt(0).toUpperCase() || '?'}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="pt-10 p-4 space-y-2">
+                <div className="pt-12 p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-lg">{form.businessName}</h3>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#3F5331] text-white">BUSINESS</span>
@@ -615,8 +715,10 @@ export default function BusinessProfileFlow({
 
           {step === 'tariff' && (
             <>
-              <h2 className="text-xl font-bold mb-1">{t('businessProfile.tariff.title')}</h2>
-              <p className={`text-sm mb-5 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.tariff.subtitle')}</p>
+              <div className="mb-5">
+                <h2 className={`text-xl font-bold mb-1 ${ac.pageHeading}`}>{t('businessProfile.tariff.title')}</h2>
+                <p className={`text-sm ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.tariff.subtitle')}</p>
+              </div>
               <div className="space-y-4">
                 {(Object.keys(BUSINESS_PLANS) as BusinessPlanId[]).map((planId) => {
                   const plan = BUSINESS_PLANS[planId];
@@ -652,27 +754,27 @@ export default function BusinessProfileFlow({
               <p className={`text-xs mt-4 ${isLight ? 'text-gray-500' : 'text-white/45'}`}>{t('businessProfile.tariff.disclaimer')}</p>
             </>
           )}
-        </div>
-
-        {step !== 'payment' && (
-          <div className={`fixed bottom-0 left-0 right-0 p-4 border-t ${headerBorder} ${shell}`}>
-            {step === 'tariff' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (!validateStep('tariff')) return;
-                  setStep('payment');
-                }}
-                className="w-full py-3.5 rounded-2xl font-semibold bg-[#3F5331] text-white"
-              >
-                {t('businessProfile.continue')}
-              </button>
-            ) : (
-              continueBtn
-            )}
           </div>
-        )}
+
+          {step !== 'payment' && (
+            <div
+              className={`shrink-0 border-t px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] ${headerBorder} ${shell}`}
+            >
+              <button type="button" onClick={handleContinue} disabled={loading} className={primaryBtnClass}>
+                {step === 'tariff' ? t('businessProfile.continue') : continueLabel}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+        layerClassName="fixed inset-x-0 top-[max(4.5rem,env(safe-area-inset-top))] z-[100002] flex justify-center px-3 pointer-events-none animate-slide-down"
+      />
 
       <PaymentSummaryModal
         isOpen={step === 'payment'}

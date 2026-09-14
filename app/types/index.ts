@@ -11,8 +11,6 @@ export interface BusinessSeller {
   logo: string | null;
   category: string;
   city: string;
-  rating: number;
-  reviewsCount: number;
   activeListingsCount: number;
   followersCount: number;
   memberSince: string;
