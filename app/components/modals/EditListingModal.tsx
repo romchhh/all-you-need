@@ -92,6 +92,7 @@ export const EditListingModal = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSoldConfirm, setShowSoldConfirm] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [status, setStatus] = useState<string>(listing.status || 'active');
   const isRejected = (listing.status as string) === 'rejected';
   const conditionRef = useRef<HTMLDivElement>(null);
@@ -184,6 +185,124 @@ export const EditListingModal = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let blurTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      if (blurTimeout) {
+        clearTimeout(blurTimeout);
+        blurTimeout = null;
+      }
+
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+
+    const handleFocusOut = () => {
+      blurTimeout = setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (
+          !activeElement ||
+          (activeElement instanceof HTMLElement &&
+            activeElement.tagName !== 'INPUT' &&
+            activeElement.tagName !== 'TEXTAREA' &&
+            !activeElement.isContentEditable)
+        ) {
+          setIsInputFocused(false);
+        }
+      }, 150);
+    };
+
+    const handleVisualViewportChange = () => {
+      if (!window.visualViewport) return;
+
+      const keyboardOpen = window.visualViewport.height < window.innerHeight * 0.75;
+      if (keyboardOpen) {
+        setIsInputFocused(true);
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (
+        !activeElement ||
+        (activeElement instanceof HTMLElement &&
+          activeElement.tagName !== 'INPUT' &&
+          activeElement.tagName !== 'TEXTAREA' &&
+          !activeElement.isContentEditable)
+      ) {
+        setIsInputFocused(false);
+      }
+    };
+
+    const checkInitialState = () => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        (activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.isContentEditable)
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+
+    checkInitialState();
+    document.addEventListener('focusin', handleFocusIn, true);
+    document.addEventListener('focusout', handleFocusOut, true);
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+    }
+
+    return () => {
+      if (blurTimeout) clearTimeout(blurTimeout);
+      document.removeEventListener('focusin', handleFocusIn, true);
+      document.removeEventListener('focusout', handleFocusOut, true);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
+      }
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !buttonsRef.current) return;
+
+    const buttonsElement = buttonsRef.current;
+
+    const fixButtonsPosition = () => {
+      requestAnimationFrame(() => {
+        if (!buttonsElement) return;
+        buttonsElement.style.position = 'fixed';
+        buttonsElement.style.bottom = '0';
+        buttonsElement.style.left = '0';
+        buttonsElement.style.right = '0';
+        const transformValue = isInputFocused ? 'translateY(100%)' : 'translateY(0)';
+        buttonsElement.style.transform = transformValue;
+        buttonsElement.style.setProperty('-webkit-transform', transformValue);
+      });
+    };
+
+    fixButtonsPosition();
+
+    const handleResize = () => {
+      if (!isInputFocused) fixButtonsPosition();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isOpen, isInputFocused]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
