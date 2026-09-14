@@ -11,17 +11,17 @@ export const maxDuration = 120;
 
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
-function isUploadBlob(value: FormDataEntryValue | null): value is Blob {
-  return typeof Blob !== 'undefined' && value instanceof Blob && value.size > 0;
+function isUploadFile(value: FormDataEntryValue | null): value is File {
+  if (value == null || typeof value === 'string') return false;
+  return value.size > 0;
 }
 
-async function saveUploadedFile(file: Blob, prefix: string): Promise<string> {
+async function saveUploadedFile(file: File, prefix: string): Promise<string> {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error('FILE_TOO_LARGE');
   }
 
-  const named = file as File;
-  const name = typeof named.name === 'string' ? named.name : '';
+  const name = file.name || '';
   const type = file.type || '';
   let ext = name.split('.').pop()?.toLowerCase() || '';
   if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
@@ -123,10 +123,10 @@ export async function PUT(request: NextRequest) {
       const logoFile = form.get('logo');
       const coverFile = form.get('coverImage');
       try {
-        if (isUploadBlob(logoFile)) {
+        if (isUploadFile(logoFile)) {
           logoPath = await saveUploadedFile(logoFile, 'logo');
         }
-        if (isUploadBlob(coverFile)) {
+        if (isUploadFile(coverFile)) {
           coverPath = await saveUploadedFile(coverFile, 'cover');
         }
       } catch (uploadError) {
