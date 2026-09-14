@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 
@@ -45,6 +46,7 @@ export default function PromotionModal({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   useHideBottomNav(isOpen);
+  useBodyScrollLock(isOpen);
   const [selectedPromotion, setSelectedPromotion] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [activePromotions, setActivePromotions] = useState<string[]>([]);
@@ -122,43 +124,6 @@ export default function PromotionModal({
   };
 
   // Блокуємо скрол при відкритті модального вікна
-  useEffect(() => {
-    if (isOpen) {
-      // Зберігаємо поточну позицію скролу
-      const scrollY = window.scrollY;
-      // Блокуємо скрол на body та html
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      // Відновлюємо скрол
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      // Відновлюємо позицію скролу
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
-    }
-    
-    return () => {
-      // Очищення при розмонтуванні
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
-    };
-  }, [isOpen]);
 
   const handleSelectPromotion = async () => {
     if (!selectedPromotion) return;

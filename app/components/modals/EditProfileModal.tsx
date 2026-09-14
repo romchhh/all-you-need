@@ -7,6 +7,7 @@ import { Toast } from '@/components/ui/Toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export const EditProfileModal = ({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   useHideBottomNav(isOpen);
+  useBodyScrollLock(isOpen);
 
   // Валідація номера телефону
   const validatePhone = (phoneNumber: string): boolean => {
@@ -101,123 +103,6 @@ export const EditProfileModal = ({
   };
 
   // Оновлюємо локальний стан при зміні props
-  useEffect(() => {
-    if (isOpen) {
-      setFirstName(currentFirstName || '');
-      setLastName(currentLastName || '');
-      setPhone(currentPhone || '');
-      setAvatarPreview(currentAvatar);
-      setAvatarFile(null);
-      setPhoneError('');
-    }
-  }, [isOpen, currentFirstName, currentLastName, currentPhone, currentAvatar]);
-
-  // Блокуємо скрол body та html при відкритому модальному вікні та запобігаємо свайпу вниз
-  useEffect(() => {
-    if (isOpen) {
-      // Зберігаємо поточну позицію скролу
-      const scrollY = window.scrollY;
-      // Блокуємо скрол на body та html
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-      
-      // Запобігаємо pull-to-close (свайп вниз для закриття)
-      let touchStartY: number | null = null;
-      let touchStartScrollY: number | null = null;
-      
-      const handleTouchStart = (e: TouchEvent) => {
-        const touch = e.touches[0];
-        if (touch) {
-          touchStartY = touch.clientY;
-          touchStartScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        }
-      };
-      
-      const preventPullToClose = (e: TouchEvent) => {
-        // Не блокуємо події всередині модального контенту — дозволяємо скрол в обох напрямках
-        const target = e.target as Node;
-        const scrollableModal = document.querySelector('[data-edit-profile-scrollable]');
-        if (scrollableModal && scrollableModal.contains(target)) {
-          return;
-        }
-        
-        if (touchStartY === null || touchStartScrollY === null) {
-          return;
-        }
-        
-        const touch = e.touches[0];
-        if (!touch) return;
-        
-        const deltaY = touch.clientY - touchStartY;
-        const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        
-        // Ніколи не блокуємо скрол вгору (негативний deltaY)
-        if (deltaY < 0) {
-          return;
-        }
-        
-        // Дозволяємо згортання тільки якщо користувач тягне за саму верхню частину (білу смужку/header)
-        // AppHeader ~36px (лого), запас під відступи — ~48px
-        const headerHeight = 48;
-        const isPullingFromHeader = touchStartY < headerHeight;
-        
-        // Якщо користувач тягне за header (верхня зона) і на початку скролу - дозволяємо згортання
-        if (touchStartScrollY <= 10 && isPullingFromHeader && deltaY > 0 && deltaY > 5) {
-          // Дозволяємо згортання - не запобігаємо
-          return;
-        }
-        
-        // Якщо користувач тягне не з header - запобігаємо згортанню тільки на початку скролу
-        if (deltaY > 0 && deltaY > 5) {
-          if (touchStartScrollY <= 10 || (currentScrollY === 0 && deltaY > 10)) {
-            if (!isPullingFromHeader) {
-              e.preventDefault();
-              e.stopPropagation();
-              return;
-            }
-          }
-        }
-      };
-      
-      const handleTouchEnd = () => {
-        touchStartY = null;
-        touchStartScrollY = null;
-      };
-      
-      // Додаємо обробники для запобігання свайпу вниз
-      document.addEventListener('touchstart', handleTouchStart, { passive: true });
-      document.addEventListener('touchmove', preventPullToClose, { passive: false });
-      document.addEventListener('touchend', handleTouchEnd, { passive: true });
-      document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
-      
-      // Cleanup для видалення обробників
-      return () => {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.documentElement.style.overflow = '';
-        document.removeEventListener('touchstart', handleTouchStart);
-        document.removeEventListener('touchmove', preventPullToClose);
-        document.removeEventListener('touchend', handleTouchEnd);
-        document.removeEventListener('touchcancel', handleTouchEnd);
-      };
-    } else {
-      // Розблоковуємо скрол
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 

@@ -6,6 +6,7 @@ import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { getBotStartLink } from '@/utils/botLinks';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 interface ReferralModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface ReferralModalProps {
 
 export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModalProps) => {
   const { t } = useLanguage();
+  useBodyScrollLock(isOpen);
   const { isLight } = useTheme();
   const { toast, showToast, hideToast } = useToast();
   const [showFallback, setShowFallback] = useState(false);
@@ -44,34 +46,6 @@ export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModal
   }, [isOpen, telegramId]);
 
   // Блокуємо скрол body та html при відкритому модальному вікні
-  useEffect(() => {
-    if (isOpen) {
-      const scrollY = window.scrollY;
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
-    }
-    
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-    };
-  }, [isOpen]);
 
   if (!isOpen) return null;
 

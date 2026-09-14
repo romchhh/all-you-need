@@ -74,6 +74,7 @@ export async function PUT(request: NextRequest) {
       const form = await request.formData();
       telegramIdRaw = String(form.get('telegramId') || '');
       body = {
+        partial: form.get('partial'),
         businessName: form.get('businessName'),
         category: form.get('category'),
         subcategory: form.get('subcategory'),
@@ -87,6 +88,8 @@ export async function PUT(request: NextRequest) {
         instagram: form.get('instagram'),
         website: form.get('website'),
         workingHours: form.get('workingHours'),
+        plan: form.get('plan'),
+        listingIds: form.get('listingIds'),
       };
       const logoFile = form.get('logo');
       const coverFile = form.get('coverImage');
@@ -118,12 +121,13 @@ export async function PUT(request: NextRequest) {
     const description = String(body.description || '').trim();
     const city = String(body.city || '').trim();
     const serviceArea = String(body.serviceArea || 'city_only');
+    const isPartial = body.partial === true || body.partial === 'true' || body.partial === 1 || body.partial === '1';
 
-    if (!businessName || !category || !description || !city) {
+    if (!isPartial && (!businessName || !category || !description || !city)) {
       return NextResponse.json({ error: 'Required fields missing' }, { status: 400 });
     }
 
-    if (!isValidServiceArea(serviceArea)) {
+    if (serviceArea && !isValidServiceArea(serviceArea)) {
       return NextResponse.json({ error: 'Invalid service area' }, { status: 400 });
     }
 
@@ -133,23 +137,49 @@ export async function PUT(request: NextRequest) {
         ? parseInt(String(radiusRaw), 10)
         : null;
 
-    const profileId = await upsertBusinessProfileDraft(user.id, {
-      businessName,
-      category,
-      subcategory: body.subcategory ? String(body.subcategory) : null,
-      description,
-      city,
-      address: body.address ? String(body.address) : null,
-      serviceArea,
-      serviceRadiusKm: Number.isFinite(serviceRadiusKm as number) ? serviceRadiusKm : null,
-      telegram: body.telegram ? String(body.telegram) : null,
-      phone: body.phone ? String(body.phone) : null,
-      instagram: body.instagram ? String(body.instagram) : null,
-      website: body.website ? String(body.website) : null,
-      workingHours: body.workingHours ? String(body.workingHours) : null,
-      logo: logoPath ?? null,
-      coverImage: coverPath ?? null,
-    });
+    const listingIdsRaw = body.listingIds;
+    let listingIds: number[] | undefined;
+    if (listingIdsRaw != null && String(listingIdsRaw).trim() !== '') {
+      try {
+        const parsed = JSON.parse(String(listingIdsRaw)) as unknown;
+        if (Array.isArray(parsed)) {
+          listingIds = parsed.map((id) => parseInt(String(id), 10)).filter((id) => Number.isFinite(id));
+        }
+      } catch {
+        listingIds = String(listingIdsRaw)
+          .split(',')
+          .map((id) => parseInt(id.trim(), 10))
+          .filter((id) => Number.isFinite(id));
+      }
+    }
+
+    const planRaw = body.plan;
+    const plan =
+      planRaw != null && String(planRaw).trim() !== '' ? String(planRaw).trim() : undefined;
+
+    const profileId = await upsertBusinessProfileDraft(
+      user.id,
+      {
+        businessName,
+        category,
+        subcategory: body.subcategory ? String(body.subcategory) : null,
+        description,
+        city,
+        address: body.address ? String(body.address) : null,
+        serviceArea: serviceArea || 'city_only',
+        serviceRadiusKm: Number.isFinite(serviceRadiusKm as number) ? serviceRadiusKm : null,
+        telegram: body.telegram ? String(body.telegram) : null,
+        phone: body.phone ? String(body.phone) : null,
+        instagram: body.instagram ? String(body.instagram) : null,
+        website: body.website ? String(body.website) : null,
+        workingHours: body.workingHours ? String(body.workingHours) : null,
+        logo: logoPath ?? null,
+        coverImage: coverPath ?? null,
+        plan: plan as 'business' | 'business_pro' | null | undefined,
+        listingIds,
+      },
+      { partial: isPartial }
+    );
 
     const profile = await prisma.businessProfile.findUnique({ where: { id: profileId } });
 

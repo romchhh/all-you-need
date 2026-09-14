@@ -4,6 +4,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 interface ImageViewModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface ImageViewModalProps {
 
 export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt, onClose }: ImageViewModalProps) => {
   const { isLight } = useTheme();
+  useBodyScrollLock(isOpen);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [imageError, setImageError] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -87,18 +89,6 @@ export const ImageViewModal = ({ isOpen, images, imageUrl, initialIndex = 0, alt
     touchEndX.current = null;
     touchStartY.current = null;
   };
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, [isOpen]);
 
   if (!isOpen || imageList.length === 0) return null;
 

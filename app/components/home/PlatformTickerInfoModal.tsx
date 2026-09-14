@@ -6,6 +6,7 @@ import { ArrowLeft, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import {
   ONBOARDING_SECTIONS,
   type PlatformOnboardingActionId,
@@ -33,6 +34,8 @@ export function PlatformTickerInfoModal({
   const [mounted, setMounted] = useState(false);
   const [view, setView] = useState<ModalView>('sections');
 
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -58,15 +61,6 @@ export function PlatformTickerInfoModal({
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose, view]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [isOpen]);
 
   if (!mounted || !isOpen || typeof document === 'undefined') {
     return null;

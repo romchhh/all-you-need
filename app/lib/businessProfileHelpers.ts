@@ -25,6 +25,7 @@ export type BusinessProfileInput = {
   workingHours?: string | null;
   logo?: string | null;
   coverImage?: string | null;
+  plan?: BusinessPlanId | null;
   listingIds?: number[];
 };
 
@@ -50,26 +51,45 @@ export function isBusinessProfileActive(profile: {
 
 export async function upsertBusinessProfileDraft(
   userId: number,
-  data: BusinessProfileInput
+  data: BusinessProfileInput,
+  options?: { partial?: boolean }
 ): Promise<number> {
   const existing = await prisma.businessProfile.findUnique({ where: { userId } });
+  const partial = options?.partial ?? false;
+
+  const pickString = (value: string | undefined | null, existingValue: string | null | undefined) => {
+    const trimmed = value != null ? String(value).trim() : '';
+    if (trimmed) return trimmed;
+    if (partial) return existingValue ?? '';
+    return trimmed;
+  };
+
+  const listingIdsJson =
+    data.listingIds !== undefined
+      ? data.listingIds.length > 0
+        ? JSON.stringify(data.listingIds)
+        : null
+      : existing?.linkedListingIds ?? null;
 
   const payload = {
-    businessName: data.businessName.trim(),
-    category: data.category,
-    subcategory: data.subcategory || null,
-    description: data.description.trim(),
-    city: data.city.trim(),
-    address: data.address?.trim() || null,
-    serviceArea: data.serviceArea,
-    serviceRadiusKm: data.serviceRadiusKm ?? null,
-    telegram: data.telegram?.trim() || null,
-    phone: data.phone?.trim() || null,
-    instagram: data.instagram?.trim() || null,
-    website: data.website?.trim() || null,
-    workingHours: data.workingHours?.trim() || null,
-    logo: data.logo ?? existing?.logo ?? null,
-    coverImage: data.coverImage ?? existing?.coverImage ?? null,
+    businessName: pickString(data.businessName, existing?.businessName),
+    category: pickString(data.category, existing?.category),
+    subcategory: data.subcategory?.trim() || (partial ? existing?.subcategory ?? null : null),
+    description: pickString(data.description, existing?.description),
+    city: pickString(data.city, existing?.city),
+    address: data.address?.trim() || (partial ? existing?.address ?? null : null),
+    serviceArea: data.serviceArea || (partial ? existing?.serviceArea ?? 'city_only' : data.serviceArea),
+    serviceRadiusKm: data.serviceRadiusKm ?? (partial ? existing?.serviceRadiusKm ?? null : null),
+    telegram: data.telegram?.trim() || (partial ? existing?.telegram ?? null : null),
+    phone: data.phone?.trim() || (partial ? existing?.phone ?? null : null),
+    instagram: data.instagram?.trim() || (partial ? existing?.instagram ?? null : null),
+    website: data.website?.trim() || (partial ? existing?.website ?? null : null),
+    workingHours: data.workingHours?.trim() || (partial ? existing?.workingHours ?? null : null),
+    logo: data.logo !== undefined ? data.logo : partial ? (existing?.logo ?? null) : null,
+    coverImage:
+      data.coverImage !== undefined ? data.coverImage : partial ? (existing?.coverImage ?? null) : null,
+    plan: data.plan !== undefined ? data.plan : existing?.plan ?? null,
+    linkedListingIds: listingIdsJson,
     updatedAt: new Date(),
   };
 
@@ -211,19 +231,35 @@ export async function processBusinessSubscriptionFromBalance(
   plan: BusinessPlanId
 ): Promise<{ newBalance: number; price: number }> {
   const price = BUSINESS_PLANS[plan].price;
-  if (currentBalance < price) {
+  const balanceBefore = Number(currentBalance);
+
+  if (!Number.isFinite(balanceBefore) || balanceBefore + 0.001 < price) {
     throw new Error('Insufficient balance');
   }
 
-  const newBalance = currentBalance - price;
   const nowStr = nowSQLite();
 
   await prisma.$executeRawUnsafe(
-    `UPDATE User SET balance = ?, updatedAt = ? WHERE id = ?`,
-    newBalance,
+    `UPDATE User SET balance = balance - ?, updatedAt = ? WHERE id = ? AND balance >= ?`,
+    price,
     nowStr,
-    userId
+    userId,
+    price
   );
+
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT balance FROM User WHERE id = ?`,
+    userId
+  )) as Array<{ balance: number | string }>;
+
+  if (rows.length === 0) {
+    throw new Error('User not found');
+  }
+
+  const newBalance = Number(rows[0].balance);
+  if (!Number.isFinite(newBalance) || balanceBefore - newBalance + 0.001 < price) {
+    throw new Error('Insufficient balance');
+  }
 
   await createTransaction({
     userId,

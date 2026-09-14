@@ -2,20 +2,30 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import { X, Upload, Check, ChevronLeft, Briefcase, MapPin, Phone, Image as ImageIcon, Package, AlertCircle } from 'lucide-react';
+import { X, Upload, Check, ChevronLeft, MapPin, Phone, Image as ImageIcon, Package, AlertCircle } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
+import {
+  clearBusinessWizardState,
+  loadBusinessWizardState,
+  saveBusinessWizardState,
+  type StoredBusinessWizardForm,
+  type BusinessWizardStep,
+} from '@/lib/businessProfileWizardStorage';
 import { getCategories } from '@/constants/categories';
 import { majorGermanCities } from '@/constants/major-german-cities';
 import { BUSINESS_PLANS, type BusinessPlanId, type ServiceArea } from '@/lib/businessProfileConstants';
 import { Listing } from '@/types';
 import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
+import { BusinessBrandIcon } from '@/components/business/BusinessBrandIcon';
 
 const PaymentSummaryModal = dynamic(
   () => import('@/components/modals/PaymentSummaryModal').then((m) => ({ default: m.PaymentSummaryModal })),
@@ -102,6 +112,44 @@ const initialForm = (defaults: { telegram?: string; phone?: string }): FormState
   savedLogoPath: null,
   savedCoverPath: null,
 });
+
+const formToStored = (form: FormState): StoredBusinessWizardForm => ({
+  businessName: form.businessName,
+  category: form.category,
+  subcategory: form.subcategory,
+  description: form.description,
+  city: form.city,
+  address: form.address,
+  serviceArea: form.serviceArea,
+  serviceRadiusKm: form.serviceRadiusKm,
+  telegram: form.telegram,
+  phone: form.phone,
+  instagram: form.instagram,
+  website: form.website,
+  workingHours: form.workingHours,
+  selectedListingIds: form.selectedListingIds,
+  selectedPlan: form.selectedPlan,
+  savedLogoPath: form.savedLogoPath,
+  savedCoverPath: form.savedCoverPath,
+  logoPreview: form.logoPreview?.startsWith('blob:') ? form.savedLogoPath : form.logoPreview,
+  coverPreview: form.coverPreview?.startsWith('blob:') ? form.savedCoverPath : form.coverPreview,
+});
+
+const storedToForm = (
+  stored: StoredBusinessWizardForm,
+  defaults: { telegram?: string; phone?: string }
+): FormState => ({
+  ...stored,
+  logoFile: null,
+  coverFile: null,
+  telegram: stored.telegram || defaults.telegram || '',
+  phone: stored.phone || defaults.phone || '',
+  logoPreview: stored.logoPreview || stored.savedLogoPath,
+  coverPreview: stored.coverPreview || stored.savedCoverPath,
+});
+
+const restoreStep = (savedStep: BusinessWizardStep): WizardStep =>
+  savedStep === 'payment' ? 'tariff' : savedStep;
 
 type ImageUploadBoxProps = {
   preview: string | null;
@@ -201,7 +249,116 @@ export default function BusinessProfileFlow({
   const [flowError, setFlowError] = useState<string | null>(null);
   const openedRef = useRef(false);
 
+  const paymentTelegramId = useMemo(
+    () => resolvePaymentTelegramId(tg, telegramId) || telegramId,
+    [tg, telegramId]
+  );
+
   useHideBottomNav(isOpen);
+  useBodyScrollLock(isOpen);
+
+  const saveDraftToLocal = useCallback(
+    (currentStep: WizardStep, currentForm: FormState) => {
+      if (renewMode || !paymentTelegramId) return;
+      saveBusinessWizardState(paymentTelegramId, {
+        step: currentStep,
+        form: formToStored(currentForm),
+        savedAt: Date.now(),
+      });
+    },
+    [paymentTelegramId, renewMode]
+  );
+
+  const saveDraftToServer = useCallback(
+    async (currentForm: FormState) => {
+      if (renewMode || !paymentTelegramId) return;
+
+      const hasAnyData = [
+        currentForm.businessName,
+        currentForm.category,
+        currentForm.description,
+        currentForm.city,
+        currentForm.telegram,
+        currentForm.phone,
+        currentForm.instagram,
+        currentForm.website,
+      ].some((value) => value.trim());
+
+      if (
+        !hasAnyData &&
+        !currentForm.savedLogoPath &&
+        !currentForm.savedCoverPath &&
+        !currentForm.logoFile &&
+        !currentForm.coverFile
+      ) {
+        return;
+      }
+
+      try {
+        if (currentForm.logoFile || currentForm.coverFile) {
+          const fd = new FormData();
+          fd.append('partial', 'true');
+          fd.append('telegramId', paymentTelegramId);
+          fd.append('businessName', currentForm.businessName);
+          fd.append('category', currentForm.category);
+          fd.append('subcategory', currentForm.subcategory);
+          fd.append('description', currentForm.description);
+          fd.append('city', currentForm.city);
+          fd.append('address', currentForm.address);
+          fd.append('serviceArea', currentForm.serviceArea);
+          if (currentForm.serviceRadiusKm) fd.append('serviceRadiusKm', currentForm.serviceRadiusKm);
+          fd.append('telegram', currentForm.telegram);
+          fd.append('phone', currentForm.phone);
+          fd.append('instagram', currentForm.instagram);
+          fd.append('website', currentForm.website);
+          fd.append('workingHours', currentForm.workingHours);
+          if (currentForm.selectedPlan) fd.append('plan', currentForm.selectedPlan);
+          fd.append('listingIds', JSON.stringify(currentForm.selectedListingIds));
+          if (currentForm.logoFile) fd.append('logo', currentForm.logoFile);
+          if (currentForm.coverFile) fd.append('coverImage', currentForm.coverFile);
+          await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
+        } else {
+          await fetch('/api/user/business-profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              partial: true,
+              telegramId: paymentTelegramId,
+              businessName: currentForm.businessName,
+              category: currentForm.category,
+              subcategory: currentForm.subcategory,
+              description: currentForm.description,
+              city: currentForm.city,
+              address: currentForm.address,
+              serviceArea: currentForm.serviceArea,
+              serviceRadiusKm:
+                currentForm.serviceArea === 'city_radius' ? currentForm.serviceRadiusKm : null,
+              telegram: currentForm.telegram,
+              phone: currentForm.phone,
+              instagram: currentForm.instagram,
+              website: currentForm.website,
+              workingHours: currentForm.workingHours,
+              plan: currentForm.selectedPlan,
+              listingIds: currentForm.selectedListingIds,
+              logo: currentForm.savedLogoPath,
+              coverImage: currentForm.savedCoverPath,
+            }),
+          });
+        }
+      } catch {
+        // silent autosave
+      }
+    },
+    [paymentTelegramId, renewMode]
+  );
+
+  const handleClose = useCallback(() => {
+    if (!renewMode) {
+      saveDraftToLocal(step, form);
+      void saveDraftToServer(form);
+    }
+    onClose();
+  }, [form, onClose, renewMode, saveDraftToLocal, saveDraftToServer, step]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -253,35 +410,50 @@ export default function BusinessProfileFlow({
     if (renewMode && existingProfile) {
       setForm(prefillFromExisting(existingProfile));
       setStep('tariff');
-    } else if (existingProfile?.businessName) {
-      setForm(prefillFromExisting(existingProfile));
-      setStep('step1');
     } else {
-      setStep('step1');
-      setForm(initialForm({ telegram: defaultTelegram, phone: defaultPhone }));
-    }
+      const localDraft = loadBusinessWizardState(paymentTelegramId);
+      const serverTime = existingProfile?.updatedAt
+        ? new Date(existingProfile.updatedAt).getTime()
+        : 0;
+      const useLocalDraft = Boolean(localDraft && (!serverTime || localDraft.savedAt > serverTime));
 
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen, defaultTelegram, defaultPhone, renewMode, existingProfile]);
+      if (useLocalDraft && localDraft) {
+        setForm(storedToForm(localDraft.form, { telegram: defaultTelegram, phone: defaultPhone }));
+        setStep(restoreStep(localDraft.step));
+      } else if (existingProfile?.businessName) {
+        setForm(prefillFromExisting(existingProfile));
+        setStep('step1');
+      } else {
+        setStep('step1');
+        setForm(initialForm({ telegram: defaultTelegram, phone: defaultPhone }));
+      }
+    }
+  }, [isOpen, defaultTelegram, defaultPhone, renewMode, existingProfile, paymentTelegramId]);
+
+  useEffect(() => {
+    if (!isOpen || renewMode) return;
+    const timer = setTimeout(() => {
+      saveDraftToLocal(step, form);
+      void saveDraftToServer(form);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [isOpen, renewMode, step, form, saveDraftToLocal, saveDraftToServer]);
 
   useEffect(() => {
     if (!isOpen || step !== 'step5') return;
-    fetch(`/api/listings?userId=${telegramId}&viewerId=${telegramId}&limit=50&offset=0`)
+    fetch(`/api/listings?userId=${paymentTelegramId}&viewerId=${paymentTelegramId}&limit=50&offset=0`)
       .then((r) => (r.ok ? r.json() : { listings: [] }))
       .then((data) => setUserListings(data.listings || []))
       .catch(() => setUserListings([]));
-  }, [isOpen, step, telegramId]);
+  }, [isOpen, step, paymentTelegramId]);
 
   useEffect(() => {
     if (!isOpen) return;
-    fetch(`/api/user/balance?telegramId=${telegramId}`)
+    fetch(`/api/user/balance?telegramId=${paymentTelegramId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => setUserBalance(Number(data?.balance) || 0))
       .catch(() => {});
-  }, [isOpen, telegramId]);
+  }, [isOpen, paymentTelegramId]);
 
   const stepNumber = useMemo(() => {
     const map: Record<WizardStep, number | null> = {
@@ -358,9 +530,14 @@ export default function BusinessProfileFlow({
     if (!validateStep(step)) return;
     if (step === 'step5' && userListings.length === 0) {
       setStep('preview');
+      saveDraftToLocal('preview', form);
+      void saveDraftToServer(form);
       return;
     }
-    setStep(order[idx + 1]);
+    const nextStep = order[idx + 1];
+    setStep(nextStep);
+    saveDraftToLocal(nextStep, form);
+    void saveDraftToServer(form);
     tg?.HapticFeedback.impactOccurred('light');
   };
 
@@ -374,7 +551,7 @@ export default function BusinessProfileFlow({
 
   const uploadDraft = useCallback(async (): Promise<{ logo?: string; coverImage?: string }> => {
     const fd = new FormData();
-    fd.append('telegramId', telegramId);
+    fd.append('telegramId', paymentTelegramId);
     fd.append('businessName', form.businessName);
     fd.append('category', form.category);
     fd.append('subcategory', form.subcategory);
@@ -398,7 +575,7 @@ export default function BusinessProfileFlow({
       logo: data.profile?.logo || form.savedLogoPath || undefined,
       coverImage: data.profile?.coverImage || form.savedCoverPath || undefined,
     };
-  }, [form, telegramId]);
+  }, [form, paymentTelegramId]);
 
   const handlePayment = async (paymentMethod: 'balance' | 'direct') => {
     if (!form.selectedPlan) return;
@@ -420,14 +597,14 @@ export default function BusinessProfileFlow({
 
       const payload = renewMode
         ? {
-            telegramId,
+            telegramId: paymentTelegramId,
             plan: form.selectedPlan,
             paymentMethod,
             renew: true,
             listingIds: form.selectedListingIds,
           }
         : {
-            telegramId,
+            telegramId: paymentTelegramId,
             plan: form.selectedPlan,
             paymentMethod,
             listingIds: form.selectedListingIds,
@@ -466,6 +643,7 @@ export default function BusinessProfileFlow({
 
       showToast(t('businessProfile.success'), 'success');
       tg?.HapticFeedback.notificationOccurred('success');
+      clearBusinessWizardState(paymentTelegramId);
       onSuccess();
       onClose();
     } catch (e) {
@@ -500,7 +678,10 @@ export default function BusinessProfileFlow({
   const showWizardProgress = wizardIndex >= 0;
 
   const accentIcon = isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]';
-  const stepIconWrap = isLight ? 'bg-[#3F5331]/10' : 'bg-[#C8E6A0]/10';
+
+  const renderBusinessIcon = (iconSize = 22) => (
+    <BusinessBrandIcon size={iconSize} className={accentIcon} />
+  );
 
   const renderStepHeader = (title: string, icon: React.ReactNode) => (
     <div className="mb-5">
@@ -510,9 +691,7 @@ export default function BusinessProfileFlow({
         </p>
       )}
       <div className="flex items-center gap-2.5">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stepIconWrap}`}>
-          {icon}
-        </div>
+        <div className="flex shrink-0 items-center justify-center">{icon}</div>
         <h2 className={`text-xl font-bold ${ac.pageHeading}`}>{title}</h2>
       </div>
     </div>
@@ -542,7 +721,7 @@ export default function BusinessProfileFlow({
           type="button"
           aria-label={t('common.close')}
           className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
-          onClick={onClose}
+          onClick={handleClose}
         />
 
         <div
@@ -553,13 +732,14 @@ export default function BusinessProfileFlow({
           >
             <button
               type="button"
-              onClick={step === 'step1' || (renewMode && step === 'tariff') ? onClose : goBack}
+              onClick={step === 'step1' || (renewMode && step === 'tariff') ? handleClose : goBack}
               className={`p-2 -ml-2 rounded-full ${isLight ? 'hover:bg-gray-100' : 'hover:bg-white/10'}`}
             >
               {step === 'step1' || (renewMode && step === 'tariff') ? <X size={22} /> : <ChevronLeft size={22} />}
             </button>
             <span className="flex items-center gap-1.5 font-semibold text-sm">
-              {renewMode ? t('businessProfile.suspended.renewTitle') : 'TradeGround Business'}
+              <BusinessBrandIcon size={20} className={accentIcon} />
+              <span>{renewMode ? t('businessProfile.suspended.renewTitle') : 'TradeGround Business'}</span>
               <BusinessBetaBadge />
             </span>
             <div className="w-10" />
@@ -605,7 +785,7 @@ export default function BusinessProfileFlow({
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 pb-8">
           {step === 'step1' && (
             <>
-              {renderStepHeader(t('businessProfile.steps.step1.title'), <Briefcase size={20} className={accentIcon} />)}
+              {renderStepHeader(t('businessProfile.steps.step1.title'), renderBusinessIcon())}
               <div className="space-y-4">
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.logo')} *</label>
@@ -775,7 +955,7 @@ export default function BusinessProfileFlow({
 
           {step === 'preview' && (
             <>
-              {renderStepHeader(t('businessProfile.preview.title'), <Briefcase size={20} className={accentIcon} />)}
+              {renderStepHeader(t('businessProfile.preview.title'), renderBusinessIcon())}
               <p className={`text-sm mb-5 -mt-2 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.preview.subtitle')}</p>
               <div className={`overflow-hidden rounded-2xl border ${isLight ? 'border-gray-200' : 'border-white/15'}`}>
                 <div className="relative h-32 bg-[#3F5331]/30">
@@ -879,6 +1059,7 @@ export default function BusinessProfileFlow({
         onConfirm={handlePayment}
         businessPlan={form.selectedPlan}
         userBalance={userBalance}
+        telegramId={paymentTelegramId}
         tg={tg}
       />
     </>

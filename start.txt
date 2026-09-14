@@ -1,0 +1,1 @@
+cd ~/all-you-need && git pull && docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build

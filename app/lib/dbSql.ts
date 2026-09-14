@@ -62,6 +62,14 @@ export function sqlDatetimeLte(column: string, paramPlaceholder: string): string
   return `datetime(${column}) <= datetime(${paramPlaceholder})`;
 }
 
+/** users_legacy.user_id is NUMERIC on PostgreSQL; telegram ids are passed as numbers. */
+export function usersLegacyTelegramIdWhere(param = '?'): string {
+  if (isPostgres()) {
+    return `user_id = ${param}::numeric`;
+  }
+  return `user_id = ${param}`;
+}
+
 export function tableInfoQuery(table: string): string {
   if (isPostgres()) {
     return `
@@ -173,6 +181,8 @@ const PRISMA_PG_COLUMNS = [
   'packageType',
   'listingsCount',
   'paidAt',
+  'startsAt',
+  'endsAt',
   'cityKey',
   'processedAt',
   'referrerTelegramId',
@@ -324,6 +334,8 @@ export function adaptSql(sql: string): string {
   s = s.replace(/datetime\(([^)]+)\)\s*>\s*datetime\('now'\)/gi, '$1 > NOW()');
   s = s.replace(/datetime\(([^)]+)\)/gi, '$1::timestamp');
   s = s.replace(/\bIFNULL\s*\(/gi, 'COALESCE(');
+  // users_legacy.user_id is NUMERIC in production PostgreSQL
+  s = s.replace(/\buser_id\s*=\s*\?/gi, 'user_id = ?::numeric');
   s = s.replace(/\bINSTR\s*\(/gi, 'STRPOS(');
   s = s.replace(
     /\bSUBSTR\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\)/gi,

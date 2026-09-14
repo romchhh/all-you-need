@@ -9,6 +9,7 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { getCategories } from '@/constants/categories';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { useEffect } from 'react';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 interface CategoriesModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const CategoriesModal = ({
   tg
 }: CategoriesModalProps) => {
   const { t } = useLanguage();
+  useBodyScrollLock(isOpen);
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const categories = getCategories(t);
@@ -31,33 +33,6 @@ export const CategoriesModal = ({
     ? 'radial-gradient(ellipse 85% 100% at 18% 0%, rgba(63, 83, 49, 0.14) 0%, transparent 45%), linear-gradient(180deg, #ffffff 0%, #f6f8f4 100%)'
     : 'radial-gradient(ellipse 80% 100% at 20% 0%, #3F5331 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, #3F5331 0%, transparent 40%), #000000';
   // Блокуємо скрол body при відкритому модальному вікні
-  useEffect(() => {
-    if (isOpen) {
-      const scrollY = window.scrollY;
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
-    }
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-    };
-  }, [isOpen]);
 
   if (!isOpen) return null;
 

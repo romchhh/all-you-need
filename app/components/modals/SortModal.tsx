@@ -11,6 +11,7 @@ import { Category } from '@/types';
 import { getCategories } from '@/constants/categories';
 import { getCurrencySymbol, Currency } from '@/utils/currency';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 // Стилі для повзунків
 const sliderStyles = `
@@ -81,6 +82,7 @@ export const SortModal = ({
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   useHideBottomNav(isOpen);
+  useBodyScrollLock(isOpen);
   const chipActive = isLight
     ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 text-[#3F5331] font-semibold'
     : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
@@ -147,35 +149,7 @@ export const SortModal = ({
       setLocalSelectedCategory(selectedCategory);
       setLocalSelectedSubcategory(selectedSubcategory);
       setLocalCondition(selectedCondition);
-      // Зберігаємо поточну позицію скролу
-      const scrollY = window.scrollY;
-      // Блокуємо скрол на body та html
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      // Розблоковуємо скрол
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
     }
-    
-    // Cleanup при розмонтуванні
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-    };
   }, [isOpen, minPrice, maxPrice, selectedCurrency, selectedCategory, selectedSubcategory, selectedCondition]);
   
   // Оновлюємо максимальну ціну при зміні категорії

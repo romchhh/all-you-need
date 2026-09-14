@@ -16,7 +16,7 @@ export async function getUserLanguageForTelegramId(telegramId: string): Promise<
   try {
     const legacyUsers = (await prisma.$queryRawUnsafe(
       `SELECT language FROM users_legacy WHERE user_id = ?`,
-      telegramId
+      telegramIdNum
     )) as Array<{ language: string | null }>;
 
     if (legacyUsers.length > 0 && legacyUsers[0].language) {

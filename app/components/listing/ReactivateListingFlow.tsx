@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/features/ui/hooks/useToast';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 // Динамічні імпорти для оптимізації
 const ListingPackageModal = dynamic(() => import('@/components/modals/ListingPackageModal'), { ssr: false });
@@ -28,6 +29,7 @@ interface UserStatus {
 }
 
 export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, onSuccess }: ReactivateListingFlowProps) {
+  useBodyScrollLock(isOpen);
   const { t } = useLanguage();
   const { showToast } = useToast();
   const [step, setStep] = useState<Step>('buy_package');
@@ -46,17 +48,6 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
   };
 
   // Блокуємо скрол при відкритті модального вікна
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {

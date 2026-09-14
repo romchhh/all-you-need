@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 interface PhoneModalProps {
   isOpen: boolean;
@@ -14,43 +15,11 @@ interface PhoneModalProps {
 
 export const PhoneModal = ({ isOpen, onClose, phoneNumber, tg }: PhoneModalProps) => {
   const { t } = useLanguage();
+  useBodyScrollLock(isOpen);
   const { toast, showToast, hideToast } = useToast();
   const [copied, setCopied] = useState(false);
 
   // Блокуємо скрол body та html при відкритому модальному вікні
-  useEffect(() => {
-    if (isOpen) {
-      // Зберігаємо поточну позицію скролу
-      const scrollY = window.scrollY;
-      // Блокуємо скрол на body та html
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      // Розблоковуємо скрол
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
-      setCopied(false);
-    }
-    
-    // Cleanup при розмонтуванні
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-    };
-  }, [isOpen]);
 
   if (!isOpen) return null;
 

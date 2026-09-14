@@ -96,10 +96,15 @@ export async function POST(request: NextRequest) {
     const subscriptionMetadata = { listingIds: normalizedListingIds, renew: Boolean(renew) };
 
     if (paymentMethod === 'balance') {
+      const balance = Number(user.balance);
+      if (!Number.isFinite(balance)) {
+        return NextResponse.json({ error: 'Invalid balance' }, { status: 400 });
+      }
+
       try {
         const { newBalance } = await processBusinessSubscriptionFromBalance(
           user.id,
-          user.balance,
+          balance,
           planId
         );
 

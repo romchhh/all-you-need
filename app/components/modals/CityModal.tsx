@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { useState, useEffect, Fragment, useRef, useCallback, useMemo, type MouseEvent } from 'react';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { germanCities, fetchGermanCitiesFromAPI, isGermanCityValid } from '@/constants/german-cities';
@@ -106,6 +107,7 @@ export const CityModal = ({
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   useHideBottomNav(isOpen);
+  useBodyScrollLock(isOpen);
   const chipActive = isLight
     ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 text-[#3F5331] font-semibold'
     : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
@@ -140,42 +142,6 @@ export const CityModal = ({
       setSubsDropdownOpen(true);
     }
   }, [isOpen, openSubscriptionsSection]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setLocalSelectedCities([...selectedCities]);
-      setSearchQuery('');
-      setSubsDropdownOpen(false);
-      // Зберігаємо поточну позицію скролу
-      const scrollY = window.scrollY;
-      // Блокуємо скрол на body та html
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      // Розблоковуємо скрол
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
-    }
-    
-    // Cleanup при розмонтуванні
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-    };
-  }, [isOpen]);
 
   // Загружаємо міста з API при зміні запиту
   useEffect(() => {

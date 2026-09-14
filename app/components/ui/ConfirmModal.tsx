@@ -3,6 +3,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const ConfirmModal = ({
   tg
 }: ConfirmModalProps) => {
   const { isLight } = useTheme();
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 

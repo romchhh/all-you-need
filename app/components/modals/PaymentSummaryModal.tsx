@@ -5,7 +5,9 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { useState, useEffect, useMemo } from 'react';
+import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 
 interface PaymentSummaryModalProps {
   isOpen: boolean;
@@ -15,6 +17,7 @@ interface PaymentSummaryModalProps {
   promotionType?: string | null;
   businessPlan?: 'business' | 'business_pro' | null;
   userBalance?: number;
+  telegramId?: string | null;
   tg: TelegramWebApp | null;
 }
 
@@ -49,6 +52,7 @@ export const PaymentSummaryModal = ({
   promotionType,
   businessPlan,
   userBalance = 0,
+  telegramId: telegramIdProp,
   tg,
 }: PaymentSummaryModalProps) => {
   const { t } = useLanguage();
@@ -59,6 +63,12 @@ export const PaymentSummaryModal = ({
   const [confirming, setConfirming] = useState(false);
 
   useHideBottomNav(isOpen);
+  useBodyScrollLock(isOpen);
+
+  const paymentTelegramId = useMemo(
+    () => resolvePaymentTelegramId(tg, telegramIdProp),
+    [tg, telegramIdProp]
+  );
 
   const effectiveBalance = fetchedBalance ?? normalizeBalance(userBalance);
 
@@ -78,16 +88,12 @@ export const PaymentSummaryModal = ({
 
     setPaymentMethod('balance');
 
-    const telegramId =
-      tg?.initDataUnsafe?.user?.id?.toString() ||
-      (typeof window !== 'undefined' ? sessionStorage.getItem('telegramId') : null);
-
-    if (!telegramId) return;
+    if (!paymentTelegramId) return;
 
     let cancelled = false;
     setBalanceLoading(true);
 
-    fetch(`/api/user/balance?telegramId=${telegramId}`)
+    fetch(`/api/user/balance?telegramId=${paymentTelegramId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || data?.balance == null) return;
@@ -103,7 +109,7 @@ export const PaymentSummaryModal = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, tg]);
+  }, [isOpen, paymentTelegramId]);
 
   useEffect(() => {
     if (!isOpen || balanceLoading) return;
@@ -111,39 +117,6 @@ export const PaymentSummaryModal = ({
       setPaymentMethod('direct');
     }
   }, [isOpen, balanceLoading, canPayWithBalance, paymentMethod]);
-
-  useEffect(() => {
-    if (isOpen) {
-      const scrollY = window.scrollY;
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0', 10) * -1);
-      }
-    }
-
-    return () => {
-      const scrollY = document.body.style.top;
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0', 10) * -1);
-      }
-    };
-  }, [isOpen]);
 
   const confirmDisabled = useMemo(() => {
     if (confirming || totalPrice <= 0) return true;

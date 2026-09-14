@@ -6,6 +6,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { compressImageOnClient } from '@/utils/imageUtils';
 
 // Динамічні імпорти для оптимізації
@@ -43,6 +44,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
   const [userBalance, setUserBalance] = useState<number>(0);
 
   useHideBottomNav(isOpen);
+  useBodyScrollLock(isOpen);
 
   // Хелпер для отримання telegramId з різних джерел
   const getTelegramId = (): string | null => {
@@ -52,17 +54,6 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
   };
 
   // Блокуємо скрол при відкритті модального вікна
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {

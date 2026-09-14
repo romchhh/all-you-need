@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 
 interface ListingPackage {
   type: string;
@@ -32,6 +33,7 @@ export default function ListingPackageModal({
   onSelectPackage,
   telegramId,
 }: ListingPackageModalProps) {
+  useBodyScrollLock(isOpen);
   const { t } = useLanguage();
   const { user } = useTelegram();
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
@@ -44,17 +46,6 @@ export default function ListingPackageModal({
   const userId = telegramId || user?.id;
 
   // Блокуємо скрол при відкритті модального вікна
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && userId) {

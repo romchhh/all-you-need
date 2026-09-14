@@ -1,10 +1,11 @@
 'use client';
 
-import { Briefcase, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
+import { BusinessBrandIcon } from '@/components/business/BusinessBrandIcon';
 
 interface BusinessPromoCardProps {
   onCreate: () => void;
@@ -27,13 +28,10 @@ export function BusinessPromoCard({ onCreate, variant = 'create' }: BusinessProm
       }`}
     >
       <div className="flex items-center gap-2.5 p-3">
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-            isLight ? 'bg-[#3F5331]/12 text-[#3F5331]' : 'bg-[#C8E6A0]/12 text-[#C8E6A0]'
-          }`}
-        >
-          <Briefcase size={18} />
-        </div>
+        <BusinessBrandIcon
+          size={26}
+          className={`shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
+        />
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex items-center gap-1.5">
             <p className={`truncate text-sm font-semibold ${ac.pageHeading}`}>

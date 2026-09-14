@@ -51,6 +51,10 @@ export async function findUserByTelegramId(telegramId: number): Promise<UserData
   const user = users[0];
   return {
     ...user,
+    balance: Number(user.balance) || 0,
+    rating: Number(user.rating) || 0,
+    reviewsCount: Number(user.reviewsCount) || 0,
+    listingPackagesBalance: Number(user.listingPackagesBalance) || 0,
     hasUsedFreeAd: Boolean(user.hasUsedFreeAd),
   };
 }
@@ -72,8 +76,8 @@ export async function getUserBalance(telegramId: number): Promise<UserBalance | 
   }
 
   return {
-    balance: users[0].balance,
-    listingPackagesBalance: users[0].listingPackagesBalance ?? 1,
+    balance: Number(users[0].balance) || 0,
+    listingPackagesBalance: Number(users[0].listingPackagesBalance) || 1,
     hasUsedFreeAd: Boolean(users[0].hasUsedFreeAd),
   };
 }
@@ -166,7 +170,7 @@ export async function getUserLanguage(telegramId: string | number | bigint): Pro
   try {
     const legacy = await prisma.$queryRawUnsafe(
       `SELECT language FROM users_legacy WHERE user_id = ?`,
-      telegramId.toString()
+      id
     ) as Array<{ language: string | null }>;
     if (legacy.length > 0 && (legacy[0].language === 'uk' || legacy[0].language === 'ru')) {
       return legacy[0].language as 'uk' | 'ru';

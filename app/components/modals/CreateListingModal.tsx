@@ -14,6 +14,7 @@ import { Toast } from '@/components/ui/Toast';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { FixedLogoHeader } from '@/components/layout/FixedLogoHeader';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
+import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import {
   LISTING_TITLE_MAX_LENGTH,
   LISTING_DESCRIPTION_MAX_LENGTH,
@@ -41,6 +42,7 @@ export const CreateListingModal = ({
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   useHideBottomNav(isOpen);
+  useBodyScrollLock(isOpen);
   const { toast, showToast, hideToast } = useToast();
   const imageUpload = useListingImageUpload({
     isOpen,
@@ -422,51 +424,6 @@ export const CreateListingModal = ({
   }, [isOpen, isInputFocused]);
 
   // Блокуємо скрол body при відкритому модальному вікні (оптимізовано для плавності)
-  useEffect(() => {
-    if (isOpen) {
-      // Використовуємо requestAnimationFrame для плавної зміни
-      const scrollY = window.scrollY;
-      // Зберігаємо scrollY в data-атрибуті для подальшого відновлення
-      document.body.setAttribute('data-scroll-y', scrollY.toString());
-      
-      requestAnimationFrame(() => {
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${scrollY}px`;
-        document.body.style.width = '100%';
-        document.documentElement.style.overflow = 'hidden';
-      });
-    } else {
-      // Плавне відновлення
-      const savedScrollY = document.body.getAttribute('data-scroll-y');
-      
-      requestAnimationFrame(() => {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.documentElement.style.overflow = '';
-        document.body.removeAttribute('data-scroll-y');
-        
-        // Відновлюємо позицію без стрибків
-        if (savedScrollY) {
-          const scrollPosition = parseInt(savedScrollY, 10);
-          // Використовуємо requestAnimationFrame для плавного скролу
-          requestAnimationFrame(() => {
-            window.scrollTo(0, scrollPosition);
-          });
-        }
-      });
-    }
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      document.documentElement.style.overflow = '';
-      document.body.removeAttribute('data-scroll-y');
-    };
-  }, [isOpen]);
 
   // Оновлюємо позицію меню валюти при відкритті
   useEffect(() => {

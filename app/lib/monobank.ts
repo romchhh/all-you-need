@@ -48,9 +48,13 @@ export async function createMonobankInvoice(params: CreateInvoiceParams): Promis
 
   // Знаходимо користувача
   const telegramIdStr = telegramId.toString();
+  const telegramIdNum = parseInt(telegramIdStr, 10);
+  if (!Number.isFinite(telegramIdNum)) {
+    throw new Error('Invalid telegramId');
+  }
   const users = await prisma.$queryRawUnsafe(
-    `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-    telegramIdStr
+    `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+    telegramIdNum
   ) as Array<{ id: number }>;
 
   if (!users[0]) {
