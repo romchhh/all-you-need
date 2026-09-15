@@ -94,39 +94,144 @@ def _quote_pg_table(table: str) -> str:
 
 
 PRISMA_PG_TABLES = (
-    "User",
-    "Listing",
-    "Favorite",
-    "ViewHistory",
-    "Transaction",
-    "Payment",
-    "Review",
-    "Category",
-    "Admin",
-    "Link",
-    "TelegramListing",
-    "CitySubscription",
-    "AnalyticsEvent",
-    "SystemMonitorLog",
-    "SystemSettings",
+    "BusinessSubscriptionPurchase",
     "ListingPackagePurchase",
-    "PromotionPurchase",
-    "Referral",
-    "UserSession",
+    "SystemMonitorLog",
+    "TelegramListing",
     "CityDigestQueue",
+    "CitySubscription",
+    "PromotionPurchase",
+    "BusinessProfile",
+    "BusinessFollow",
+    "AnalyticsEvent",
+    "SystemSettings",
+    "ViewHistory",
+    "UserSession",
+    "Transaction",
+    "Referral",
+    "Favorite",
+    "Category",
+    "Payment",
+    "Listing",
+    "Review",
+    "Admin",
+    "User",
+    "Link",
 )
 
 _IDENT_LOOKBEHIND = r'(?<![A-Za-z0-9_."])'
+_IDENT_LOOKAHEAD = r'(?![A-Za-z0-9_])'
 
 
 def _quote_pg_column_name(sql: str, col: str) -> str:
-    """Quote a camelCase Prisma column without splitting longer aliases like sellerTelegramId."""
-    sql = re.sub(rf"\.{re.escape(col)}\b", f'."{col}"', sql)
-    return re.sub(rf"{_IDENT_LOOKBEHIND}{re.escape(col)}\b", f'"{col}"', sql)
+    """Quote a camelCase Prisma column without splitting longer names/aliases.
+
+    sellerTelegramId must not become seller\"telegramId\".
+    """
+    ident = re.escape(col)
+    sql = re.sub(rf"\.{ident}{_IDENT_LOOKAHEAD}", f'."{col}"', sql)
+    return re.sub(rf"{_IDENT_LOOKBEHIND}{ident}{_IDENT_LOOKAHEAD}", f'"{col}"', sql)
+
+
+def _quote_pg_table_name(sql: str, table: str) -> str:
+    quoted = f'"{table}"'
+    sql = re.sub(
+        rf"\bCREATE TABLE IF NOT EXISTS {table}\b",
+        f"CREATE TABLE IF NOT EXISTS {quoted}",
+        sql,
+        flags=re.IGNORECASE,
+    )
+    sql = re.sub(rf"\bFROM {table}\b", f"FROM {quoted}", sql, flags=re.IGNORECASE)
+    sql = re.sub(rf"\bJOIN {table}\b", f"JOIN {quoted}", sql, flags=re.IGNORECASE)
+    sql = re.sub(rf"\bUPDATE {table}\b", f"UPDATE {quoted}", sql, flags=re.IGNORECASE)
+    sql = re.sub(rf"\bINTO {table}\b", f"INTO {quoted}", sql, flags=re.IGNORECASE)
+    sql = re.sub(rf"\bDELETE FROM {table}\b", f'DELETE FROM {quoted}', sql, flags=re.IGNORECASE)
+    sql = re.sub(rf"\bON {table}\(", f"ON {quoted}(", sql, flags=re.IGNORECASE)
+    return sql
 
 
 PRISMA_PG_COLUMNS = (
-    "userId",
+    "highlightCreditsRemaining",
+    "topCreditsRemaining",
+    "listingPackagesBalance",
+    "marketplaceListingId",
+    "subscriptionEndsAt",
+    "referrerTelegramId",
+    "referredTelegramId",
+    "businessProfileId",
+    "channelMessageId",
+    "moderationStatus",
+    "publicationTariff",
+    "sellerTelegramId",
+    "viewerTelegramId",
+    "followerUserId",
+    "linkedListingIds",
+    "followersCount",
+    "optimizedImages",
+    "promotionType",
+    "promotionEnds",
+    "previousPrice",
+    "priceChangedAt",
+    "rejectionReason",
+    "favoriteBoost",
+    "hasUsedFreeAd",
+    "agreementAccepted",
+    "reviewsCount",
+    "paymentMethod",
+    "paymentStatus",
+    "packageType",
+    "listingsCount",
+    "sellerFirstName",
+    "sellerLastName",
+    "sellerUsername",
+    "sellerAvatar",
+    "sellerPhone",
+    "favoritesCount",
+    "subscriptionStatus",
+    "serviceRadiusKm",
+    "workingHours",
+    "coverImage",
+    "businessName",
+    "profileType",
+    "serviceArea",
+    "isPublished",
+    "isSuperadmin",
+    "priceDisplay",
+    "rewardPaidAt",
+    "lastActiveAt",
+    "startsAt",
+    "endsAt",
+    "paidAt",
+    "cityKey",
+    "processedAt",
+    "webhookData",
+    "completedAt",
+    "invoiceId",
+    "amountEur",
+    "pageUrl",
+    "eventName",
+    "eventGroup",
+    "entityType",
+    "entityId",
+    "targetId",
+    "sortOrder",
+    "parentId",
+    "linkName",
+    "linkUrl",
+    "linkCount",
+    "userAgent",
+    "ipAddress",
+    "addedDate",
+    "addedBy",
+    "updatedBy",
+    "checkedAt",
+    "serviceName",
+    "latencyMs",
+    "listingId",
+    "viewedAt",
+    "expiresAt",
+    "autoRenew",
+    "subcategory",
     "telegramId",
     "firstName",
     "lastName",
@@ -135,56 +240,10 @@ PRISMA_PG_COLUMNS = (
     "publishedAt",
     "moderatedAt",
     "moderatedBy",
-    "optimizedImages",
-    "promotionType",
-    "promotionEnds",
-    "isFree",
-    "previousPrice",
-    "priceChangedAt",
-    "favoriteBoost",
-    "subcategory",
-    "moderationStatus",
-    "rejectionReason",
-    "listingId",
-    "viewerTelegramId",
-    "viewedAt",
-    "targetId",
-    "eventName",
-    "eventGroup",
-    "entityType",
-    "entityId",
-    "lastActiveAt",
-    "sortOrder",
-    "parentId",
     "isActive",
-    "linkName",
-    "linkUrl",
-    "linkCount",
-    "hasUsedFreeAd",
-    "agreementAccepted",
-    "listingPackagesBalance",
-    "autoRenew",
-    "expiresAt",
-    "priceDisplay",
-    "channelMessageId",
-    "marketplaceListingId",
-    "reviewsCount",
-    "paymentMethod",
-    "completedAt",
-    "invoiceId",
-    "amountEur",
-    "pageUrl",
-    "webhookData",
-    "packageType",
-    "listingsCount",
-    "paidAt",
-    "cityKey",
-    "processedAt",
-    "referrerTelegramId",
-    "referredTelegramId",
+    "isFree",
+    "userId",
     "rewardPaid",
-    "rewardPaidAt",
-    "sellerTelegramId",
 )
 
 BOOLEAN_PG_COLUMNS = (
@@ -194,25 +253,14 @@ BOOLEAN_PG_COLUMNS = (
     "hasUsedFreeAd",
     "agreementAccepted",
     "autoRenew",
-    "rewardPaid",
+    "isPublished",
 )
 
 
 def quote_pg_identifiers(sql: str) -> str:
     s = sql
     for table in PRISMA_PG_TABLES:
-        s = re.sub(
-            rf"\bCREATE TABLE IF NOT EXISTS {table}\b",
-            f'CREATE TABLE IF NOT EXISTS "{table}"',
-            s,
-            flags=re.IGNORECASE,
-        )
-        s = re.sub(rf"\bFROM {table}\b", f'FROM "{table}"', s, flags=re.IGNORECASE)
-        s = re.sub(rf"\bJOIN {table}\b", f'JOIN "{table}"', s, flags=re.IGNORECASE)
-        s = re.sub(rf"\bUPDATE {table}\b", f'UPDATE "{table}"', s, flags=re.IGNORECASE)
-        s = re.sub(rf"\bINTO {table}\b", f'INTO "{table}"', s, flags=re.IGNORECASE)
-        s = re.sub(rf"\bDELETE FROM {table}\b", f'DELETE FROM "{table}"', s, flags=re.IGNORECASE)
-        s = re.sub(rf"\bON {table}\(", f'ON "{table}"(', s, flags=re.IGNORECASE)
+        s = _quote_pg_table_name(s, table)
     for col in sorted(PRISMA_PG_COLUMNS, key=len, reverse=True):
         s = _quote_pg_column_name(s, col)
     for col in BOOLEAN_PG_COLUMNS:

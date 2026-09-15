@@ -4,13 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   BadgeCheck,
+  Check,
   Globe,
   Instagram,
   MessageCircle,
-  MoreHorizontal,
   Phone,
-  Users,
-  SlidersHorizontal,
+  Share2,
+  UserPlus,
 } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
@@ -25,6 +25,8 @@ import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { usePageTransition } from '@/contexts/PageTransitionContext';
 import { useParams } from 'next/navigation';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
+import { Toast } from '@/components/ui/Toast';
+import { useToast } from '@/features/ui/hooks/useToast';
 import { FixedLogoHeader, OVERLAY_BACK_BUTTON_TOP_CLASS, overlayHeaderActionClass } from '@/components/layout/FixedLogoHeader';
 import {
   buildSellerProfileContactMessage,
@@ -91,6 +93,7 @@ export function BusinessProfilePage({
   const categories = useMemo(() => getCategories(t), [t]);
   const { user: currentUser } = useTelegram();
   const { hide: hidePageLoader } = usePageTransition();
+  const { toast, showToast, hideToast } = useToast();
 
   const [profile, setProfile] = useState<PublicBusinessProfile | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
@@ -100,6 +103,9 @@ export function BusinessProfilePage({
   const [listingFilter, setListingFilter] = useState<ListingFilter>('all');
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isOwn, setIsOwn] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
 
   useSwipeBack({
     onSwipeBack: onBackToPreviousListing || onClose,
@@ -111,8 +117,11 @@ export function BusinessProfilePage({
     try {
       setLoading(true);
       const viewerId = currentUser?.id?.toString() || '';
+      const viewerQuery = viewerId ? `&viewerTelegramId=${encodeURIComponent(viewerId)}` : '';
       const [profileRes, listingsRes] = await Promise.all([
-        fetch(`/api/business-profile/public?telegramId=${sellerTelegramId}&lang=${lang}`),
+        fetch(
+          `/api/business-profile/public?telegramId=${encodeURIComponent(sellerTelegramId)}&lang=${lang}${viewerQuery}`
+        ),
         fetch(
           `/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&profileType=business&status=active&limit=50&offset=0`
         ),
@@ -121,6 +130,8 @@ export function BusinessProfilePage({
       if (profileRes.ok) {
         const data = await profileRes.json();
         setProfile(data.profile);
+        setIsFollowing(Boolean(data.isFollowing));
+        setIsOwn(Boolean(data.isOwn) || (viewerId !== '' && viewerId === String(sellerTelegramId)));
         setLoadError(false);
       } else {
         setLoadError(true);
@@ -164,10 +175,7 @@ export function BusinessProfilePage({
 
   const handleMessage = () => {
     if (!profile) return;
-    const username =
-      profile.sellerUsername ||
-      profile.telegram?.replace(/^@/, '') ||
-      '';
+    const username = profile.sellerUsername || profile.telegram?.replace(/^@/, '') || '';
     if (!username.trim()) return;
     const message = buildSellerProfileContactMessage(
       getProfileShareLink(sellerTelegramId),
@@ -186,6 +194,53 @@ export function BusinessProfilePage({
     if (!profile?.website) return;
     const url = profile.website.startsWith('http') ? profile.website : `https://${profile.website}`;
     window.open(url, '_blank');
+  };
+
+  const viewingOwn =
+    isOwn || Boolean(currentUser?.id && String(currentUser.id) === String(sellerTelegramId));
+
+  const handleFollow = async () => {
+    if (viewingOwn || followBusy) return;
+    if (!currentUser?.id) {
+      showToast(t('businessProfile.public.loginToSubscribe'), 'info');
+      return;
+    }
+
+    const nextFollowing = !isFollowing;
+    setFollowBusy(true);
+    tg?.HapticFeedback?.impactOccurred?.('light');
+
+    try {
+      const res = await fetch('/api/business-profile/public', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: sellerTelegramId,
+          followerTelegramId: String(currentUser.id),
+          action: nextFollowing ? 'follow' : 'unfollow',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(t('businessProfile.public.subscribeError'), 'error');
+        return;
+      }
+
+      setIsFollowing(Boolean(data.isFollowing));
+      if (typeof data.followersCount === 'number') {
+        setProfile((prev) => (prev ? { ...prev, followersCount: data.followersCount } : prev));
+      }
+      showToast(
+        data.isFollowing
+          ? t('businessProfile.public.subscribedToast')
+          : t('businessProfile.public.unsubscribedToast'),
+        'success'
+      );
+    } catch {
+      showToast(t('businessProfile.public.subscribeError'), 'error');
+    } finally {
+      setFollowBusy(false);
+    }
   };
 
   const headerActionClass = overlayHeaderActionClass(isLight);
@@ -228,10 +283,21 @@ export function BusinessProfilePage({
     );
   }
 
-  const actionBtnBase = `flex flex-col items-center justify-center gap-1.5 rounded-2xl py-3 px-2 text-xs font-medium transition-colors min-w-0 flex-1`;
-  const actionBtnSecondary = isLight
-    ? 'bg-gray-100 text-gray-900 hover:bg-gray-200/80'
-    : 'bg-[#1C1C1C] text-white hover:bg-white/10 border border-white/10';
+  const canMessage = Boolean(
+    (profile.sellerUsername || profile.telegram?.replace(/^@/, '') || '').trim()
+  );
+  const statCard = isLight
+    ? 'rounded-2xl bg-white/80 border border-[#3F5331]/10 px-2 py-3 text-center'
+    : 'rounded-2xl bg-white/[0.06] border border-white/10 px-2 py-3 text-center';
+  const secondaryBtn = isLight
+    ? 'bg-white border border-[#3F5331]/15 text-[#3F5331] hover:bg-[#E8F0E0]/70'
+    : 'bg-white/[0.08] border border-white/15 text-white hover:bg-white/15';
+  const chipBtn = isLight
+    ? 'bg-white border border-[#3F5331]/15 text-[#3F5331] hover:bg-[#E8F0E0]/70'
+    : 'bg-white/[0.08] border border-white/10 text-white/90 hover:bg-white/15';
+  const aboutCard = isLight
+    ? 'rounded-2xl border border-[#3F5331]/10 bg-white/80 p-4'
+    : 'rounded-2xl border border-white/10 bg-white/[0.05] p-4';
 
   return (
     <div className={`min-h-screen pb-24 ${ac.overlayShell}`}>
@@ -255,21 +321,40 @@ export function BusinessProfilePage({
       >
         <ArrowLeft size={20} />
       </button>
+      <button
+        type="button"
+        onClick={() => setShowShareModal(true)}
+        aria-label={t('common.share')}
+        className={`fixed right-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${OVERLAY_BACK_BUTTON_TOP_CLASS} ${headerActionClass}`}
+      >
+        <Share2 size={18} />
+      </button>
 
-      <div className="relative mt-2">
-        <div className={`h-44 sm:h-52 ${coverUrl ? '' : isLight ? 'bg-[#3F5331]/20' : 'bg-[#3F5331]/30'}`}>
+      <div className="relative">
+        <div
+          className={`relative h-40 overflow-hidden sm:h-48 ${
+            coverUrl ? '' : isLight ? 'bg-gradient-to-br from-[#3F5331]/25 to-[#C8E6A0]/20' : 'bg-gradient-to-br from-[#3F5331]/50 to-[#1a2414]'
+          }`}
+        >
           {coverUrl && <img src={coverUrl} alt="" className="w-full h-full object-cover" />}
-        </div>
-        <div className="absolute -bottom-10 left-4">
           <div
-            className={`w-20 h-20 rounded-2xl overflow-hidden border-4 ${
-              isLight ? 'border-white shadow-lg' : 'border-black bg-[#1C1C1C]'
+            className={`pointer-events-none absolute inset-0 ${
+              isLight
+                ? 'bg-gradient-to-t from-white/70 via-transparent to-transparent'
+                : 'bg-gradient-to-t from-black/55 via-transparent to-black/20'
+            }`}
+          />
+        </div>
+        <div className="absolute -bottom-11 left-4">
+          <div
+            className={`h-[88px] w-[88px] overflow-hidden rounded-2xl border-[3px] shadow-lg ${
+              isLight ? 'border-white bg-white' : 'border-[#0f1408] bg-[#1C1C1C]'
             }`}
           >
             {logoUrl ? (
-              <img src={logoUrl} alt="" className="w-full h-full object-cover" />
+              <img src={logoUrl} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-2xl font-bold bg-[#3F5331]/30 text-[#C8E6A0]">
+              <div className="flex h-full w-full items-center justify-center bg-[#3F5331]/30 text-2xl font-bold text-[#C8E6A0]">
                 {profile.businessName.charAt(0)}
               </div>
             )}
@@ -277,78 +362,121 @@ export function BusinessProfilePage({
         </div>
       </div>
 
-      <div className="px-4 pt-12 pb-4">
-        <div className="mb-4 grid grid-cols-[2.5rem_1fr_2.5rem] items-center gap-2">
-          <span aria-hidden />
-          <div className="flex items-center justify-center gap-1.5 min-w-0">
-            <h1 className={`text-lg font-semibold truncate text-center ${ac.pageHeading}`}>{profile.businessName}</h1>
-            <BadgeCheck size={18} className="text-emerald-400 shrink-0" />
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowShareModal(true)}
-            className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
-              isLight ? 'border-gray-300 text-gray-900 hover:bg-gray-100' : 'border-white text-white hover:bg-white/10'
-            }`}
-          >
-            <MoreHorizontal size={18} />
-          </button>
+      <div className="px-4 pt-14 pb-4">
+        <div className="mb-1 flex items-start gap-2">
+          <h1 className={`min-w-0 flex-1 text-[1.35rem] font-semibold leading-tight ${ac.pageHeading}`}>
+            {profile.businessName}
+          </h1>
+          <BadgeCheck size={20} className="mt-0.5 shrink-0 text-emerald-400" />
         </div>
 
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div>
-            <p className={`text-sm mt-1 ${ac.mutedText}`}>
-              {categoryLabel} · {profile.city}
-            </p>
-          </div>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <span
-            className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide ${
+            className={`text-[10px] font-bold tracking-wide rounded-full px-2.5 py-1 ${
               isLight
-                ? 'border border-[#3F5331] text-[#3F5331]'
-                : 'border border-[#C8E6A0]/50 text-[#C8E6A0]'
+                ? 'border border-[#3F5331]/40 text-[#3F5331] bg-[#E8F0E0]/70'
+                : 'border border-[#C8E6A0]/40 text-[#C8E6A0] bg-[#C8E6A0]/10'
             }`}
           >
             BUSINESS{isPro ? ' PRO' : ''}
           </span>
+          <p className={`text-sm ${ac.mutedText}`}>
+            {categoryLabel}
+            {profile.city ? ` · ${profile.city}` : ''}
+          </p>
         </div>
 
-        <div className={`flex items-center gap-3 text-sm mb-3 ${ac.mutedText}`}>
-          <span className="flex items-center gap-1">
-            <Users size={14} />
-            {profile.followersCount} {t('businessProfile.public.followersLabel')}
-          </span>
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className={statCard}>
+            <div className={`text-lg font-semibold tabular-nums ${ac.pageHeading}`}>{profile.activeListingsCount}</div>
+            <div className={`mt-0.5 text-[11px] leading-tight ${ac.mutedText}`}>
+              {t('businessProfile.public.listingsShort')}
+            </div>
+          </div>
+          <div className={statCard}>
+            <div className={`text-lg font-semibold tabular-nums ${ac.pageHeading}`}>{profile.followersCount}</div>
+            <div className={`mt-0.5 text-[11px] leading-tight ${ac.mutedText}`}>
+              {t('businessProfile.public.followersShort')}
+            </div>
+          </div>
+          <div className={statCard}>
+            <div className={`text-sm font-semibold leading-tight ${ac.pageHeading}`}>{profile.memberSince}</div>
+            <div className={`mt-0.5 text-[11px] leading-tight ${ac.mutedText}`}>
+              {t('businessProfile.public.onPlatform')}
+            </div>
+          </div>
         </div>
 
-        <div className="flex gap-2 mb-6">
-          <button type="button" onClick={handleMessage} className={`${actionBtnBase} ${listingPrimaryCta(isLight)}`}>
-            <MessageCircle size={20} />
-            {t('businessProfile.public.write')}
+        {!viewingOwn && (
+          <button
+            type="button"
+            onClick={() => void handleFollow()}
+            disabled={followBusy}
+            className={`mb-2 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
+              isFollowing ? secondaryBtn : listingPrimaryCta(isLight)
+            }`}
+          >
+            {isFollowing ? <Check size={18} /> : <UserPlus size={18} />}
+            {isFollowing ? t('businessProfile.public.subscribed') : t('businessProfile.public.subscribe')}
           </button>
-          {profile.phone && (
-            <button
-              type="button"
-              onClick={() => setShowPhoneModal(true)}
-              className={`${actionBtnBase} ${actionBtnSecondary}`}
-            >
-              <Phone size={20} />
-              {t('businessProfile.public.call')}
-            </button>
-          )}
-          {profile.instagram && (
-            <button type="button" onClick={handleInstagram} className={`${actionBtnBase} ${actionBtnSecondary}`}>
-              <Instagram size={20} />
-              Instagram
-            </button>
-          )}
-          {profile.website && (
-            <button type="button" onClick={handleWebsite} className={`${actionBtnBase} ${actionBtnSecondary}`}>
-              <Globe size={20} />
-              {t('businessProfile.public.website')}
-            </button>
-          )}
-        </div>
+        )}
+        {viewingOwn && (
+          <div className={`mb-2 rounded-2xl px-4 py-3 text-center text-sm ${isLight ? 'bg-[#E8F0E0]/80 text-[#3F5331]' : 'bg-white/[0.08] text-white/80'}`}>
+            {t('businessProfile.public.ownProfile')}
+          </div>
+        )}
 
-        <div className={`flex border-b mb-4 ${isLight ? 'border-gray-200' : 'border-white/10'}`}>
+        {(canMessage || profile.phone) && (
+          <div className="mb-3 flex gap-2">
+            {canMessage && (
+              <button
+                type="button"
+                onClick={handleMessage}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-medium transition-colors ${secondaryBtn}`}
+              >
+                <MessageCircle size={18} />
+                {t('businessProfile.public.write')}
+              </button>
+            )}
+            {profile.phone && (
+              <button
+                type="button"
+                onClick={() => setShowPhoneModal(true)}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-medium transition-colors ${secondaryBtn}`}
+              >
+                <Phone size={18} />
+                {t('businessProfile.public.call')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {(profile.instagram || profile.website) && (
+          <div className="mb-5 flex gap-2">
+            {profile.instagram && (
+              <button
+                type="button"
+                onClick={handleInstagram}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-medium transition-colors ${chipBtn}`}
+              >
+                <Instagram size={16} />
+                Instagram
+              </button>
+            )}
+            {profile.website && (
+              <button
+                type="button"
+                onClick={handleWebsite}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-medium transition-colors ${chipBtn}`}
+              >
+                <Globe size={16} />
+                {t('businessProfile.public.website')}
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className={`mb-4 flex border-b ${isLight ? 'border-gray-200' : 'border-white/10'}`}>
           {(
             [
               ['listings', t('businessProfile.public.tabs.listings'), profile.activeListingsCount],
@@ -359,7 +487,7 @@ export function BusinessProfilePage({
               key={id}
               type="button"
               onClick={() => setTab(id as TabId)}
-              className={`flex-1 pb-3 text-sm font-medium transition-colors relative ${
+              className={`relative flex-1 pb-3 text-sm font-medium transition-colors ${
                 tab === id ? ac.pageHeading : ac.mutedText
               }`}
             >
@@ -378,7 +506,7 @@ export function BusinessProfilePage({
 
         {tab === 'listings' && (
           <>
-            <div className="flex items-center gap-2 mb-4 overflow-x-auto scrollbar-hide">
+            <div className="mb-4 flex items-center gap-2 overflow-x-auto scrollbar-hide">
               {(
                 [
                   ['all', t('businessProfile.public.filters.all')],
@@ -390,7 +518,7 @@ export function BusinessProfilePage({
                   key={id}
                   type="button"
                   onClick={() => setListingFilter(id)}
-                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     listingFilter === id
                       ? isLight
                         ? 'bg-gray-900 text-white'
@@ -403,9 +531,6 @@ export function BusinessProfilePage({
                   {label}
                 </button>
               ))}
-              <button type="button" className={`ml-auto p-2 rounded-full ${actionBtnSecondary}`} aria-label="Filter">
-                <SlidersHorizontal size={18} />
-              </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               {filteredListings.map((listing) => (
@@ -423,35 +548,34 @@ export function BusinessProfilePage({
               ))}
             </div>
             {filteredListings.length === 0 && (
-              <p className={`text-center py-8 text-sm ${ac.mutedText}`}>{t('businessProfile.public.noListings')}</p>
+              <p className={`py-8 text-center text-sm ${ac.mutedText}`}>{t('businessProfile.public.noListings')}</p>
             )}
           </>
         )}
 
         {tab === 'about' && (
-          <div className="space-y-4">
-            <div>
-              <h3 className={`font-semibold mb-2 ${ac.pageHeading}`}>{t('businessProfile.public.aboutTitle')}</h3>
+          <div className="space-y-3">
+            <div className={aboutCard}>
+              <h3 className={`mb-2 font-semibold ${ac.pageHeading}`}>{t('businessProfile.public.aboutTitle')}</h3>
               <p className={`text-sm leading-relaxed whitespace-pre-wrap ${ac.mutedText}`}>{profile.description}</p>
             </div>
             {profile.address && (
-              <div>
-                <h3 className={`font-semibold mb-1 ${ac.pageHeading}`}>{t('businessProfile.fields.address')}</h3>
+              <div className={aboutCard}>
+                <h3 className={`mb-1 font-semibold ${ac.pageHeading}`}>{t('businessProfile.fields.address')}</h3>
                 <p className={`text-sm ${ac.mutedText}`}>{profile.address}</p>
               </div>
             )}
             {profile.workingHours && (
-              <div>
-                <h3 className={`font-semibold mb-1 ${ac.pageHeading}`}>{t('businessProfile.fields.workingHours')}</h3>
+              <div className={aboutCard}>
+                <h3 className={`mb-1 font-semibold ${ac.pageHeading}`}>{t('businessProfile.fields.workingHours')}</h3>
                 <p className={`text-sm whitespace-pre-wrap ${ac.mutedText}`}>{profile.workingHours}</p>
               </div>
             )}
-            <p className={`text-xs ${ac.mutedText}`}>
+            <p className={`px-1 text-xs ${ac.mutedText}`}>
               {t('businessProfile.public.memberSince')}: {profile.memberSince}
             </p>
           </div>
         )}
-
       </div>
 
       <PhoneModal
@@ -468,6 +592,8 @@ export function BusinessProfilePage({
         shareText={profile.businessName}
         tg={tg}
       />
+
+      <Toast message={toast.message} type={toast.type} isVisible={toast.isVisible} onClose={hideToast} />
     </div>
   );
 }

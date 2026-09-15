@@ -399,3 +399,48 @@ export async function sendBalanceCreditedNotification(
 
   return await sendTelegramMessage(telegramId, message);
 }
+
+/**
+ * Власник Business-профілю: новий підписник.
+ */
+export async function sendBusinessNewFollowerNotification(params: {
+  ownerTelegramId: string | number;
+  businessName: string;
+  followerName: string;
+  followerUsername?: string | null;
+  followersCount: number;
+}): Promise<boolean> {
+  const { getUserLanguage } = await import('@/utils/userHelpers');
+  const lang = await getUserLanguage(params.ownerTelegramId);
+  const safeBiz = escapeHtmlTelegram(params.businessName || 'Business');
+  const safeName = escapeHtmlTelegram(params.followerName || (lang === 'ru' ? 'Пользователь' : 'Користувач'));
+  const username = params.followerUsername?.replace(/^@/, '').trim();
+  const who = username ? `${safeName} (@${escapeHtmlTelegram(username)})` : safeName;
+  const count = params.followersCount;
+
+  const message =
+    lang === 'ru'
+      ? `🔔 <b>Новый подписчик</b>\n\n` +
+        `На ваш Business-профиль «<b>${safeBiz}</b>» подписался ${who}.\n\n` +
+        `Сейчас подписчиков: <b>${count}</b>`
+      : `🔔 <b>Новий підписник</b>\n\n` +
+        `На ваш Business-профіль «<b>${safeBiz}</b>» підписався ${who}.\n\n` +
+        `Зараз підписників: <b>${count}</b>`;
+
+  const webappUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_BASE_URL || '';
+  const options: Partial<{
+    disable_web_page_preview: boolean;
+    reply_markup: { inline_keyboard: { text: string; web_app: { url: string } }[][] };
+  }> = { disable_web_page_preview: true };
+
+  if (webappUrl.startsWith('https://')) {
+    const tid = String(params.ownerTelegramId);
+    const profileUrl = `${webappUrl.replace(/\/$/, '')}/${lang}/profile?telegramId=${encodeURIComponent(tid)}`;
+    const btn = lang === 'ru' ? 'Открыть профиль' : 'Відкрити профіль';
+    options.reply_markup = {
+      inline_keyboard: [[{ text: btn, web_app: { url: profileUrl } }]],
+    };
+  }
+
+  return sendTelegramMessage(params.ownerTelegramId, message, options);
+}
