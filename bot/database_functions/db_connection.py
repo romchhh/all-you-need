@@ -116,6 +116,15 @@ PRISMA_PG_TABLES = (
     "CityDigestQueue",
 )
 
+_IDENT_LOOKBEHIND = r'(?<![A-Za-z0-9_."])'
+
+
+def _quote_pg_column_name(sql: str, col: str) -> str:
+    """Quote a camelCase Prisma column without splitting longer aliases like sellerTelegramId."""
+    sql = re.sub(rf"\.{re.escape(col)}\b", f'."{col}"', sql)
+    return re.sub(rf"{_IDENT_LOOKBEHIND}{re.escape(col)}\b", f'"{col}"', sql)
+
+
 PRISMA_PG_COLUMNS = (
     "userId",
     "telegramId",
@@ -204,16 +213,15 @@ def quote_pg_identifiers(sql: str) -> str:
         s = re.sub(rf"\bINTO {table}\b", f'INTO "{table}"', s, flags=re.IGNORECASE)
         s = re.sub(rf"\bDELETE FROM {table}\b", f'DELETE FROM "{table}"', s, flags=re.IGNORECASE)
         s = re.sub(rf"\bON {table}\(", f'ON "{table}"(', s, flags=re.IGNORECASE)
-    for col in PRISMA_PG_COLUMNS:
-        s = re.sub(rf"\.{col}\b", f'."{col}"', s, flags=re.IGNORECASE)
-        s = re.sub(rf'(?<![."\\w]){col}\b', f'"{col}"', s, flags=re.IGNORECASE)
+    for col in sorted(PRISMA_PG_COLUMNS, key=len, reverse=True):
+        s = _quote_pg_column_name(s, col)
     for col in BOOLEAN_PG_COLUMNS:
         s = re.sub(rf'"{col}"\s*=\s*1\b', f'"{col}" = true', s, flags=re.IGNORECASE)
         s = re.sub(rf'"{col}"\s*=\s*0\b', f'"{col}" = false', s, flags=re.IGNORECASE)
         s = re.sub(rf'\."{col}"\s*=\s*1\b', f'."{col}" = true', s, flags=re.IGNORECASE)
-        s = re.sub(rf'(?<![."\\w]){col}\s*=\s*1\b', f'"{col}" = true', s, flags=re.IGNORECASE)
+        s = re.sub(rf'{_IDENT_LOOKBEHIND}{col}\s*=\s*1\b', f'"{col}" = true', s, flags=re.IGNORECASE)
         s = re.sub(rf'\."{col}"\s*=\s*0\b', f'."{col}" = false', s, flags=re.IGNORECASE)
-        s = re.sub(rf'(?<![."\\w]){col}\s*=\s*0\b', f'"{col}" = false', s, flags=re.IGNORECASE)
+        s = re.sub(rf'{_IDENT_LOOKBEHIND}{col}\s*=\s*0\b', f'"{col}" = false', s, flags=re.IGNORECASE)
         s = re.sub(
             rf'COALESCE\s*\(\s*"{col}"\s*,\s*0\s*\)',
             f'COALESCE("{col}", false)',

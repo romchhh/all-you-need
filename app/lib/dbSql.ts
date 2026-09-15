@@ -375,9 +375,10 @@ function quotePgIdentifiers(sql: string): string {
     s = s.replace(new RegExp(`\\bON ${table}\\(`, 'gi'), `ON "${table}"(`);
   }
 
-  for (const col of PRISMA_PG_COLUMNS) {
+  const cols = [...PRISMA_PG_COLUMNS].sort((a, b) => b.length - a.length);
+  for (const col of cols) {
     s = s.replace(new RegExp(`\\.${col}\\b`, 'g'), `."${col}"`);
-    s = s.replace(new RegExp(`(?<![."\\w])${col}\\b`, 'g'), `"${col}"`);
+    s = s.replace(new RegExp(`(?<![A-Za-z0-9_."])${col}\\b`, 'g'), `"${col}"`);
   }
 
   const BOOLEAN_PG_COLUMNS = [
@@ -392,10 +393,10 @@ function quotePgIdentifiers(sql: string): string {
   for (const col of BOOLEAN_PG_COLUMNS) {
     s = s.replace(new RegExp(`"${col}"\\s*=\\s*1\\b`, 'gi'), `"${col}" = true`);
     s = s.replace(new RegExp(`\\."${col}"\\s*=\\s*1\\b`, 'gi'), `."${col}" = true`);
-    s = s.replace(new RegExp(`(?<![."\\w])${col}\\s*=\\s*1\\b`, 'gi'), `"${col}" = true`);
+    s = s.replace(new RegExp(`(?<![A-Za-z0-9_."])${col}\\s*=\\s*1\\b`, 'gi'), `"${col}" = true`);
     s = s.replace(new RegExp(`"${col}"\\s*=\\s*0\\b`, 'gi'), `"${col}" = false`);
     s = s.replace(new RegExp(`\\."${col}"\\s*=\\s*0\\b`, 'gi'), `."${col}" = false`);
-    s = s.replace(new RegExp(`(?<![."\\w])${col}\\s*=\\s*0\\b`, 'gi'), `"${col}" = false`);
+    s = s.replace(new RegExp(`(?<![A-Za-z0-9_."])${col}\\s*=\\s*0\\b`, 'gi'), `"${col}" = false`);
     s = s.replace(
       new RegExp(`COALESCE\\s*\\(\\s*"${col}"\\s*,\\s*0\\s*\\)`, 'gi'),
       `COALESCE("${col}", false)`

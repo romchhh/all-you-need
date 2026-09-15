@@ -46,16 +46,18 @@ async def handle_moderation_approve(callback: types.CallbackQuery):
         )
         
         if success:
-            # Отримуємо дані оголошення для повідомлення користувачу
-            if source == 'telegram':
-                listing_data = get_telegram_listing_by_id(listing_id)
-            else:
-                listing_data = db.get_listing_by_id(listing_id)
-            
-            if listing_data:
-                telegram_id = listing_data.get('sellerTelegramId')
-                if telegram_id:
-                    await send_approval_notification(telegram_id, listing_data, source, listing_id)
+            try:
+                if source == 'telegram':
+                    listing_data = get_telegram_listing_by_id(listing_id)
+                else:
+                    listing_data = db.get_listing_by_id(listing_id)
+
+                if listing_data:
+                    telegram_id = listing_data.get('sellerTelegramId')
+                    if telegram_id:
+                        await send_approval_notification(telegram_id, listing_data, source, listing_id)
+            except Exception as notify_err:
+                print(f"Помилка сповіщення після схвалення оголошення {listing_id}: {notify_err}")
             
             # Видаляємо inline кнопки та надсилаємо нове повідомлення
             status_text = f"✅ <b>Оголошення #{listing_id} схвалено</b>\n\nМодератор: @{callback.from_user.username or callback.from_user.first_name}"
