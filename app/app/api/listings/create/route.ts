@@ -23,23 +23,35 @@ export async function POST(request: NextRequest) {
   
   try {
     console.log('[Create Listing API] Starting request processing');
-    
-    const formData = await request.formData();
+
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (parseError: any) {
+      console.error('[Create Listing API] formData parse failed:', parseError);
+      return NextResponse.json(
+        { error: 'PHOTO_UPLOAD_FAILED' },
+        { status: 400 }
+      );
+    }
     
     // Отримуємо дані з форми
     const telegramId = formData.get('telegramId') as string;
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
-    const price = formData.get('price') as string;
+    const priceRaw = (formData.get('price') as string) || '0';
     const currency = (formData.get('currency') as 'UAH' | 'EUR' | 'USD') || 'UAH';
-    const isFree = formData.get('isFree') === 'true';
+    const isFree = formData.get('isFree') === 'true' || formData.get('isNegotiable') === 'true';
+    const price = isFree ? '0' : priceRaw;
     const category = formData.get('category') as string;
     const subcategory = formData.get('subcategory') as string | null;
     const location = formData.get('location') as string;
     const condition = formData.get('condition') as string;
     const autoRenew = formData.get('autoRenew') === 'true';
     const requestedProfileType = formData.get('profileType') === 'business' ? 'business' : 'personal';
-    const allImages = formData.getAll('images') as File[];
+    const allImages = formData.getAll('images').filter((value): value is File => {
+      return typeof value !== 'string' && typeof (value as File).size === 'number' && (value as File).size > 0;
+    });
     const MAX_PHOTOS = 10;
 
     // Обмежуємо кількість фото до максимуму
@@ -340,7 +352,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

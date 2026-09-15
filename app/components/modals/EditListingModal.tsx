@@ -721,10 +721,11 @@ export const EditListingModal = ({
               <>
                 <div className="flex gap-2 items-center mb-2">
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    min={0}
-                    step={0.01}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={price}
                     onChange={(e) => {
                       const raw = e.target.value.replace(',', '.');

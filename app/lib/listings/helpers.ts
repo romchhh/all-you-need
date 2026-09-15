@@ -6,6 +6,11 @@ import { join } from 'path';
 import sharp from 'sharp';
 import { toSQLiteDate, addDays, nowSQLite } from '@/utils/dateHelpers';
 import { getSystemSetting } from '@/utils/dbHelpers';
+import { isPostgres } from '@/lib/dbSql';
+
+function sqlBool(value: boolean | undefined): boolean | number {
+  return isPostgres() ? Boolean(value) : value ? 1 : 0;
+}
 
 /** Шлях до файлу в public/listings без path.join(dir, dynamic) — Turbopack інакше сканує всі uploads. */
 function listingDiskFile(baseDir: string, filename: string): string {
@@ -134,7 +139,7 @@ export async function saveOriginalImages(
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const ext = file.type.split('/')[1] || 'jpg';
+        const ext = (file.type.split('/')[1] || 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
         const filename = `listing_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
         const filepath = listingDiskFile(uploadsDir, filename);
         
@@ -428,7 +433,8 @@ export async function createDraftListing(
   
   // Використовуємо executeRawUnsafe без executeWithRetry для швидкості
   // executeWithRetry додає затримки, що сповільнює створення
-  const autoRenew = data.autoRenew ? 1 : 0;
+  const autoRenew = sqlBool(Boolean(data.autoRenew));
+  const isFree = sqlBool(Boolean(data.isFree));
 
   try {
     await prisma.$executeRawUnsafe(
@@ -442,7 +448,7 @@ export async function createDraftListing(
       data.description,
       data.price,
       data.currency,
-      data.isFree ? 1 : 0,
+      isFree,
       data.category,
       data.subcategory || null,
       data.condition || null,
@@ -467,7 +473,7 @@ export async function createDraftListing(
       data.description,
       data.price,
       data.currency,
-      data.isFree ? 1 : 0,
+      isFree,
       data.category,
       data.subcategory || null,
       data.condition || null,
@@ -512,7 +518,7 @@ export async function updateListingToDraft(
       data.description,
       data.price,
       data.currency,
-      data.isFree ? 1 : 0,
+      sqlBool(Boolean(data.isFree)),
       data.category,
       data.subcategory || null,
       data.condition || null,
@@ -600,7 +606,7 @@ export async function updateListingData(
           data.description,
           data.price,
           data.currency,
-          data.isFree ? 1 : 0,
+          sqlBool(Boolean(data.isFree)),
           data.category,
           data.subcategory || null,
           data.condition || null,
@@ -637,7 +643,7 @@ export async function updateListingData(
           data.description,
           data.price,
           data.currency,
-          data.isFree ? 1 : 0,
+          sqlBool(Boolean(data.isFree)),
           data.category,
           data.subcategory || null,
           data.condition || null,
@@ -676,7 +682,7 @@ export async function updateListingData(
         data.description,
         data.price,
         data.currency,
-        data.isFree ? 1 : 0,
+        sqlBool(Boolean(data.isFree)),
         data.category,
         data.subcategory || null,
         data.condition || null,

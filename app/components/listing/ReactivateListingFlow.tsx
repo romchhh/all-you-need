@@ -6,6 +6,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
+import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 
 // Динамічні імпорти для оптимізації
 const ListingPackageModal = dynamic(() => import('@/components/modals/ListingPackageModal'), { ssr: false });
@@ -42,9 +43,7 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
 
   // Хелпер для отримання telegramId з різних джерел
   const getTelegramId = (): string | null => {
-    return tg?.initDataUnsafe?.user?.id?.toString()
-      || (typeof window !== 'undefined' ? sessionStorage.getItem('telegramId') : null)
-      || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('telegramId') : null);
+    return resolvePaymentTelegramId(tg, null);
   };
 
   // Блокуємо скрол при відкритті модального вікна

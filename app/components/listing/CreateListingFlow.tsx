@@ -8,7 +8,7 @@ import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
-import { compressImageOnClient } from '@/utils/imageUtils';
+import { isEngineErrorMessage, toSafeListingUploadFile } from '@/utils/imageUtils';
 import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 
 // Динамічні імпорти для оптимізації
@@ -136,6 +136,33 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
     setStep('select_promotion');
   };
 
+  const cloneListingPayload = async (data: any) => {
+    const images: File[] = Array.isArray(data?.images) ? data.images.filter(Boolean) : [];
+    if (images.length === 0) {
+      throw new Error(t('createListing.addPhoto') || 'Додайте хоча б одне фото');
+    }
+
+    const safeImages: File[] = [];
+    for (let i = 0; i < images.length; i++) {
+      safeImages.push(await toSafeListingUploadFile(images[i], i));
+    }
+
+    return { ...data, images: safeImages };
+  };
+
+  const listingErrorMessage = (error: unknown) => {
+    const msg = error instanceof Error ? error.message : String(error || '');
+    if (
+      /did not match the expected pattern|PHOTO_UPLOAD_FAILED|At least one image is required/i.test(msg)
+    ) {
+      return t('createListing.photoUploadFailed') || t('createListing.errorCreating') || 'Не вдалося завантажити фото';
+    }
+    if (isEngineErrorMessage(msg)) {
+      return t('createListing.errorCreating') || 'Помилка при створенні оголошення';
+    }
+    return msg || t('createListing.errorCreating') || 'Помилка при створенні оголошення';
+  };
+
   const handleCreateListing = async (data: any) => {
     try {
       const telegramId = getTelegramId();
@@ -146,9 +173,10 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       }
 
       console.log('[CreateListingFlow] User submitted listing form, checking if package needed...');
-      
-      pendingListingDataRef.current = data;
-      setPendingListingData(data);
+
+      const cloned = await cloneListingPayload(data);
+      pendingListingDataRef.current = cloned;
+      setPendingListingData(cloned);
       
       // Перевіряємо, чи потрібно купити пакет
       const needsPackage = await checkIfNeedPackage();
@@ -168,7 +196,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       setStep('select_promotion');
     } catch (error: any) {
       console.error('[CreateListingFlow] Error in handleCreateListing:', error);
-      showToast(error.message || t('common.error'), 'error');
+      showToast(listingErrorMessage(error), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
     }
   };
@@ -185,40 +213,41 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         showToast(t('payments.processing') || 'Списання коштів з балансу...', 'info');
       }
       
-      // Стискаємо зображення перед відправкою
+      const images: File[] = Array.isArray(data?.images) ? data.images.filter(Boolean) : [];
+      if (images.length === 0) {
+        throw new Error(t('createListing.addPhoto') || 'Додайте хоча б одне фото');
+      }
+
       const compressedImages: File[] = [];
-      for (const image of data.images) {
-        try {
-          // Якщо файл більше 2MB, стискаємо
-          if (image.size > 2 * 1024 * 1024) {
-            console.log('[CreateListingFlow] Compressing image:', image.name);
-            const compressed = await compressImageOnClient(image, 2);
-            compressedImages.push(compressed);
-          } else {
-            compressedImages.push(image);
-          }
-        } catch (error) {
-          console.error('[CreateListingFlow] Failed to compress image, using original:', error);
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        if (image?.type === 'image/jpeg' && /^listing-\d+-\d+\.jpg$/.test(image.name || '')) {
           compressedImages.push(image);
+        } else {
+          compressedImages.push(await toSafeListingUploadFile(image, i));
         }
       }
-      
-      const formData = new FormData();
-      formData.append('telegramId', telegramId);
-      formData.append('title', data.title);
-      formData.append('description', data.description);
-      formData.append('price', data.price);
-      formData.append('currency', data.currency);
-      formData.append('isFree', data.isFree.toString());
-      formData.append('category', data.category);
-      formData.append('subcategory', data.subcategory || '');
-      formData.append('location', data.location);
-      formData.append('condition', data.condition);
-      formData.append('autoRenew', (data.autoRenew === true).toString());
-      formData.append('profileType', data.profileType === 'business' ? 'business' : 'personal');
 
-      compressedImages.forEach((image: File) => {
-        formData.append('images', image);
+      const formData = new FormData();
+      const appendField = (key: string, value: unknown) => {
+        formData.append(key, value == null ? '' : String(value));
+      };
+      appendField('telegramId', telegramId);
+      appendField('title', data.title);
+      appendField('description', data.description);
+      appendField('price', data.isFree || data.isNegotiable ? '0' : data.price);
+      appendField('currency', data.currency || 'EUR');
+      appendField('isFree', data.isFree === true);
+      appendField('isNegotiable', data.isNegotiable === true);
+      appendField('category', data.category);
+      appendField('subcategory', data.subcategory || '');
+      appendField('location', data.location);
+      appendField('condition', data.condition || 'new');
+      appendField('autoRenew', data.autoRenew === true);
+      appendField('profileType', data.profileType === 'business' ? 'business' : 'personal');
+
+      compressedImages.forEach((image, index) => {
+        formData.append('images', image, image.name || `listing-${index}.jpg`);
       });
 
       // Створюємо AbortController для таймауту
@@ -269,12 +298,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       
       clearTimeout(timeoutId);
 
-      const result = await response.json();
+      const result = await response.json().catch(() => ({} as { error?: string; listingId?: number }));
 
       console.log('[CreateListingFlow] Create listing response:', result);
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create listing');
+        throw new Error(result.error || t('createListing.errorCreating') || 'Failed to create listing');
       }
 
       // Отримуємо listingId - якщо його немає в результаті, чекаємо трохи і перевіряємо знову
@@ -338,8 +367,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       }
     } catch (error: any) {
       console.error('[CreateListingFlow] Error creating listing:', error);
-      showToast(error.message || t('common.error'), 'error');
+      const message = listingErrorMessage(error);
+      showToast(message, 'error');
       tg?.HapticFeedback.notificationOccurred('error');
+      const wrapped = new Error(message);
+      (wrapped as any).alreadyToasted = true;
+      throw wrapped;
     } finally {
       setLoading(false);
     }
@@ -481,7 +514,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
         const packageData = await packageRes.json();
 
         if (!packageRes.ok) {
-          throw new Error(packageData.error || 'Failed to purchase package');
+          throw new Error(packageData.error || t('payments.purchaseError') || 'Failed to purchase package');
         }
 
         if (packageData.paymentRequired && packageData.pageUrl) {
@@ -499,8 +532,10 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
       await createListingWithData(data, telegramId, selectedPromotionType, paymentMethod);
     } catch (error: any) {
       console.error('[CreateListingFlow] Error in payment flow:', error);
-      showToast(error.message || t('payments.purchaseError'), 'error');
-      tg?.HapticFeedback.notificationOccurred('error');
+      if (!error?.alreadyToasted) {
+        showToast(listingErrorMessage(error), 'error');
+        tg?.HapticFeedback.notificationOccurred('error');
+      }
       throw error;
     }
   };

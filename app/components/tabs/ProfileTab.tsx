@@ -1530,17 +1530,16 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           // Кнопка «Опублікувати без реклами» повинна бути скрізь,
           // ОКРІМ випадку, коли користувач сам натиснув «Рекламувати»
           showSkipButton={promotionOpenSource !== 'manual'}
-          onSelectPromotion={(promotionType) => {
+          onSelectPromotion={async (promotionType) => {
             if (promotionType) {
               // Користувач вибрав рекламу - зберігаємо і відкриваємо PaymentSummaryModal
               setSelectedPromotionType(promotionType);
               setShowPromotionModal(false);
               setShowPaymentSummaryModal(true);
               fetchUserBalance(); // Оновлюємо баланс перед показом PaymentSummaryModal
-            } else {
-              // Користувач пропустив рекламу - обробляємо без оплати
-              handlePromotionSkipped();
+              return;
             }
+            await handlePromotionSkipped();
           }}
         />
       )}

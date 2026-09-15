@@ -65,7 +65,7 @@ export async function compressImageOnClient(
             }
 
             resolve(
-              new File([blob], file.name, {
+              new File([blob], safeImageFileName(file.name, 'jpg'), {
                 type: 'image/jpeg',
                 lastModified: Date.now(),
               })
@@ -83,4 +83,52 @@ export async function compressImageOnClient(
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsDataURL(file);
   });
+}
+
+/** ASCII name so Safari/undici FormData does not throw pattern-mismatch. */
+export function safeImageFileName(originalName: string | undefined, ext = 'jpg'): string {
+  const base = (originalName || 'photo')
+    .split(/[/\\]/)
+    .pop()
+    ?.replace(/\.[^.]+$/, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return `${base || 'photo'}.${ext}`;
+}
+
+function sanitizeImageMime(type: string | undefined): string {
+  const raw = (type || '').split(';')[0].trim().toLowerCase();
+  if (raw === 'image/jpg') return 'image/jpeg';
+  if (/^image\/[a-z0-9.+-]+$/.test(raw)) return raw;
+  return 'image/jpeg';
+}
+
+/**
+ * Converts a gallery/camera file into a JPEG Blob that Telegram WebView and
+ * Node formData() can parse. Must run before the file input is unmounted.
+ */
+export async function toSafeListingUploadFile(file: File, index: number): Promise<File> {
+  const name = `listing-${Date.now()}-${index}.jpg`;
+  try {
+    const compressed = await compressImageOnClient(file, 2);
+    return new File([compressed], name, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+  } catch (error) {
+    console.warn('[toSafeListingUploadFile] compress failed, wrapping original', error);
+    const bytes = await file.arrayBuffer();
+    return new File([bytes], name, {
+      type: sanitizeImageMime(file.type),
+      lastModified: Date.now(),
+    });
+  }
+}
+
+export function isEngineErrorMessage(message: string | undefined | null): boolean {
+  if (!message) return true;
+  return /did not match the expected pattern|Failed to parse|multipart|formData|Failed to fetch|NetworkError|Load failed|prisma|invalid input syntax|unexpected token/i.test(
+    message
+  );
 }

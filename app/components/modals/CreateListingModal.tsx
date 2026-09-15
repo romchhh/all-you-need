@@ -607,7 +607,13 @@ export const CreateListingModal = ({
         }
       }}
     >
-      <div className="w-full h-full flex flex-col min-h-0">
+      <form
+        noValidate
+        className="w-full h-full flex flex-col min-h-0"
+        onSubmit={(e) => {
+          e.preventDefault();
+        }}
+      >
         <FixedLogoHeader
           mode="sticky"
           scrollParent={formScrollParent}
@@ -945,10 +951,11 @@ export const CreateListingModal = ({
               <>
                 <div className="flex gap-2 items-center mb-2">
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    min={0}
-                    step={0.01}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={price}
                     onChange={(e) => {
                       const raw = e.target.value.replace(',', '.');
@@ -1338,6 +1345,7 @@ export const CreateListingModal = ({
           } as React.CSSProperties}
         >
           <button
+            type="button"
             onClick={onClose}
             className={`flex-1 px-4 py-1.5 bg-transparent rounded-xl text-base font-semibold border transition-colors font-montserrat ${
               isLight
@@ -1348,6 +1356,7 @@ export const CreateListingModal = ({
             {t('common.cancel')}
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={loading}
             className={`flex-1 rounded-xl px-4 py-1.5 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 font-montserrat ${createPrimaryCtaClass}`}
@@ -1455,7 +1464,7 @@ export const CreateListingModal = ({
             </button>
           </div>
         )}
-      </div>
+      </form>
 
       {/* Toast сповіщення */}
       <Toast
