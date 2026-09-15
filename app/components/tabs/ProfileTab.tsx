@@ -769,54 +769,17 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             </div>
             
             {/* Статистика */}
-            <div className="mt-3">
-              {isBusinessView && businessStats ? (
-                <div className="space-y-2">
-                  <p className={`text-xs font-semibold uppercase tracking-wide ${ac.mutedText}`}>
-                    {t('businessProfile.stats.title')}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(
-                      [
-                        ['followers', businessStats.followersCount, Users],
-                        ['profileViews', businessStats.profileViews, Eye],
-                        ['listingViews', businessStats.listingViews, Eye],
-                        ['contacts', businessStats.contactClicks, MousePointerClick],
-                        ['activeListings', businessStats.activeListings, Megaphone],
-                        ['totalListings', businessStats.totalListings, Package],
-                      ] as const
-                    ).map(([key, value, Icon]) => (
-                      <div
-                        key={key}
-                        className={`rounded-2xl border px-2 py-2.5 text-center ${
-                          isLight
-                            ? 'border-[#3F5331]/10 bg-white/80'
-                            : 'border-white/10 bg-white/[0.05]'
-                        }`}
-                      >
-                        <Icon size={14} className={`mx-auto mb-1 ${ac.mutedText}`} />
-                        <div className={`text-base font-semibold tabular-nums ${ac.pageHeading}`}>{value}</div>
-                        <div className={`mt-0.5 text-[10px] leading-tight ${ac.mutedText}`}>
-                          {t(`businessProfile.stats.${key}`)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {dashboardStats && (
-                    <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
-                      <Megaphone size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
-                      <span>
-                        {dashboardStats.activeListings} {t('sales.active')}
-                      </span>
-                    </div>
-                  )}
+            <div className="mt-3 space-y-1.5">
+              {!isBusinessView && dashboardStats && (
+                <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
+                  <Megaphone size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
+                  <span>
+                    {dashboardStats.activeListings} {t('sales.active')}
+                  </span>
                 </div>
               )}
               {profile.balance !== undefined && (
-                <div className={`mt-2 flex items-center gap-2 text-sm ${ac.mutedText}`}>
+                <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
                   <Wallet size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
                   <span>
                     {t('profile.balance')}: {profile.balance.toFixed(2)}€
@@ -862,6 +825,51 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           />
         )}
       </div>
+
+      {isBusinessView && businessStats && (
+        <div className="px-4 pb-4">
+          <div
+            className={`overflow-hidden rounded-2xl border ${
+              isLight
+                ? 'border-[#3F5331]/12 bg-gradient-to-br from-white to-[#E8F0E0]/40'
+                : 'border-white/10 bg-white/[0.04]'
+            }`}
+          >
+            <div
+              className={`border-b px-4 py-3 ${
+                isLight ? 'border-[#3F5331]/10 bg-white/60' : 'border-white/10 bg-white/[0.03]'
+              }`}
+            >
+              <h3 className={`text-sm font-semibold ${ac.pageHeading}`}>{t('businessProfile.stats.title')}</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-3 p-4">
+              {(
+                [
+                  ['followers', businessStats.followersCount, Users],
+                  ['profileViews', businessStats.profileViews, Eye],
+                  ['listingViews', businessStats.listingViews, Eye],
+                  ['contacts', businessStats.contactClicks, MousePointerClick],
+                  ['activeListings', businessStats.activeListings, Megaphone],
+                  ['totalListings', businessStats.totalListings, Package],
+                ] as const
+              ).map(([key, value, Icon]) => (
+                <div
+                  key={key}
+                  className={`rounded-xl px-2 py-3 text-center ${
+                    isLight ? 'bg-white/70' : 'bg-white/[0.06]'
+                  }`}
+                >
+                  <Icon size={15} className={`mx-auto mb-2 ${isLight ? 'text-[#3F5331]/70' : 'text-[#C8E6A0]/80'}`} />
+                  <div className={`text-xl font-bold tabular-nums leading-none ${ac.pageHeading}`}>{value}</div>
+                  <div className={`mt-1.5 text-[11px] leading-snug ${ac.mutedText}`}>
+                    {t(`businessProfile.stats.${key}`)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Кнопки дій */}
       <div className="px-4 space-y-3 pb-4">
