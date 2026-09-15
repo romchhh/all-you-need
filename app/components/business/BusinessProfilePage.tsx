@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   BadgeCheck,
@@ -36,11 +36,14 @@ import {
 import { PhoneModal } from '@/components/modals/PhoneModal';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { getProfileShareLink } from '@/utils/botLinks';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 
 type TabId = 'listings' | 'about';
 type ListingFilter = 'all' | 'services' | 'products';
 
 interface PublicBusinessProfile {
+  id: number;
   businessName: string;
   logo: string | null;
   coverImage: string | null;
@@ -106,6 +109,7 @@ export function BusinessProfilePage({
   const [isFollowing, setIsFollowing] = useState(false);
   const [isOwn, setIsOwn] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  const profileViewTrackedRef = useRef<number | null>(null);
 
   useSwipeBack({
     onSwipeBack: onBackToPreviousListing || onClose,
@@ -154,6 +158,34 @@ export function BusinessProfilePage({
     void fetchProfile();
   }, [fetchProfile]);
 
+  useEffect(() => {
+    if (!profile?.id || loading || loadError) return;
+    if (profileViewTrackedRef.current === profile.id) return;
+    profileViewTrackedRef.current = profile.id;
+    trackAnalytics({
+      eventName: ANALYTICS_EVENTS.profileView,
+      eventGroup: ANALYTICS_EVENT_GROUPS.navigation,
+      telegramId: currentUser?.id,
+      entityType: 'business_profile',
+      entityId: String(profile.id),
+    });
+  }, [profile?.id, loading, loadError, currentUser?.id]);
+
+  const trackBusinessContact = useCallback(
+    (channel: 'telegram' | 'phone') => {
+      if (!profile?.id) return;
+      trackAnalytics({
+        eventName: ANALYTICS_EVENTS.contactSeller,
+        eventGroup: ANALYTICS_EVENT_GROUPS.engagement,
+        telegramId: currentUser?.id,
+        entityType: 'business_profile',
+        entityId: String(profile.id),
+        metadata: { channel },
+      });
+    },
+    [profile?.id, currentUser?.id]
+  );
+
   const categoryLabel = useMemo(() => {
     if (!profile) return '';
     return categories.find((c) => c.id === profile.category)?.name || profile.category;
@@ -177,6 +209,7 @@ export function BusinessProfilePage({
     if (!profile) return;
     const username = profile.sellerUsername || profile.telegram?.replace(/^@/, '') || '';
     if (!username.trim()) return;
+    trackBusinessContact('telegram');
     const message = buildSellerProfileContactMessage(
       getProfileShareLink(sellerTelegramId),
       resolveSellerContactLang(language)
@@ -441,7 +474,10 @@ export function BusinessProfilePage({
             {profile.phone && (
               <button
                 type="button"
-                onClick={() => setShowPhoneModal(true)}
+                onClick={() => {
+                  trackBusinessContact('phone');
+                  setShowPhoneModal(true);
+                }}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-medium transition-colors ${secondaryBtn}`}
               >
                 <Phone size={18} />

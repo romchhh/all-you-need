@@ -1255,6 +1255,15 @@
       "cta": "Відновити підписку",
       "renewTitle": "Відновлення підписки"
     },
+    "stats": {
+      "title": "Статистика",
+      "followers": "Підписники",
+      "profileViews": "Перегляди профілю",
+      "listingViews": "Перегляди оголошень",
+      "contacts": "Звернення",
+      "activeListings": "Активні",
+      "totalListings": "Усього оголошень"
+    },
     "public": {
       "write": "Написати",
       "call": "Подзвонити",

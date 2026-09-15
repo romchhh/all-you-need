@@ -506,3 +506,106 @@ export async function consumeBusinessPromotionCredit(
   });
   return true;
 }
+
+export type BusinessProfileStatsPayload = {
+  followersCount: number;
+  profileViews: number;
+  listingViews: number;
+  contactClicks: number;
+  activeListings: number;
+  totalListings: number;
+};
+
+export async function getBusinessProfileStatsForUserId(
+  userId: number
+): Promise<BusinessProfileStatsPayload | null> {
+  const { rawQuery } = await import('@/lib/dbSql');
+
+  const profile = await prisma.businessProfile.findUnique({ where: { userId } });
+  if (!profile) return null;
+
+  const listingStats = (await rawQuery<
+    Array<{
+      listingViews: bigint | number | null;
+      totalListings: bigint | number;
+      activeListings: bigint | number;
+    }>
+  >(
+    prisma,
+    `SELECT
+        COALESCE(SUM(views), 0) as listingViews,
+        COUNT(*) as totalListings,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings
+      FROM Listing
+      WHERE userId = ? AND COALESCE(profileType, 'personal') = 'business'`,
+    [userId]
+  ))[0];
+
+  const profileEntityId = String(profile.id);
+
+  let profileViews = 0;
+  let profileContacts = 0;
+  let listingContacts = 0;
+
+  try {
+    const { ensureAnalyticsEventTable } = await import('@/lib/analytics/analyticsStore');
+    await ensureAnalyticsEventTable();
+
+    profileViews = Number(
+      (
+        await rawQuery<Array<{ cnt: bigint | number }>>(
+          prisma,
+          `SELECT COUNT(*) as cnt
+            FROM AnalyticsEvent
+            WHERE eventName = 'profile_view'
+              AND entityType = 'business_profile'
+              AND entityId = ?`,
+          [profileEntityId]
+        )
+      )[0]?.cnt ?? 0
+    );
+
+    profileContacts = Number(
+      (
+        await rawQuery<Array<{ cnt: bigint | number }>>(
+          prisma,
+          `SELECT COUNT(*) as cnt
+            FROM AnalyticsEvent
+            WHERE eventName = 'contact_seller'
+              AND entityType = 'business_profile'
+              AND entityId = ?`,
+          [profileEntityId]
+        )
+      )[0]?.cnt ?? 0
+    );
+
+    listingContacts = Number(
+      (
+        await rawQuery<Array<{ cnt: bigint | number }>>(
+          prisma,
+          `SELECT COUNT(*) as cnt
+            FROM AnalyticsEvent ae
+            INNER JOIN Listing l ON CAST(ae.entityId AS INTEGER) = l.id
+            WHERE ae.eventName = 'contact_seller'
+              AND ae.entityType = 'listing'
+              AND l.userId = ?
+              AND COALESCE(l.profileType, 'personal') = 'business'`,
+          [userId]
+        )
+      )[0]?.cnt ?? 0
+    );
+  } catch {
+    // analytics table may be unavailable
+  }
+
+  const toNum = (v: bigint | number | null | undefined) => Number(v ?? 0);
+
+  return {
+    followersCount: profile.followersCount,
+    profileViews,
+    listingViews: toNum(listingStats?.listingViews),
+    contactClicks: profileContacts + listingContacts,
+    activeListings: toNum(listingStats?.activeListings),
+    totalListings: toNum(listingStats?.totalListings),
+  };
+}

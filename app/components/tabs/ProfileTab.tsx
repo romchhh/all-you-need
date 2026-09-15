@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle, Gift } from 'lucide-react';
+import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle, Gift, Eye, Users, MousePointerClick } from 'lucide-react';
 import { NavIcon } from '@/components/layout/NavIcon';
 import { ImageViewModal } from '@/components/modals/ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
@@ -126,6 +126,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [isBusinessSuspended, setIsBusinessSuspended] = useState(false);
   const [businessRenewMode, setBusinessRenewMode] = useState(false);
   const [businessEditMode, setBusinessEditMode] = useState(false);
+  const [businessStats, setBusinessStats] = useState<{
+    followersCount: number;
+    profileViews: number;
+    listingViews: number;
+    contactClicks: number;
+    activeListings: number;
+    totalListings: number;
+  } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -300,9 +308,27 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       setBusinessProfile(data.profile || null);
       if (!data.isActive) {
         setProfileViewMode('personal');
+        setBusinessStats(null);
+      } else if (profileViewMode === 'business') {
+        void fetchBusinessStats();
       }
     } catch (e) {
       console.error('Error fetching business profile:', e);
+    }
+  };
+
+  const fetchBusinessStats = async () => {
+    if (!profile?.telegramId) return;
+    try {
+      const res = await fetch(`/api/user/business-profile/stats?telegramId=${profile.telegramId}`);
+      if (!res.ok) {
+        setBusinessStats(null);
+        return;
+      }
+      setBusinessStats(await res.json());
+    } catch (e) {
+      console.error('Error fetching business stats:', e);
+      setBusinessStats(null);
     }
   };
 
@@ -366,6 +392,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       fetchBusinessProfile();
     }
   }, [profile?.telegramId]);
+
+  useEffect(() => {
+    if (isBusinessActive && profileViewMode === 'business' && profile?.telegramId) {
+      void fetchBusinessStats();
+    }
+  }, [isBusinessActive, profileViewMode, profile?.telegramId]);
 
   // Обробка пропуску реклами
   const handlePromotionSkipped = async () => {
@@ -737,20 +769,60 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             </div>
             
             {/* Статистика */}
-            <div className="space-y-1.5 mt-3">
-              {dashboardStats && (
-                <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
-                  <Megaphone size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
-                  <span>{dashboardStats.activeListings} {t('sales.active')}</span>
+            <div className="mt-3">
+              {isBusinessView && businessStats ? (
+                <div className="space-y-2">
+                  <p className={`text-xs font-semibold uppercase tracking-wide ${ac.mutedText}`}>
+                    {t('businessProfile.stats.title')}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        ['followers', businessStats.followersCount, Users],
+                        ['profileViews', businessStats.profileViews, Eye],
+                        ['listingViews', businessStats.listingViews, Eye],
+                        ['contacts', businessStats.contactClicks, MousePointerClick],
+                        ['activeListings', businessStats.activeListings, Megaphone],
+                        ['totalListings', businessStats.totalListings, Package],
+                      ] as const
+                    ).map(([key, value, Icon]) => (
+                      <div
+                        key={key}
+                        className={`rounded-2xl border px-2 py-2.5 text-center ${
+                          isLight
+                            ? 'border-[#3F5331]/10 bg-white/80'
+                            : 'border-white/10 bg-white/[0.05]'
+                        }`}
+                      >
+                        <Icon size={14} className={`mx-auto mb-1 ${ac.mutedText}`} />
+                        <div className={`text-base font-semibold tabular-nums ${ac.pageHeading}`}>{value}</div>
+                        <div className={`mt-0.5 text-[10px] leading-tight ${ac.mutedText}`}>
+                          {t(`businessProfile.stats.${key}`)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {dashboardStats && (
+                    <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
+                      <Megaphone size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
+                      <span>
+                        {dashboardStats.activeListings} {t('sales.active')}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
               {profile.balance !== undefined && (
-                <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
+                <div className={`mt-2 flex items-center gap-2 text-sm ${ac.mutedText}`}>
                   <Wallet size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
-                  <span>{t('profile.balance')}: {profile.balance.toFixed(2)}€</span>
+                  <span>
+                    {t('profile.balance')}: {profile.balance.toFixed(2)}€
+                  </span>
                 </div>
               )}
-              {/* Тимчасово прибрано "Доступно объявлений" */}
             </div>
           </div>
         </div>
@@ -1602,6 +1674,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         }}
         onSuccess={() => {
           fetchBusinessProfile();
+          void fetchBusinessStats();
           fetchListingsWithFilters(0, true);
           refetch();
           setBusinessRenewMode(false);

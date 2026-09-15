@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       isOwn,
       isFollowing,
       profile: {
+        id: profile.id,
         businessName: profile.businessName,
         logo: profile.logo,
         coverImage: profile.coverImage,
