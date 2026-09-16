@@ -21,6 +21,9 @@ export interface BusinessSeller {
   website?: string | null;
   sellerTelegramId: string;
   sellerUsername?: string | null;
+  rating?: number;
+  reviewsCount?: number;
+  telegramSince?: string;
 }
 
 export interface Listing {

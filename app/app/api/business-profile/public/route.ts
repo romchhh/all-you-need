@@ -74,6 +74,8 @@ export async function GET(request: NextRequest) {
         memberSince: formatBusinessMemberSince(user.createdAt, lang),
         sellerTelegramId: telegramId,
         sellerUsername: user.username,
+        rating: Number(user.rating) || 0,
+        reviewsCount: Number(user.reviewsCount) || 0,
       },
     });
   } catch (error) {

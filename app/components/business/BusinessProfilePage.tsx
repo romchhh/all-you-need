@@ -8,9 +8,11 @@ import {
   Globe,
   Instagram,
   MessageCircle,
+  MoreHorizontal,
   Phone,
-  Share2,
+  Star,
   UserPlus,
+  Users,
 } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
@@ -27,7 +29,6 @@ import { useParams } from 'next/navigation';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
-import { FixedLogoHeader, OVERLAY_BACK_BUTTON_TOP_CLASS, overlayHeaderActionClass } from '@/components/layout/FixedLogoHeader';
 import {
   buildSellerProfileContactMessage,
   openSellerTelegramChat,
@@ -63,6 +64,8 @@ interface PublicBusinessProfile {
   memberSince: string;
   sellerTelegramId: string;
   sellerUsername: string | null;
+  rating: number;
+  reviewsCount: number;
 }
 
 interface BusinessProfilePageProps {
@@ -77,6 +80,22 @@ interface BusinessProfilePageProps {
   favorites: Set<number>;
   tg: TelegramWebApp | null;
   onBackToPreviousListing?: (() => void) | null;
+}
+
+function formatRatingReviews(
+  rating: number,
+  count: number,
+  t: (key: string, params?: Record<string, string>) => string
+): string {
+  const ratingStr = rating.toFixed(1);
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  let key = 'businessProfile.public.ratingReviews';
+  if (mod10 === 1 && mod100 !== 11) key = 'businessProfile.public.ratingReviews_one';
+  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+    key = 'businessProfile.public.ratingReviews_few';
+  }
+  return t(key, { rating: ratingStr, count: String(count) });
 }
 
 export function BusinessProfilePage({
@@ -276,27 +295,25 @@ export function BusinessProfilePage({
     }
   };
 
-  const headerActionClass = overlayHeaderActionClass(isLight);
   const handleBack = onBackToPreviousListing || onClose;
+  const navBtnClass = isLight
+    ? 'flex h-10 w-10 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm hover:bg-black/35'
+    : 'flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
 
   if (loadError) {
     return (
       <div className={`min-h-screen pb-24 ${ac.overlayShell}`}>
-        <FixedLogoHeader mode="window-fixed" zClassName="z-[50]" paddingX={false} outerClassName="px-4 lg:px-6" />
-        <button
-          type="button"
-          onClick={handleBack}
-          aria-label={t('common.back')}
-          className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${OVERLAY_BACK_BUTTON_TOP_CLASS} ${headerActionClass}`}
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="px-4 pt-24 text-center">
+        <div className="px-4 pt-[max(env(safe-area-inset-top,0px),12px)]">
+          <button type="button" onClick={handleBack} aria-label={t('common.back')} className={navBtnClass}>
+            <ArrowLeft size={20} />
+          </button>
+        </div>
+        <div className="px-4 pt-16 text-center">
           <p className={`mb-4 ${ac.mutedText}`}>{t('common.error')}</p>
           <button
             type="button"
             onClick={handleBack}
-            className={`px-4 py-2 rounded-xl font-medium ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}
+            className={`rounded-xl px-4 py-2 font-medium ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}
           >
             {t('common.back')}
           </button>
@@ -308,8 +325,7 @@ export function BusinessProfilePage({
   if (loading || !profile) {
     return (
       <div className={`min-h-screen ${ac.overlayShell}`}>
-        <FixedLogoHeader mode="window-fixed" zClassName="z-[50]" paddingX={false} outerClassName="px-4 lg:px-6" />
-        <div className={`${OVERLAY_BACK_BUTTON_TOP_CLASS} px-4`}>
+        <div className="px-4 pt-20">
           <ListingGridSkeleton count={4} />
         </div>
       </div>
@@ -319,196 +335,198 @@ export function BusinessProfilePage({
   const canMessage = Boolean(
     (profile.sellerUsername || profile.telegram?.replace(/^@/, '') || '').trim()
   );
-  const statCard = isLight
-    ? 'rounded-2xl bg-white/80 border border-[#3F5331]/10 px-2 py-3 text-center'
-    : 'rounded-2xl bg-white/[0.06] border border-white/10 px-2 py-3 text-center';
-  const secondaryBtn = isLight
-    ? 'bg-white border border-[#3F5331]/15 text-[#3F5331] hover:bg-[#E8F0E0]/70'
-    : 'bg-white/[0.08] border border-white/15 text-white hover:bg-white/15';
-  const chipBtn = isLight
-    ? 'bg-white border border-[#3F5331]/15 text-[#3F5331] hover:bg-[#E8F0E0]/70'
-    : 'bg-white/[0.08] border border-white/10 text-white/90 hover:bg-white/15';
+  const showRating = profile.reviewsCount > 0 && profile.rating > 0;
   const aboutCard = isLight
     ? 'rounded-2xl border border-[#3F5331]/10 bg-white/80 p-4'
     : 'rounded-2xl border border-white/10 bg-white/[0.05] p-4';
 
+  const actionBtnBase =
+    'flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-3 text-xs font-medium transition-colors';
+  const actionPrimary = isLight
+    ? 'bg-[#3F5331] text-white hover:bg-[#344728]'
+    : 'bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0]';
+  const actionSecondary = isLight
+    ? 'bg-gray-100 text-gray-900 hover:bg-gray-200/80'
+    : 'bg-[#1C1C1C] text-white hover:bg-white/10 border border-white/10';
+
+  const contactActions = [
+    canMessage
+      ? {
+          key: 'message',
+          label: t('businessProfile.public.write'),
+          icon: MessageCircle,
+          onClick: handleMessage,
+          primary: true,
+        }
+      : null,
+    profile.phone
+      ? {
+          key: 'phone',
+          label: t('businessProfile.public.call'),
+          icon: Phone,
+          onClick: () => {
+            trackBusinessContact('phone');
+            setShowPhoneModal(true);
+          },
+          primary: false,
+        }
+      : null,
+    profile.instagram
+      ? {
+          key: 'instagram',
+          label: 'Instagram',
+          icon: Instagram,
+          onClick: handleInstagram,
+          primary: false,
+        }
+      : null,
+    profile.website
+      ? {
+          key: 'website',
+          label: t('businessProfile.public.website'),
+          icon: Globe,
+          onClick: handleWebsite,
+          primary: false,
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    key: string;
+    label: string;
+    icon: typeof MessageCircle;
+    onClick: () => void;
+    primary: boolean;
+  }>;
+
   return (
     <div className={`min-h-screen pb-24 ${ac.overlayShell}`}>
-      <FixedLogoHeader
-        mode="window-fixed"
-        zClassName="z-[50]"
-        paddingX={false}
-        outerClassName="px-4 lg:px-6"
-        onClick={() => {
-          if (typeof window !== 'undefined') {
-            window.location.href = `/${lang}/bazaar`;
-          }
-        }}
-      />
-
-      <button
-        type="button"
-        onClick={handleBack}
-        aria-label={t('common.back')}
-        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${OVERLAY_BACK_BUTTON_TOP_CLASS} ${headerActionClass}`}
-      >
-        <ArrowLeft size={20} />
-      </button>
-      <button
-        type="button"
-        onClick={() => setShowShareModal(true)}
-        aria-label={t('common.share')}
-        className={`fixed right-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${OVERLAY_BACK_BUTTON_TOP_CLASS} ${headerActionClass}`}
-      >
-        <Share2 size={18} />
-      </button>
-
       <div className="relative">
         <div
-          className={`relative h-40 overflow-hidden sm:h-48 ${
-            coverUrl ? '' : isLight ? 'bg-gradient-to-br from-[#3F5331]/25 to-[#C8E6A0]/20' : 'bg-gradient-to-br from-[#3F5331]/50 to-[#1a2414]'
+          className={`relative h-52 overflow-hidden sm:h-56 ${
+            coverUrl ? '' : isLight ? 'bg-[#3F5331]/20' : 'bg-[#3F5331]/35'
           }`}
         >
-          {coverUrl && <img src={coverUrl} alt="" className="w-full h-full object-cover" />}
-          <div
-            className={`pointer-events-none absolute inset-0 ${
-              isLight
-                ? 'bg-gradient-to-t from-white/70 via-transparent to-transparent'
-                : 'bg-gradient-to-t from-black/55 via-transparent to-black/20'
-            }`}
-          />
-        </div>
-        <div className="absolute -bottom-11 left-4">
-          <div
-            className={`h-[88px] w-[88px] overflow-hidden rounded-2xl border-[3px] shadow-lg ${
-              isLight ? 'border-white bg-white' : 'border-[#0f1408] bg-[#1C1C1C]'
-            }`}
-          >
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[#3F5331]/30 text-2xl font-bold text-[#C8E6A0]">
-                {profile.businessName.charAt(0)}
-              </div>
-            )}
+          {coverUrl && <img src={coverUrl} alt="" className="h-full w-full object-cover" />}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/10 to-black/45" />
+
+          <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-4 pb-2 pt-[max(env(safe-area-inset-top,0px),10px)]">
+            <button type="button" onClick={handleBack} aria-label={t('common.back')} className={navBtnClass}>
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-1">
+              <span className="truncate text-base font-semibold text-white">{profile.businessName}</span>
+              <BadgeCheck size={18} className="shrink-0 text-emerald-400" />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              aria-label={t('common.share')}
+              className={navBtnClass}
+            >
+              <MoreHorizontal size={18} />
+            </button>
+          </div>
+
+          <div className="absolute -bottom-12 left-4 z-10">
+            <div
+              className={`h-24 w-24 overflow-hidden rounded-full border-4 shadow-lg ${
+                isLight ? 'border-black bg-[#111]' : 'border-black bg-[#1C1C1C]'
+              }`}
+            >
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-[#3F5331]/40 text-2xl font-bold text-[#C8E6A0]">
+                  {profile.businessName.charAt(0)}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="px-4 pt-14 pb-4">
-        <div className="mb-1 flex items-start gap-2">
-          <h1 className={`min-w-0 flex-1 text-[1.35rem] font-semibold leading-tight ${ac.pageHeading}`}>
-            {profile.businessName}
-          </h1>
-          <BadgeCheck size={20} className="mt-0.5 shrink-0 text-emerald-400" />
+      <div className="px-4 pb-4 pt-14">
+        <div className="mb-1 flex items-center gap-1.5">
+          <h1 className={`min-w-0 truncate text-xl font-bold ${ac.pageHeading}`}>{profile.businessName}</h1>
+          <BadgeCheck size={18} className="shrink-0 text-emerald-400" />
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <p className={`mb-3 text-sm ${ac.mutedText}`}>
+          {categoryLabel}
+          {profile.city ? ` · ${profile.city}` : ''}
+        </p>
+
+        <div className="mb-2 flex items-center justify-between gap-3">
+          {showRating ? (
+            <div className="flex min-w-0 items-center gap-1.5 text-sm">
+              <Star size={16} className="shrink-0 fill-amber-400 text-amber-400" />
+              <span className={`truncate ${ac.pageHeading}`}>
+                {formatRatingReviews(profile.rating, profile.reviewsCount, t)}
+              </span>
+            </div>
+          ) : (
+            <span className={`text-sm ${ac.mutedText}`}>{profile.memberSince}</span>
+          )}
           <span
-            className={`text-[10px] font-bold tracking-wide rounded-full px-2.5 py-1 ${
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${
               isLight
-                ? 'border border-[#3F5331]/40 text-[#3F5331] bg-[#E8F0E0]/70'
-                : 'border border-[#C8E6A0]/40 text-[#C8E6A0] bg-[#C8E6A0]/10'
+                ? 'border border-[#3F5331]/50 text-[#3F5331]'
+                : 'border border-[#C8E6A0]/50 text-[#C8E6A0]'
             }`}
           >
             BUSINESS{isPro ? ' PRO' : ''}
           </span>
-          <p className={`text-sm ${ac.mutedText}`}>
-            {categoryLabel}
-            {profile.city ? ` · ${profile.city}` : ''}
-          </p>
         </div>
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
-          <div className={statCard}>
-            <div className={`text-lg font-semibold tabular-nums ${ac.pageHeading}`}>{profile.activeListingsCount}</div>
-            <div className={`mt-0.5 text-[11px] leading-tight ${ac.mutedText}`}>
-              {t('businessProfile.public.listingsShort')}
-            </div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className={`flex items-center gap-1.5 text-sm ${ac.mutedText}`}>
+            <Users size={16} className="shrink-0" />
+            <span>
+              {profile.followersCount} {t('businessProfile.public.followersLabel')}
+            </span>
           </div>
-          <div className={statCard}>
-            <div className={`text-lg font-semibold tabular-nums ${ac.pageHeading}`}>{profile.followersCount}</div>
-            <div className={`mt-0.5 text-[11px] leading-tight ${ac.mutedText}`}>
-              {t('businessProfile.public.followersShort')}
-            </div>
-          </div>
-          <div className={statCard}>
-            <div className={`text-sm font-semibold leading-tight ${ac.pageHeading}`}>{profile.memberSince}</div>
-            <div className={`mt-0.5 text-[11px] leading-tight ${ac.mutedText}`}>
-              {t('businessProfile.public.onPlatform')}
-            </div>
-          </div>
+          {!viewingOwn && (
+            <button
+              type="button"
+              onClick={() => void handleFollow()}
+              disabled={followBusy}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                isFollowing
+                  ? isLight
+                    ? 'border border-[#3F5331]/30 bg-[#E8F0E0] text-[#3F5331]'
+                    : 'border border-[#C8E6A0]/30 bg-[#C8E6A0]/10 text-[#C8E6A0]'
+                  : isLight
+                    ? 'bg-[#3F5331] text-white'
+                    : 'bg-[#C8E6A0] text-[#0f1408]'
+              }`}
+            >
+              {isFollowing ? (
+                <span className="inline-flex items-center gap-1">
+                  <Check size={14} />
+                  {t('businessProfile.public.subscribed')}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1">
+                  <UserPlus size={14} />
+                  {t('businessProfile.public.subscribe')}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
-        {!viewingOwn && (
-          <button
-            type="button"
-            onClick={() => void handleFollow()}
-            disabled={followBusy}
-            className={`mb-2 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
-              isFollowing ? secondaryBtn : listingPrimaryCta(isLight)
-            }`}
-          >
-            {isFollowing ? <Check size={18} /> : <UserPlus size={18} />}
-            {isFollowing ? t('businessProfile.public.subscribed') : t('businessProfile.public.subscribe')}
-          </button>
-        )}
-        {viewingOwn && (
-          <div className={`mb-2 rounded-2xl px-4 py-3 text-center text-sm ${isLight ? 'bg-[#E8F0E0]/80 text-[#3F5331]' : 'bg-white/[0.08] text-white/80'}`}>
-            {t('businessProfile.public.ownProfile')}
-          </div>
-        )}
-
-        {(canMessage || profile.phone) && (
-          <div className="mb-3 flex gap-2">
-            {canMessage && (
+        {contactActions.length > 0 && (
+          <div className="mb-6 flex gap-2">
+            {contactActions.map(({ key, label, icon: Icon, onClick, primary }) => (
               <button
+                key={key}
                 type="button"
-                onClick={handleMessage}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-medium transition-colors ${secondaryBtn}`}
+                onClick={onClick}
+                className={`${actionBtnBase} ${primary ? actionPrimary : actionSecondary}`}
               >
-                <MessageCircle size={18} />
-                {t('businessProfile.public.write')}
+                <Icon size={20} />
+                {label}
               </button>
-            )}
-            {profile.phone && (
-              <button
-                type="button"
-                onClick={() => {
-                  trackBusinessContact('phone');
-                  setShowPhoneModal(true);
-                }}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-medium transition-colors ${secondaryBtn}`}
-              >
-                <Phone size={18} />
-                {t('businessProfile.public.call')}
-              </button>
-            )}
-          </div>
-        )}
-
-        {(profile.instagram || profile.website) && (
-          <div className="mb-5 flex gap-2">
-            {profile.instagram && (
-              <button
-                type="button"
-                onClick={handleInstagram}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-medium transition-colors ${chipBtn}`}
-              >
-                <Instagram size={16} />
-                Instagram
-              </button>
-            )}
-            {profile.website && (
-              <button
-                type="button"
-                onClick={handleWebsite}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-medium transition-colors ${chipBtn}`}
-              >
-                <Globe size={16} />
-                {t('businessProfile.public.website')}
-              </button>
-            )}
+            ))}
           </div>
         )}
 
@@ -632,10 +650,4 @@ export function BusinessProfilePage({
       <Toast message={toast.message} type={toast.type} isVisible={toast.isVisible} onClose={hideToast} />
     </div>
   );
-}
-
-function listingPrimaryCta(isLight: boolean) {
-  return isLight
-    ? 'bg-[#3F5331] text-white hover:bg-[#344728]'
-    : 'bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0] shadow-[0_0_18px_rgba(200,230,160,0.35)]';
 }

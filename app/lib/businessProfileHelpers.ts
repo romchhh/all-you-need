@@ -342,12 +342,14 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
   if (Number.isNaN(telegramIdNum)) return null;
 
   const users = (await prisma.$queryRawUnsafe(
-    `SELECT id, username, createdAt FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+    `SELECT id, username, createdAt, rating, reviewsCount FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
     telegramIdNum
   )) as Array<{
     id: number;
     username: string | null;
     createdAt: Date | string;
+    rating: number | null;
+    reviewsCount: number | null;
   }>;
 
   const user = users[0];
@@ -394,6 +396,14 @@ export function formatBusinessMemberSince(dateInput: Date | string, lang: 'uk' |
   return lang === 'ru' ? `${years} г.` : `${years} р.`;
 }
 
+export function formatBusinessTelegramSince(dateInput: Date | string): string {
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (Number.isNaN(date.getTime())) return '';
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const y = date.getFullYear();
+  return `${m}.${y}`;
+}
+
 export async function getBusinessSellerSummaryForUser(
   userId: number,
   lang: 'uk' | 'ru' = 'uk'
@@ -404,12 +414,14 @@ export async function getBusinessSellerSummaryForUser(
   if (!profile || !isBusinessProfileActive(profile)) return null;
 
   const users = (await prisma.$queryRawUnsafe(
-    `SELECT CAST(telegramId AS INTEGER) as telegramId, username, createdAt FROM User WHERE id = ?`,
+    `SELECT CAST(telegramId AS INTEGER) as telegramId, username, createdAt, rating, reviewsCount FROM User WHERE id = ?`,
     userId
   )) as Array<{
     telegramId: number;
     username: string | null;
     createdAt: Date | string;
+    rating: number | null;
+    reviewsCount: number | null;
   }>;
 
   const user = users[0];
@@ -428,6 +440,9 @@ export async function getBusinessSellerSummaryForUser(
     activeListingsCount: Number(activeListingsCount[0]?.cnt ?? 0),
     followersCount: profile.followersCount,
     memberSince: formatBusinessMemberSince(user.createdAt, lang),
+    telegramSince: formatBusinessTelegramSince(user.createdAt),
+    rating: Number(user.rating) || 0,
+    reviewsCount: Number(user.reviewsCount) || 0,
     plan: profile.plan,
     telegram: profile.telegram,
     phone: profile.phone,
