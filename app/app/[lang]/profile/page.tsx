@@ -446,6 +446,9 @@ const ProfilePage = () => {
         onEditModalChange={setIsEditModalOpen}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
+        onPreviewBusinessProfile={(payload) => {
+          setSelectedSeller(payload);
+        }}
       />
     );
   };

@@ -1262,6 +1262,27 @@
       "activeListings": "Активные",
       "totalListings": "Всего объявлений"
     },
+    "owner": {
+      "viewProfile": "Посмотреть профиль",
+      "subscriptionActiveUntil": "Подписка активна до {date}",
+      "manage": "Управлять",
+      "highlightSlots": "Highlight",
+      "topSlots": "TOP",
+      "promoDiscount": "Ваша скидка {percent}% на все продвижения",
+      "results30days": "Результаты за 30 дней",
+      "seeAll": "Смотреть все",
+      "kpiViews": "Просмотры",
+      "kpiInquiries": "Обращения",
+      "kpiFavorites": "В избранном",
+      "kpiReviews": "Новых отзывов",
+      "myListings": "Мои объявления (Business)",
+      "addListing": "Добавить",
+      "promoteListings": "Продвигать объявления",
+      "allListings": "Все объявления",
+      "tabActive": "Активные",
+      "tabModeration": "На проверке",
+      "tabInactive": "Неактивные"
+    },
     "public": {
       "write": "Написать",
       "call": "Позвонить",

@@ -529,6 +529,9 @@ export type BusinessProfileStatsPayload = {
   contactClicks: number;
   activeListings: number;
   totalListings: number;
+  pendingListings: number;
+  inactiveListings: number;
+  favoritesTotal: number;
 };
 
 export async function getBusinessProfileStatsForUserId(
@@ -544,13 +547,19 @@ export async function getBusinessProfileStatsForUserId(
       listingViews: bigint | number | null;
       totalListings: bigint | number;
       activeListings: bigint | number;
+      pendingListings: bigint | number;
+      inactiveListings: bigint | number;
+      favoritesTotal: bigint | number | null;
     }>
   >(
     prisma,
     `SELECT
         COALESCE(SUM(views), 0) as listingViews,
         COUNT(*) as totalListings,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings,
+        SUM(CASE WHEN status = 'pending_moderation' THEN 1 ELSE 0 END) as pendingListings,
+        SUM(CASE WHEN status IN ('deactivated', 'hidden', 'expired', 'sold', 'rejected') THEN 1 ELSE 0 END) as inactiveListings,
+        COALESCE(SUM(favoritesCount), 0) as favoritesTotal
       FROM Listing
       WHERE userId = ? AND COALESCE(profileType, 'personal') = 'business'`,
     [userId]
@@ -622,5 +631,8 @@ export async function getBusinessProfileStatsForUserId(
     contactClicks: profileContacts + listingContacts,
     activeListings: toNum(listingStats?.activeListings),
     totalListings: toNum(listingStats?.totalListings),
+    pendingListings: toNum(listingStats?.pendingListings),
+    inactiveListings: toNum(listingStats?.inactiveListings),
+    favoritesTotal: toNum(listingStats?.favoritesTotal),
   };
 }

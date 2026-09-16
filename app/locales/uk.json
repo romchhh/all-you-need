@@ -1264,6 +1264,27 @@
       "activeListings": "Активні",
       "totalListings": "Усього оголошень"
     },
+    "owner": {
+      "viewProfile": "Переглянути профіль",
+      "subscriptionActiveUntil": "Підписка активна до {date}",
+      "manage": "Керувати",
+      "highlightSlots": "Highlight",
+      "topSlots": "TOP",
+      "promoDiscount": "Ваша знижка {percent}% на всі просування",
+      "results30days": "Результати за 30 днів",
+      "seeAll": "Дивитись усі",
+      "kpiViews": "Перегляди",
+      "kpiInquiries": "Звернення",
+      "kpiFavorites": "В обраному",
+      "kpiReviews": "Нових відгуків",
+      "myListings": "Мої оголошення (Business)",
+      "addListing": "Додати",
+      "promoteListings": "Просувати оголошення",
+      "allListings": "Усі оголошення",
+      "tabActive": "Активні",
+      "tabModeration": "На перевірці",
+      "tabInactive": "Неактивні"
+    },
     "public": {
       "write": "Написати",
       "call": "Подзвонити",

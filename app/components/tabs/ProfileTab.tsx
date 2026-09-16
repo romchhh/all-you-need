@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle, Gift, Eye, Users, MousePointerClick } from 'lucide-react';
+import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle, Gift } from 'lucide-react';
 import { NavIcon } from '@/components/layout/NavIcon';
 import { ImageViewModal } from '@/components/modals/ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
@@ -32,6 +32,11 @@ import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { BusinessPromoCard } from '@/components/business/BusinessPromoCard';
 import { BusinessSuspendedCard } from '@/components/business/BusinessSuspendedCard';
 import { ProfileModeSwitcher, type ProfileViewMode } from '@/components/business/ProfileModeSwitcher';
+import {
+  BusinessOwnerProfileView,
+  type BusinessListingTab,
+  type BusinessProfileData,
+} from '@/components/business/BusinessOwnerProfileView';
 
 const EditListingModal = dynamic(
   () => import('@/components/modals/EditListingModal').then((m) => ({ default: m.EditListingModal })),
@@ -56,10 +61,18 @@ interface ProfileTabProps {
   onEditModalChange?: (isOpen: boolean) => void;
   /** Обране з батьківської сторінки (localStorage + API) — для коректного відображення isFavorite та лайків */
   favorites?: Set<number>;
-  onToggleFavorite?: (id: number) => void;
+  onToggleFavorite?: (listingId: number) => void;
+  /** Відкрити публічний Business-профіль (як бачить покупець) */
+  onPreviewBusinessProfile?: (payload: {
+    telegramId: string;
+    name: string;
+    avatar: string;
+    username?: string;
+    phone?: string;
+  }) => void;
 }
 
-export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalChange, favorites: favoritesProp, onToggleFavorite }: ProfileTabProps) => {
+export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalChange, favorites: favoritesProp, onToggleFavorite, onPreviewBusinessProfile }: ProfileTabProps) => {
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
@@ -101,26 +114,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [selectedListingForReactivation, setSelectedListingForReactivation] = useState<number | null>(null);
   const [showBusinessFlow, setShowBusinessFlow] = useState(false);
   const [profileViewMode, setProfileViewMode] = useState<ProfileViewMode>('personal');
-  const [businessProfile, setBusinessProfile] = useState<{
-    businessName: string;
-    logo?: string | null;
-    coverImage?: string | null;
-    description?: string;
-    city?: string;
-    plan?: string | null;
-    linkedListingIds?: string | null;
-    category?: string;
-    subcategory?: string | null;
-    address?: string | null;
-    serviceArea?: string;
-    serviceRadiusKm?: number | null;
-    telegram?: string | null;
-    phone?: string | null;
-    instagram?: string | null;
-    website?: string | null;
-    workingHours?: string | null;
-    updatedAt?: string;
-  } | null>(null);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfileData | null>(null);
   const [isBusinessActive, setIsBusinessActive] = useState(false);
   const [hasBusinessProfile, setHasBusinessProfile] = useState(false);
   const [isBusinessSuspended, setIsBusinessSuspended] = useState(false);
@@ -133,7 +127,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     contactClicks: number;
     activeListings: number;
     totalListings: number;
+    pendingListings: number;
+    inactiveListings: number;
+    favoritesTotal: number;
   } | null>(null);
+  const [businessListingTab, setBusinessListingTab] = useState<BusinessListingTab>('active');
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -399,6 +397,23 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     }
   }, [isBusinessActive, profileViewMode, profile?.telegramId]);
 
+  useEffect(() => {
+    if (profileViewMode !== 'business') return;
+    setBusinessListingTab('active');
+  }, [profileViewMode]);
+
+  useEffect(() => {
+    if (!isBusinessActive || profileViewMode !== 'business') return;
+    const status =
+      businessListingTab === 'active'
+        ? 'active'
+        : businessListingTab === 'moderation'
+          ? 'pending_moderation'
+          : 'deactivated';
+    setSelectedStatus(status);
+    setSelectedCategory('all');
+  }, [businessListingTab, isBusinessActive, profileViewMode]);
+
   // Обробка пропуску реклами
   const handlePromotionSkipped = async () => {
     if (!selectedListingForPromotion) return;
@@ -635,45 +650,220 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   })();
   const displayUsername = profile.username ? `@${profile.username}` : '';
   const isBusinessView = profileViewMode === 'business' && isBusinessActive;
-  const headerPhoto = isBusinessView ? businessProfile?.logo || null : profile.avatar || null;
+  const headerPhoto = profile.avatar || null;
   const headerPhotoUrl = headerPhoto ? getResolvedImageUrl(headerPhoto) : null;
-  const headerCoverUrl =
-    isBusinessView && businessProfile?.coverImage
-      ? getResolvedImageUrl(businessProfile.coverImage)
-      : null;
-  const headerInitial = (
-    isBusinessView && businessProfile?.businessName
-      ? businessProfile.businessName
-      : displayName
-  )
-    .charAt(0)
-    .toUpperCase();
+  const headerInitial = displayName.charAt(0).toUpperCase();
+
+  const renderUserListingCards = () => {
+    if (userListings.length === 0) {
+      return (
+        <div className="py-16 text-center">
+          <p className={`mb-2 font-medium ${ac.pageHeading}`}>{t('sales.noListings')}</p>
+          <p className={`text-sm ${ac.salesEmptyHint}`}>{t('sales.createFirst')}</p>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="space-y-3">
+          {userListings.map((listing) => {
+            const isSold = listing.status === 'sold';
+            const isDeactivated =
+              (listing.status as string) === 'deactivated' || (listing.status as string) === 'hidden';
+            const isExpired = listing.status === 'expired';
+            return (
+              <ProfileListingCard
+                key={listing.id}
+                listing={{ ...listing, favoritesCount: listing.favoritesCount || 0 }}
+                alwaysShowStats
+                isFavorite={favorites.has(listing.id)}
+                isSold={isSold}
+                isDeactivated={isDeactivated || isExpired}
+                onSelect={(selectedListing) => {
+                  if (onSelectListing) {
+                    fetch(`/api/listings/${selectedListing.id}`)
+                      .then((res) => res.json())
+                      .then((data) => {
+                        onSelectListing({ ...selectedListing, ...data });
+                      })
+                      .catch((err) => console.error('Error loading listing:', err));
+                  }
+                }}
+                onEdit={() => {
+                  if (listing.status === 'pending_moderation') {
+                    showToast(
+                      t('editListing.cannotEditOnModeration') || 'Не можна редагувати оголошення під час модерації',
+                      'error'
+                    );
+                    tg?.HapticFeedback.notificationOccurred('error');
+                    return;
+                  }
+                  setEditingListing(listing);
+                }}
+                onReactivate={() => {
+                  setSelectedListingForReactivation(listing.id);
+                  setShowReactivateFlow(true);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                onMarkAsSold={() => {
+                  if (listing.status === 'pending_moderation') {
+                    showToast(
+                      t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації',
+                      'error'
+                    );
+                    return;
+                  }
+                  if (listing.status === 'rejected') {
+                    showToast(
+                      t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення',
+                      'error'
+                    );
+                    return;
+                  }
+                  setConfirmModal({
+                    isOpen: true,
+                    title: t('editListing.markAsSold'),
+                    message: t('editListing.confirmMarkSold'),
+                    onConfirm: async () => {
+                      try {
+                        const formData = new FormData();
+                        formData.append('title', listing.title);
+                        formData.append('description', listing.description);
+                        formData.append('price', listing.isFree ? '0' : listing.price);
+                        formData.append('isFree', listing.isFree ? 'true' : 'false');
+                        formData.append('category', listing.category);
+                        if (listing.subcategory) {
+                          formData.append('subcategory', listing.subcategory);
+                        }
+                        formData.append('location', listing.location);
+                        formData.append('condition', listing.condition || '');
+                        formData.append('telegramId', profile.telegramId);
+                        formData.append('status', 'sold');
+
+                        const response = await fetch(`/api/listings/${listing.id}/update`, {
+                          method: 'PUT',
+                          body: formData,
+                        });
+
+                        if (response.ok) {
+                          showToast(t('editListing.listingMarkedSold'), 'success');
+                          tg?.HapticFeedback.notificationOccurred('success');
+                          setConfirmModal({ ...confirmModal, isOpen: false });
+                          await fetchListingsWithFilters(0, true);
+                          void refetchStats();
+                          router.refresh();
+                        } else {
+                          const errorData = await response.json().catch(() => ({}));
+                          console.error('Error updating listing:', errorData);
+                          showToast(t('editListing.updateError'), 'error');
+                        }
+                      } catch (error) {
+                        console.error('Error marking listing as sold:', error);
+                        showToast(t('editListing.updateError'), 'error');
+                      }
+                    },
+                    confirmText: t('editListing.markAsSold'),
+                    cancelText: t('common.cancel'),
+                    confirmButtonClass: 'bg-green-500 hover:bg-green-600',
+                  });
+                }}
+                onPromote={() => {
+                  setSelectedListingForPromotion(listing);
+                  setShowPromotionModal(true);
+                  setPromotionOpenSource('manual');
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                viewerTelegramId={profile.telegramId}
+                showToast={showToast}
+                onAutoRenewChange={(listingId, autoRenew) => {
+                  setUserListings((prev) =>
+                    prev.map((l) => (l.id === listingId ? { ...l, autoRenew } : l))
+                  );
+                }}
+                tg={tg}
+              />
+            );
+          })}
+        </div>
+        {hasMore && userListings.length > 0 && userListings.length < totalListings && (
+          <div className="py-6">
+            <button onClick={loadMoreListings} className={ac.salesFilterBar}>
+              {t('sales.showMore')}
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const openBusinessPreview = () => {
+    if (!profile?.telegramId || !businessProfile) return;
+    onPreviewBusinessProfile?.({
+      telegramId: profile.telegramId,
+      name: businessProfile.businessName,
+      avatar: businessProfile.logo || profile.avatar || '',
+      username: profile.username || undefined,
+      phone: businessProfile.phone || profile.phone || undefined,
+    });
+    tg?.HapticFeedback.impactOccurred('light');
+  };
+
+  const openBusinessEdit = () => {
+    setBusinessRenewMode(false);
+    setBusinessEditMode(true);
+    setShowBusinessFlow(true);
+    tg?.HapticFeedback.impactOccurred('light');
+  };
+
+  const openBusinessPromote = () => {
+    const activeListing = userListings.find((listing) => listing.status === 'active');
+    if (activeListing) {
+      setSelectedListingForPromotion(activeListing);
+      setShowPromotionModal(true);
+      setPromotionOpenSource('manual');
+      tg?.HapticFeedback.impactOccurred('light');
+      return;
+    }
+    showToast(t('sales.noListings'), 'error');
+  };
 
   return (
     <>
     <div className="min-h-screen pb-24">
+      {isBusinessView && businessProfile && businessStats ? (
+        <BusinessOwnerProfileView
+          personalName={displayName}
+          personalAvatar={profile.avatar}
+          businessProfile={businessProfile}
+          businessStats={businessStats}
+          rating={profile.rating || 0}
+          reviewsCount={profile.reviewsCount || 0}
+          profileViewMode={profileViewMode}
+          onProfileModeChange={(mode) => {
+            setProfileViewMode(mode);
+            tg?.HapticFeedback.impactOccurred('light');
+          }}
+          listingTab={businessListingTab}
+          onListingTabChange={setBusinessListingTab}
+          onPreviewProfile={openBusinessPreview}
+          onEditBusiness={openBusinessEdit}
+          onManageSubscription={openBusinessEdit}
+          onPromoteListings={openBusinessPromote}
+          onCreateListing={onCreateListing}
+          renderListings={renderUserListingCards}
+          hasMoreListings={hasMore && userListings.length > 0 && userListings.length < totalListings}
+          onLoadMore={loadMoreListings}
+        />
+      ) : (
+      <>
       {/* Профіль хедер */}
       <div className="pb-4 max-lg:-mt-0.5">
-        {isBusinessView && (
-          <div className={`relative h-36 overflow-hidden ${headerCoverUrl ? '' : isLight ? 'bg-[#3F5331]/15' : 'bg-[#3F5331]/30'}`}>
-            {headerCoverUrl ? (
-              <img
-                src={headerCoverUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : null}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
-          </div>
-        )}
-        <div className={`px-4 ${isBusinessView ? 'relative z-10' : 'pt-1'}`}>
+        <div className="px-4 pt-1">
         <div className="flex items-start gap-4">
-          {/* Фото профілю */}
           <div 
-            className={`overflow-hidden flex-shrink-0 relative cursor-pointer select-none border-2 ${
-              isBusinessView
-                ? `-mt-8 h-20 w-20 rounded-2xl border-4 shadow-lg ${isLight ? 'bg-white border-white' : 'bg-[#1C1C1C] border-[#0a0a0a]'}`
-                : `w-16 h-16 rounded-full ${isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white'}`
+            className={`overflow-hidden flex-shrink-0 relative cursor-pointer select-none border-2 w-16 h-16 rounded-full ${
+              isLight ? 'bg-white border-gray-200' : 'bg-[#1C1C1C] border-white'
             }`}
             {...avatarLongPress}
           >
@@ -683,7 +873,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 <img 
                   src={headerPhotoUrl}
                   alt={displayName}
-                  className={`w-full h-full relative z-10 ${isBusinessView ? 'object-contain p-1' : 'object-cover'}`}
+                  className="w-full h-full relative z-10 object-cover"
                   loading="eager"
                   decoding="async"
                   onError={(e) => {
@@ -698,39 +888,26 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     }
                   }}
                 />
-                <div className={`hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gray-800 text-white text-xl font-bold relative z-10`}>
+                <div className="hidden avatar-placeholder w-full h-full flex items-center justify-center bg-gray-800 text-white text-xl font-bold relative z-10">
                   {headerInitial}
                 </div>
               </>
             ) : (
-              <div className={`w-full h-full flex items-center justify-center bg-gray-800 text-white text-xl font-bold`}>
+              <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white text-xl font-bold">
                 {headerInitial}
               </div>
             )}
           </div>
           
-          {/* Інформація */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex-1 min-w-0">
-                <h2 className={`text-lg font-bold mb-1 truncate ${ac.pageHeading}`}>
-                  {profileViewMode === 'business' && businessProfile?.businessName
-                    ? businessProfile.businessName
-                    : displayName}
-                </h2>
-                {profileViewMode === 'business' && isBusinessActive ? (
-                  <p className={`text-sm truncate ${ac.mutedText}`}>
-                    <span className="inline-flex items-center gap-1 font-semibold text-[#C8E6A0]">
-                      BUSINESS{businessProfile?.plan === 'business_pro' ? ' PRO' : ''}
-                    </span>
-                    {businessProfile?.city ? ` · ${businessProfile.city}` : ''}
-                  </p>
-                ) : displayUsername ? (
+                <h2 className={`text-lg font-bold mb-1 truncate ${ac.pageHeading}`}>{displayName}</h2>
+                {displayUsername ? (
                   <p className={`text-sm truncate ${ac.mutedText}`}>{displayUsername}</p>
                 ) : null}
               </div>
               
-              {/* Кнопки дій */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => {
@@ -748,13 +925,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 </button>
                 <button
                   onClick={() => {
-                    if (isBusinessView) {
-                      setBusinessRenewMode(false);
-                      setBusinessEditMode(true);
-                      setShowBusinessFlow(true);
-                    } else {
-                      setIsEditModalOpen(true);
-                    }
+                    setIsEditModalOpen(true);
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
                   className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
@@ -768,9 +939,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
               </div>
             </div>
             
-            {/* Статистика */}
             <div className="mt-3 space-y-1.5">
-              {!isBusinessView && dashboardStats && (
+              {dashboardStats && (
                 <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
                   <Megaphone size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
                   <span>
@@ -826,54 +996,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         )}
       </div>
 
-      {isBusinessView && businessStats && (
-        <div className="px-4 pb-4">
-          <div
-            className={`overflow-hidden rounded-2xl border ${
-              isLight
-                ? 'border-[#3F5331]/12 bg-gradient-to-br from-white to-[#E8F0E0]/40'
-                : 'border-white/10 bg-white/[0.04]'
-            }`}
-          >
-            <div
-              className={`border-b px-4 py-3 ${
-                isLight ? 'border-[#3F5331]/10 bg-white/60' : 'border-white/10 bg-white/[0.03]'
-              }`}
-            >
-              <h3 className={`text-sm font-semibold ${ac.pageHeading}`}>{t('businessProfile.stats.title')}</h3>
-            </div>
-            <div className="grid grid-cols-3 gap-3 p-4">
-              {(
-                [
-                  ['followers', businessStats.followersCount, Users],
-                  ['profileViews', businessStats.profileViews, Eye],
-                  ['listingViews', businessStats.listingViews, Eye],
-                  ['contacts', businessStats.contactClicks, MousePointerClick],
-                  ['activeListings', businessStats.activeListings, Megaphone],
-                  ['totalListings', businessStats.totalListings, Package],
-                ] as const
-              ).map(([key, value, Icon]) => (
-                <div
-                  key={key}
-                  className={`rounded-xl px-2 py-3 text-center ${
-                    isLight ? 'bg-white/70' : 'bg-white/[0.06]'
-                  }`}
-                >
-                  <Icon size={15} className={`mx-auto mb-2 ${isLight ? 'text-[#3F5331]/70' : 'text-[#C8E6A0]/80'}`} />
-                  <div className={`text-xl font-bold tabular-nums leading-none ${ac.pageHeading}`}>{value}</div>
-                  <div className={`mt-1.5 text-[11px] leading-snug ${ac.mutedText}`}>
-                    {t(`businessProfile.stats.${key}`)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Кнопки дій */}
       <div className="px-4 space-y-3 pb-4">
-        {/* Кнопка поповнення балансу */}
         <button 
           className="w-full bg-[#3F5331] hover:bg-[#344728] text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
           onClick={() => {
@@ -885,7 +1008,6 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           {t('profile.topUpBalance')}
         </button>
 
-        {/* Кнопка створення оголошення */}
         <button 
           className={`w-full bg-transparent font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors border-2 ${
             isLight
@@ -904,16 +1026,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         </button>
       </div>
 
-      {/* Розділювач */}
       <div className="px-4 pb-4">
         <div className={`border-t ${isLight ? 'border-gray-200' : 'border-white/20'}`}></div>
       </div>
 
-      {/* Оголошення користувача */}
       <div className="px-4">
         <h3 className={`text-lg font-semibold mb-3 ${ac.pageHeading}`}>{t('sales.title')}</h3>
         
-        {/* Фільтри */}
         <div className="flex gap-2 mb-4">
             {/* Фільтр за статусом */}
             <button
@@ -1134,148 +1253,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             </div>
           )}
 
-          {userListings.length > 0 ? (
-            <>
-              <div className="space-y-3">
-                {userListings.map(listing => {
-                  const isSold = listing.status === 'sold';
-                  const isDeactivated = (listing.status as string) === 'deactivated' || (listing.status as string) === 'hidden'; // Підтримка обох варіантів для сумісності
-                  const isRejected = listing.status === 'rejected';
-                  const isExpired = listing.status === 'expired';
-                  return (
-                    <ProfileListingCard
-                      key={listing.id}
-                        listing={{ ...listing, favoritesCount: listing.favoritesCount || 0 }}
-                        alwaysShowStats
-                        isFavorite={favorites.has(listing.id)}
-                        isSold={isSold}
-                        isDeactivated={isDeactivated || isExpired}
-                        onSelect={(selectedListing) => {
-                          if (onSelectListing) {
-                            // Завантажуємо повну інформацію про товар
-                            fetch(`/api/listings/${selectedListing.id}`)
-                              .then(res => res.json())
-                              .then(data => {
-                                const fullListing = { ...selectedListing, ...data };
-                                onSelectListing(fullListing);
-                              })
-                              .catch(err => console.error('Error loading listing:', err));
-                          }
-                        }}
-                      onEdit={() => {
-                        // Забороняємо редагувати оголошення на модерації
-                        // Але дозволяємо редагувати відхилені оголошення
-                        if (listing.status === 'pending_moderation') {
-                          showToast(t('editListing.cannotEditOnModeration') || 'Не можна редагувати оголошення під час модерації', 'error');
-                          tg?.HapticFeedback.notificationOccurred('error');
-                          return;
-                        }
-                        // Відхилені оголошення можна редагувати
-                        setEditingListing(listing);
-                      }}
-                      onReactivate={() => {
-                        // Відкриваємо флоу реактивації
-                        console.log('[ProfileTab] Opening reactivation flow for listing:', listing.id);
-                        setSelectedListingForReactivation(listing.id);
-                        setShowReactivateFlow(true);
-                        tg?.HapticFeedback.impactOccurred('light');
-                      }}
-                      onMarkAsSold={() => {
-                        if (listing.status === 'pending_moderation') {
-                          showToast(t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації', 'error');
-                          return;
-                        }
-                        if (listing.status === 'rejected') {
-                          showToast(t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення', 'error');
-                          return;
-                        }
-                        setConfirmModal({
-                          isOpen: true,
-                          title: t('editListing.markAsSold'),
-                          message: t('editListing.confirmMarkSold'),
-                          onConfirm: async () => {
-                              try {
-                                const formData = new FormData();
-                                formData.append('title', listing.title);
-                                formData.append('description', listing.description);
-                                formData.append('price', listing.isFree ? '0' : listing.price);
-                                formData.append('isFree', listing.isFree ? 'true' : 'false');
-                                formData.append('category', listing.category);
-                                if (listing.subcategory) {
-                                  formData.append('subcategory', listing.subcategory);
-                                }
-                                formData.append('location', listing.location);
-                                formData.append('condition', listing.condition || '');
-                                formData.append('telegramId', profile.telegramId);
-                                formData.append('status', 'sold');
-
-                                const response = await fetch(`/api/listings/${listing.id}/update`, {
-                                  method: 'PUT',
-                                  body: formData,
-                                });
-
-                                if (response.ok) {
-                                  showToast(t('editListing.listingMarkedSold'), 'success');
-                                  tg?.HapticFeedback.notificationOccurred('success');
-                                  // Закриваємо модальне вікно після успішного оновлення
-                                  setConfirmModal({ ...confirmModal, isOpen: false });
-                                  // Оновлюємо список оголошень
-                                  await fetchListingsWithFilters(0, true);
-                                  void refetchStats();
-                                  // Оновлюємо сторінку
-                                  router.refresh();
-                                } else {
-                                  const errorData = await response.json().catch(() => ({}));
-                                  console.error('Error updating listing:', errorData);
-                                  showToast(t('editListing.updateError'), 'error');
-                                }
-                              } catch (error) {
-                                console.error('Error marking listing as sold:', error);
-                                showToast(t('editListing.updateError'), 'error');
-                              }
-                          },
-                          confirmText: t('editListing.markAsSold'),
-                          cancelText: t('common.cancel'),
-                          confirmButtonClass: 'bg-green-500 hover:bg-green-600',
-                        });
-                      }}
-                      onPromote={() => {
-                        setSelectedListingForPromotion(listing);
-                        setShowPromotionModal(true);
-                        setPromotionOpenSource('manual');
-                        tg?.HapticFeedback.impactOccurred('light');
-                      }}
-                      viewerTelegramId={profile.telegramId}
-                      showToast={showToast}
-                      onAutoRenewChange={(listingId, autoRenew) => {
-                        setUserListings(prev =>
-                          prev.map(l => (l.id === listingId ? { ...l, autoRenew } : l))
-                        );
-                      }}
-                      tg={tg}
-                    />
-                  );
-                })}
-              </div>
-              {hasMore && userListings.length > 0 && userListings.length < totalListings && (
-                <div className="py-6">
-                  <button
-                    onClick={loadMoreListings}
-                    className={ac.salesFilterBar}
-                  >
-                    {t('sales.showMore')}
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="py-16 text-center">
-              <p className={`mb-2 font-medium ${ac.pageHeading}`}>{t('sales.noListings')}</p>
-              <p className={`text-sm ${ac.salesEmptyHint}`}>{t('sales.createFirst')}</p>
-            </div>
-          )}
-        </div>
+          {renderUserListingCards()}
       </div>
+      </>
+      )}
 
       {/* Кнопки налаштувань */}
       <div className="px-4 py-6 space-y-3">
@@ -1326,6 +1307,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           <ChevronRight size={20} className={ac.mutedText} />
         </button>
       </div>
+    </div>
 
       {/* Модальне вікно перегляду аватара */}
       {showAvatarModal && headerPhotoUrl && (
