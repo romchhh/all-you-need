@@ -533,28 +533,40 @@ export async function getBusinessProfileStatsForUserId(
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
   if (!profile) return null;
 
-  const listingStats = (await rawQuery<
-    Array<{
-      listingViews: bigint | number | null;
-      totalListings: bigint | number;
-      activeListings: bigint | number;
-      pendingListings: bigint | number;
-      inactiveListings: bigint | number;
-      favoritesTotal: bigint | number | null;
-    }>
-  >(
-    prisma,
-    `SELECT
-        COALESCE(SUM(views), 0) as listingViews,
-        COUNT(*) as totalListings,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings,
-        SUM(CASE WHEN status = 'pending_moderation' THEN 1 ELSE 0 END) as pendingListings,
-        SUM(CASE WHEN status IN ('deactivated', 'hidden', 'expired', 'sold', 'rejected') THEN 1 ELSE 0 END) as inactiveListings,
-        COALESCE(SUM(favoritesCount), 0) as favoritesTotal
-      FROM Listing
-      WHERE userId = ? AND COALESCE(profileType, 'personal') = 'business'`,
-    [userId]
-  ))[0];
+  let listingStats: {
+    listingViews: bigint | number | null;
+    totalListings: bigint | number;
+    activeListings: bigint | number;
+    pendingListings: bigint | number;
+    inactiveListings: bigint | number;
+    favoritesTotal: bigint | number | null;
+  } | undefined;
+
+  try {
+    listingStats = (
+      await rawQuery<Array<NonNullable<typeof listingStats>>>(
+        prisma,
+        `SELECT
+            COALESCE(SUM(views), 0) as listingViews,
+            COUNT(*) as totalListings,
+            SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings,
+            SUM(CASE WHEN status = 'pending_moderation' THEN 1 ELSE 0 END) as pendingListings,
+            SUM(CASE WHEN status IN ('deactivated', 'hidden', 'expired', 'sold', 'rejected') THEN 1 ELSE 0 END) as inactiveListings,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM Favorite f
+              INNER JOIN Listing bl ON bl.id = f.listingId
+              WHERE bl.userId = ?
+                AND COALESCE(bl.profileType, 'personal') = 'business'
+            ), 0) as favoritesTotal
+          FROM Listing
+          WHERE userId = ? AND COALESCE(profileType, 'personal') = 'business'`,
+        [userId, userId]
+      )
+    )[0];
+  } catch (error) {
+    console.error('[BusinessProfile stats] listing query failed', error);
+  }
 
   const profileEntityId = String(profile.id);
 

@@ -27,16 +27,14 @@ export async function POST(
 
     // Знаходимо оголошення з користувачем
     const listings = await prisma.$queryRawUnsafe(
-      `SELECT l.*, 
-              u.id as user_id,
-              CAST(u.telegramId AS INTEGER) as user_telegramId,
-              u.listingPackagesBalance as user_listingPackagesBalance,
-              u.hasUsedFreeAd as user_hasUsedFreeAd
+      `SELECT l.id,
+              l.userId,
+              u.telegramId
        FROM Listing l
        JOIN User u ON l.userId = u.id
        WHERE l.id = ?`,
       listingId
-    ) as any[];
+    ) as Array<{ id: number; userId: number; telegramId: string | number | bigint }>;
 
     if (listings.length === 0) {
       return NextResponse.json(
@@ -47,9 +45,12 @@ export async function POST(
 
     const listing = listings[0];
 
-    // Перевіряємо що це оголошення належить користувачу
-    // Використовуємо String() для порівняння, щоб уникнути проблем з типами (BIGINT)
-    if (String(listing.user_telegramId) !== String(telegramId)) {
+    if (String(listing.telegramId) !== String(telegramId)) {
+      console.error('[Reactivate Listing] Unauthorized owner mismatch:', {
+        listingId,
+        ownerTelegramId: String(listing.telegramId),
+        requestTelegramId: String(telegramId),
+      });
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }

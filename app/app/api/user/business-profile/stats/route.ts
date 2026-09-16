@@ -35,6 +35,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(stats ?? EMPTY_BUSINESS_PROFILE_STATS);
   } catch (error) {
     console.error('[BusinessProfile stats GET]', error);
-    return NextResponse.json({ error: 'Failed to fetch business stats' }, { status: 500 });
+    return NextResponse.json(EMPTY_BUSINESS_PROFILE_STATS);
   }
 }
