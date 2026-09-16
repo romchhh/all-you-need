@@ -37,7 +37,7 @@ import {
   type BusinessListingTab,
   type BusinessProfileData,
 } from '@/components/business/BusinessOwnerProfileView';
-import { EMPTY_BUSINESS_PROFILE_STATS } from '@/lib/businessProfileHelpers';
+import { EMPTY_BUSINESS_PROFILE_STATS } from '@/lib/businessProfileConstants';
 
 const EditListingModal = dynamic(
   () => import('@/components/modals/EditListingModal').then((m) => ({ default: m.EditListingModal })),

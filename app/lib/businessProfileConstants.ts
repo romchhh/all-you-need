@@ -36,3 +36,27 @@ export const BUSINESS_PLAN_MONTHLY_CREDITS: Record<
   business: { highlight: 2, top: 0 },
   business_pro: { highlight: 5, top: 2 },
 };
+
+export type BusinessProfileStatsPayload = {
+  followersCount: number;
+  profileViews: number;
+  listingViews: number;
+  contactClicks: number;
+  activeListings: number;
+  totalListings: number;
+  pendingListings: number;
+  inactiveListings: number;
+  favoritesTotal: number;
+};
+
+export const EMPTY_BUSINESS_PROFILE_STATS: BusinessProfileStatsPayload = {
+  followersCount: 0,
+  profileViews: 0,
+  listingViews: 0,
+  contactClicks: 0,
+  activeListings: 0,
+  totalListings: 0,
+  pendingListings: 0,
+  inactiveListings: 0,
+  favoritesTotal: 0,
+};

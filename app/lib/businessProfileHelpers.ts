@@ -6,6 +6,7 @@ import {
   BUSINESS_PLAN_MONTHLY_CREDITS,
   BUSINESS_SUBSCRIPTION_DAYS,
   type BusinessPlanId,
+  type BusinessProfileStatsPayload,
 } from '@/lib/businessProfileConstants';
 import type { PaymentMethod } from '@/lib/payments/paymentConstants';
 
@@ -522,29 +523,7 @@ export async function consumeBusinessPromotionCredit(
   return true;
 }
 
-export type BusinessProfileStatsPayload = {
-  followersCount: number;
-  profileViews: number;
-  listingViews: number;
-  contactClicks: number;
-  activeListings: number;
-  totalListings: number;
-  pendingListings: number;
-  inactiveListings: number;
-  favoritesTotal: number;
-};
-
-export const EMPTY_BUSINESS_PROFILE_STATS: BusinessProfileStatsPayload = {
-  followersCount: 0,
-  profileViews: 0,
-  listingViews: 0,
-  contactClicks: 0,
-  activeListings: 0,
-  totalListings: 0,
-  pendingListings: 0,
-  inactiveListings: 0,
-  favoritesTotal: 0,
-};
+export type { BusinessProfileStatsPayload };
 
 export async function getBusinessProfileStatsForUserId(
   userId: number

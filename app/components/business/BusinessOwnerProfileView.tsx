@@ -22,7 +22,7 @@ import {
   BUSINESS_PLAN_MONTHLY_CREDITS,
   type BusinessPlanId,
 } from '@/lib/businessProfileConstants';
-import type { BusinessProfileStatsPayload } from '@/lib/businessProfileHelpers';
+import type { BusinessProfileStatsPayload } from '@/lib/businessProfileConstants';
 import type { ProfileViewMode } from '@/components/business/ProfileModeSwitcher';
 
 export type BusinessListingTab = 'active' | 'moderation' | 'inactive';

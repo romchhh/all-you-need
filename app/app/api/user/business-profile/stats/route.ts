@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
+import { EMPTY_BUSINESS_PROFILE_STATS } from '@/lib/businessProfileConstants';
 import {
-  EMPTY_BUSINESS_PROFILE_STATS,
   expireBusinessProfileIfNeeded,
   getBusinessProfileStatsForUserId,
   isBusinessProfileActive,
