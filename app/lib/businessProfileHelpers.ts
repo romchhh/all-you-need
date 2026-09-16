@@ -534,6 +534,18 @@ export type BusinessProfileStatsPayload = {
   favoritesTotal: number;
 };
 
+export const EMPTY_BUSINESS_PROFILE_STATS: BusinessProfileStatsPayload = {
+  followersCount: 0,
+  profileViews: 0,
+  listingViews: 0,
+  contactClicks: 0,
+  activeListings: 0,
+  totalListings: 0,
+  pendingListings: 0,
+  inactiveListings: 0,
+  favoritesTotal: 0,
+};
+
 export async function getBusinessProfileStatsForUserId(
   userId: number
 ): Promise<BusinessProfileStatsPayload | null> {

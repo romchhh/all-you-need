@@ -240,6 +240,9 @@ export function BusinessOwnerProfileView({
             <span className={`mb-2 inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${limeBg} text-[#1a1a1a]`}>
               BUSINESS{isPro ? ' PRO' : ''}
             </span>
+            {businessProfile.city ? (
+              <p className={`mb-1 text-sm ${ac.mutedText}`}>{businessProfile.city}</p>
+            ) : null}
             {showRating && (
               <div className={`mb-1 flex items-center gap-1 text-sm ${ac.mutedText}`}>
                 <Star size={14} className="fill-amber-400 text-amber-400" />
@@ -254,6 +257,12 @@ export function BusinessOwnerProfileView({
             </div>
           </div>
         </div>
+
+        {businessProfile.description ? (
+          <p className={`mb-4 line-clamp-4 text-sm leading-relaxed ${ac.mutedText}`}>
+            {businessProfile.description}
+          </p>
+        ) : null}
 
         <div className="flex gap-2">
           <button

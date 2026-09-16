@@ -37,6 +37,7 @@ import {
   type BusinessListingTab,
   type BusinessProfileData,
 } from '@/components/business/BusinessOwnerProfileView';
+import { EMPTY_BUSINESS_PROFILE_STATS } from '@/lib/businessProfileHelpers';
 
 const EditListingModal = dynamic(
   () => import('@/components/modals/EditListingModal').then((m) => ({ default: m.EditListingModal })),
@@ -831,17 +832,21 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   return (
     <>
     <div className="min-h-screen pb-24">
-      {isBusinessView && businessProfile && businessStats ? (
+      {isBusinessView ? (
+        businessProfile ? (
         <BusinessOwnerProfileView
           personalName={displayName}
           personalAvatar={profile.avatar}
           businessProfile={businessProfile}
-          businessStats={businessStats}
+          businessStats={businessStats ?? EMPTY_BUSINESS_PROFILE_STATS}
           rating={profile.rating || 0}
           reviewsCount={profile.reviewsCount || 0}
           profileViewMode={profileViewMode}
           onProfileModeChange={(mode) => {
             setProfileViewMode(mode);
+            if (mode === 'business') {
+              void fetchBusinessStats();
+            }
             tg?.HapticFeedback.impactOccurred('light');
           }}
           listingTab={businessListingTab}
@@ -855,6 +860,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           hasMoreListings={hasMore && userListings.length > 0 && userListings.length < totalListings}
           onLoadMore={loadMoreListings}
         />
+        ) : (
+          <div className="px-4 py-16 text-center">
+            <p className={ac.mutedText}>{t('common.loading')}</p>
+          </div>
+        )
       ) : (
       <>
       {/* Профіль хедер */}
@@ -968,6 +978,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           mode={profileViewMode}
           onChange={(mode) => {
             setProfileViewMode(mode);
+            if (mode === 'business') {
+              void fetchBusinessStats();
+            }
             tg?.HapticFeedback.impactOccurred('light');
           }}
           hasBusinessProfile={isBusinessActive}
