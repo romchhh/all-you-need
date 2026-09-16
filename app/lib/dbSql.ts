@@ -538,8 +538,8 @@ export async function rawQuery<T>(
   sql: string,
   params: unknown[] = []
 ): Promise<T> {
-  const { sql: q, params: p } = toPgParams(sql, params);
-  return prisma.$queryRawUnsafe(q, ...p);
+  // prisma.$queryRawUnsafe is already patched with toPgParams in lib/prisma.ts
+  return prisma.$queryRawUnsafe(sql, ...params);
 }
 
 export async function rawExecute(
@@ -547,6 +547,5 @@ export async function rawExecute(
   sql: string,
   params: unknown[] = []
 ): Promise<number> {
-  const { sql: q, params: p } = toPgParams(sql, params);
-  return prisma.$executeRawUnsafe(q, ...p);
+  return prisma.$executeRawUnsafe(sql, ...params);
 }

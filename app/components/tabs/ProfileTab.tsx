@@ -1645,6 +1645,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           }}
           listingId={selectedListingForReactivation}
           tg={tg}
+          telegramId={profile?.telegramId}
           onSuccess={async () => {
             showToast(t('editListing.listingReactivated'), 'success');
             tg?.HapticFeedback.notificationOccurred('success');

@@ -494,28 +494,10 @@ export function SearchView({
   useEffect(() => {
     if (screenMode !== 'discover') return;
     const trimmed = debouncedQuery.trim();
-    if (trimmed.length >= MIN_QUERY_LENGTH) {
-      onQueryChangeRef.current?.(trimmed);
-      return;
-    }
     if (trimmed.length === 0) {
       onQueryChangeRef.current?.('');
     }
   }, [debouncedQuery, screenMode]);
-
-  // Під час набору на головній сторінці пошуку — одразу екран результатів (без проміжного discover)
-  useEffect(() => {
-    if (screenMode !== 'discover') return;
-    if (suppressAutoResultsRef.current) return;
-
-    const trimmed = debouncedQuery.trim();
-    if (trimmed.length < MIN_QUERY_LENGTH) return;
-
-    setScreenMode('results');
-    onQueryChangeRef.current?.(trimmed);
-    lastFetchKeyRef.current = '';
-    void fetchSearchResults(trimmed, { saveHistory: true, force: true });
-  }, [debouncedQuery, screenMode, fetchSearchResults]);
 
   const activeQueryRef = useRef(activeQuery);
   activeQueryRef.current = activeQuery;
@@ -679,7 +661,7 @@ export function SearchView({
 
   const stickySearchBg = isLight
     ? 'border-b border-[#3F5331]/10 bg-[#f5f7f2]/95 backdrop-blur-md'
-    : 'border-b border-white/10 bg-[var(--tg-theme-bg-color,#111111)]/95 backdrop-blur-md';
+    : 'border-b border-white/10 bg-black/90 backdrop-blur-md';
 
   const catalogListingsProps = {
     favorites,
@@ -883,20 +865,7 @@ export function SearchView({
         placeholder={searchPlaceholder || t('bazaar.whatInterestsYou')}
         value={localQuery}
         onChange={(e) => {
-          suppressAutoResultsRef.current = false;
-          const next = e.target.value;
-          setLocalQuery(next);
-          const trimmed = next.trim();
-          if (trimmed.length >= MIN_QUERY_LENGTH && screenMode === 'discover') {
-            setScreenMode('results');
-            onQueryChangeRef.current?.(trimmed);
-            setLoadingResults(true);
-          }
-        }}
-        onFocus={() => {
-          if (screenMode === 'results') {
-            openMainSearchPage();
-          }
+          setLocalQuery(e.target.value);
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {

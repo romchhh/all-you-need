@@ -22,6 +22,19 @@ interface User {
   activeListingsCount: number;
 }
 
+function formatAdminDateTime(value: string | null | undefined): string {
+  if (!value) return 'Ніколи';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Ніколи';
+  return date.toLocaleString('uk-UA', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function AdminUsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
@@ -227,8 +240,8 @@ export default function AdminUsersPage() {
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider whitespace-nowrap min-w-[130px]">
                   Дата реєстрації
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider whitespace-nowrap min-w-[140px]">
-                  Остання активність
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider whitespace-nowrap min-w-[160px]">
+                  Останній захід
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider whitespace-nowrap min-w-[120px] sticky right-0 bg-gray-50 z-20 border-l border-gray-200">
                   Дії
@@ -287,10 +300,8 @@ export default function AdminUsersPage() {
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 min-w-[130px]">
                     {new Date(user.createdAt).toLocaleDateString('uk-UA')}
                   </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 min-w-[140px]">
-                    {user.lastActiveAt
-                      ? new Date(user.lastActiveAt).toLocaleDateString('uk-UA')
-                      : 'Ніколи'}
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 min-w-[160px]">
+                    {formatAdminDateTime(user.lastActiveAt)}
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm font-medium min-w-[120px] sticky right-0 bg-white z-10 border-l border-gray-200">
                     <button
@@ -356,7 +367,7 @@ export default function AdminUsersPage() {
                 <span className="font-medium">Реєстрація:</span> {new Date(user.createdAt).toLocaleDateString('uk-UA')}
               </div>
               <div>
-                <span className="font-medium">Активність:</span> {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleDateString('uk-UA') : 'Ніколи'}
+                <span className="font-medium">Захід:</span> {formatAdminDateTime(user.lastActiveAt)}
               </div>
             </div>
             <div className="pt-2 border-t border-gray-200">

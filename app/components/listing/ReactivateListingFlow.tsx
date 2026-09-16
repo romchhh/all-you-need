@@ -18,6 +18,7 @@ interface ReactivateListingFlowProps {
   onClose: () => void;
   listingId: number;
   tg: TelegramWebApp | null;
+  telegramId?: string | null;
   onSuccess?: () => void;
 }
 
@@ -29,7 +30,7 @@ interface UserStatus {
   paidListingsEnabled: boolean;
 }
 
-export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, onSuccess }: ReactivateListingFlowProps) {
+export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, telegramId, onSuccess }: ReactivateListingFlowProps) {
   useBodyScrollLock(isOpen);
   const { t } = useLanguage();
   const { showToast } = useToast();
@@ -43,7 +44,7 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
 
   // Хелпер для отримання telegramId з різних джерел
   const getTelegramId = (): string | null => {
-    return resolvePaymentTelegramId(tg, null);
+    return resolvePaymentTelegramId(tg, telegramId || null);
   };
 
   // Блокуємо скрол при відкритті модального вікна
@@ -66,6 +67,8 @@ export default function ReactivateListingFlow({ isOpen, onClose, listingId, tg, 
 
       if (!telegramId) {
         console.error('[ReactivateListingFlow] No telegramId available');
+        showToast(t('common.error'), 'error');
+        onClose();
         return false;
       }
 

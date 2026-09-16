@@ -846,58 +846,35 @@ export async function ensureUserSessionTable(): Promise<void> {
 export async function updateUserActivity(telegramId: string | number): Promise<void> {
   try {
     await ensureUserSessionTable();
-    
+
     const telegramIdNum = typeof telegramId === 'string' ? parseInt(telegramId, 10) : telegramId;
-    // Використовуємо поточний час в форматі, сумісному з SQLite DATETIME
-    const currentTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    
-    // Знаходимо користувача
-    const users = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-    );
-    
-    if (!users[0]) {
-      return; // Користувач не знайдений
-    }
-    
-    const userId = users[0].id;
-    
-    // Перевіряємо чи існує запис в UserSession
-    const sessions = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM UserSession WHERE userId = ? AND telegramId = ?`,
-        userId,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-    );
-    
-    if (sessions[0]) {
-      // Оновлюємо існуючий запис
-      await executeWithRetry(() =>
-        prisma.$executeRawUnsafe(
-          `UPDATE UserSession SET lastActiveAt = ? WHERE userId = ? AND telegramId = ?`,
-          currentTime,
-          userId,
+    if (!Number.isFinite(telegramIdNum)) return;
+
+    const users = await executeWithRetry(
+      () =>
+        prisma.$queryRawUnsafe(
+          `SELECT id FROM User WHERE telegramId = ?`,
           telegramIdNum
-        )
-      );
-    } else {
-      // Створюємо новий запис
-      await executeWithRetry(() =>
-        prisma.$executeRawUnsafe(
-          `INSERT INTO UserSession (userId, telegramId, lastActiveAt, createdAt) VALUES (?, ?, ?, ?)`,
-          userId,
-          telegramIdNum,
-          currentTime,
-          currentTime
-        )
-      );
+        ) as Promise<Array<{ id: number }>>
+    );
+
+    if (!users[0]) {
+      return;
     }
+
+    const now = new Date();
+    await executeWithRetry(() =>
+      prisma.$executeRawUnsafe(
+        `INSERT INTO UserSession (userId, telegramId, lastActiveAt, createdAt)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(userId, telegramId) DO UPDATE SET lastActiveAt = excluded.lastActiveAt`,
+        users[0].id,
+        telegramIdNum,
+        now,
+        now
+      )
+    );
   } catch (error: any) {
-    // Тиха обробка помилок - не блокуємо додаток
     if (process.env.NODE_ENV === 'development') {
       console.log('Note: Could not update user activity:', error.message);
     }

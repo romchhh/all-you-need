@@ -24,7 +24,7 @@ export async function GET(
       prisma.$queryRawUnsafe(
         `SELECT 
           u.id,
-          CAST(u.telegramId AS INTEGER) as telegramId,
+          u.telegramId as telegramId,
           u.username,
           u.firstName,
           u.lastName,
@@ -36,7 +36,7 @@ export async function GET(
           u.isActive,
           u.createdAt,
           u.updatedAt,
-          us.lastActiveAt,
+          (SELECT MAX(us2.lastActiveAt) FROM UserSession us2 WHERE us2.userId = u.id) as lastActiveAt,
           (SELECT COUNT(*) FROM Listing WHERE userId = u.id) as listingsCount,
           (SELECT COUNT(*) FROM Listing WHERE userId = u.id AND status = 'active') as activeListingsCount,
           (SELECT COUNT(*) FROM Listing WHERE userId = u.id AND status = 'pending') as pendingListingsCount,
@@ -44,9 +44,7 @@ export async function GET(
           (SELECT SUM(views) FROM Listing WHERE userId = u.id) as totalViews,
           (SELECT COUNT(*) FROM Favorite WHERE userId = u.id) as favoritesCount
         FROM User u
-        LEFT JOIN UserSession us ON u.id = us.userId
-        WHERE u.id = ?
-        GROUP BY u.id`,
+        WHERE u.id = ?`,
         userId
       ) as Promise<Array<any>>
     ).catch(() => {
@@ -55,7 +53,7 @@ export async function GET(
         prisma.$queryRawUnsafe(
           `SELECT 
             u.id,
-            CAST(u.telegramId AS INTEGER) as telegramId,
+            u.telegramId as telegramId,
             u.username,
             u.firstName,
             u.lastName,

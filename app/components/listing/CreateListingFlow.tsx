@@ -21,6 +21,7 @@ interface CreateListingFlowProps {
   isOpen: boolean;
   onClose: () => void;
   tg: TelegramWebApp | null;
+  telegramId?: string | null;
   onSuccess?: () => void;
 }
 
@@ -32,7 +33,7 @@ interface UserStatus {
   paidListingsEnabled: boolean;
 }
 
-export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: CreateListingFlowProps) {
+export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onSuccess }: CreateListingFlowProps) {
   const { t } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
   const [step, setStep] = useState<Step>('create_listing');
@@ -51,7 +52,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, onSuccess }: Cr
 
   // Хелпер для отримання telegramId з різних джерел
   const getTelegramId = (): string | null => {
-    return resolvePaymentTelegramId(tg, null);
+    return resolvePaymentTelegramId(tg, telegramId || null);
   };
 
   // Блокуємо скрол при відкритті модального вікна

@@ -67,6 +67,19 @@ export default function AdminUserDetailPage() {
   const grantDraft = (listingId: number) =>
     grantForm[listingId] ?? { type: 'highlighted', days: 7 };
 
+  const formatAdminDateTime = (value: string | null | undefined) => {
+    if (!value) return 'Ніколи';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Ніколи';
+    return date.toLocaleString('uk-UA', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   const formatListingPromo = (listing: User['recentListings'][number]) => {
     if (!listing.promotionType) return '—';
     const ends = listing.promotionEnds ? new Date(listing.promotionEnds) : null;
@@ -343,8 +356,8 @@ export default function AdminUserDetailPage() {
           value={user.isActive ? 'Активний' : 'Заблокований'}
         />
         <StatCard
-          title="Остання активність"
-          value={user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleDateString('uk-UA') : 'Ніколи'}
+          title="Останній захід"
+          value={formatAdminDateTime(user.lastActiveAt)}
         />
       </div>
 

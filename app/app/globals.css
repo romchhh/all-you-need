@@ -99,11 +99,10 @@ body {
   min-height: var(--tg-viewport-height, 100dvh);
 }
 
-/* Мобільні: трохи більший відступ від верху (safe area + додатковий зазор) — усі сторінки, крім адмінки */
+/* Мобільні: відступ під логотип дає FixedLogoHeader spacer, без додаткового padding-top */
 @media (max-width: 1023px) {
   body:not(.admin-panel) {
-    /* Менший зазор під фіксований логотип — контент ближче до шапки */
-    padding-top: calc(env(safe-area-inset-top, 0px) + 1.125rem);
+    padding-top: 0;
   }
 }
 

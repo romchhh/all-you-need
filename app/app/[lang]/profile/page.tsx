@@ -671,6 +671,7 @@ const ProfilePage = () => {
             showToast(t('createListing.listingCreated'), 'success');
           }}
           tg={tg}
+          telegramId={profile.telegramId}
         />
       )}
 

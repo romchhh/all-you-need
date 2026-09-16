@@ -56,13 +56,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Фільтр по даті останньої активності (з UserSession)
+    const lastActiveExpr = `(SELECT MAX(us2.lastActiveAt) FROM UserSession us2 WHERE us2.userId = u.id)`;
     if (activeFrom || activeTo) {
       if (activeFrom) {
-        whereClause += ' AND COALESCE(us.lastActiveAt, u.createdAt) >= ?';
+        whereClause += ` AND COALESCE(${lastActiveExpr}, u.createdAt) >= ?`;
         params.push(new Date(activeFrom).toISOString());
       }
       if (activeTo) {
-        whereClause += ' AND COALESCE(us.lastActiveAt, u.createdAt) <= ?';
+        whereClause += ` AND COALESCE(${lastActiveExpr}, u.createdAt) <= ?`;
         params.push(new Date(activeTo).toISOString());
       }
     }
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
     const usersQuery = `
       SELECT 
         u.id,
-        CAST(u.telegramId AS INTEGER) as telegramId,
+        u.telegramId as telegramId,
         u.username,
         u.firstName,
         u.lastName,
@@ -81,42 +82,65 @@ export async function GET(request: NextRequest) {
         u.isActive,
         u.createdAt,
         u.updatedAt,
-        us.lastActiveAt,
+        ${lastActiveExpr} as lastActiveAt,
         (SELECT COUNT(*) FROM Listing WHERE userId = u.id) as listingsCount,
         (SELECT COUNT(*) FROM Listing WHERE userId = u.id AND status = 'active') as activeListingsCount
       FROM User u
-      LEFT JOIN UserSession us ON u.id = us.userId
       ${whereClause}
-      GROUP BY u.id
-      ORDER BY COALESCE(us.lastActiveAt, u.createdAt) DESC
+      ORDER BY COALESCE(${lastActiveExpr}, u.createdAt) DESC
       LIMIT ? OFFSET ?
     `;
 
     const countQuery = `
-      SELECT COUNT(DISTINCT u.id) as count
+      SELECT COUNT(*) as count
       FROM User u
-      LEFT JOIN UserSession us ON u.id = us.userId
       ${whereClause}
+    `;
+
+    const fallbackUsersQuery = `
+      SELECT 
+        u.id,
+        u.telegramId as telegramId,
+        u.username,
+        u.firstName,
+        u.lastName,
+        u.avatar,
+        u.balance,
+        u.rating,
+        u.reviewsCount,
+        u.isActive,
+        u.createdAt,
+        u.updatedAt,
+        NULL as lastActiveAt,
+        (SELECT COUNT(*) FROM Listing WHERE userId = u.id) as listingsCount,
+        (SELECT COUNT(*) FROM Listing WHERE userId = u.id AND status = 'active') as activeListingsCount
+      FROM User u
+      ${whereClause.replaceAll(lastActiveExpr, 'u.createdAt')}
+      ORDER BY u.createdAt DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const fallbackCountQuery = `
+      SELECT COUNT(*) as count
+      FROM User u
+      ${whereClause.replaceAll(lastActiveExpr, 'u.createdAt')}
     `;
 
     const [usersData, totalCountData] = await Promise.all([
       executeWithRetry(() =>
         prisma.$queryRawUnsafe(usersQuery, ...params, limit, offset) as Promise<any[]>
-      ).catch(() => {
-        // Якщо таблиця UserSession не існує, виконуємо без неї
-        const simpleUsersQuery = usersQuery.replace('LEFT JOIN UserSession us ON u.id = us.userId', '').replace('COALESCE(us.lastActiveAt, u.createdAt)', 'u.createdAt').replace('us.lastActiveAt,', '').replace('GROUP BY u.id', '');
-        return executeWithRetry(() =>
-          prisma.$queryRawUnsafe(simpleUsersQuery, ...params, limit, offset) as Promise<any[]>
-        );
-      }),
+      ).catch(() =>
+        executeWithRetry(() =>
+          prisma.$queryRawUnsafe(fallbackUsersQuery, ...params, limit, offset) as Promise<any[]>
+        )
+      ),
       executeWithRetry(() =>
         prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>
-      ).catch(() => {
-        const simpleCountQuery = countQuery.replace('LEFT JOIN UserSession us ON u.id = us.userId', '');
-        return executeWithRetry(() =>
-          prisma.$queryRawUnsafe(simpleCountQuery, ...params) as Promise<Array<{ count: bigint }>>
-        );
-      }),
+      ).catch(() =>
+        executeWithRetry(() =>
+          prisma.$queryRawUnsafe(fallbackCountQuery, ...params) as Promise<Array<{ count: bigint }>>
+        )
+      ),
     ]);
 
     const formattedUsers = usersData.map((user: any) => ({
