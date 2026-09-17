@@ -1262,7 +1262,43 @@
       "listingViews": "Перегляди оголошень",
       "contacts": "Звернення",
       "activeListings": "Активні",
-      "totalListings": "Усього оголошень"
+      "totalListings": "Усього оголошень",
+      "periodDays": "{days} днів",
+      "chartTitle": "Перегляди оголошень",
+      "tip": "Регулярно оновлюйте оголошення та додавайте фото — це допомагає отримувати більше переглядів."
+    },
+    "subscription": {
+      "title": "Керування підпискою",
+      "currentPlan": "Поточний тариф",
+      "active": "Активна",
+      "renewsOn": "Наступне продовження {date}",
+      "perkRenewal": "Оновлення {date}",
+      "discountLabel": "Знижка",
+      "changePlan": "Змінити тариф",
+      "paymentMethod": "Спосіб оплати",
+      "paymentMethodHint": "Оплата через Telegram / баланс TradeGround",
+      "paymentHistory": "Історія платежів",
+      "cancel": "Скасувати підписку"
+    },
+    "analytics": {
+      "proTitle": "Business PRO аналітика",
+      "funnelTitle": "Воронка конверсії",
+      "trafficTitle": "Джерела трафіку",
+      "impressions": "Покази оголошень",
+      "listingViews": "Перегляди оголошень",
+      "profileViews": "Перегляди профілю",
+      "inquiries": "Звернення",
+      "sourceMain": "Головна",
+      "sourceCategory": "Категорії",
+      "sourceSearch": "Пошук",
+      "sourceSimilar": "Схожі",
+      "sourceProfile": "Профіль",
+      "sourceOther": "Інше",
+      "tab": {
+        "overview": "Огляд",
+        "listings": "Оголошення",
+        "promotion": "Просування"
+      }
     },
     "owner": {
       "viewProfile": "Переглянути профіль",

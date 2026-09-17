@@ -1260,7 +1260,43 @@
       "listingViews": "Просмотры объявлений",
       "contacts": "Обращения",
       "activeListings": "Активные",
-      "totalListings": "Всего объявлений"
+      "totalListings": "Всего объявлений",
+      "periodDays": "{days} дней",
+      "chartTitle": "Просмотры объявлений",
+      "tip": "Регулярно обновляйте объявления и добавляйте фото — это помогает получать больше просмотров."
+    },
+    "subscription": {
+      "title": "Управление подпиской",
+      "currentPlan": "Текущий тариф",
+      "active": "Активна",
+      "renewsOn": "Следующее продление {date}",
+      "perkRenewal": "Обновление {date}",
+      "discountLabel": "Скидка",
+      "changePlan": "Сменить тариф",
+      "paymentMethod": "Способ оплаты",
+      "paymentMethodHint": "Оплата через Telegram / баланс TradeGround",
+      "paymentHistory": "История платежей",
+      "cancel": "Отменить подписку"
+    },
+    "analytics": {
+      "proTitle": "Business PRO аналитика",
+      "funnelTitle": "Воронка конверсии",
+      "trafficTitle": "Источники трафика",
+      "impressions": "Показы объявлений",
+      "listingViews": "Просмотры объявлений",
+      "profileViews": "Просмотры профиля",
+      "inquiries": "Обращения",
+      "sourceMain": "Главная",
+      "sourceCategory": "Категории",
+      "sourceSearch": "Поиск",
+      "sourceSimilar": "Похожие",
+      "sourceProfile": "Профиль",
+      "sourceOther": "Другое",
+      "tab": {
+        "overview": "Обзор",
+        "listings": "Объявления",
+        "promotion": "Продвижение"
+      }
     },
     "owner": {
       "viewProfile": "Посмотреть профиль",

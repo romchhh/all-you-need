@@ -5,9 +5,11 @@ import {
   BadgeCheck,
   ChevronDown,
   ChevronRight,
-  Clover,
+  Crown,
+  Eye,
   Heart,
   MessageCircle,
+  Percent,
   Rocket,
   Settings2,
   Star,
@@ -24,6 +26,7 @@ import {
 } from '@/lib/businessProfileConstants';
 import type { BusinessProfileStatsPayload } from '@/lib/businessProfileConstants';
 import type { ProfileViewMode } from '@/components/business/ProfileModeSwitcher';
+import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
 
 export type BusinessListingTab = 'active' | 'moderation' | 'inactive';
 
@@ -65,6 +68,7 @@ interface BusinessOwnerProfileViewProps {
   onPreviewProfile: () => void;
   onEditBusiness: () => void;
   onManageSubscription: () => void;
+  onViewAllStats?: () => void;
   onPromoteListings: () => void;
   onCreateListing?: () => void;
   renderListings: () => ReactNode;
@@ -112,6 +116,7 @@ export function BusinessOwnerProfileView({
   onPreviewProfile,
   onEditBusiness,
   onManageSubscription,
+  onViewAllStats,
   onPromoteListings,
   onCreateListing,
   renderListings,
@@ -121,6 +126,7 @@ export function BusinessOwnerProfileView({
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
+  const ui = getBusinessProfileUi(isLight);
 
   const logoUrl = businessProfile.logo ? getResolvedImageUrl(businessProfile.logo) : null;
   const personalAvatarUrl = personalAvatar ? getResolvedImageUrl(personalAvatar) : null;
@@ -132,19 +138,11 @@ export function BusinessOwnerProfileView({
   const promoDiscount = isPro ? 20 : 10;
   const showRating = reviewsCount > 0 && rating > 0;
 
-  const cardShell = isLight
-    ? 'rounded-2xl border border-[#3F5331]/12 bg-white'
-    : 'rounded-2xl border border-[#C8E6A0]/15 bg-[#141414]';
-  const limeBorder = isLight ? 'border-[#3F5331]/35' : 'border-[#C8E6A0]/35';
-  const limeText = isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]';
-  const limeBg = isLight ? 'bg-[#C8E6A0]' : 'bg-[#C8E6A0]';
-  const limeBgSoft = isLight ? 'bg-[#C8E6A0]/20' : 'bg-[#C8E6A0]/10';
-
   const kpiItems = [
-    { key: 'kpiViews', value: businessStats.listingViews + businessStats.profileViews },
-    { key: 'kpiInquiries', value: businessStats.contactClicks },
-    { key: 'kpiFavorites', value: businessStats.favoritesTotal },
-    { key: 'kpiReviews', value: 0 },
+    { key: 'kpiViews', value: businessStats.listingViews + businessStats.profileViews, icon: Eye },
+    { key: 'kpiInquiries', value: businessStats.contactClicks, icon: MessageCircle },
+    { key: 'kpiFavorites', value: businessStats.favoritesTotal, icon: Heart },
+    { key: 'kpiReviews', value: 0, icon: Star },
   ] as const;
 
   const listingTabs: Array<{ id: BusinessListingTab; label: string; count: number }> = [
@@ -154,7 +152,7 @@ export function BusinessOwnerProfileView({
   ];
 
   return (
-    <div className="px-4 pb-4 space-y-4">
+    <div className="space-y-4 px-4 pb-4">
       {/* Profile switcher */}
       <div
         className={`flex items-center gap-2 rounded-2xl p-1.5 ${
@@ -166,7 +164,7 @@ export function BusinessOwnerProfileView({
           onClick={() => onProfileModeChange('personal')}
           className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors ${
             profileViewMode === 'personal'
-              ? `${limeBg} text-[#1a1a1a] shadow-sm`
+              ? `${ui.tabActive} shadow-sm`
               : isLight
                 ? 'text-gray-700 hover:bg-white/70'
                 : 'text-white/75 hover:bg-white/10'
@@ -185,7 +183,11 @@ export function BusinessOwnerProfileView({
           </div>
           <span className="truncate text-xs font-semibold">
             {personalName}
-            <span className={`block text-[10px] font-medium ${profileViewMode === 'personal' ? 'text-[#1a1a1a]/70' : ac.mutedText}`}>
+            <span
+              className={`block text-[10px] font-medium ${
+                profileViewMode === 'personal' ? 'text-[#1a1a1a]/70' : ac.mutedText
+              }`}
+            >
               {t('businessProfile.switcher.personal')}
             </span>
           </span>
@@ -196,7 +198,7 @@ export function BusinessOwnerProfileView({
           onClick={() => onProfileModeChange('business')}
           className={`flex min-w-0 flex-[1.15] items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors ${
             profileViewMode === 'business'
-              ? `${limeBg} text-[#1a1a1a] shadow-sm`
+              ? `${ui.tabActive} shadow-sm`
               : isLight
                 ? 'text-gray-700 hover:bg-white/70'
                 : 'text-white/75 hover:bg-white/10'
@@ -217,7 +219,7 @@ export function BusinessOwnerProfileView({
       </div>
 
       {/* Identity */}
-      <div className={`${cardShell} p-4`}>
+      <div className={`${ui.cardShell} p-4`}>
         <div className="mb-4 flex items-start gap-4">
           <div
             className={`h-24 w-24 shrink-0 overflow-hidden rounded-full border-2 ${
@@ -237,7 +239,7 @@ export function BusinessOwnerProfileView({
               <h2 className={`truncate text-xl font-bold ${ac.pageHeading}`}>{businessProfile.businessName}</h2>
               <BadgeCheck size={18} className="shrink-0 text-emerald-400" />
             </div>
-            <span className={`mb-2 inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${limeBg} text-[#1a1a1a]`}>
+            <span className={`mb-2 inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${ui.limeBg} text-[#1a1a1a]`}>
               BUSINESS{isPro ? ' PRO' : ''}
             </span>
             {businessProfile.city ? (
@@ -265,23 +267,15 @@ export function BusinessOwnerProfileView({
         ) : null}
 
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onPreviewProfile}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${limeBorder} ${limeText} ${
-              isLight ? 'hover:bg-[#E8F0E0]/70' : 'hover:bg-[#C8E6A0]/10'
-            }`}
-          >
-            <MessageCircle size={18} />
+          <button type="button" onClick={onPreviewProfile} className={`${ui.btnOutline} flex-1`}>
+            <Eye size={18} />
             {t('businessProfile.owner.viewProfile')}
           </button>
           <button
             type="button"
             onClick={onEditBusiness}
             aria-label={t('businessProfile.editTitle')}
-            className={`flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-2xl border transition-colors ${limeBorder} ${limeText} ${
-              isLight ? 'hover:bg-[#E8F0E0]/70' : 'hover:bg-[#C8E6A0]/10'
-            }`}
+            className={ui.btnIconOutline}
           >
             <Settings2 size={20} />
           </button>
@@ -290,21 +284,16 @@ export function BusinessOwnerProfileView({
 
       {/* Subscription */}
       {businessProfile.subscriptionEndsAt && (
-        <div className={`${cardShell} border-2 ${limeBorder} p-4`}>
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <p className={`text-sm font-medium leading-snug ${ac.pageHeading}`}>
-              {t('businessProfile.owner.subscriptionActiveUntil', {
-                date: formatSubscriptionDate(businessProfile.subscriptionEndsAt, language),
-              })}
-            </p>
-            <button
-              type="button"
-              onClick={onManageSubscription}
-              className={`shrink-0 text-sm font-semibold ${limeText}`}
-            >
-              {t('businessProfile.owner.manage')} →
-            </button>
-          </div>
+        <div className={`${ui.cardShell} border-2 ${ui.limeBorder} p-4`}>
+          <p className={`mb-3 text-sm font-medium leading-snug ${ac.pageHeading}`}>
+            {t('businessProfile.owner.subscriptionActiveUntil', {
+              date: formatSubscriptionDate(businessProfile.subscriptionEndsAt, language),
+            })}
+          </p>
+          <button type="button" onClick={onManageSubscription} className={`${ui.btnSolidSm} mb-3`}>
+            {t('businessProfile.owner.manage')}
+            <ChevronRight size={16} />
+          </button>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <div className={`rounded-xl px-3 py-2.5 ${isLight ? 'bg-gray-50' : 'bg-white/[0.05]'}`}>
               <div className={`mb-1 flex items-center gap-1 text-xs ${ac.mutedText}`}>
@@ -317,7 +306,7 @@ export function BusinessOwnerProfileView({
             </div>
             <div className={`rounded-xl px-3 py-2.5 ${isLight ? 'bg-gray-50' : 'bg-white/[0.05]'}`}>
               <div className={`mb-1 flex items-center gap-1 text-xs ${ac.mutedText}`}>
-                <Rocket size={14} />
+                <Crown size={14} />
                 {t('businessProfile.owner.topSlots')}
               </div>
               <p className={`text-lg font-bold tabular-nums ${ac.pageHeading}`}>
@@ -325,25 +314,29 @@ export function BusinessOwnerProfileView({
               </p>
             </div>
           </div>
-          <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${limeBgSoft} ${limeText}`}>
-            <Clover size={14} className="shrink-0" />
+          <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${ui.limeBgSoft} ${ui.limeText}`}>
+            <Percent size={14} className="shrink-0" />
             <span>{t('businessProfile.owner.promoDiscount', { percent: String(promoDiscount) })}</span>
           </div>
         </div>
       )}
 
       {/* 30-day stats */}
-      <div className={cardShell}>
-        <div className={`flex items-center justify-between border-b px-4 py-3 ${isLight ? 'border-[#3F5331]/10' : 'border-white/10'}`}>
+      <div className={ui.cardShell}>
+        <div className={`flex items-center justify-between border-b px-4 py-3 ${ui.divider}`}>
           <h3 className={`text-sm font-semibold ${ac.pageHeading}`}>{t('businessProfile.owner.results30days')}</h3>
-          <span className={`text-xs font-medium ${limeText}`}>{t('businessProfile.owner.seeAll')} ›</span>
+          {onViewAllStats ? (
+            <button type="button" onClick={onViewAllStats} className={`text-xs font-semibold ${ui.limeText}`}>
+              {t('businessProfile.owner.seeAll')} ›
+            </button>
+          ) : (
+            <span className={`text-xs font-medium ${ui.limeText}`}>{t('businessProfile.owner.seeAll')} ›</span>
+          )}
         </div>
-        <div className="grid grid-cols-4 divide-x">
-          {kpiItems.map(({ key, value }) => (
-            <div
-              key={key}
-              className={`px-1 py-4 text-center ${isLight ? 'divide-[#3F5331]/10' : 'divide-white/10'}`}
-            >
+        <div className={`grid grid-cols-4 divide-x ${ui.divider}`}>
+          {kpiItems.map(({ key, value, icon: Icon }) => (
+            <div key={key} className="px-1 py-4 text-center">
+              <Icon size={16} className={`mx-auto mb-2 ${ui.limeText}`} />
               <div className={`text-lg font-bold tabular-nums leading-none ${ac.pageHeading}`}>
                 {value.toLocaleString(language === 'ru' ? 'ru-RU' : 'uk-UA')}
               </div>
@@ -356,32 +349,24 @@ export function BusinessOwnerProfileView({
       </div>
 
       {/* Listings */}
-      <div className={cardShell}>
-        <div className={`flex items-center justify-between gap-2 border-b px-4 py-3 ${isLight ? 'border-[#3F5331]/10' : 'border-white/10'}`}>
+      <div className={ui.cardShell}>
+        <div className={`flex items-center justify-between gap-2 border-b px-4 py-3 ${ui.divider}`}>
           <h3 className={`text-sm font-semibold ${ac.pageHeading}`}>{t('businessProfile.owner.myListings')}</h3>
           {onCreateListing && (
-            <button
-              type="button"
-              onClick={onCreateListing}
-              className={`text-sm font-semibold ${limeText}`}
-            >
+            <button type="button" onClick={onCreateListing} className={ui.btnOutlineSm}>
               + {t('businessProfile.owner.addListing')}
             </button>
           )}
         </div>
 
-        <div className={`flex gap-1 border-b p-2 ${isLight ? 'border-[#3F5331]/10' : 'border-white/10'}`}>
+        <div className={`flex gap-1 border-b p-2 ${ui.divider}`}>
           {listingTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => onListingTabChange(tab.id)}
               className={`flex-1 rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${
-                listingTab === tab.id
-                  ? `${limeBg} text-[#1a1a1a]`
-                  : isLight
-                    ? 'text-gray-600 hover:bg-gray-100'
-                    : 'text-white/65 hover:bg-white/10'
+                listingTab === tab.id ? ui.tabActive : ui.tabIdle
               }`}
             >
               {tab.label} {tab.count}
@@ -390,13 +375,7 @@ export function BusinessOwnerProfileView({
         </div>
 
         <div className="p-3">
-          <button
-            type="button"
-            onClick={onPromoteListings}
-            className={`mb-3 flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${limeBorder} ${limeText} ${
-              isLight ? 'hover:bg-[#E8F0E0]/70' : 'hover:bg-[#C8E6A0]/10'
-            }`}
-          >
+          <button type="button" onClick={onPromoteListings} className={`${ui.btnSolid} mb-3 w-full`}>
             <Rocket size={18} />
             {t('businessProfile.owner.promoteListings')}
           </button>
@@ -407,7 +386,7 @@ export function BusinessOwnerProfileView({
             <button
               type="button"
               onClick={onLoadMore}
-              className={`mt-3 flex w-full items-center justify-center gap-1 py-2 text-sm font-semibold ${limeText}`}
+              className={`mt-3 flex w-full items-center justify-center gap-1 py-2 text-sm font-semibold ${ui.limeText}`}
             >
               {t('businessProfile.owner.allListings')} →
             </button>

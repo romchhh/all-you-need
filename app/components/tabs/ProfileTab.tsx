@@ -37,6 +37,8 @@ import {
   type BusinessListingTab,
   type BusinessProfileData,
 } from '@/components/business/BusinessOwnerProfileView';
+import { BusinessSubscriptionSheet } from '@/components/business/BusinessSubscriptionSheet';
+import { BusinessStatsSheet } from '@/components/business/BusinessStatsSheet';
 import { EMPTY_BUSINESS_PROFILE_STATS } from '@/lib/businessProfileConstants';
 
 const EditListingModal = dynamic(
@@ -133,6 +135,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     favoritesTotal: number;
   } | null>(null);
   const [businessListingTab, setBusinessListingTab] = useState<BusinessListingTab>('active');
+  const [showBusinessSubscriptionSheet, setShowBusinessSubscriptionSheet] = useState(false);
+  const [showBusinessStatsSheet, setShowBusinessStatsSheet] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -817,6 +821,24 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     tg?.HapticFeedback.impactOccurred('light');
   };
 
+  const openBusinessSubscription = () => {
+    setShowBusinessSubscriptionSheet(true);
+    tg?.HapticFeedback.impactOccurred('light');
+  };
+
+  const openBusinessStats = () => {
+    setShowBusinessStatsSheet(true);
+    tg?.HapticFeedback.impactOccurred('light');
+  };
+
+  const openBusinessChangePlan = () => {
+    setShowBusinessSubscriptionSheet(false);
+    setBusinessRenewMode(true);
+    setBusinessEditMode(false);
+    setShowBusinessFlow(true);
+    tg?.HapticFeedback.impactOccurred('light');
+  };
+
   const openBusinessPromote = () => {
     const activeListing = userListings.find((listing) => listing.status === 'active');
     if (activeListing) {
@@ -853,7 +875,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           onListingTabChange={setBusinessListingTab}
           onPreviewProfile={openBusinessPreview}
           onEditBusiness={openBusinessEdit}
-          onManageSubscription={openBusinessEdit}
+          onManageSubscription={openBusinessSubscription}
+          onViewAllStats={openBusinessStats}
           onPromoteListings={openBusinessPromote}
           onCreateListing={onCreateListing}
           renderListings={renderUserListingCards}
@@ -1692,6 +1715,23 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         editMode={businessEditMode}
         existingProfile={businessProfile}
       />
+
+      {businessProfile && (
+        <>
+          <BusinessSubscriptionSheet
+            isOpen={showBusinessSubscriptionSheet}
+            onClose={() => setShowBusinessSubscriptionSheet(false)}
+            businessProfile={businessProfile}
+            onChangePlan={openBusinessChangePlan}
+          />
+          <BusinessStatsSheet
+            isOpen={showBusinessStatsSheet}
+            onClose={() => setShowBusinessStatsSheet(false)}
+            businessStats={businessStats ?? EMPTY_BUSINESS_PROFILE_STATS}
+            businessProfile={businessProfile}
+          />
+        </>
+      )}
 
       <Toast
         message={toast.message}
