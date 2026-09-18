@@ -6,6 +6,8 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 
 export type BusinessContactChannel = 'telegram' | 'phone' | 'instagram' | 'website';
 
+const TELEGRAM_ICON_SRC = '/images/contacts/telegram.svg';
+
 type BusinessContactBrandIconProps = {
   channel: BusinessContactChannel;
   size?: number;
@@ -22,21 +24,15 @@ export function BusinessContactBrandIcon({
 
   if (channel === 'telegram') {
     return (
-      <svg
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={TELEGRAM_ICON_SRC}
+        alt=""
         width={size}
         height={size}
-        viewBox="0 0 40 40"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className={`shrink-0 ${className}`}
-        aria-hidden
-      >
-        <circle cx="20" cy="20" r="20" fill="#2AABEE" />
-        <path
-          d="M10.5 19.8c4.9-2.1 8.2-3.5 9.9-4.2 4.7-2 5.7-2.3 6.3-2.4.1 0 .3 0 .4.1.1.1.1.2.1.3 0 .1-.1.2-.2.3-.9 1-3.8 3.7-5.2 4.9-.2.2-.4.5-.3.8l.8 3.6c.1.4-.3.7-.7.5l-2.9-2.1c-.2-.1-.4-.1-.6 0l-4.1 1.9c-.4.2-.8 0-1-.4l-1.5-3.6c-.1-.3 0-.6.2-.8l8.8-8.1c.2-.2 0-.5-.3-.4-3.6 1.6-8.6 3.8-15 6.7-.3.1-.5.4-.5.7 0 .3.2.5.5.6z"
-          fill="#fff"
-        />
-      </svg>
+        draggable={false}
+        className={`shrink-0 rounded-full ${className}`}
+      />
     );
   }
 
