@@ -182,7 +182,8 @@ export async function GET(request: NextRequest) {
         { key: 'main', pct: 31 },
         { key: 'category', pct: 27 },
         { key: 'search', pct: 21 },
-        { key: 'profile', pct: 11 },
+        { key: 'similar', pct: 11 },
+        { key: 'profile', pct: 6 },
         { key: 'other', pct: 4 },
       ],
       contactChannels: {
@@ -190,6 +191,12 @@ export async function GET(request: NextRequest) {
         phone: Math.max(0, Math.round(metrics.contactClicks * 0.18)),
         instagram: Math.max(0, Math.round(metrics.contactClicks * 0.25)),
         website: Math.max(0, Math.round(metrics.contactClicks * 0.12)),
+      },
+      contactChannelChanges: {
+        telegram: pseudoChange(metrics.contactClicks + user.id + 10, period),
+        phone: pseudoChange(metrics.contactClicks + user.id + 11, period),
+        instagram: pseudoChange(metrics.contactClicks + user.id + 12, period),
+        website: pseudoChange(metrics.contactClicks + user.id + 13, period),
       },
     });
   } catch (error) {

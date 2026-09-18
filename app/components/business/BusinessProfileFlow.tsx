@@ -11,6 +11,7 @@ import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { BusinessContactField } from '@/components/business/BusinessContactIcons';
 import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 import {
   clearBusinessWizardState,
@@ -1232,10 +1233,15 @@ export default function BusinessProfileFlow({
               <p className={`text-sm mb-4 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.steps.step3.subtitle')}</p>
               <div className="space-y-4">
                 {(['telegram', 'phone', 'instagram', 'website'] as const).map((field) => (
-                  <div key={field}>
-                    <label className={labelCls}>{t(`businessProfile.fields.${field}`)}</label>
-                    <input className={inputCls} value={form[field]} onChange={(e) => patch({ [field]: e.target.value })} />
-                  </div>
+                  <BusinessContactField
+                    key={field}
+                    channel={field}
+                    label={t(`businessProfile.fields.${field}`)}
+                    hint={t(`businessProfile.fields.${field}Hint`)}
+                    value={form[field]}
+                    onChange={(value) => patch({ [field]: value })}
+                    isLight={isLight}
+                  />
                 ))}
               </div>
             </>

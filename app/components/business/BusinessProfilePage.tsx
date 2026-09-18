@@ -5,11 +5,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   Check,
-  Globe,
-  Instagram,
-  MessageCircle,
   MoreHorizontal,
-  Phone,
   Star,
   UserPlus,
   Users,
@@ -40,6 +36,10 @@ import { formatWorkingHoursForDisplay, WEEKDAY_KEYS } from '@/lib/businessProfil
 import { getProfileShareLink } from '@/utils/botLinks';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
+import {
+  BusinessContactBrandIcon,
+  type BusinessContactChannel,
+} from '@/components/business/BusinessContactIcons';
 
 type TabId = 'listings' | 'about';
 type ListingFilter = 'all' | 'services' | 'products';
@@ -371,8 +371,8 @@ export function BusinessProfilePage({
     canMessage
       ? {
           key: 'message',
+          channel: 'telegram' as const,
           label: t('businessProfile.public.write'),
-          icon: MessageCircle,
           onClick: handleMessage,
           primary: true,
         }
@@ -380,8 +380,8 @@ export function BusinessProfilePage({
     profile.phone
       ? {
           key: 'phone',
+          channel: 'phone' as const,
           label: t('businessProfile.public.call'),
-          icon: Phone,
           onClick: () => {
             trackBusinessContact('phone');
             setShowPhoneModal(true);
@@ -392,8 +392,8 @@ export function BusinessProfilePage({
     profile.instagram
       ? {
           key: 'instagram',
+          channel: 'instagram' as const,
           label: 'Instagram',
-          icon: Instagram,
           onClick: handleInstagram,
           primary: false,
         }
@@ -401,16 +401,16 @@ export function BusinessProfilePage({
     profile.website
       ? {
           key: 'website',
+          channel: 'website' as const,
           label: t('businessProfile.public.website'),
-          icon: Globe,
           onClick: handleWebsite,
           primary: false,
         }
       : null,
   ].filter(Boolean) as Array<{
     key: string;
+    channel: BusinessContactChannel;
     label: string;
-    icon: typeof MessageCircle;
     onClick: () => void;
     primary: boolean;
   }>;
@@ -534,14 +534,14 @@ export function BusinessProfilePage({
 
         {contactActions.length > 0 && (
           <div className="mb-6 flex gap-2">
-            {contactActions.map(({ key, label, icon: Icon, onClick, primary }) => (
+            {contactActions.map(({ key, channel, label, onClick, primary }) => (
               <button
                 key={key}
                 type="button"
                 onClick={onClick}
                 className={`${actionBtnBase} ${primary ? actionPrimary : actionSecondary}`}
               >
-                <Icon size={20} />
+                <BusinessContactBrandIcon channel={channel} size={28} />
                 {label}
               </button>
             ))}

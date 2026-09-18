@@ -49,6 +49,7 @@ import { Listing } from '@/types';
 import { getResolvedImageUrl, compressImageOnClient } from '@/utils/imageUtils';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { BusinessBrandIcon } from '@/components/business/BusinessBrandIcon';
+import { BusinessContactField } from '@/components/business/BusinessContactIcons';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
 import type { BusinessProfileData } from '@/components/business/BusinessOwnerProfileView';
 
@@ -1116,14 +1117,15 @@ export default function BusinessSettingsFlow({
             {screen === 'contacts' && (
               <div className="space-y-4 pb-28">
                 {(['telegram', 'phone', 'instagram', 'website'] as const).map((field) => (
-                  <div key={field}>
-                    <label className={labelCls}>{t(`businessProfile.fields.${field}`)}</label>
-                    <input
-                      className={inputCls}
-                      value={form[field]}
-                      onChange={(e) => patch({ [field]: e.target.value })}
-                    />
-                  </div>
+                  <BusinessContactField
+                    key={field}
+                    channel={field}
+                    label={t(`businessProfile.fields.${field}`)}
+                    hint={t(`businessProfile.fields.${field}Hint`)}
+                    value={form[field]}
+                    onChange={(value) => patch({ [field]: value })}
+                    isLight={isLight}
+                  />
                 ))}
               </div>
             )}

@@ -72,7 +72,8 @@ function buildFallbackAnalytics(
       { key: 'main', pct: 31 },
       { key: 'category', pct: 27 },
       { key: 'search', pct: 21 },
-      { key: 'profile', pct: 11 },
+      { key: 'similar', pct: 11 },
+      { key: 'profile', pct: 6 },
       { key: 'other', pct: 4 },
     ],
     contactChannels: {
@@ -80,6 +81,12 @@ function buildFallbackAnalytics(
       phone: Math.round(metrics.contactClicks * 0.18),
       instagram: Math.round(metrics.contactClicks * 0.25),
       website: Math.round(metrics.contactClicks * 0.12),
+    },
+    contactChannelChanges: {
+      telegram: 17,
+      phone: 8,
+      instagram: 20,
+      website: 33,
     },
   };
 }
@@ -172,9 +179,16 @@ export function BusinessStatsSheet({
           >
             <ChevronLeft size={22} />
           </button>
-          <h2 className={`text-base font-bold ${ac.pageHeading}`}>
-            {isPro ? t('businessProfile.analytics.proTitle') : t('businessProfile.stats.title')}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className={`text-base font-bold ${ac.pageHeading}`}>
+              {isPro ? t('businessProfile.analytics.pageTitle') : t('businessProfile.stats.title')}
+            </h2>
+            {isPro ? (
+              <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${ui.limeBorder} ${ui.limeText}`}>
+                PRO
+              </span>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -186,21 +200,6 @@ export function BusinessStatsSheet({
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className={`mb-4 flex gap-1 rounded-xl p-1 ${isLight ? 'bg-gray-100/90' : 'border border-white/10 bg-black/30'}`}>
-            {periods.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPeriod(p)}
-                className={`flex-1 rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${
-                  period === p ? ui.tabActive : ui.tabIdle
-                }`}
-              >
-                {t('businessProfile.stats.periodDays', { days: String(p) })}
-              </button>
-            ))}
-          </div>
-
           {isPro ? (
             <div className={`mb-4 flex gap-1 rounded-xl p-1 ${isLight ? 'bg-gray-100/90' : 'border border-white/10 bg-black/30'}`}>
               {(['overview', 'listings', 'promotion'] as StatsTab[]).map((id) => (
@@ -217,6 +216,21 @@ export function BusinessStatsSheet({
               ))}
             </div>
           ) : null}
+
+          <div className={`mb-4 flex gap-1 rounded-xl p-1 ${isLight ? 'bg-gray-100/90' : 'border border-white/10 bg-black/30'}`}>
+            {periods.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className={`flex-1 rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${
+                  period === p ? ui.tabActive : ui.tabIdle
+                }`}
+              >
+                {t('businessProfile.stats.periodDays', { days: String(p) })}
+              </button>
+            ))}
+          </div>
 
           {loading && isPro ? (
             <div className={`mb-4 rounded-xl px-3 py-2 text-center text-xs ${ac.mutedText}`}>

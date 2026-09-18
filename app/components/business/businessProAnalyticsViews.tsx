@@ -2,13 +2,9 @@
 
 import {
   Eye,
-  Globe,
   Heart,
-  Instagram,
   Lightbulb,
   MessageCircle,
-  Phone,
-  Send,
   Star,
   Users,
   Zap,
@@ -21,9 +17,13 @@ import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
 import {
-  AreaLineChart,
+  BusinessContactBrandIcon,
+  type BusinessContactChannel,
+} from '@/components/business/BusinessContactIcons';
+import {
   ChangeBadge,
   DonutChart,
+  TRAFFIC_SOURCE_COLORS,
   type AnalyticsPayload,
 } from '@/components/business/businessProAnalyticsParts';
 
@@ -69,10 +69,30 @@ function trafficSourceLabel(key: string, t: (k: string) => string): string {
     main: 'businessProfile.analytics.sourceMain',
     category: 'businessProfile.analytics.sourceCategory',
     search: 'businessProfile.analytics.sourceSearch',
+    similar: 'businessProfile.analytics.sourceSimilar',
     profile: 'businessProfile.analytics.sourceProfile',
     other: 'businessProfile.analytics.sourceOther',
   };
   return t(map[key] || 'businessProfile.analytics.sourceOther');
+}
+
+function AnalyticsTipCard({ text }: { text: string }) {
+  const { t } = useLanguage();
+  const { isLight } = useTheme();
+  const ac = getAppearanceClasses(isLight);
+  const ui = getBusinessProfileUi(isLight);
+
+  return (
+    <div className={`${ui.cardShell} flex items-start gap-3 p-4`}>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-400/15">
+        <Lightbulb size={20} className="text-amber-400" />
+      </div>
+      <div>
+        <p className={`text-sm font-semibold ${ui.limeText}`}>{t('businessProfile.analytics.tipTitle')}</p>
+        <p className={`mt-1 text-sm leading-relaxed ${ac.pageHeading}`}>{text}</p>
+      </div>
+    </div>
+  );
 }
 
 export function AnalyticsOverviewTab({ data }: { data: AnalyticsPayload }) {
@@ -82,117 +102,87 @@ export function AnalyticsOverviewTab({ data }: { data: AnalyticsPayload }) {
   const ui = getBusinessProfileUi(isLight);
   const locale = language === 'ru' ? 'ru-RU' : 'uk-UA';
 
-  const chartValues = useMemo(() => {
-    const base = Math.max(data.metrics.listingViews, 1);
-    return Array.from({ length: 10 }, (_, i) => Math.round(base * (0.35 + (i / 9) * 0.65)));
-  }, [data.metrics.listingViews]);
+  const totalViews = data.metrics.listingViews + data.metrics.profileViews;
 
-  const dynamics = [
-    { key: 'listingViews', label: t('businessProfile.analytics.listingViews'), value: data.metrics.listingViews, change: data.changes.listingViews },
-    { key: 'profileViews', label: t('businessProfile.analytics.profileViews'), value: data.metrics.profileViews, change: data.changes.profileViews },
-    { key: 'contactClicks', label: t('businessProfile.analytics.inquiries'), value: data.metrics.contactClicks, change: data.changes.contactClicks },
-    { key: 'favoritesTotal', label: t('businessProfile.owner.kpiFavorites'), value: data.metrics.favoritesTotal, change: data.changes.favoritesTotal },
-    { key: 'reviewsCount', label: t('businessProfile.owner.kpiReviews'), value: data.metrics.reviewsCount, change: data.changes.reviewsCount },
-    { key: 'followersCount', label: t('businessProfile.analytics.newFollowers'), value: data.metrics.followersCount, change: data.changes.followersCount },
+  const contactItems: Array<{
+    channel: BusinessContactChannel;
+    label: string;
+    count: number;
+    change: number;
+  }> = [
+    {
+      channel: 'telegram',
+      label: 'Telegram',
+      count: data.contactChannels.telegram,
+      change: data.contactChannelChanges.telegram,
+    },
+    {
+      channel: 'phone',
+      label: t('businessProfile.fields.phone'),
+      count: data.contactChannels.phone,
+      change: data.contactChannelChanges.phone,
+    },
+    {
+      channel: 'instagram',
+      label: 'Instagram',
+      count: data.contactChannels.instagram,
+      change: data.contactChannelChanges.instagram,
+    },
+    {
+      channel: 'website',
+      label: t('businessProfile.fields.website'),
+      count: data.contactChannels.website,
+      change: data.contactChannelChanges.website,
+    },
   ];
 
-  const funnelSteps = [
-    { label: t('businessProfile.analytics.impressions'), value: data.funnel.impressions, width: 100 },
+  const profileStats = [
     {
-      label: t('businessProfile.analytics.listingViews'),
-      value: data.funnel.listingViews,
-      width: Math.max(18, (data.funnel.listingViews / Math.max(data.funnel.impressions, 1)) * 100),
+      icon: Eye,
+      value: data.metrics.profileViews,
+      label: t('businessProfile.analytics.profileViewsShort'),
+      change: data.changes.profileViews,
+      prefix: '',
     },
     {
-      label: t('businessProfile.analytics.profileViews'),
-      value: data.funnel.profileViews,
-      width: Math.max(10, (data.funnel.profileViews / Math.max(data.funnel.impressions, 1)) * 100),
+      icon: Users,
+      value: data.metrics.followersCount,
+      label: t('businessProfile.analytics.newFollowersShort'),
+      change: data.changes.followersCount,
+      prefix: '+',
     },
     {
-      label: t('businessProfile.analytics.inquiries'),
-      value: data.funnel.inquiries,
-      width: Math.max(6, (data.funnel.inquiries / Math.max(data.funnel.impressions, 1)) * 100),
+      icon: MessageCircle,
+      value: data.metrics.contactClicks,
+      label: t('businessProfile.analytics.inquiriesShort'),
+      change: data.changes.contactClicks,
+      prefix: '',
     },
-  ];
-
-  const contactItems = [
-    { icon: Send, label: 'Telegram', count: data.contactChannels.telegram },
-    { icon: Phone, label: t('businessProfile.public.call'), count: data.contactChannels.phone },
-    { icon: Instagram, label: 'Instagram', count: data.contactChannels.instagram },
-    { icon: Globe, label: t('businessProfile.public.website'), count: data.contactChannels.website },
   ];
 
   return (
-    <div className="space-y-4">
-      <div>
-        <p className={`mb-2 text-sm font-semibold ${ac.pageHeading}`}>
-          {t('businessProfile.analytics.dynamicsTitle', { days: String(data.period) })}
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          {dynamics.slice(0, 4).map(({ label, value, change }) => (
-            <div key={label} className={`${ui.cardShell} p-3`}>
-              <div className="mb-1 flex items-start justify-between gap-1">
-                <p className={`text-xl font-bold tabular-nums ${ac.pageHeading}`}>
-                  {value.toLocaleString(locale)}
-                </p>
-                <ChangeBadge value={change} />
-              </div>
-              <p className={`text-[11px] leading-tight ${ac.mutedText}`}>{label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
+    <div className="space-y-5">
       <div className={`${ui.cardShell} p-4`}>
-        <p className={`mb-2 text-sm font-semibold ${ac.pageHeading}`}>
-          {t('businessProfile.stats.chartTitle')}
-        </p>
-        <AreaLineChart values={chartValues} isLight={isLight} />
-      </div>
-
-      <div className={`${ui.cardShell} divide-y ${ui.divider}`}>
-        {dynamics.map(({ label, value, change }) => (
-          <div key={label} className="flex items-center gap-3 px-4 py-3">
-            <span className={`flex-1 text-sm ${ac.pageHeading}`}>{label}</span>
-            <ChangeBadge value={change} />
-            <span className={`text-sm font-bold tabular-nums ${ac.pageHeading}`}>
-              {value.toLocaleString(locale)}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className={`${ui.cardShell} p-4`}>
-        <p className={`mb-3 text-sm font-semibold ${ac.pageHeading}`}>
-          {t('businessProfile.analytics.funnelTitle')}
-        </p>
-        <div className="space-y-3">
-          {funnelSteps.map((step) => (
-            <div key={step.label}>
-              <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                <span className={ac.mutedText}>{step.label}</span>
-                <span className={`font-semibold tabular-nums ${ac.pageHeading}`}>
-                  {step.value.toLocaleString(locale)}
-                </span>
-              </div>
-              <div className={`h-2 overflow-hidden rounded-full ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}>
-                <div className={`h-full rounded-full ${ui.limeBg}`} style={{ width: `${step.width}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className={`${ui.cardShell} p-4`}>
-        <p className={`mb-3 text-sm font-semibold ${ac.pageHeading}`}>
-          {t('businessProfile.analytics.trafficTitle')}
+        <p className={`mb-4 text-sm font-semibold ${ac.pageHeading}`}>
+          {t('businessProfile.analytics.viewSourcesTitle')}
         </p>
         <div className="flex items-center gap-4">
-          <DonutChart segments={data.trafficSources} />
-          <div className="min-w-0 flex-1 space-y-2">
-            {data.trafficSources.map((source) => (
+          <DonutChart
+            segments={data.trafficSources}
+            centerValue={totalViews}
+            centerLabel={t('businessProfile.analytics.viewsCountLabel')}
+            locale={locale}
+          />
+          <div className="min-w-0 flex-1 space-y-2.5">
+            {data.trafficSources.map((source, i) => (
               <div key={source.key} className="flex items-center justify-between gap-2 text-xs">
-                <span className={`truncate ${ac.mutedText}`}>{trafficSourceLabel(source.key, t)}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: TRAFFIC_SOURCE_COLORS[i] || TRAFFIC_SOURCE_COLORS[0] }}
+                  />
+                  <span className={`truncate ${ac.mutedText}`}>{trafficSourceLabel(source.key, t)}</span>
+                </span>
                 <span className={`shrink-0 font-semibold tabular-nums ${ac.pageHeading}`}>{source.pct}%</span>
               </div>
             ))}
@@ -204,45 +194,42 @@ export function AnalyticsOverviewTab({ data }: { data: AnalyticsPayload }) {
         <p className={`mb-2 text-sm font-semibold ${ac.pageHeading}`}>
           {t('businessProfile.analytics.contactChannelsTitle')}
         </p>
-        <div className="grid grid-cols-2 gap-2">
-          {contactItems.map(({ icon: Icon, label, count }) => (
-            <div key={label} className={`${ui.cardShell} p-3 text-center`}>
-              <Icon size={18} className={`mx-auto mb-2 ${ui.limeText}`} />
-              <p className={`text-lg font-bold tabular-nums ${ac.pageHeading}`}>{count}</p>
-              <p className={`mt-1 text-[11px] ${ac.mutedText}`}>{label}</p>
+        <div className="grid grid-cols-4 gap-2">
+          {contactItems.map(({ channel, label, count, change }) => (
+            <div key={channel} className={`${ui.cardShell} flex flex-col items-center px-1.5 py-3 text-center`}>
+              <BusinessContactBrandIcon channel={channel} size={28} className="mb-2" />
+              <p className={`text-base font-bold tabular-nums leading-none ${ac.pageHeading}`}>{count}</p>
+              <p className={`mt-1 line-clamp-2 text-[9px] leading-tight ${ac.mutedText}`}>{label}</p>
+              <div className="mt-1.5">
+                <ChangeBadge value={change} />
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className={`${ui.cardShell} p-4`}>
-        <p className={`mb-3 text-sm font-semibold ${ac.pageHeading}`}>
+      <div>
+        <p className={`mb-2 text-sm font-semibold ${ac.pageHeading}`}>
           {t('businessProfile.analytics.profileStatsTitle')}
         </p>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          {[
-            { icon: Eye, label: t('businessProfile.stats.profileViews'), value: data.metrics.profileViews },
-            { icon: Users, label: t('businessProfile.analytics.newFollowers'), value: data.metrics.followersCount },
-            { icon: MessageCircle, label: t('businessProfile.analytics.inquiries'), value: data.metrics.contactClicks },
-          ].map(({ icon: Icon, label, value }) => (
-            <div key={label}>
-              <Icon size={16} className={`mx-auto mb-1 ${ui.limeText}`} />
-              <p className={`text-base font-bold tabular-nums ${ac.pageHeading}`}>
+        <div className="grid grid-cols-3 gap-2">
+          {profileStats.map(({ icon: Icon, value, label, change, prefix }) => (
+            <div key={label} className={`${ui.cardShell} px-2 py-3 text-center`}>
+              <Icon size={16} className={`mx-auto mb-2 ${ui.limeText}`} />
+              <p className={`text-base font-bold tabular-nums leading-none ${ac.pageHeading}`}>
+                {prefix}
                 {value.toLocaleString(locale)}
               </p>
-              <p className={`mt-0.5 text-[10px] leading-tight ${ac.mutedText}`}>{label}</p>
+              <p className={`mt-1 line-clamp-2 text-[9px] leading-tight ${ac.mutedText}`}>{label}</p>
+              <div className="mt-1.5 flex justify-center">
+                <ChangeBadge value={change} />
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${ui.limeBorder} ${ui.limeBgSoft}`}>
-        <Lightbulb size={18} className={`mt-0.5 shrink-0 ${ui.limeText}`} />
-        <div>
-          <p className={`text-xs font-semibold ${ui.limeText}`}>{t('businessProfile.analytics.tipTitle')}</p>
-          <p className={`mt-1 text-sm leading-relaxed ${ac.pageHeading}`}>{t('businessProfile.stats.tip')}</p>
-        </div>
-      </div>
+      <AnalyticsTipCard text={t('businessProfile.analytics.proTip')} />
     </div>
   );
 }
