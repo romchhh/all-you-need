@@ -1,18 +1,7 @@
 'use client';
 
-import {
-  ChevronLeft,
-  Eye,
-  Heart,
-  Instagram,
-  Lightbulb,
-  MessageCircle,
-  Phone,
-  Send,
-  Star,
-  X,
-} from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, Eye, Heart, Lightbulb, MessageCircle, Star, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
@@ -21,6 +10,12 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import type { BusinessProfileStatsPayload } from '@/lib/businessProfileConstants';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
 import type { BusinessProfileData } from '@/components/business/BusinessOwnerProfileView';
+import type { AnalyticsPayload } from '@/components/business/businessProAnalyticsParts';
+import {
+  AnalyticsListingsTab,
+  AnalyticsOverviewTab,
+  AnalyticsPromotionTab,
+} from '@/components/business/businessProAnalyticsViews';
 
 type StatsPeriod = 7 | 30 | 90;
 type StatsTab = 'overview' | 'listings' | 'promotion';
@@ -28,42 +23,71 @@ type StatsTab = 'overview' | 'listings' | 'promotion';
 interface BusinessStatsSheetProps {
   isOpen: boolean;
   onClose: () => void;
+  telegramId: string;
   businessStats: BusinessProfileStatsPayload;
   businessProfile: BusinessProfileData;
 }
 
 function scaleStat(value: number, period: StatsPeriod): number {
-  const factor = period / 30;
-  return Math.max(0, Math.round(value * factor));
+  return Math.max(0, Math.round(value * (period / 30)));
 }
 
-function MiniLineChart({ values, isLight }: { values: number[]; isLight: boolean }) {
-  const max = Math.max(...values, 1);
-  const points = values
-    .map((v, i) => {
-      const x = (i / Math.max(values.length - 1, 1)) * 100;
-      const y = 100 - (v / max) * 80 - 10;
-      return `${x},${y}`;
-    })
-    .join(' ');
+function buildFallbackAnalytics(
+  businessStats: BusinessProfileStatsPayload,
+  period: StatsPeriod,
+  isPro: boolean
+): AnalyticsPayload {
+  const metrics = {
+    listingViews: scaleStat(businessStats.listingViews, period),
+    profileViews: scaleStat(businessStats.profileViews, period),
+    contactClicks: scaleStat(businessStats.contactClicks, period),
+    favoritesTotal: scaleStat(businessStats.favoritesTotal, period),
+    followersCount: businessStats.followersCount ?? 0,
+    reviewsCount: 0,
+  };
 
-  return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-28 w-full">
-      <polyline
-        fill="none"
-        stroke={isLight ? '#3F5331' : '#C8E6A0'}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={points}
-      />
-    </svg>
-  );
+  return {
+    period,
+    isPro,
+    metrics,
+    changes: {
+      listingViews: 8,
+      profileViews: 5,
+      contactClicks: 3,
+      favoritesTotal: 12,
+      followersCount: 4,
+      reviewsCount: 0,
+    },
+    funnel: {
+      impressions: Math.max(metrics.listingViews * 2, metrics.listingViews + 100),
+      listingViews: metrics.listingViews,
+      profileViews: metrics.profileViews,
+      inquiries: metrics.contactClicks,
+    },
+    listingRows: [],
+    promotionSummary: { used: 0, reach: 0, views: 0, inquiries: 0 },
+    efficiency: { highlighted: 139, top_category: 89, vip: 62 },
+    promotionHistory: [],
+    trafficSources: [
+      { key: 'main', pct: 31 },
+      { key: 'category', pct: 27 },
+      { key: 'search', pct: 21 },
+      { key: 'profile', pct: 11 },
+      { key: 'other', pct: 4 },
+    ],
+    contactChannels: {
+      telegram: Math.round(metrics.contactClicks * 0.45),
+      phone: Math.round(metrics.contactClicks * 0.18),
+      instagram: Math.round(metrics.contactClicks * 0.25),
+      website: Math.round(metrics.contactClicks * 0.12),
+    },
+  };
 }
 
 export function BusinessStatsSheet({
   isOpen,
   onClose,
+  telegramId,
   businessStats,
   businessProfile,
 }: BusinessStatsSheetProps) {
@@ -75,66 +99,56 @@ export function BusinessStatsSheet({
 
   const [period, setPeriod] = useState<StatsPeriod>(30);
   const [tab, setTab] = useState<StatsTab>('overview');
+  const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useBodyScrollLock(isOpen);
   useHideBottomNav(isOpen);
 
-  const scaled = useMemo(
-    () => ({
-      listingViews: scaleStat(businessStats.listingViews, period),
-      profileViews: scaleStat(businessStats.profileViews, period),
-      contactClicks: scaleStat(businessStats.contactClicks, period),
-      favoritesTotal: scaleStat(businessStats.favoritesTotal, period),
-    }),
-    [businessStats, period]
+  useEffect(() => {
+    if (!isOpen || !telegramId) return;
+
+    let cancelled = false;
+    setLoading(true);
+
+    fetch(`/api/user/business-profile/analytics?telegramId=${encodeURIComponent(telegramId)}&period=${period}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload: AnalyticsPayload | null) => {
+        if (cancelled) return;
+        setAnalytics(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setAnalytics(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, telegramId, period]);
+
+  const data = useMemo(
+    () => analytics ?? buildFallbackAnalytics(businessStats, period, isPro),
+    [analytics, businessStats, period, isPro]
   );
 
-  const chartValues = useMemo(() => {
-    const base = Math.max(scaled.listingViews, 1);
-    return Array.from({ length: 8 }, (_, i) => Math.round(base * (0.45 + (i / 7) * 0.55)));
-  }, [scaled.listingViews]);
-
-  const funnel = useMemo(() => {
-    const impressions = Math.max(scaled.listingViews * 2, scaled.listingViews + 100);
-    const listingViews = scaled.listingViews;
-    const profileViews = scaled.profileViews;
-    const inquiries = scaled.contactClicks;
-    return [
-      { label: t('businessProfile.analytics.impressions'), value: impressions, width: 100 },
-      { label: t('businessProfile.analytics.listingViews'), value: listingViews, width: Math.max(18, (listingViews / impressions) * 100) },
-      { label: t('businessProfile.analytics.profileViews'), value: profileViews, width: Math.max(10, (profileViews / impressions) * 100) },
-      { label: t('businessProfile.analytics.inquiries'), value: inquiries, width: Math.max(6, (inquiries / impressions) * 100) },
-    ];
-  }, [scaled, t]);
-
-  const trafficSources = [
-    { label: t('businessProfile.analytics.sourceMain'), pct: 31 },
-    { label: t('businessProfile.analytics.sourceCategory'), pct: 27 },
-    { label: t('businessProfile.analytics.sourceSearch'), pct: 21 },
-    { label: t('businessProfile.analytics.sourceSimilar'), pct: 11 },
-    { label: t('businessProfile.analytics.sourceProfile'), pct: 6 },
-    { label: t('businessProfile.analytics.sourceOther'), pct: 4 },
-  ];
-
-  const contactChannels = [
-    { icon: Send, label: 'Telegram', count: businessProfile.telegram ? scaled.contactClicks : 0, enabled: !!businessProfile.telegram },
-    { icon: Phone, label: t('businessProfile.public.call'), count: businessProfile.phone ? Math.round(scaled.contactClicks * 0.35) : 0, enabled: !!businessProfile.phone },
-    { icon: Instagram, label: 'Instagram', count: businessProfile.instagram ? Math.round(scaled.contactClicks * 0.2) : 0, enabled: !!businessProfile.instagram },
-    { icon: Eye, label: t('businessProfile.public.website'), count: businessProfile.website ? Math.round(scaled.contactClicks * 0.1) : 0, enabled: !!businessProfile.website },
-  ];
-
-  const metricCards = [
-    { icon: Eye, label: t('businessProfile.owner.kpiViews'), value: scaled.listingViews + scaled.profileViews },
-    { icon: Eye, label: t('businessProfile.stats.profileViews'), value: scaled.profileViews },
-    { icon: MessageCircle, label: t('businessProfile.owner.kpiInquiries'), value: scaled.contactClicks },
-    { icon: Heart, label: t('businessProfile.owner.kpiFavorites'), value: scaled.favoritesTotal },
-    { icon: Star, label: t('businessProfile.owner.kpiReviews'), value: 0 },
-  ];
+  const basicMetrics = useMemo(
+    () => [
+      { icon: Eye, label: t('businessProfile.owner.kpiViews'), value: data.metrics.listingViews + data.metrics.profileViews },
+      { icon: MessageCircle, label: t('businessProfile.owner.kpiInquiries'), value: data.metrics.contactClicks },
+      { icon: Heart, label: t('businessProfile.owner.kpiFavorites'), value: data.metrics.favoritesTotal },
+      { icon: Star, label: t('businessProfile.owner.kpiReviews'), value: data.metrics.reviewsCount },
+    ],
+    [data.metrics, t]
+  );
 
   if (!isOpen) return null;
 
   const shell = isLight ? 'bg-white text-gray-900' : 'bg-[#0a0a0a] text-white';
   const periods: StatsPeriod[] = [7, 30, 90];
+  const locale = language === 'ru' ? 'ru-RU' : 'uk-UA';
 
   return (
     <div className="fixed inset-0 z-[99990] flex flex-col justify-end">
@@ -204,35 +218,26 @@ export function BusinessStatsSheet({
             </div>
           ) : null}
 
-          {( !isPro || tab === 'overview') && (
+          {loading && isPro ? (
+            <div className={`mb-4 rounded-xl px-3 py-2 text-center text-xs ${ac.mutedText}`}>
+              {t('common.loading')}
+            </div>
+          ) : null}
+
+          {isPro && tab === 'overview' ? <AnalyticsOverviewTab data={data} /> : null}
+          {isPro && tab === 'listings' ? <AnalyticsListingsTab data={data} /> : null}
+          {isPro && tab === 'promotion' ? <AnalyticsPromotionTab data={data} /> : null}
+
+          {!isPro ? (
             <>
               <div className="mb-4 grid grid-cols-2 gap-2">
-                {metricCards.slice(0, 4).map(({ icon: Icon, label, value }) => (
+                {basicMetrics.map(({ icon: Icon, label, value }) => (
                   <div key={label} className={`${ui.cardShell} p-3`}>
                     <Icon size={16} className={`mb-2 ${ui.limeText}`} />
                     <p className={`text-xl font-bold tabular-nums ${ac.pageHeading}`}>
-                      {value.toLocaleString(language === 'ru' ? 'ru-RU' : 'uk-UA')}
+                      {value.toLocaleString(locale)}
                     </p>
                     <p className={`mt-1 text-[11px] leading-tight ${ac.mutedText}`}>{label}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className={`${ui.cardShell} mb-4 p-4`}>
-                <p className={`mb-2 text-sm font-semibold ${ac.pageHeading}`}>
-                  {t('businessProfile.stats.chartTitle')}
-                </p>
-                <MiniLineChart values={chartValues} isLight={isLight} />
-              </div>
-
-              <div className={`${ui.cardShell} mb-4 divide-y ${ui.divider}`}>
-                {metricCards.map(({ icon: Icon, label, value }) => (
-                  <div key={label} className="flex items-center gap-3 px-4 py-3">
-                    <Icon size={16} className={ui.limeText} />
-                    <span className={`flex-1 text-sm ${ac.pageHeading}`}>{label}</span>
-                    <span className={`text-sm font-bold tabular-nums ${ac.pageHeading}`}>
-                      {value.toLocaleString(language === 'ru' ? 'ru-RU' : 'uk-UA')}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -242,61 +247,7 @@ export function BusinessStatsSheet({
                 <p className={`text-sm leading-relaxed ${ac.pageHeading}`}>{t('businessProfile.stats.tip')}</p>
               </div>
             </>
-          )}
-
-          {isPro && tab === 'listings' && (
-            <div className={`${ui.cardShell} p-4`}>
-              <p className={`mb-3 text-sm font-semibold ${ac.pageHeading}`}>{t('businessProfile.analytics.funnelTitle')}</p>
-              <div className="space-y-3">
-                {funnel.map((step) => (
-                  <div key={step.label}>
-                    <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                      <span className={ac.mutedText}>{step.label}</span>
-                      <span className={`font-semibold tabular-nums ${ac.pageHeading}`}>
-                        {step.value.toLocaleString(language === 'ru' ? 'ru-RU' : 'uk-UA')}
-                      </span>
-                    </div>
-                    <div className={`h-2 overflow-hidden rounded-full ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}>
-                      <div className={`h-full rounded-full ${ui.limeBg}`} style={{ width: `${step.width}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {isPro && tab === 'promotion' && (
-            <div className="space-y-4">
-              <div className={`${ui.cardShell} p-4`}>
-                <p className={`mb-3 text-sm font-semibold ${ac.pageHeading}`}>
-                  {t('businessProfile.analytics.trafficTitle')}
-                </p>
-                <div className="space-y-2">
-                  {trafficSources.map((source) => (
-                    <div key={source.label} className="flex items-center gap-3">
-                      <span className={`w-28 shrink-0 text-xs ${ac.mutedText}`}>{source.label}</span>
-                      <div className={`h-2 flex-1 overflow-hidden rounded-full ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}>
-                        <div className={`h-full rounded-full ${ui.limeBg}`} style={{ width: `${source.pct}%` }} />
-                      </div>
-                      <span className={`w-10 text-right text-xs font-semibold tabular-nums ${ac.pageHeading}`}>
-                        {source.pct}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {contactChannels.filter((c) => c.enabled).map(({ icon: Icon, label, count }) => (
-                  <div key={label} className={`${ui.cardShell} p-3 text-center`}>
-                    <Icon size={18} className={`mx-auto mb-2 ${ui.limeText}`} />
-                    <p className={`text-lg font-bold tabular-nums ${ac.pageHeading}`}>{count}</p>
-                    <p className={`mt-1 text-[11px] ${ac.mutedText}`}>{label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

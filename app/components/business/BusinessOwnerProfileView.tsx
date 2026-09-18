@@ -76,6 +76,52 @@ interface BusinessOwnerProfileViewProps {
   onLoadMore?: () => void;
 }
 
+function CreditRing({
+  remaining,
+  total,
+  label,
+  icon: Icon,
+  isLight,
+}: {
+  remaining: number;
+  total: number;
+  label: string;
+  icon: typeof Heart;
+  isLight: boolean;
+}) {
+  const pct = total > 0 ? Math.min(100, (remaining / total) * 100) : 0;
+  const r = 18;
+  const c = 2 * Math.PI * r;
+  const dash = (pct / 100) * c;
+
+  return (
+    <div className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${isLight ? 'bg-gray-50' : 'bg-white/[0.05]'}`}>
+      <div className="relative h-12 w-12 shrink-0">
+        <svg viewBox="0 0 44 44" className="h-full w-full -rotate-90">
+          <circle cx="22" cy="22" r={r} fill="transparent" stroke={isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)'} strokeWidth="4" />
+          <circle
+            cx="22"
+            cy="22"
+            r={r}
+            fill="transparent"
+            stroke="#C8E6A0"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${c}`}
+          />
+        </svg>
+        <Icon size={14} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[#C8E6A0]" />
+      </div>
+      <div className="min-w-0">
+        <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-white/55'}`}>{label}</p>
+        <p className={`text-base font-bold tabular-nums ${isLight ? 'text-gray-900' : 'text-white'}`}>
+          {remaining} / {total}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function formatRatingLine(
   rating: number,
   count: number,
@@ -294,25 +340,23 @@ export function BusinessOwnerProfileView({
             {t('businessProfile.owner.manage')}
             <ChevronRight size={16} />
           </button>
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <div className={`rounded-xl px-3 py-2.5 ${isLight ? 'bg-gray-50' : 'bg-white/[0.05]'}`}>
-              <div className={`mb-1 flex items-center gap-1 text-xs ${ac.mutedText}`}>
-                <Heart size={14} />
-                {t('businessProfile.owner.highlightSlots')}
-              </div>
-              <p className={`text-lg font-bold tabular-nums ${ac.pageHeading}`}>
-                {highlightRemaining} / {planCredits.highlight}
-              </p>
-            </div>
-            <div className={`rounded-xl px-3 py-2.5 ${isLight ? 'bg-gray-50' : 'bg-white/[0.05]'}`}>
-              <div className={`mb-1 flex items-center gap-1 text-xs ${ac.mutedText}`}>
-                <Crown size={14} />
-                {t('businessProfile.owner.topSlots')}
-              </div>
-              <p className={`text-lg font-bold tabular-nums ${ac.pageHeading}`}>
-                {topRemaining} / {planCredits.top}
-              </p>
-            </div>
+          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <CreditRing
+              remaining={highlightRemaining}
+              total={planCredits.highlight}
+              label={t('businessProfile.owner.highlightSlots')}
+              icon={Heart}
+              isLight={isLight}
+            />
+            {planCredits.top > 0 ? (
+              <CreditRing
+                remaining={topRemaining}
+                total={planCredits.top}
+                label={t('businessProfile.owner.topSlots')}
+                icon={Crown}
+                isLight={isLight}
+              />
+            ) : null}
           </div>
           <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${ui.limeBgSoft} ${ui.limeText}`}>
             <Percent size={14} className="shrink-0" />

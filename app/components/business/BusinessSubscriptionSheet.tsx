@@ -156,21 +156,26 @@ export function BusinessSubscriptionSheet({
             ) : null}
           </div>
 
-          <div className={`${ui.cardShell} divide-y ${ui.divider}`}>
-            {perkRows.map(({ icon: Icon, label, value, hint }) => (
-              <div key={label} className="flex items-center gap-3 px-4 py-3.5">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ui.limeBgSoft}`}>
-                  <Icon size={18} className={ui.limeText} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-sm font-semibold ${ac.pageHeading}`}>{label}</span>
-                    <span className={`text-sm font-bold tabular-nums ${ui.limeText}`}>{value}</span>
+          <div className={`${ui.cardShell} p-4`}>
+            <p className={`mb-3 text-xs font-semibold uppercase tracking-wide ${ac.mutedText}`}>
+              {t('businessProfile.subscription.inYourPlan')}
+            </p>
+            <div className="space-y-3">
+              {perkRows.map(({ icon: Icon, label, value, hint }) => (
+                <div key={label} className="flex items-center gap-3">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ui.limeBgSoft}`}>
+                    <Icon size={18} className={ui.limeText} />
                   </div>
-                  <p className={`mt-0.5 text-xs ${ac.mutedText}`}>{hint}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-sm font-semibold ${ac.pageHeading}`}>{label}</span>
+                      <span className={`text-sm font-bold tabular-nums ${ui.limeText}`}>{value}</span>
+                    </div>
+                    <p className={`mt-0.5 text-xs ${ac.mutedText}`}>{hint}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           <button type="button" onClick={onChangePlan} className={`${ui.btnOutline} w-full`}>
@@ -179,13 +184,20 @@ export function BusinessSubscriptionSheet({
           </button>
 
           <div className={`${ui.cardShell} divide-y ${ui.divider}`}>
-            <div className="flex items-center gap-3 px-4 py-3.5">
-              <CreditCard size={18} className={ui.limeText} />
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-semibold ${ac.pageHeading}`}>
-                  {t('businessProfile.subscription.paymentMethod')}
-                </p>
-                <p className={`text-xs ${ac.mutedText}`}>{t('businessProfile.subscription.paymentMethodHint')}</p>
+            <div className="px-4 py-3.5">
+              <p className={`mb-3 text-xs font-semibold uppercase tracking-wide ${ac.mutedText}`}>
+                {t('businessProfile.subscription.paymentSection')}
+              </p>
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ui.limeBgSoft}`}>
+                  <CreditCard size={18} className={ui.limeText} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-semibold ${ac.pageHeading}`}>
+                    {t('businessProfile.subscription.paymentMethod')}
+                  </p>
+                  <p className={`text-xs ${ac.mutedText}`}>{t('businessProfile.subscription.cardEnding')}</p>
+                </div>
               </div>
             </div>
             <button

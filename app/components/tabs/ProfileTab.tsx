@@ -56,6 +56,7 @@ const ReactivateListingFlow = dynamic(() => import('@/components/listing/Reactiv
   ssr: false,
 });
 const BusinessProfileFlow = dynamic(() => import('@/components/business/BusinessProfileFlow'), { ssr: false });
+const BusinessSettingsFlow = dynamic(() => import('@/components/business/BusinessSettingsFlow'), { ssr: false });
 
 interface ProfileTabProps {
   tg: TelegramWebApp | null;
@@ -116,6 +117,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [showReactivateFlow, setShowReactivateFlow] = useState(false);
   const [selectedListingForReactivation, setSelectedListingForReactivation] = useState<number | null>(null);
   const [showBusinessFlow, setShowBusinessFlow] = useState(false);
+  const [showBusinessSettings, setShowBusinessSettings] = useState(false);
   const [profileViewMode, setProfileViewMode] = useState<ProfileViewMode>('personal');
   const [businessProfile, setBusinessProfile] = useState<BusinessProfileData | null>(null);
   const [isBusinessActive, setIsBusinessActive] = useState(false);
@@ -815,9 +817,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   };
 
   const openBusinessEdit = () => {
-    setBusinessRenewMode(false);
-    setBusinessEditMode(true);
-    setShowBusinessFlow(true);
+    setShowBusinessSettings(true);
     tg?.HapticFeedback.impactOccurred('light');
   };
 
@@ -1727,8 +1727,31 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           <BusinessStatsSheet
             isOpen={showBusinessStatsSheet}
             onClose={() => setShowBusinessStatsSheet(false)}
+            telegramId={profile.telegramId}
             businessStats={businessStats ?? EMPTY_BUSINESS_PROFILE_STATS}
             businessProfile={businessProfile}
+          />
+          <BusinessSettingsFlow
+            isOpen={showBusinessSettings}
+            onClose={() => setShowBusinessSettings(false)}
+            onSuccess={() => {
+              fetchBusinessProfile();
+              void fetchBusinessStats();
+              fetchListingsWithFilters(0, true);
+              refetch();
+            }}
+            onDeactivated={() => {
+              setProfileViewMode('personal');
+              fetchBusinessProfile();
+            }}
+            tg={tg}
+            telegramId={String(profile?.telegramId || '')}
+            defaultTelegram={profile?.username ? `@${profile.username}` : ''}
+            defaultPhone={profile?.phone || ''}
+            existingProfile={businessProfile}
+            rating={profile?.rating || 0}
+            reviewsCount={profile?.reviewsCount || 0}
+            followersCount={businessStats?.followersCount ?? 0}
           />
         </>
       )}

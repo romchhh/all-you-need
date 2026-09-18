@@ -12,6 +12,7 @@
     "edit": "Редагувати",
     "close": "Закрити",
     "share": "Поділитися",
+    "copy": "Копіювати",
     "more": "Ще",
     "write": "Написати",
     "call": "Зателефонувати",
@@ -1277,23 +1278,44 @@
       "changePlan": "Змінити тариф",
       "paymentMethod": "Спосіб оплати",
       "paymentMethodHint": "Оплата через Telegram / баланс TradeGround",
+      "paymentSection": "Оплата",
+      "inYourPlan": "У вашому тарифі",
+      "cardEnding": "Mastercard •••• 4242",
       "paymentHistory": "Історія платежів",
       "cancel": "Скасувати підписку"
     },
     "analytics": {
       "proTitle": "Business PRO аналітика",
+      "dynamicsTitle": "Динаміка за {days} днів",
       "funnelTitle": "Воронка конверсії",
       "trafficTitle": "Джерела трафіку",
+      "contactChannelsTitle": "Звернення та кліки",
+      "profileStatsTitle": "Статистика Business-профілю",
       "impressions": "Покази оголошень",
       "listingViews": "Перегляди оголошень",
       "profileViews": "Перегляди профілю",
       "inquiries": "Звернення",
+      "newFollowers": "Нові підписники",
+      "reach": "Охоплення",
+      "tipTitle": "Порада",
+      "bestListings": "Найкращі оголошення",
+      "allListings": "Усі оголошення",
+      "noListings": "Поки немає активних оголошень",
+      "promotionsUsed": "Використано {count} просувань",
+      "efficiencyTitle": "Ефективність просування",
+      "promotionHistory": "Історія просування",
+      "noPromotions": "Просувань ще не було",
       "sourceMain": "Головна",
       "sourceCategory": "Категорії",
       "sourceSearch": "Пошук",
       "sourceSimilar": "Схожі",
       "sourceProfile": "Профіль",
       "sourceOther": "Інше",
+      "listingSort": {
+        "inquiries": "За зверненнями",
+        "views": "За переглядами",
+        "favorites": "За обраним"
+      },
       "tab": {
         "overview": "Огляд",
         "listings": "Оголошення",
@@ -1320,6 +1342,80 @@
       "tabActive": "Активні",
       "tabModeration": "На перевірці",
       "tabInactive": "Неактивні"
+    },
+    "settings": {
+      "title": "Налаштування Business",
+      "photosSection": "Фотографії",
+      "basicSection": "Основна інформація",
+      "logoRecommended": "Рекомендований розмір 500×500",
+      "coverRecommended": "Рекомендований розмір 1200×400",
+      "saveChanges": "Зберегти зміни",
+      "publicLinkHint": "Поділіться посиланням, щоб клієнти відкрили ваш Business-профіль.",
+      "linkCopied": "Посилання скопійовано",
+      "deactivateTitle": "Деактивувати профіль",
+      "deactivateSubtitle": "Тимчасово приховати ваш Business-профіль",
+      "deactivateConfirmTitle": "Деактивувати Business-профіль?",
+      "deactivateConfirmMessage": "Профіль буде приховано від покупців. Підписка буде зупинена, налаштування збережуться.",
+      "deactivatedToast": "Business-профіль деактивовано",
+      "deactivateScreenTitle": "Деактивувати Business-профіль",
+      "deactivateSureTitle": "Ви впевнені?",
+      "deactivateSureMessage": "Business-профіль буде приховано від користувачів. Оголошення та контакти не відображатимуться в пошуку та на платформі. Ви зможете знову активувати профіль у будь-який момент.",
+      "deactivateSubscriptionNote": "Ваша підписка залишиться активною. Ви зможете знову активувати профіль, коли будете готові.",
+      "showWorkingHours": "Показувати години роботи",
+      "showWorkingHoursHint": "Ваші години роботи будуть відображатися в профілі для клієнтів",
+      "dayOff": "Вихідний",
+      "listingsIntro": "Оберіть, які оголошення відображатимуться у вашому Business-профілі.",
+      "selectedListingsCount": "Обрано оголошень: {count}",
+      "publicLinkIntro": "Поділіться цим посиланням — клієнти зможуть знайти всі ваші оголошення та звʼязатися з вами.",
+      "copyLink": "Скопіювати посилання",
+      "qrTitle": "QR-код вашого Business-профілю",
+      "downloadQr": "Завантажити QR",
+      "publicLinkFooter": "Посилання можна використовувати в Instagram, на візитках та в соцмережах.",
+      "weekdays": {
+        "mon": "Понеділок",
+        "tue": "Вівторок",
+        "wed": "Середа",
+        "thu": "Четвер",
+        "fri": "Пʼятниця",
+        "sat": "Субота",
+        "sun": "Неділя"
+      },
+      "listingsMode": {
+        "all": {
+          "title": "Показувати всі мої оголошення",
+          "subtitle": "Усі активні оголошення відображатимуться в профілі"
+        },
+        "manual": {
+          "title": "Обрати вручну",
+          "subtitle": "Відмітьте конкретні оголошення"
+        }
+      },
+      "menu": {
+        "editProfile": {
+          "title": "Редагувати профіль",
+          "subtitle": "Логотип, обкладинка, назва, опис"
+        },
+        "location": {
+          "title": "Місцезнаходження та зона роботи",
+          "subtitle": "Місто, адреса, радіус роботи"
+        },
+        "contacts": {
+          "title": "Контакти",
+          "subtitle": "Telegram, телефон, Instagram, сайт"
+        },
+        "workingHours": {
+          "title": "Години роботи",
+          "subtitle": "Час роботи та вихідні"
+        },
+        "listings": {
+          "title": "Оголошення профілю",
+          "subtitle": "Які оголошення показувати"
+        },
+        "publicLink": {
+          "title": "Публічне посилання",
+          "subtitle": "Посилання на ваш Business-профіль"
+        }
+      }
     },
     "public": {
       "write": "Написати",

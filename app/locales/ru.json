@@ -12,6 +12,7 @@
     "edit": "Редактировать",
     "close": "Закрыть",
     "share": "Поделиться",
+    "copy": "Копировать",
     "more": "Ещё",
     "write": "Написать",
     "call": "Позвонить",
@@ -1275,23 +1276,44 @@
       "changePlan": "Сменить тариф",
       "paymentMethod": "Способ оплаты",
       "paymentMethodHint": "Оплата через Telegram / баланс TradeGround",
+      "paymentSection": "Оплата",
+      "inYourPlan": "В вашем тарифе",
+      "cardEnding": "Mastercard •••• 4242",
       "paymentHistory": "История платежей",
       "cancel": "Отменить подписку"
     },
     "analytics": {
       "proTitle": "Business PRO аналитика",
+      "dynamicsTitle": "Динамика за {days} дней",
       "funnelTitle": "Воронка конверсии",
       "trafficTitle": "Источники трафика",
+      "contactChannelsTitle": "Обращения и клики",
+      "profileStatsTitle": "Статистика Business-профиля",
       "impressions": "Показы объявлений",
       "listingViews": "Просмотры объявлений",
       "profileViews": "Просмотры профиля",
       "inquiries": "Обращения",
+      "newFollowers": "Новые подписчики",
+      "reach": "Охват",
+      "tipTitle": "Совет",
+      "bestListings": "Лучшие объявления",
+      "allListings": "Все объявления",
+      "noListings": "Пока нет активных объявлений",
+      "promotionsUsed": "Использовано {count} продвижений",
+      "efficiencyTitle": "Эффективность продвижения",
+      "promotionHistory": "История продвижения",
+      "noPromotions": "Продвижений пока не было",
       "sourceMain": "Главная",
       "sourceCategory": "Категории",
       "sourceSearch": "Поиск",
       "sourceSimilar": "Похожие",
       "sourceProfile": "Профиль",
       "sourceOther": "Другое",
+      "listingSort": {
+        "inquiries": "По обращениям",
+        "views": "По просмотрам",
+        "favorites": "По избранному"
+      },
       "tab": {
         "overview": "Обзор",
         "listings": "Объявления",
@@ -1318,6 +1340,80 @@
       "tabActive": "Активные",
       "tabModeration": "На проверке",
       "tabInactive": "Неактивные"
+    },
+    "settings": {
+      "title": "Настройки Business",
+      "photosSection": "Фотографии",
+      "basicSection": "Основная информация",
+      "logoRecommended": "Рекомендуемый размер 500×500",
+      "coverRecommended": "Рекомендуемый размер 1200×400",
+      "saveChanges": "Сохранить изменения",
+      "publicLinkHint": "Поделитесь ссылкой, чтобы клиенты открыли ваш Business-профиль.",
+      "linkCopied": "Ссылка скопирована",
+      "deactivateTitle": "Деактивировать профиль",
+      "deactivateSubtitle": "Временно скрыть ваш Business-профиль",
+      "deactivateConfirmTitle": "Деактивировать Business-профиль?",
+      "deactivateConfirmMessage": "Профиль будет скрыт от покупателей. Подписка будет остановлена, настройки сохранятся.",
+      "deactivatedToast": "Business-профиль деактивирован",
+      "deactivateScreenTitle": "Деактивировать Business-профиль",
+      "deactivateSureTitle": "Вы уверены?",
+      "deactivateSureMessage": "Business-профиль будет скрыт от пользователей. Объявления и контакты не будут отображаться в поиске и на платформе. Вы сможете снова активировать профиль в любой момент.",
+      "deactivateSubscriptionNote": "Ваша подписка останется активной. Вы сможете снова активировать профиль, когда будете готовы.",
+      "showWorkingHours": "Показывать часы работы",
+      "showWorkingHoursHint": "Ваши часы работы будут отображаться в профиле для клиентов",
+      "dayOff": "Выходной",
+      "listingsIntro": "Выберите, какие объявления будут отображаться в вашем Business-профиле.",
+      "selectedListingsCount": "Выбрано объявлений: {count}",
+      "publicLinkIntro": "Поделитесь этой ссылкой — клиенты смогут найти все ваши объявления и связаться с вами.",
+      "copyLink": "Скопировать ссылку",
+      "qrTitle": "QR-код вашего Business-профиля",
+      "downloadQr": "Скачать QR",
+      "publicLinkFooter": "Ссылку можно использовать в Instagram, на визитках и в соцсетях.",
+      "weekdays": {
+        "mon": "Понедельник",
+        "tue": "Вторник",
+        "wed": "Среда",
+        "thu": "Четверг",
+        "fri": "Пятница",
+        "sat": "Суббота",
+        "sun": "Воскресенье"
+      },
+      "listingsMode": {
+        "all": {
+          "title": "Показывать все мои объявления",
+          "subtitle": "Все активные объявления будут отображаться в профиле"
+        },
+        "manual": {
+          "title": "Выбрать вручную",
+          "subtitle": "Отметьте конкретные объявления"
+        }
+      },
+      "menu": {
+        "editProfile": {
+          "title": "Редактировать профиль",
+          "subtitle": "Логотип, обложка, название, описание"
+        },
+        "location": {
+          "title": "Местоположение и зона работы",
+          "subtitle": "Город, адрес, радиус работы"
+        },
+        "contacts": {
+          "title": "Контакты",
+          "subtitle": "Telegram, телефон, Instagram, сайт"
+        },
+        "workingHours": {
+          "title": "Часы работы",
+          "subtitle": "Время работы и выходные"
+        },
+        "listings": {
+          "title": "Объявления профиля",
+          "subtitle": "Какие объявления показывать"
+        },
+        "publicLink": {
+          "title": "Публичная ссылка",
+          "subtitle": "Ссылка на ваш Business-профиль"
+        }
+      }
     },
     "public": {
       "write": "Написать",

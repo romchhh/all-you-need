@@ -9,6 +9,13 @@ import {
   type BusinessProfileStatsPayload,
 } from '@/lib/businessProfileConstants';
 import type { PaymentMethod } from '@/lib/payments/paymentConstants';
+import {
+  parseLinkedListingIds,
+  serializeListingDisplayConfig,
+  type ListingDisplayMode,
+} from '@/lib/businessProfileSettings';
+
+export { parseLinkedListingIds } from '@/lib/businessProfileSettings';
 
 export type BusinessProfileInput = {
   businessName: string;
@@ -28,18 +35,9 @@ export type BusinessProfileInput = {
   coverImage?: string | null;
   plan?: BusinessPlanId | null;
   listingIds?: number[];
+  listingDisplayMode?: ListingDisplayMode;
 };
 
-export function parseLinkedListingIds(raw: string | null | undefined): number[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((id) => parseInt(String(id), 10)).filter((id) => Number.isFinite(id));
-  } catch {
-    return [];
-  }
-}
 
 export function isBusinessProfileActive(profile: {
   subscriptionStatus: string;
@@ -66,11 +64,13 @@ export async function upsertBusinessProfileDraft(
   };
 
   const listingIdsJson =
-    data.listingIds !== undefined
-      ? data.listingIds.length > 0
-        ? JSON.stringify(data.listingIds)
-        : null
-      : existing?.linkedListingIds ?? null;
+    data.listingDisplayMode !== undefined
+      ? serializeListingDisplayConfig(data.listingDisplayMode, data.listingIds ?? [])
+      : data.listingIds !== undefined
+        ? data.listingIds.length > 0
+          ? serializeListingDisplayConfig('manual', data.listingIds)
+          : null
+        : existing?.linkedListingIds ?? null;
 
   const payload = {
     businessName: pickString(data.businessName, existing?.businessName),
@@ -168,6 +168,16 @@ export async function linkListingToBusinessIfAllowed(
   }
 
   return true;
+}
+
+export async function pauseBusinessProfile(userId: number, businessProfileId: number): Promise<void> {
+  await prisma.businessProfile.update({
+    where: { id: businessProfileId },
+    data: {
+      isPublished: false,
+      updatedAt: new Date(),
+    },
+  });
 }
 
 export async function deactivateBusinessProfile(

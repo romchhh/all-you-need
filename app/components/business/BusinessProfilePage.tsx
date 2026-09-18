@@ -36,6 +36,7 @@ import {
 } from '@/utils/sellerContact';
 import { PhoneModal } from '@/components/modals/PhoneModal';
 import { ShareModal } from '@/components/modals/ShareModal';
+import { formatWorkingHoursForDisplay, WEEKDAY_KEYS } from '@/lib/businessProfileSettings';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
@@ -113,6 +114,14 @@ export function BusinessProfilePage({
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const categories = useMemo(() => getCategories(t), [t]);
+  const weekdayLabels = useMemo(
+    () =>
+      Object.fromEntries(WEEKDAY_KEYS.map((key) => [key, t(`businessProfile.settings.weekdays.${key}`)])) as Record<
+        (typeof WEEKDAY_KEYS)[number],
+        string
+      >,
+    [t]
+  );
   const { user: currentUser } = useTelegram();
   const { hide: hidePageLoader } = usePageTransition();
   const { toast, showToast, hideToast } = useToast();
@@ -129,6 +138,15 @@ export function BusinessProfilePage({
   const [isOwn, setIsOwn] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const profileViewTrackedRef = useRef<number | null>(null);
+  const formattedWorkingHours = useMemo(
+    () =>
+      formatWorkingHoursForDisplay(
+        profile?.workingHours,
+        weekdayLabels,
+        t('businessProfile.settings.dayOff')
+      ),
+    [profile?.workingHours, weekdayLabels, t]
+  );
 
   useSwipeBack({
     onSwipeBack: onBackToPreviousListing || onClose,
@@ -619,10 +637,10 @@ export function BusinessProfilePage({
                 <p className={`text-sm ${ac.mutedText}`}>{profile.address}</p>
               </div>
             )}
-            {profile.workingHours && (
+            {formattedWorkingHours && (
               <div className={aboutCard}>
                 <h3 className={`mb-1 font-semibold ${ac.pageHeading}`}>{t('businessProfile.fields.workingHours')}</h3>
-                <p className={`text-sm whitespace-pre-wrap ${ac.mutedText}`}>{profile.workingHours}</p>
+                <p className={`text-sm whitespace-pre-wrap ${ac.mutedText}`}>{formattedWorkingHours}</p>
               </div>
             )}
             <p className={`px-1 text-xs ${ac.mutedText}`}>

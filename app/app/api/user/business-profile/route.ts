@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
 import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile } from '@/lib/businessProfileHelpers';
+import type { ListingDisplayMode } from '@/lib/businessProfileSettings';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -119,6 +120,7 @@ export async function PUT(request: NextRequest) {
         workingHours: form.get('workingHours'),
         plan: form.get('plan'),
         listingIds: form.get('listingIds'),
+        listingDisplayMode: form.get('listingDisplayMode'),
       };
       const logoFile = form.get('logo');
       const coverFile = form.get('coverImage');
@@ -190,6 +192,10 @@ export async function PUT(request: NextRequest) {
 
     const listingIdsRaw = body.listingIds;
     let listingIds: number[] | undefined;
+    let listingDisplayMode: ListingDisplayMode | undefined;
+    if (body.listingDisplayMode === 'all' || body.listingDisplayMode === 'manual') {
+      listingDisplayMode = body.listingDisplayMode;
+    }
     if (listingIdsRaw != null && String(listingIdsRaw).trim() !== '') {
       try {
         const parsed = JSON.parse(String(listingIdsRaw)) as unknown;
@@ -228,6 +234,7 @@ export async function PUT(request: NextRequest) {
         coverImage: coverPath,
         plan: plan as 'business' | 'business_pro' | null | undefined,
         listingIds,
+        listingDisplayMode,
       },
       { partial: isPartial }
     );
