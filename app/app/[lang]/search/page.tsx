@@ -6,7 +6,6 @@ import { Listing } from '@/types';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { useUser } from '@/features/user/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { AppHeader } from '@/components/layout/AppHeader';
 import { SearchView } from '@/components/search/SearchView';
 import { ListingDetail } from '@/components/listing/ListingDetail';
 import { SellerProfileRouter } from '@/components/profile/SellerProfileRouter';
@@ -306,7 +305,6 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen pb-20 animate-content-crossfade">
-      <AppHeader />
       <SearchView
           initialQuery={initialQuery}
           initialCategory={initialCategory}
@@ -319,6 +317,13 @@ export default function SearchPage() {
           onQueryChange={handleQueryChange}
           onCategoryChange={handleCategoryChange}
           onSelectListing={handleSelectListing}
+          onSelectBusiness={(payload) => {
+            setSelectedSeller({
+              telegramId: payload.telegramId,
+              name: payload.name,
+              avatar: payload.avatar,
+            });
+          }}
           onToggleFavorite={toggleFavorite}
           tg={tg}
         />

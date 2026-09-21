@@ -31,7 +31,9 @@ import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { BusinessPromoCard } from '@/components/business/BusinessPromoCard';
 import { BusinessSuspendedCard } from '@/components/business/BusinessSuspendedCard';
-import { ProfileModeSwitcher, type ProfileViewMode } from '@/components/business/ProfileModeSwitcher';
+import type { ProfileViewMode } from '@/components/business/ProfileModeSwitcher';
+import { ProfileModeSwitcherRich } from '@/components/business/ProfileModeSwitcherRich';
+import { useProfileViewMode } from '@/contexts/ProfileViewModeContext';
 import {
   BusinessOwnerProfileView,
   type BusinessListingTab,
@@ -85,6 +87,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
   const { profile, dashboardStats, loading, refetch, refetchStats } = useUser();
+  const { mode: profileViewMode, setMode: setProfileViewMode, refreshBusinessStatus } = useProfileViewMode();
   const [userListings, setUserListings] = useState<Listing[]>([]);
   const [favoritesLocal, setFavoritesLocal] = useState<Set<number>>(new Set());
   const favorites = favoritesProp ?? favoritesLocal;
@@ -118,7 +121,6 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [selectedListingForReactivation, setSelectedListingForReactivation] = useState<number | null>(null);
   const [showBusinessFlow, setShowBusinessFlow] = useState(false);
   const [showBusinessSettings, setShowBusinessSettings] = useState(false);
-  const [profileViewMode, setProfileViewMode] = useState<ProfileViewMode>('personal');
   const [businessProfile, setBusinessProfile] = useState<BusinessProfileData | null>(null);
   const [isBusinessActive, setIsBusinessActive] = useState(false);
   const [hasBusinessProfile, setHasBusinessProfile] = useState(false);
@@ -839,6 +841,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     tg?.HapticFeedback.impactOccurred('light');
   };
 
+  const handleProfileModeChange = (mode: ProfileViewMode) => {
+    setProfileViewMode(mode);
+    if (mode === 'business') {
+      void fetchBusinessStats();
+    }
+    tg?.HapticFeedback.impactOccurred('light');
+  };
+
   const openBusinessPromote = () => {
     const activeListing = userListings.find((listing) => listing.status === 'active');
     if (activeListing) {
@@ -864,13 +874,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           rating={profile.rating || 0}
           reviewsCount={profile.reviewsCount || 0}
           profileViewMode={profileViewMode}
-          onProfileModeChange={(mode) => {
-            setProfileViewMode(mode);
-            if (mode === 'business') {
-              void fetchBusinessStats();
-            }
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
+          onProfileModeChange={handleProfileModeChange}
           listingTab={businessListingTab}
           onListingTabChange={setBusinessListingTab}
           onPreviewProfile={openBusinessPreview}
@@ -890,6 +894,18 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         )
       ) : (
       <>
+      {isBusinessActive && businessProfile && (
+        <div className="px-4 pb-3 pt-1">
+          <ProfileModeSwitcherRich
+            mode={profileViewMode}
+            onChange={handleProfileModeChange}
+            personalName={displayName}
+            personalAvatar={profile.avatar}
+            businessName={businessProfile.businessName}
+            businessLogo={businessProfile.logo}
+          />
+        </div>
+      )}
       {/* Профіль хедер */}
       <div className="pb-4 max-lg:-mt-0.5">
         <div className="px-4 pt-1">
@@ -996,19 +1012,6 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       </div>
 
       <div className="px-4 pb-2">
-        {isBusinessActive && (
-        <ProfileModeSwitcher
-          mode={profileViewMode}
-          onChange={(mode) => {
-            setProfileViewMode(mode);
-            if (mode === 'business') {
-              void fetchBusinessStats();
-            }
-            tg?.HapticFeedback.impactOccurred('light');
-          }}
-          hasBusinessProfile={isBusinessActive}
-        />
-        )}
         {isBusinessSuspended && (
           <BusinessSuspendedCard
             onRenew={() => {
@@ -1698,10 +1701,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           setBusinessRenewMode(false);
           setBusinessEditMode(false);
           fetchBusinessProfile();
+          void refreshBusinessStatus();
         }}
         onSuccess={() => {
           fetchBusinessProfile();
           void fetchBusinessStats();
+          void refreshBusinessStatus();
           fetchListingsWithFilters(0, true);
           refetch();
           setBusinessRenewMode(false);
@@ -1737,12 +1742,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             onSuccess={() => {
               fetchBusinessProfile();
               void fetchBusinessStats();
+              void refreshBusinessStatus();
               fetchListingsWithFilters(0, true);
               refetch();
             }}
             onDeactivated={() => {
               setProfileViewMode('personal');
               fetchBusinessProfile();
+              void refreshBusinessStatus();
             }}
             tg={tg}
             telegramId={String(profile?.telegramId || '')}

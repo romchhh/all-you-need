@@ -33,7 +33,11 @@ import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { getCurrencySymbol } from '@/utils/currency';
-import { getCategories } from '@/constants/categories';
+import { BusinessSphereFields } from '@/components/business/BusinessSphereFields';
+import {
+  businessActivityToLegacyFields,
+  legacyFieldsToBusinessActivity,
+} from '@/lib/businessSphereConstants';
 import { majorGermanCities } from '@/constants/major-german-cities';
 import { type ServiceArea } from '@/lib/businessProfileConstants';
 import {
@@ -80,8 +84,8 @@ interface BusinessSettingsFlowProps {
 
 interface FormState {
   businessName: string;
-  category: string;
-  subcategory: string;
+  sphere: string;
+  directions: string[];
   description: string;
   logoFile: File | null;
   logoPreview: string | null;
@@ -114,8 +118,7 @@ function prefillForm(
 
   return {
     businessName: profile.businessName || '',
-    category: profile.category || '',
-    subcategory: profile.subcategory || '',
+    ...legacyFieldsToBusinessActivity(profile.category, profile.subcategory),
     description: profile.description || '',
     logoFile: null,
     logoPreview: profile.logo || null,
@@ -306,7 +309,6 @@ export default function BusinessSettingsFlow({
   const ac = getAppearanceClasses(isLight);
   const ui = getBusinessProfileUi(isLight);
   const { toast, showToast, hideToast } = useToast();
-  const categories = useMemo(() => getCategories(t), [t]);
 
   const [screen, setScreen] = useState<SettingsScreen>('hub');
   const [form, setForm] = useState<FormState>(() =>
@@ -326,11 +328,6 @@ export default function BusinessSettingsFlow({
   const isPro = existingProfile.plan === 'business_pro';
   const logoUrl = form.logoPreview ? getResolvedImageUrl(form.logoPreview) : null;
   const showRating = reviewsCount > 0 && rating > 0;
-
-  const subcategories = useMemo(
-    () => categories.find((c) => c.id === form.category)?.subcategories || [],
-    [categories, form.category]
-  );
 
   const filteredCities = useMemo(() => {
     const query = cityQuery.trim().toLowerCase();
@@ -424,8 +421,8 @@ export default function BusinessSettingsFlow({
     if (target === 'editProfile') {
       const hasLogo = Boolean(form.logoFile || form.logoPreview || form.savedLogoPath);
       if (!form.businessName.trim()) return t('businessProfile.validation.businessName');
-      if (!form.category) return t('businessProfile.validation.category');
-      if (!form.subcategory) return t('businessProfile.validation.subcategory');
+      if (!form.sphere) return t('businessProfile.validation.sphere');
+      if (form.directions.length === 0) return t('businessProfile.validation.directions');
       if (!form.description.trim()) return t('businessProfile.validation.description');
       if (!hasLogo) return t('businessProfile.validation.logo');
     }
@@ -450,6 +447,7 @@ export default function BusinessSettingsFlow({
           ? activeUserListings.map((listing) => listing.id)
           : form.selectedListingIds;
       const workingHours = serializeWorkingHoursSettings(form.workingHoursSettings);
+      const activity = businessActivityToLegacyFields(form.sphere, form.directions);
       const hasNewFiles = Boolean(form.logoFile || form.coverFile);
       let res: Response;
 
@@ -457,8 +455,8 @@ export default function BusinessSettingsFlow({
         const fd = new FormData();
         fd.append('telegramId', telegramId);
         fd.append('businessName', form.businessName);
-        fd.append('category', form.category);
-        fd.append('subcategory', form.subcategory);
+        fd.append('category', activity.category);
+        fd.append('subcategory', activity.subcategory || '');
         fd.append('description', form.description);
         fd.append('city', form.city);
         fd.append('address', form.address);
@@ -481,8 +479,8 @@ export default function BusinessSettingsFlow({
           body: JSON.stringify({
             telegramId,
             businessName: form.businessName,
-            category: form.category,
-            subcategory: form.subcategory,
+            category: activity.category,
+            subcategory: activity.subcategory,
             description: form.description,
             city: form.city,
             address: form.address,
@@ -911,37 +909,12 @@ export default function BusinessSettingsFlow({
                         onChange={(e) => patch({ businessName: e.target.value })}
                       />
                     </div>
-                    <div>
-                      <label className={labelCls}>{t('businessProfile.fields.category')} *</label>
-                      <select
-                        className={inputCls}
-                        value={form.category}
-                        onChange={(e) => patch({ category: e.target.value, subcategory: '' })}
-                      >
-                        <option value="">{t('businessProfile.fields.selectCategory')}</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelCls}>{t('businessProfile.fields.subcategory')} *</label>
-                      <select
-                        className={inputCls}
-                        value={form.subcategory}
-                        onChange={(e) => patch({ subcategory: e.target.value })}
-                        disabled={!form.category}
-                      >
-                        <option value="">{t('businessProfile.fields.selectSubcategory')}</option>
-                        {subcategories.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <BusinessSphereFields
+                      sphere={form.sphere}
+                      directions={form.directions}
+                      onSphereChange={(sphere) => patch({ sphere, directions: [] })}
+                      onDirectionsChange={(directions) => patch({ directions })}
+                    />
                     <div>
                       <div className="mb-1.5 flex items-center justify-between gap-2">
                         <label className={labelCls.replace('mb-1.5 ', '')}>

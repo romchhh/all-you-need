@@ -12,8 +12,8 @@ export type BusinessWizardStep =
 
 export type StoredBusinessWizardForm = {
   businessName: string;
-  category: string;
-  subcategory: string;
+  sphere: string;
+  directions: string[];
   description: string;
   city: string;
   address: string;

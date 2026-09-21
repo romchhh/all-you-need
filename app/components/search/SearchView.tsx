@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Clock, Flame, MapPin, Search, SlidersHorizontal, Sparkles, TrendingUp, X } from 'lucide-react';
+import { ArrowLeft, Briefcase, Clock, Flame, MapPin, Search, SlidersHorizontal, Sparkles, TrendingUp, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TelegramWebApp } from '@/types/telegram';
@@ -14,7 +14,27 @@ import {
   CATEGORY_POPULAR_QUERY_KEYS,
   POPULAR_SEARCH_QUERY_KEYS,
 } from '@/constants/popularSearchQueries';
-import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
+import {
+  POPULAR_BUSINESS_SEARCH_QUERY_KEYS,
+} from '@/constants/popularBusinessSearchQueries';
+import {
+  BUSINESS_DIRECTIONS_BY_SPHERE,
+  BUSINESS_SPHERE_IDS,
+  getBusinessDirectionLabel,
+  getBusinessSphereLabel,
+  isValidBusinessSphere,
+  type BusinessSphereId,
+} from '@/lib/businessSphereConstants';
+import { SearchEntityToggle, type SearchEntityMode } from '@/components/search/SearchEntityToggle';
+import {
+  BusinessSearchResultCard,
+  type BusinessSearchCardData,
+} from '@/components/search/BusinessSearchResultCard';
+import {
+  BusinessSearchFilterModal,
+  DEFAULT_BUSINESS_SEARCH_FILTERS,
+  type BusinessSearchFilterState,
+} from '@/components/search/BusinessSearchFilterModal';
 import {
   addToSearchHistory,
   clearSearchHistory,
@@ -47,6 +67,8 @@ const CityModal = dynamic(
 
 const SEARCH_DEBOUNCE_MS = 800;
 const MIN_QUERY_LENGTH = 2;
+const SEARCH_STICKY_CLASS =
+  'sticky z-[42] top-0 pt-[max(env(safe-area-inset-top,0px),10px)]';
 
 type SearchScreenMode = 'discover' | 'results';
 type SortOption = 'newest' | 'price_low' | 'price_high' | 'popular';
@@ -63,6 +85,7 @@ interface SearchViewProps {
   onQueryChange?: (query: string) => void;
   onCategoryChange?: (category: string | null) => void;
   onSelectListing: (listing: Listing) => void;
+  onSelectBusiness?: (payload: { telegramId: string; name: string; avatar: string }) => void;
   onToggleFavorite: (id: number) => void;
   tg: TelegramWebApp | null;
 }
@@ -171,10 +194,11 @@ export function SearchView({
   onQueryChange,
   onCategoryChange,
   onSelectListing,
+  onSelectBusiness,
   onToggleFavorite,
   tg,
 }: SearchViewProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -222,6 +246,18 @@ export function SearchView({
   const [popularListings, setPopularListings] = useState<Listing[]>([]);
   const [recentViewedListings, setRecentViewedListings] = useState<Listing[]>([]);
   const [loadingDiscover, setLoadingDiscover] = useState(false);
+  const [searchEntityMode, setSearchEntityMode] = useState<SearchEntityMode>('listings');
+  const [selectedBusinessSphere, setSelectedBusinessSphere] = useState<string | null>(null);
+  const [businessFilters, setBusinessFilters] = useState<BusinessSearchFilterState>(
+    DEFAULT_BUSINESS_SEARCH_FILTERS
+  );
+  const [showBusinessFilterModal, setShowBusinessFilterModal] = useState(false);
+  const [businessResults, setBusinessResults] = useState<BusinessSearchCardData[]>([]);
+  const [businessTotal, setBusinessTotal] = useState(0);
+  const [loadingBusinessResults, setLoadingBusinessResults] = useState(false);
+  const [recommendedBusinesses, setRecommendedBusinesses] = useState<BusinessSearchCardData[]>([]);
+  const businessRequestRef = useRef(0);
+  const lastBusinessFetchKeyRef = useRef('');
   const [viewMode] = useState<'grid' | 'list'>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('bazaarViewMode') === 'list' ? 'list' : 'grid';
@@ -386,8 +422,102 @@ export function SearchView({
     ]
   );
 
+  const buildBusinessFetchKey = useCallback(
+    (query: string, sphere: string | null) => {
+      const f = businessFilters;
+      return `business|${query.trim()}|${sphere ?? ''}|${citiesKey}|${f.sortBy}|${f.sphere ?? ''}|${f.direction ?? ''}|${f.hasPhysicalAddress}|${f.travelsToClient}|${f.worksOnline}|${f.minRating ?? ''}`;
+    },
+    [businessFilters, citiesKey]
+  );
+
+  const fetchBusinessResults = useCallback(
+    async (
+      query: string,
+      options?: {
+        haptic?: boolean;
+        saveHistory?: boolean;
+        force?: boolean;
+        sphere?: string | null;
+      }
+    ) => {
+      const trimmed = query.trim();
+      if (trimmed.length < MIN_QUERY_LENGTH) return;
+
+      const sphere = options?.sphere !== undefined ? options.sphere : selectedBusinessSphere;
+      const effectiveSphere = businessFilters.sphere ?? sphere;
+      const fetchKey = `commit|${buildBusinessFetchKey(trimmed, sphere)}`;
+      if (!options?.force && fetchKey === lastBusinessFetchKeyRef.current) return;
+
+      lastBusinessFetchKeyRef.current = fetchKey;
+      const requestId = ++businessRequestRef.current;
+      setLoadingBusinessResults(true);
+      setActiveQuery(trimmed);
+
+      if (options?.saveHistory !== false) {
+        addToSearchHistory(trimmed);
+        refreshLocalHistory();
+      }
+      if (options?.haptic) {
+        tg?.HapticFeedback?.impactOccurred?.('light');
+      }
+
+      try {
+        const params = new URLSearchParams({
+          limit: '24',
+          offset: '0',
+          sortBy: businessFilters.sortBy,
+          search: trimmed,
+          lang: language === 'ru' ? 'ru' : 'uk',
+        });
+        if (citiesKey) params.set('cities', citiesKey);
+        if (effectiveSphere) params.set('sphere', effectiveSphere);
+        if (businessFilters.direction) params.set('direction', businessFilters.direction);
+        if (businessFilters.hasPhysicalAddress) params.set('hasPhysicalAddress', 'true');
+        if (businessFilters.travelsToClient) params.set('travelsToClient', 'true');
+        if (businessFilters.worksOnline) params.set('worksOnline', 'true');
+        if (businessFilters.minRating != null) {
+          params.set('minRating', String(businessFilters.minRating));
+        }
+        if (profileTelegramId) params.set('viewerTelegramId', profileTelegramId);
+
+        const res = await fetch(`/api/search/business?${params.toString()}`, { cache: 'no-store' });
+        if (requestId !== businessRequestRef.current) return;
+
+        if (res.ok) {
+          const data = await res.json();
+          const list = (data.businesses || []) as BusinessSearchCardData[];
+          setBusinessResults(list);
+          setBusinessTotal(data.total ?? list.length);
+        } else {
+          setBusinessResults([]);
+          setBusinessTotal(0);
+        }
+      } catch {
+        if (requestId === businessRequestRef.current) {
+          setBusinessResults([]);
+          setBusinessTotal(0);
+          lastBusinessFetchKeyRef.current = '';
+        }
+      } finally {
+        if (requestId === businessRequestRef.current) {
+          setLoadingBusinessResults(false);
+        }
+      }
+    },
+    [
+      buildBusinessFetchKey,
+      businessFilters,
+      citiesKey,
+      language,
+      profileTelegramId,
+      refreshLocalHistory,
+      selectedBusinessSphere,
+      tg,
+    ]
+  );
+
   const commitSearch = useCallback(
-    (query: string, options?: { haptic?: boolean; saveHistory?: boolean; category?: string | null }) => {
+    (query: string, options?: { haptic?: boolean; saveHistory?: boolean; category?: string | null; sphere?: string | null }) => {
       const trimmed = query.trim();
       if (trimmed.length < MIN_QUERY_LENGTH) return;
 
@@ -404,14 +534,50 @@ export function SearchView({
       onQueryChangeRef.current?.(trimmed);
       dismissMobileKeyboard();
       lastFetchKeyRef.current = '';
-      void fetchSearchResults(trimmed, {
-        haptic: options?.haptic ?? true,
-        saveHistory: options?.saveHistory ?? true,
-        force: true,
-        category: options?.category,
+      lastBusinessFetchKeyRef.current = '';
+      if (searchEntityMode === 'businesses') {
+        void fetchBusinessResults(trimmed, {
+          haptic: options?.haptic ?? true,
+          saveHistory: options?.saveHistory ?? true,
+          force: true,
+          sphere: options?.sphere,
+        });
+      } else {
+        void fetchSearchResults(trimmed, {
+          haptic: options?.haptic ?? true,
+          saveHistory: options?.saveHistory ?? true,
+          force: true,
+          category: options?.category,
+        });
+      }
+    },
+    [fetchBusinessResults, fetchSearchResults, searchEntityMode, selectedBusinessSphere]
+  );
+
+  const handleBusinessSphereSelect = useCallback(
+    (sphereId: string | null) => {
+      const next = selectedBusinessSphere === sphereId ? null : sphereId;
+      setSelectedBusinessSphere(next);
+      lastBusinessFetchKeyRef.current = '';
+      tg?.HapticFeedback?.impactOccurred?.('light');
+
+      const query = localQuery.trim();
+      if (screenMode === 'results' && query.length >= MIN_QUERY_LENGTH && searchEntityMode === 'businesses') {
+        void fetchBusinessResults(query, { force: true, sphere: next });
+      }
+    },
+    [fetchBusinessResults, localQuery, screenMode, searchEntityMode, selectedBusinessSphere, tg]
+  );
+
+  const openBusinessProfile = useCallback(
+    (business: BusinessSearchCardData) => {
+      onSelectBusiness?.({
+        telegramId: business.sellerTelegramId,
+        name: business.businessName,
+        avatar: business.logo || '',
       });
     },
-    [fetchSearchResults]
+    [onSelectBusiness]
   );
 
   const handleCategorySelect = useCallback(
@@ -502,15 +668,45 @@ export function SearchView({
   const activeQueryRef = useRef(activeQuery);
   activeQueryRef.current = activeQuery;
 
-  // Зміна фільтрів у режимі результатів — перезавантажити
+  const handleEntityModeChange = useCallback(
+    (mode: SearchEntityMode) => {
+      if (mode === searchEntityMode) return;
+      setSearchEntityMode(mode);
+      lastFetchKeyRef.current = '';
+      lastBusinessFetchKeyRef.current = '';
+      tg?.HapticFeedback?.impactOccurred?.('light');
+
+      if (screenMode !== 'results') return;
+      const q = activeQueryRef.current.trim();
+      if (q.length < MIN_QUERY_LENGTH) return;
+      if (mode === 'businesses') {
+        void fetchBusinessResults(q, { force: true, saveHistory: false });
+      } else {
+        void fetchSearchResults(q, { force: true, saveHistory: false });
+      }
+    },
+    [fetchBusinessResults, fetchSearchResults, screenMode, searchEntityMode, tg]
+  );
+
+  // Зміна фільтрів у режимі результатів — перезавантажити (оголошення)
   useEffect(() => {
-    if (screenMode !== 'results') return;
+    if (screenMode !== 'results' || searchEntityMode !== 'listings') return;
     const q = activeQueryRef.current.trim();
     if (q.length < MIN_QUERY_LENGTH) return;
     lastFetchKeyRef.current = '';
     void fetchSearchResults(q, { saveHistory: false, force: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- лише фільтри, не activeQuery
-  }, [sortBy, showFreeOnly, citiesKey, screenMode, fetchSearchResults]);
+  }, [sortBy, showFreeOnly, citiesKey, screenMode, searchEntityMode, fetchSearchResults]);
+
+  // Зміна фільтрів у режимі результатів — перезавантажити (бізнеси)
+  useEffect(() => {
+    if (screenMode !== 'results' || searchEntityMode !== 'businesses') return;
+    const q = activeQueryRef.current.trim();
+    if (q.length < MIN_QUERY_LENGTH) return;
+    lastBusinessFetchKeyRef.current = '';
+    void fetchBusinessResults(q, { saveHistory: false, force: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- лише фільтри, не activeQuery
+  }, [businessFilters, citiesKey, screenMode, searchEntityMode, fetchBusinessResults]);
 
   // Discover data
   useEffect(() => {
@@ -537,6 +733,33 @@ export function SearchView({
       cancelled = true;
     };
   }, [profileTelegramId]);
+
+  useEffect(() => {
+    if (searchEntityMode !== 'businesses') return;
+    let cancelled = false;
+
+    const params = new URLSearchParams({
+      limit: '6',
+      lang: language === 'ru' ? 'ru' : 'uk',
+    });
+    if (profileTelegramId) params.set('viewerTelegramId', profileTelegramId);
+
+    fetch(`/api/search/business/discover?${params}`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setRecommendedBusinesses(
+          Array.isArray(data.recommendedBusinesses) ? data.recommendedBusinesses : []
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setRecommendedBusinesses([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [language, profileTelegramId, searchEntityMode]);
 
   useEffect(() => {
     const previews = getRecentSearchListings();
@@ -589,6 +812,18 @@ export function SearchView({
     return POPULAR_SEARCH_QUERY_KEYS.map((key) => t(`bazaar.search.queries.${key}`));
   }, [selectedCategory, t]);
 
+  const businessPopularQueries = useMemo(() => {
+    const lang = language === 'ru' ? 'ru' : 'uk';
+
+    if (selectedBusinessSphere && isValidBusinessSphere(selectedBusinessSphere)) {
+      return BUSINESS_DIRECTIONS_BY_SPHERE[selectedBusinessSphere as BusinessSphereId]
+        .slice(0, 8)
+        .map((id) => getBusinessDirectionLabel(id, lang) || id);
+    }
+
+    return POPULAR_BUSINESS_SEARCH_QUERY_KEYS.map((key) => t(`bazaar.search.businessQueries.${key}`));
+  }, [language, selectedBusinessSphere, t]);
+
   const hasActiveFilters = Boolean(
     sortBy !== 'newest' ||
       showFreeOnly ||
@@ -599,6 +834,22 @@ export function SearchView({
       selectedSubcategory != null ||
       (screenMode === 'results' && selectedCategory)
   );
+
+  const hasActiveBusinessFilters = Boolean(
+    businessFilters.sortBy !== 'relevance' ||
+      businessFilters.sphere ||
+      businessFilters.direction ||
+      businessFilters.hasPhysicalAddress ||
+      businessFilters.travelsToClient ||
+      businessFilters.worksOnline ||
+      businessFilters.minRating != null ||
+      (screenMode === 'results' && selectedBusinessSphere)
+  );
+
+  const effectiveSearchPlaceholder =
+    searchEntityMode === 'businesses'
+      ? t('bazaar.search.businessPlaceholder')
+      : searchPlaceholder || t('bazaar.whatInterestsYou');
 
   const persistFilters = useCallback(
     (patch: Partial<{
@@ -640,6 +891,11 @@ export function SearchView({
     }
     const q = activeQuery.trim();
     if (q.length < MIN_QUERY_LENGTH) return;
+    if (searchEntityMode === 'businesses') {
+      lastBusinessFetchKeyRef.current = '';
+      void fetchBusinessResults(q, { force: true, saveHistory: false, haptic: false });
+      return;
+    }
     lastFetchKeyRef.current = '';
     void fetchSearchResults(q, { force: true, saveHistory: false, haptic: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- лише фільтри/місто
@@ -653,6 +909,7 @@ export function SearchView({
     selectedCurrency,
     selectedSubcategory,
     screenMode,
+    searchEntityMode,
   ]);
 
   const trimmedLocal = localQuery.trim();
@@ -673,24 +930,75 @@ export function SearchView({
 
   const resultsContent = (
     <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto space-y-4">
-      <div className="min-w-0 pt-1">
-        {!loadingResults && !isTypingPending && activeQuery && (
-          <p className={`text-sm ${ac.mutedText}`}>
-            {t('bazaar.search.resultsCount', { count: String(searchTotal) })}
-          </p>
-        )}
-        {activeQuery && (loadingResults || (isTypingPending && trimmedLocal !== activeQuery)) && (
-          <p className={`text-sm ${ac.mutedText}`}>{t('bazaar.search.searching')}</p>
-        )}
-      </div>
+      <SearchEntityToggle
+        mode={searchEntityMode}
+        onChange={handleEntityModeChange}
+        count={
+          !loadingResults &&
+          !loadingBusinessResults &&
+          !isTypingPending &&
+          activeQuery
+            ? searchEntityMode === 'businesses'
+              ? businessTotal
+              : searchTotal
+            : null
+        }
+        className="pt-1"
+      />
 
-      {loadingResults || (isTypingPending && trimmedLocal !== activeQuery) ? (
-        <CatalogListingsSkeleton count={6} />
-      ) : searchResults.length > 0 ? (
-        <CatalogListings items={searchResults} {...catalogListingsProps} />
-      ) : activeQuery ? (
-        <p className={`py-12 text-center text-sm ${ac.mutedText}`}>{t('common.nothingFound')}</p>
-      ) : null}
+      {searchEntityMode === 'businesses' ? (
+        <>
+          {loadingBusinessResults || (isTypingPending && trimmedLocal !== activeQuery) ? (
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-28 animate-pulse rounded-2xl ${isLight ? 'bg-gray-200/70' : 'bg-white/10'}`}
+                />
+              ))}
+            </div>
+          ) : businessResults.length > 0 ? (
+            <div className="space-y-3">
+              {businessResults.map((business) => (
+                <BusinessSearchResultCard
+                  key={business.id}
+                  business={business}
+                  onOpen={openBusinessProfile}
+                  tg={tg}
+                />
+              ))}
+            </div>
+          ) : activeQuery ? (
+            <div className="py-12 text-center">
+              <p className={`mb-2 font-medium ${ac.pageHeading}`}>
+                {t('bazaar.search.businessNotFoundTitle')}
+              </p>
+              <p className={`text-sm ${ac.mutedText}`}>{t('bazaar.search.businessNotFoundHint')}</p>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <div className="min-w-0">
+            {!loadingResults && !isTypingPending && activeQuery && (
+              <p className={`text-sm ${ac.mutedText}`}>
+                {t('bazaar.search.resultsCount', { count: String(searchTotal) })}
+              </p>
+            )}
+            {activeQuery && (loadingResults || (isTypingPending && trimmedLocal !== activeQuery)) && (
+              <p className={`text-sm ${ac.mutedText}`}>{t('bazaar.search.searching')}</p>
+            )}
+          </div>
+
+          {loadingResults || (isTypingPending && trimmedLocal !== activeQuery) ? (
+            <CatalogListingsSkeleton count={6} />
+          ) : searchResults.length > 0 ? (
+            <CatalogListings items={searchResults} {...catalogListingsProps} />
+          ) : activeQuery ? (
+            <p className={`py-12 text-center text-sm ${ac.mutedText}`}>{t('common.nothingFound')}</p>
+          ) : null}
+        </>
+      )}
     </div>
   );
 
@@ -789,9 +1097,147 @@ export function SearchView({
     </div>
   );
 
+  const businessDiscoverContent = (
+    <div className="space-y-6 px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
+      <SearchSection
+        title={
+          selectedBusinessSphere
+            ? `${t('bazaar.search.popularQueries')}: ${
+                getBusinessSphereLabel(selectedBusinessSphere, language === 'ru' ? 'ru' : 'uk') ?? ''
+              }`
+            : t('bazaar.search.popularQueries')
+        }
+        icon={<Flame size={16} />}
+        isLight={isLight}
+      >
+        <div className="flex flex-wrap gap-2">
+          {businessPopularQueries.map((query) => (
+            <button key={query} type="button" onClick={() => pickQuery(query)} className={chipClass}>
+              {query}
+            </button>
+          ))}
+        </div>
+      </SearchSection>
+
+      <SearchSection
+        title={t('bazaar.search.recommendedBusinesses')}
+        icon={<TrendingUp size={16} />}
+        isLight={isLight}
+      >
+        {recommendedBusinesses.length > 0 ? (
+          <div className="space-y-3">
+            {recommendedBusinesses.map((business) => (
+              <BusinessSearchResultCard
+                key={business.id}
+                business={business}
+                onOpen={openBusinessProfile}
+                tg={tg}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className={`text-sm ${ac.mutedText}`}>{t('common.nothingFound')}</p>
+        )}
+      </SearchSection>
+    </div>
+  );
+
   const backBtnClass = isLight
     ? 'border-[#3F5331]/20 bg-white/95 text-[#3F5331] shadow-sm hover:bg-[#E8F0E0]/80'
     : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
+
+  const businessLang = language === 'ru' ? 'ru' : 'uk';
+
+  const spheresRow = (
+    <div className="space-y-2">
+      <h3 className={`px-4 text-sm font-semibold ${ac.pageHeading}`}>
+        {t('bazaar.search.businessSpheresTitle')}
+      </h3>
+      <div
+        className="scrollbar-hide w-full max-w-full overflow-x-auto"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }}
+      >
+        <div className="mx-auto flex w-max gap-2 px-4 pb-2 lg:px-0" style={{ minWidth: 'max-content' }}>
+          <div
+            className="flex min-w-[80px] max-w-[90px] flex-shrink-0 cursor-pointer flex-col items-center"
+            onClick={() => handleBusinessSphereSelect(null)}
+          >
+            <div
+              className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl transition-all ${
+                !selectedBusinessSphere
+                  ? isLight
+                    ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
+                    : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
+                  : isLight
+                    ? 'border-2 border-[#3F5331] bg-white'
+                    : 'border border-white/25 bg-[#1C1C1C]'
+              }`}
+            >
+              <Briefcase
+                size={24}
+                className={!selectedBusinessSphere ? (isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]') : ac.mutedText}
+              />
+            </div>
+            <span
+              className={`px-0.5 text-center text-xs font-medium leading-tight whitespace-normal ${
+                !selectedBusinessSphere
+                  ? isLight
+                    ? 'text-[#3F5331]'
+                    : 'text-[#C8E6A0]'
+                  : ac.categoryRowLabel
+              }`}
+            >
+              {t('bazaar.search.businessFilters.allSpheres')}
+            </span>
+          </div>
+          {BUSINESS_SPHERE_IDS.map((sphereId) => {
+            const active = selectedBusinessSphere === sphereId;
+            const label = getBusinessSphereLabel(sphereId, businessLang) || sphereId;
+            return (
+              <div
+                key={sphereId}
+                className="flex min-w-[80px] max-w-[90px] flex-shrink-0 cursor-pointer flex-col items-center"
+                onClick={() => handleBusinessSphereSelect(sphereId)}
+              >
+                <div
+                  className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl px-1 transition-all ${
+                    active
+                      ? isLight
+                        ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
+                        : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
+                      : isLight
+                        ? 'border-2 border-[#3F5331] bg-white'
+                        : 'border border-white/25 bg-[#1C1C1C]'
+                  }`}
+                >
+                  <Briefcase
+                    size={22}
+                    className={active ? (isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]') : ac.mutedText}
+                  />
+                </div>
+                <span
+                  className={`px-0.5 text-center text-[11px] font-medium leading-tight whitespace-normal ${
+                    active
+                      ? isLight
+                        ? 'text-[#3F5331]'
+                        : 'text-[#C8E6A0]'
+                      : ac.categoryRowLabel
+                  }`}
+                >
+                  {label}
+                </span>
+              </div>
+            );
+          })}
+          <div className="w-2 min-w-[0.5rem] flex-shrink-0" aria-hidden />
+        </div>
+      </div>
+    </div>
+  );
 
   const categoriesRow = (
     <div
@@ -862,7 +1308,7 @@ export function SearchView({
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}
-        placeholder={searchPlaceholder || t('bazaar.whatInterestsYou')}
+        placeholder={effectiveSearchPlaceholder}
         value={localQuery}
         onChange={(e) => {
           setLocalQuery(e.target.value);
@@ -898,36 +1344,38 @@ export function SearchView({
     <>
       {screenMode === 'discover' ? (
         <>
-          <div className="px-4 pt-0">
-            <div className="flex justify-end pb-2">
-              <button
-                type="button"
-                onClick={() => {
-                  tg?.HapticFeedback?.impactOccurred?.('light');
-                  onBack();
-                }}
-                aria-label={t('common.close')}
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <h1 className={`min-w-0 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
-              {t('bazaar.search.pageTitle')}
+          <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-[max(env(safe-area-inset-top,0px),10px)]">
+            <h1 className={`min-w-0 flex-1 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
+              {t('bazaar.search.title')}
             </h1>
+            <button
+              type="button"
+              onClick={() => {
+                tg?.HapticFeedback?.impactOccurred?.('light');
+                onBack();
+              }}
+              aria-label={t('common.close')}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
+            >
+              <X size={20} />
+            </button>
           </div>
 
-          {categoriesRow}
+          <div className="px-4 pb-3">
+            <SearchEntityToggle mode={searchEntityMode} onChange={handleEntityModeChange} />
+          </div>
+
+          {searchEntityMode === 'listings' ? categoriesRow : spheresRow}
 
           <div className="mx-auto w-full max-w-xl space-y-2 px-4 pb-2 pt-2 xl:max-w-2xl lg:mx-auto">
             {searchField}
           </div>
 
-          {discoverContent}
+          {searchEntityMode === 'listings' ? discoverContent : businessDiscoverContent}
         </>
       ) : (
         <>
-          <div className={`${STICKY_BELOW_APP_HEADER_CLASS} z-[42] ${stickySearchBg}`}>
+          <div className={`${SEARCH_STICKY_CLASS} ${stickySearchBg}`}>
             <div className="mx-auto flex w-full max-w-xl items-center gap-1.5 px-4 py-2 xl:max-w-2xl lg:mx-auto">
               <button
                 type="button"
@@ -944,12 +1392,16 @@ export function SearchView({
               <button
                 type="button"
                 onClick={() => {
-                  setShowSortModal(true);
+                  if (searchEntityMode === 'businesses') {
+                    setShowBusinessFilterModal(true);
+                  } else {
+                    setShowSortModal(true);
+                  }
                   tg?.HapticFeedback?.impactOccurred?.('light');
                 }}
                 aria-label={t('common.filter')}
                 className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
-                  hasActiveFilters
+                  (searchEntityMode === 'businesses' ? hasActiveBusinessFilters : hasActiveFilters)
                     ? isLight
                       ? 'border-[#3F5331] bg-white'
                       : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
@@ -961,7 +1413,7 @@ export function SearchView({
                 <SlidersHorizontal
                   size={18}
                   className={
-                    hasActiveFilters
+                    (searchEntityMode === 'businesses' ? hasActiveBusinessFilters : hasActiveFilters)
                       ? isLight
                         ? 'text-[#3F5331]'
                         : 'text-[#C8E6A0]'
@@ -970,7 +1422,7 @@ export function SearchView({
                         : 'text-white'
                   }
                 />
-                {hasActiveFilters && (
+                {(searchEntityMode === 'businesses' ? hasActiveBusinessFilters : hasActiveFilters) && (
                   <span
                     className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
                       isLight
@@ -981,6 +1433,7 @@ export function SearchView({
                   />
                 )}
               </button>
+              {searchEntityMode === 'listings' && (
               <button
                 type="button"
                 onClick={() => {
@@ -1021,6 +1474,7 @@ export function SearchView({
                   />
                 )}
               </button>
+              )}
             </div>
           </div>
 
@@ -1028,6 +1482,7 @@ export function SearchView({
         </>
       )}
 
+      {searchEntityMode === 'listings' && (
       <SortModal
         isOpen={showSortModal}
         currentSort={sortBy}
@@ -1067,7 +1522,22 @@ export function SearchView({
         }}
         tg={tg}
       />
+      )}
 
+      <BusinessSearchFilterModal
+        isOpen={showBusinessFilterModal}
+        filters={businessFilters}
+        onClose={() => setShowBusinessFilterModal(false)}
+        onApply={(next) => {
+          setBusinessFilters(next);
+          if (next.sphere !== businessFilters.sphere) {
+            setSelectedBusinessSphere(next.sphere);
+          }
+        }}
+        tg={tg}
+      />
+
+      {searchEntityMode === 'listings' && (
       <CityModal
         isOpen={isCityModalOpen}
         selectedCities={localCities}
@@ -1079,6 +1549,7 @@ export function SearchView({
         tg={tg}
         profileTelegramId={profileTelegramId}
       />
+      )}
     </>
   );
 }

@@ -14,6 +14,10 @@ import {
   serializeListingDisplayConfig,
   type ListingDisplayMode,
 } from '@/lib/businessProfileSettings';
+import {
+  parseBusinessDirections,
+  serializeBusinessDirections,
+} from '@/lib/businessSphereConstants';
 
 export { parseLinkedListingIds } from '@/lib/businessProfileSettings';
 
@@ -75,7 +79,12 @@ export async function upsertBusinessProfileDraft(
   const payload = {
     businessName: pickString(data.businessName, existing?.businessName),
     category: pickString(data.category, existing?.category),
-    subcategory: data.subcategory?.trim() || (partial ? existing?.subcategory ?? null : null),
+    subcategory:
+      data.subcategory !== undefined
+        ? serializeBusinessDirections(parseBusinessDirections(data.subcategory))
+        : partial
+          ? existing?.subcategory ?? null
+          : null,
     description: pickString(data.description, existing?.description),
     city: pickString(data.city, existing?.city),
     address: data.address?.trim() || (partial ? existing?.address ?? null : null),

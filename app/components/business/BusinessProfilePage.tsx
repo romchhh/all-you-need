@@ -16,7 +16,6 @@ import { ListingCard } from '@/components/listing/ListingCard';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
-import { getCategories } from '@/constants/categories';
 import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { useSwipeBack } from '@/features/ui/hooks/useSwipeBack';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
@@ -33,6 +32,11 @@ import {
 import { PhoneModal } from '@/components/modals/PhoneModal';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { formatWorkingHoursForDisplay, WEEKDAY_KEYS } from '@/lib/businessProfileSettings';
+import {
+  getBusinessDirectionLabel,
+  getBusinessSphereLabel,
+  legacyFieldsToBusinessActivity,
+} from '@/lib/businessSphereConstants';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
@@ -113,7 +117,6 @@ export function BusinessProfilePage({
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  const categories = useMemo(() => getCategories(t), [t]);
   const weekdayLabels = useMemo(
     () =>
       Object.fromEntries(WEEKDAY_KEYS.map((key) => [key, t(`businessProfile.settings.weekdays.${key}`)])) as Record<
@@ -223,10 +226,23 @@ export function BusinessProfilePage({
     [profile?.id, currentUser?.id]
   );
 
-  const categoryLabel = useMemo(() => {
-    if (!profile) return '';
-    return categories.find((c) => c.id === profile.category)?.name || profile.category;
-  }, [categories, profile]);
+  const businessActivity = useMemo(() => {
+    if (!profile) return { sphere: '', directions: [] as string[] };
+    return legacyFieldsToBusinessActivity(profile.category, profile.subcategory);
+  }, [profile]);
+
+  const sphereLabel = useMemo(() => {
+    if (!businessActivity.sphere) return '';
+    return getBusinessSphereLabel(businessActivity.sphere, language === 'ru' ? 'ru' : 'uk');
+  }, [businessActivity.sphere, language]);
+
+  const directionLabels = useMemo(
+    () =>
+      businessActivity.directions.map((id) =>
+        getBusinessDirectionLabel(id, language === 'ru' ? 'ru' : 'uk')
+      ),
+    [businessActivity.directions, language]
+  );
 
   const filteredListings = useMemo(() => {
     if (listingFilter === 'services') {
@@ -468,10 +484,25 @@ export function BusinessProfilePage({
           <BadgeCheck size={18} className="shrink-0 text-emerald-400" />
         </div>
 
-        <p className={`mb-3 text-sm ${ac.mutedText}`}>
-          {categoryLabel}
+        <p className={`mb-2 text-sm ${ac.mutedText}`}>
+          {sphereLabel}
           {profile.city ? ` · ${profile.city}` : ''}
         </p>
+
+        {directionLabels.length > 0 ? (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {directionLabels.map((label) => (
+              <span
+                key={label}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  isLight ? 'bg-[#3F5331]/10 text-[#3F5331]' : 'bg-[#C8E6A0]/15 text-[#C8E6A0]'
+                }`}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         <div className="mb-2 flex items-center justify-between gap-3">
           {showRating ? (

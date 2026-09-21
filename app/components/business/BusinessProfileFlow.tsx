@@ -12,6 +12,11 @@ import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { BusinessContactField } from '@/components/business/BusinessContactIcons';
+import { BusinessSphereFields } from '@/components/business/BusinessSphereFields';
+import {
+  businessActivityToLegacyFields,
+  legacyFieldsToBusinessActivity,
+} from '@/lib/businessSphereConstants';
 import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 import {
   clearBusinessWizardState,
@@ -20,7 +25,6 @@ import {
   type StoredBusinessWizardForm,
   type BusinessWizardStep,
 } from '@/lib/businessProfileWizardStorage';
-import { getCategories } from '@/constants/categories';
 import { majorGermanCities } from '@/constants/major-german-cities';
 import { BUSINESS_PLANS, type BusinessPlanId, type ServiceArea } from '@/lib/businessProfileConstants';
 import { Listing } from '@/types';
@@ -69,8 +73,8 @@ interface BusinessProfileFlowProps {
 
 interface FormState {
   businessName: string;
-  category: string;
-  subcategory: string;
+  sphere: string;
+  directions: string[];
   description: string;
   logoFile: File | null;
   logoPreview: string | null;
@@ -93,8 +97,8 @@ interface FormState {
 
 const initialForm = (defaults: { telegram?: string; phone?: string }): FormState => ({
   businessName: '',
-  category: '',
-  subcategory: '',
+  sphere: '',
+  directions: [],
   description: '',
   logoFile: null,
   logoPreview: null,
@@ -117,8 +121,8 @@ const initialForm = (defaults: { telegram?: string; phone?: string }): FormState
 
 const formToStored = (form: FormState): StoredBusinessWizardForm => ({
   businessName: form.businessName,
-  category: form.category,
-  subcategory: form.subcategory,
+  sphere: form.sphere,
+  directions: form.directions,
   description: form.description,
   city: form.city,
   address: form.address,
@@ -140,18 +144,30 @@ const formToStored = (form: FormState): StoredBusinessWizardForm => ({
 const storedToForm = (
   stored: StoredBusinessWizardForm,
   defaults: { telegram?: string; phone?: string }
-): FormState => ({
-  ...stored,
-  logoFile: null,
-  coverFile: null,
-  telegram: stored.telegram || defaults.telegram || '',
-  phone: stored.phone || defaults.phone || '',
-  logoPreview: stored.logoPreview || stored.savedLogoPath,
-  coverPreview: stored.coverPreview || stored.savedCoverPath,
-});
+): FormState => {
+  const legacy = legacyFieldsToBusinessActivity(
+    (stored as StoredBusinessWizardForm & { category?: string }).category,
+    (stored as StoredBusinessWizardForm & { subcategory?: string }).subcategory
+  );
+  return {
+    ...stored,
+    sphere: stored.sphere || legacy.sphere,
+    directions: stored.directions?.length ? stored.directions : legacy.directions,
+    logoFile: null,
+    coverFile: null,
+    telegram: stored.telegram || defaults.telegram || '',
+    phone: stored.phone || defaults.phone || '',
+    logoPreview: stored.logoPreview || stored.savedLogoPath,
+    coverPreview: stored.coverPreview || stored.savedCoverPath,
+  };
+};
 
 const restoreStep = (savedStep: BusinessWizardStep): WizardStep =>
   savedStep === 'payment' ? 'tariff' : savedStep;
+
+function getActivityPayload(form: Pick<FormState, 'sphere' | 'directions'>) {
+  return businessActivityToLegacyFields(form.sphere, form.directions);
+}
 
 type ImageUploadBoxProps = {
   preview: string | null;
@@ -254,7 +270,6 @@ export default function BusinessProfileFlow({
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const { toast, showToast, hideToast } = useToast();
-  const categories = useMemo(() => getCategories(t), [t]);
   const [step, setStep] = useState<WizardStep>('step1');
   const [form, setForm] = useState<FormState>(() => initialForm({ telegram: defaultTelegram, phone: defaultPhone }));
   const [userListings, setUserListings] = useState<Listing[]>([]);
@@ -294,7 +309,7 @@ export default function BusinessProfileFlow({
 
       const hasAnyData = [
         currentForm.businessName,
-        currentForm.category,
+        currentForm.sphere,
         currentForm.description,
         currentForm.city,
         currentForm.telegram,
@@ -314,14 +329,15 @@ export default function BusinessProfileFlow({
       }
 
       try {
+        const activity = getActivityPayload(currentForm);
         let res: Response;
         if (currentForm.logoFile || currentForm.coverFile) {
           const fd = new FormData();
           fd.append('partial', 'true');
           fd.append('telegramId', paymentTelegramId);
           fd.append('businessName', currentForm.businessName);
-          fd.append('category', currentForm.category);
-          fd.append('subcategory', currentForm.subcategory);
+          fd.append('category', activity.category);
+          fd.append('subcategory', activity.subcategory || '');
           fd.append('description', currentForm.description);
           fd.append('city', currentForm.city);
           fd.append('address', currentForm.address);
@@ -345,8 +361,8 @@ export default function BusinessProfileFlow({
               partial: true,
               telegramId: paymentTelegramId,
               businessName: currentForm.businessName,
-              category: currentForm.category,
-              subcategory: currentForm.subcategory,
+              category: activity.category,
+              subcategory: activity.subcategory,
               description: currentForm.description,
               city: currentForm.city,
               address: currentForm.address,
@@ -467,8 +483,7 @@ export default function BusinessProfileFlow({
       return {
         ...initialForm({ telegram: defaultTelegram, phone: defaultPhone }),
         businessName: profile.businessName || '',
-        category: profile.category || '',
-        subcategory: profile.subcategory || '',
+        ...legacyFieldsToBusinessActivity(profile.category, profile.subcategory),
         description: profile.description || '',
         city: profile.city || '',
         address: profile.address || '',
@@ -564,10 +579,6 @@ export default function BusinessProfileFlow({
     return map[step];
   }, [step]);
 
-  const subcategories = useMemo(() => {
-    return categories.find((c) => c.id === form.category)?.subcategories || [];
-  }, [categories, form.category]);
-
   const patch = (partial: Partial<FormState>) => {
     setFlowError(null);
     setForm((prev) => ({ ...prev, ...partial }));
@@ -593,8 +604,8 @@ export default function BusinessProfileFlow({
     if (s === 'step1') {
       const hasLogo = Boolean(form.logoFile || form.logoPreview || form.savedLogoPath);
       if (!form.businessName.trim()) return t('businessProfile.validation.businessName');
-      if (!form.category) return t('businessProfile.validation.category');
-      if (!form.subcategory) return t('businessProfile.validation.subcategory');
+      if (!form.sphere) return t('businessProfile.validation.sphere');
+      if (form.directions.length === 0) return t('businessProfile.validation.directions');
       if (!form.description.trim()) return t('businessProfile.validation.description');
       if (!hasLogo) return t('businessProfile.validation.logo');
     }
@@ -651,11 +662,12 @@ export default function BusinessProfileFlow({
   };
 
   const uploadDraft = useCallback(async (): Promise<{ logo?: string; coverImage?: string }> => {
+    const activity = getActivityPayload(form);
     const fd = new FormData();
     fd.append('telegramId', paymentTelegramId);
     fd.append('businessName', form.businessName);
-    fd.append('category', form.category);
-    fd.append('subcategory', form.subcategory);
+    fd.append('category', activity.category);
+    fd.append('subcategory', activity.subcategory || '');
     fd.append('description', form.description);
     fd.append('city', form.city);
     fd.append('address', form.address);
@@ -690,14 +702,15 @@ export default function BusinessProfileFlow({
     setLoading(true);
     setFlowError(null);
     try {
+      const activity = getActivityPayload(form);
       const hasNewFiles = Boolean(form.logoFile || form.coverFile);
       let res: Response;
       if (hasNewFiles) {
         const fd = new FormData();
         fd.append('telegramId', paymentTelegramId);
         fd.append('businessName', form.businessName);
-        fd.append('category', form.category);
-        fd.append('subcategory', form.subcategory);
+        fd.append('category', activity.category);
+        fd.append('subcategory', activity.subcategory || '');
         fd.append('description', form.description);
         fd.append('city', form.city);
         fd.append('address', form.address);
@@ -719,8 +732,8 @@ export default function BusinessProfileFlow({
           body: JSON.stringify({
             telegramId: paymentTelegramId,
             businessName: form.businessName,
-            category: form.category,
-            subcategory: form.subcategory,
+            category: activity.category,
+            subcategory: activity.subcategory,
             description: form.description,
             city: form.city,
             address: form.address,
@@ -784,6 +797,7 @@ export default function BusinessProfileFlow({
         patch({ savedLogoPath: paths.logo || null, savedCoverPath: paths.coverImage || null });
       }
 
+      const activity = getActivityPayload(form);
       const payload = renewMode
         ? {
             telegramId: paymentTelegramId,
@@ -798,8 +812,8 @@ export default function BusinessProfileFlow({
             paymentMethod,
             listingIds: form.selectedListingIds,
             businessName: form.businessName,
-            category: form.category,
-            subcategory: form.subcategory,
+            category: activity.category,
+            subcategory: activity.subcategory,
             description: form.description,
             city: form.city,
             address: form.address,
@@ -1047,24 +1061,12 @@ export default function BusinessProfileFlow({
                   <label className={labelCls}>{t('businessProfile.fields.businessName')} *</label>
                   <input className={inputCls} value={form.businessName} onChange={(e) => patch({ businessName: e.target.value })} />
                 </div>
-                <div>
-                  <label className={labelCls}>{t('businessProfile.fields.category')} *</label>
-                  <select className={inputCls} value={form.category} onChange={(e) => patch({ category: e.target.value, subcategory: '' })}>
-                    <option value="">{t('businessProfile.fields.selectCategory')}</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls}>{t('businessProfile.fields.subcategory')} *</label>
-                  <select className={inputCls} value={form.subcategory} onChange={(e) => patch({ subcategory: e.target.value })} disabled={!form.category}>
-                    <option value="">{t('businessProfile.fields.selectSubcategory')}</option>
-                    {subcategories.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <BusinessSphereFields
+                  sphere={form.sphere}
+                  directions={form.directions}
+                  onSphereChange={(sphere) => patch({ sphere, directions: [] })}
+                  onDirectionsChange={(directions) => patch({ directions })}
+                />
                 <div>
                   <label className={labelCls}>{t('businessProfile.fields.description')} *</label>
                   <textarea className={`${inputCls} min-h-[100px] resize-none`} value={form.description} onChange={(e) => patch({ description: e.target.value })} />

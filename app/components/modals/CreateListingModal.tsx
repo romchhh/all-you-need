@@ -8,6 +8,7 @@ import { germanCities, fetchGermanCitiesFromAPI } from '@/constants/german-citie
 import { majorGermanCities } from '@/constants/major-german-cities';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useProfileViewMode } from '@/contexts/ProfileViewModeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
@@ -41,6 +42,7 @@ export const CreateListingModal = ({
 }: CreateListingModalProps) => {
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
+  const { isBusinessActive, defaultListingProfileType } = useProfileViewMode();
   const ac = getAppearanceClasses(isLight);
   useHideBottomNav(isOpen);
   useBodyScrollLock(isOpen);
@@ -70,7 +72,6 @@ export const CreateListingModal = ({
   const categories = getCategories(t);
   const [autoRenew, setAutoRenew] = useState(false);
   const [profileType, setProfileType] = useState<'personal' | 'business'>('personal');
-  const [hasActiveBusiness, setHasActiveBusiness] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -165,40 +166,12 @@ export const CreateListingModal = ({
 
   useEffect(() => {
     if (!isOpen) {
-      setHasActiveBusiness(false);
       setProfileType('personal');
       return;
     }
 
-    const telegramId =
-      tg?.initDataUnsafe?.user?.id?.toString() ||
-      (typeof window !== 'undefined' ? sessionStorage.getItem('telegramId') : null) ||
-      (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('telegramId') : null);
-
-    if (!telegramId) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/user/business-profile?telegramId=${telegramId}`);
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
-        if (cancelled) return;
-        const active = Boolean(data.isActive);
-        setHasActiveBusiness(active);
-        if (!active) setProfileType('personal');
-      } catch {
-        if (!cancelled) {
-          setHasActiveBusiness(false);
-          setProfileType('personal');
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, tg]);
+    setProfileType(isBusinessActive ? defaultListingProfileType : 'personal');
+  }, [isOpen, isBusinessActive, defaultListingProfileType]);
 
   // Автоматично встановлюємо isFree при виборі категорії "Безкоштовно"
   useEffect(() => {
@@ -582,7 +555,7 @@ export const CreateListingModal = ({
         condition,
         images,
         autoRenew,
-        profileType: hasActiveBusiness && profileType === 'business' ? 'business' : 'personal',
+        profileType: isBusinessActive && profileType === 'business' ? 'business' : 'personal',
       });
       tg?.HapticFeedback.notificationOccurred('success');
       
@@ -634,7 +607,7 @@ export const CreateListingModal = ({
           <div className="flex items-center justify-center px-4 pb-2 max-lg:pb-3">
             <h2 className={`text-xl font-bold ${ac.pageHeading}`}>{t('createListing.title')}</h2>
           </div>
-          {hasActiveBusiness && (
+          {isBusinessActive && (
             <div
               className={`rounded-2xl border p-4 sm:p-5 ${
                 isLight
