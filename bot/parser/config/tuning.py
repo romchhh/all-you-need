@@ -20,15 +20,20 @@ PARSER_AI_SCREEN_ENABLED: bool = True
 # У Telegram-канали — лише вручну (кнопка модерації), не автоматом.
 PARSER_AUTO_APPROVE_ENABLED: bool = True
 PARSER_AUTO_APPROVE_DAILY_LIMIT: int = 450
-PARSER_AUTO_APPROVE_INTERVAL_MIN: float = 3.0
+# Backlog drain (кожні N хв) — aggressive, без хвильового throttling
+PARSER_AUTO_APPROVE_INTERVAL_MIN: float = 2.0
 PARSER_AUTO_APPROVE_BATCH: int = 80
 PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = 250
 PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = 250
 PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = 72
 PARSER_AUTO_APPROVE_WAVE_MINUTES: int = 5
 PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = False
-# Ручний /parse: без хвильових лімітів, добираємо pending до денної квоти
+# Рівномірний денний бюджет (Europe/Kyiv): не вичерпувати 450 до обіду
+PARSER_AUTO_APPROVE_PACE_ENABLED: bool = True
+PARSER_AUTO_APPROVE_PACE_BUFFER_MIN: int = 45
+# Ручний /parse + scheduled backlog: rounds aggressive drain
 PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS: int = 12
+PARSER_AUTO_APPROVE_SCHEDULED_DRAIN_ROUNDS: int = 8
 # 1.0 = усі нові parsed_items одразу на МП (real-time), не 50%
 PARSER_AUTO_APPROVE_TARGET_RATIO: float = 1.0
 

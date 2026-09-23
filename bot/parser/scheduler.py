@@ -240,6 +240,7 @@ async def run_parser_cycle(
                             drain_stats = await run_auto_approve_drain(
                                 aiogram_bot,
                                 aggressive=True,
+                                respect_pace=False,
                                 min_total_approved=target,
                                 already_approved=total_approved,
                             )

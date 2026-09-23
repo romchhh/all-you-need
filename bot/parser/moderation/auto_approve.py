@@ -25,6 +25,9 @@ from parser.config.settings import (
     PARSER_AUTO_APPROVE_MAX_AGE_HOURS,
     PARSER_AUTO_APPROVE_MAX_PER_CATEGORY,
     PARSER_AUTO_APPROVE_MAX_PER_CHANNEL,
+    PARSER_AUTO_APPROVE_PACE_BUFFER_MIN,
+    PARSER_AUTO_APPROVE_PACE_ENABLED,
+    PARSER_AUTO_APPROVE_SCHEDULED_DRAIN_ROUNDS,
     PARSER_AUTO_APPROVE_SERVICES_CHANNEL,
     PARSER_AUTO_APPROVE_WAVE_MINUTES,
 )
@@ -89,6 +92,27 @@ def _kyiv_day_start_utc() -> datetime:
     return start.astimezone(timezone.utc)
 
 
+def _today_approved_count() -> int:
+    start = _kyiv_day_start_utc()
+    rows = list_auto_approved_since((start - timedelta(hours=6)).isoformat())
+    total = 0
+    for row in rows:
+        dt = _parse_moderated_at(row.get("moderated_at"))
+        if dt is not None and dt >= start:
+            total += 1
+    return total
+
+
+def _pace_budget_now() -> int:
+    """Лінійний денний бюджет (Europe/Kyiv): до півночі — повний ліміт."""
+    if not PARSER_AUTO_APPROVE_PACE_ENABLED:
+        return PARSER_AUTO_APPROVE_DAILY_LIMIT
+    now = datetime.now(_KYIV_TZ)
+    mins = now.hour * 60 + now.minute + PARSER_AUTO_APPROVE_PACE_BUFFER_MIN
+    fraction = min(1.0, max(0.0, mins / (24 * 60)))
+    return max(1, int(round(PARSER_AUTO_APPROVE_DAILY_LIMIT * fraction)))
+
+
 def _parse_moderated_at(raw: Optional[str]) -> Optional[datetime]:
     if not raw:
         return None
@@ -142,13 +166,16 @@ def _today_counts() -> dict[str, Counter]:
     }
 
 
-def remaining_auto_approve_slots() -> int:
+def remaining_auto_approve_slots(*, respect_pace: bool = True) -> int:
     ensure_parsed_items_table()
     counts = _today_counts()
     in_flight = count_auto_approve_in_flight()
-    # Активні claim не повинні блокувати весь денний ліміт (завислі скидає drain).
     used = int(counts["total"].get("_", 0)) + min(in_flight, 5)
-    return max(0, PARSER_AUTO_APPROVE_DAILY_LIMIT - used)
+    daily_left = max(0, PARSER_AUTO_APPROVE_DAILY_LIMIT - used)
+    if not respect_pace or not PARSER_AUTO_APPROVE_PACE_ENABLED:
+        return daily_left
+    pace_left = max(0, _pace_budget_now() - used)
+    return min(daily_left, pace_left)
 
 
 def _recent_auto_approved_count(minutes: int | None = None) -> int:
@@ -175,11 +202,20 @@ def _ensure_auto_approve_unblocked(*, reset_claims: bool = False) -> None:
     in_flight = count_auto_approve_in_flight()
     if in_flight:
         logger.warning("auto-approve: %s claim у процесі", in_flight)
-    daily_left = remaining_auto_approve_slots()
+    daily_left = remaining_auto_approve_slots(respect_pace=False)
+    paced_left = remaining_auto_approve_slots(respect_pace=True)
     wave_left = remaining_auto_approve_wave_slots()
     if daily_left <= 0:
         logger.info("auto-approve: денний ліміт вичерпано (%s/день)", PARSER_AUTO_APPROVE_DAILY_LIMIT)
-    elif wave_left <= 0 and daily_left > 0:
+    elif paced_left <= 0 and daily_left > 0 and PARSER_AUTO_APPROVE_PACE_ENABLED:
+        logger.info(
+            "auto-approve: денний pace до %s:00 Kyiv (%s/%s, budget=%s)",
+            datetime.now(_KYIV_TZ).strftime("%H:%M"),
+            _today_approved_count(),
+            PARSER_AUTO_APPROVE_DAILY_LIMIT,
+            _pace_budget_now(),
+        )
+    elif wave_left <= 0 and paced_left > 0:
         logger.info(
             "auto-approve: хвиля %s хв заповнена (%s за вікно, batch=%s)",
             PARSER_AUTO_APPROVE_WAVE_MINUTES,
@@ -188,8 +224,12 @@ def _ensure_auto_approve_unblocked(*, reset_claims: bool = False) -> None:
         )
 
 
-def remaining_auto_approve_wave_slots(*, aggressive: bool = False) -> int:
-    daily = remaining_auto_approve_slots()
+def remaining_auto_approve_wave_slots(
+    *,
+    aggressive: bool = False,
+    respect_pace: bool = True,
+) -> int:
+    daily = remaining_auto_approve_slots(respect_pace=respect_pace or not aggressive)
     if aggressive:
         return daily
     return max(
@@ -283,15 +323,27 @@ def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[b
     return True, ""
 
 
-def explain_manual_review(item: dict, *, aggressive: bool = False) -> str:
+def explain_manual_review(
+    item: dict,
+    *,
+    aggressive: bool = False,
+    respect_pace: bool = False,
+) -> str:
     """Коротка причина, чому оголошення не автопублікувалось одразу."""
     if not PARSER_AUTO_APPROVE_ENABLED:
         return "auto_approve_disabled"
-    if not aggressive and remaining_auto_approve_wave_slots() <= 0:
+    if remaining_auto_approve_slots(respect_pace=False) <= 0:
+        return "daily_cap"
+    if respect_pace and remaining_auto_approve_slots(respect_pace=True) <= 0:
+        return "pace_limit"
+    if not aggressive and remaining_auto_approve_wave_slots(respect_pace=respect_pace) <= 0:
         return "wave_limit_or_daily_cap"
     if not aggressive and not _under_soft_caps(hydrate_parsed_item(item), _today_counts()):
         return "diversity_cap"
-    ok, reason = is_auto_approve_eligible(hydrate_parsed_item(item), aggressive=aggressive)
+    ok, reason = is_auto_approve_eligible(
+        hydrate_parsed_item(item),
+        aggressive=aggressive,
+    )
     if not ok:
         return reason or "not_eligible"
     return "prepare_failed"
@@ -542,12 +594,21 @@ def _schedule_home_activity_revalidate() -> None:
         logger.debug("home-activity revalidate schedule skipped", exc_info=True)
 
 
-async def _auto_approve_one(bot: Bot, item: dict, *, aggressive: bool = False) -> bool:
+async def _auto_approve_one(
+    bot: Bot,
+    item: dict,
+    *,
+    aggressive: bool = False,
+    respect_pace: bool = True,
+) -> bool:
     item = hydrate_parsed_item(item)
     item_id = int(item.get("id") or 0)
     if not item_id:
         return False
-    if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
+    if remaining_auto_approve_wave_slots(
+        aggressive=aggressive,
+        respect_pace=respect_pace,
+    ) <= 0:
         return False
 
     ok, reason = is_auto_approve_eligible(item, aggressive=aggressive)
@@ -596,6 +657,7 @@ async def maybe_auto_approve_and_notify(
     item_data: dict,
     *,
     aggressive: bool = False,
+    respect_pace: bool = False,
 ) -> bool:
     """
     Parse-time: одразу після insert — автопублікація (real-time).
@@ -604,7 +666,10 @@ async def maybe_auto_approve_and_notify(
     if not PARSER_AUTO_APPROVE_ENABLED:
         return False
     _ensure_auto_approve_unblocked(reset_claims=False)
-    if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
+    if remaining_auto_approve_wave_slots(
+        aggressive=aggressive,
+        respect_pace=respect_pace,
+    ) <= 0:
         return False
     item = hydrate_parsed_item(item_data)
     if not aggressive and not _under_soft_caps(item, _today_counts()):
@@ -617,15 +682,22 @@ async def maybe_auto_approve_and_notify(
             reason,
         )
         return False
-    return await _auto_approve_one(bot, item, aggressive=aggressive)
+    return await _auto_approve_one(
+        bot,
+        item,
+        aggressive=aggressive,
+        respect_pace=respect_pace,
+    )
 
 
 async def run_auto_approve_drain(
     bot: Bot | None = None,
     *,
     aggressive: bool = False,
+    respect_pace: bool | None = None,
     min_total_approved: int = 0,
     already_approved: int = 0,
+    max_rounds: int | None = None,
 ) -> dict:
     """Добирає різноманітну пачку з pending до денного ліміту (або min_total_approved)."""
     stats: dict = {
@@ -634,9 +706,14 @@ async def run_auto_approve_drain(
         "slots": 0,
         "rounds": 0,
         "skip_reasons": {},
+        "pending": 0,
     }
     if not PARSER_AUTO_APPROVE_ENABLED:
         return stats
+
+    if respect_pace is None:
+        # Parse-cycle drain — burst; scheduled backlog — рівномірний pace
+        respect_pace = aggressive and min_total_approved <= 0
 
     goal = max(0, int(min_total_approved) - int(already_approved))
     skip_reasons: Counter = Counter()
@@ -658,9 +735,19 @@ async def run_auto_approve_drain(
     try:
         from parser.notify.admin import SEND_DELAY_SEC
 
-        max_rounds = PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS if aggressive else 1
+        if max_rounds is None:
+            if aggressive and min_total_approved > 0:
+                max_rounds = PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS
+            elif aggressive:
+                max_rounds = PARSER_AUTO_APPROVE_SCHEDULED_DRAIN_ROUNDS
+            else:
+                max_rounds = 1
+
         for _round in range(max_rounds):
-            if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
+            if remaining_auto_approve_wave_slots(
+                aggressive=aggressive,
+                respect_pace=respect_pace,
+            ) <= 0:
                 break
             if goal > 0 and stats["approved"] >= goal:
                 break
@@ -669,6 +756,7 @@ async def run_auto_approve_drain(
                 PARSER_AUTO_APPROVE_MAX_AGE_HOURS,
                 limit=1200 if aggressive else 800,
             )
+            stats["pending"] = max(stats["pending"], len(pending))
             eligible: list[dict] = []
             round_skip: Counter = Counter()
             for item in pending:
@@ -693,7 +781,10 @@ async def run_auto_approve_drain(
                 )
 
             async with _LOCK:
-                slots = remaining_auto_approve_wave_slots(aggressive=aggressive)
+                slots = remaining_auto_approve_wave_slots(
+                    aggressive=aggressive,
+                    respect_pace=respect_pace,
+                )
                 stats["slots"] = max(stats["slots"], slots)
                 if slots <= 0:
                     break
@@ -725,11 +816,19 @@ async def run_auto_approve_drain(
                 item_id = int(item.get("id") or 0)
                 if item_id:
                     tried_ids.add(item_id)
-                if remaining_auto_approve_wave_slots(aggressive=aggressive) <= 0:
+                if remaining_auto_approve_wave_slots(
+                    aggressive=aggressive,
+                    respect_pace=respect_pace,
+                ) <= 0:
                     break
                 if goal > 0 and stats["approved"] >= goal:
                     break
-                if await _auto_approve_one(bot, item, aggressive=aggressive):
+                if await _auto_approve_one(
+                    bot,
+                    item,
+                    aggressive=aggressive,
+                    respect_pace=respect_pace,
+                ):
                     stats["approved"] += 1
                     round_approved += 1
                     await asyncio.sleep(SEND_DELAY_SEC)
@@ -761,13 +860,22 @@ async def run_auto_approve_drain(
 
         if stats["approved"]:
             logger.info(
-                "🤖 auto-approve drain: +%s (ліміт %s/день, залишок %s, rounds=%s)",
+                "🤖 auto-approve drain: +%s (ліміт %s/день, залишок %s, rounds=%s, pending=%s)",
                 stats["approved"],
                 PARSER_AUTO_APPROVE_DAILY_LIMIT,
-                remaining_auto_approve_slots(),
+                remaining_auto_approve_slots(respect_pace=respect_pace),
                 stats["rounds"],
+                stats["pending"],
             )
             _schedule_home_activity_revalidate()
+        elif stats["pending"] and respect_pace:
+            logger.info(
+                "auto-approve backlog: %s pending, slots=%s (pace budget=%s, used=%s)",
+                stats["pending"],
+                remaining_auto_approve_slots(respect_pace=True),
+                _pace_budget_now(),
+                _today_approved_count(),
+            )
         return stats
     finally:
         if close_bot:
@@ -792,8 +900,14 @@ def register_auto_approve_job(scheduler) -> None:
     async def _job():
         try:
             from main import bot as main_bot
+            from parser.storage.connection import parser_db_cycle
 
-            await run_auto_approve_drain(main_bot)
+            with parser_db_cycle():
+                await run_auto_approve_drain(
+                    main_bot,
+                    aggressive=True,
+                    respect_pace=True,
+                )
         except Exception:
             logger.exception("auto-approve drain job failed")
 
@@ -807,7 +921,7 @@ def register_auto_approve_job(scheduler) -> None:
         max_instances=1,
     )
     logger.info(
-        "✅ Auto-approve drain зареєстровано (%s/день, кожні %s хв)",
+        "✅ Auto-approve backlog drain (%s/день, кожні %s хв, aggressive+pace)",
         PARSER_AUTO_APPROVE_DAILY_LIMIT,
         PARSER_AUTO_APPROVE_INTERVAL_MIN,
     )
