@@ -900,14 +900,16 @@ def register_auto_approve_job(scheduler) -> None:
     async def _job():
         try:
             from main import bot as main_bot
+            from parser.core.session_lock import GLOBAL_PARSER_RUN_LOCK
             from parser.storage.connection import parser_db_cycle
 
-            with parser_db_cycle():
-                await run_auto_approve_drain(
-                    main_bot,
-                    aggressive=True,
-                    respect_pace=True,
-                )
+            async with GLOBAL_PARSER_RUN_LOCK:
+                with parser_db_cycle():
+                    await run_auto_approve_drain(
+                        main_bot,
+                        aggressive=True,
+                        respect_pace=True,
+                    )
         except Exception:
             logger.exception("auto-approve drain job failed")
 

@@ -105,8 +105,10 @@ def format_parser_stats(
                 lines.append(f"• <code>{msg}</code>")
             if any("database is locked" in str(e.get("error", "")).lower() for e in account_errors):
                 lines.append(
-                    "ℹ️ <i>database is locked</i> — зазвичай два процеси чіпають SQLite "
-                    "(bot на хості + Docker, або два /parse). Залиште один bot і один Next.js."
+                    "ℹ️ <i>database is locked</i> — файл Pyrogram <code>.session</code> зайнятий "
+                    "(другий bot-процес, DM автору під час парсингу, або залишки <code>-wal/-shm</code> "
+                    "у <code>bot/parser/sessions/</code>). Має бути один bot; після зупинки bot можна "
+                    "видалити <code>*.session-wal</code> / <code>*.session-shm</code> без активного парсера."
                 )
         if channel_errors:
             lines.append(f"⚠️ Помилок каналів: <b>{len(channel_errors)}</b>")

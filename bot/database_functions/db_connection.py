@@ -71,10 +71,8 @@ def bool_assign_placeholder() -> str:
 
 def is_sqlite_locked_error(err: BaseException) -> bool:
     if is_postgres():
-        psycopg2, _ = _load_psycopg2()
-        if isinstance(err, psycopg2.OperationalError):
-            return True
-        return False
+        msg = str(err).lower()
+        return "database is locked" in msg or "database is busy" in msg or "could not obtain lock" in msg
     cur: BaseException | None = err
     while cur is not None:
         if isinstance(cur, sqlite3.OperationalError):

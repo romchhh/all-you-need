@@ -27,8 +27,8 @@ PYROGRAM_SLEEP_THRESHOLD = 0
 _DB_LOCKED_RETRIES = 12
 _CLIENT_START_RETRIES = 8
 _ACCOUNT_BUCKET_RETRIES = 4
-_INTER_ACCOUNT_SLEEP_SEC = 4.0
-_DEFERRED_PASS_SLEEP_SEC = 12.0
+_INTER_ACCOUNT_SLEEP_SEC = 6.0
+_DEFERRED_PASS_SLEEP_SEC = 20.0
 
 
 def _build_pyrogram_client(acc: PyrogramAccount):
@@ -106,10 +106,10 @@ async def _run_bucket_on_account(
 
     last_err: BaseException | None = None
     for start_attempt in range(_CLIENT_START_RETRIES):
-        await asyncio.to_thread(prepare_pyrogram_session, acc.session_path)
         client = _build_pyrogram_client(acc)
         try:
             async with pyrogram_session_guard(acc.session_path):
+                await asyncio.to_thread(prepare_pyrogram_session, acc.session_path)
                 async with client:
                     for idx, (channel, city) in enumerate(bucket):
                         try:
@@ -279,10 +279,10 @@ async def _run_parse_on_account(
 
     last_err: BaseException | None = None
     for start_attempt in range(_CLIENT_START_RETRIES):
-        await asyncio.to_thread(prepare_pyrogram_session, acc.session_path)
         client = _build_pyrogram_client(acc)
         try:
             async with pyrogram_session_guard(acc.session_path):
+                await asyncio.to_thread(prepare_pyrogram_session, acc.session_path)
                 async with client:
                     result = await _parse_with_retries(
                         parse_fn, client, channel, city, notify_callback

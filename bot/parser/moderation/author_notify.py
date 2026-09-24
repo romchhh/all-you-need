@@ -169,6 +169,7 @@ async def _send_author_dm(
 
     from parser.core.pyrogram_accounts import PYROGRAM_SLEEP_THRESHOLD
     from parser.core.session_lock import pyrogram_session_guard
+    from parser.storage.session_sqlite import prepare_pyrogram_session, release_pyrogram_session
 
     app = Client(
         name=str(acc.session_path),
@@ -178,6 +179,7 @@ async def _send_author_dm(
         sleep_threshold=PYROGRAM_SLEEP_THRESHOLD,
     )
     async with pyrogram_session_guard(acc.session_path, timeout=_DM_SESSION_TIMEOUT):
+        await asyncio.to_thread(prepare_pyrogram_session, acc.session_path)
         async with app:
             target = await _resolve_dm_target(app, item)
             if target is None:
@@ -203,6 +205,7 @@ async def _send_author_dm(
                 item.get("id"),
             )
             return target
+    await asyncio.to_thread(release_pyrogram_session, acc.session_path)
 
 
 async def try_notify_author_via_pyrogram(
@@ -211,7 +214,17 @@ async def try_notify_author_via_pyrogram(
     use_services_sender: bool = False,
     channel_only: bool = False,
 ):
+    from parser.core.session_lock import wait_for_parser_idle
+    from parser.storage.connection import is_sqlite_locked_error
+
     item_id = item.get("id")
+    if not await wait_for_parser_idle(max_wait_sec=300.0):
+        logger.info(
+            "DM автору item %s відкладено — триває цикл парсингу",
+            item_id,
+        )
+        return
+
     has_username = bool(_username_target(item))
     has_source = bool(item.get("source_channel")) and item.get("message_id") is not None
     has_author_id = bool(item.get("author_id"))
@@ -275,6 +288,12 @@ async def try_notify_author_via_pyrogram(
             if _is_session_busy(e):
                 logger.info(
                     "Сесія %s зайнята парсером — пробуємо інший акаунт",
+                    acc.label,
+                )
+                continue
+            if is_sqlite_locked_error(e):
+                logger.info(
+                    "SQLite session locked для %s — пробуємо інший акаунт",
                     acc.label,
                 )
                 continue
