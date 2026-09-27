@@ -187,6 +187,44 @@ async def scheduler_jobs():
         import traceback
         traceback.print_exc()
 
+    # Щоденний бекап БД → Telegram адмінам (22:00 Europe/Kyiv)
+    try:
+        from utils.daily_db_backup import (
+            backup_cron_hour,
+            backup_cron_minute,
+            backup_enabled,
+            run_daily_db_backup_job,
+        )
+
+        backup_job_id = "daily_db_backup_telegram"
+        existing_backup_job = scheduler.get_job(backup_job_id)
+        if existing_backup_job:
+            scheduler.remove_job(backup_job_id)
+
+        if backup_enabled():
+            scheduler.add_job(
+                run_daily_db_backup_job,
+                "cron",
+                hour=backup_cron_hour(),
+                minute=backup_cron_minute(),
+                id=backup_job_id,
+                replace_existing=True,
+                max_instances=1,
+                args=[bot],
+            )
+            added = scheduler.get_job(backup_job_id)
+            nxt = getattr(added, "next_run_time", None) if added else None
+            print(
+                f"✅ Scheduler job '{backup_job_id}' додано "
+                f"({backup_cron_hour():02d}:{backup_cron_minute():02d} Kyiv, next={nxt})"
+            )
+        else:
+            print("ℹ️ daily_db_backup вимкнено (bot/tuning.py: DB_BACKUP_ENABLED=False)")
+    except Exception as e:
+        print(f"❌ Помилка реєстрації daily_db_backup job: {e}")
+        import traceback
+        traceback.print_exc()
+
 router = Router()
 
   

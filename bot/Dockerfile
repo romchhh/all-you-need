@@ -15,6 +15,7 @@ RUN apt-get update \
       g++ \
       ca-certificates \
       tzdata \
+      postgresql-client \
  && rm -rf /var/lib/apt/lists/* \
  && ln -snf /usr/share/zoneinfo/Europe/Kyiv /etc/localtime \
  && echo Europe/Kyiv > /etc/timezone
