@@ -11,6 +11,7 @@ import {
 import type { PaymentMethod } from '@/lib/payments/paymentConstants';
 import {
   parseLinkedListingIds,
+  parseListingDisplayConfig,
   serializeListingDisplayConfig,
   type ListingDisplayMode,
 } from '@/lib/businessProfileSettings';
@@ -119,6 +120,32 @@ export async function upsertBusinessProfileDraft(
     },
   });
   return created.id;
+}
+
+/** ID оголошень, які показуються на Business-вітрині (режим «усі» або ручний вибір). */
+export async function resolveBusinessListingIds(
+  userId: number,
+  linkedListingIdsRaw: string | null | undefined
+): Promise<number[]> {
+  const config = parseListingDisplayConfig(linkedListingIdsRaw);
+  if (config.mode === 'manual') {
+    return config.ids.filter((id) => Number.isFinite(id));
+  }
+
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT id FROM Listing WHERE userId = ? ORDER BY id DESC`,
+    userId
+  )) as Array<{ id: number }>;
+
+  return rows.map((row) => row.id).filter((id) => Number.isFinite(id));
+}
+
+/** Синхронізує profileType оголошень з вибраними в Business-вітрині. */
+export async function syncBusinessListingProfileTypes(userId: number): Promise<void> {
+  const profile = await prisma.businessProfile.findUnique({ where: { userId } });
+  if (!profile || !isBusinessProfileActive(profile)) return;
+  const ids = await resolveBusinessListingIds(userId, profile.linkedListingIds);
+  await assignListingsToProfile(userId, ids);
 }
 
 export async function assignListingsToProfile(
@@ -251,14 +278,24 @@ export async function activateBusinessSubscription(
   listingIds: number[] = []
 ): Promise<void> {
   const profile = await prisma.businessProfile.findUnique({ where: { id: businessProfileId } });
-  const storedIds = parseLinkedListingIds(profile?.linkedListingIds);
+  const config = parseListingDisplayConfig(profile?.linkedListingIds);
+  const explicitIds = listingIds.filter((id) => Number.isFinite(id));
   const idsToAssign =
-    listingIds.length > 0 ? listingIds : storedIds.length > 0 ? storedIds : [];
+    explicitIds.length > 0
+      ? explicitIds
+      : await resolveBusinessListingIds(userId, profile?.linkedListingIds);
 
   const credits = BUSINESS_PLAN_MONTHLY_CREDITS[plan];
   const now = new Date();
   const endsAt = new Date(now);
   endsAt.setDate(endsAt.getDate() + BUSINESS_SUBSCRIPTION_DAYS);
+
+  const linkedListingIds =
+    explicitIds.length > 0
+      ? serializeListingDisplayConfig('manual', explicitIds)
+      : profile?.linkedListingIds && config.mode === 'manual'
+        ? profile.linkedListingIds
+        : serializeListingDisplayConfig('all', []);
 
   await prisma.businessProfile.update({
     where: { id: businessProfileId },
@@ -267,7 +304,7 @@ export async function activateBusinessSubscription(
       subscriptionStatus: 'active',
       subscriptionEndsAt: endsAt,
       isPublished: true,
-      linkedListingIds: JSON.stringify(idsToAssign),
+      linkedListingIds,
       highlightCreditsRemaining: credits.highlight,
       topCreditsRemaining: credits.top,
       updatedAt: now,
@@ -385,7 +422,9 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
     return null;
   }
 
-  const listingIds = parseLinkedListingIds(profile.linkedListingIds);
+  await syncBusinessListingProfileTypes(user.id);
+
+  const listingIds = await resolveBusinessListingIds(user.id, profile.linkedListingIds);
   const activeListingsCount = (await prisma.$queryRawUnsafe(
     `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND COALESCE(profileType, 'personal') = 'business' AND status = 'active'`,
     user.id
@@ -548,12 +587,22 @@ export async function getBusinessProfileStatsForUserId(
   userId: number
 ): Promise<BusinessProfileStatsPayload | null> {
   const { rawQuery } = await import('@/lib/dbSql');
+  const { isPostgres, sqlNowMinusDays } = await import('@/lib/dbSql');
 
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
   if (!profile) return null;
 
+  await syncBusinessListingProfileTypes(userId);
+
+  const sinceExpr = sqlNowMinusDays(30);
+  const analyticsSinceFilter = isPostgres()
+    ? `createdAt >= ${sinceExpr}`
+    : `datetime(createdAt) >= ${sinceExpr}`;
+  const analyticsAeSinceFilter = isPostgres()
+    ? `ae.createdAt >= ${sinceExpr}`
+    : `datetime(ae.createdAt) >= ${sinceExpr}`;
+
   let listingStats: {
-    listingViews: bigint | number | null;
     totalListings: bigint | number;
     activeListings: bigint | number;
     pendingListings: bigint | number;
@@ -566,7 +615,6 @@ export async function getBusinessProfileStatsForUserId(
       await rawQuery<Array<NonNullable<typeof listingStats>>>(
         prisma,
         `SELECT
-            COALESCE(SUM(views), 0) as listingViews,
             COUNT(*) as totalListings,
             SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings,
             SUM(CASE WHEN status = 'pending_moderation' THEN 1 ELSE 0 END) as pendingListings,
@@ -592,6 +640,7 @@ export async function getBusinessProfileStatsForUserId(
   let profileViews = 0;
   let profileContacts = 0;
   let listingContacts = 0;
+  let listingViews30d = 0;
 
   try {
     const { ensureAnalyticsEventTable } = await import('@/lib/analytics/analyticsStore');
@@ -605,7 +654,8 @@ export async function getBusinessProfileStatsForUserId(
             FROM AnalyticsEvent
             WHERE eventName = 'profile_view'
               AND entityType = 'business_profile'
-              AND entityId = ?`,
+              AND entityId = ?
+              AND ${analyticsSinceFilter}`,
           [profileEntityId]
         )
       )[0]?.cnt ?? 0
@@ -619,7 +669,8 @@ export async function getBusinessProfileStatsForUserId(
             FROM AnalyticsEvent
             WHERE eventName = 'contact_seller'
               AND entityType = 'business_profile'
-              AND entityId = ?`,
+              AND entityId = ?
+              AND ${analyticsSinceFilter}`,
           [profileEntityId]
         )
       )[0]?.cnt ?? 0
@@ -635,7 +686,25 @@ export async function getBusinessProfileStatsForUserId(
             WHERE ae.eventName = 'contact_seller'
               AND ae.entityType = 'listing'
               AND l.userId = ?
-              AND COALESCE(l.profileType, 'personal') = 'business'`,
+              AND COALESCE(l.profileType, 'personal') = 'business'
+              AND ${analyticsAeSinceFilter}`,
+          [userId]
+        )
+      )[0]?.cnt ?? 0
+    );
+
+    listingViews30d = Number(
+      (
+        await rawQuery<Array<{ cnt: bigint | number }>>(
+          prisma,
+          `SELECT COUNT(*) as cnt
+            FROM AnalyticsEvent ae
+            INNER JOIN Listing l ON CAST(ae.entityId AS INTEGER) = l.id
+            WHERE ae.eventName = 'listing_view'
+              AND ae.entityType = 'listing'
+              AND l.userId = ?
+              AND COALESCE(l.profileType, 'personal') = 'business'
+              AND ${analyticsAeSinceFilter}`,
           [userId]
         )
       )[0]?.cnt ?? 0
@@ -649,7 +718,7 @@ export async function getBusinessProfileStatsForUserId(
   return {
     followersCount: profile.followersCount,
     profileViews,
-    listingViews: toNum(listingStats?.listingViews),
+    listingViews: listingViews30d,
     contactClicks: profileContacts + listingContacts,
     activeListings: toNum(listingStats?.activeListings),
     totalListings: toNum(listingStats?.totalListings),

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
-import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile } from '@/lib/businessProfileHelpers';
+import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile, resolveBusinessListingIds } from '@/lib/businessProfileHelpers';
 import type { ListingDisplayMode } from '@/lib/businessProfileSettings';
 
 export const dynamic = 'force-dynamic';
@@ -241,9 +241,10 @@ export async function PUT(request: NextRequest) {
 
     const profile = await prisma.businessProfile.findUnique({ where: { id: profileId } });
 
-    if (profile && listingIds !== undefined && isBusinessProfileActive(profile)) {
+    if (profile && isBusinessProfileActive(profile)) {
       try {
-        await assignListingsToProfile(user.id, listingIds);
+        const resolvedIds = await resolveBusinessListingIds(user.id, profile.linkedListingIds);
+        await assignListingsToProfile(user.id, resolvedIds);
       } catch (assignError) {
         console.error('[BusinessProfile PUT] assign listings failed', assignError);
       }

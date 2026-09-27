@@ -188,6 +188,18 @@ export async function POST(request: NextRequest) {
     // Створюємо оголошення
     let listingId: number;
     try {
+      let initialProfileType: 'personal' | 'business' = 'personal';
+      if (requestedProfileType === 'business') {
+        const { expireBusinessProfileIfNeeded, isBusinessProfileActive } = await import(
+          '@/lib/businessProfileHelpers'
+        );
+        await expireBusinessProfileIfNeeded(user.id);
+        const bp = await prisma.businessProfile.findUnique({ where: { userId: user.id } });
+        if (bp && isBusinessProfileActive(bp)) {
+          initialProfileType = 'business';
+        }
+      }
+
       listingId = await createDraftListing(
         user.id,
         {
@@ -202,7 +214,8 @@ export async function POST(request: NextRequest) {
           location: normalizedLocation,
           autoRenew,
         },
-        savedImageUrls
+        savedImageUrls,
+        initialProfileType
       );
       console.log('[Create Listing API] Listing created with ID:', listingId);
 

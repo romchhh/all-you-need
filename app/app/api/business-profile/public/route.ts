@@ -68,7 +68,6 @@ export async function GET(request: NextRequest) {
         instagram: profile.instagram,
         website: profile.website,
         workingHours: profile.workingHours,
-        plan: profile.plan,
         followersCount: profile.followersCount,
         activeListingsCount,
         memberSince: formatBusinessMemberSince(user.createdAt, lang),

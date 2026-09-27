@@ -1378,6 +1378,8 @@
     },
     "owner": {
       "viewProfile": "Посмотреть профиль",
+      "listingSourceBusiness": "Business-витрина",
+      "listingSourcePersonal": "Личный профиль",
       "subscriptionActiveUntil": "Подписка активна до {date}",
       "manage": "Управлять",
       "highlightSlots": "Highlight",

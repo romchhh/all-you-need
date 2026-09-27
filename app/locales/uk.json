@@ -1380,6 +1380,8 @@
     },
     "owner": {
       "viewProfile": "Переглянути профіль",
+      "listingSourceBusiness": "Business-вітрина",
+      "listingSourcePersonal": "Особистий профіль",
       "subscriptionActiveUntil": "Підписка активна до {date}",
       "manage": "Керувати",
       "highlightSlots": "Highlight",

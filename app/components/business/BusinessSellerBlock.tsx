@@ -36,7 +36,6 @@ export function BusinessSellerBlock({ business, onViewProfile, tg }: BusinessSel
   const ac = getAppearanceClasses(isLight);
 
   const logoUrl = business.logo ? getResolvedImageUrl(business.logo) : null;
-  const isPro = business.plan === 'business_pro';
   const showRating = (business.reviewsCount ?? 0) > 0 && (business.rating ?? 0) > 0;
   const telegramSinceLabel = business.telegramSince
     ? t('businessProfile.public.onTelegramSince', { date: business.telegramSince })
@@ -86,7 +85,7 @@ export function BusinessSellerBlock({ business, onViewProfile, tg }: BusinessSel
                 isLight ? 'bg-[#C8E6A0] text-[#1a2414]' : 'bg-[#C8E6A0] text-[#0f1408]'
               }`}
             >
-              BUSINESS{isPro ? ' PRO' : ''}
+              BUSINESS
             </span>
             {showRating && (
               <div className={`mb-1.5 flex items-center gap-1 text-sm ${ac.mutedText}`}>

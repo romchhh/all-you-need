@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  BadgeCheck,
   Camera,
   Check,
   ChevronLeft,
@@ -800,15 +799,14 @@ export default function BusinessSettingsFlow({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-center gap-1.5">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
                         <h2 className={`truncate text-lg font-bold ${ac.pageHeading}`}>
                           {existingProfile.businessName}
                         </h2>
-                        <BadgeCheck size={16} className="shrink-0 text-emerald-400" />
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${ui.limeBg} text-[#1a1a1a]`}>
+                          BUSINESS
+                        </span>
                       </div>
-                      <span className={`mb-2 inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${ui.limeBg} text-[#1a1a1a]`}>
-                        BUSINESS{isPro ? ' PRO' : ''}
-                      </span>
                       {showRating ? (
                         <div className={`mb-1 flex items-center gap-1 text-sm ${ac.mutedText}`}>
                           <Star size={14} className="fill-amber-400 text-amber-400" />

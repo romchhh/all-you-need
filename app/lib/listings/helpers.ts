@@ -425,7 +425,8 @@ export function parseExistingImages(images: string | string[]): string[] {
 export async function createDraftListing(
   userId: number,
   data: ListingFormData,
-  imageUrls: string[]
+  imageUrls: string[],
+  profileType: 'personal' | 'business' = 'personal'
 ): Promise<number> {
   const now = new Date();
   const createTime = toSQLiteDate(now);
@@ -436,13 +437,15 @@ export async function createDraftListing(
   const autoRenew = sqlBool(Boolean(data.autoRenew));
   const isFree = sqlBool(Boolean(data.isFree));
 
+  const safeProfileType = profileType === 'business' ? 'business' : 'personal';
+
   try {
     await prisma.$executeRawUnsafe(
       `INSERT INTO Listing (
         userId, title, description, price, currency, isFree, category, subcategory,
-        condition, location, images, status, moderationStatus, expiresAt, autoRenew, createdAt, updatedAt, publishedAt
+        condition, location, images, status, moderationStatus, expiresAt, autoRenew, profileType, createdAt, updatedAt, publishedAt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, ?, NULL)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, ?, ?, NULL)`,
       userId,
       data.title,
       data.description,
@@ -456,33 +459,59 @@ export async function createDraftListing(
       JSON.stringify(imageUrls),
       expiresTime,
       autoRenew,
+      safeProfileType,
       createTime,
       createTime
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (!msg.includes('autoRenew')) throw err;
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO Listing (
-        userId, title, description, price, currency, isFree, category, subcategory,
-        condition, location, images, status, moderationStatus, expiresAt, createdAt, updatedAt, publishedAt
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, NULL)`,
-      userId,
-      data.title,
-      data.description,
-      data.price,
-      data.currency,
-      isFree,
-      data.category,
-      data.subcategory || null,
-      data.condition || null,
-      data.location,
-      JSON.stringify(imageUrls),
-      expiresTime,
-      createTime,
-      createTime
-    );
+    if (!msg.includes('autoRenew') && !msg.includes('profileType')) throw err;
+    if (msg.includes('profileType')) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO Listing (
+          userId, title, description, price, currency, isFree, category, subcategory,
+          condition, location, images, status, moderationStatus, expiresAt, autoRenew, createdAt, updatedAt, publishedAt
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, ?, NULL)`,
+        userId,
+        data.title,
+        data.description,
+        data.price,
+        data.currency,
+        isFree,
+        data.category,
+        data.subcategory || null,
+        data.condition || null,
+        data.location,
+        JSON.stringify(imageUrls),
+        expiresTime,
+        autoRenew,
+        createTime,
+        createTime
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO Listing (
+          userId, title, description, price, currency, isFree, category, subcategory,
+          condition, location, images, status, moderationStatus, expiresAt, createdAt, updatedAt, publishedAt
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_moderation', 'pending', ?, ?, ?, NULL)`,
+        userId,
+        data.title,
+        data.description,
+        data.price,
+        data.currency,
+        isFree,
+        data.category,
+        data.subcategory || null,
+        data.condition || null,
+        data.location,
+        JSON.stringify(imageUrls),
+        expiresTime,
+        createTime,
+        createTime
+      );
+    }
   }
 
   // Отримуємо ID створеного оголошення

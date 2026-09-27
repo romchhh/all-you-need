@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
-  BadgeCheck,
   Check,
   MoreHorizontal,
   Star,
@@ -63,7 +62,6 @@ interface PublicBusinessProfile {
   instagram: string | null;
   website: string | null;
   workingHours: string | null;
-  plan: string | null;
   followersCount: number;
   activeListingsCount: number;
   memberSince: string;
@@ -256,7 +254,6 @@ export function BusinessProfilePage({
 
   const coverUrl = profile?.coverImage ? getResolvedImageUrl(profile.coverImage) : null;
   const logoUrl = profile?.logo ? getResolvedImageUrl(profile.logo) : null;
-  const isPro = profile?.plan === 'business_pro';
 
   const handleMessage = () => {
     if (!profile) return;
@@ -435,20 +432,27 @@ export function BusinessProfilePage({
     <div className={`min-h-screen pb-24 ${ac.overlayShell}`}>
       <div className="relative">
         <div
-          className={`relative h-52 overflow-hidden sm:h-56 ${
-            coverUrl ? '' : isLight ? 'bg-[#3F5331]/20' : 'bg-[#3F5331]/35'
+          className={`relative h-44 overflow-hidden sm:h-48 ${
+            coverUrl ? '' : isLight ? 'bg-gradient-to-br from-[#3F5331]/30 to-[#2a3820]/20' : 'bg-gradient-to-br from-[#3F5331]/50 to-[#1a2414]'
           }`}
         >
-          {coverUrl && <img src={coverUrl} alt="" className="h-full w-full object-cover" />}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/10 to-black/45" />
+          {coverUrl ? (
+            <img src={coverUrl} alt="" className="h-full w-full object-cover object-center" />
+          ) : null}
+          <div
+            className={`pointer-events-none absolute inset-0 ${
+              isLight
+                ? 'bg-gradient-to-b from-black/45 via-black/10 to-transparent'
+                : 'bg-gradient-to-b from-black/50 via-black/25 to-transparent'
+            }`}
+          />
 
           <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-4 pb-2 pt-[max(env(safe-area-inset-top,0px),10px)]">
             <button type="button" onClick={handleBack} aria-label={t('common.back')} className={navBtnClass}>
               <ArrowLeft size={20} />
             </button>
-            <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5 px-1">
+            <div className="flex min-w-0 flex-1 justify-center px-1">
               <span className="truncate text-base font-semibold text-white">{profile.businessName}</span>
-              <BadgeCheck size={18} className="shrink-0 text-emerald-400" />
             </div>
             <button
               type="button"
@@ -459,29 +463,39 @@ export function BusinessProfilePage({
               <MoreHorizontal size={18} />
             </button>
           </div>
+        </div>
 
-          <div className="absolute -bottom-12 left-4 z-10">
-            <div
-              className={`h-24 w-24 overflow-hidden rounded-full border-4 shadow-lg ${
-                isLight ? 'border-black bg-[#111]' : 'border-black bg-[#1C1C1C]'
-              }`}
-            >
-              {logoUrl ? (
-                <img src={logoUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-[#3F5331]/40 text-2xl font-bold text-[#C8E6A0]">
-                  {profile.businessName.charAt(0)}
-                </div>
-              )}
-            </div>
+        <div className="relative z-10 px-4 sm:pl-6">
+          <div
+            className={`-mt-14 inline-flex h-28 w-28 overflow-hidden rounded-full ring-4 ring-offset-2 ${
+              isLight
+                ? 'bg-[#111] ring-white ring-offset-[#f5f7f2]'
+                : 'bg-[#141414] ring-[#C8E6A0]/30 ring-offset-[#000000]'
+            }`}
+          >
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-[#3F5331]/50 text-3xl font-bold text-[#C8E6A0]">
+                {profile.businessName.charAt(0)}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="px-4 pb-4 pt-14">
-        <div className="mb-1 flex items-center gap-1.5">
-          <h1 className={`min-w-0 truncate text-xl font-bold ${ac.pageHeading}`}>{profile.businessName}</h1>
-          <BadgeCheck size={18} className="shrink-0 text-emerald-400" />
+      <div className="px-4 pb-4 pt-3 text-left">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <h1 className={`min-w-0 text-xl font-bold ${ac.pageHeading}`}>{profile.businessName}</h1>
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${
+              isLight
+                ? 'border border-[#3F5331]/50 text-[#3F5331]'
+                : 'border border-[#C8E6A0]/50 text-[#C8E6A0]'
+            }`}
+          >
+            BUSINESS
+          </span>
         </div>
 
         <p className={`mb-2 text-sm ${ac.mutedText}`}>
@@ -515,15 +529,6 @@ export function BusinessProfilePage({
           ) : (
             <span className={`text-sm ${ac.mutedText}`}>{profile.memberSince}</span>
           )}
-          <span
-            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${
-              isLight
-                ? 'border border-[#3F5331]/50 text-[#3F5331]'
-                : 'border border-[#C8E6A0]/50 text-[#C8E6A0]'
-            }`}
-          >
-            BUSINESS{isPro ? ' PRO' : ''}
-          </span>
         </div>
 
         <div className="mb-4 flex items-center justify-between gap-3">

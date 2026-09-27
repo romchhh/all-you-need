@@ -30,6 +30,8 @@ interface ProfileListingCardProps {
   tg: TelegramWebApp | null;
   /** У «Мої оголошення» — завжди показувати око та серце з фактичними лічильниками (навіть 0). */
   alwaysShowStats?: boolean;
+  /** У режимі Business-профілю — мітка «вітрина / особистий». */
+  showListingProfileSource?: boolean;
 }
 
 export const ProfileListingCard = ({
@@ -47,6 +49,7 @@ export const ProfileListingCard = ({
   showToast,
   tg,
   alwaysShowStats = false,
+  showListingProfileSource = false,
 }: ProfileListingCardProps) => {
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
@@ -410,6 +413,23 @@ export const ProfileListingCard = ({
             >
               {listing.title}
             </div>
+            {showListingProfileSource && (
+              <p
+                className={`mt-1 text-[10px] font-semibold uppercase tracking-wide ${
+                  listing.profileType === 'business'
+                    ? isLight
+                      ? 'text-[#3F5331]'
+                      : 'text-[#C8E6A0]'
+                    : isLight
+                      ? 'text-gray-500'
+                      : 'text-white/55'
+                }`}
+              >
+                {listing.profileType === 'business'
+                  ? t('businessProfile.owner.listingSourceBusiness')
+                  : t('businessProfile.owner.listingSourcePersonal')}
+              </p>
+            )}
             <div className={`font-bold mt-1 min-w-0 ${
               isSold
                 ? 'text-gray-500 line-through'

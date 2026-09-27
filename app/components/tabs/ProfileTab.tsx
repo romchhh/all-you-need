@@ -418,7 +418,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         ? 'active'
         : businessListingTab === 'moderation'
           ? 'pending_moderation'
-          : 'deactivated';
+          : 'inactive';
     setSelectedStatus(status);
     setSelectedCategory('all');
   }, [businessListingTab, isBusinessActive, profileViewMode]);
@@ -686,6 +686,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 key={listing.id}
                 listing={{ ...listing, favoritesCount: listing.favoritesCount || 0 }}
                 alwaysShowStats
+                showListingProfileSource={isBusinessView}
                 isFavorite={favorites.has(listing.id)}
                 isSold={isSold}
                 isDeactivated={isDeactivated || isExpired}

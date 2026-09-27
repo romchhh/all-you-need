@@ -530,6 +530,9 @@ export const ListingDetail = ({
     }
   };
 
+  const sellerListingsProfileQuery =
+    listing.profileType === 'business' ? '&profileType=business' : '';
+
   useEffect(() => {
     const fetchRelatedListings = async () => {
       try {
@@ -537,8 +540,9 @@ export const ListingDetail = ({
         // Завантажуємо оголошення продавця (тільки активні)
         if (listing.seller.telegramId) {
           const viewerId = currentUser?.id?.toString() || '';
-          // Додаємо фільтр status=active, щоб показувати тільки активні оголошення
-          const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=16&offset=0`);
+          const sellerResponse = await fetch(
+            `/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=16&offset=0${sellerListingsProfileQuery}`
+          );
           if (sellerResponse.ok) {
             const sellerData = await sellerResponse.json();
             const filtered = (sellerData.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -571,6 +575,7 @@ export const ListingDetail = ({
   }, [
     listing.id,
     listing.seller.telegramId,
+    listing.profileType,
     listing.category,
     listing.subcategory,
     currentUser?.id,
@@ -582,7 +587,9 @@ export const ListingDetail = ({
     try {
       const viewerId = currentUser?.id?.toString() || '';
       // Додаємо фільтр status=active, щоб показувати тільки активні оголошення
-      const response = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=16&offset=${sellerOffset}`);
+      const response = await fetch(
+        `/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=16&offset=${sellerOffset}${sellerListingsProfileQuery}`
+      );
       if (response.ok) {
         const data = await response.json();
         const filtered = (data.listings || []).filter((l: Listing) => l.id !== listing.id);
@@ -645,7 +652,9 @@ export const ListingDetail = ({
       if (listing.seller.telegramId) {
         const viewerIdStr = currentUser?.id?.toString() || '';
         // Додаємо фільтр status=active, щоб показувати тільки активні оголошення
-        const sellerResponse = await fetch(`/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerIdStr}&status=active&limit=16&offset=0`);
+        const sellerResponse = await fetch(
+          `/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerIdStr}&status=active&limit=16&offset=0${sellerListingsProfileQuery}`
+        );
         if (sellerResponse.ok) {
           const sellerData = await sellerResponse.json();
           const filtered = (sellerData.listings || []).filter((l: Listing) => l.id !== listing.id);

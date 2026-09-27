@@ -203,6 +203,9 @@ export async function GET(request: NextRequest) {
         // Підтримка обох варіантів для сумісності; деактивовані = вручну деактивовані + закінчені за терміном (expired)
         if (status === 'deactivated') {
           whereClause += " AND (l.status = 'deactivated' OR l.status = 'hidden' OR l.status = 'expired')";
+        } else if (status === 'inactive') {
+          whereClause +=
+            " AND l.status IN ('deactivated', 'hidden', 'expired', 'sold', 'rejected')";
         } else if (status === 'hidden') {
           whereClause += " AND (l.status = 'deactivated' OR l.status = 'hidden' OR l.status = 'expired')";
         } else {
@@ -247,6 +250,7 @@ export async function GET(request: NextRequest) {
           l.tags,
           l.createdAt,
           l.publishedAt,
+          COALESCE(l.profileType, 'personal') as profileType,
           u.username as sellerUsername,
           u.firstName as sellerFirstName,
           u.lastName as sellerLastName,
@@ -842,6 +846,8 @@ export async function GET(request: NextRequest) {
                autoRenew:
                  (listing as any).autoRenew === true || Number((listing as any).autoRenew) === 1,
                favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
+               profileType:
+                 (listing as any).profileType === 'business' ? 'business' : 'personal',
              };
     });
 

@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react';
 import {
-  BadgeCheck,
   ChevronRight,
   Crown,
   Eye,
@@ -183,10 +182,14 @@ export function BusinessOwnerProfileView({
   const showRating = reviewsCount > 0 && rating > 0;
 
   const kpiItems = [
-    { key: 'kpiViews', value: businessStats.listingViews + businessStats.profileViews, icon: Eye },
+    {
+      key: 'kpiViews',
+      value: businessStats.profileViews + businessStats.listingViews,
+      icon: Eye,
+    },
     { key: 'kpiInquiries', value: businessStats.contactClicks, icon: MessageCircle },
     { key: 'kpiFavorites', value: businessStats.favoritesTotal, icon: Heart },
-    { key: 'kpiReviews', value: 0, icon: Star },
+    { key: 'kpiReviews', value: reviewsCount, icon: Star },
   ] as const;
 
   const listingTabs: Array<{ id: BusinessListingTab; label: string; count: number }> = [
@@ -223,13 +226,12 @@ export function BusinessOwnerProfileView({
             )}
           </div>
           <div className="min-w-0 flex-1 pt-1">
-            <div className="mb-1 flex items-center gap-1.5">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
               <h2 className={`truncate text-xl font-bold ${ac.pageHeading}`}>{businessProfile.businessName}</h2>
-              <BadgeCheck size={18} className="shrink-0 text-emerald-400" />
+              <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${ui.limeBg} text-[#1a1a1a]`}>
+                BUSINESS
+              </span>
             </div>
-            <span className={`mb-2 inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${ui.limeBg} text-[#1a1a1a]`}>
-              BUSINESS{isPro ? ' PRO' : ''}
-            </span>
             {businessProfile.city ? (
               <p className={`mb-1 text-sm ${ac.mutedText}`}>{businessProfile.city}</p>
             ) : null}
