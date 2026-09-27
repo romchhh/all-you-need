@@ -1,11 +1,13 @@
 cd ~/all-you-need && git pull && ./docker/up.sh
 
-# Або явно (те саме, що up.sh за замовчуванням):
+# Docker-команди (завжди з host-db overlay на VPS):
+#   ./docker/compose.sh ps
+#   ./docker/compose.sh logs -f bot
+#   ./docker/compose.sh exec bot python3 scripts/test_daily_db_backup.py --send
+
+# Або явно:
 # docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
 
-# Якщо раніше запускали без host-db і з’явився allyouneed-postgres на :5432:
-# docker compose -f docker-compose.yml -f docker-compose.host-db.yml down --remove-orphans
-# docker rm -f allyouneed-postgres 2>/dev/null; docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
-
-# Бекап у Telegram:
-# docker compose -f docker-compose.yml -f docker-compose.host-db.yml exec bot python3 scripts/test_daily_db_backup.py --send
+# Після git pull один раз (якщо exec без -f падає): додай у .env рядок
+# COMPOSE_FILE=docker-compose.yml:docker-compose.host-db.yml
+# або знову: ./docker/prepare-env.sh

@@ -26,4 +26,23 @@ fi
 
 mkdir -p "$ROOT/database/backups" "$ROOT/bot/parser/sessions" "$ROOT/bot/logs"
 
+# Щоб `docker compose exec …` без -f працював на VPS (host PostgreSQL)
+ensure_compose_file() {
+  env_file="$ROOT/.env"
+  if [ ! -f "$env_file" ]; then
+    return 0
+  fi
+  if grep -q '^COMPOSE_FILE=' "$env_file" 2>/dev/null; then
+    return 0
+  fi
+  {
+    echo ""
+    echo "# Docker Compose (VPS: PostgreSQL на хості). Для PG у Docker: USE_DOCKER_POSTGRES=1 ./docker/up.sh"
+    echo "COMPOSE_FILE=docker-compose.yml:docker-compose.host-db.yml"
+  } >> "$env_file"
+  echo "[prepare-env] appended COMPOSE_FILE to .env (host-db overlay)"
+}
+
+ensure_compose_file
+
 echo "[prepare-env] ready (edit bot/.env: TOKEN, WEBAPP_URL, ADMINISTRATORS)"
