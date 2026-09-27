@@ -13,3 +13,5 @@ DB_BACKUP_MINUTE: int = 0
 DB_BACKUP_NOTIFY_ADMINS: bool = True
 DB_BACKUP_KEEP_DAYS: int = 14
 DB_BACKUP_PG_TIMEOUT_SEC: int = 900
+# Шлях до pg_dump (якщо порожньо — авто: найновіший у /usr/lib/postgresql/*/bin/)
+DB_BACKUP_PG_DUMP: str = ""

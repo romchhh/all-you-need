@@ -103,6 +103,28 @@ def _pg_connection_env() -> dict[str, str]:
 
 
 def _find_pg_dump() -> str:
+    custom = (
+        getattr(_tuning, "DB_BACKUP_PG_DUMP", "") or os.environ.get("PG_DUMP_PATH", "")
+    ).strip()
+    if custom:
+        path = Path(custom)
+        if path.is_file():
+            return str(path)
+        raise FileNotFoundError(f"DB_BACKUP_PG_DUMP / PG_DUMP_PATH не знайдено: {custom}")
+
+    pg_root = Path("/usr/lib/postgresql")
+    if pg_root.is_dir():
+        version_dirs: list[tuple[int, Path]] = []
+        for entry in pg_root.iterdir():
+            if not entry.is_dir() or not entry.name.isdigit():
+                continue
+            candidate = entry / "bin" / "pg_dump"
+            if candidate.is_file():
+                version_dirs.append((int(entry.name), candidate))
+        if version_dirs:
+            version_dirs.sort(key=lambda item: item[0], reverse=True)
+            return str(version_dirs[0][1])
+
     path = shutil.which("pg_dump")
     if path:
         return path
@@ -110,7 +132,7 @@ def _find_pg_dump() -> str:
         if Path(candidate).is_file():
             return candidate
     raise FileNotFoundError(
-        "pg_dump не знайдено (встановіть postgresql-client у Docker-образ bot)"
+        "pg_dump не знайдено (встановіть postgresql-client-18 у Docker-образ bot)"
     )
 
 
@@ -131,7 +153,7 @@ def create_database_backup() -> Path:
             "--file",
             str(out_path),
         ]
-        logger.info("daily_db_backup: pg_dump → %s", out_path.name)
+        logger.info("daily_db_backup: pg_dump (%s) → %s", pg_dump, out_path.name)
         proc = subprocess.run(
             cmd,
             env=env,
