@@ -1,6 +1,13 @@
-# Запуск:  ./docker/up.sh
-# або:     docker compose up -d --build  (після ./docker/prepare-env.sh)
+# Запуск (VPS з PostgreSQL на хості):
+#   docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
+#   або:  ./docker/up.sh
 #
+# Локально з Postgres у Docker (профіль docker-postgres):
+#   USE_DOCKER_POSTGRES=1 ./docker/up.sh
+#   або:  docker compose --profile docker-postgres up -d --build
+#
+# НЕ запускайте лише `docker compose up` на VPS, де вже слухає :5432 — буде
+# «address already in use» і bot не підніметься.
 # При старті автоматично:
 #   1. app  → prisma migrate deploy (PostgreSQL схема + bot/parser таблиці)
 #   2. bot  → backup SQLite + копія даних у PostgreSQL (один раз, якщо є ayn_marketplace.db)
@@ -9,6 +16,7 @@
 
 services:
   postgres:
+    profiles: ["docker-postgres"]
     image: postgres:16-alpine
     container_name: allyouneed-postgres
     restart: unless-stopped
@@ -110,8 +118,6 @@ services:
       - ./bot/parser/sessions:/app/bot/parser/sessions
       - ./bot/logs:/app/bot/logs
     depends_on:
-      postgres:
-        condition: service_healthy
       app:
         condition: service_healthy
 

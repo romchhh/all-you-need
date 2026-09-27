@@ -1,1 +1,11 @@
-cd ~/all-you-need && git pull && docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
+cd ~/all-you-need && git pull && ./docker/up.sh
+
+# Або явно (те саме, що up.sh за замовчуванням):
+# docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
+
+# Якщо раніше запускали без host-db і з’явився allyouneed-postgres на :5432:
+# docker compose -f docker-compose.yml -f docker-compose.host-db.yml down --remove-orphans
+# docker rm -f allyouneed-postgres 2>/dev/null; docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build
+
+# Бекап у Telegram:
+# docker compose -f docker-compose.yml -f docker-compose.host-db.yml exec bot python3 scripts/test_daily_db_backup.py --send
