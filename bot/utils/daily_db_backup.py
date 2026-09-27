@@ -1,7 +1,7 @@
 """
 Щоденний бекап БД → Telegram адмінам.
 
-PostgreSQL: pg_dump (custom format, стиснутий).
+PostgreSQL: pg_dump по частинах (схема + data-only на таблицю) для ліміту Telegram.
 SQLite (legacy): копія файлу + gzip.
 """
 
@@ -10,6 +10,7 @@ from __future__ import annotations
 import gzip
 import logging
 import os
+import re
 import shutil
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -60,6 +61,11 @@ def backup_cron_minute() -> int:
 
 def backup_pg_timeout_sec() -> int:
     return max(60, int(_tuning.DB_BACKUP_PG_TIMEOUT_SEC))
+
+
+def telegram_max_part_bytes() -> int:
+    mb = max(1, min(49, int(getattr(_tuning, "DB_BACKUP_TELEGRAM_MAX_MB", 45))))
+    return mb * 1024 * 1024
 
 
 def admin_telegram_ids() -> list[int]:
@@ -136,41 +142,128 @@ def _find_pg_dump() -> str:
     )
 
 
-def create_database_backup() -> Path:
-    """Створює файл бекапу в database/backups/."""
+def _safe_table_slug(table_name: str) -> str:
+    slug = re.sub(r"[^\w.-]+", "_", table_name).strip("_")
+    return slug[:48] or "table"
+
+
+def _pg_table_identifier(schema: str, table: str) -> str:
+    return f'{schema}."{table}"'
+
+
+def _list_pg_user_tables() -> list[tuple[str, str]]:
+    from database_functions.db_connection import _load_psycopg2
+
+    psycopg2, _ = _load_psycopg2()
+    conn = psycopg2.connect(pg_dsn_for_psycopg2(get_database_url()))
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT table_schema, table_name
+                FROM information_schema.tables
+                WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                  AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """
+            )
+            rows = cur.fetchall()
+            return [(str(s), str(t)) for s, t in rows]
+    finally:
+        conn.close()
+
+
+def _run_pg_dump(out_path: Path, extra_args: list[str]) -> None:
+    pg_dump = _find_pg_dump()
+    env = _pg_connection_env()
+    cmd = [
+        pg_dump,
+        "--format=custom",
+        "--no-owner",
+        "--no-acl",
+        *extra_args,
+        "--file",
+        str(out_path),
+    ]
+    proc = subprocess.run(
+        cmd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=backup_pg_timeout_sec(),
+        check=False,
+    )
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "").strip()[:2000]
+        if out_path.is_file():
+            out_path.unlink(missing_ok=True)
+        raise RuntimeError(f"pg_dump failed ({proc.returncode}): {err}")
+    if not out_path.is_file() or out_path.stat().st_size == 0:
+        if out_path.is_file():
+            out_path.unlink(missing_ok=True)
+        raise RuntimeError(f"pg_dump не створив файл або файл порожній: {out_path.name}")
+
+
+def _run_pg_dump_plain_gzip(out_path: Path, extra_args: list[str]) -> None:
+    """Plain SQL → gzip (менший розмір для великих таблиць)."""
+    pg_dump = _find_pg_dump()
+    env = _pg_connection_env()
+    cmd = [
+        pg_dump,
+        "--format=plain",
+        "--no-owner",
+        "--no-acl",
+        *extra_args,
+    ]
+    proc = subprocess.run(
+        cmd,
+        env=env,
+        capture_output=True,
+        timeout=backup_pg_timeout_sec(),
+        check=False,
+    )
+    if proc.returncode != 0:
+        err = (proc.stderr or b"").decode("utf-8", errors="replace")[:2000]
+        raise RuntimeError(f"pg_dump plain failed ({proc.returncode}): {err}")
+    if not proc.stdout:
+        raise RuntimeError(f"pg_dump plain порожній вивід: {out_path.name}")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(out_path, "wb", compresslevel=6) as gz:
+        gz.write(proc.stdout)
+
+
+def _create_postgres_table_backups(label: str) -> list[Path]:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    parts: list[Path] = []
+
+    schema_path = BACKUP_DIR / f"ayn_marketplace_pg_{label}_00_schema.dump"
+    logger.info("daily_db_backup: schema → %s", schema_path.name)
+    _run_pg_dump(schema_path, ["--schema-only"])
+    parts.append(schema_path)
+
+    tables = _list_pg_user_tables()
+    if not tables:
+        raise RuntimeError("PostgreSQL: не знайдено жодної таблиці для бекапу")
+
+    for index, (schema, table) in enumerate(tables, start=1):
+        slug = _safe_table_slug(table)
+        table_id = _pg_table_identifier(schema, table)
+        dump_path = BACKUP_DIR / f"ayn_marketplace_pg_{label}_{index:02d}_{slug}.dump"
+        logger.info("daily_db_backup: table %s → %s", table_id, dump_path.name)
+        _run_pg_dump(dump_path, ["--data-only", f"--table={table_id}"])
+        parts.append(dump_path)
+
+    return parts
+
+
+def create_database_backup() -> list[Path]:
+    """Створює файл(и) бекапу в database/backups/."""
     label = _timestamp_label()
 
     if is_postgres():
-        out_path = BACKUP_DIR / f"ayn_marketplace_pg_{label}.dump"
-        pg_dump = _find_pg_dump()
-        env = _pg_connection_env()
-        cmd = [
-            pg_dump,
-            "--format=custom",
-            "--no-owner",
-            "--no-acl",
-            "--file",
-            str(out_path),
-        ]
-        logger.info("daily_db_backup: pg_dump (%s) → %s", pg_dump, out_path.name)
-        proc = subprocess.run(
-            cmd,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=backup_pg_timeout_sec(),
-            check=False,
-        )
-        if proc.returncode != 0:
-            err = (proc.stderr or proc.stdout or "").strip()[:2000]
-            if out_path.is_file():
-                out_path.unlink(missing_ok=True)
-            raise RuntimeError(f"pg_dump failed ({proc.returncode}): {err}")
-        if not out_path.is_file() or out_path.stat().st_size == 0:
-            raise RuntimeError("pg_dump не створив файл або файл порожній")
-        return out_path
+        return _create_postgres_table_backups(label)
 
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     if not DB_PATH.is_file():
         raise FileNotFoundError(f"SQLite БД не знайдено: {DB_PATH}")
 
@@ -183,7 +276,7 @@ def create_database_backup() -> Path:
     finally:
         raw_copy.unlink(missing_ok=True)
     logger.info("daily_db_backup: sqlite gzip → %s", gz_path.name)
-    return gz_path
+    return [gz_path]
 
 
 def cleanup_old_backups(*, keep_days: int | None = None) -> int:
@@ -193,7 +286,12 @@ def cleanup_old_backups(*, keep_days: int | None = None) -> int:
         return 0
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     removed = 0
-    patterns = ("ayn_marketplace_pg_*.dump", "ayn_marketplace_*.db.gz", "ayn_marketplace_*.db")
+    patterns = (
+        "ayn_marketplace_pg_*.dump",
+        "ayn_marketplace_pg_*.sql.gz",
+        "ayn_marketplace_*.db.gz",
+        "ayn_marketplace_*.db",
+    )
     for pattern in patterns:
         for path in BACKUP_DIR.glob(pattern):
             try:
@@ -218,11 +316,36 @@ def _human_size(num_bytes: int) -> str:
     return f"{num_bytes} B"
 
 
+def _telegram_send_path(path: Path, schema: str, table: str) -> Path:
+    """Якщо custom dump занадто великий — пробуємо sql.gz для однієї таблиці."""
+    limit = telegram_max_part_bytes()
+    if path.stat().st_size <= limit:
+        return path
+
+    if table and schema:
+        gz_path = path.with_suffix(".sql.gz")
+        logger.info(
+            "daily_db_backup: %s > %s, пробуємо plain+gzip",
+            path.name,
+            _human_size(limit),
+        )
+        table_id = _pg_table_identifier(schema, table)
+        _run_pg_dump_plain_gzip(gz_path, ["--data-only", f"--table={table_id}"])
+        if gz_path.stat().st_size <= TELEGRAM_MAX_DOCUMENT_BYTES:
+            path.unlink(missing_ok=True)
+            return gz_path
+        gz_path.unlink(missing_ok=True)
+
+    return path
+
+
 async def send_daily_backup_to_admins(bot: Bot) -> dict[str, Any]:
     """Бекап + розсилка адмінам. Повертає статистику для логів."""
     stats: dict[str, Any] = {
         "ok": False,
         "path": None,
+        "paths": [],
+        "files": 0,
         "size": 0,
         "sent": 0,
         "failed": 0,
@@ -234,12 +357,16 @@ async def send_daily_backup_to_admins(bot: Bot) -> dict[str, Any]:
         stats["error"] = "disabled"
         return stats
 
-    backup_path: Path | None = None
     try:
-        backup_path = create_database_backup()
-        size = backup_path.stat().st_size
-        stats["path"] = str(backup_path)
-        stats["size"] = size
+        backup_paths = create_database_backup()
+        if not backup_paths:
+            raise RuntimeError("бекап не створив жодного файлу")
+
+        total_size = sum(p.stat().st_size for p in backup_paths)
+        stats["paths"] = [str(p) for p in backup_paths]
+        stats["path"] = stats["paths"][0]
+        stats["files"] = len(backup_paths)
+        stats["size"] = total_size
 
         removed = cleanup_old_backups()
         if removed:
@@ -258,44 +385,76 @@ async def send_daily_backup_to_admins(bot: Bot) -> dict[str, Any]:
 
         now_kyiv = datetime.now(KYIV_TZ).strftime("%d.%m.%Y %H:%M")
         db_kind = "PostgreSQL" if is_postgres() else "SQLite"
-        caption = (
+        part_count = len(backup_paths)
+        intro = (
             f"🗄 <b>Щоденний бекап БД</b>\n"
             f"📅 {now_kyiv} (Europe/Kyiv)\n"
-            f"💾 {db_kind} · {_human_size(size)}\n"
-            f"📁 <code>{backup_path.name}</code>"
+            f"💾 {db_kind} · {_human_size(total_size)} · частин: <b>{part_count}</b>\n"
+            f"📋 Схема + окремий файл на кожну таблицю\n"
+            f"♻️ Відновлення: <code>pg_restore -d DB schema.dump</code>, "
+            f"потім <code>pg_restore -d DB table.dump</code> (або <code>psql | gunzip</code> для .sql.gz)"
         )
 
-        if size > TELEGRAM_MAX_DOCUMENT_BYTES:
-            notice = (
-                f"{caption}\n\n"
-                f"⚠️ Файл занадто великий для Telegram "
-                f"({_human_size(size)} &gt; 49 MB).\n"
-                f"Бекап збережено на сервері: <code>{backup_path}</code>"
-            )
-            for admin_id in admin_ids:
-                try:
-                    await bot.send_message(admin_id, notice, parse_mode="HTML")
-                    stats["sent"] += 1
-                except Exception as e:
-                    stats["failed"] += 1
-                    logger.warning("daily_db_backup notify %s: %s", admin_id, e)
-            stats["ok"] = True
-            return stats
+        table_meta: list[tuple[str, str]] = []
+        if is_postgres():
+            table_meta = [("", "")] + _list_pg_user_tables()
 
         for admin_id in admin_ids:
             try:
-                await bot.send_document(
-                    admin_id,
-                    FSInputFile(str(backup_path)),
-                    caption=caption,
-                    parse_mode="HTML",
-                )
+                await bot.send_message(admin_id, intro, parse_mode="HTML")
                 stats["sent"] += 1
             except Exception as e:
                 stats["failed"] += 1
-                logger.warning("daily_db_backup document %s: %s", admin_id, e)
+                logger.warning("daily_db_backup intro %s: %s", admin_id, e)
 
-        stats["ok"] = stats["sent"] > 0 or stats["failed"] == 0
+            for idx, path in enumerate(backup_paths, start=1):
+                schema, table = ("", "")
+                if idx <= len(table_meta):
+                    schema, table = table_meta[idx - 1]
+
+                send_path = path
+                if is_postgres() and idx > 1 and table:
+                    try:
+                        send_path = _telegram_send_path(path, schema, table)
+                    except Exception as e:
+                        logger.warning("daily_db_backup compress %s: %s", path.name, e)
+                        send_path = path
+
+                size = send_path.stat().st_size
+                title = "schema" if idx == 1 and is_postgres() else (table or send_path.stem)
+                caption = (
+                    f"📦 Частина {idx}/{part_count} · <code>{title}</code>\n"
+                    f"💾 {_human_size(size)}\n"
+                    f"📁 <code>{send_path.name}</code>"
+                )
+
+                if size > TELEGRAM_MAX_DOCUMENT_BYTES:
+                    notice = (
+                        f"⚠️ Частина {idx}/{part_count} <code>{send_path.name}</code> "
+                        f"занадто велика для Telegram ({_human_size(size)}).\n"
+                        f"Файл лишився на сервері: <code>{send_path}</code>"
+                    )
+                    try:
+                        await bot.send_message(admin_id, notice, parse_mode="HTML")
+                        stats["sent"] += 1
+                    except Exception as e:
+                        stats["failed"] += 1
+                        logger.warning("daily_db_backup oversize notify %s: %s", admin_id, e)
+                    continue
+
+                try:
+                    await bot.send_document(
+                        admin_id,
+                        FSInputFile(str(send_path)),
+                        caption=caption,
+                        parse_mode="HTML",
+                    )
+                    stats["sent"] += 1
+                except Exception as e:
+                    stats["failed"] += 1
+                    logger.warning("daily_db_backup document %s %s: %s", admin_id, send_path.name, e)
+
+        stats["ok"] = stats["failed"] == 0 or stats["sent"] > 0
         return stats
     except Exception as e:
         stats["error"] = str(e)
@@ -317,8 +476,8 @@ async def run_daily_db_backup_job(bot: Bot) -> None:
     stats = await send_daily_backup_to_admins(bot)
     if stats.get("ok"):
         logger.info(
-            "✅ daily_db_backup: %s sent=%s failed=%s size=%s",
-            stats.get("path"),
+            "✅ daily_db_backup: files=%s sent=%s failed=%s size=%s",
+            stats.get("files"),
             stats.get("sent"),
             stats.get("failed"),
             stats.get("size"),

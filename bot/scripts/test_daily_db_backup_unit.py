@@ -34,7 +34,9 @@ class DailyDbBackupTests(unittest.TestCase):
             ), patch("utils.daily_db_backup.BACKUP_DIR", backup_dir), patch(
                 "utils.daily_db_backup._timestamp_label", return_value="unit_test"
             ):
-                path = create_database_backup()
+                paths = create_database_backup()
+            self.assertEqual(len(paths), 1)
+            path = paths[0]
             self.assertEqual(path.name, "ayn_marketplace_unit_test.db.gz")
             with gzip.open(path, "rb") as f:
                 self.assertIn(b"sqlite-test-data", f.read())

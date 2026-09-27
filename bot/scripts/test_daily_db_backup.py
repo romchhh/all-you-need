@@ -24,10 +24,15 @@ def test_create_backup() -> Path:
     from utils.daily_db_backup import create_database_backup, cleanup_old_backups
 
     path = create_database_backup()
-    assert path.is_file(), "backup file missing"
-    assert path.stat().st_size > 0, "backup file empty"
+    assert path, "backup files missing"
+    total = sum(p.stat().st_size for p in path)
+    assert total > 0, "backup empty"
     removed = cleanup_old_backups(keep_days=3650)
-    print(f"OK backup: {path} ({path.stat().st_size} bytes), cleanup removed={removed}")
+    print(f"OK backup: {len(path)} file(s), {total} bytes total, cleanup removed={removed}")
+    for p in path[:5]:
+        print(f"  - {p.name} ({p.stat().st_size} bytes)")
+    if len(path) > 5:
+        print(f"  ... +{len(path) - 5} more")
     return path
 
 

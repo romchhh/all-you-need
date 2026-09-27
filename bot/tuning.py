@@ -15,3 +15,5 @@ DB_BACKUP_KEEP_DAYS: int = 14
 DB_BACKUP_PG_TIMEOUT_SEC: int = 900
 # Шлях до pg_dump (якщо порожньо — авто: найновіший у /usr/lib/postgresql/*/bin/)
 DB_BACKUP_PG_DUMP: str = ""
+# Ліміт розміру одного файлу для Telegram (MB, макс ~49)
+DB_BACKUP_TELEGRAM_MAX_MB: int = 45
