@@ -24,6 +24,11 @@ import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
 import {
+  normalizeInstagramUrl,
+  normalizeWebsiteUrl,
+  openExternalUrl,
+} from '@/utils/socialLinks';
+import {
   buildSellerProfileContactMessage,
   openSellerTelegramChat,
   resolveSellerContactLang,
@@ -210,7 +215,7 @@ export function BusinessProfilePage({
   }, [profile?.id, loading, loadError, currentUser?.id]);
 
   const trackBusinessContact = useCallback(
-    (channel: 'telegram' | 'phone') => {
+    (channel: 'telegram' | 'phone' | 'instagram' | 'website') => {
       if (!profile?.id) return;
       trackAnalytics({
         eventName: ANALYTICS_EVENTS.contactSeller,
@@ -269,14 +274,18 @@ export function BusinessProfilePage({
 
   const handleInstagram = () => {
     if (!profile?.instagram) return;
-    const handle = profile.instagram.replace(/^@/, '').trim();
-    window.open(`https://instagram.com/${handle}`, '_blank');
+    const url = normalizeInstagramUrl(profile.instagram);
+    if (!url) return;
+    trackBusinessContact('instagram');
+    openExternalUrl(url, tg ?? undefined);
   };
 
   const handleWebsite = () => {
     if (!profile?.website) return;
-    const url = profile.website.startsWith('http') ? profile.website : `https://${profile.website}`;
-    window.open(url, '_blank');
+    const url = normalizeWebsiteUrl(profile.website);
+    if (!url) return;
+    trackBusinessContact('website');
+    openExternalUrl(url, tg ?? undefined);
   };
 
   const viewingOwn =

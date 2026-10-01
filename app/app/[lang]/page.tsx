@@ -19,6 +19,13 @@ const AYNMarketplace = () => {
         router.replace(`/${lang}/listing/${m[1]}`);
         return true;
       }
+      if (sp === 'business') {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('openBusinessFlow', '1');
+        }
+        router.replace(`/${lang}/bazaar`);
+        return true;
+      }
       return false;
     };
     if (tryListing()) return;

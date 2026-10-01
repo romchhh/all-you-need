@@ -12,6 +12,8 @@ import { guestListingCopy } from '@/utils/guestListingCopy';
 import { getCategories } from '@/constants/categories';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 
 interface ListingPageClientProps {
   listingId: number;
@@ -27,6 +29,18 @@ export default function ListingPageClient({ listingId, lang }: ListingPageClient
   const router = useRouter();
   const searchParams = useSearchParams();
   const categories = useMemo(() => getCategories(t), [t]);
+
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (!ref || !ref.startsWith('author_dm')) return;
+    trackAnalytics({
+      eventName: ANALYTICS_EVENTS.authorNotifyClick,
+      eventGroup: ANALYTICS_EVENT_GROUPS.engagement,
+      entityType: 'listing',
+      entityId: String(listingId),
+      metadata: { ref, surface: 'listing_page' },
+    });
+  }, [listingId, searchParams]);
 
   useEffect(() => {
     let isMounted = true;

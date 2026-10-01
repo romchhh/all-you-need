@@ -8,6 +8,11 @@ import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { useState, useEffect, useMemo } from 'react';
 import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
+import {
+  BUSINESS_PLANS,
+  formatBusinessPlanPrice,
+  type BusinessPlanId,
+} from '@/lib/businessProfileConstants';
 
 interface PaymentSummaryModalProps {
   isOpen: boolean;
@@ -21,9 +26,9 @@ interface PaymentSummaryModalProps {
   tg: TelegramWebApp | null;
 }
 
-const BUSINESS_PLAN_PRICES: Record<string, number> = {
-  business: 9.9,
-  business_pro: 19.9,
+const BUSINESS_PLAN_PRICES: Record<BusinessPlanId, number> = {
+  business: BUSINESS_PLANS.business.price,
+  business_pro: BUSINESS_PLANS.business_pro.price,
 };
 
 const PACKAGE_PRICES: Record<string, number> = {
@@ -55,7 +60,8 @@ export const PaymentSummaryModal = ({
   telegramId: telegramIdProp,
   tg,
 }: PaymentSummaryModalProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const planLang = language === 'ru' ? 'ru' : 'uk';
   const { isLight } = useTheme();
   const [paymentMethod, setPaymentMethod] = useState<'balance' | 'direct'>('balance');
   const [fetchedBalance, setFetchedBalance] = useState<number | null>(null);
@@ -77,7 +83,7 @@ export const PaymentSummaryModal = ({
   const promotionPrice = promotionType ? PROMOTION_PRICES[promotionType] || 0 : 0;
   const businessPrice = businessPlan ? BUSINESS_PLAN_PRICES[businessPlan] || 0 : 0;
   const totalPrice = packagePrice + promotionPrice + businessPrice;
-  const canPayWithBalance = totalPrice > 0 && effectiveBalance >= totalPrice;
+  const canPayWithBalance = totalPrice <= 0 ? true : effectiveBalance >= totalPrice;
 
   useEffect(() => {
     if (!isOpen) {
@@ -277,7 +283,11 @@ export const PaymentSummaryModal = ({
                       ? t('businessProfile.plans.businessPro.name')
                       : t('businessProfile.plans.business.name')}
                   </span>
-                  <span className={rowStrong}>{businessPrice} €</span>
+                  <span className={rowStrong}>
+                    {businessPlan && BUSINESS_PLANS[businessPlan].price <= 0
+                      ? formatBusinessPlanPrice(businessPlan, planLang)
+                      : `${businessPrice.toFixed(2)} €`}
+                  </span>
                 </div>
               )}
 

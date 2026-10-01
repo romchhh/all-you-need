@@ -9,7 +9,7 @@ from __future__ import annotations
 # ── Цикл парсингу ─────────────────────────────────────────────
 PARSER_INTERVAL_MIN: float = 15.0
 PARSER_ROLLING_LOOKBACK: int = 0
-PARSER_DEDUP_ENABLED: bool = False
+PARSER_DEDUP_ENABLED: bool = True
 
 # ── AI-фільтр (ключ OPENAI_API_KEY — лише в .env) ─────────────
 PARSER_AI_ENABLED: bool = True
@@ -23,13 +23,13 @@ PARSER_AUTO_APPROVE_DAILY_LIMIT: int = 450
 # Backlog drain (кожні N хв) — aggressive, без хвильового throttling
 PARSER_AUTO_APPROVE_INTERVAL_MIN: float = 2.0
 PARSER_AUTO_APPROVE_BATCH: int = 80
-PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = 250
-PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = 250
+PARSER_AUTO_APPROVE_MAX_PER_CHANNEL: int = 60
+PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = 120
 PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = 72
 PARSER_AUTO_APPROVE_WAVE_MINUTES: int = 5
 PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = False
-# Рівномірний денний бюджет (Europe/Kyiv): не вичерпувати 450 до обіду
-PARSER_AUTO_APPROVE_PACE_ENABLED: bool = True
+# Рівномірний денний бюджет — вимкнено: backlog публікується протягом дня (2-хв job + parse-time)
+PARSER_AUTO_APPROVE_PACE_ENABLED: bool = False
 PARSER_AUTO_APPROVE_PACE_BUFFER_MIN: int = 45
 # Ручний /parse + scheduled backlog: rounds aggressive drain
 PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS: int = 12

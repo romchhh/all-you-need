@@ -285,13 +285,15 @@ export function BusinessOwnerProfileView({
             <ChevronRight size={16} />
           </button>
           <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <CreditRing
-              remaining={highlightRemaining}
-              total={planCredits.highlight}
-              label={t('businessProfile.owner.highlightSlots')}
-              icon={Heart}
-              isLight={isLight}
-            />
+            {planCredits.highlight > 0 ? (
+              <CreditRing
+                remaining={highlightRemaining}
+                total={planCredits.highlight}
+                label={t('businessProfile.owner.highlightSlots')}
+                icon={Heart}
+                isLight={isLight}
+              />
+            ) : null}
             {planCredits.top > 0 ? (
               <CreditRing
                 remaining={topRemaining}

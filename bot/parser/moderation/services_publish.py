@@ -7,7 +7,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
@@ -40,6 +40,22 @@ from utils.translations import t
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
+
+
+class ServicesChannelPublishResult(NamedTuple):
+    chat_ids: list[int]
+    post_url: str | None
+
+
+def channel_post_public_url(chat_id: int, message_id: int) -> str:
+    cid = str(int(chat_id))
+    if cid.startswith("-100"):
+        internal = cid[4:]
+    elif cid.startswith("-"):
+        internal = cid[1:]
+    else:
+        internal = cid
+    return f"https://t.me/c/{internal}/{int(message_id)}"
 
 # Hamburg | TradeGround — публікація після модерації
 TRADE_SERVICES_CHANNEL_HAMBURG_ID: int = int(
@@ -469,47 +485,54 @@ async def _send_services_post(
     keyboard: InlineKeyboardMarkup,
     photo_inputs: list,
     listing_id: int,
-) -> bool:
+) -> int | None:
     try:
+        sent_message_id: int | None = None
         if len(photo_inputs) == 1:
-            await bot.send_photo(
+            msg = await bot.send_photo(
                 chat_id=chat_id,
                 photo=photo_inputs[0],
                 caption=text_with_bot,
                 parse_mode="HTML",
                 reply_markup=keyboard,
             )
+            sent_message_id = msg.message_id
         elif len(photo_inputs) > 1:
             media = []
             for i, ph in enumerate(photo_inputs):
                 cap = text_with_bot if i == 0 else None
                 pmode = "HTML" if i == 0 else None
                 media.append(InputMediaPhoto(media=ph, caption=cap, parse_mode=pmode))
-            await bot.send_media_group(chat_id=chat_id, media=media)
+            msgs = await bot.send_media_group(chat_id=chat_id, media=media)
+            if msgs:
+                sent_message_id = msgs[0].message_id
         else:
             default_path = _default_channel_photo_path()
             if default_path:
-                await bot.send_photo(
+                msg = await bot.send_photo(
                     chat_id=chat_id,
                     photo=FSInputFile(default_path),
                     caption=text_with_bot,
                     parse_mode="HTML",
                     reply_markup=keyboard,
                 )
+                sent_message_id = msg.message_id
             else:
-                await bot.send_message(
+                msg = await bot.send_message(
                     chat_id=chat_id,
                     text=text_with_bot,
                     parse_mode="HTML",
                     disable_web_page_preview=False,
                 )
+                sent_message_id = msg.message_id
         logger.info(
-            "Listing %s опубліковано в %s (chat_id=%s)",
+            "Listing %s опубліковано в %s (chat_id=%s, msg=%s)",
             listing_id,
             services_channel_label(chat_id),
             chat_id,
+            sent_message_id,
         )
-        return True
+        return sent_message_id
     except TelegramBadRequest as e:
         err = str(e).lower()
         if "can't parse entities" in err or "unclosed start tag" in err:
@@ -520,14 +543,16 @@ async def _send_services_post(
                     listing_id,
                 )
                 try:
+                    retry_msg_id: int | None = None
                     if len(photo_inputs) == 1:
-                        await bot.send_photo(
+                        rmsg = await bot.send_photo(
                             chat_id=chat_id,
                             photo=photo_inputs[0],
                             caption=safe_text,
                             parse_mode="HTML",
                             reply_markup=keyboard,
                         )
+                        retry_msg_id = rmsg.message_id
                     elif len(photo_inputs) > 1:
                         media = []
                         for i, ph in enumerate(photo_inputs):
@@ -536,30 +561,34 @@ async def _send_services_post(
                             media.append(
                                 InputMediaPhoto(media=ph, caption=cap, parse_mode=pmode)
                             )
-                        await bot.send_media_group(chat_id=chat_id, media=media)
+                        rmsgs = await bot.send_media_group(chat_id=chat_id, media=media)
+                        if rmsgs:
+                            retry_msg_id = rmsgs[0].message_id
                     else:
                         default_path = _default_channel_photo_path()
                         if default_path:
-                            await bot.send_photo(
+                            rmsg = await bot.send_photo(
                                 chat_id=chat_id,
                                 photo=FSInputFile(default_path),
                                 caption=safe_text,
                                 parse_mode="HTML",
                                 reply_markup=keyboard,
                             )
+                            retry_msg_id = rmsg.message_id
                         else:
-                            await bot.send_message(
+                            rmsg = await bot.send_message(
                                 chat_id=chat_id,
                                 text=safe_text,
                                 parse_mode="HTML",
                                 disable_web_page_preview=False,
                             )
+                            retry_msg_id = rmsg.message_id
                     logger.info(
                         "Listing %s опубліковано в %s після safe truncate",
                         listing_id,
                         services_channel_label(chat_id),
                     )
-                    return True
+                    return retry_msg_id
                 except Exception as retry_err:
                     logger.warning(
                         "Retry publish listing %s у %s failed: %s",
@@ -581,7 +610,7 @@ async def _send_services_post(
             e,
             exc_info=True,
         )
-    return False
+    return None
 
 
 async def publish_services_listing_to_channel(
@@ -593,7 +622,7 @@ async def publish_services_listing_to_channel(
     *,
     marketplace_listing_id: int | None = None,
     force_channel_ids: list[int] | None = None,
-) -> list[int]:
+) -> ServicesChannelPublishResult:
     """
     listing_id — id parsed_items (для логів).
     marketplace_listing_id — id Listing на маркетплейсі (deep link); якщо None — channel-only.
@@ -606,7 +635,7 @@ async def publish_services_listing_to_channel(
             listing_id,
             services_channel_quiet_hours_message(),
         )
-        return []
+        return ServicesChannelPublishResult([], None)
 
     channel_ids = list(force_channel_ids) if force_channel_ids else resolve_services_trade_channel_ids(item)
     logger.info(
@@ -738,16 +767,20 @@ async def publish_services_listing_to_channel(
     photo_inputs = _channel_photo_inputs_from_images_web(list(images_web) if images_web else [])
 
     published: list[int] = []
+    primary_post_url: str | None = None
     for chat_id in channel_ids:
-        if await _send_services_post(
+        msg_id = await _send_services_post(
             bot,
             chat_id,
             text_with_bot=text_with_bot,
             keyboard=keyboard,
             photo_inputs=photo_inputs,
             listing_id=listing_id,
-        ):
+        )
+        if msg_id:
             published.append(chat_id)
+            if primary_post_url is None:
+                primary_post_url = channel_post_public_url(chat_id, msg_id)
 
     if len(published) > 1:
         logger.info(
@@ -755,4 +788,4 @@ async def publish_services_listing_to_channel(
             listing_id,
             format_services_channels_labels(published),
         )
-    return published
+    return ServicesChannelPublishResult(published, primary_post_url)

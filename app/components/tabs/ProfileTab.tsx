@@ -98,6 +98,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       setFavoritesLocal(getFavoritesFromStorage());
     }
   }, [favoritesProp]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (sessionStorage.getItem('openBusinessFlow') === '1') {
+      sessionStorage.removeItem('openBusinessFlow');
+      setShowBusinessFlow(true);
+    }
+  }, []);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [isSavingListing, setIsSavingListing] = useState(false);

@@ -33,21 +33,18 @@ export const LISTING_STATS_PUBLISHED_AT_SQL = listingStatsPublishedAtSql();
 
 export function newListingsInKyivWindowSql(tableAlias?: string): string {
   const p = tableAlias ? `${tableAlias}.` : '';
-  // Лічильник «нових сьогодні» — за createdAt (не updatedAt), щоб міграція БД не
-  // занижувала/завищувала статистику через масове оновлення updatedAt.
+  const publishedAt = listingStatsPublishedAtSql(tableAlias);
   if (isPostgres()) {
     return `
   ${p}status = 'active'
-  AND ${p}"createdAt" IS NOT NULL
-  AND ${p}"createdAt" >= ?::timestamp
-  AND ${p}"createdAt" <= ?::timestamp
+  AND (${publishedAt}) >= ?::timestamp
+  AND (${publishedAt}) <= ?::timestamp
 `;
   }
   return `
   ${p}status = 'active'
-  AND ${p}createdAt IS NOT NULL
-  AND datetime(${p}createdAt) >= datetime(?)
-  AND datetime(${p}createdAt) <= datetime(?)
+  AND datetime((${publishedAt})) >= datetime(?)
+  AND datetime((${publishedAt})) <= datetime(?)
 `;
 }
 

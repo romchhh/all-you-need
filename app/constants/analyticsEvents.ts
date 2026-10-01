@@ -26,6 +26,7 @@ export const ANALYTICS_EVENTS = {
   citySelect: 'city_select',
   onboardingAction: 'onboarding_action',
   profileView: 'profile_view',
+  authorNotifyClick: 'author_notify_click',
 } as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
@@ -76,4 +77,5 @@ export const ANALYTICS_EVENT_CONFIG_MAP: Record<
   [ANALYTICS_EVENTS.citySelect]: 'trackNavigation',
   [ANALYTICS_EVENTS.onboardingAction]: 'trackNavigation',
   [ANALYTICS_EVENTS.profileView]: 'trackNavigation',
+  [ANALYTICS_EVENTS.authorNotifyClick]: 'trackContactSeller',
 };

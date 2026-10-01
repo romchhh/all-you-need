@@ -11,3 +11,7 @@ cd ~/all-you-need && git pull && ./docker/up.sh
 # Після git pull один раз (якщо exec без -f падає): додай у .env рядок
 # COMPOSE_FILE=docker-compose.yml:docker-compose.host-db.yml
 # або знову: ./docker/prepare-env.sh
+
+
+
+cd ~/all-you-need && git pull && docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build

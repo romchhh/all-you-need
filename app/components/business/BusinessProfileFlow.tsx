@@ -26,7 +26,13 @@ import {
   type BusinessWizardStep,
 } from '@/lib/businessProfileWizardStorage';
 import { majorGermanCities } from '@/constants/major-german-cities';
-import { BUSINESS_PLANS, type BusinessPlanId, type ServiceArea } from '@/lib/businessProfileConstants';
+import {
+  BUSINESS_PLANS,
+  formatBusinessPlanPrice,
+  isFreeBusinessPlan,
+  type BusinessPlanId,
+  type ServiceArea,
+} from '@/lib/businessProfileConstants';
 import { Listing } from '@/types';
 import { getResolvedImageUrl, compressImageOnClient } from '@/utils/imageUtils';
 import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
@@ -114,7 +120,7 @@ const initialForm = (defaults: { telegram?: string; phone?: string }): FormState
   coverPreview: null,
   workingHours: '',
   selectedListingIds: [],
-  selectedPlan: null,
+  selectedPlan: 'business',
   savedLogoPath: null,
   savedCoverPath: null,
 });
@@ -266,7 +272,8 @@ export default function BusinessProfileFlow({
   editMode = false,
   existingProfile = null,
 }: BusinessProfileFlowProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const planLang = language === 'ru' ? 'ru' : 'uk';
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const { toast, showToast, hideToast } = useToast();
@@ -721,7 +728,10 @@ export default function BusinessProfileFlow({
         fd.append('instagram', form.instagram);
         fd.append('website', form.website);
         fd.append('workingHours', form.workingHours);
-        fd.append('listingIds', JSON.stringify(form.selectedListingIds));
+        if (form.selectedListingIds.length > 0) {
+          fd.append('listingDisplayMode', 'manual');
+          fd.append('listingIds', JSON.stringify(form.selectedListingIds));
+        }
         if (form.logoFile) fd.append('logo', form.logoFile);
         if (form.coverFile) fd.append('coverImage', form.coverFile);
         res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
@@ -744,7 +754,9 @@ export default function BusinessProfileFlow({
             instagram: form.instagram,
             website: form.website,
             workingHours: form.workingHours,
-            listingIds: form.selectedListingIds,
+            ...(form.selectedListingIds.length > 0
+              ? { listingDisplayMode: 'manual' as const, listingIds: form.selectedListingIds }
+              : {}),
             ...(form.savedLogoPath ? { logo: form.savedLogoPath } : {}),
             ...(form.savedCoverPath ? { coverImage: form.savedCoverPath } : {}),
           }),
@@ -964,6 +976,11 @@ export default function BusinessProfileFlow({
     }
     if (step === 'tariff') {
       if (!validateStep('tariff')) return;
+      if (form.selectedPlan && isFreeBusinessPlan(form.selectedPlan)) {
+        void handlePayment('balance');
+        tg?.HapticFeedback?.impactOccurred('light');
+        return;
+      }
       setStep('payment');
       tg?.HapticFeedback?.impactOccurred('light');
       return;
@@ -1394,9 +1411,11 @@ export default function BusinessProfileFlow({
                           : isLight ? 'border-gray-200' : 'border-white/15'
                       }`}
                     >
-                      <div className="flex justify-between items-start mb-2">
+                      <div className="flex justify-between items-start mb-2 gap-3">
                         <span className="font-bold">{t(plan.labelKey)}</span>
-                        <span className="font-bold text-[#C8E6A0]">{plan.price.toFixed(2)} € / {t('businessProfile.tariff.month')}</span>
+                        <span className="font-bold text-[#C8E6A0] text-right shrink-0">
+                          {formatBusinessPlanPrice(planId, planLang)}
+                        </span>
                       </div>
                       <p className={`text-sm mb-3 ${isLight ? 'text-gray-600' : 'text-white/65'}`}>
                         {t(`businessProfile.plans.${planId === 'business_pro' ? 'businessPro' : 'business'}.tagline`)}
@@ -1410,7 +1429,11 @@ export default function BusinessProfileFlow({
                   );
                 })}
               </div>
-              <p className={`text-xs mt-4 ${isLight ? 'text-gray-500' : 'text-white/45'}`}>{t('businessProfile.tariff.disclaimer')}</p>
+              {form.selectedPlan ? (
+                <p className={`text-xs mt-4 ${isLight ? 'text-gray-500' : 'text-white/45'}`}>
+                  {t('businessProfile.tariff.disclaimer')}
+                </p>
+              ) : null}
             </>
           )}
           </div>
@@ -1423,7 +1446,9 @@ export default function BusinessProfileFlow({
                 {loading && editMode && step === 'preview'
                   ? t('common.saving')
                   : step === 'tariff'
-                    ? t('businessProfile.continue')
+                    ? form.selectedPlan === 'business_pro'
+                      ? t('businessProfile.tariff.switchToPro')
+                      : t('businessProfile.tariff.createFree')
                     : continueLabel}
               </button>
             </div>

@@ -89,13 +89,14 @@ export async function POST(request: NextRequest) {
 
     const planId = plan as BusinessPlanId;
     const price = BUSINESS_PLANS[planId].price;
+    const effectivePaymentMethod = price <= 0 ? 'balance' : paymentMethod;
     const storedListingIds = existingProfile ? parseLinkedListingIds(existingProfile.linkedListingIds) : [];
     const normalizedListingIds = Array.isArray(listingIds) && listingIds.length > 0
       ? listingIds.map((id: unknown) => parseInt(String(id), 10)).filter((id: number) => Number.isFinite(id))
       : storedListingIds;
     const subscriptionMetadata = { listingIds: normalizedListingIds, renew: Boolean(renew) };
 
-    if (paymentMethod === 'balance') {
+    if (effectivePaymentMethod === 'balance') {
       const balance = Number(user.balance);
       if (!Number.isFinite(balance)) {
         return NextResponse.json({ error: 'Invalid balance' }, { status: 400 });

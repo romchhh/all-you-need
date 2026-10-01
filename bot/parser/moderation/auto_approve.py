@@ -1,7 +1,8 @@
 """
 Автопідтвердження parsed_items на маркетплейс (real-time після parse).
 
-Товари → лише маркетплейс. Послуги → маркетплейс + Telegram-канал (Hamburg/Germany).
+Товари → маркетплейс + DM автору (раз на місяць на оголошення).
+Послуги → маркетплейс + DM (+ Business CTA); канали — лише якщо PARSER_AUTO_APPROVE_SERVICES_CHANNEL.
 Дублікати на МП прибирає окремий job (marketplace_dedup_cleanup).
 """
 
@@ -47,7 +48,7 @@ from parser.marketplace_categories import (
     force_services_marketplace_categories,
 )
 from parser.moderation.approve_routing import notify_chat_for_parsed_item
-from parser.moderation.formatting import preserve_parsed_source_fields
+from parser.moderation.formatting import parsed_item_for_outreach, preserve_parsed_source_fields
 from parser.moderation.marketplace_publish import (
     MarketplacePublishError,
     publish_parsed_item_marketplace,
@@ -87,8 +88,11 @@ _STUB_TITLES = frozenset({
 
 
 def _kyiv_day_start_utc() -> datetime:
+    """Початок «дня» як на головній (06:00 Europe/Kyiv)."""
     now = datetime.now(_KYIV_TZ)
-    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = now.replace(hour=6, minute=0, second=0, microsecond=0)
+    if now < start:
+        start = start - timedelta(days=1)
     return start.astimezone(timezone.utc)
 
 
@@ -311,6 +315,10 @@ def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[b
         try:
             if active_listing_duplicate(dedup_key, title, description):
                 return False, "duplicate"
+            from parser.storage.author_outreach import dedup_key_recently_published
+
+            if dedup_key_recently_published(dedup_key):
+                return False, "duplicate_outreach"
         except Exception as e:
             logger.warning("auto-approve dedup check failed: %s", e)
             return False, "dedup_error"
@@ -507,6 +515,7 @@ async def _publish_and_notify(
     item["auto_approved"] = 1
 
     channel_published: list[int] = []
+    channel_post_url: str | None = None
     if PARSER_AUTO_APPROVE_SERVICES_CHANNEL and _is_service_item(listing_item):
         try:
             from parser.moderation.services_publish import (
@@ -516,7 +525,7 @@ async def _publish_and_notify(
             )
 
             force_ids = resolve_services_trade_channel_ids(listing_item)
-            channel_published = await publish_services_listing_to_channel(
+            channel_result = await publish_services_listing_to_channel(
                 bot,
                 listing_item,
                 item_id,
@@ -525,6 +534,8 @@ async def _publish_and_notify(
                 marketplace_listing_id=listing_id,
                 force_channel_ids=force_ids,
             )
+            channel_published = list(channel_result.chat_ids)
+            channel_post_url = channel_result.post_url
             if channel_published:
                 update_mod_path_status(item_id, "channel", "approved", moderated_by=None)
                 logger.info(
@@ -550,11 +561,16 @@ async def _publish_and_notify(
             "auto-approve city-digest Listing %s: %s", listing_id, notify_err
         )
 
-    schedule_author_notify(
-        listing_item,
+    from parser.moderation.author_notify import schedule_author_notify_if_allowed
+
+    outreach_item = parsed_item_for_outreach(item, listing_item)
+    is_service = _is_service_item(listing_item)
+    schedule_author_notify_if_allowed(
+        outreach_item,
         listing_id,
-        use_services_sender=_is_service_item(listing_item),
+        use_services_sender=is_service,
         channel_only=False,
+        channel_url=channel_post_url if is_service else None,
     )
 
     try:
@@ -908,7 +924,7 @@ def register_auto_approve_job(scheduler) -> None:
                     await run_auto_approve_drain(
                         main_bot,
                         aggressive=True,
-                        respect_pace=True,
+                        respect_pace=False,
                     )
         except Exception:
             logger.exception("auto-approve drain job failed")
@@ -923,7 +939,7 @@ def register_auto_approve_job(scheduler) -> None:
         max_instances=1,
     )
     logger.info(
-        "✅ Auto-approve backlog drain (%s/день, кожні %s хв, aggressive+pace)",
+        "✅ Auto-approve backlog drain (%s/день, кожні %s хв, без pace-throttle)",
         PARSER_AUTO_APPROVE_DAILY_LIMIT,
         PARSER_AUTO_APPROVE_INTERVAL_MIN,
     )

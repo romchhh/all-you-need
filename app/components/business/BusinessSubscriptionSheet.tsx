@@ -20,6 +20,7 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import {
   BUSINESS_PLANS,
   BUSINESS_PLAN_MONTHLY_CREDITS,
+  formatBusinessPlanPrice,
   type BusinessPlanId,
 } from '@/lib/businessProfileConstants';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
@@ -53,6 +54,7 @@ export function BusinessSubscriptionSheet({
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
+  const planLang = language === 'ru' ? 'ru' : 'uk';
   const ui = getBusinessProfileUi(isLight);
 
   useBodyScrollLock(isOpen);
@@ -74,13 +76,19 @@ export function BusinessSubscriptionSheet({
   const shell = isLight ? 'bg-white text-gray-900' : 'bg-[#0a0a0a] text-white';
   const headerBorder = ui.divider;
 
+  const planFeatures = t(plan.featuresKey).split('\n').filter(Boolean);
+
   const perkRows = [
-    {
-      icon: Zap,
-      label: t('businessProfile.owner.highlightSlots'),
-      value: `${highlightRemaining} / ${planCredits.highlight}`,
-      hint: t('businessProfile.subscription.perkRenewal', { date: renewalDate ?? '—' }),
-    },
+    ...(planCredits.highlight > 0
+      ? [
+          {
+            icon: Zap,
+            label: t('businessProfile.owner.highlightSlots'),
+            value: `${highlightRemaining} / ${planCredits.highlight}`,
+            hint: t('businessProfile.subscription.perkRenewal', { date: renewalDate ?? '—' }),
+          },
+        ]
+      : []),
     ...(planCredits.top > 0
       ? [
           {
@@ -141,7 +149,7 @@ export function BusinessSubscriptionSheet({
                 </p>
                 <p className={`mt-1 text-lg font-bold ${ac.pageHeading}`}>{t(plan.labelKey)}</p>
                 <p className={`mt-0.5 text-sm font-semibold ${ui.limeText}`}>
-                  {plan.price.toFixed(2)} € / {t('businessProfile.tariff.month')}
+                  {formatBusinessPlanPrice(planId, planLang)}
                 </p>
               </div>
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${ui.limeBgSoft} ${ui.limeText}`}>
@@ -176,6 +184,13 @@ export function BusinessSubscriptionSheet({
                 </div>
               ))}
             </div>
+            <ul className={`mt-4 space-y-1.5 border-t pt-4 ${ui.divider}`}>
+              {planFeatures.map((line) => (
+                <li key={line} className={`text-sm ${ac.mutedText}`}>
+                  {line}
+                </li>
+              ))}
+            </ul>
           </div>
 
           <button type="button" onClick={onChangePlan} className={`${ui.btnOutline} w-full`}>

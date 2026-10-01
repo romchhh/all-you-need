@@ -90,6 +90,15 @@ export function useBazaarPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (sessionStorage.getItem('openBusinessFlow') !== '1') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const telegramId = urlParams.get('telegramId') || sessionStorage.getItem('telegramId');
+    const query = telegramId ? `?telegramId=${encodeURIComponent(telegramId)}` : '';
+    router.replace(`/${lang}/profile${query}`);
+  }, [lang, router]);
   
   // Отримуємо категорії з перекладами (мемо — інакше ефект deep-link зациклюється)
   const categories = useMemo(() => getCategories(t), [t]);

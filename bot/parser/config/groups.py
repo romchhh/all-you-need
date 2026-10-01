@@ -26,6 +26,7 @@ class ParserGroup:
     default_subcategory: Optional[str] = None
     strip_trailing_link: bool = False
     enabled: bool = True
+    listings_in_comments: bool = False
     notes: str = ""
 
 
@@ -388,8 +389,9 @@ GROUPS: tuple[ParserGroup, ...] = (
         "Germany",
         "goods",
         label="Germany Ukraine News",
-        enabled=False,
-        notes="Новини; оголошення лише в коментарях",
+        enabled=True,
+        listings_in_comments=True,
+        notes="Новини; оголошення в коментарях до постів",
     ),
     ParserGroup(
         "nrw_community",
@@ -424,6 +426,16 @@ GROUPS: tuple[ParserGroup, ...] = (
         notes="Досуг / заходи",
     ),
 )
+
+
+def find_parser_group(channel: str) -> ParserGroup | None:
+    from parser.config.channels import normalize_channel_key
+
+    nk = normalize_channel_key(channel)
+    for g in GROUPS:
+        if normalize_channel_key(g.key) == nk:
+            return g
+    return None
 
 
 def enabled_groups() -> list[ParserGroup]:

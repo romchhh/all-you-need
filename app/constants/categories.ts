@@ -166,6 +166,17 @@ export const getCategories = (t: (key: string) => string): Category[] => [
     ]
   },
   {
+    id: 'food_gastro',
+    name: t('categories.food_gastro'),
+    icon: '🍽️',
+    subcategories: [
+      { id: 'homemade', name: t('categories.subcategories.homemade_food') },
+      { id: 'products_grocery', name: t('categories.subcategories.products_grocery') },
+      { id: 'catering', name: t('categories.subcategories.catering') },
+      { id: 'other', name: t('categories.subcategories.other') },
+    ],
+  },
+  {
     id: 'free',
     name: t('categories.free'),
     icon: '🎁'

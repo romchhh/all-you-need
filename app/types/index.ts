@@ -60,6 +60,8 @@ export interface Listing {
   favoritesCount?: number;
   profileType?: 'personal' | 'business';
   businessSeller?: BusinessSeller | null;
+  /** Оголошення з парсера — контакт «Написати» веде на @ автора з джерела. */
+  fromParser?: boolean;
 }
 
 export interface Subcategory {

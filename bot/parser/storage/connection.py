@@ -255,3 +255,6 @@ def ensure_parser_storage() -> None:
     ensure_parser_cursors_table()
     ensure_parser_accounts_table()
     migrate_env_accounts_if_empty()
+    from parser.storage.author_outreach import ensure_author_outreach_table
+
+    ensure_author_outreach_table()

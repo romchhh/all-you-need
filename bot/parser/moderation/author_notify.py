@@ -15,18 +15,34 @@ from parser.core.account_pool import (
     list_accounts_round_robin,
 )
 from parser.core.telegram_meta import resolve_pyrogram_chat_ref
-from parser.moderation.formatting import format_listing_open_links_html
+from parser.moderation.formatting import (
+    business_profile_signup_url,
+    format_author_notify_open_links_html,
+)
 from parser.storage import parser_accounts_db as accounts_db
 
 logger = logging.getLogger(__name__)
 
-NOTIFY_AUTHOR_TEXT_RU = (
+NOTIFY_AUTHOR_GOODS_TEXT_RU = (
     "Привет! 👋\n\n"
-    "Мы нашли ваше объявление «{title}» и добавили его на наш маркетплейс "
-    "<b>Trade Ground</b> — площадку для украино- и русскоязычных в Германии.\n\n"
+    "Мы нашли ваше объявление «{title}» и добавили его в TradeGround — "
+    "маркетплейс товаров и услуг для украино- и русскоязычных в Германии.\n\n"
     "🔗 Ваше объявление:\n"
     "{open_links}\n\n"
-    "Если хотите внести изменения или удалить объявление — напишите нам."
+    "Если хотите изменить или удалить объявление — просто напишите нам."
+)
+
+NOTIFY_AUTHOR_SERVICES_TEXT_RU = (
+    "Привет! 👋\n\n"
+    "Мы нашли ваше объявление «{title}» и добавили его в TradeGround — "
+    "маркетплейс товаров и услуг для украино- и русскоязычных в Германии.\n\n"
+    "🔗 Ваше объявление:\n"
+    "{open_links}\n\n"
+    "💼 Оказываете услуги регулярно?\n"
+    "Создайте бесплатный Business-профиль — расскажите о себе или компании, "
+    "добавьте контакты и соберите свои объявления в одном месте.\n\n"
+    "👉 <a href=\"{business_url}\">Создать Business-профиль бесплатно</a>\n\n"
+    "Если хотите изменить или удалить объявление — просто напишите нам."
 )
 
 NOTIFY_AUTHOR_CHANNEL_TEXT_RU = (
@@ -149,13 +165,36 @@ async def _resolve_dm_target(app: Any, item: dict) -> str | int | None:
         return None
 
 
-def _build_notify_text(item: dict, listing_id: int, *, channel_only: bool) -> str:
+def _build_notify_text(
+    item: dict,
+    listing_id: int,
+    *,
+    channel_only: bool,
+    services_marketplace: bool = False,
+    channel_url: str | None = None,
+) -> str:
     title = html.escape(str(item.get("title") or "").strip() or "объявление")
     if channel_only:
         return NOTIFY_AUTHOR_CHANNEL_TEXT_RU.format(title=title)
-    return NOTIFY_AUTHOR_TEXT_RU.format(
+    open_links = format_author_notify_open_links_html(
+        listing_id,
+        lang="ru",
+        channel_url=channel_url,
+        include_channel=bool(services_marketplace and channel_url),
+    )
+    if services_marketplace:
+        business_url = html.escape(
+            business_profile_signup_url(listing_id=listing_id, lang="ru"),
+            quote=True,
+        )
+        return NOTIFY_AUTHOR_SERVICES_TEXT_RU.format(
+            title=title,
+            open_links=open_links,
+            business_url=business_url,
+        )
+    return NOTIFY_AUTHOR_GOODS_TEXT_RU.format(
         title=title,
-        open_links=format_listing_open_links_html(listing_id, lang="ru"),
+        open_links=open_links,
     )
 
 
@@ -213,11 +252,17 @@ async def try_notify_author_via_pyrogram(
     listing_id: int,
     use_services_sender: bool = False,
     channel_only: bool = False,
+    channel_url: str | None = None,
 ):
     from parser.core.session_lock import wait_for_parser_idle
+    from parser.storage.author_outreach import record_author_outreach, should_skip_author_dm
     from parser.storage.connection import is_sqlite_locked_error
 
     item_id = item.get("id")
+    skip = should_skip_author_dm(item, listing_id=listing_id)
+    if skip:
+        logger.info("DM автору item %s пропущено: %s", item_id, skip)
+        return
     if not await wait_for_parser_idle(max_wait_sec=300.0):
         logger.info(
             "DM автору item %s відкладено — триває цикл парсингу",
@@ -244,7 +289,14 @@ async def try_notify_author_via_pyrogram(
         )
         return
 
-    plain_text = _build_notify_text(item, listing_id, channel_only=channel_only)
+    is_services = (item.get("category") or "").strip().lower() == "services_work"
+    plain_text = _build_notify_text(
+        item,
+        listing_id,
+        channel_only=channel_only,
+        services_marketplace=is_services and not channel_only,
+        channel_url=channel_url,
+    )
     last_error: Exception | None = None
 
     logger.info(
@@ -262,6 +314,12 @@ async def try_notify_author_via_pyrogram(
         try:
             target = await _send_author_dm(acc, item, plain_text)
             accounts_db.mark_dm_result(acc.id, ok=True)
+            notify_kind = "services" if is_services else "goods"
+            record_author_outreach(
+                item,
+                listing_id=listing_id,
+                notify_kind=notify_kind,
+            )
             logger.info(
                 "DM автору item %s успішно через %s → %s",
                 item_id,
@@ -321,12 +379,39 @@ async def try_notify_author_via_pyrogram(
         )
 
 
+def schedule_author_notify_if_allowed(
+    item: dict,
+    listing_id: int,
+    *,
+    use_services_sender: bool = False,
+    channel_only: bool = False,
+    channel_url: str | None = None,
+) -> None:
+    from parser.storage.author_outreach import should_skip_author_dm
+
+    if should_skip_author_dm(item, listing_id=listing_id):
+        logger.info(
+            "schedule DM skipped item %s listing %s",
+            item.get("id"),
+            listing_id,
+        )
+        return
+    schedule_author_notify(
+        item,
+        listing_id,
+        use_services_sender=use_services_sender,
+        channel_only=channel_only,
+        channel_url=channel_url,
+    )
+
+
 def schedule_author_notify(
     item: dict,
     listing_id: int,
     *,
     use_services_sender: bool = False,
     channel_only: bool = False,
+    channel_url: str | None = None,
 ) -> None:
     """Фонове сповіщення з логуванням необроблених помилок task."""
 
@@ -337,6 +422,7 @@ def schedule_author_notify(
                 listing_id,
                 use_services_sender=use_services_sender,
                 channel_only=channel_only,
+                channel_url=channel_url,
             )
         except Exception:
             logger.exception(

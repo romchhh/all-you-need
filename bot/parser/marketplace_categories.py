@@ -113,6 +113,12 @@ MARKETPLACE_TAXONOMY: dict[str, dict[str, str] | None] = {
         "garages_parking": "гаражи, парковки",
         "other": "недвижимость прочее",
     },
+    "food_gastro": {
+        "homemade": "домашняя еда, выпечка, кондитерка",
+        "products_grocery": "продукты, бакалея, сыр, мясо",
+        "catering": "кейтеринг, торты на заказ",
+        "other": "еда прочее",
+    },
     "free": None,
 }
 
@@ -211,6 +217,11 @@ PARSER_TO_MARKETPLACE: dict[tuple[str, str | None], tuple[str, str | None]] = {
     ("free_stuff", "giveaway"): ("free", None),
     ("free_stuff", "exchange"): ("free", None),
     ("free_stuff", None): ("free", None),
+    ("food_gastro", "homemade"): ("food_gastro", "homemade"),
+    ("food_gastro", "products_grocery"): ("food_gastro", "products_grocery"),
+    ("food_gastro", "catering"): ("food_gastro", "catering"),
+    ("food_gastro", None): ("food_gastro", "other"),
+    ("food", None): ("food_gastro", "other"),
     # Невідома категорія — не fashion (інакше вакансії/сміття стають «Мода»)
     ("other", None): ("home", "other"),
 }

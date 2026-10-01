@@ -134,6 +134,9 @@ def create_marketplace_listing(
     cursor = conn.cursor()
 
     cat = (category or "").strip().lower()
+    if cat == "free" or (is_free and cat not in ("services_work",)):
+        is_free = True
+        price_str = "Free"
     if cat == "services_work":
         condition = "new"
         # Без конкретної ціни — договірна, не Free

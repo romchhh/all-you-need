@@ -57,7 +57,23 @@ def _finalize_fields(
         subcategory = locked.get("subcategory")
         condition = "new"
 
-    if not price or str(price).strip().lower() in ("", "0", "none", "null"):
+    cat_lower = str(category or "").strip().lower()
+    price_l = str(price or "").strip().lower()
+    explicit_free = bool(is_free) or cat_lower in ("free", "free_stuff")
+    if not explicit_free:
+        import re
+
+        explicit_free = bool(
+            re.search(r"\b(безкоштовно|бесплатно|віддам|отдам|даром|free)\b", blob.lower())
+        )
+
+    if explicit_free and cat_lower != "services_work":
+        price = "Free"
+        currency = None
+        is_free = True
+        category = "free"
+        subcategory = None
+    elif not price or price_l in ("", "0", "none", "null"):
         price = "Договорная"
         currency = None
         is_free = False

@@ -396,12 +396,12 @@ export default function BusinessSettingsFlow({
   }, [screen, form.city]);
 
   useEffect(() => {
-    if (!isOpen || screen !== 'listings') return;
+    if (!isOpen || !telegramId) return;
     fetch(`/api/listings?userId=${telegramId}&viewerId=${telegramId}&limit=50&offset=0`)
       .then((r) => (r.ok ? r.json() : { listings: [] }))
       .then((data) => setUserListings(data.listings || []))
       .catch(() => setUserListings([]));
-  }, [isOpen, screen, telegramId]);
+  }, [isOpen, telegramId]);
 
   useEffect(() => {
     if (!isOpen || screen !== 'listings' || activeUserListings.length === 0) return;
@@ -438,7 +438,8 @@ export default function BusinessSettingsFlow({
     return null;
   };
 
-  const saveProfile = useCallback(async () => {
+  const saveProfile = useCallback(async (options?: { syncListings?: boolean }) => {
+    const syncListings = options?.syncListings ?? false;
     setLoading(true);
     try {
       const listingIdsToAssign =
@@ -466,8 +467,10 @@ export default function BusinessSettingsFlow({
         fd.append('instagram', form.instagram);
         fd.append('website', form.website);
         fd.append('workingHours', workingHours);
-        fd.append('listingDisplayMode', form.listingDisplayMode);
-        fd.append('listingIds', JSON.stringify(listingIdsToAssign));
+        if (syncListings) {
+          fd.append('listingDisplayMode', form.listingDisplayMode);
+          fd.append('listingIds', JSON.stringify(listingIdsToAssign));
+        }
         if (form.logoFile) fd.append('logo', form.logoFile);
         if (form.coverFile) fd.append('coverImage', form.coverFile);
         res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
@@ -490,8 +493,12 @@ export default function BusinessSettingsFlow({
             instagram: form.instagram,
             website: form.website,
             workingHours,
-            listingDisplayMode: form.listingDisplayMode,
-            listingIds: listingIdsToAssign,
+            ...(syncListings
+              ? {
+                  listingDisplayMode: form.listingDisplayMode,
+                  listingIds: listingIdsToAssign,
+                }
+              : {}),
             ...(form.savedLogoPath ? { logo: form.savedLogoPath } : {}),
             ...(form.savedCoverPath ? { coverImage: form.savedCoverPath } : {}),
           }),
@@ -534,7 +541,7 @@ export default function BusinessSettingsFlow({
       tg?.HapticFeedback.notificationOccurred('error');
       return;
     }
-    const ok = await saveProfile();
+    const ok = await saveProfile({ syncListings: fromScreen === 'listings' });
     if (ok) setScreen('hub');
   };
 

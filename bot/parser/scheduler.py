@@ -151,6 +151,7 @@ async def run_parser_cycle(
                         aiogram_bot,
                         item_data,
                         aggressive=True,
+                        respect_pace=False,
                     ):
                         auto_approved_inline += 1
                         return

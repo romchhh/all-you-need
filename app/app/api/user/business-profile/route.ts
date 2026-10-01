@@ -6,6 +6,7 @@ import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
 import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile, resolveBusinessListingIds } from '@/lib/businessProfileHelpers';
 import type { ListingDisplayMode } from '@/lib/businessProfileSettings';
+import { normalizeInstagramForStorage, normalizeWebsiteForStorage } from '@/utils/socialLinks';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -227,8 +228,8 @@ export async function PUT(request: NextRequest) {
         serviceRadiusKm: Number.isFinite(serviceRadiusKm as number) ? serviceRadiusKm : null,
         telegram: body.telegram ? String(body.telegram) : null,
         phone: body.phone ? String(body.phone) : null,
-        instagram: body.instagram ? String(body.instagram) : null,
-        website: body.website ? String(body.website) : null,
+        instagram: body.instagram != null ? normalizeInstagramForStorage(String(body.instagram)) : null,
+        website: body.website != null ? normalizeWebsiteForStorage(String(body.website)) : null,
         workingHours: body.workingHours ? String(body.workingHours) : null,
         logo: logoPath,
         coverImage: coverPath,
@@ -239,9 +240,13 @@ export async function PUT(request: NextRequest) {
       { partial: isPartial }
     );
 
+    const listingConfigTouched =
+      listingDisplayMode !== undefined ||
+      (listingIdsRaw != null && String(listingIdsRaw).trim() !== '');
+
     const profile = await prisma.businessProfile.findUnique({ where: { id: profileId } });
 
-    if (profile && isBusinessProfileActive(profile)) {
+    if (profile && isBusinessProfileActive(profile) && listingConfigTouched) {
       try {
         const resolvedIds = await resolveBusinessListingIds(user.id, profile.linkedListingIds);
         await assignListingsToProfile(user.id, resolvedIds);

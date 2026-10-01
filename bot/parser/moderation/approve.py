@@ -20,7 +20,7 @@ from parser.marketplace_categories import (
     force_services_marketplace_categories,
 )
 from parser.core.parse_pipeline import finalize_listing_item_for_publish, ensure_parsed_item_ai_screened
-from parser.moderation.author_notify import schedule_author_notify
+from parser.moderation.author_notify import schedule_author_notify_if_allowed
 from parser.core.location import resolve_parsed_location
 from parser.moderation.formatting import (
     build_marketplace_description,
@@ -28,6 +28,7 @@ from parser.moderation.formatting import (
     ensure_marketplace_description_has_source,
     format_listing_open_links_html,
     preserve_parsed_source_fields,
+    parsed_item_for_outreach,
 )
 from parser.moderation.marketplace_publish import (
     MarketplacePublishError,
@@ -223,8 +224,9 @@ async def _approve_services_both(
             except Exception:
                 pass
         published_chats: list[int] = []
+        channel_post_url: str | None = None
         if not quiet:
-            published_chats = await publish_services_listing_to_channel(
+            channel_result = await publish_services_listing_to_channel(
                 bot,
                 listing_item,
                 item_id,
@@ -233,6 +235,8 @@ async def _approve_services_both(
                 marketplace_listing_id=listing_id,
                 force_channel_ids=force_channels,
             )
+            published_chats = list(channel_result.chat_ids)
+            channel_post_url = channel_result.post_url
             if published_chats:
                 update_mod_path_status(
                     item_id, "channel", "approved", moderated_by=moderator_id
@@ -254,27 +258,29 @@ async def _approve_services_both(
             parse_mode="HTML",
             message=callback.message,
         )
-
+        outreach = parsed_item_for_outreach(item, listing_item)
+        if not existing_listing_id:
+            schedule_author_notify_if_allowed(
+                outreach,
+                listing_id,
+                use_services_sender=True,
+                channel_only=False,
+                channel_url=channel_post_url,
+            )
+        elif int(item.get("auto_approved") or 0) == 1 and not quiet:
+            schedule_author_notify_if_allowed(
+                outreach,
+                listing_id,
+                use_services_sender=True,
+                channel_only=True,
+                channel_url=channel_post_url,
+            )
     asyncio.create_task(_followup())
     if quiet and already_on_mp:
         try:
             await callback.answer(services_channel_quiet_hours_message(), show_alert=True)
         except TelegramBadRequest:
             pass
-    if not existing_listing_id:
-        schedule_author_notify(
-            listing_item,
-            listing_id,
-            use_services_sender=True,
-            channel_only=False,
-        )
-    elif int(item.get("auto_approved") or 0) == 1 and not quiet:
-        schedule_author_notify(
-            listing_item,
-            listing_id,
-            use_services_sender=True,
-            channel_only=True,
-        )
     logger.info(
         "parsed_item %s → Listing %s + канал послуг (підтв. %s, mp_existed=%s, quiet=%s)",
         item_id,
@@ -363,8 +369,9 @@ async def _approve_marketplace(
         )
 
     asyncio.create_task(_approve_followup())
-    schedule_author_notify(
-        listing_item,
+    outreach = parsed_item_for_outreach(item, listing_item)
+    schedule_author_notify_if_allowed(
+        outreach,
         listing_id,
         use_services_sender=(item_category == "services_work"),
     )

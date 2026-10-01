@@ -68,14 +68,29 @@ export async function upsertBusinessProfileDraft(
     return trimmed;
   };
 
-  const listingIdsJson =
-    data.listingDisplayMode !== undefined
-      ? serializeListingDisplayConfig(data.listingDisplayMode, data.listingIds ?? [])
-      : data.listingIds !== undefined
-        ? data.listingIds.length > 0
-          ? serializeListingDisplayConfig('manual', data.listingIds)
-          : null
-        : existing?.linkedListingIds ?? null;
+  const listingIdsJson = (() => {
+    if (data.listingDisplayMode !== undefined) {
+      let ids = data.listingIds ?? [];
+      if (
+        data.listingDisplayMode === 'manual' &&
+        ids.length === 0 &&
+        existing?.linkedListingIds
+      ) {
+        const prev = parseListingDisplayConfig(existing.linkedListingIds);
+        if (prev.mode === 'manual' && prev.ids.length > 0) {
+          ids = prev.ids;
+        }
+      }
+      return serializeListingDisplayConfig(data.listingDisplayMode, ids);
+    }
+    if (data.listingIds !== undefined) {
+      if (data.listingIds.length > 0) {
+        return serializeListingDisplayConfig('manual', data.listingIds);
+      }
+      return existing?.linkedListingIds ?? serializeListingDisplayConfig('all', []);
+    }
+    return existing?.linkedListingIds ?? null;
+  })();
 
   const payload = {
     businessName: pickString(data.businessName, existing?.businessName),
@@ -321,6 +336,10 @@ export async function processBusinessSubscriptionFromBalance(
 ): Promise<{ newBalance: number; price: number }> {
   const price = BUSINESS_PLANS[plan].price;
   const balanceBefore = Number(currentBalance);
+
+  if (price <= 0) {
+    return { newBalance: balanceBefore, price: 0 };
+  }
 
   if (!Number.isFinite(balanceBefore) || balanceBefore + 0.001 < price) {
     throw new Error('Insufficient balance');

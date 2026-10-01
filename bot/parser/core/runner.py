@@ -97,19 +97,39 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
     stats = {"added": 0, "skipped": 0, "reasons": {}}
     processed_groups: set[str] = set()
 
+    from parser.config.groups import find_parser_group
+    from parser.core.discussion_parse import iter_discussion_listing_messages
+    from parser.storage.author_outreach import source_message_locked
+
+    group_cfg = find_parser_group(channel)
     logger.info("Парсимо канал %s (місто: %s)", channel, city)
 
     chat_target = await resolve_pyrogram_chat_target(app, channel)
 
     fetch_limit, ignore_cursor = _active_fetch_options()
-    async for msg in iter_new_channel_messages(
-        app,
-        chat_target,
-        source_channel=channel,
-        parser_type="default",
-        fetch_limit=fetch_limit,
-        ignore_cursor=ignore_cursor,
-    ):
+
+    async def _iter_messages():
+        if group_cfg and group_cfg.listings_in_comments:
+            limit = fetch_limit or FETCH_LIMIT
+            async for reply, _parent in iter_discussion_listing_messages(
+                app,
+                chat_target,
+                source_channel=channel,
+                fetch_limit=limit,
+            ):
+                yield reply
+            return
+        async for msg in iter_new_channel_messages(
+            app,
+            chat_target,
+            source_channel=channel,
+            parser_type="default",
+            fetch_limit=fetch_limit,
+            ignore_cursor=ignore_cursor,
+        ):
+            yield msg
+
+    async for msg in _iter_messages():
         if getattr(msg, "media_group_id", None):
             gid = str(msg.media_group_id)
             if gid in processed_groups:
@@ -131,6 +151,10 @@ async def parse_channel(app, channel: str, city: str, notify_callback) -> dict:
             effective_message_id = msg.id
 
         # Overlap / повторний прохід: уже збережені message_id — без quality/AI.
+        if source_message_locked(channel, effective_message_id):
+            stats["skipped"] += 1
+            stats["reasons"]["вже опубліковано"] = stats["reasons"].get("вже опубліковано", 0) + 1
+            continue
         if parsed_item_exists(channel, effective_message_id, "default"):
             stats["skipped"] += 1
             stats["reasons"]["дублікат (бд)"] = stats["reasons"].get("дублікат (бд)", 0) + 1

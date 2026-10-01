@@ -201,6 +201,21 @@ export async function GET(
       businessSeller = await getBusinessSellerSummaryForUser(listing.userId, langParam);
     }
 
+    let parserAuthorUsername: string | null = null;
+    try {
+      const parserRows = (await prisma.$queryRawUnsafe(
+        `SELECT author_username FROM parsed_items WHERE marketplace_listing_id = ? ORDER BY id DESC LIMIT 1`,
+        listingId
+      )) as Array<{ author_username: string | null }>;
+      const raw = parserRows[0]?.author_username;
+      parserAuthorUsername = raw ? String(raw).trim().replace(/^@/, '') : null;
+    } catch {
+      parserAuthorUsername = null;
+    }
+
+    const contactUsername =
+      parserAuthorUsername || (listing.username ? String(listing.username).replace(/^@/, '') : null);
+
     const formattedListing = {
         id: listing.id,
         title: listing.title,
@@ -220,11 +235,11 @@ export async function GET(
         seller: {
           name: listing.firstName 
             ? `${listing.firstName} ${listing.lastName || ''}`.trim()
-            : listing.username || 'Користувач',
+            : contactUsername || listing.username || 'Користувач',
           avatar: listing.avatar || '👤',
           phone: listing.phone || '',
           telegramId: listing.telegramId?.toString() || '',
-          username: listing.username || null,
+          username: contactUsername,
         },
         category: listing.category,
         subcategory: listing.subcategory,
@@ -249,6 +264,7 @@ export async function GET(
         favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
         profileType,
         businessSeller,
+        fromParser: Boolean(parserAuthorUsername),
       };
 
     return NextResponse.json(formattedListing);

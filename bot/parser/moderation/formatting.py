@@ -63,6 +63,64 @@ def listing_bot_url(listing_id: int) -> str:
     return f"https://t.me/{BOT_USERNAME.lstrip('@')}?start=listing_{listing_id}"
 
 
+def author_notify_outbound_url(
+    listing_id: int,
+    link_type: str,
+    *,
+    lang: str = "ru",
+    channel_url: str | None = None,
+) -> str:
+    """Посилання через веб-редирект з фіксацією кліку (DM авторам)."""
+    base = WEBAPP_URL.rstrip("/")
+    q = f"listingId={int(listing_id)}&linkType={link_type}&lang={lang}"
+    if link_type == "channel" and channel_url:
+        from urllib.parse import quote
+
+        q += f"&channelUrl={quote(channel_url.strip(), safe='')}"
+    return f"{base}/api/analytics/outbound?{q}"
+
+
+def format_author_notify_open_links_html(
+    listing_id: int,
+    *,
+    lang: str = "ru",
+    channel_url: str | None = None,
+    include_channel: bool = False,
+) -> str:
+    """
+    Посилання для DM авторам (RU):
+    Marketplace (веб), опційно канал, Mini App / бот.
+    """
+    mp = html.escape(
+        author_notify_outbound_url(listing_id, "marketplace", lang=lang),
+        quote=True,
+    )
+    bot = html.escape(
+        author_notify_outbound_url(listing_id, "miniapp", lang=lang),
+        quote=True,
+    )
+    lines = [
+        f'📱 <a href="{mp}">Открыть в Marketplace</a>',
+    ]
+    if include_channel and channel_url:
+        ch = html.escape(
+            author_notify_outbound_url(
+                listing_id,
+                "channel",
+                lang=lang,
+                channel_url=channel_url,
+            ),
+            quote=True,
+        )
+        lines.append(f'📢 <a href="{ch}">Открыть в Канале</a>')
+    lines.append(f'🤖 <a href="{bot}">Открыть через бот</a>')
+    return "\n".join(lines)
+
+
+def business_profile_signup_url(*, listing_id: int, lang: str = "ru") -> str:
+    return author_notify_outbound_url(listing_id, "business_profile", lang=lang)
+
+
 def format_listing_open_links_html(listing_id: int, *, lang: str = "uk") -> str:
     """
     HTML-рядки з посиланнями на оголошення після публікації:
@@ -308,6 +366,17 @@ def build_marketplace_description(item: dict) -> str:
     footer = marketplace_author_source_footer(item)
     parts = [base, footer]
     return "\n\n".join(p for p in parts if p)
+
+
+def parsed_item_for_outreach(source: dict, listing_item: dict | None = None) -> dict:
+    """Контекст для DM / outreach: enriched title + source identity."""
+    out = dict(source)
+    if listing_item:
+        for key in ("title", "category", "subcategory"):
+            val = listing_item.get(key)
+            if val:
+                out[key] = val
+    return out
 
 
 def preserve_parsed_source_fields(enriched: dict, source: dict) -> dict:

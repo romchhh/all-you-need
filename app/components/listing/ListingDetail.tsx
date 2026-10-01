@@ -285,9 +285,12 @@ export const ListingDetail = ({
       telegramId: currentUser?.id || profile?.telegramId || undefined,
       entityType: 'listing',
       entityId: String(listing.id),
+      metadata: {
+        contactSource: listing.fromParser ? 'parser_author' : 'seller_profile',
+      },
     });
     openSellerTelegramChat(username, message, tg ?? undefined);
-  }, [isOwnListing, listing.id, listing.title, listing.seller.username, listing.seller.phone, language, tg, showToast, t, currentUser?.id, profile?.telegramId]);
+  }, [isOwnListing, listing.id, listing.title, listing.seller.username, listing.seller.phone, listing.fromParser, language, tg, showToast, t, currentUser?.id, profile?.telegramId]);
 
   const viewerTelegramIdStr = String(currentUser?.id || profile?.telegramId || '');
 

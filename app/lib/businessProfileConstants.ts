@@ -1,7 +1,7 @@
 export const BUSINESS_PLANS = {
   business: {
     id: 'business' as const,
-    price: 9.9,
+    price: 0,
     labelKey: 'businessProfile.plans.business.name',
     featuresKey: 'businessProfile.plans.business.features',
   },
@@ -12,6 +12,20 @@ export const BUSINESS_PLANS = {
     featuresKey: 'businessProfile.plans.businessPro.features',
   },
 } as const;
+
+export function isFreeBusinessPlan(planId: BusinessPlanId): boolean {
+  return BUSINESS_PLANS[planId].price <= 0;
+}
+
+export function formatBusinessPlanPrice(planId: BusinessPlanId, lang: 'ru' | 'uk'): string {
+  const plan = BUSINESS_PLANS[planId];
+  if (plan.price <= 0) {
+    return lang === 'ru' ? 'БЕСПЛАТНО' : 'БЕЗКОШТОВНО';
+  }
+  const amount = plan.price.toFixed(2).replace('.', lang === 'ru' ? ',' : '.');
+  const month = lang === 'ru' ? 'месяц' : 'місяць';
+  return `${amount} € / ${month}`;
+}
 
 export type BusinessPlanId = keyof typeof BUSINESS_PLANS;
 
@@ -33,7 +47,7 @@ export const BUSINESS_PLAN_MONTHLY_CREDITS: Record<
   BusinessPlanId,
   { highlight: number; top: number }
 > = {
-  business: { highlight: 2, top: 0 },
+  business: { highlight: 0, top: 0 },
   business_pro: { highlight: 5, top: 2 },
 };
 
