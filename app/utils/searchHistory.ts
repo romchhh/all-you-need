@@ -1,7 +1,8 @@
 const SEARCH_HISTORY_KEY = 'ayn_marketplace_search_history';
 const SEARCH_HISTORY_V2_KEY = 'ayn_search_history_v2';
 const MAX_HISTORY_ITEMS = 10;
-const MAX_LISTINGS_PER_ENTRY = 6;
+/** Скільки оголошень зберігати на один пошуковий запит у історії */
+const MAX_LISTINGS_PER_ENTRY = 100;
 
 export type SearchListingPreview = {
   id: number;
@@ -72,7 +73,7 @@ export const getRecentSearchListings = (): SearchListingPreview[] => {
     }
   }
 
-  return result.slice(0, 12);
+  return result;
 };
 
 export const addToSearchHistory = (

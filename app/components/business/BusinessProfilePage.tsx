@@ -70,7 +70,6 @@ interface PublicBusinessProfile {
   workingHours: string | null;
   serviceArea: string | null;
   serviceRadiusKm: number | null;
-  plan: string | null;
   followersCount: number;
   activeListingsCount: number;
   memberSince: string;
@@ -261,8 +260,6 @@ export function BusinessProfilePage({
     return label;
   }, [profile?.serviceArea, profile?.serviceRadiusKm, t]);
 
-  const isProPlan = profile?.plan === 'business_pro';
-
   const filteredListings = useMemo(() => {
     if (listingFilter === 'services') {
       return listings.filter((l) => l.category === 'services_work');
@@ -358,7 +355,7 @@ export function BusinessProfilePage({
 
   if (loadError) {
     return (
-      <div className={`min-h-screen pb-24 ${ac.overlayShell}`}>
+      <div className={`min-h-screen pb-24 ${ac.pageBackground}`}>
         <div className="px-4 pt-[max(env(safe-area-inset-top,0px),12px)]">
           <button type="button" onClick={handleBack} aria-label={t('common.back')} className={navBtnClass}>
             <ArrowLeft size={20} />
@@ -380,7 +377,7 @@ export function BusinessProfilePage({
 
   if (loading || !profile) {
     return (
-      <div className={`min-h-screen ${ac.overlayShell}`}>
+      <div className={`min-h-screen ${ac.pageBackground}`}>
         <div className="px-4 pt-20">
           <ListingGridSkeleton count={4} />
         </div>
@@ -454,7 +451,7 @@ export function BusinessProfilePage({
   }>;
 
   return (
-    <div className={`min-h-screen pb-24 ${ac.overlayShell}`}>
+    <div className={`min-h-screen pb-24 ${ac.pageBackground}`}>
       <div className="relative">
         <div
           className={`relative h-44 overflow-hidden sm:h-48 ${
@@ -469,6 +466,13 @@ export function BusinessProfilePage({
               isLight
                 ? 'bg-gradient-to-b from-black/45 via-black/10 to-transparent'
                 : 'bg-gradient-to-b from-black/50 via-black/25 to-transparent'
+            }`}
+          />
+          <div
+            className={`pointer-events-none absolute inset-x-0 bottom-0 h-20 ${
+              isLight
+                ? 'bg-gradient-to-b from-transparent to-[#f5f7f2]'
+                : 'bg-gradient-to-b from-transparent to-[#000000]'
             }`}
           />
 
@@ -521,11 +525,6 @@ export function BusinessProfilePage({
           >
             BUSINESS
           </span>
-          {isProPlan ? (
-            <span className="shrink-0 rounded-full bg-[#C8E6A0] px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#1a1a1a]">
-              {t('businessProfile.public.proBadge')}
-            </span>
-          ) : null}
         </div>
 
         <p className={`mb-2 text-sm ${ac.mutedText}`}>

@@ -318,8 +318,17 @@ const BazaarTabComponent = ({
         case 'promotion':
           router.push(`/${lang}/profile`);
           break;
-        case 'referral':
-          router.push(`/${lang}/referral`);
+        case 'businessProfile':
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('openBusinessFlow', '1');
+          }
+          router.push(`/${lang}/profile`);
+          break;
+        case 'openReferralProgram':
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('openReferralModal', '1');
+          }
+          router.push(`/${lang}/profile`);
           break;
       }
     },

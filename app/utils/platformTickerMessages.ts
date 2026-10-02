@@ -359,7 +359,9 @@ export type PlatformOnboardingActionId =
   | 'notifications'
   | 'favorites'
   | 'promotion'
-  | 'referral';
+  | 'businessProfile'
+  | 'referral'
+  | 'openReferralProgram';
 
 export type OnboardingSection = {
   id: PlatformOnboardingActionId;
@@ -410,6 +412,14 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
     descriptionKey: 'platformTicker.onboarding.sections.promotion.description',
     buttonKey: 'platformTicker.onboarding.sections.promotion.button',
     highlightTypes: ['ads'],
+  },
+  {
+    id: 'businessProfile',
+    emoji: '💼',
+    titleKey: 'platformTicker.onboarding.sections.businessProfile.title',
+    descriptionKey: 'platformTicker.onboarding.sections.businessProfile.description',
+    buttonKey: 'platformTicker.onboarding.sections.businessProfile.button',
+    highlightTypes: ['listing', 'platform'],
   },
   {
     id: 'referral',

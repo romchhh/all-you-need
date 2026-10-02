@@ -139,28 +139,39 @@ export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModal
   return (
     <>
       <div
-        className={`fixed inset-0 backdrop-blur-sm z-[100] flex items-end justify-center animate-fadeIn ${
+        className={`fixed inset-0 z-[100] flex flex-col justify-end ${
           isLight ? 'bg-black/25' : 'bg-black/50'
-        }`}
+        } backdrop-blur-sm animate-fadeIn`}
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className="fixed inset-x-0 bottom-0 z-[101] flex max-h-[min(92vh,720px)] flex-col items-center justify-end pointer-events-none"
+        role="dialog"
+        aria-modal="true"
       >
         <div
-          className={`${sheet} w-full max-w-md p-6 animate-slideUp max-h-[90vh] overflow-y-auto`}
+          className={`${sheet} pointer-events-auto flex w-full max-w-md max-h-[inherit] flex-col min-h-0 animate-slideUp`}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className={`w-12 h-1 ${handleBar} rounded-full mx-auto mb-6`} />
-          
-          {/* Хедер */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className={`text-xl font-bold ${titleCls}`}>{t('referral.title')}</h2>
-            <button
-              onClick={onClose}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
-            >
-              <X size={20} className={isLight ? 'text-gray-800' : 'text-white'} />
-            </button>
+          <div className="shrink-0 p-6 pb-3">
+            <div className={`w-12 h-1 ${handleBar} rounded-full mx-auto mb-6`} />
+
+            <div className="flex items-center justify-between">
+              <h2 className={`text-xl font-bold ${titleCls}`}>{t('referral.title')}</h2>
+              <button
+                type="button"
+                onClick={onClose}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${closeBtn}`}
+              >
+                <X size={20} className={isLight ? 'text-gray-800' : 'text-white'} />
+              </button>
+            </div>
           </div>
 
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {/* Опис */}
-          <div className="mb-4 px-2">
+          <div className="mb-4 px-0">
             <p className={`text-xs leading-relaxed whitespace-pre-line ${descCls}`}>
               {t('referral.description')}
             </p>
@@ -219,6 +230,7 @@ export const ReferralModal = ({ isOpen, onClose, telegramId, tg }: ReferralModal
                 {copied ? t('share.linkCopied') : t('share.copyLink')}
               </span>
             </button>
+          </div>
           </div>
         </div>
       </div>

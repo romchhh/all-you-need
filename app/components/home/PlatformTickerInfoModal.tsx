@@ -13,6 +13,8 @@ import {
   type TickerMessageType,
 } from '@/utils/platformTickerMessages';
 import { PromotionTypeCards } from '@/components/promotions/PromotionTypeCards';
+import { BusinessProfileOnboardingPanel } from '@/components/home/BusinessProfileOnboardingPanel';
+import { ReferralOnboardingPanel } from '@/components/home/ReferralOnboardingPanel';
 
 type PlatformTickerInfoModalProps = {
   isOpen: boolean;
@@ -21,7 +23,7 @@ type PlatformTickerInfoModalProps = {
   onAction: (action: PlatformOnboardingActionId) => void;
 };
 
-type ModalView = 'sections' | 'promotion';
+type ModalView = 'sections' | 'promotion' | 'business' | 'referral';
 
 export function PlatformTickerInfoModal({
   isOpen,
@@ -51,7 +53,7 @@ export function PlatformTickerInfoModal({
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (view === 'promotion') {
+      if (view === 'promotion' || view === 'business' || view === 'referral') {
         setView('sections');
         return;
       }
@@ -75,20 +77,48 @@ export function PlatformTickerInfoModal({
       setView('promotion');
       return;
     }
+    if (action === 'businessProfile') {
+      setView('business');
+      return;
+    }
+    if (action === 'referral') {
+      setView('referral');
+      return;
+    }
     onAction(action);
     onClose();
   };
+
+  const headerTitle =
+    view === 'promotion'
+      ? t('promotions.title')
+      : view === 'business'
+        ? t('platformTicker.onboarding.businessDetail.title')
+        : view === 'referral'
+          ? t('platformTicker.onboarding.referralDetail.title')
+          : t('platformTicker.onboarding.brandTitle');
+  const headerSubtitle =
+    view === 'promotion'
+      ? t('promotions.description')
+      : view === 'business'
+        ? t('platformTicker.onboarding.businessDetail.subtitle')
+        : view === 'referral'
+          ? t('platformTicker.onboarding.referralDetail.subtitle')
+          : t('platformTicker.onboarding.intro');
 
   const sectionButtonClass = isLight
     ? 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-[#3F5331]/20 bg-white px-3.5 py-2 text-xs font-semibold text-[#2D3E28] transition-colors hover:border-[#3F5331]/35 hover:bg-[#E8F0E0]/60'
     : 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-white/30 bg-transparent px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/10';
 
-  const headerTitle =
-    view === 'promotion' ? t('promotions.title') : t('platformTicker.onboarding.brandTitle');
-  const headerSubtitle =
-    view === 'promotion'
-      ? t('promotions.description')
-      : t('platformTicker.onboarding.intro');
+  const handleCreateBusiness = () => {
+    onAction('businessProfile');
+    onClose();
+  };
+
+  const handleOpenReferral = () => {
+    onAction('openReferralProgram');
+    onClose();
+  };
 
   return createPortal(
     <>
@@ -112,7 +142,7 @@ export function PlatformTickerInfoModal({
           }`}
         >
           <div className="flex min-w-0 flex-1 items-start gap-2 pr-1">
-            {view === 'promotion' && (
+            {(view === 'promotion' || view === 'business' || view === 'referral') && (
               <button
                 type="button"
                 onClick={() => setView('sections')}
@@ -155,6 +185,10 @@ export function PlatformTickerInfoModal({
             <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               <PromotionTypeCards isLight={isLight} />
             </div>
+          ) : view === 'business' ? (
+            <BusinessProfileOnboardingPanel onCreate={handleCreateBusiness} />
+          ) : view === 'referral' ? (
+            <ReferralOnboardingPanel onOpenReferral={handleOpenReferral} />
           ) : (
             <ul className="space-y-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {ONBOARDING_SECTIONS.map((section) => (

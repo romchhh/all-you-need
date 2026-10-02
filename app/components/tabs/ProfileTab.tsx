@@ -105,6 +105,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       sessionStorage.removeItem('openBusinessFlow');
       setShowBusinessFlow(true);
     }
+    if (sessionStorage.getItem('openReferralModal') === '1') {
+      sessionStorage.removeItem('openReferralModal');
+      setShowReferralModal(true);
+    }
   }, []);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
@@ -326,6 +330,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         setBusinessStats(null);
       } else if (profileViewMode === 'business') {
         void fetchBusinessStats();
+        void fetchListingsWithFilters(0, true);
       }
     } catch (e) {
       console.error('Error fetching business profile:', e);
@@ -407,6 +412,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       fetchBusinessProfile();
     }
   }, [profile?.telegramId]);
+
+  useEffect(() => {
+    if (profile?.telegramId && profileViewMode === 'business' && isBusinessActive) {
+      void fetchBusinessProfile();
+    }
+  }, [profileViewMode, isBusinessActive, profile?.telegramId]);
 
   useEffect(() => {
     if (isBusinessActive && profileViewMode === 'business' && profile?.telegramId) {

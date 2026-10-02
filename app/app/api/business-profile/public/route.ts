@@ -75,7 +75,6 @@ export async function GET(request: NextRequest) {
         sellerUsername: user.username,
         rating: Number(user.rating) || 0,
         reviewsCount: Number(user.reviewsCount) || 0,
-        plan: profile.plan,
       },
     });
   } catch (error) {

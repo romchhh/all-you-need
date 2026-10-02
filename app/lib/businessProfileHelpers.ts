@@ -443,17 +443,25 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
 
   await syncBusinessListingProfileTypes(user.id);
 
-  const listingIds = await resolveBusinessListingIds(user.id, profile.linkedListingIds);
-  const activeListingsCount = (await prisma.$queryRawUnsafe(
-    `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND COALESCE(profileType, 'personal') = 'business' AND status = 'active'`,
-    user.id
-  )) as Array<{ cnt: bigint | number }>;
+  const vitrineIds = await resolveBusinessListingIds(user.id, profile.linkedListingIds);
+  const activeListingsCount =
+    vitrineIds.length === 0
+      ? 0
+      : Number(
+          (
+            (await prisma.$queryRawUnsafe(
+              `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active'`,
+              user.id,
+              ...vitrineIds
+            )) as Array<{ cnt: bigint | number }>
+          )[0]?.cnt ?? 0
+        );
 
   return {
     profile,
     user,
-    listingIds,
-    activeListingsCount: Number(activeListingsCount[0]?.cnt ?? 0),
+    listingIds: vitrineIds,
+    activeListingsCount,
   };
 }
 
@@ -505,17 +513,27 @@ export async function getBusinessSellerSummaryForUser(
   const user = users[0];
   if (!user) return null;
 
-  const activeListingsCount = (await prisma.$queryRawUnsafe(
-    `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND COALESCE(profileType, 'personal') = 'business' AND status = 'active'`,
-    userId
-  )) as Array<{ cnt: bigint | number }>;
+  await syncBusinessListingProfileTypes(userId);
+  const vitrineIds = await resolveBusinessListingIds(userId, profile.linkedListingIds);
+  const activeListingsCount =
+    vitrineIds.length === 0
+      ? 0
+      : Number(
+          (
+            (await prisma.$queryRawUnsafe(
+              `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active'`,
+              userId,
+              ...vitrineIds
+            )) as Array<{ cnt: bigint | number }>
+          )[0]?.cnt ?? 0
+        );
 
   return {
     businessName: profile.businessName,
     logo: profile.logo,
     category: profile.category,
     city: profile.city,
-    activeListingsCount: Number(activeListingsCount[0]?.cnt ?? 0),
+    activeListingsCount: activeListingsCount,
     followersCount: profile.followersCount,
     memberSince: formatBusinessMemberSince(user.createdAt, lang),
     telegramSince: formatBusinessTelegramSince(user.createdAt),
@@ -602,6 +620,48 @@ export async function consumeBusinessPromotionCredit(
 
 export type { BusinessProfileStatsPayload };
 
+async function queryBusinessVitrineListingStats(
+  userId: number,
+  listingIds: number[]
+): Promise<{
+  totalListings: bigint | number;
+  activeListings: bigint | number;
+  pendingListings: bigint | number;
+  inactiveListings: bigint | number;
+  favoritesTotal: bigint | number | null;
+}> {
+  const empty = {
+    totalListings: 0,
+    activeListings: 0,
+    pendingListings: 0,
+    inactiveListings: 0,
+    favoritesTotal: 0,
+  };
+  if (listingIds.length === 0) return empty;
+
+  const { rawQuery } = await import('@/lib/dbSql');
+  const placeholders = listingIds.map(() => '?').join(',');
+
+  return (
+    (await rawQuery<Array<typeof empty>>(
+      prisma,
+      `SELECT
+          COUNT(*) as totalListings,
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings,
+          SUM(CASE WHEN status = 'pending_moderation' THEN 1 ELSE 0 END) as pendingListings,
+          SUM(CASE WHEN status IN ('deactivated', 'hidden', 'expired', 'sold', 'rejected') THEN 1 ELSE 0 END) as inactiveListings,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM Favorite f
+            WHERE f.listingId IN (${placeholders})
+          ), 0) as favoritesTotal
+        FROM Listing
+        WHERE userId = ? AND id IN (${placeholders})`,
+      [...listingIds, userId, ...listingIds]
+    ))[0] ?? empty
+  );
+}
+
 export async function getBusinessProfileStatsForUserId(
   userId: number
 ): Promise<BusinessProfileStatsPayload | null> {
@@ -629,27 +689,10 @@ export async function getBusinessProfileStatsForUserId(
     favoritesTotal: bigint | number | null;
   } | undefined;
 
+  const vitrineIds = await resolveBusinessListingIds(userId, profile.linkedListingIds);
+
   try {
-    listingStats = (
-      await rawQuery<Array<NonNullable<typeof listingStats>>>(
-        prisma,
-        `SELECT
-            COUNT(*) as totalListings,
-            SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings,
-            SUM(CASE WHEN status = 'pending_moderation' THEN 1 ELSE 0 END) as pendingListings,
-            SUM(CASE WHEN status IN ('deactivated', 'hidden', 'expired', 'sold', 'rejected') THEN 1 ELSE 0 END) as inactiveListings,
-            COALESCE((
-              SELECT COUNT(*)
-              FROM Favorite f
-              INNER JOIN Listing bl ON bl.id = f.listingId
-              WHERE bl.userId = ?
-                AND COALESCE(bl.profileType, 'personal') = 'business'
-            ), 0) as favoritesTotal
-          FROM Listing
-          WHERE userId = ? AND COALESCE(profileType, 'personal') = 'business'`,
-        [userId, userId]
-      )
-    )[0];
+    listingStats = await queryBusinessVitrineListingStats(userId, vitrineIds);
   } catch (error) {
     console.error('[BusinessProfile stats] listing query failed', error);
   }

@@ -26,9 +26,13 @@ export const useTelegram = () => {
       // Приховуємо основну кнопку
       telegram.MainButton.hide();
 
-      // Налаштування для повноекранного режиму з можливістю згортання
-      telegram.backgroundColor = '#ffffff';
-      telegram.headerColor = '#ffffff';
+      // Кольори під Telegram (secondary_bg_color підлаштовується під тему клієнта)
+      if (typeof telegram.headerColor !== 'undefined') {
+        telegram.headerColor = 'secondary_bg_color';
+      }
+      if (typeof telegram.backgroundColor !== 'undefined') {
+        telegram.backgroundColor = 'secondary_bg_color';
+      }
 
       // Налаштування viewport
       const updateViewport = () => {

@@ -416,18 +416,10 @@ export const ProfileListingCard = ({
             {showListingProfileSource && (
               <p
                 className={`mt-1 text-[10px] font-semibold uppercase tracking-wide ${
-                  listing.profileType === 'business'
-                    ? isLight
-                      ? 'text-[#3F5331]'
-                      : 'text-[#C8E6A0]'
-                    : isLight
-                      ? 'text-gray-500'
-                      : 'text-white/55'
+                  isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'
                 }`}
               >
-                {listing.profileType === 'business'
-                  ? t('businessProfile.owner.listingSourceBusiness')
-                  : t('businessProfile.owner.listingSourcePersonal')}
+                {t('businessProfile.owner.listingSourceBusiness')}
               </p>
             )}
             <div className={`font-bold mt-1 min-w-0 ${

@@ -10,6 +10,7 @@ import { SearchView } from '@/components/search/SearchView';
 import { ListingDetail } from '@/components/listing/ListingDetail';
 import { SellerProfileRouter } from '@/components/profile/SellerProfileRouter';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
+import { AppHeader } from '@/components/layout/AppHeader';
 import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
 import {
@@ -305,6 +306,7 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen pb-20 animate-content-crossfade">
+      {!selectedListing && !selectedSeller && <AppHeader />}
       <SearchView
           initialQuery={initialQuery}
           initialCategory={initialCategory}

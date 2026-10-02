@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
-import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile, resolveBusinessListingIds } from '@/lib/businessProfileHelpers';
+import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile, resolveBusinessListingIds, syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
 import type { ListingDisplayMode } from '@/lib/businessProfileSettings';
 import { normalizeInstagramForStorage, normalizeWebsiteForStorage } from '@/utils/socialLinks';
 
@@ -65,6 +65,10 @@ export async function GET(request: NextRequest) {
 
     const isActive = isBusinessProfileActive(profile);
     const isSuspended = !isActive && profile.subscriptionStatus === 'expired';
+
+    if (isActive) {
+      await syncBusinessListingProfileTypes(user.id);
+    }
 
     return NextResponse.json({
       hasProfile: true,

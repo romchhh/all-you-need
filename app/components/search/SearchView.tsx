@@ -52,6 +52,7 @@ import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
+import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
@@ -67,8 +68,8 @@ const CityModal = dynamic(
 
 const SEARCH_DEBOUNCE_MS = 800;
 const MIN_QUERY_LENGTH = 2;
-const SEARCH_STICKY_CLASS =
-  'sticky z-[42] top-0 pt-[max(env(safe-area-inset-top,0px),10px)]';
+const SEARCH_RESULTS_LIMIT = 100;
+const SEARCH_STICKY_CLASS = `${STICKY_BELOW_APP_HEADER_CLASS} z-[42]`;
 
 type SearchScreenMode = 'discover' | 'results';
 type SortOption = 'newest' | 'price_low' | 'price_high' | 'popular';
@@ -349,7 +350,7 @@ export function SearchView({
 
       try {
         const params = new URLSearchParams({
-          limit: '24',
+          limit: String(SEARCH_RESULTS_LIMIT),
           offset: '0',
           sortBy,
           search: trimmed,
@@ -388,7 +389,7 @@ export function SearchView({
           setSearchResults(list);
           setSearchTotal(data.total ?? list.length);
           if (list.length > 0) {
-            updateSearchHistoryListings(trimmed, list.slice(0, 6).map(listingToSearchPreview));
+            updateSearchHistoryListings(trimmed, list.map(listingToSearchPreview));
           }
         } else {
           setSearchResults([]);
@@ -463,7 +464,7 @@ export function SearchView({
 
       try {
         const params = new URLSearchParams({
-          limit: '24',
+          limit: String(SEARCH_RESULTS_LIMIT),
           offset: '0',
           sortBy: businessFilters.sortBy,
           search: trimmed,
@@ -713,7 +714,7 @@ export function SearchView({
     let cancelled = false;
     setLoadingDiscover(true);
 
-    const params = new URLSearchParams({ popularLimit: '6', recentLimit: '4' });
+    const params = new URLSearchParams({ popularLimit: '24', recentLimit: '16' });
     if (profileTelegramId) params.set('telegramId', profileTelegramId);
 
     fetch(`/api/search/discover?${params}`, { cache: 'no-store' })
@@ -769,24 +770,34 @@ export function SearchView({
     }
 
     let cancelled = false;
-    const ids = previews.slice(0, 4).map((p) => p.id);
+    const ids = previews.map((p) => p.id);
 
-    Promise.all(
-      ids.map(async (id) => {
-        try {
-          const params = profileTelegramId ? `?viewerId=${profileTelegramId}` : '';
-          const res = await fetch(`/api/listings/${id}${params}`);
-          if (res.ok) return (await res.json()) as Listing;
-        } catch {
-          /* skip */
-        }
-        return null;
-      })
-    ).then((rows) => {
-      if (!cancelled) {
-        setRecentSearchListings(rows.filter(Boolean) as Listing[]);
+    const loadByIds = async () => {
+      const loaded: Listing[] = [];
+      const chunkSize = 20;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        if (cancelled) return;
+        const chunk = ids.slice(i, i + chunkSize);
+        const rows = await Promise.all(
+          chunk.map(async (id) => {
+            try {
+              const params = profileTelegramId ? `?viewerId=${profileTelegramId}` : '';
+              const res = await fetch(`/api/listings/${id}${params}`);
+              if (res.ok) return (await res.json()) as Listing;
+            } catch {
+              /* skip */
+            }
+            return null;
+          })
+        );
+        loaded.push(...(rows.filter(Boolean) as Listing[]));
       }
-    });
+      if (!cancelled) {
+        setRecentSearchListings(loaded);
+      }
+    };
+
+    void loadByIds();
 
     return () => {
       cancelled = true;
@@ -917,8 +928,8 @@ export function SearchView({
     trimmedLocal.length >= MIN_QUERY_LENGTH && trimmedLocal !== debouncedQuery.trim();
 
   const stickySearchBg = isLight
-    ? 'border-b border-[#3F5331]/10 bg-[#f5f7f2]/95 backdrop-blur-md'
-    : 'border-b border-white/10 bg-black/90 backdrop-blur-md';
+    ? 'border-b border-[#3F5331]/10 bg-[#f5f7f2]/98 backdrop-blur-md'
+    : 'border-b border-white/10 bg-[#000000]/95 backdrop-blur-md';
 
   const catalogListingsProps = {
     favorites,
@@ -1077,7 +1088,7 @@ export function SearchView({
           icon={<TrendingUp size={16} />}
           isLight={isLight}
         >
-          <CatalogListings items={recentViewedListings} limit={4} {...catalogListingsProps} />
+          <CatalogListings items={recentViewedListings} {...catalogListingsProps} />
         </SearchSection>
       )}
 
@@ -1089,7 +1100,7 @@ export function SearchView({
         {loadingDiscover && popularListings.length === 0 ? (
           <CatalogListingsSkeleton count={6} />
         ) : popularListings.length > 0 ? (
-          <CatalogListings items={popularListings} limit={6} {...catalogListingsProps} />
+          <CatalogListings items={popularListings} {...catalogListingsProps} />
         ) : (
           <p className={`text-sm ${ac.mutedText}`}>{t('common.nothingFound')}</p>
         )}
@@ -1344,7 +1355,7 @@ export function SearchView({
     <>
       {screenMode === 'discover' ? (
         <>
-          <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-[max(env(safe-area-inset-top,0px),10px)]">
+          <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-1">
             <h1 className={`min-w-0 flex-1 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
               {t('bazaar.search.title')}
             </h1>
