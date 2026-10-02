@@ -80,6 +80,14 @@ def author_notify_outbound_url(
     return f"{base}/api/analytics/outbound?{q}"
 
 
+def author_notify_listing_preview_url(listing_id: int, *, lang: str = "ru") -> str:
+    """
+    Веб-сторінка оголошення для картки-превʼю в Telegram (OG-теги).
+    Окремо від кнопок t.me — інакше превʼю буде бот, а не оголошення.
+    """
+    return f"{listing_url(listing_id, lang=lang)}?ref=author_dm_preview"
+
+
 def format_author_notify_open_links_html(
     listing_id: int,
     *,
@@ -88,36 +96,40 @@ def format_author_notify_open_links_html(
     include_channel: bool = False,
 ) -> str:
     """
-    Посилання для DM авторам (RU):
-    Marketplace (веб), опційно канал, Mini App / бот.
+    Клікабельні посилання для DM авторам (RU): одразу в Telegram (Mini App / бот).
+    Превʼю знизу — окремий plain URL через author_notify_listing_preview_url().
     """
-    mp = html.escape(
-        author_notify_outbound_url(listing_id, "marketplace", lang=lang),
-        quote=True,
-    )
-    bot = html.escape(
-        author_notify_outbound_url(listing_id, "miniapp", lang=lang),
-        quote=True,
-    )
-    lines = [
-        f'📱 <a href="{mp}">Открыть в Marketplace</a>',
-    ]
-    if include_channel and channel_url:
-        ch = html.escape(
-            author_notify_outbound_url(
-                listing_id,
-                "channel",
-                lang=lang,
-                channel_url=channel_url,
-            ),
+    lines: list[str] = []
+    mini = listing_miniapp_url(listing_id)
+    if mini:
+        mini_esc = html.escape(mini, quote=True)
+        lines.append(f'📱 <a href="{mini_esc}">Открыть в Marketplace</a>')
+    else:
+        mp = html.escape(
+            author_notify_outbound_url(listing_id, "marketplace", lang=lang),
             quote=True,
         )
-        lines.append(f'📢 <a href="{ch}">Открыть в Канале</a>')
-    lines.append(f'🤖 <a href="{bot}">Открыть через бот</a>')
+        lines.append(f'📱 <a href="{mp}">Открыть в Marketplace</a>')
+
+    if include_channel and channel_url:
+        ch_target = channel_url.strip()
+        if ch_target.startswith("http"):
+            ch = html.escape(ch_target, quote=True)
+            lines.append(f'📢 <a href="{ch}">Открыть в Канале</a>')
+
+    bot = listing_bot_url(listing_id)
+    if bot:
+        bot_esc = html.escape(bot, quote=True)
+        lines.append(f'🤖 <a href="{bot_esc}">Открыть через бот</a>')
+    elif mini:
+        lines.append(f'🤖 <a href="{html.escape(mini, quote=True)}">Открыть через бот</a>')
     return "\n".join(lines)
 
 
 def business_profile_signup_url(*, listing_id: int, lang: str = "ru") -> str:
+    """Deep-link у Mini App (Business onboarding). listing_id лишається для outbound-аналітики за потреби."""
+    if BOT_USERNAME:
+        return f"https://t.me/{BOT_USERNAME.lstrip('@')}?startapp=business"
     return author_notify_outbound_url(listing_id, "business_profile", lang=lang)
 
 

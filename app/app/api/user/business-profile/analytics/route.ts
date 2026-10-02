@@ -4,6 +4,8 @@ import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
 import {
   expireBusinessProfileIfNeeded,
   getBusinessProfileStatsForUserId,
+  getBusinessProfileContactChannelStats,
+  businessMetricPctChange,
   isBusinessProfileActive,
 } from '@/lib/businessProfileHelpers';
 
@@ -168,6 +170,8 @@ export async function GET(request: NextRequest) {
       inquiries: metrics.contactClicks,
     };
 
+    const channelStats = await getBusinessProfileContactChannelStats(String(profile.id), period);
+
     return NextResponse.json({
       period,
       isPro: profile.plan === 'business_pro',
@@ -186,17 +190,21 @@ export async function GET(request: NextRequest) {
         { key: 'profile', pct: 6 },
         { key: 'other', pct: 4 },
       ],
-      contactChannels: {
-        telegram: Math.max(0, Math.round(metrics.contactClicks * 0.45)),
-        phone: Math.max(0, Math.round(metrics.contactClicks * 0.18)),
-        instagram: Math.max(0, Math.round(metrics.contactClicks * 0.25)),
-        website: Math.max(0, Math.round(metrics.contactClicks * 0.12)),
-      },
+      contactChannels: channelStats.current,
       contactChannelChanges: {
-        telegram: pseudoChange(metrics.contactClicks + user.id + 10, period),
-        phone: pseudoChange(metrics.contactClicks + user.id + 11, period),
-        instagram: pseudoChange(metrics.contactClicks + user.id + 12, period),
-        website: pseudoChange(metrics.contactClicks + user.id + 13, period),
+        telegram: businessMetricPctChange(
+          channelStats.current.telegram,
+          channelStats.previous.telegram
+        ),
+        phone: businessMetricPctChange(channelStats.current.phone, channelStats.previous.phone),
+        instagram: businessMetricPctChange(
+          channelStats.current.instagram,
+          channelStats.previous.instagram
+        ),
+        website: businessMetricPctChange(
+          channelStats.current.website,
+          channelStats.previous.website
+        ),
       },
     });
   } catch (error) {

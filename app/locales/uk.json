@@ -1507,6 +1507,8 @@
       "memberSince": "На платформі",
       "aboutTitle": "Про компанію",
       "noListings": "Поки немає активних оголошень",
+      "noDescription": "Компанія ще не додала опис.",
+      "proBadge": "PRO",
       "tabs": {
         "listings": "Оголошення",
         "about": "Про компанію"

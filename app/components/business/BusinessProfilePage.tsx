@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
+  MapPin,
   MoreHorizontal,
   Star,
   UserPlus,
@@ -67,6 +68,9 @@ interface PublicBusinessProfile {
   instagram: string | null;
   website: string | null;
   workingHours: string | null;
+  serviceArea: string | null;
+  serviceRadiusKm: number | null;
+  plan: string | null;
   followersCount: number;
   activeListingsCount: number;
   memberSince: string;
@@ -246,6 +250,18 @@ export function BusinessProfilePage({
       ),
     [businessActivity.directions, language]
   );
+
+  const serviceAreaLine = useMemo(() => {
+    if (!profile?.serviceArea) return '';
+    const areaKey = profile.serviceArea;
+    const label = t(`businessProfile.serviceArea.${areaKey}`);
+    if (areaKey === 'city_radius' && profile.serviceRadiusKm != null && profile.serviceRadiusKm > 0) {
+      return `${label} · ${profile.serviceRadiusKm} km`;
+    }
+    return label;
+  }, [profile?.serviceArea, profile?.serviceRadiusKm, t]);
+
+  const isProPlan = profile?.plan === 'business_pro';
 
   const filteredListings = useMemo(() => {
     if (listingFilter === 'services') {
@@ -505,6 +521,11 @@ export function BusinessProfilePage({
           >
             BUSINESS
           </span>
+          {isProPlan ? (
+            <span className="shrink-0 rounded-full bg-[#C8E6A0] px-2.5 py-1 text-[10px] font-bold tracking-wide text-[#1a1a1a]">
+              {t('businessProfile.public.proBadge')}
+            </span>
+          ) : null}
         </div>
 
         <p className={`mb-2 text-sm ${ac.mutedText}`}>
@@ -540,11 +561,14 @@ export function BusinessProfilePage({
           )}
         </div>
 
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className={`flex items-center gap-1.5 text-sm ${ac.mutedText}`}>
-            <Users size={16} className="shrink-0" />
-            <span>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-sm ${ac.mutedText}`}>
+            <span className="inline-flex items-center gap-1.5">
+              <Users size={16} className="shrink-0" />
               {profile.followersCount} {t('businessProfile.public.followersLabel')}
+            </span>
+            <span>
+              {profile.activeListingsCount} {t('businessProfile.public.listingsShort')}
             </span>
           </div>
           {!viewingOwn && (
@@ -638,8 +662,8 @@ export function BusinessProfilePage({
                   className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     listingFilter === id
                       ? isLight
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-white/15 text-white'
+                        ? 'bg-[#3F5331] text-white'
+                        : 'bg-[#C8E6A0] text-[#0f1408]'
                       : isLight
                         ? 'bg-gray-100 text-gray-700'
                         : 'bg-[#1C1C1C] text-white/70'
@@ -674,8 +698,21 @@ export function BusinessProfilePage({
           <div className="space-y-3">
             <div className={aboutCard}>
               <h3 className={`mb-2 font-semibold ${ac.pageHeading}`}>{t('businessProfile.public.aboutTitle')}</h3>
-              <p className={`text-sm leading-relaxed whitespace-pre-wrap ${ac.mutedText}`}>{profile.description}</p>
+              <p className={`text-sm leading-relaxed whitespace-pre-wrap ${ac.mutedText}`}>
+                {profile.description?.trim() || t('businessProfile.public.noDescription')}
+              </p>
             </div>
+            {serviceAreaLine ? (
+              <div className={aboutCard}>
+                <h3 className={`mb-1 font-semibold ${ac.pageHeading}`}>
+                  {t('businessProfile.fields.serviceArea')}
+                </h3>
+                <p className={`flex items-start gap-2 text-sm ${ac.mutedText}`}>
+                  <MapPin size={16} className="mt-0.5 shrink-0" />
+                  <span>{serviceAreaLine}</span>
+                </p>
+              </div>
+            ) : null}
             {profile.address && (
               <div className={aboutCard}>
                 <h3 className={`mb-1 font-semibold ${ac.pageHeading}`}>{t('businessProfile.fields.address')}</h3>

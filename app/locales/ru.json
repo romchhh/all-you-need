@@ -1500,6 +1500,8 @@
       "memberSince": "На платформе",
       "aboutTitle": "О компании",
       "noListings": "Пока нет активных объявлений",
+      "noDescription": "Компания пока не добавила описание.",
+      "proBadge": "PRO",
       "tabs": {
         "listings": "Объявления",
         "about": "О компании"

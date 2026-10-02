@@ -746,3 +746,82 @@ export async function getBusinessProfileStatsForUserId(
     favoritesTotal: toNum(listingStats?.favoritesTotal),
   };
 }
+
+export type BusinessContactChannel = 'telegram' | 'phone' | 'instagram' | 'website';
+
+const BUSINESS_CONTACT_CHANNELS: BusinessContactChannel[] = [
+  'telegram',
+  'phone',
+  'instagram',
+  'website',
+];
+
+function emptyContactChannelCounts(): Record<BusinessContactChannel, number> {
+  return { telegram: 0, phone: 0, instagram: 0, website: 0 };
+}
+
+function parseBusinessContactChannel(metadata: string | null): BusinessContactChannel | null {
+  if (!metadata) return null;
+  try {
+    const meta = JSON.parse(metadata) as { channel?: string };
+    const ch = meta.channel;
+    if (ch && (BUSINESS_CONTACT_CHANNELS as string[]).includes(ch)) {
+      return ch as BusinessContactChannel;
+    }
+  } catch {
+    // ignore invalid json
+  }
+  return null;
+}
+
+/** Кліки по контактах на публічному Business-профілі (contact_seller + metadata.channel). */
+export async function getBusinessProfileContactChannelStats(
+  profileEntityId: string,
+  periodDays: number
+): Promise<{
+  current: Record<BusinessContactChannel, number>;
+  previous: Record<BusinessContactChannel, number>;
+}> {
+  const result = {
+    current: emptyContactChannelCounts(),
+    previous: emptyContactChannelCounts(),
+  };
+  const { rawQuery, isPostgres } = await import('@/lib/dbSql');
+  const sinceCurrent = isPostgres()
+    ? `createdAt >= NOW() - INTERVAL '${periodDays} days'`
+    : `datetime(createdAt) >= datetime('now', '-${periodDays} days')`;
+  const sincePrevious = isPostgres()
+    ? `createdAt >= NOW() - INTERVAL '${periodDays * 2} days' AND createdAt < NOW() - INTERVAL '${periodDays} days'`
+    : `datetime(createdAt) >= datetime('now', '-${periodDays * 2} days') AND datetime(createdAt) < datetime('now', '-${periodDays} days')`;
+
+  try {
+    const { ensureAnalyticsEventTable } = await import('@/lib/analytics/analyticsStore');
+    await ensureAnalyticsEventTable();
+
+    for (const bucket of ['current', 'previous'] as const) {
+      const timeFilter = bucket === 'current' ? sinceCurrent : sincePrevious;
+      const rows = await rawQuery<Array<{ metadata: string | null }>>(
+        prisma,
+        `SELECT metadata FROM AnalyticsEvent
+          WHERE eventName = 'contact_seller'
+            AND entityType = 'business_profile'
+            AND entityId = ?
+            AND ${timeFilter}`,
+        [profileEntityId]
+      );
+      for (const row of rows) {
+        const channel = parseBusinessContactChannel(row.metadata);
+        if (channel) result[bucket][channel] += 1;
+      }
+    }
+  } catch {
+    // analytics table may be unavailable
+  }
+
+  return result;
+}
+
+export function businessMetricPctChange(current: number, previous: number): number {
+  if (previous <= 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}

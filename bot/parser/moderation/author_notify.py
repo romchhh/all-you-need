@@ -16,6 +16,7 @@ from parser.core.account_pool import (
 )
 from parser.core.telegram_meta import resolve_pyrogram_chat_ref
 from parser.moderation.formatting import (
+    author_notify_listing_preview_url,
     business_profile_signup_url,
     format_author_notify_open_links_html,
 )
@@ -29,7 +30,8 @@ NOTIFY_AUTHOR_GOODS_TEXT_RU = (
     "маркетплейс товаров и услуг для украино- и русскоязычных в Германии.\n\n"
     "🔗 Ваше объявление:\n"
     "{open_links}\n\n"
-    "Если хотите изменить или удалить объявление — просто напишите нам."
+    "Если хотите изменить или удалить объявление — просто напишите нам.\n\n"
+    "{preview_url}"
 )
 
 NOTIFY_AUTHOR_SERVICES_TEXT_RU = (
@@ -42,7 +44,8 @@ NOTIFY_AUTHOR_SERVICES_TEXT_RU = (
     "Создайте бесплатный Business-профиль — расскажите о себе или компании, "
     "добавьте контакты и соберите свои объявления в одном месте.\n\n"
     "👉 <a href=\"{business_url}\">Создать Business-профиль бесплатно</a>\n\n"
-    "Если хотите изменить или удалить объявление — просто напишите нам."
+    "Если хотите изменить или удалить объявление — просто напишите нам.\n\n"
+    "{preview_url}"
 )
 
 NOTIFY_AUTHOR_CHANNEL_TEXT_RU = (
@@ -173,6 +176,8 @@ def _build_notify_text(
     services_marketplace: bool = False,
     channel_url: str | None = None,
 ) -> str:
+    from parser.config.tuning import PARSER_AUTHOR_DM_BUSINESS_CTA
+
     title = html.escape(str(item.get("title") or "").strip() or "объявление")
     if channel_only:
         return NOTIFY_AUTHOR_CHANNEL_TEXT_RU.format(title=title)
@@ -182,7 +187,12 @@ def _build_notify_text(
         channel_url=channel_url,
         include_channel=bool(services_marketplace and channel_url),
     )
-    if services_marketplace:
+    preview_url = html.escape(
+        author_notify_listing_preview_url(listing_id, lang="ru"),
+        quote=False,
+    )
+    show_business_cta = services_marketplace and PARSER_AUTHOR_DM_BUSINESS_CTA
+    if show_business_cta:
         business_url = html.escape(
             business_profile_signup_url(listing_id=listing_id, lang="ru"),
             quote=True,
@@ -191,10 +201,12 @@ def _build_notify_text(
             title=title,
             open_links=open_links,
             business_url=business_url,
+            preview_url=preview_url,
         )
     return NOTIFY_AUTHOR_GOODS_TEXT_RU.format(
         title=title,
         open_links=open_links,
+        preview_url=preview_url,
     )
 
 

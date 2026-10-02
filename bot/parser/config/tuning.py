@@ -28,6 +28,8 @@ PARSER_AUTO_APPROVE_MAX_PER_CATEGORY: int = 120
 PARSER_AUTO_APPROVE_MAX_AGE_HOURS: int = 72
 PARSER_AUTO_APPROVE_WAVE_MINUTES: int = 5
 PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = False
+# CTA «Business-профиль» у DM авторам послуг — увімкнути після готовності вітрини
+PARSER_AUTHOR_DM_BUSINESS_CTA: bool = False
 # Рівномірний денний бюджет — вимкнено: backlog публікується протягом дня (2-хв job + parse-time)
 PARSER_AUTO_APPROVE_PACE_ENABLED: bool = False
 PARSER_AUTO_APPROVE_PACE_BUFFER_MIN: int = 45
