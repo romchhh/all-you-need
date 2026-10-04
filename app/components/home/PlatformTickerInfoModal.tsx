@@ -12,6 +12,8 @@ import {
   type PlatformOnboardingActionId,
   type TickerMessageType,
 } from '@/utils/platformTickerMessages';
+import { trackAnalytics } from '@/utils/analyticsClient';
+import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { PromotionTypeCards } from '@/components/promotions/PromotionTypeCards';
 import { BusinessProfileOnboardingPanel } from '@/components/home/BusinessProfileOnboardingPanel';
 import { ReferralOnboardingPanel } from '@/components/home/ReferralOnboardingPanel';
@@ -74,6 +76,11 @@ export function PlatformTickerInfoModal({
 
   const handleAction = (action: PlatformOnboardingActionId) => {
     if (action === 'promotion') {
+      trackAnalytics({
+        eventName: ANALYTICS_EVENTS.promotionView,
+        eventGroup: ANALYTICS_EVENT_GROUPS.monetization,
+        metadata: { source: 'platform_ticker_onboarding' },
+      });
       setView('promotion');
       return;
     }
@@ -91,7 +98,7 @@ export function PlatformTickerInfoModal({
 
   const headerTitle =
     view === 'promotion'
-      ? t('promotions.title')
+      ? t('promotions.marketplaceTitle')
       : view === 'business'
         ? t('platformTicker.onboarding.businessDetail.title')
         : view === 'referral'
@@ -99,7 +106,7 @@ export function PlatformTickerInfoModal({
           : t('platformTicker.onboarding.brandTitle');
   const headerSubtitle =
     view === 'promotion'
-      ? t('promotions.description')
+      ? t('promotions.marketplaceDescription')
       : view === 'business'
         ? t('platformTicker.onboarding.businessDetail.subtitle')
         : view === 'referral'

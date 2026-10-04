@@ -16,6 +16,8 @@ import {
 
 type HomeActivityStatsProps = {
   isLight: boolean;
+  /** Клік по місту в dropdown — відкрити каталог з фільтром локації. */
+  onSelectCity?: (city: string) => void;
 };
 
 type MenuPosition = {
@@ -24,7 +26,10 @@ type MenuPosition = {
   width: number;
 };
 
-export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: HomeActivityStatsProps) {
+export const HomeActivityStats = memo(function HomeActivityStats({
+  isLight,
+  onSelectCity,
+}: HomeActivityStatsProps) {
   const { t, language } = useLanguage();
   const ac = getAppearanceClasses(isLight);
   const [stats, setStats] = useState<HomeActivityData | null>(() => readHomeActivityCache());
@@ -188,7 +193,9 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
     ? `px-3 pb-1.5 pt-0.5 text-[11px] font-medium uppercase tracking-wide ${ac.mutedText}`
     : 'px-3 pb-1.5 pt-0.5 text-[11px] font-medium uppercase tracking-wide text-white/50';
 
-  const dropdownRowClass = isLight ? 'text-gray-900' : 'text-white';
+  const dropdownRowButtonClass = isLight
+    ? 'w-full px-3 py-2.5 text-left text-sm leading-snug text-gray-900 transition-colors hover:bg-[#E8F0E0]/80 active:bg-[#E8F0E0]'
+    : 'w-full px-3 py-2.5 text-left text-sm leading-snug text-white transition-colors hover:bg-white/[0.06] active:bg-white/[0.1]';
   const dropdownDivider = isLight ? 'divide-black/[0.04]' : 'divide-white/[0.08]';
 
   const cityMenu =
@@ -216,18 +223,31 @@ export const HomeActivityStats = memo(function HomeActivityStats({ isLight }: Ho
               <ul className={`divide-y ${dropdownDivider}`}>
                 {cities.map(({ city, count }) => {
                   const label = city ? city : t('bazaar.activityOtherCity');
+                  const clickable = Boolean(onSelectCity && city && city !== 'Germany');
                   return (
-                    <li
-                      key={city || '__other__'}
-                      className={`px-3 py-2.5 text-sm leading-snug ${dropdownRowClass}`}
-                      role="option"
-                    >
-                      <span className="block min-w-0">
-                        {t('bazaar.activityCityRow', {
-                          city: label,
-                          count: fmt(count),
-                        })}
-                      </span>
+                    <li key={city || '__other__'} role="option">
+                      {clickable ? (
+                        <button
+                          type="button"
+                          className={dropdownRowButtonClass}
+                          onClick={() => {
+                            onSelectCity?.(city);
+                            setMenuOpen(false);
+                          }}
+                        >
+                          {t('bazaar.activityCityRow', {
+                            city: label,
+                            count: fmt(count),
+                          })}
+                        </button>
+                      ) : (
+                        <span className={`block px-3 py-2.5 text-sm leading-snug ${isLight ? 'text-gray-900' : 'text-white'}`}>
+                          {t('bazaar.activityCityRow', {
+                            city: label,
+                            count: fmt(count),
+                          })}
+                        </span>
+                      )}
                     </li>
                   );
                 })}

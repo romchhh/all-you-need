@@ -46,6 +46,7 @@ export type BusinessProfileData = {
   instagram?: string | null;
   website?: string | null;
   workingHours?: string | null;
+  portfolioImages?: string | null;
   updatedAt?: string;
   subscriptionEndsAt?: string | null;
   highlightCreditsRemaining?: number;

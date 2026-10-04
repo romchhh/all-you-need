@@ -62,6 +62,8 @@ export interface Listing {
   businessSeller?: BusinessSeller | null;
   /** Оголошення з парсера — контакт «Написати» веде на @ автора з джерела. */
   fromParser?: boolean;
+  /** Посилання на оригінальний пост (парсер), якщо немає @ автора. */
+  originalPostUrl?: string | null;
 }
 
 export interface Subcategory {

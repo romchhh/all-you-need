@@ -64,6 +64,24 @@ export function openSellerTelegramChat(
   tg?: TelegramWebApp,
 ): void {
   const link = buildSellerTelegramLink(username, message);
+  openTelegramDeepLink(link, tg);
+}
+
+/** Відкрити вибір чату з готовим текстом (коли немає @username продавця). */
+export function openSellerContactViaTelegramShare(
+  listingUrl: string,
+  message: string,
+  tg?: TelegramWebApp,
+): void {
+  const url = listingUrl.trim();
+  const text = message.trim();
+  const shareUrl = url
+    ? `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
+    : `https://t.me/share/url?text=${encodeURIComponent(text)}`;
+  openTelegramDeepLink(shareUrl, tg);
+}
+
+export function openTelegramDeepLink(link: string, tg?: TelegramWebApp): void {
   if (tg?.openTelegramLink) {
     tg.openTelegramLink(link);
     tg.HapticFeedback?.impactOccurred('medium');

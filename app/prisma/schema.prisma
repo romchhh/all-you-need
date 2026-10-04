@@ -424,6 +424,7 @@ model BusinessProfile {
   workingHours       String?
   plan               String?   // business | business_pro
   linkedListingIds   String?   // JSON array of listing ids for storefront
+  portfolioImages    String?   // JSON array of image URLs for public portfolio tab
   highlightCreditsRemaining Int @default(0)
   topCreditsRemaining       Int @default(0)
   followersCount            Int @default(0)

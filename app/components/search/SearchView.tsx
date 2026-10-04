@@ -47,6 +47,8 @@ import {
   loadBazaarTabStateFromStorage,
   persistBazaarTabState,
 } from '@/lib/bazaar/bazaarTabStateStorage';
+import { formatCityFilterLabel, normalizeCityInput } from '@/lib/city/cityNormalization';
+import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import type { Currency } from '@/utils/currency';
 import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
@@ -56,6 +58,8 @@ import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHead
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
+import { useToast } from '@/features/ui/hooks/useToast';
+import { Toast } from '@/components/ui/Toast';
 
 const SortModal = dynamic(
   () => import('@/components/modals/SortModal').then((m) => ({ default: m.SortModal })),
@@ -77,6 +81,9 @@ type SortOption = 'newest' | 'price_low' | 'price_high' | 'popular';
 interface SearchViewProps {
   initialQuery: string;
   initialCategory?: string | null;
+  initialEntityMode?: SearchEntityMode;
+  initialCitiesFromUrl?: string[];
+  onUrlStateChange?: (state: { q: string; cities: string; mode: SearchEntityMode }) => void;
   categories: Category[];
   searchPlaceholder?: string;
   selectedCities?: string[];
@@ -186,6 +193,9 @@ function CatalogListingsSkeleton({ count = 6 }: { count?: number }) {
 export function SearchView({
   initialQuery,
   initialCategory = null,
+  initialEntityMode = 'listings',
+  initialCitiesFromUrl = [],
+  onUrlStateChange,
   categories,
   searchPlaceholder,
   selectedCities = [],
@@ -199,9 +209,11 @@ export function SearchView({
   onToggleFavorite,
   tg,
 }: SearchViewProps) {
+  useHideBottomNav(true);
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
+  const { toast, showToast, hideToast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
   const lastFetchKeyRef = useRef('');
@@ -219,7 +231,13 @@ export function SearchView({
   );
   const [localQuery, setLocalQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
-  const [localCities, setLocalCities] = useState<string[]>(selectedCities);
+  const [localCities, setLocalCities] = useState<string[]>(() => {
+    const fromUrl = (initialCitiesFromUrl ?? []).map((c) => normalizeCityInput(c)).filter(Boolean);
+    const fromProp = selectedCities ?? [];
+    const fromStorage = loadBazaarTabStateFromStorage().selectedCities ?? [];
+    const source = fromUrl.length > 0 ? fromUrl : fromProp.length > 0 ? fromProp : fromStorage;
+    return source.map((c) => normalizeCityInput(c)).filter(Boolean);
+  });
   const citiesKey = localCities.join(',');
   const savedFilters = useMemo(() => loadBazaarTabStateFromStorage(), []);
   const [sortBy, setSortBy] = useState<SortOption>(savedFilters.sortBy ?? 'newest');
@@ -247,7 +265,8 @@ export function SearchView({
   const [popularListings, setPopularListings] = useState<Listing[]>([]);
   const [recentViewedListings, setRecentViewedListings] = useState<Listing[]>([]);
   const [loadingDiscover, setLoadingDiscover] = useState(false);
-  const [searchEntityMode, setSearchEntityMode] = useState<SearchEntityMode>('listings');
+  const [searchEntityMode, setSearchEntityMode] = useState<SearchEntityMode>(initialEntityMode);
+  const [followBusyId, setFollowBusyId] = useState<number | null>(null);
   const [selectedBusinessSphere, setSelectedBusinessSphere] = useState<string | null>(null);
   const [businessFilters, setBusinessFilters] = useState<BusinessSearchFilterState>(
     DEFAULT_BUSINESS_SEARCH_FILTERS
@@ -257,6 +276,7 @@ export function SearchView({
   const [businessTotal, setBusinessTotal] = useState(0);
   const [loadingBusinessResults, setLoadingBusinessResults] = useState(false);
   const [recommendedBusinesses, setRecommendedBusinesses] = useState<BusinessSearchCardData[]>([]);
+  const [loadingRecommendedBusinesses, setLoadingRecommendedBusinesses] = useState(false);
   const businessRequestRef = useRef(0);
   const lastBusinessFetchKeyRef = useRef('');
   const [viewMode] = useState<'grid' | 'list'>(() => {
@@ -581,6 +601,57 @@ export function SearchView({
     [onSelectBusiness]
   );
 
+  const handleToggleBusinessFollow = useCallback(
+    async (business: BusinessSearchCardData) => {
+      if (!profileTelegramId) {
+        showToast(t('businessProfile.public.loginToSubscribe'), 'info');
+        return;
+      }
+      if (String(business.sellerTelegramId) === String(profileTelegramId)) return;
+
+      const nextFollowing = !business.isFollowing;
+      setFollowBusyId(business.id);
+      try {
+        const res = await fetch('/api/business-profile/public', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId: business.sellerTelegramId,
+            followerTelegramId: profileTelegramId,
+            action: nextFollowing ? 'follow' : 'unfollow',
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast(t('businessProfile.public.subscribeError'), 'error');
+          return;
+        }
+        const patchBusiness = (b: BusinessSearchCardData) =>
+          b.id === business.id
+            ? {
+                ...b,
+                isFollowing: Boolean(data.isFollowing),
+                followersCount:
+                  typeof data.followersCount === 'number' ? data.followersCount : b.followersCount,
+              }
+            : b;
+        setBusinessResults((prev) => prev.map(patchBusiness));
+        setRecommendedBusinesses((prev) => prev.map(patchBusiness));
+        showToast(
+          data.isFollowing
+            ? t('businessProfile.public.subscribedToast')
+            : t('businessProfile.public.unsubscribedToast'),
+          'success'
+        );
+      } catch {
+        showToast(t('businessProfile.public.subscribeError'), 'error');
+      } finally {
+        setFollowBusyId(null);
+      }
+    },
+    [profileTelegramId, showToast, t]
+  );
+
   const handleCategorySelect = useCallback(
     (categoryId: string | null) => {
       const next = selectedCategory === categoryId ? null : categoryId;
@@ -666,6 +737,14 @@ export function SearchView({
     }
   }, [debouncedQuery, screenMode]);
 
+  useEffect(() => {
+    onUrlStateChange?.({
+      q: activeQuery || localQuery,
+      cities: citiesKey,
+      mode: searchEntityMode,
+    });
+  }, [activeQuery, localQuery, citiesKey, searchEntityMode, onUrlStateChange]);
+
   const activeQueryRef = useRef(activeQuery);
   activeQueryRef.current = activeQuery;
 
@@ -677,9 +756,21 @@ export function SearchView({
       lastBusinessFetchKeyRef.current = '';
       tg?.HapticFeedback?.impactOccurred?.('light');
 
-      if (screenMode !== 'results') return;
       const q = activeQueryRef.current.trim();
-      if (q.length < MIN_QUERY_LENGTH) return;
+      if (q.length < MIN_QUERY_LENGTH) {
+        setScreenMode('discover');
+        if (mode === 'businesses') {
+          setBusinessResults([]);
+          setBusinessTotal(0);
+          setActiveQuery('');
+        } else {
+          setSearchResults([]);
+          setSearchTotal(0);
+        }
+        return;
+      }
+
+      if (screenMode !== 'results') return;
       if (mode === 'businesses') {
         void fetchBusinessResults(q, { force: true, saveHistory: false });
       } else {
@@ -736,11 +827,11 @@ export function SearchView({
   }, [profileTelegramId]);
 
   useEffect(() => {
-    if (searchEntityMode !== 'businesses') return;
     let cancelled = false;
+    setLoadingRecommendedBusinesses(true);
 
     const params = new URLSearchParams({
-      limit: '6',
+      limit: '12',
       lang: language === 'ru' ? 'ru' : 'uk',
     });
     if (profileTelegramId) params.set('viewerTelegramId', profileTelegramId);
@@ -755,12 +846,15 @@ export function SearchView({
       })
       .catch(() => {
         if (!cancelled) setRecommendedBusinesses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRecommendedBusinesses(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [language, profileTelegramId, searchEntityMode]);
+  }, [language, profileTelegramId]);
 
   useEffect(() => {
     const previews = getRecentSearchListings();
@@ -860,7 +954,9 @@ export function SearchView({
   const effectiveSearchPlaceholder =
     searchEntityMode === 'businesses'
       ? t('bazaar.search.businessPlaceholder')
-      : searchPlaceholder || t('bazaar.whatInterestsYou');
+      : localCities.length > 0
+        ? t('bazaar.searchInCity', { city: formatCityFilterLabel(localCities[0]) })
+        : searchPlaceholder || t('bazaar.whatInterestsYou');
 
   const persistFilters = useCallback(
     (patch: Partial<{
@@ -875,7 +971,9 @@ export function SearchView({
       const current = loadBazaarTabStateFromStorage();
       persistBazaarTabState({
         ...current,
-        selectedCities: patch.selectedCities ?? localCities,
+        selectedCities: (patch.selectedCities ?? localCities)
+          .map((c) => normalizeCityInput(c))
+          .filter(Boolean),
         sortBy: patch.sortBy ?? sortBy,
         showFreeOnly: patch.showFreeOnly ?? showFreeOnly,
         minPrice: patch.minPrice !== undefined ? patch.minPrice : minPrice,
@@ -969,12 +1067,17 @@ export function SearchView({
               ))}
             </div>
           ) : businessResults.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-5">
               {businessResults.map((business) => (
                 <BusinessSearchResultCard
                   key={business.id}
                   business={business}
                   onOpen={openBusinessProfile}
+                  onSelectListing={openListing}
+                  onToggleFavorite={onToggleFavorite}
+                  favorites={favorites}
+                  onToggleFollow={handleToggleBusinessFollow}
+                  followBusy={followBusyId === business.id}
                   tg={tg}
                 />
               ))}
@@ -985,6 +1088,32 @@ export function SearchView({
                 {t('bazaar.search.businessNotFoundTitle')}
               </p>
               <p className={`text-sm ${ac.mutedText}`}>{t('bazaar.search.businessNotFoundHint')}</p>
+            </div>
+          ) : recommendedBusinesses.length > 0 ? (
+            <div className="space-y-3">
+              <p className={`text-sm ${ac.mutedText}`}>{t('bazaar.search.recommendedBusinesses')}</p>
+              {recommendedBusinesses.map((business) => (
+                <BusinessSearchResultCard
+                  key={business.id}
+                  business={business}
+                  onOpen={openBusinessProfile}
+                  onSelectListing={openListing}
+                  onToggleFavorite={onToggleFavorite}
+                  favorites={favorites}
+                  onToggleFollow={handleToggleBusinessFollow}
+                  followBusy={followBusyId === business.id}
+                  tg={tg}
+                />
+              ))}
+            </div>
+          ) : loadingRecommendedBusinesses ? (
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-28 animate-pulse rounded-2xl ${isLight ? 'bg-gray-200/70' : 'bg-white/10'}`}
+                />
+              ))}
             </div>
           ) : null}
         </>
@@ -1135,13 +1264,27 @@ export function SearchView({
         icon={<TrendingUp size={16} />}
         isLight={isLight}
       >
-        {recommendedBusinesses.length > 0 ? (
+        {loadingRecommendedBusinesses ? (
           <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className={`h-28 animate-pulse rounded-2xl ${isLight ? 'bg-gray-200/70' : 'bg-white/10'}`}
+              />
+            ))}
+          </div>
+        ) : recommendedBusinesses.length > 0 ? (
+          <div className="space-y-5">
             {recommendedBusinesses.map((business) => (
               <BusinessSearchResultCard
                 key={business.id}
                 business={business}
                 onOpen={openBusinessProfile}
+                onSelectListing={openListing}
+                onToggleFavorite={onToggleFavorite}
+                favorites={favorites}
+                onToggleFollow={handleToggleBusinessFollow}
+                followBusy={followBusyId === business.id}
                 tg={tg}
               />
             ))}
@@ -1378,8 +1521,74 @@ export function SearchView({
 
           {searchEntityMode === 'listings' ? categoriesRow : spheresRow}
 
-          <div className="mx-auto w-full max-w-xl space-y-2 px-4 pb-2 pt-2 xl:max-w-2xl lg:mx-auto">
-            {searchField}
+          <div className="mx-auto w-full max-w-xl px-4 pb-2 pt-2 xl:max-w-2xl lg:mx-auto">
+            <div className="flex items-center gap-1.5">
+              <div className="min-w-0 flex-1">{searchField}</div>
+              {searchEntityMode === 'listings' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSortModal(true);
+                      tg?.HapticFeedback?.impactOccurred?.('light');
+                    }}
+                    aria-label={t('common.filter')}
+                    className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+                      hasActiveFilters
+                        ? isLight
+                          ? 'border-[#3F5331] bg-white'
+                          : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
+                        : isLight
+                          ? 'border-[#3F5331]/15 bg-white shadow-sm hover:bg-[#E8F0E0]/60'
+                          : 'border-white bg-transparent hover:bg-white/10'
+                    }`}
+                  >
+                    <SlidersHorizontal
+                      size={18}
+                      className={
+                        hasActiveFilters
+                          ? isLight
+                            ? 'text-[#3F5331]'
+                            : 'text-[#C8E6A0]'
+                          : isLight
+                            ? 'text-gray-800'
+                            : 'text-white'
+                      }
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCityModalOpen(true);
+                      tg?.HapticFeedback?.impactOccurred?.('light');
+                    }}
+                    aria-label={t('bazaar.selectCity') || t('common.city') || 'City'}
+                    className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+                      localCities.length > 0
+                        ? isLight
+                          ? 'border-[#3F5331] bg-transparent'
+                          : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
+                        : isLight
+                          ? 'border-[#3F5331]/20 bg-[#E8F0E0]/70 hover:bg-[#E8F0E0]'
+                          : 'border-white bg-transparent hover:bg-white/10'
+                    }`}
+                  >
+                    <MapPin
+                      size={18}
+                      className={
+                        localCities.length > 0
+                          ? isLight
+                            ? 'text-[#3F5331]'
+                            : 'text-[#C8E6A0]'
+                          : isLight
+                            ? 'text-[#5A6B52]'
+                            : 'text-white'
+                      }
+                    />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {searchEntityMode === 'listings' ? discoverContent : businessDiscoverContent}
@@ -1554,13 +1763,15 @@ export function SearchView({
         selectedCities={localCities}
         onClose={() => setIsCityModalOpen(false)}
         onSelect={(cities) => {
-          setLocalCities(cities);
-          persistFilters({ selectedCities: cities });
+          const normalized = cities.map((c) => normalizeCityInput(c)).filter(Boolean);
+          setLocalCities(normalized);
+          persistFilters({ selectedCities: normalized });
         }}
         tg={tg}
         profileTelegramId={profileTelegramId}
       />
       )}
+      <Toast message={toast.message} type={toast.type} isVisible={toast.isVisible} onClose={hideToast} />
     </>
   );
 }

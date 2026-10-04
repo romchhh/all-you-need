@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
+import { parsePortfolioImages, serializePortfolioImages } from '@/lib/businessProfileSettings';
 import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile, resolveBusinessListingIds, syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
 import type { ListingDisplayMode } from '@/lib/businessProfileSettings';
 import { normalizeInstagramForStorage, normalizeWebsiteForStorage } from '@/utils/socialLinks';
@@ -95,6 +96,8 @@ export async function PUT(request: NextRequest) {
     let body: Record<string, unknown> = {};
     let logoPath: string | null | undefined;
     let coverPath: string | null | undefined;
+    let portfolioImagesParsed: string[] | undefined;
+    const portfolioPathsFromUpload: string[] = [];
 
     if (contentType.includes('multipart/form-data')) {
       let form: FormData;
@@ -129,6 +132,18 @@ export async function PUT(request: NextRequest) {
       };
       const logoFile = form.get('logo');
       const coverFile = form.get('coverImage');
+      const portfolioNew = form.getAll('portfolioNew').filter(isUploadFile);
+      const portfolioKeepRaw = form.get('portfolioImages');
+      if (portfolioKeepRaw != null && String(portfolioKeepRaw).trim() !== '') {
+        try {
+          const parsed = JSON.parse(String(portfolioKeepRaw)) as unknown;
+          if (Array.isArray(parsed)) {
+            portfolioImagesParsed = parsePortfolioImages(JSON.stringify(parsed));
+          }
+        } catch {
+          /* keep undefined */
+        }
+      }
       try {
         if (isUploadFile(logoFile)) {
           logoPath = await saveUploadedFile(logoFile, 'logo');
@@ -153,6 +168,16 @@ export async function PUT(request: NextRequest) {
           { status: 500 }
         );
       }
+      try {
+        for (const file of portfolioNew) {
+          if (!isUploadFile(file)) continue;
+          const path = await saveUploadedFile(file, 'portfolio');
+          portfolioPathsFromUpload.push(path);
+        }
+      } catch (uploadError) {
+        console.error('[BusinessProfile PUT] portfolio save failed', uploadError);
+        return NextResponse.json({ error: 'Failed to save portfolio image' }, { status: 500 });
+      }
     } else {
       const json = await request.json();
       telegramIdRaw = String(json.telegramId || '');
@@ -163,6 +188,22 @@ export async function PUT(request: NextRequest) {
         typeof json.coverImage === 'string' && json.coverImage.trim()
           ? json.coverImage.trim()
           : undefined;
+      if (json.portfolioImages !== undefined) {
+        if (Array.isArray(json.portfolioImages)) {
+          portfolioImagesParsed = (json.portfolioImages as unknown[]).filter(
+            (p: unknown): p is string => typeof p === 'string' && p.trim().length > 0
+          );
+        } else if (typeof json.portfolioImages === 'string') {
+          portfolioImagesParsed = parsePortfolioImages(json.portfolioImages);
+        }
+      }
+    }
+
+    if (portfolioPathsFromUpload.length > 0) {
+      const merged = [...(portfolioImagesParsed ?? []), ...portfolioPathsFromUpload];
+      portfolioImagesParsed = parsePortfolioImages(serializePortfolioImages(merged));
+    } else if (portfolioImagesParsed !== undefined) {
+      portfolioImagesParsed = parsePortfolioImages(serializePortfolioImages(portfolioImagesParsed));
     }
 
     if (!telegramIdRaw) {
@@ -240,6 +281,7 @@ export async function PUT(request: NextRequest) {
         plan: plan as 'business' | 'business_pro' | null | undefined,
         listingIds,
         listingDisplayMode,
+        portfolioImages: portfolioImagesParsed,
       },
       { partial: isPartial }
     );

@@ -14,7 +14,9 @@
     "db:init": "tsx scripts/init-db.ts",
     "db:fix-location-hamburg": "tsx scripts/fix-location-hamburg.ts",
     "db:remove-description-footer": "tsx scripts/remove-description-footer.ts",
-    "test:city-notify": "tsx scripts/test-city-subscription-notify.ts"
+    "test:city-notify": "tsx scripts/test-city-subscription-notify.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
@@ -35,7 +37,8 @@
     "prisma": "6.19.3",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.7.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   },
   "overrides": {
     "deepmerge-ts": "8.0.1"

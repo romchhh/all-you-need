@@ -2,6 +2,9 @@
  * Спільні фільтри каталогу для /api/listings та /api/listings/feed.
  */
 
+
+import { cityFilterPatterns, listingCityOrGroupSql } from '@/lib/city/listingCityMatch';
+
 export type CatalogFilterParams = {
   category: string | null;
   subcategory: string | null;
@@ -54,9 +57,12 @@ export function appendCatalogFiltersToWhere(
     where += ' AND l.isFree = 1';
   }
   if (filters.cities.length > 0) {
-    const placeholders = filters.cities.map(() => 'l.location LIKE ?').join(' OR ');
-    where += ` AND (${placeholders})`;
-    filters.cities.forEach((city) => params.push(`%${city}%`));
+    const cityOrGroups: string[] = [];
+    for (const rawCity of filters.cities) {
+      const patterns = cityFilterPatterns(rawCity);
+      cityOrGroups.push(listingCityOrGroupSql(patterns, params));
+    }
+    where += ` AND (${cityOrGroups.join(' OR ')})`;
   }
 
   if (filters.condition) {

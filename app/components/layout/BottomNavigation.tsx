@@ -217,7 +217,7 @@ export const BottomNavigation = ({
     }, 450);
   };
 
-  if (!mounted || hiddenByOverlay || (!isSearchPage && hiddenByKeyboard) || typeof document === 'undefined') {
+  if (!mounted || hiddenByOverlay || isSearchPage || (!isSearchPage && hiddenByKeyboard) || typeof document === 'undefined') {
     return null;
   }
 
@@ -231,7 +231,6 @@ export const BottomNavigation = ({
       }`}
       style={{
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)',
-        transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : undefined,
       }}
     >
       <div className="mx-auto flex max-w-2xl items-center justify-around px-2 sm:px-4 lg:max-w-6xl lg:px-8">

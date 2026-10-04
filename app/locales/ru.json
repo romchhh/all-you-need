@@ -921,6 +921,8 @@
   },
   "promotions": {
     "title": "Рекламировать объявление",
+    "marketplaceTitle": "Продвижение в маркетплейсе",
+    "marketplaceDescription": "Сделайте объявление заметнее и получите больше просмотров.",
     "description": "Выберите тип рекламы для вашего объявления",
     "skip": "Пропустить",
     "addPromotion": "Добавить рекламу",
@@ -1163,7 +1165,7 @@
         },
         "promotion": {
           "title": "Продвижение в маркетплейсе",
-          "description": "HIGHLIGHT, TOP и VIP — платные инструменты, которые увеличивают видимость объявления.",
+          "description": "Сделайте объявление заметнее и получите больше просмотров.",
           "button": "Подробнее"
         },
         "businessProfile": {
@@ -1453,6 +1455,8 @@
     "settings": {
       "title": "Настройки Business",
       "photosSection": "Фотографии",
+      "portfolioHint": "Добавьте до 30 фото — они отображаются во вкладке «Портфолио».",
+      "addPortfolioPhotos": "Добавить фото",
       "basicSection": "Основная информация",
       "logoRecommended": "Рекомендуемый размер 500×500",
       "coverRecommended": "Рекомендуемый размер 1200×400",
@@ -1518,6 +1522,10 @@
           "title": "Объявления профиля",
           "subtitle": "Какие объявления показывать"
         },
+        "portfolio": {
+          "title": "Портфолио",
+          "subtitle": "Фото работ для вкладки в профиле"
+        },
         "publicLink": {
           "title": "Публичная ссылка",
           "subtitle": "Ссылка на ваш Business-профиль"
@@ -1543,6 +1551,7 @@
       "ratingReviews_one": "{rating} ({count} отзыв)",
       "ratingReviews_few": "{rating} ({count} отзыва)",
       "listingsShort": "объявлений",
+      "telegramSinceShort": "на TG",
       "onPlatform": "на платформе",
       "onTelegramSince": "На TG с {date}",
       "memberSince": "На платформе",
@@ -1552,8 +1561,21 @@
       "proBadge": "PRO",
       "tabs": {
         "listings": "Объявления",
-        "about": "О компании"
+        "about": "О компании",
+        "portfolio": "Портфолио",
+        "reviews": "Отзывы"
       },
+      "noPortfolio": "Компания пока не добавила фото работ.",
+      "noReviews": "Пока нет отзывов.",
+      "noReviewsYet": "Рейтинг появится после первых отзывов",
+      "reviewsHint": "Оставьте отзыв о работе с этой компанией.",
+      "leaveReview": "Оставить отзыв",
+      "reviewRating": "Оценка",
+      "reviewCommentPlaceholder": "Комментарий (необязательно)",
+      "reviewSubmit": "Отправить отзыв",
+      "reviewSubmitted": "Спасибо! Отзыв опубликован.",
+      "reviewAlreadyLeft": "Вы уже оставляли отзыв этому продавцу.",
+      "loginToReview": "Войдите через Telegram, чтобы оставить отзыв",
       "filters": {
         "all": "Все",
         "services": "Услуги",

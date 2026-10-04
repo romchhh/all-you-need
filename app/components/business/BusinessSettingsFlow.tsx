@@ -42,6 +42,7 @@ import { type ServiceArea } from '@/lib/businessProfileConstants';
 import {
   WEEKDAY_KEYS,
   parseListingDisplayConfig,
+  parsePortfolioImages,
   parseWorkingHoursSettings,
   serializeWorkingHoursSettings,
   type ListingDisplayMode,
@@ -63,6 +64,7 @@ type SettingsScreen =
   | 'contacts'
   | 'workingHours'
   | 'listings'
+  | 'portfolio'
   | 'publicLink'
   | 'deactivate';
 
@@ -103,6 +105,8 @@ interface FormState {
   selectedListingIds: number[];
   savedLogoPath: string | null;
   savedCoverPath: string | null;
+  portfolioPaths: string[];
+  portfolioNewFiles: File[];
 }
 
 const BUSINESS_NAME_MAX = 100;
@@ -136,6 +140,8 @@ function prefillForm(
     selectedListingIds: linkedIds,
     savedLogoPath: profile.logo || null,
     savedCoverPath: profile.coverImage || null,
+    portfolioPaths: parsePortfolioImages(profile.portfolioImages ?? null),
+    portfolioNewFiles: [],
   };
 }
 
@@ -534,7 +540,58 @@ export default function BusinessSettingsFlow({
     }
   }, [activeUserListings, form, onSuccess, showToast, t, telegramId, tg]);
 
+  const savePortfolio = useCallback(async () => {
+    setLoading(true);
+    try {
+      const hasNew = form.portfolioNewFiles.length > 0;
+      let res: Response;
+      if (hasNew) {
+        const fd = new FormData();
+        fd.append('telegramId', telegramId);
+        fd.append('partial', 'true');
+        fd.append('portfolioImages', JSON.stringify(form.portfolioPaths));
+        for (const file of form.portfolioNewFiles) {
+          fd.append('portfolioNew', file);
+        }
+        res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
+      } else {
+        res = await fetch('/api/user/business-profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId,
+            partial: true,
+            portfolioImages: form.portfolioPaths,
+          }),
+        });
+      }
+      if (!res.ok) {
+        showToast(await readApiError(res, t('common.error')), 'error');
+        return false;
+      }
+      const data = await res.json();
+      patch({
+        portfolioPaths: parsePortfolioImages(data.profile?.portfolioImages ?? null),
+        portfolioNewFiles: [],
+      });
+      showToast(t('businessProfile.updated'), 'success');
+      onSuccess();
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast(t('common.error'), 'error');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [form.portfolioNewFiles, form.portfolioPaths, onSuccess, showToast, t, telegramId]);
+
   const handleSave = async (fromScreen: SettingsScreen) => {
+    if (fromScreen === 'portfolio') {
+      const ok = await savePortfolio();
+      if (ok) setScreen('hub');
+      return;
+    }
     const err = validateScreen(fromScreen);
     if (err) {
       showToast(err, 'error');
@@ -543,6 +600,31 @@ export default function BusinessSettingsFlow({
     }
     const ok = await saveProfile({ syncListings: fromScreen === 'listings' });
     if (ok) setScreen('hub');
+  };
+
+  const handlePortfolioPick = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const nextFiles: File[] = [...form.portfolioNewFiles];
+    for (const file of Array.from(files)) {
+      if (form.portfolioPaths.length + nextFiles.length >= 30) break;
+      try {
+        nextFiles.push(await compressImageOnClient(file, 2));
+      } catch {
+        showToast(t('businessProfile.validation.photoUploadFailed'), 'error');
+      }
+    }
+    patch({ portfolioNewFiles: nextFiles });
+  };
+
+  const removePortfolioAt = (index: number) => {
+    if (index < form.portfolioPaths.length) {
+      patch({ portfolioPaths: form.portfolioPaths.filter((_, i) => i !== index) });
+      return;
+    }
+    const newIndex = index - form.portfolioPaths.length;
+    patch({
+      portfolioNewFiles: form.portfolioNewFiles.filter((_, i) => i !== newIndex),
+    });
   };
 
   const handleImagePick = async (file: File | null, kind: 'logo' | 'cover') => {
@@ -659,6 +741,8 @@ export default function BusinessSettingsFlow({
         return t('businessProfile.settings.menu.workingHours.title');
       case 'listings':
         return t('businessProfile.settings.menu.listings.title');
+      case 'portfolio':
+        return t('businessProfile.settings.menu.portfolio.title');
       case 'publicLink':
         return t('businessProfile.settings.menu.publicLink.title');
       case 'deactivate':
@@ -703,6 +787,12 @@ export default function BusinessSettingsFlow({
       icon: Package,
       title: t('businessProfile.settings.menu.listings.title'),
       subtitle: t('businessProfile.settings.menu.listings.subtitle'),
+    },
+    {
+      id: 'portfolio',
+      icon: ImageIcon,
+      title: t('businessProfile.settings.menu.portfolio.title'),
+      subtitle: t('businessProfile.settings.menu.portfolio.subtitle'),
     },
     {
       id: 'publicLink',
@@ -1337,6 +1427,51 @@ export default function BusinessSettingsFlow({
                   <Info size={14} className="mt-0.5 shrink-0" />
                   <span>{t('businessProfile.settings.publicLinkFooter')}</span>
                 </div>
+              </div>
+            )}
+
+            {screen === 'portfolio' && (
+              <div className="space-y-4 pb-28">
+                <p className={`text-sm ${ac.mutedText}`}>{t('businessProfile.settings.portfolioHint')}</p>
+                <div className="grid grid-cols-3 gap-1">
+                  {form.portfolioPaths.map((path, index) => (
+                    <div key={`saved-${path}-${index}`} className="relative aspect-square overflow-hidden rounded-lg bg-black/10">
+                      <img src={getResolvedImageUrl(path)} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePortfolioAt(index)}
+                        className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white"
+                        aria-label={t('common.delete')}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {form.portfolioNewFiles.map((file, index) => (
+                    <div key={`new-${file.name}-${index}`} className="relative aspect-square overflow-hidden rounded-lg bg-black/10">
+                      <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePortfolioAt(form.portfolioPaths.length + index)}
+                        className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white"
+                        aria-label={t('common.delete')}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <label className={`${ui.btnOutline} inline-flex cursor-pointer items-center justify-center gap-2`}>
+                  <Camera size={18} />
+                  {t('businessProfile.settings.addPortfolioPhotos')}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => void handlePortfolioPick(e.target.files)}
+                  />
+                </label>
               </div>
             )}
 

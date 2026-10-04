@@ -1,5 +1,13 @@
 cd ~/all-you-need && git pull && ./docker/up.sh
 
+# --- Deploy checklist (після pull) ---
+# 1. Docker up/build — entrypoint робить prisma migrate deploy (у т.ч. portfolioImages)
+# 2. Smoke:
+#    - GET /api/business-profile/public?telegramId=<id>&lang=uk
+#    - GET /api/search/business?limit=5&lang=uk
+#    - Mini App: /uk/search (без нижнього меню), business tab, публічний Business-профіль
+# 3. Якщо 500 на BusinessProfile — перевірити migrate: ./docker/compose.sh exec app npx prisma migrate deploy --schema=app/prisma/schema.prisma
+
 # Docker-команди (завжди з host-db overlay на VPS):
 #   ./docker/compose.sh ps
 #   ./docker/compose.sh logs -f bot
@@ -11,7 +19,5 @@ cd ~/all-you-need && git pull && ./docker/up.sh
 # Після git pull один раз (якщо exec без -f падає): додай у .env рядок
 # COMPOSE_FILE=docker-compose.yml:docker-compose.host-db.yml
 # або знову: ./docker/prepare-env.sh
-
-
 
 cd ~/all-you-need && git pull && docker compose -f docker-compose.yml -f docker-compose.host-db.yml up -d --build

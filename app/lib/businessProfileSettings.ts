@@ -140,3 +140,21 @@ export function serializeListingDisplayConfig(mode: ListingDisplayMode, ids: num
 export function parseLinkedListingIds(raw: string | null | undefined): number[] {
   return parseListingDisplayConfig(raw).ids;
 }
+
+export function parsePortfolioImages(raw: string | null | undefined): string[] {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+const PORTFOLIO_MAX = 30;
+
+export function serializePortfolioImages(paths: string[]): string {
+  const unique = [...new Set(paths.map((p) => p.trim()).filter(Boolean))].slice(0, PORTFOLIO_MAX);
+  return JSON.stringify(unique);
+}

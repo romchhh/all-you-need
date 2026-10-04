@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma';
+import { rawQuery } from '@/lib/dbSql';
+import { businessCityOrGroupSql, cityFilterPatterns } from '@/lib/city/listingCityMatch';
 import {
   getCustomDirectionText,
   getBusinessDirectionLabel,
@@ -91,9 +93,10 @@ function appendFilterClauses(filters: BusinessSearchFilters, params: unknown[]):
   }
 
   if (filters.cities?.length) {
-    const cityParts = filters.cities.map(() => 'bp.city LIKE ?');
-    filters.cities.forEach((city) => params.push(`%${city.trim()}%`));
-    clause += ` AND (${cityParts.join(' OR ')})`;
+    const cityGroups = filters.cities.map((rawCity) =>
+      businessCityOrGroupSql(cityFilterPatterns(rawCity), params)
+    );
+    clause += ` AND (${cityGroups.join(' OR ')})`;
   }
 
   if (filters.hasPhysicalAddress) {
@@ -121,10 +124,11 @@ async function resolveViewerUserId(viewerTelegramId?: string | null): Promise<nu
   const viewerIdNum = parseInt(viewerTelegramId, 10);
   if (Number.isNaN(viewerIdNum)) return null;
 
-  const viewers = (await prisma.$queryRawUnsafe(
+  const viewers = await rawQuery<Array<{ id: number }>>(
+    prisma,
     `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ? LIMIT 1`,
-    viewerIdNum
-  )) as Array<{ id: number }>;
+    [viewerIdNum]
+  );
 
   return viewers[0]?.id ?? null;
 }
@@ -171,15 +175,16 @@ export async function searchBusinessProfiles(
   const searchClause = appendSearchClause(search, whereParams);
   const filterClause = appendFilterClauses(filters, whereParams);
 
-  const countRows = (await prisma.$queryRawUnsafe(
+  const countRows = await rawQuery<Array<{ cnt: bigint | number }>>(
+    prisma,
     `SELECT COUNT(DISTINCT bp.id) as cnt
      FROM BusinessProfile bp
      JOIN User u ON u.id = bp.userId
      WHERE ${ACTIVE_BUSINESS_WHERE}
      ${searchClause}
      ${filterClause}`,
-    ...whereParams
-  )) as Array<{ cnt: bigint | number }>;
+    whereParams
+  );
 
   const total = Number(countRows[0]?.cnt ?? 0);
   if (total === 0) {
@@ -215,7 +220,8 @@ export async function searchBusinessProfiles(
       ? `LEFT JOIN BusinessFollow bf ON bf.businessProfileId = bp.id AND bf.followerUserId = ?`
       : '';
 
-  const rows = (await prisma.$queryRawUnsafe(
+  const rows = await rawQuery<Array<Record<string, unknown>>>(
+    prisma,
     `SELECT DISTINCT
        bp.id,
        bp.businessName,
@@ -238,8 +244,8 @@ export async function searchBusinessProfiles(
      ${filterClause}
      ${orderBy}
      LIMIT ? OFFSET ?`,
-    ...listParams
-  )) as Array<Record<string, unknown>>;
+    listParams
+  );
 
   const items: BusinessSearchResultRow[] = rows.map((row) => ({
     id: Number(row.id),

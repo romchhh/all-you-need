@@ -8,6 +8,8 @@ import {
 } from '@/lib/businessProfileHelpers';
 import { prisma } from '@/lib/prisma';
 import { sendBusinessNewFollowerNotification } from '@/lib/telegram/telegramNotifications';
+import { parsePortfolioImages } from '@/lib/businessProfileSettings';
+import { logApiError } from '@/lib/server/logApiError';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,10 +26,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Business profile not found' }, { status: 404 });
     }
 
-    const { profile, user, activeListingsCount } = data;
+    const { profile, user, activeListingsCount, listingIds } = data;
 
     let isFollowing = false;
     const isOwn = Boolean(viewerTelegramId && String(viewerTelegramId) === String(telegramId));
+    let viewerHasReviewed = false;
     if (viewerTelegramId && !isOwn) {
       try {
         const viewer = await findUserByTelegramId(parseTelegramId(viewerTelegramId));
@@ -41,16 +44,72 @@ export async function GET(request: NextRequest) {
             },
           });
           isFollowing = Boolean(follow);
+          const priorReview = await prisma.review.findFirst({
+            where: { userId: viewer.id, targetId: user.id },
+          });
+          viewerHasReviewed = Boolean(priorReview);
         }
       } catch {
         // invalid viewer id — treat as guest
       }
     }
 
+    let reviews: Array<{
+      id: number;
+      rating: number;
+      comment: string | null;
+      createdAt: string;
+      authorName: string;
+      authorAvatar: string | null;
+    }> = [];
+
+    try {
+      const reviewRows = await prisma.review.findMany({
+        where: { targetId: user.id },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              username: true,
+              avatar: true,
+            },
+          },
+        },
+      });
+
+      reviews = reviewRows.map((row) => {
+        const authorName =
+          [row.user.firstName, row.user.lastName].filter(Boolean).join(' ').trim() ||
+          (row.user.username ? `@${row.user.username}` : '');
+        return {
+          id: row.id,
+          rating: row.rating,
+          comment: row.comment,
+          createdAt: row.createdAt.toISOString(),
+          authorName,
+          authorAvatar: row.user.avatar,
+        };
+      });
+    } catch (reviewErr) {
+      console.error('[BusinessProfile public GET] reviews', reviewErr);
+    }
+
+    let portfolioImages: string[] = [];
+    try {
+      portfolioImages = parsePortfolioImages(profile.portfolioImages);
+    } catch {
+      portfolioImages = [];
+    }
+
     return NextResponse.json({
       isActive: isBusinessProfileActive(profile),
       isOwn,
       isFollowing,
+      viewerHasReviewed,
+      vitrineListingIds: listingIds,
       profile: {
         id: profile.id,
         businessName: profile.businessName,
@@ -75,10 +134,12 @@ export async function GET(request: NextRequest) {
         sellerUsername: user.username,
         rating: Number(user.rating) || 0,
         reviewsCount: Number(user.reviewsCount) || 0,
+        portfolioImages,
       },
+      reviews,
     });
   } catch (error) {
-    console.error('[BusinessProfile public GET]', error);
+    logApiError('business-profile/public GET', error);
     return NextResponse.json({ error: 'Failed to fetch business profile' }, { status: 500 });
   }
 }

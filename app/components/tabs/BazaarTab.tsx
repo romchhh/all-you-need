@@ -15,6 +15,7 @@ import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsE
 import { ListingsRefreshOverlay } from '@/components/ui/ListingsRefreshOverlay';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { HomeActivityStats } from '@/components/home/HomeActivityStats';
+import { normalizeCityInput, formatCityFilterLabel } from '@/lib/city/cityNormalization';
 import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -501,7 +502,11 @@ const BazaarTabComponent = ({
                   onSearchChange('');
                 }}
                 searchQuery={searchQuery}
-                searchPlaceholder={selectedCities.length > 0 ? t('bazaar.searchInCity', { city: selectedCities[0] }) : t('bazaar.whatInterestsYou')}
+                searchPlaceholder={
+                  selectedCities.length > 0
+                    ? t('bazaar.searchInCity', { city: formatCityFilterLabel(selectedCities[0]) })
+                    : t('bazaar.whatInterestsYou')
+                }
                 hasActiveFilters={hasActiveFilters}
                 tg={tg}
               />
@@ -568,7 +573,15 @@ const BazaarTabComponent = ({
           </div>
           <div className="animate-content-in overflow-visible px-4 pb-3 lg:flex lg:justify-center lg:px-6">
             <div className="w-full max-w-full overflow-visible lg:max-w-xl xl:max-w-2xl">
-              <HomeActivityStats isLight={isLight} />
+              <HomeActivityStats
+                isLight={isLight}
+                onSelectCity={(city) => {
+                  const key = normalizeCityInput(city);
+                  if (!key || key === 'Germany') return;
+                  commitCatalogState({ selectedCities: [key] });
+                  tg?.HapticFeedback?.impactOccurred?.('light');
+                }}
+              />
             </div>
           </div>
         </>
@@ -732,8 +745,8 @@ const BazaarTabComponent = ({
         !selectedCategory &&
         sortBy === 'newest' &&
         !hasActiveFilters && (
-          <div className="animate-content-in px-4 pb-3 pt-1 lg:flex lg:justify-center lg:px-6">
-            <div className="flex w-full max-w-full gap-8 lg:max-w-xl xl:max-w-2xl">
+          <div className="animate-content-in w-full max-w-[1680px] mx-auto px-4 sm:px-6 pb-3 pt-1">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:mx-auto lg:max-w-xl xl:max-w-2xl">
               {(['forYou', 'new'] as const).map((mode) => {
                 const active = pickBazaarTabField(savedState, 'feedMode') === mode;
                 return (
@@ -752,11 +765,11 @@ const BazaarTabComponent = ({
                       });
                       tg?.HapticFeedback?.impactOccurred('light');
                     }}
-                    className={`relative pb-2 text-sm font-semibold transition-colors ${
+                    className={`relative w-full pb-2.5 text-center text-base font-semibold leading-tight transition-colors sm:text-[1.0625rem] ${
                       active
                         ? isLight
-                          ? 'text-[#3F5331] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-[#3F5331]'
-                          : 'text-[#C8E6A0] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-[#C8E6A0]'
+                          ? 'text-[#3F5331] after:absolute after:bottom-0 after:left-1/2 after:h-[2px] after:w-[min(100%,4.5rem)] after:-translate-x-1/2 after:rounded-full after:bg-[#3F5331]'
+                          : 'text-[#C8E6A0] after:absolute after:bottom-0 after:left-1/2 after:h-[2px] after:w-[min(100%,4.5rem)] after:-translate-x-1/2 after:rounded-full after:bg-[#C8E6A0]'
                         : isLight
                           ? 'text-[#5A6B52] hover:text-[#3F5331]'
                           : 'text-white/60 hover:text-[#C8E6A0]'
@@ -910,7 +923,11 @@ const BazaarTabComponent = ({
           setIsCityModalOpen(false);
           setCityModalOpenSubscriptions(false);
         }}
-        onSelect={(cities) => setSelectedCities(cities)}
+        onSelect={(cities) =>
+          commitCatalogState({
+            selectedCities: cities.map((c) => normalizeCityInput(c)).filter(Boolean),
+          })
+        }
         tg={tg}
         profileTelegramId={profileTelegramId}
         onToast={onToast}

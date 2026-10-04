@@ -14,9 +14,11 @@ import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
 import {
   buildSellerContactMessage,
   getListingContactUrl,
+  openSellerContactViaTelegramShare,
   openSellerTelegramChat,
   resolveSellerContactLang,
 } from '@/utils/sellerContact';
+import { resolveListingContactAction, resolveListingContactUsername } from '@/lib/listingContactResolve';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
@@ -261,24 +263,11 @@ export const ListingDetail = ({
       return;
     }
 
-    const username = listing.seller.username;
-    const phone = listing.seller.phone;
+    const contactLang = resolveSellerContactLang(language);
+    const listingUrl = getListingContactUrl(listing.id);
+    const message = buildSellerContactMessage(listing.title, listingUrl, contactLang);
+    const action = resolveListingContactAction(listing);
 
-    if (!username?.trim()) {
-      if (phone?.trim()) {
-        setShowPhoneModal(true);
-        tg?.HapticFeedback?.impactOccurred('light');
-        return;
-      }
-      showToast(t('listingDetail.telegramIdNotFound'), 'error');
-      return;
-    }
-
-    const message = buildSellerContactMessage(
-      listing.title,
-      getListingContactUrl(listing.id),
-      resolveSellerContactLang(language),
-    );
     trackAnalytics({
       eventName: ANALYTICS_EVENTS.contactSeller,
       eventGroup: ANALYTICS_EVENT_GROUPS.engagement,
@@ -287,10 +276,35 @@ export const ListingDetail = ({
       entityId: String(listing.id),
       metadata: {
         contactSource: listing.fromParser ? 'parser_author' : 'seller_profile',
+        contactKind: action.kind,
       },
     });
-    openSellerTelegramChat(username, message, tg ?? undefined);
-  }, [isOwnListing, listing.id, listing.title, listing.seller.username, listing.seller.phone, listing.fromParser, language, tg, showToast, t, currentUser?.id, profile?.telegramId]);
+
+    if (action.kind === 'telegram_dm') {
+      openSellerTelegramChat(action.username, message, tg ?? undefined);
+      return;
+    }
+
+    openSellerContactViaTelegramShare(listingUrl, message, tg ?? undefined);
+  }, [
+    isOwnListing,
+    listing,
+    language,
+    tg,
+    currentUser?.id,
+    profile?.telegramId,
+  ]);
+
+  const contactUsernameForDisplay = useMemo(
+    () =>
+      resolveListingContactUsername(
+        listing.seller.username,
+        listing.seller.telegramId,
+        listing.description,
+        listing.businessSeller ?? null
+      ),
+    [listing.seller.username, listing.seller.telegramId, listing.description, listing.businessSeller]
+  );
 
   const viewerTelegramIdStr = String(currentUser?.id || profile?.telegramId || '');
 
@@ -1199,9 +1213,9 @@ export const ListingDetail = ({
             </div>
             <div className="flex-1">
               <p className={`font-semibold text-lg mb-1 ${isLight ? 'text-gray-900' : 'text-white'}`}>{listing.seller.name}</p>
-              {listing.seller.username && (
+              {contactUsernameForDisplay && (
                 isOwnListing ? (
-                  <p className={`text-sm mb-1 ${ac.mutedText}`}>@{listing.seller.username}</p>
+                  <p className={`text-sm mb-1 ${ac.mutedText}`}>@{contactUsernameForDisplay}</p>
                 ) : (
                   <button
                     type="button"
@@ -1211,7 +1225,7 @@ export const ListingDetail = ({
                     }}
                     className={`text-sm mb-1 text-left underline-offset-2 hover:underline ${ac.mutedText}`}
                   >
-                    @{listing.seller.username}
+                    @{contactUsernameForDisplay}
                   </button>
                 )
               )}
@@ -1365,17 +1379,8 @@ export const ListingDetail = ({
               </>
             ) : (
               <>
-                {listing.seller.username && listing.seller.username.trim() !== '' ? (
-                  <>
-                    <MessageCircle size={24} />
-                    {t('common.write')}
-                  </>
-                ) : (
-                  <>
-                    <Phone size={24} />
-                    {t('common.call')}
-                  </>
-                )}
+                <MessageCircle size={24} />
+                {t('common.write')}
               </>
             )}
           </button>

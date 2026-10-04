@@ -44,6 +44,18 @@ function extractAuthorUsername(text: string): string | null {
   return m?.[1] || null;
 }
 
+export function extractAuthorUsernameFromDescription(text: string): string | null {
+  return extractAuthorUsername(text);
+}
+
+const ORIGINAL_POST_URL_RE =
+  /🔗\s*(?:Оригінальне оголошення|Оригинальное объявление|Original(?:\s+(?:post|listing|ad))?)\s*:?\s*(https?:\/\/[^\s\n]+)/iu;
+
+export function extractOriginalPostUrlFromDescription(text: string): string | null {
+  const m = (text || '').match(ORIGINAL_POST_URL_RE);
+  return m?.[1]?.trim() || null;
+}
+
 function hasOriginalPostLink(text: string): boolean {
   return /🔗\s*(?:Оригінальне|Оригинальное|Original)/iu.test(text);
 }

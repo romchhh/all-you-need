@@ -5,6 +5,8 @@ import {
   searchBusinessProfiles,
   type BusinessSearchSort,
 } from '@/lib/business/businessSearchHelpers';
+import { attachBusinessSearchListingPreviews } from '@/lib/business/businessSearchListings';
+import { logApiError } from '@/lib/server/logApiError';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,16 +48,19 @@ export async function GET(request: NextRequest) {
       viewerTelegramId,
     });
 
+    const mapped = items.map((item) => ({
+      ...item,
+      activityLine: formatBusinessActivityLine(item.category, item.subcategory, lang),
+      locationLine: formatBusinessLocationLine(item.city, item.address),
+    }));
+    const businesses = await attachBusinessSearchListingPreviews(mapped);
+
     return NextResponse.json({
       total,
-      businesses: items.map((item) => ({
-        ...item,
-        activityLine: formatBusinessActivityLine(item.category, item.subcategory, lang),
-        locationLine: formatBusinessLocationLine(item.city, item.address),
-      })),
+      businesses,
     });
   } catch (error) {
-    console.error('[search/business GET]', error);
+    logApiError('search/business GET', error);
     return NextResponse.json({ total: 0, businesses: [], error: 'unavailable' }, { status: 503 });
   }
 }

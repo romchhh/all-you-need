@@ -37,9 +37,7 @@ export function BusinessSellerBlock({ business, onViewProfile, tg }: BusinessSel
 
   const logoUrl = business.logo ? getResolvedImageUrl(business.logo) : null;
   const showRating = (business.reviewsCount ?? 0) > 0 && (business.rating ?? 0) > 0;
-  const telegramSinceLabel = business.telegramSince
-    ? t('businessProfile.public.onTelegramSince', { date: business.telegramSince })
-    : business.memberSince;
+  const telegramSinceDate = business.telegramSince?.trim() || null;
 
   const shellClass = isLight
     ? 'border-[#3F5331]/15 bg-white'
@@ -124,19 +122,26 @@ export function BusinessSellerBlock({ business, onViewProfile, tg }: BusinessSel
             isLight ? 'divide-[#3F5331]/10 text-gray-600' : 'divide-white/10 text-white/60'
           }`}
         >
-          <div className="flex flex-col items-center gap-1 px-1 py-1">
+          <div className="flex flex-col items-center gap-1 px-1 py-1 min-h-[4.25rem]">
             <Users size={16} className="opacity-70" />
-            <span className={`text-base font-bold tabular-nums ${ac.pageHeading}`}>{business.followersCount}</span>
+            <span className={`text-base font-bold tabular-nums leading-none ${ac.pageHeading}`}>{business.followersCount}</span>
             <span className="leading-tight">{t('businessProfile.public.followersShort')}</span>
           </div>
-          <div className="flex flex-col items-center gap-1 px-1 py-1">
+          <div className="flex flex-col items-center gap-1 px-1 py-1 min-h-[4.25rem]">
             <Package size={16} className="opacity-70" />
-            <span className={`text-base font-bold tabular-nums ${ac.pageHeading}`}>{business.activeListingsCount}</span>
+            <span className={`text-base font-bold tabular-nums leading-none ${ac.pageHeading}`}>{business.activeListingsCount}</span>
             <span className="leading-tight">{t('businessProfile.public.listingsShort')}</span>
           </div>
-          <div className="flex flex-col items-center gap-1 px-1 py-1">
+          <div className="flex min-h-[4.25rem] flex-col items-center gap-1 px-1 py-1">
             <Globe size={16} className="opacity-70" />
-            <span className={`text-sm font-semibold leading-tight ${ac.pageHeading}`}>{telegramSinceLabel}</span>
+            <span className={`text-base font-bold tabular-nums leading-none ${ac.pageHeading}`}>
+              {telegramSinceDate ?? '—'}
+            </span>
+            <span className="leading-tight">
+              {telegramSinceDate
+                ? t('businessProfile.public.telegramSinceShort')
+                : business.memberSince}
+            </span>
           </div>
         </div>
       </div>

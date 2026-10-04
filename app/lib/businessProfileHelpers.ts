@@ -13,6 +13,7 @@ import {
   parseLinkedListingIds,
   parseListingDisplayConfig,
   serializeListingDisplayConfig,
+  serializePortfolioImages,
   type ListingDisplayMode,
 } from '@/lib/businessProfileSettings';
 import {
@@ -41,6 +42,7 @@ export type BusinessProfileInput = {
   plan?: BusinessPlanId | null;
   listingIds?: number[];
   listingDisplayMode?: ListingDisplayMode;
+  portfolioImages?: string[] | null;
 };
 
 
@@ -115,6 +117,12 @@ export async function upsertBusinessProfileDraft(
     coverImage: data.coverImage !== undefined ? data.coverImage : existing?.coverImage ?? null,
     plan: data.plan !== undefined ? data.plan : existing?.plan ?? null,
     linkedListingIds: listingIdsJson,
+    portfolioImages:
+      data.portfolioImages !== undefined
+        ? serializePortfolioImages(data.portfolioImages ?? [])
+        : partial
+          ? existing?.portfolioImages ?? null
+          : existing?.portfolioImages ?? null,
     updatedAt: new Date(),
   };
 

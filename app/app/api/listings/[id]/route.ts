@@ -6,6 +6,8 @@ import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
 import { getBusinessSellerSummaryForUser } from '@/lib/businessProfileHelpers';
+import { resolveListingContactUsername } from '@/lib/listingContactResolve';
+import { isParserAggregatorListing } from '@/utils/listingDescriptionDisplay';
 
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
@@ -202,19 +204,35 @@ export async function GET(
     }
 
     let parserAuthorUsername: string | null = null;
+    let parserMsgLink: string | null = null;
     try {
       const parserRows = (await prisma.$queryRawUnsafe(
-        `SELECT author_username FROM parsed_items WHERE marketplace_listing_id = ? ORDER BY id DESC LIMIT 1`,
+        `SELECT author_username, msg_link FROM parsed_items WHERE marketplace_listing_id = ? ORDER BY id DESC LIMIT 1`,
         listingId
-      )) as Array<{ author_username: string | null }>;
+      )) as Array<{ author_username: string | null; msg_link: string | null }>;
       const raw = parserRows[0]?.author_username;
       parserAuthorUsername = raw ? String(raw).trim().replace(/^@/, '') : null;
+      const linkRaw = parserRows[0]?.msg_link;
+      parserMsgLink = linkRaw ? String(linkRaw).trim() : null;
     } catch {
       parserAuthorUsername = null;
+      parserMsgLink = null;
     }
 
-    const contactUsername =
-      parserAuthorUsername || (listing.username ? String(listing.username).replace(/^@/, '') : null);
+    const listingUsername = listing.username ? String(listing.username).replace(/^@/, '') : null;
+    const isAggregator = isParserAggregatorListing(listingUsername, listing.telegramId);
+
+    const contactUsername = resolveListingContactUsername(
+      listingUsername,
+      listing.telegramId,
+      listing.description,
+      businessSeller,
+      parserAuthorUsername
+    );
+
+    const fromParser = Boolean(
+      parserAuthorUsername || parserMsgLink || isAggregator
+    );
 
     const formattedListing = {
         id: listing.id,
@@ -264,7 +282,8 @@ export async function GET(
         favoritesCount: normalizeFavoritesCount((listing as any).favoritesCount),
         profileType,
         businessSeller,
-        fromParser: Boolean(parserAuthorUsername),
+        fromParser,
+        originalPostUrl: parserMsgLink,
       };
 
     return NextResponse.json(formattedListing);

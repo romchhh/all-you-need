@@ -66,6 +66,7 @@ export const CITY_ALIASES: Record<string, string> = {
   'франкфурт': 'Frankfurt',
   'frankfurt': 'Frankfurt',
   'frankfurt am main': 'Frankfurt',
+  'wedel': 'Wedel',
 };
 
 export function normalizeCityInput(city: string): string {
@@ -79,5 +80,10 @@ export function listingCityKeyFromLocation(location: string): string {
   if (!raw) return '';
   const first = raw.includes(',') ? raw.split(',')[0].trim() : raw;
   return normalizeCityInput(first);
+}
+
+/** Підпис міста в UI (placeholder, чіпи) — канонічна назва. */
+export function formatCityFilterLabel(city: string): string {
+  return normalizeCityInput(city) || city.trim();
 }
 

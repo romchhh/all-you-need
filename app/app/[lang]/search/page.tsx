@@ -9,8 +9,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { SearchView } from '@/components/search/SearchView';
 import { ListingDetail } from '@/components/listing/ListingDetail';
 import { SellerProfileRouter } from '@/components/profile/SellerProfileRouter';
-import { BottomNavigation } from '@/components/layout/BottomNavigation';
-import { AppHeader } from '@/components/layout/AppHeader';
 import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
 import {
@@ -18,7 +16,6 @@ import {
   addFavoriteToStorage,
   removeFavoriteFromStorage,
 } from '@/utils/favorites';
-import { loadBazaarTabStateFromStorage } from '@/lib/bazaar/bazaarTabStateStorage';
 import { getCategories } from '@/constants/categories';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
 
@@ -46,13 +43,16 @@ export default function SearchPage() {
 
   const initialQuery = searchParams.get('q') ?? '';
   const initialCategory = searchParams.get('category');
+  const initialEntityMode =
+    searchParams.get('mode') === 'businesses' ? ('businesses' as const) : ('listings' as const);
+  const initialCitiesFromUrl =
+    searchParams
+      .get('cities')
+      ?.split(',')
+      .map((c) => c.trim())
+      .filter(Boolean) ?? [];
 
   const categories = useMemo(() => getCategories(t), [t]);
-
-  const selectedCities = useMemo(
-    () => loadBazaarTabStateFromStorage().selectedCities ?? [],
-    []
-  );
 
   useEffect(() => {
     if (lang === 'uk' || lang === 'ru') {
@@ -165,6 +165,22 @@ export default function SearchPage() {
     window.history.replaceState({}, '', url.toString());
   }, []);
 
+  const handleSearchUrlState = useCallback(
+    (state: { q: string; cities: string; mode: 'listings' | 'businesses' }) => {
+      if (typeof window === 'undefined') return;
+      const url = new URL(window.location.href);
+      const q = state.q.trim();
+      if (q) url.searchParams.set('q', q);
+      else url.searchParams.delete('q');
+      if (state.cities) url.searchParams.set('cities', state.cities);
+      else url.searchParams.delete('cities');
+      if (state.mode === 'businesses') url.searchParams.set('mode', 'businesses');
+      else url.searchParams.delete('mode');
+      window.history.replaceState({}, '', url.toString());
+    },
+    []
+  );
+
   const handleBack = useCallback(() => {
     tg?.HapticFeedback?.impactOccurred?.('light');
     router.push(`/${lang}/bazaar`);
@@ -224,10 +240,7 @@ export default function SearchPage() {
     );
   }
 
-  const searchPlaceholder =
-    selectedCities.length > 0
-      ? t('bazaar.searchInCity', { city: selectedCities[0] })
-      : t('bazaar.whatInterestsYou');
+  const searchPlaceholder = t('bazaar.whatInterestsYou');
 
   if (selectedSeller) {
     return (
@@ -305,14 +318,15 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen pb-20 animate-content-crossfade">
-      {!selectedListing && !selectedSeller && <AppHeader />}
+    <div className="min-h-screen pb-6 animate-content-crossfade">
       <SearchView
           initialQuery={initialQuery}
           initialCategory={initialCategory}
+          initialEntityMode={initialEntityMode}
+          initialCitiesFromUrl={initialCitiesFromUrl}
+          onUrlStateChange={handleSearchUrlState}
           categories={categories}
           searchPlaceholder={searchPlaceholder}
-          selectedCities={selectedCities}
           favorites={favorites}
           profileTelegramId={profile?.telegramId != null ? String(profile.telegramId) : null}
           onBack={handleBack}
@@ -329,32 +343,6 @@ export default function SearchPage() {
           onToggleFavorite={toggleFavorite}
           tg={tg}
         />
-
-      <BottomNavigation
-        activeTab="bazaar"
-        onTabChange={(tab) => {
-          let telegramId = new URLSearchParams(window.location.search).get('telegramId');
-          if (!telegramId) {
-            telegramId = sessionStorage.getItem('telegramId');
-          }
-
-          const queryString = telegramId ? `?telegramId=${telegramId}` : '';
-          const targetPath =
-            tab === 'bazaar'
-              ? 'bazaar'
-              : tab === 'favorites'
-                ? 'favorites'
-                : tab === 'profile'
-                  ? 'profile'
-                  : 'categories';
-
-          router.push(`/${lang}/${targetPath}${queryString}`);
-        }}
-        onCloseDetail={() => {}}
-        onCreateListing={() => router.push(`/${lang}/bazaar?create=1`)}
-        favoritesCount={favorites.size}
-        tg={tg}
-      />
 
       <Toast
         message={toast.message}

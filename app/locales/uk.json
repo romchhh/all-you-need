@@ -928,6 +928,8 @@
   },
   "promotions": {
     "title": "Рекламувати оголошення",
+    "marketplaceTitle": "Просування в маркетплейсі",
+    "marketplaceDescription": "Зробіть оголошення помітнішим і отримайте більше переглядів.",
     "description": "Виберіть тип реклами для вашого оголошення",
     "skip": "Пропустити",
     "addPromotion": "Додати рекламу",
@@ -1170,7 +1172,7 @@
         },
         "promotion": {
           "title": "Просування в маркетплейсі",
-          "description": "HIGHLIGHT, TOP і VIP — платні інструменти, які збільшують видимість оголошення.",
+          "description": "Зробіть оголошення помітнішим і отримайте більше переглядів.",
           "button": "Докладніше"
         },
         "businessProfile": {
@@ -1460,6 +1462,8 @@
     "settings": {
       "title": "Налаштування Business",
       "photosSection": "Фотографії",
+      "portfolioHint": "Додайте до 30 фото — вони відображатимуться у вкладці «Портфоліо».",
+      "addPortfolioPhotos": "Додати фото",
       "basicSection": "Основна інформація",
       "logoRecommended": "Рекомендований розмір 500×500",
       "coverRecommended": "Рекомендований розмір 1200×400",
@@ -1525,6 +1529,10 @@
           "title": "Оголошення профілю",
           "subtitle": "Які оголошення показувати"
         },
+        "portfolio": {
+          "title": "Портфоліо",
+          "subtitle": "Фото робіт для вкладки в профілі"
+        },
         "publicLink": {
           "title": "Публічне посилання",
           "subtitle": "Посилання на ваш Business-профіль"
@@ -1550,6 +1558,7 @@
       "ratingReviews_one": "{rating} ({count} відгук)",
       "ratingReviews_few": "{rating} ({count} відгуки)",
       "listingsShort": "оголошень",
+      "telegramSinceShort": "на TG",
       "onPlatform": "на платформі",
       "onTelegramSince": "На TG з {date}",
       "memberSince": "На платформі",
@@ -1559,8 +1568,21 @@
       "proBadge": "PRO",
       "tabs": {
         "listings": "Оголошення",
-        "about": "Про компанію"
+        "about": "Про компанію",
+        "portfolio": "Портфоліо",
+        "reviews": "Відгуки"
       },
+      "noPortfolio": "Компанія ще не додала фото робіт.",
+      "noReviews": "Поки немає відгуків.",
+      "noReviewsYet": "Рейтинг з’явиться після перших відгуків",
+      "reviewsHint": "Залиште відгук про співпрацю з цією компанією.",
+      "leaveReview": "Залишити відгук",
+      "reviewRating": "Оцінка",
+      "reviewCommentPlaceholder": "Коментар (необов’язково)",
+      "reviewSubmit": "Надіслати відгук",
+      "reviewSubmitted": "Дякуємо! Відгук опубліковано.",
+      "reviewAlreadyLeft": "Ви вже залишали відгук цьому продавцю.",
+      "loginToReview": "Увійдіть через Telegram, щоб залишити відгук",
       "filters": {
         "all": "Всі",
         "services": "Послуги",

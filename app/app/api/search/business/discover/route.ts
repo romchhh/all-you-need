@@ -4,6 +4,7 @@ import {
   formatBusinessLocationLine,
   getRecommendedBusinessProfiles,
 } from '@/lib/business/businessSearchHelpers';
+import { attachBusinessSearchListingPreviews } from '@/lib/business/businessSearchListings';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,14 +16,14 @@ export async function GET(request: NextRequest) {
     const lang = (sp.get('lang') === 'ru' ? 'ru' : 'uk') as 'uk' | 'ru';
 
     const items = await getRecommendedBusinessProfiles(limit, viewerTelegramId);
+    const mapped = items.map((item) => ({
+      ...item,
+      activityLine: formatBusinessActivityLine(item.category, item.subcategory, lang),
+      locationLine: formatBusinessLocationLine(item.city, item.address),
+    }));
+    const recommendedBusinesses = await attachBusinessSearchListingPreviews(mapped);
 
-    return NextResponse.json({
-      recommendedBusinesses: items.map((item) => ({
-        ...item,
-        activityLine: formatBusinessActivityLine(item.category, item.subcategory, lang),
-        locationLine: formatBusinessLocationLine(item.city, item.address),
-      })),
-    });
+    return NextResponse.json({ recommendedBusinesses });
   } catch (error) {
     console.error('[search/business/discover GET]', error);
     return NextResponse.json({ recommendedBusinesses: [], error: 'unavailable' }, { status: 503 });
