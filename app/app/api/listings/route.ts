@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sqlDatetimeCompare, sqlListingAutoRenewSelect } from '@/lib/dbSql';
+import { sqlDatetimeCompare, sqlListingAutoRenewSelect, normalizeTelegramIdForDb } from '@/lib/dbSql';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
@@ -97,11 +97,13 @@ export async function GET(request: NextRequest) {
     // Фільтр по користувачу
     if (userId) {
       // Знаходимо внутрішній id користувача за telegramId
-      const userIdNum = parseInt(userId);
-      const users = await prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-        userIdNum
-      ) as Array<{ id: number }>;
+      const telegramIdKey = normalizeTelegramIdForDb(userId);
+      const users = telegramIdKey
+        ? ((await prisma.$queryRawUnsafe(
+            `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
+            telegramIdKey
+          )) as Array<{ id: number }>)
+        : [];
       if (users[0]) {
         where.userId = users[0].id;
         // Для профілю користувача показуємо всі оголошення (pending, active, sold тощо)
@@ -183,7 +185,9 @@ export async function GET(request: NextRequest) {
 
     if (userId) {
       // Визначаємо, чи це власний профіль (viewerId === userId)
-      const isOwnProfile = viewerId && parseInt(viewerId) === parseInt(userId);
+      const isOwnProfile =
+        Boolean(viewerId) &&
+        normalizeTelegramIdForDb(viewerId) === normalizeTelegramIdForDb(userId);
       
       // Отримуємо параметри фільтрації
       const status = searchParams.get('status');
@@ -193,7 +197,7 @@ export async function GET(request: NextRequest) {
       // Для користувача використовуємо raw query з даними про продавця
       // Якщо це не власний профіль, виключаємо продані оголошення
       let whereClause = "WHERE CAST(u.telegramId AS TEXT) = ?";
-      const queryParams: any[] = [parseInt(userId)];
+      const queryParams: any[] = [normalizeTelegramIdForDb(userId)];
       
       if (!isOwnProfile) {
         whereClause += " AND l.status != 'sold' AND l.status != 'hidden' AND l.status != 'deactivated' AND l.status != 'rejected' AND l.status != 'expired'";

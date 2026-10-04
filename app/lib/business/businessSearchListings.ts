@@ -35,6 +35,34 @@ const LISTING_SELECT = `
   ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
 `;
 
+export async function fetchFormattedActiveListingsByIds(ids: number[]): Promise<Listing[]> {
+  const listingIds = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id)))];
+  if (listingIds.length === 0) return [];
+
+  const placeholders = listingIds.map(() => '?').join(',');
+  const sql = `SELECT ${LISTING_SELECT}
+       FROM Listing l
+       JOIN User u ON l.userId = u.id
+       WHERE l.id IN (${placeholders}) AND l.status = 'active'`;
+
+  let rows: Array<Record<string, unknown>> = [];
+  try {
+    rows = await rawQuery<Array<Record<string, unknown>>>(prisma, sql, listingIds);
+  } catch {
+    const sqlNoFav = sql.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+    rows = await rawQuery<Array<Record<string, unknown>>>(prisma, sqlNoFav, listingIds);
+  }
+
+  const listingById = new Map<number, Listing>();
+  for (const row of rows) {
+    listingById.set(Number(row.id), formatListingRow(row));
+  }
+
+  return listingIds
+    .map((id) => listingById.get(id))
+    .filter((listing): listing is Listing => Boolean(listing));
+}
+
 function formatListingRow(listing: Record<string, unknown>): Listing {
   let rawImages: string[] = [];
   try {
@@ -127,22 +155,8 @@ export async function attachBusinessSearchListingPreviews<T extends { id: number
   });
 
   const allListingIds = [...new Set(idLists.flat())];
-  const listingById = new Map<number, Listing>();
-
-  if (allListingIds.length > 0) {
-    const placeholders = allListingIds.map(() => '?').join(',');
-    const rows = await rawQuery<Array<Record<string, unknown>>>(
-      prisma,
-      `SELECT ${LISTING_SELECT}
-       FROM Listing l
-       JOIN User u ON l.userId = u.id
-       WHERE l.id IN (${placeholders}) AND l.status = 'active'`,
-      allListingIds
-    );
-    for (const row of rows) {
-      listingById.set(Number(row.id), formatListingRow(row));
-    }
-  }
+  const formatted = await fetchFormattedActiveListingsByIds(allListingIds);
+  const listingById = new Map(formatted.map((listing) => [listing.id, listing]));
 
   return businesses.map((b, index) => {
     const ordered = idLists[index]

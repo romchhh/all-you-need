@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
+import { findUserByTelegramId } from '@/utils/userHelpers';
 import {
   expireBusinessProfileIfNeeded,
   getPublicBusinessProfileByTelegramId,
@@ -9,6 +9,7 @@ import {
 import { prisma } from '@/lib/prisma';
 import { sendBusinessNewFollowerNotification } from '@/lib/telegram/telegramNotifications';
 import { parsePortfolioImages } from '@/lib/businessProfileSettings';
+import { fetchFormattedActiveListingsByIds } from '@/lib/business/businessSearchListings';
 import { logApiError } from '@/lib/server/logApiError';
 
 export async function GET(request: NextRequest) {
@@ -26,7 +27,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Business profile not found' }, { status: 404 });
     }
 
-    const { profile, user, activeListingsCount, listingIds } = data;
+    const { profile, user, listingIds } = data;
+    let listings: Awaited<ReturnType<typeof fetchFormattedActiveListingsByIds>> = [];
+    try {
+      listings = await fetchFormattedActiveListingsByIds(listingIds);
+    } catch (listingErr) {
+      logApiError('business-profile/public listings', listingErr);
+    }
+    const activeListingsCount = listings.length;
+    const vitrineListingIds = listings.map((listing) => listing.id);
 
     let isFollowing = false;
     const isOwn = Boolean(viewerTelegramId && String(viewerTelegramId) === String(telegramId));
@@ -109,7 +118,8 @@ export async function GET(request: NextRequest) {
       isOwn,
       isFollowing,
       viewerHasReviewed,
-      vitrineListingIds: listingIds,
+      vitrineListingIds,
+      listings,
       profile: {
         id: profile.id,
         businessName: profile.businessName,

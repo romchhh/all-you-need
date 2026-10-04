@@ -200,39 +200,35 @@ export function BusinessProfilePage({
       setLoading(true);
       const viewerId = currentUser?.id?.toString() || '';
       const viewerQuery = viewerId ? `&viewerTelegramId=${encodeURIComponent(viewerId)}` : '';
-      const [profileRes, listingsRes] = await Promise.all([
-        fetch(
-          `/api/business-profile/public?telegramId=${encodeURIComponent(sellerTelegramId)}&lang=${lang}${viewerQuery}`
-        ),
-        fetch(
-          `/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&profileType=business&status=active&limit=50&offset=0`
-        ),
-      ]);
+      const profileRes = await fetch(
+        `/api/business-profile/public?telegramId=${encodeURIComponent(sellerTelegramId)}&lang=${lang}${viewerQuery}`
+      );
 
-      if (profileRes.ok) {
-        const data = await profileRes.json();
-        setProfile({
-          ...data.profile,
-          portfolioImages: Array.isArray(data.profile?.portfolioImages) ? data.profile.portfolioImages : [],
-        });
-        setReviews(Array.isArray(data.reviews) ? data.reviews : []);
-        setVitrineListingIds(
-          Array.isArray(data.vitrineListingIds)
-            ? data.vitrineListingIds.filter((id: unknown) => typeof id === 'number' && Number.isFinite(id))
-            : []
-        );
-        setIsFollowing(Boolean(data.isFollowing));
-        setViewerHasReviewed(Boolean(data.viewerHasReviewed));
-        setIsOwn(Boolean(data.isOwn) || (viewerId !== '' && viewerId === String(sellerTelegramId)));
-        setLoadError(false);
-      } else {
+      if (!profileRes.ok) {
         setLoadError(true);
+        return;
       }
 
-      if (listingsRes.ok) {
-        const data = await listingsRes.json();
-        setListings(data.listings || []);
-      }
+      const data = await profileRes.json();
+      const listingsFromProfile: Listing[] = Array.isArray(data.listings) ? data.listings : [];
+      const vitrineIds = (
+        Array.isArray(data.vitrineListingIds) ? data.vitrineListingIds : listingsFromProfile.map((l) => l.id)
+      )
+        .map((id: unknown) => Number(id))
+        .filter((id: number) => Number.isFinite(id));
+
+      setProfile({
+        ...data.profile,
+        activeListingsCount: listingsFromProfile.length,
+        portfolioImages: Array.isArray(data.profile?.portfolioImages) ? data.profile.portfolioImages : [],
+      });
+      setReviews(Array.isArray(data.reviews) ? data.reviews : []);
+      setVitrineListingIds(vitrineIds);
+      setListings(listingsFromProfile);
+      setIsFollowing(Boolean(data.isFollowing));
+      setViewerHasReviewed(Boolean(data.viewerHasReviewed));
+      setIsOwn(Boolean(data.isOwn) || (viewerId !== '' && viewerId === String(sellerTelegramId)));
+      setLoadError(false);
     } catch (e) {
       console.error(e);
       setLoadError(true);
