@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { rawQuery, sqlNow } from '@/lib/dbSql';
+import { rawQuery, sqlBooleanIsTrue, sqlLikeOp, sqlNow } from '@/lib/dbSql';
 import { businessCityOrGroupSql, cityFilterPatterns } from '@/lib/city/listingCityMatch';
 import {
   getCustomDirectionText,
@@ -43,11 +43,13 @@ export type BusinessSearchResultRow = {
   isFollowing: boolean;
 };
 
-const ACTIVE_BUSINESS_WHERE = `
+function activeBusinessWhere(): string {
+  return `
   bp.subscriptionStatus = 'active'
   AND (bp.subscriptionEndsAt IS NULL OR bp.subscriptionEndsAt > ${sqlNow()})
-  AND bp.isPublished = 1
+  AND ${sqlBooleanIsTrue('bp.isPublished')}
 `;
+}
 
 function buildSearchPattern(term: string): string {
   return `%${term.trim().replace(/[%_]/g, '')}%`;
@@ -58,22 +60,23 @@ function appendSearchClause(search: string | undefined, params: unknown[]): stri
 
   const pattern = buildSearchPattern(search);
   params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern);
+  const like = sqlLikeOp();
 
   return ` AND (
-    bp.businessName LIKE ?
-    OR bp.category LIKE ?
-    OR bp.subcategory LIKE ?
-    OR bp.description LIKE ?
+    bp.businessName ${like} ?
+    OR bp.category ${like} ?
+    OR bp.subcategory ${like} ?
+    OR bp.description ${like} ?
     OR EXISTS (
       SELECT 1 FROM Listing l
       WHERE l.userId = bp.userId
         AND COALESCE(l.profileType, 'personal') = 'business'
         AND l.status = 'active'
         AND (
-          l.title LIKE ?
-          OR l.description LIKE ?
-          OR l.category LIKE ?
-          OR l.subcategory LIKE ?
+          l.title ${like} ?
+          OR l.description ${like} ?
+          OR l.category ${like} ?
+          OR l.subcategory ${like} ?
         )
     )
   )`;
@@ -88,7 +91,7 @@ function appendFilterClauses(filters: BusinessSearchFilters, params: unknown[]):
   }
 
   if (filters.direction?.trim()) {
-    clause += ' AND bp.subcategory LIKE ?';
+    clause += ` AND bp.subcategory ${sqlLikeOp()} ?`;
     params.push(`%"${filters.direction.trim()}"%`);
   }
 
@@ -179,7 +182,7 @@ export async function searchBusinessProfiles(
     `SELECT COUNT(DISTINCT bp.id) as cnt
      FROM BusinessProfile bp
      JOIN User u ON u.id = bp.userId
-     WHERE ${ACTIVE_BUSINESS_WHERE}
+     WHERE ${activeBusinessWhere()}
      ${searchClause}
      ${filterClause}`,
     whereParams
@@ -197,15 +200,15 @@ export async function searchBusinessProfiles(
   }
   listParams.push(...whereParams);
 
-  let orderBy = 'ORDER BY bp.followersCount DESC, COALESCE(u.rating, 0) DESC';
+  let orderBy = 'ORDER BY followersCount DESC, rating DESC';
   if (sortBy === 'rating') {
-    orderBy = 'ORDER BY COALESCE(u.rating, 0) DESC, COALESCE(u.reviewsCount, 0) DESC, bp.followersCount DESC';
+    orderBy = 'ORDER BY rating DESC, reviewsCount DESC, followersCount DESC';
   } else if (search) {
     listParams.push(buildSearchPattern(search));
     orderBy = `ORDER BY
-      CASE WHEN bp.businessName LIKE ? THEN 0 ELSE 1 END,
-      COALESCE(u.rating, 0) DESC,
-      bp.followersCount DESC`;
+      CASE WHEN bp.businessName ${sqlLikeOp()} ? THEN 0 ELSE 1 END,
+      rating DESC,
+      followersCount DESC`;
   }
 
   listParams.push(limit, offset);
@@ -221,7 +224,7 @@ export async function searchBusinessProfiles(
 
   const rows = await rawQuery<Array<Record<string, unknown>>>(
     prisma,
-    `SELECT DISTINCT
+    `SELECT
        bp.id,
        bp.businessName,
        bp.logo,
@@ -238,7 +241,7 @@ export async function searchBusinessProfiles(
      FROM BusinessProfile bp
      JOIN User u ON u.id = bp.userId
      ${followJoin}
-     WHERE ${ACTIVE_BUSINESS_WHERE}
+     WHERE ${activeBusinessWhere()}
      ${searchClause}
      ${filterClause}
      ${orderBy}

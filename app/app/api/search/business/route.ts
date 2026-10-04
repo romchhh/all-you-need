@@ -53,7 +53,13 @@ export async function GET(request: NextRequest) {
       activityLine: formatBusinessActivityLine(item.category, item.subcategory, lang),
       locationLine: formatBusinessLocationLine(item.city, item.address),
     }));
-    const businesses = await attachBusinessSearchListingPreviews(mapped);
+    let businesses = mapped;
+    try {
+      businesses = await attachBusinessSearchListingPreviews(mapped);
+    } catch (previewError) {
+      logApiError('search/business previews', previewError);
+      businesses = mapped.map((b) => ({ ...b, vitrineListings: [] }));
+    }
 
     return NextResponse.json({
       total,

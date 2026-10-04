@@ -82,6 +82,19 @@ export function sqlListingAutoRenewEnabled(listingAlias = 'l'): string {
   return `COALESCE(${listingAlias}.autoRenew, 0) = 1`;
 }
 
+/** Boolean column is true (PG boolean / SQLite 0/1). */
+export function sqlBooleanIsTrue(expr: string): string {
+  if (isPostgres()) {
+    return `COALESCE(${expr}, false) = true`;
+  }
+  return `COALESCE(${expr}, 0) = 1`;
+}
+
+/** Case-insensitive LIKE (ILIKE on PostgreSQL). */
+export function sqlLikeOp(): string {
+  return isPostgres() ? 'ILIKE' : 'LIKE';
+}
+
 export function sqlNowMinusDays(days: number): string {
   return isPostgres()
     ? `NOW() - INTERVAL '${days} days'`
