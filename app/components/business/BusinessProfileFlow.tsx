@@ -564,7 +564,8 @@ export default function BusinessProfileFlow({
         .catch(() => null);
     }, 800);
     return () => clearTimeout(timer);
-y
+  }, [isOpen, renewMode, planPickerMode, editMode, step, form, saveDraftToLocal, saveDraftToServer, applySavedMedia]);
+
   useEffect(() => {
     bodyScrollRef.current?.scrollTo({ top: 0 });
     setCityQuery('');
