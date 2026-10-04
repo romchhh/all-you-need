@@ -6,7 +6,7 @@ import { join } from 'path';
 import sharp from 'sharp';
 import { toSQLiteDate, addDays, nowSQLite } from '@/utils/dateHelpers';
 import { getSystemSetting } from '@/utils/dbHelpers';
-import { isPostgres } from '@/lib/dbSql';
+import { isPostgres, normalizeTelegramIdForDb, sqlUserTelegramIdWhere } from '@/lib/dbSql';
 
 function sqlBool(value: boolean | undefined): boolean | number {
   return isPostgres() ? Boolean(value) : value ? 1 : 0;
@@ -45,10 +45,12 @@ interface ListingFormData {
  */
 export async function findUserByTelegramIdForListing(telegramId: string): Promise<User | null> {
   await ensureUserApiRawColumns();
-  const users = await prisma.$queryRawUnsafe(
-    `SELECT id, listingPackagesBalance, hasUsedFreeAd FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-    parseInt(telegramId)
-  ) as User[];
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key) return null;
+  const users = (await prisma.$queryRawUnsafe(
+    `SELECT id, listingPackagesBalance, hasUsedFreeAd FROM User WHERE ${sqlUserTelegramIdWhere('?')}`,
+    key
+  )) as User[];
 
   return users[0] || null;
 }

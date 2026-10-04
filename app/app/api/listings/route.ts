@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sqlDatetimeCompare } from '@/lib/dbSql';
+import { sqlDatetimeCompare, sqlListingAutoRenewSelect } from '@/lib/dbSql';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       // Знаходимо внутрішній id користувача за telegramId
       const userIdNum = parseInt(userId);
       const users = await prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
         userIdNum
       ) as Array<{ id: number }>;
       if (users[0]) {
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
       
       // Для користувача використовуємо raw query з даними про продавця
       // Якщо це не власний профіль, виключаємо продані оголошення
-      let whereClause = "WHERE CAST(u.telegramId AS INTEGER) = ?";
+      let whereClause = "WHERE CAST(u.telegramId AS TEXT) = ?";
       const queryParams: any[] = [parseInt(userId)];
       
       if (!isOwnProfile) {
@@ -244,7 +244,7 @@ export async function GET(request: NextRequest) {
           l.promotionType,
           l.promotionEnds,
           l.expiresAt,
-          COALESCE(l.autoRenew, 0) as autoRenew,
+          ${sqlListingAutoRenewSelect('l')},
           l.images,
           l.optimizedImages,
           l.tags,
@@ -256,7 +256,7 @@ export async function GET(request: NextRequest) {
           u.lastName as sellerLastName,
           u.avatar as sellerAvatar,
           u.phone as sellerPhone,
-          CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+          CAST(u.telegramId AS TEXT) as sellerTelegramId,
           ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
         FROM Listing l
         JOIN User u ON l.userId = u.id
@@ -325,7 +325,8 @@ export async function GET(request: NextRequest) {
           queryFallback = queryFallback.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
         }
         if (arBroken) {
-          queryFallback = queryFallback.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
+          const autoRenewFrag = sqlListingAutoRenewSelect('l');
+          queryFallback = queryFallback.replace(`, ${autoRenewFrag}`, '');
         }
         userListings = await prisma.$queryRawUnsafe(queryFallback, ...queryParams) as any[];
         userListings = userListings.map((listing: any) => ({
@@ -363,7 +364,7 @@ export async function GET(request: NextRequest) {
         try {
           const parserRows = (await prisma.$queryRawUnsafe(
             `SELECT l.id,
-                    CAST(u.telegramId AS INTEGER) as telegramId,
+                    CAST(u.telegramId AS TEXT) as telegramId,
                     u.username,
                     EXISTS(SELECT 1 FROM parsed_items pi WHERE pi.marketplace_listing_id = l.id) as fromParser
              FROM Listing l
@@ -633,7 +634,7 @@ export async function GET(request: NextRequest) {
                u.firstName as sellerFirstName,
                u.lastName as sellerLastName,
                u.avatar as sellerAvatar,
-               CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+               CAST(u.telegramId AS TEXT) as sellerTelegramId,
                ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount
              FROM Listing l
              JOIN User u ON l.userId = u.id
@@ -691,7 +692,8 @@ export async function GET(request: NextRequest) {
             .replace(LISTING_FAVORITES_JOIN_SQL, '');
         }
         if (arBroken) {
-          queryFallback = queryFallback.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
+          const autoRenewFrag = sqlListingAutoRenewSelect('l');
+          queryFallback = queryFallback.replace(`, ${autoRenewFrag}`, '');
         }
         const [data, count] = await Promise.all([
           prisma.$queryRawUnsafe(queryFallback, ...params, limit, offset) as any,

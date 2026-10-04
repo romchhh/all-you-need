@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizePgBoolean, sqlListingAutoRenewEnabled, sqlNow } from '@/lib/dbSql';
 import { sendListingExpiredNotification, sendListingAutoRenewedNotification } from '@/lib/telegram/telegramNotifications';
 import { executeInClause } from '@/utils/dbHelpers';
 import { ensureListingApiRawColumns } from '@/lib/prisma';
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
        WHERE l.status = 'active'
          AND l.expiresAt IS NOT NULL
          AND datetime(l.expiresAt) <= datetime(?)
-         AND COALESCE(l.autoRenew, 0) = 1`,
+         AND ${sqlListingAutoRenewEnabled('l')}`,
       now
     )) as Array<{ id: number; title: string; userId: number; expiresAt: string }>;
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const users = (await prisma.$queryRawUnsafe(
-          `SELECT CAST(telegramId AS INTEGER) as telegramId FROM User WHERE id = ?`,
+          `SELECT CAST(telegramId AS TEXT) as telegramId FROM User WHERE id = ?`,
           listing.userId
         )) as Array<{ telegramId: number }>;
 
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
     // 2) Решта прострочених: platform/parser → sold; user → expired + notify
     const expiredListings = (await prisma.$queryRawUnsafe(
       `SELECT l.id, l.title, l.userId,
-              CAST(u.telegramId AS INTEGER) as telegramId,
+              CAST(u.telegramId AS TEXT) as telegramId,
               u.username,
               EXISTS(SELECT 1 FROM parsed_items pi WHERE pi.marketplace_listing_id = l.id) as fromParser
        FROM Listing l

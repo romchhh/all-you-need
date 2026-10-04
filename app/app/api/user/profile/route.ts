@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { normalizePgBoolean } from '@/lib/dbSql';
+import { normalizePgBoolean, normalizeTelegramIdForDb } from '@/lib/dbSql';
 import { executeWithRetry, ensureUserSessionTable, updateUserActivity } from '@/lib/prisma';
 import {
   getUserLanguageForTelegramId,
@@ -112,8 +112,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Конвертуємо telegramId в число
-    const telegramIdNum = parseInt(telegramId);
+    const telegramIdKey = normalizeTelegramIdForDb(telegramId);
+    if (!telegramIdKey) {
+      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
+    }
 
     // Додаємо retry logic для уникнення проблем з блокуванням БД
     const { executeWithRetry, ensureUserApiRawColumns } = await import('@/lib/prisma');
@@ -122,7 +124,7 @@ export async function POST(request: NextRequest) {
     // Перевіряємо чи користувач існує через raw query (з retry)
     const existingUsers = await executeWithRetry(() =>
       prisma.$queryRaw<Array<{ id: number }>>`
-        SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
+        SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ${telegramIdKey}
       `
     );
     
@@ -158,7 +160,7 @@ export async function POST(request: NextRequest) {
       }>>`
         SELECT 
           id,
-          CAST(telegramId AS INTEGER) as telegramId,
+          CAST(telegramId AS TEXT) as telegramId,
           username,
           firstName,
           lastName,
@@ -171,7 +173,7 @@ export async function POST(request: NextRequest) {
           createdAt,
           updatedAt
         FROM User
-        WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
+        WHERE CAST(telegramId AS TEXT) = ${telegramIdKey}
       `
     );
     user = fullUsers[0];
@@ -227,7 +229,7 @@ export async function POST(request: NextRequest) {
             lastName = ${updateLastName},
             avatar = ${updateAvatar},
             updatedAt = ${new Date()}
-          WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
+          WHERE CAST(telegramId AS TEXT) = ${telegramIdKey}
         `
       );
       
@@ -247,7 +249,7 @@ export async function POST(request: NextRequest) {
       }>>`
         SELECT 
           id,
-          CAST(telegramId AS INTEGER) as telegramId,
+          CAST(telegramId AS TEXT) as telegramId,
           username,
           firstName,
           lastName,
@@ -258,7 +260,7 @@ export async function POST(request: NextRequest) {
           COALESCE(agreementAccepted, 0) as agreementAccepted,
           createdAt
         FROM User
-        WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
+        WHERE CAST(telegramId AS TEXT) = ${telegramIdKey}
       `
       );
       
@@ -268,7 +270,7 @@ export async function POST(request: NextRequest) {
     // Оновлюємо активність користувача
     try {
       await ensureUserSessionTable();
-      await updateUserActivity(telegramIdNum);
+      await updateUserActivity(telegramIdKey);
     } catch (err) {
       // Тиха обробка помилок - не блокуємо відповідь
     }
@@ -323,9 +325,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const telegramIdNum = parseInt(telegramId, 10);
+    const telegramIdKey = normalizeTelegramIdForDb(telegramId);
 
-    if (isNaN(telegramIdNum)) {
+    if (!telegramIdKey) {
       return NextResponse.json(
         { error: 'Invalid telegramId format' },
         { status: 400 }
@@ -341,7 +343,7 @@ export async function GET(request: NextRequest) {
       prisma.$queryRawUnsafe(
         `SELECT 
           id,
-          CAST(telegramId AS INTEGER) as telegramId,
+          CAST(telegramId AS TEXT) as telegramId,
           username,
           firstName,
           lastName,
@@ -355,8 +357,8 @@ export async function GET(request: NextRequest) {
           COALESCE(agreementAccepted, 0) as agreementAccepted,
           createdAt
         FROM User
-        WHERE CAST(telegramId AS INTEGER) = ?`,
-        telegramIdNum
+        WHERE CAST(telegramId AS TEXT) = ?`,
+        telegramIdKey
       ) as Promise<Array<{
         id: number;
         telegramId: number | bigint;
@@ -395,7 +397,7 @@ export async function GET(request: NextRequest) {
     // Оновлюємо активність користувача (тільки для активних)
     try {
       await ensureUserSessionTable();
-      await updateUserActivity(telegramIdNum);
+      await updateUserActivity(telegramIdKey);
     } catch (err) {
       // Тиха обробка помилок - не блокуємо відповідь
     }

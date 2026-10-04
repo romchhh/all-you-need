@@ -327,7 +327,7 @@ async function handle(_request: NextRequest) {
     for (const u of TEST_USERS) {
       const avatarPath = await downloadAvatar(u.telegramId);
       const existingRows = await prisma.$queryRawUnsafe<UserRow[]>(
-        'SELECT id, firstName, lastName, avatar FROM User WHERE CAST(telegramId AS INTEGER) = ?',
+        'SELECT id, firstName, lastName, avatar FROM User WHERE CAST(telegramId AS TEXT) = ?',
         u.telegramId
       );
       const existing = existingRows[0];
@@ -358,7 +358,7 @@ async function handle(_request: NextRequest) {
           now
         );
         const inserted = await prisma.$queryRawUnsafe<{ id: number }[]>(
-          'SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?',
+          'SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?',
           u.telegramId
         );
         userId = inserted[0].id;

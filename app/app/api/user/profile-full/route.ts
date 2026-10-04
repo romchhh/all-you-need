@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizeTelegramIdForDb, sqlListingAutoRenewSelect } from '@/lib/dbSql';
 import { executeWithRetry, ensureCurrencyColumn, ensureListingApiRawColumns } from '@/lib/prisma';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 import { listingTimeFieldsForApi, parseDbDate } from '@/utils/parseDbDate';
@@ -32,7 +33,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const telegramIdNum = parseInt(telegramId);
+    const telegramIdKey = normalizeTelegramIdForDb(telegramId);
+    if (!telegramIdKey) {
+      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
+    }
     const currencyColumnExists = await ensureCurrencyColumn();
     await ensureListingApiRawColumns();
 
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
       prisma.$queryRawUnsafe(
         `SELECT 
           id,
-          CAST(telegramId AS INTEGER) as telegramId,
+          CAST(telegramId AS TEXT) as telegramId,
           username,
           firstName,
           lastName,
@@ -52,8 +56,8 @@ export async function GET(request: NextRequest) {
           reviewsCount,
           createdAt
         FROM User
-        WHERE CAST(telegramId AS INTEGER) = ?`,
-        telegramIdNum
+        WHERE CAST(telegramId AS TEXT) = ?`,
+        telegramIdKey
       ) as Promise<Array<{
         id: number;
         telegramId: number;
@@ -81,8 +85,10 @@ export async function GET(request: NextRequest) {
     const userId = userData.id;
 
     // Визначаємо, чи це власний профіль
-    const viewerIdNum = viewerId ? parseInt(viewerId) : null;
-    const isOwnProfile = viewerIdNum !== null && viewerIdNum === telegramIdNum;
+    const isOwnProfile =
+      viewerId != null &&
+      viewerId.trim() !== '' &&
+      normalizeTelegramIdForDb(viewerId) === telegramIdKey;
 
     // Отримуємо статистику
     const stats = await executeWithRetry(() =>
@@ -143,13 +149,13 @@ export async function GET(request: NextRequest) {
         l.tags,
         l.createdAt,
         l.publishedAt,
-        COALESCE(l.autoRenew, 0) as autoRenew,
+        ${sqlListingAutoRenewSelect('l')},
         u.username as sellerUsername,
         u.firstName as sellerFirstName,
         u.lastName as sellerLastName,
         u.avatar as sellerAvatar,
         u.phone as sellerPhone,
-        CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+        CAST(u.telegramId AS TEXT) as sellerTelegramId,
         ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
       FROM Listing l
       JOIN User u ON l.userId = u.id
@@ -193,7 +199,8 @@ export async function GET(request: NextRequest) {
         queryFallback = queryFallback.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
       }
       if (arBroken) {
-        queryFallback = queryFallback.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
+        const autoRenewFrag = sqlListingAutoRenewSelect('l');
+        queryFallback = queryFallback.replace(`, ${autoRenewFrag}`, '');
       }
       userListings = await prisma.$queryRawUnsafe(queryFallback, ...queryParams) as any[];
       userListings = userListings.map((listing: any) => ({

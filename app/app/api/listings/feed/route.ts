@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
         u.firstName as sellerFirstName,
         u.lastName as sellerLastName,
         u.avatar as sellerAvatar,
-        CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+        CAST(u.telegramId AS TEXT) as sellerTelegramId,
         ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount
       FROM Listing l
       JOIN User u ON l.userId = u.id

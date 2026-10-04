@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     // Знаходимо користувача
     const users = await prisma.$queryRawUnsafe(
-      `SELECT id, createdAt FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+      `SELECT id, createdAt FROM User WHERE CAST(telegramId AS TEXT) = ?`,
       telegramIdNum
     ) as Array<{ id: number; createdAt: string }>;
 

@@ -30,8 +30,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot review yourself' }, { status: 400 });
     }
 
-    const author = await findUserByTelegramId(parseTelegramId(authorTelegramId));
-    const target = await findUserByTelegramId(parseTelegramId(targetTelegramId));
+    const author = await findUserByTelegramId(authorTelegramId);
+    const target = await findUserByTelegramId(targetTelegramId);
 
     if (!author || !target) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

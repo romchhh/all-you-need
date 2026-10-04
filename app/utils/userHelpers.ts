@@ -1,5 +1,10 @@
 import { prisma } from '@/lib/prisma';
-import { normalizePgBoolean } from '@/lib/dbSql';
+import {
+  normalizeTelegramIdForDb,
+  normalizePgBoolean,
+  sqlUserTelegramIdWhere,
+  usersLegacyTelegramIdWhere,
+} from '@/lib/dbSql';
 import { executeWithRetry, ensureUserApiRawColumns } from '@/lib/prisma';
 
 export interface UserBalance {
@@ -10,7 +15,8 @@ export interface UserBalance {
 
 export interface UserData {
   id: number;
-  telegramId: number;
+  /** Full Telegram id as string (safe for large ids). */
+  telegramId: string;
   username: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -22,15 +28,36 @@ export interface UserData {
   hasUsedFreeAd?: boolean;
 }
 
+function mapUserRow(user: Record<string, unknown>): UserData {
+  return {
+    id: Number(user.id),
+    telegramId: String(user.telegramId ?? ''),
+    username: (user.username as string | null) ?? null,
+    firstName: (user.firstName as string | null) ?? null,
+    lastName: (user.lastName as string | null) ?? null,
+    avatar: (user.avatar as string | null) ?? null,
+    balance: Number(user.balance) || 0,
+    rating: Number(user.rating) || 0,
+    reviewsCount: Number(user.reviewsCount) || 0,
+    listingPackagesBalance: Number(user.listingPackagesBalance) || 0,
+    hasUsedFreeAd: Boolean(user.hasUsedFreeAd),
+  };
+}
+
 /**
- * Знаходить користувача за telegramId
+ * Знаходить користувача за telegramId (рядок або число; у БД порівняння через TEXT).
  */
-export async function findUserByTelegramId(telegramId: number): Promise<UserData | null> {
+export async function findUserByTelegramId(
+  telegramId: string | number | bigint
+): Promise<UserData | null> {
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key) return null;
+
   await ensureUserApiRawColumns();
-  const users = await prisma.$queryRawUnsafe(
+  const users = (await prisma.$queryRawUnsafe(
     `SELECT 
       id,
-      CAST(telegramId AS INTEGER) as telegramId,
+      CAST(telegramId AS TEXT) as telegramId,
       username,
       firstName,
       lastName,
@@ -41,36 +68,33 @@ export async function findUserByTelegramId(telegramId: number): Promise<UserData
       listingPackagesBalance,
       hasUsedFreeAd
     FROM User
-    WHERE CAST(telegramId AS INTEGER) = ?`,
-    telegramId
-  ) as any[];
+    WHERE ${sqlUserTelegramIdWhere('?')}`,
+    key
+  )) as Record<string, unknown>[];
 
   if (users.length === 0) {
     return null;
   }
 
-  const user = users[0];
-  return {
-    ...user,
-    balance: Number(user.balance) || 0,
-    rating: Number(user.rating) || 0,
-    reviewsCount: Number(user.reviewsCount) || 0,
-    listingPackagesBalance: Number(user.listingPackagesBalance) || 0,
-    hasUsedFreeAd: Boolean(user.hasUsedFreeAd),
-  };
+  return mapUserRow(users[0]);
 }
 
 /**
  * Отримує баланс користувача
  */
-export async function getUserBalance(telegramId: number): Promise<UserBalance | null> {
+export async function getUserBalance(
+  telegramId: string | number | bigint
+): Promise<UserBalance | null> {
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key) return null;
+
   await ensureUserApiRawColumns();
-  const users = await prisma.$queryRawUnsafe(
+  const users = (await prisma.$queryRawUnsafe(
     `SELECT balance, listingPackagesBalance, hasUsedFreeAd 
      FROM User 
-     WHERE CAST(telegramId AS INTEGER) = ?`,
-    telegramId
-  ) as Array<{ balance: number; listingPackagesBalance: number; hasUsedFreeAd: number }>;
+     WHERE ${sqlUserTelegramIdWhere('?')}`,
+    key
+  )) as Array<{ balance: number; listingPackagesBalance: number; hasUsedFreeAd: number }>;
 
   if (users.length === 0) {
     return null;
@@ -78,7 +102,7 @@ export async function getUserBalance(telegramId: number): Promise<UserBalance | 
 
   return {
     balance: Number(users[0].balance) || 0,
-    listingPackagesBalance: Number(users[0].listingPackagesBalance) || 1,
+    listingPackagesBalance: Number(users[0].listingPackagesBalance) || 0,
     hasUsedFreeAd: Boolean(users[0].hasUsedFreeAd),
   };
 }
@@ -91,10 +115,10 @@ export async function updateUserBalance(
   amount: number,
   type: 'add' | 'deduct'
 ): Promise<number> {
-  const users = await prisma.$queryRawUnsafe(
+  const users = (await prisma.$queryRawUnsafe(
     `SELECT balance FROM User WHERE id = ?`,
     userId
-  ) as Array<{ balance: number }>;
+  )) as Array<{ balance: number }>;
 
   if (users.length === 0) {
     throw new Error('User not found');
@@ -106,9 +130,7 @@ export async function updateUserBalance(
     throw new Error('Insufficient balance');
   }
 
-  const newBalance = type === 'deduct' 
-    ? currentBalance - amount 
-    : currentBalance + amount;
+  const newBalance = type === 'deduct' ? currentBalance - amount : currentBalance + amount;
 
   await prisma.$executeRawUnsafe(
     `UPDATE User SET balance = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -127,10 +149,10 @@ export async function updateListingPackagesBalance(
   count: number,
   type: 'add' | 'deduct'
 ): Promise<number> {
-  const users = await prisma.$queryRawUnsafe(
+  const users = (await prisma.$queryRawUnsafe(
     `SELECT listingPackagesBalance FROM User WHERE id = ?`,
     userId
-  ) as Array<{ listingPackagesBalance: number }>;
+  )) as Array<{ listingPackagesBalance: number }>;
 
   if (users.length === 0) {
     throw new Error('User not found');
@@ -142,9 +164,7 @@ export async function updateListingPackagesBalance(
     throw new Error('Insufficient listing packages');
   }
 
-  const newBalance = type === 'deduct' 
-    ? currentBalance - count 
-    : currentBalance + count;
+  const newBalance = type === 'deduct' ? currentBalance - count : currentBalance + count;
 
   await prisma.$executeRawUnsafe(
     `UPDATE User SET listingPackagesBalance = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -159,20 +179,14 @@ export async function updateListingPackagesBalance(
  * Отримує мову користувача (uk | ru) за telegramId
  */
 export async function getUserLanguage(telegramId: string | number | bigint): Promise<'uk' | 'ru'> {
-  let id: number;
-  if (typeof telegramId === 'bigint') {
-    id = Number(telegramId);
-  } else if (typeof telegramId === 'string') {
-    id = parseInt(telegramId, 10);
-  } else {
-    id = Number(telegramId);
-  }
-  if (!Number.isFinite(id)) return 'uk';
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key) return 'uk';
+
   try {
-    const legacy = await prisma.$queryRawUnsafe(
-      `SELECT language FROM users_legacy WHERE user_id = ?`,
-      id
-    ) as Array<{ language: string | null }>;
+    const legacy = (await prisma.$queryRawUnsafe(
+      `SELECT language FROM users_legacy WHERE ${usersLegacyTelegramIdWhere('?')}`,
+      key
+    )) as Array<{ language: string | null }>;
     if (legacy.length > 0 && (legacy[0].language === 'uk' || legacy[0].language === 'ru')) {
       return legacy[0].language as 'uk' | 'ru';
     }
@@ -180,10 +194,10 @@ export async function getUserLanguage(telegramId: string | number | bigint): Pro
     // legacy table may not exist
   }
   try {
-    const users = await prisma.$queryRawUnsafe(
-      `SELECT language FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-      id
-    ) as Array<{ language: string | null }>;
+    const users = (await prisma.$queryRawUnsafe(
+      `SELECT language FROM User WHERE ${sqlUserTelegramIdWhere('?')}`,
+      key
+    )) as Array<{ language: string | null }>;
     if (users.length > 0 && (users[0].language === 'uk' || users[0].language === 'ru')) {
       return users[0].language as 'uk' | 'ru';
     }
@@ -194,17 +208,15 @@ export async function getUserLanguage(telegramId: string | number | bigint): Pro
 }
 
 /**
- * Парсить telegramId з різних форматів
+ * Парсить telegramId для JS (може втратити точність для id > 2^53).
+ * Для запитів до БД використовуйте normalizeTelegramIdForDb / findUserByTelegramId(string).
  */
 export function parseTelegramId(telegramId: string | number | bigint): number {
-  let parsed: number;
-  if (typeof telegramId === 'bigint') {
-    parsed = Number(telegramId);
-  } else if (typeof telegramId === 'string') {
-    parsed = parseInt(telegramId, 10);
-  } else {
-    parsed = Number(telegramId);
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key) {
+    throw new Error('Invalid telegramId format');
   }
+  const parsed = Number(key);
   if (!Number.isFinite(parsed)) {
     throw new Error('Invalid telegramId format');
   }
@@ -213,13 +225,17 @@ export function parseTelegramId(telegramId: string | number | bigint): number {
 
 /**
  * Повертає userId та isActive за telegramId. null якщо користувача немає.
- * Використовується для перевірки блокування в API.
  */
-export async function getUserIdAndActive(telegramId: number): Promise<{ userId: number; isActive: boolean } | null> {
-  const rows = await prisma.$queryRawUnsafe(
-    `SELECT id, isActive FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-    telegramId
-  ) as Array<{ id: number; isActive: number }>;
+export async function getUserIdAndActive(
+  telegramId: string | number | bigint
+): Promise<{ userId: number; isActive: boolean } | null> {
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key) return null;
+
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT id, isActive FROM User WHERE ${sqlUserTelegramIdWhere('?')}`,
+    key
+  )) as Array<{ id: number; isActive: number | boolean }>;
 
   if (rows.length === 0) return null;
   return {

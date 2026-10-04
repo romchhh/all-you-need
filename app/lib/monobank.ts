@@ -53,7 +53,7 @@ export async function createMonobankInvoice(params: CreateInvoiceParams): Promis
     throw new Error('Invalid telegramId');
   }
   const users = await prisma.$queryRawUnsafe(
-    `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+    `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
     telegramIdNum
   ) as Array<{ id: number }>;
 

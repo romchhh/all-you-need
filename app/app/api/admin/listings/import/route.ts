@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId } from '@/utils/userHelpers';
+import { normalizeTelegramIdForDb } from '@/lib/dbSql';
 import { isAdminAuthenticated } from '@/utils/adminAuth';
 import { toSQLiteDate, addDays } from '@/utils/dateHelpers';
 import { mkdir, readdir, unlink, rm, readFile } from 'fs/promises';
@@ -266,25 +267,25 @@ export async function POST(request: NextRequest) {
         }
 
         // Знаходимо або створюємо користувача
-        const telegramIdNum = parseInt(listing.telegramId, 10);
-        if (isNaN(telegramIdNum)) {
+        const telegramIdKey = normalizeTelegramIdForDb(listing.telegramId);
+        if (!telegramIdKey) {
           throw new Error(`Оголошення ${i + 1}: невірний telegramId`);
         }
 
-        let user = await findUserByTelegramId(telegramIdNum);
+        let user = await findUserByTelegramId(telegramIdKey);
         if (!user) {
           // Створюємо користувача якщо його немає
           await prisma.$executeRawUnsafe(
             `INSERT INTO User (telegramId, username, firstName, isActive, createdAt, updatedAt)
              VALUES (?, ?, ?, 1, datetime('now'), datetime('now'))`,
-            telegramIdNum,
+            telegramIdKey,
             listing.username || null,
             listing.username || null
           );
           
           const newUser = await prisma.$queryRawUnsafe(
-            `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-            telegramIdNum
+            `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
+            telegramIdKey
           ) as Array<{ id: number }>;
           
           if (newUser.length === 0) {
@@ -293,7 +294,7 @@ export async function POST(request: NextRequest) {
           
           user = {
             id: newUser[0].id,
-            telegramId: telegramIdNum,
+            telegramId: telegramIdKey,
             username: listing.username || null,
             firstName: listing.username || null,
             lastName: null,

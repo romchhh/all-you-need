@@ -446,9 +446,9 @@ export function SearchView({
   const buildBusinessFetchKey = useCallback(
     (query: string, sphere: string | null) => {
       const f = businessFilters;
-      return `business|${query.trim()}|${sphere ?? ''}|${citiesKey}|${f.sortBy}|${f.sphere ?? ''}|${f.direction ?? ''}|${f.hasPhysicalAddress}|${f.travelsToClient}|${f.worksOnline}|${f.minRating ?? ''}`;
+      return `business|${query.trim()}|${sphere ?? ''}|${f.sortBy}|${f.sphere ?? ''}|${f.direction ?? ''}|${f.hasPhysicalAddress}|${f.travelsToClient}|${f.worksOnline}|${f.minRating ?? ''}`;
     },
-    [businessFilters, citiesKey]
+    [businessFilters]
   );
 
   const fetchBusinessResults = useCallback(
@@ -490,7 +490,6 @@ export function SearchView({
           search: trimmed,
           lang: language === 'ru' ? 'ru' : 'uk',
         });
-        if (citiesKey) params.set('cities', citiesKey);
         if (effectiveSphere) params.set('sphere', effectiveSphere);
         if (businessFilters.direction) params.set('direction', businessFilters.direction);
         if (businessFilters.hasPhysicalAddress) params.set('hasPhysicalAddress', 'true');
@@ -528,7 +527,6 @@ export function SearchView({
     [
       buildBusinessFetchKey,
       businessFilters,
-      citiesKey,
       language,
       profileTelegramId,
       refreshLocalHistory,
@@ -798,7 +796,7 @@ export function SearchView({
     lastBusinessFetchKeyRef.current = '';
     void fetchBusinessResults(q, { saveHistory: false, force: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- лише фільтри, не activeQuery
-  }, [businessFilters, citiesKey, screenMode, searchEntityMode, fetchBusinessResults]);
+  }, [businessFilters, screenMode, searchEntityMode, fetchBusinessResults]);
 
   // Discover data
   useEffect(() => {

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     // Знаходимо користувача
     const users = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
         telegramIdNum
       ) as Promise<Array<{ id: number }>>
     );
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     // Знаходимо користувача
     const users = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
         telegramIdNum
       ) as Promise<Array<{ id: number }>>
     );
@@ -175,7 +175,7 @@ export async function DELETE(request: NextRequest) {
     // Знаходимо користувача
     const users = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
         telegramIdNum
       ) as Promise<Array<{ id: number }>>
     );

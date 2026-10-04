@@ -71,7 +71,7 @@ const LISTING_SELECT = `
   u.lastName as sellerLastName,
   u.avatar as sellerAvatar,
   u.phone as sellerPhone,
-  CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+  CAST(u.telegramId AS TEXT) as sellerTelegramId,
   ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
 `;
 

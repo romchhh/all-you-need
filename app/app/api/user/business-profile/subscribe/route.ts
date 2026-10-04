@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 });
     }
 
-    const user = await findUserByTelegramId(parseTelegramId(telegramIdRaw));
+    const user = await findUserByTelegramId(telegramIdRaw);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

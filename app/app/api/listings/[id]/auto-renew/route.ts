@@ -30,7 +30,7 @@ export async function POST(
     }
 
     const rows = (await prisma.$queryRawUnsafe(
-      `SELECT l.id, l.status, CAST(u.telegramId AS INTEGER) as sellerTelegramId
+      `SELECT l.id, l.status, CAST(u.telegramId AS TEXT) as sellerTelegramId
        FROM Listing l
        JOIN User u ON l.userId = u.id
        WHERE l.id = ?`,

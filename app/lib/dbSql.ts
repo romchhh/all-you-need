@@ -35,6 +35,53 @@ export function sqlNow(): string {
   return isPostgres() ? 'NOW()' : "datetime('now')";
 }
 
+/** SELECT fragment: autoRenew as 0/1 (PG boolean vs SQLite int). */
+export function sqlListingAutoRenewSelect(listingAlias = 'l'): string {
+  if (isPostgres()) {
+    return `CASE WHEN COALESCE(${listingAlias}.autoRenew, false) THEN 1 ELSE 0 END as autoRenew`;
+  }
+  return `COALESCE(${listingAlias}.autoRenew, 0) as autoRenew`;
+}
+
+export function sqlUserTelegramIdSelect(userAlias = 'u'): string {
+  return `CAST(${userAlias}.telegramId AS TEXT) as telegramId`;
+}
+
+export function sqlSellerTelegramIdSelect(userAlias = 'u'): string {
+  return `CAST(${userAlias}.telegramId AS TEXT) as sellerTelegramId`;
+}
+
+/** Canonical string key for User.telegramId lookups (BigInt-safe on PostgreSQL). */
+export function normalizeTelegramIdForDb(value: string | number | bigint | null | undefined): string {
+  if (value == null) return '';
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return '';
+    return String(Math.trunc(value));
+  }
+  return String(value).trim().replace(/^@/, '');
+}
+
+export function sqlUserTelegramIdWhere(param = '?'): string {
+  return `CAST(telegramId AS TEXT) = ${param}`;
+}
+
+export function sqlUserTelegramIdWhereAliased(userAlias = 'u', param = '?'): string {
+  return `CAST(${userAlias}.telegramId AS TEXT) = ${param}`;
+}
+
+export function sqlListingProfileTypeSelect(listingAlias = 'l'): string {
+  return `COALESCE(${listingAlias}.profileType, 'personal') as profileType`;
+}
+
+/** WHERE: listing has auto-renew enabled (PG boolean / SQLite int). */
+export function sqlListingAutoRenewEnabled(listingAlias = 'l'): string {
+  if (isPostgres()) {
+    return `COALESCE(${listingAlias}.autoRenew, false) = true`;
+  }
+  return `COALESCE(${listingAlias}.autoRenew, 0) = 1`;
+}
+
 export function sqlNowMinusDays(days: number): string {
   return isPostgres()
     ? `NOW() - INTERVAL '${days} days'`

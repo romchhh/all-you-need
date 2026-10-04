@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'telegramId is required' }, { status: 400 });
     }
 
-    const user = await findUserByTelegramId(parseTelegramId(telegramId));
+    const user = await findUserByTelegramId(telegramId);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

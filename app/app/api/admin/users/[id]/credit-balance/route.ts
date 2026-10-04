@@ -39,7 +39,7 @@ export async function POST(
     // Перевіряємо, чи існує користувач, отримуємо balance та telegramId для сповіщення
     const users = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
-        'SELECT id, balance, CAST(telegramId AS INTEGER) as telegramId FROM User WHERE id = ?',
+        'SELECT id, balance, CAST(telegramId AS TEXT) as telegramId FROM User WHERE id = ?',
         userId
       ) as Promise<Array<{ id: number; balance: number; telegramId: number }>>
     );

@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     const telegramIdNum = parseInt(telegramId, 10);
 
     const existingUsers = await prisma.$queryRaw<Array<{ id: number }>>`
-      SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ${telegramIdNum}
+      SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ${telegramIdNum}
     `;
 
     if (existingUsers.length === 0) {

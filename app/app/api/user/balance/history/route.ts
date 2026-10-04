@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const telegramIdNum = parseInt(telegramId);
     const users = await prisma.$queryRawUnsafe(
-      `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+      `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
       telegramIdNum
     ) as Array<{ id: number }>;
 

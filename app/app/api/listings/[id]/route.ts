@@ -5,9 +5,10 @@ import { getListingDisplayDate, parseDbDate } from '@/utils/parseDbDate';
 import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
-import { getBusinessSellerSummaryForUser } from '@/lib/businessProfileHelpers';
+import { resolveListingBusinessDisplay } from '@/lib/businessProfileHelpers';
 import { resolveListingContactUsername } from '@/lib/listingContactResolve';
 import { isParserAggregatorListing } from '@/utils/listingDescriptionDisplay';
+import { sqlListingAutoRenewSelect, sqlUserTelegramIdSelect } from '@/lib/dbSql';
 
 // Функція для конвертації старих значень стану в нові
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
@@ -55,13 +56,13 @@ export async function GET(
         l.status,
         l.promotionType,
         l.promotionEnds,
-        COALESCE(l.autoRenew, 0) as autoRenew,
+        ${sqlListingAutoRenewSelect('l')},
         l.images,
         l.tags,
         l.createdAt,
         l.publishedAt,
         COALESCE(l.profileType, 'personal') as profileType,
-        CAST(u.telegramId AS INTEGER) as telegramId,
+        ${sqlUserTelegramIdSelect('u')},
         u.username,
         u.firstName,
         u.lastName,
@@ -108,7 +109,6 @@ export async function GET(
         (msg.includes('Favorite') && !msg.toLowerCase().includes('favoriteboost'));
       const arBroken =
         msg.includes('autoRenew') ||
-        msg.includes('profileType') ||
         msg.includes('COALESCE types boolean') ||
         msg.includes('DatatypeMismatch');
       if (!favBroken && !arBroken) {
@@ -119,13 +119,12 @@ export async function GET(
         q = q.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
       }
       if (arBroken) {
-        q = q.replace(', COALESCE(l.autoRenew, 0) as autoRenew', '');
-        q = q.replace(", COALESCE(l.profileType, 'personal') as profileType", ", 'personal' as profileType");
+        q = q.replace(`, ${sqlListingAutoRenewSelect('l')}`, '');
       }
       listings = (await prisma.$queryRawUnsafe(q, listingId)) as Array<any>;
       if (listings[0]) {
         if (favBroken) (listings[0] as any).favoritesCount = 0;
-        if (arBroken) (listings[0] as any).autoRenew = listings[0].autoRenew ?? 0;
+        if (arBroken) (listings[0] as any).autoRenew = 0;
       }
     }
 
@@ -196,12 +195,12 @@ export async function GET(
       createdAt: listing.createdAt,
     });
 
-    const profileType = (listing as { profileType?: string }).profileType === 'business' ? 'business' : 'personal';
     const langParam = (searchParams.get('lang') || 'uk') as 'uk' | 'ru';
-    let businessSeller = null;
-    if (profileType === 'business') {
-      businessSeller = await getBusinessSellerSummaryForUser(listing.userId, langParam);
-    }
+    const { profileType, businessSeller } = await resolveListingBusinessDisplay(
+      listing.userId,
+      listingId,
+      langParam
+    );
 
     let parserAuthorUsername: string | null = null;
     let parserMsgLink: string | null = null;

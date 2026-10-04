@@ -34,7 +34,7 @@ export async function notifyCitySubscribersOfNewMarketplaceListing(params: {
   }
 
   const rows = (await prisma.$queryRawUnsafe(
-    `SELECT CAST(u.telegramId AS INTEGER) as telegramId
+    `SELECT CAST(u.telegramId AS TEXT) as telegramId
      FROM CitySubscription cs
      JOIN User u ON cs.userId = u.id
      WHERE cs.cityKey = ? AND cs.userId != ? AND u.isActive = 1`,

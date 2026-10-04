@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { normalizeTelegramIdForDb, usersLegacyTelegramIdWhere } from '@/lib/dbSql';
 
 export type UserListingStatsPayload = {
   totalListings: number;
@@ -10,13 +11,13 @@ export type UserListingStatsPayload = {
 
 /** Мова інтерфейсу: users_legacy (Prisma User не має колонки language). */
 export async function getUserLanguageForTelegramId(telegramId: string): Promise<'uk' | 'ru'> {
-  const telegramIdNum = parseInt(telegramId, 10);
-  if (Number.isNaN(telegramIdNum)) return 'uk';
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key) return 'uk';
 
   try {
     const legacyUsers = (await prisma.$queryRawUnsafe(
-      `SELECT language FROM users_legacy WHERE user_id = ?`,
-      telegramIdNum
+      `SELECT language FROM users_legacy WHERE ${usersLegacyTelegramIdWhere('?')}`,
+      key
     )) as Array<{ language: string | null }>;
 
     if (legacyUsers.length > 0 && legacyUsers[0].language) {

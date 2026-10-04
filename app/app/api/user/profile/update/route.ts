@@ -117,7 +117,7 @@ async function handleRequest(request: NextRequest) {
            phone = ?,
            avatar = ?,
            updatedAt = ?
-         WHERE CAST(telegramId AS INTEGER) = ?`,
+         WHERE CAST(telegramId AS TEXT) = ?`,
         updateData.firstName,
         updateData.lastName,
         updateData.phone,
@@ -133,7 +133,7 @@ async function handleRequest(request: NextRequest) {
            lastName = ?,
            phone = ?,
            updatedAt = ?
-         WHERE CAST(telegramId AS INTEGER) = ?`,
+         WHERE CAST(telegramId AS TEXT) = ?`,
         updateData.firstName,
         updateData.lastName,
         updateData.phone,
@@ -146,7 +146,7 @@ async function handleRequest(request: NextRequest) {
     const updatedUsers = await prisma.$queryRawUnsafe(
       `SELECT 
         id,
-        CAST(telegramId AS INTEGER) as telegramId,
+        CAST(telegramId AS TEXT) as telegramId,
         username,
         firstName,
         lastName,
@@ -157,7 +157,7 @@ async function handleRequest(request: NextRequest) {
         reviewsCount,
         createdAt
       FROM User
-      WHERE CAST(telegramId AS INTEGER) = ?`,
+      WHERE CAST(telegramId AS TEXT) = ?`,
       telegramIdNum
     ) as Array<{
       id: number;

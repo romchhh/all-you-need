@@ -20,7 +20,7 @@ export async function GET(
 
     // Перевіряємо чи користувач є власником оголошення
     const user = await prisma.$queryRawUnsafe(
-      `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
+      `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
       parseInt(userId)
     ) as Array<{ id: number }>;
 

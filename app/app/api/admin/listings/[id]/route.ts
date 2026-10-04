@@ -51,7 +51,7 @@ export async function GET(
           u.lastName as sellerLastName,
           u.avatar as sellerAvatar,
           u.phone as sellerPhone,
-          CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+          CAST(u.telegramId AS TEXT) as sellerTelegramId,
           COALESCE((SELECT COUNT(*) FROM Favorite WHERE listingId = l.id), 0) as favoritesCount,
           'marketplace' as source
         FROM Listing l
@@ -95,7 +95,7 @@ export async function GET(
               u.lastName as sellerLastName,
               u.avatar as sellerAvatar,
               u.phone as sellerPhone,
-              CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+              CAST(u.telegramId AS TEXT) as sellerTelegramId,
               0 as favoritesCount,
               'telegram' as source
             FROM TelegramListing tl

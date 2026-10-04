@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { join } from 'path';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { prisma } from '@/lib/prisma';
-import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
+import { findUserByTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
 import { parsePortfolioImages, serializePortfolioImages } from '@/lib/businessProfileSettings';
 import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile, resolveBusinessListingIds, syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'telegramId is required' }, { status: 400 });
     }
 
-    const user = await findUserByTelegramId(parseTelegramId(telegramId));
+    const user = await findUserByTelegramId(telegramId);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
@@ -213,7 +213,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'telegramId is required' }, { status: 400 });
     }
 
-    const user = await findUserByTelegramId(parseTelegramId(telegramIdRaw));
+    const user = await findUserByTelegramId(telegramIdRaw);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

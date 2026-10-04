@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     let viewerHasReviewed = false;
     if (viewerTelegramId && !isOwn) {
       try {
-        const viewer = await findUserByTelegramId(parseTelegramId(viewerTelegramId));
+        const viewer = await findUserByTelegramId(viewerTelegramId);
         if (viewer) {
           const follow = await prisma.businessFollow.findUnique({
             where: {
@@ -154,8 +154,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
 
-    const businessUser = await findUserByTelegramId(parseTelegramId(businessTelegramId));
-    const followerUser = await findUserByTelegramId(parseTelegramId(followerTelegramId));
+    const businessUser = await findUserByTelegramId(businessTelegramId);
+    const followerUser = await findUserByTelegramId(followerTelegramId);
 
     if (!businessUser || !followerUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

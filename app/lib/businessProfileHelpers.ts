@@ -425,12 +425,12 @@ export async function createBusinessSubscriptionRecord(
 }
 
 export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
-  const telegramIdNum = parseInt(telegramId, 10);
-  if (Number.isNaN(telegramIdNum)) return null;
+  const trimmed = telegramId.trim();
+  if (!trimmed) return null;
 
   const users = (await prisma.$queryRawUnsafe(
-    `SELECT id, username, createdAt, rating, reviewsCount FROM User WHERE CAST(telegramId AS INTEGER) = ?`,
-    telegramIdNum
+    `SELECT id, username, createdAt, rating, reviewsCount FROM User WHERE CAST(telegramId AS TEXT) = ?`,
+    trimmed
   )) as Array<{
     id: number;
     username: string | null;
@@ -501,6 +501,25 @@ export function formatBusinessTelegramSince(dateInput: Date | string): string {
   return `${m}.${y}`;
 }
 
+export async function resolveListingBusinessDisplay(
+  userId: number,
+  listingId: number,
+  lang: 'uk' | 'ru' = 'uk'
+): Promise<{
+  profileType: 'personal' | 'business';
+  businessSeller: Awaited<ReturnType<typeof getBusinessSellerSummaryForUser>>;
+}> {
+  await syncBusinessListingProfileTypes(userId);
+  const row = await prisma.listing.findUnique({
+    where: { id: listingId },
+    select: { profileType: true },
+  });
+  const profileType = row?.profileType === 'business' ? 'business' : 'personal';
+  const businessSeller =
+    profileType === 'business' ? await getBusinessSellerSummaryForUser(userId, lang) : null;
+  return { profileType, businessSeller };
+}
+
 export async function getBusinessSellerSummaryForUser(
   userId: number,
   lang: 'uk' | 'ru' = 'uk'
@@ -511,10 +530,10 @@ export async function getBusinessSellerSummaryForUser(
   if (!profile || !isBusinessProfileActive(profile)) return null;
 
   const users = (await prisma.$queryRawUnsafe(
-    `SELECT CAST(telegramId AS INTEGER) as telegramId, username, createdAt, rating, reviewsCount FROM User WHERE id = ?`,
+    `SELECT CAST(telegramId AS TEXT) as telegramId, username, createdAt, rating, reviewsCount FROM User WHERE id = ?`,
     userId
   )) as Array<{
-    telegramId: number;
+    telegramId: string;
     username: string | null;
     createdAt: Date | string;
     rating: number | null;

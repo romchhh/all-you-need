@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { getDatabaseConfigError, isPostgres, tableExistsQuery, tableInfoQuery, toPgParams } from './dbSql';
+import { getDatabaseConfigError, isPostgres, normalizeTelegramIdForDb, sqlUserTelegramIdWhere, tableExistsQuery, tableInfoQuery, toPgParams } from './dbSql';
 
 // Глобальна змінна для відстеження чи таблиця Favorite вже перевірена
 let favoriteTableInitialized = false;
@@ -843,18 +843,18 @@ export async function ensureUserSessionTable(): Promise<void> {
 }
 
 // Функція для оновлення активності користувача
-export async function updateUserActivity(telegramId: string | number): Promise<void> {
+export async function updateUserActivity(telegramId: string | number | bigint): Promise<void> {
   try {
     await ensureUserSessionTable();
 
-    const telegramIdNum = typeof telegramId === 'string' ? parseInt(telegramId, 10) : telegramId;
-    if (!Number.isFinite(telegramIdNum)) return;
+    const telegramIdKey = normalizeTelegramIdForDb(telegramId);
+    if (!telegramIdKey) return;
 
     const users = await executeWithRetry(
       () =>
         prisma.$queryRawUnsafe(
-          `SELECT id FROM User WHERE telegramId = ?`,
-          telegramIdNum
+          `SELECT id FROM User WHERE ${sqlUserTelegramIdWhere('?')}`,
+          telegramIdKey
         ) as Promise<Array<{ id: number }>>
     );
 
@@ -869,7 +869,7 @@ export async function updateUserActivity(telegramId: string | number): Promise<v
          VALUES (?, ?, ?, ?)
          ON CONFLICT(userId, telegramId) DO UPDATE SET lastActiveAt = excluded.lastActiveAt`,
         users[0].id,
-        telegramIdNum,
+        telegramIdKey,
         now,
         now
       )
