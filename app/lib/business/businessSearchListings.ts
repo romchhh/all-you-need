@@ -31,7 +31,7 @@ const LISTING_SELECT = `
   u.lastName as sellerLastName,
   u.avatar as sellerAvatar,
   u.phone as sellerPhone,
-  CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+  CAST(u.telegramId AS TEXT) as sellerTelegramId,
   ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
 `;
 
@@ -104,7 +104,7 @@ export async function attachBusinessSearchListingPreviews<T extends { id: number
     const userPh = userIds.map(() => '?').join(',');
     const listingRows = await rawQuery<Array<{ id: number; userId: number }>>(
       prisma,
-      `SELECT id, userId FROM Listing WHERE userId IN (${userPh}) ORDER BY id DESC`,
+      `SELECT id, userId FROM Listing WHERE userId IN (${userPh}) AND status = 'active' ORDER BY id DESC`,
       userIds
     );
     for (const row of listingRows) {

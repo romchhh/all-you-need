@@ -6,6 +6,8 @@ import {
 } from '@/lib/business/businessSearchHelpers';
 import { attachBusinessSearchListingPreviews } from '@/lib/business/businessSearchListings';
 
+import { logApiError } from '@/lib/server/logApiError';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -21,11 +23,18 @@ export async function GET(request: NextRequest) {
       activityLine: formatBusinessActivityLine(item.category, item.subcategory, lang),
       locationLine: formatBusinessLocationLine(item.city, item.address),
     }));
-    const recommendedBusinesses = await attachBusinessSearchListingPreviews(mapped);
+
+    let recommendedBusinesses = mapped;
+    try {
+      recommendedBusinesses = await attachBusinessSearchListingPreviews(mapped);
+    } catch (previewError) {
+      logApiError('search/business/discover previews', previewError);
+      recommendedBusinesses = mapped.map((b) => ({ ...b, vitrineListings: [] }));
+    }
 
     return NextResponse.json({ recommendedBusinesses });
   } catch (error) {
-    console.error('[search/business/discover GET]', error);
+    logApiError('search/business/discover GET', error);
     return NextResponse.json({ recommendedBusinesses: [], error: 'unavailable' }, { status: 503 });
   }
 }

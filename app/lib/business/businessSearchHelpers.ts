@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { rawQuery } from '@/lib/dbSql';
+import { rawQuery, sqlNow } from '@/lib/dbSql';
 import { businessCityOrGroupSql, cityFilterPatterns } from '@/lib/city/listingCityMatch';
 import {
   getCustomDirectionText,
@@ -45,7 +45,7 @@ export type BusinessSearchResultRow = {
 
 const ACTIVE_BUSINESS_WHERE = `
   bp.subscriptionStatus = 'active'
-  AND (bp.subscriptionEndsAt IS NULL OR bp.subscriptionEndsAt > datetime('now'))
+  AND (bp.subscriptionEndsAt IS NULL OR bp.subscriptionEndsAt > ${sqlNow()})
   AND bp.isPublished = 1
 `;
 
@@ -120,14 +120,13 @@ function appendFilterClauses(filters: BusinessSearchFilters, params: unknown[]):
 }
 
 async function resolveViewerUserId(viewerTelegramId?: string | null): Promise<number | null> {
-  if (!viewerTelegramId) return null;
-  const viewerIdNum = parseInt(viewerTelegramId, 10);
-  if (Number.isNaN(viewerIdNum)) return null;
+  const trimmed = viewerTelegramId?.trim();
+  if (!trimmed) return null;
 
   const viewers = await rawQuery<Array<{ id: number }>>(
     prisma,
-    `SELECT id FROM User WHERE CAST(telegramId AS INTEGER) = ? LIMIT 1`,
-    [viewerIdNum]
+    `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ? LIMIT 1`,
+    [trimmed]
   );
 
   return viewers[0]?.id ?? null;
