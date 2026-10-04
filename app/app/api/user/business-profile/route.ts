@@ -65,7 +65,10 @@ export async function GET(request: NextRequest) {
     }
 
     const isActive = isBusinessProfileActive(profile);
-    const isSuspended = !isActive && profile.subscriptionStatus === 'expired';
+    const isSuspended =
+      !isActive &&
+      profile.subscriptionStatus === 'expired' &&
+      profile.plan === 'business_pro';
 
     if (isActive) {
       await syncBusinessListingProfileTypes(user.id);

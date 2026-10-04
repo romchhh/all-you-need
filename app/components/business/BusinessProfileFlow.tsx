@@ -30,6 +30,7 @@ import {
   BUSINESS_PLANS,
   formatBusinessPlanPrice,
   isFreeBusinessPlan,
+  parsePlanFeatureLines,
   type BusinessPlanId,
   type ServiceArea,
 } from '@/lib/businessProfileConstants';
@@ -54,6 +55,8 @@ interface BusinessProfileFlowProps {
   defaultTelegram?: string;
   defaultPhone?: string;
   renewMode?: boolean;
+  /** Opens tariff step for plan change (active profile); not «Возобновление подписки». */
+  planPickerMode?: boolean;
   editMode?: boolean;
   existingProfile?: {
     businessName?: string;
@@ -269,6 +272,7 @@ export default function BusinessProfileFlow({
   defaultTelegram = '',
   defaultPhone = '',
   renewMode = false,
+  planPickerMode = false,
   editMode = false,
   existingProfile = null,
 }: BusinessProfileFlowProps) {
@@ -293,25 +297,31 @@ export default function BusinessProfileFlow({
     () => resolvePaymentTelegramId(tg, telegramId) || telegramId,
     [tg, telegramId]
   );
+  const subscribeExistingProfile = renewMode || planPickerMode;
+  const flowHeaderTitle = editMode
+    ? t('businessProfile.editTitle')
+    : renewMode
+      ? t('businessProfile.suspended.renewTitle')
+      : t('businessProfile.tariff.title');
 
   useHideBottomNav(isOpen);
   useBodyScrollLock(isOpen);
 
   const saveDraftToLocal = useCallback(
     (currentStep: WizardStep, currentForm: FormState) => {
-      if (renewMode || editMode || !paymentTelegramId) return;
+      if (renewMode || planPickerMode || editMode || !paymentTelegramId) return;
       saveBusinessWizardState(paymentTelegramId, {
         step: currentStep,
         form: formToStored(currentForm),
         savedAt: Date.now(),
       });
     },
-    [paymentTelegramId, renewMode, editMode]
+    [paymentTelegramId, renewMode, planPickerMode, editMode]
   );
 
   const saveDraftToServer = useCallback(
     async (currentForm: FormState): Promise<{ logo?: string; coverImage?: string } | null> => {
-      if (renewMode || !paymentTelegramId) return null;
+      if (renewMode || planPickerMode || !paymentTelegramId) return null;
       if (editMode && !currentForm.logoFile && !currentForm.coverFile) return null;
 
       const hasAnyData = [
@@ -416,7 +426,7 @@ export default function BusinessProfileFlow({
         return null;
       }
     },
-    [paymentTelegramId, renewMode, editMode, t]
+    [paymentTelegramId, renewMode, planPickerMode, editMode, t]
   );
 
   const applySavedMedia = useCallback(
@@ -446,7 +456,7 @@ export default function BusinessProfileFlow({
   );
 
   const handleClose = useCallback(() => {
-    if (!renewMode && !editMode) {
+    if (!renewMode && !planPickerMode && !editMode) {
       saveDraftToLocal(step, form);
       void saveDraftToServer(form).then((saved) => {
         if (!saved) return;
@@ -462,7 +472,7 @@ export default function BusinessProfileFlow({
       }).catch(() => null);
     }
     onClose();
-  }, [form, onClose, renewMode, editMode, saveDraftToLocal, saveDraftToServer, step]);
+  }, [form, onClose, renewMode, planPickerMode, editMode, saveDraftToLocal, saveDraftToServer, step]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -513,7 +523,7 @@ export default function BusinessProfileFlow({
     if (editMode && existingProfile) {
       setForm(prefillFromExisting(existingProfile));
       setStep('step1');
-    } else if (renewMode && existingProfile) {
+    } else if (subscribeExistingProfile && existingProfile) {
       setForm(prefillFromExisting(existingProfile));
       setStep('tariff');
     } else {
@@ -542,10 +552,10 @@ export default function BusinessProfileFlow({
         setForm(initialForm({ telegram: defaultTelegram, phone: defaultPhone }));
       }
     }
-  }, [isOpen, defaultTelegram, defaultPhone, renewMode, editMode, existingProfile, paymentTelegramId]);
+  }, [isOpen, defaultTelegram, defaultPhone, renewMode, planPickerMode, editMode, existingProfile, paymentTelegramId, subscribeExistingProfile]);
 
   useEffect(() => {
-    if (!isOpen || renewMode || editMode || uploadingRef.current) return;
+    if (!isOpen || renewMode || planPickerMode || editMode || uploadingRef.current) return;
     const timer = setTimeout(() => {
       if (uploadingRef.current) return;
       saveDraftToLocal(step, form);
@@ -554,7 +564,7 @@ export default function BusinessProfileFlow({
         .catch(() => null);
     }, 800);
     return () => clearTimeout(timer);
-  }, [isOpen, renewMode, editMode, step, form, saveDraftToLocal, saveDraftToServer, applySavedMedia]);
+  }, [isOpen, renewMode, planPickerMode, editMode, step, form, saveDraftToLocal, saveDraftToServer, applySavedMedia]);
 
   useEffect(() => {
     bodyScrollRef.current?.scrollTo({ top: 0 });
@@ -800,7 +810,7 @@ export default function BusinessProfileFlow({
         coverImage: form.savedCoverPath || undefined,
       };
 
-      if (!renewMode) {
+      if (!subscribeExistingProfile) {
         const uploaded = await uploadDraft();
         paths = {
           logo: uploaded.logo || form.savedLogoPath || undefined,
@@ -810,7 +820,7 @@ export default function BusinessProfileFlow({
       }
 
       const activity = getActivityPayload(form);
-      const payload = renewMode
+      const payload = subscribeExistingProfile
         ? {
             telegramId: paymentTelegramId,
             plan: form.selectedPlan,
@@ -1006,14 +1016,14 @@ export default function BusinessProfileFlow({
           >
             <button
               type="button"
-              onClick={step === 'step1' || (renewMode && step === 'tariff') ? handleClose : goBack}
+              onClick={step === 'step1' || (subscribeExistingProfile && step === 'tariff') ? handleClose : goBack}
               className={`p-2 -ml-2 rounded-full ${isLight ? 'hover:bg-gray-100' : 'hover:bg-white/10'}`}
             >
-              {step === 'step1' || (renewMode && step === 'tariff') ? <X size={22} /> : <ChevronLeft size={22} />}
+              {step === 'step1' || (subscribeExistingProfile && step === 'tariff') ? <X size={22} /> : <ChevronLeft size={22} />}
             </button>
             <span className="flex items-center gap-1.5 font-semibold text-sm">
               <BusinessBrandIcon size={20} className={accentIcon} />
-              <span>{editMode ? t('businessProfile.editTitle') : renewMode ? t('businessProfile.suspended.renewTitle') : 'TradeGround Business'}</span>
+              <span>{flowHeaderTitle}</span>
               <BusinessBetaBadge />
             </span>
             <div className="w-10" />
@@ -1399,7 +1409,7 @@ export default function BusinessProfileFlow({
                 {(Object.keys(BUSINESS_PLANS) as BusinessPlanId[]).map((planId) => {
                   const plan = BUSINESS_PLANS[planId];
                   const selected = form.selectedPlan === planId;
-                  const features = t(plan.featuresKey).split('\n').filter(Boolean);
+                  const features = parsePlanFeatureLines(t(plan.featuresKey));
                   return (
                     <button
                       key={planId}
@@ -1429,9 +1439,9 @@ export default function BusinessProfileFlow({
                   );
                 })}
               </div>
-              {form.selectedPlan ? (
+              {form.selectedPlan === 'business_pro' ? (
                 <p className={`text-xs mt-4 ${isLight ? 'text-gray-500' : 'text-white/45'}`}>
-                  {t('businessProfile.tariff.disclaimer')}
+                  {t('businessProfile.tariff.disclaimerPro')}
                 </p>
               ) : null}
             </>

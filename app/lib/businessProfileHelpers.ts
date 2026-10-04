@@ -310,8 +310,11 @@ export async function activateBusinessSubscription(
 
   const credits = BUSINESS_PLAN_MONTHLY_CREDITS[plan];
   const now = new Date();
+  const isFreePlan = BUSINESS_PLANS[plan].price <= 0;
   const endsAt = new Date(now);
-  endsAt.setDate(endsAt.getDate() + BUSINESS_SUBSCRIPTION_DAYS);
+  if (!isFreePlan) {
+    endsAt.setDate(endsAt.getDate() + BUSINESS_SUBSCRIPTION_DAYS);
+  }
 
   const linkedListingIds =
     explicitIds.length > 0
@@ -325,7 +328,7 @@ export async function activateBusinessSubscription(
     data: {
       plan,
       subscriptionStatus: 'active',
-      subscriptionEndsAt: endsAt,
+      subscriptionEndsAt: isFreePlan ? null : endsAt,
       isPublished: true,
       linkedListingIds,
       highlightCreditsRemaining: credits.highlight,

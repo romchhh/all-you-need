@@ -7,7 +7,7 @@ export const BUSINESS_PLANS = {
   },
   business_pro: {
     id: 'business_pro' as const,
-    price: 19.9,
+    price: 9.9,
     labelKey: 'businessProfile.plans.businessPro.name',
     featuresKey: 'businessProfile.plans.businessPro.features',
   },
@@ -15,6 +15,14 @@ export const BUSINESS_PLANS = {
 
 export function isFreeBusinessPlan(planId: BusinessPlanId): boolean {
   return BUSINESS_PLANS[planId].price <= 0;
+}
+
+/** Feature lines from locale (no leading ✓ — UI renders its own checkmarks). */
+export function parsePlanFeatureLines(featuresText: string): string[] {
+  return featuresText
+    .split('\n')
+    .map((line) => line.replace(/^✓\s*/, '').trim())
+    .filter(Boolean);
 }
 
 export function formatBusinessPlanPrice(planId: BusinessPlanId, lang: 'ru' | 'uk'): string {

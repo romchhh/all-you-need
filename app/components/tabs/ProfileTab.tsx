@@ -138,6 +138,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [hasBusinessProfile, setHasBusinessProfile] = useState(false);
   const [isBusinessSuspended, setIsBusinessSuspended] = useState(false);
   const [businessRenewMode, setBusinessRenewMode] = useState(false);
+  const [businessPlanPickerMode, setBusinessPlanPickerMode] = useState(false);
   const [businessEditMode, setBusinessEditMode] = useState(false);
   const [businessStats, setBusinessStats] = useState<{
     followersCount: number;
@@ -855,7 +856,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   const openBusinessChangePlan = () => {
     setShowBusinessSubscriptionSheet(false);
-    setBusinessRenewMode(true);
+    setBusinessRenewMode(false);
+    setBusinessPlanPickerMode(true);
     setBusinessEditMode(false);
     setShowBusinessFlow(true);
     tg?.HapticFeedback.impactOccurred('light');
@@ -1036,6 +1038,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           <BusinessSuspendedCard
             onRenew={() => {
               setBusinessEditMode(false);
+              setBusinessPlanPickerMode(false);
               setBusinessRenewMode(true);
               setShowBusinessFlow(true);
               tg?.HapticFeedback.impactOccurred('medium');
@@ -1048,6 +1051,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             onCreate={() => {
               setBusinessEditMode(false);
               setBusinessRenewMode(false);
+              setBusinessPlanPickerMode(false);
               setShowBusinessFlow(true);
               tg?.HapticFeedback.impactOccurred('medium');
             }}
@@ -1719,6 +1723,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         onClose={() => {
           setShowBusinessFlow(false);
           setBusinessRenewMode(false);
+          setBusinessPlanPickerMode(false);
           setBusinessEditMode(false);
           fetchBusinessProfile();
           void refreshBusinessStatus();
@@ -1730,6 +1735,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           fetchListingsWithFilters(0, true);
           refetch();
           setBusinessRenewMode(false);
+          setBusinessPlanPickerMode(false);
           setBusinessEditMode(false);
         }}
         tg={tg}
@@ -1737,6 +1743,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         defaultTelegram={profile?.username ? `@${profile.username}` : ''}
         defaultPhone={profile?.phone || ''}
         renewMode={businessRenewMode}
+        planPickerMode={businessPlanPickerMode}
         editMode={businessEditMode}
         existingProfile={businessProfile}
       />

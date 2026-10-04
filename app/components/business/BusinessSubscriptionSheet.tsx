@@ -21,6 +21,7 @@ import {
   BUSINESS_PLANS,
   BUSINESS_PLAN_MONTHLY_CREDITS,
   formatBusinessPlanPrice,
+  parsePlanFeatureLines,
   type BusinessPlanId,
 } from '@/lib/businessProfileConstants';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
@@ -76,7 +77,7 @@ export function BusinessSubscriptionSheet({
   const shell = isLight ? 'bg-white text-gray-900' : 'bg-[#0a0a0a] text-white';
   const headerBorder = ui.divider;
 
-  const planFeatures = t(plan.featuresKey).split('\n').filter(Boolean);
+  const planFeatures = parsePlanFeatureLines(t(plan.featuresKey));
 
   const perkRows = [
     ...(planCredits.highlight > 0
@@ -230,10 +231,12 @@ export function BusinessSubscriptionSheet({
             </button>
           ) : null}
 
-          <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${ui.limeBgSoft} ${ui.limeText}`}>
-            <Clover size={14} className="mt-0.5 shrink-0" />
-            <span>{t('businessProfile.tariff.disclaimer')}</span>
-          </div>
+          {isPro ? (
+            <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${ui.limeBgSoft} ${ui.limeText}`}>
+              <Clover size={14} className="mt-0.5 shrink-0" />
+              <span>{t('businessProfile.tariff.disclaimerPro')}</span>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
