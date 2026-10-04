@@ -18,6 +18,7 @@ import {
 } from '@/utils/favorites';
 import { getCategories } from '@/constants/categories';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
+import { AppHeader } from '@/components/layout/AppHeader';
 
 export default function SearchPage() {
   const params = useParams();
@@ -319,6 +320,7 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen pb-6 animate-content-crossfade">
+      <AppHeader />
       <SearchView
           initialQuery={initialQuery}
           initialCategory={initialCategory}

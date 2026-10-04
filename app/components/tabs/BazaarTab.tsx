@@ -416,6 +416,11 @@ const BazaarTabComponent = ({
 
   const hasActiveFilters = !!(sortBy !== 'newest' || showFreeOnly || minPrice !== null || maxPrice !== null || selectedCategory || selectedSubcategory || selectedCities.length > 0 || selectedCondition !== null || selectedCurrency !== null);
 
+  const showHomeFeedModeTabs =
+    !searchQuery.trim() && !selectedCategory && sortBy === 'newest' && !hasActiveFilters;
+  const homeFeedColumnShell = 'w-full max-w-full lg:max-w-xl xl:max-w-2xl';
+  const homeFeedColumnWrap = 'px-4 sm:px-6 lg:flex lg:justify-center';
+
   const renderCatalogToolbar = (showGridSwitch: boolean) => (
     <div className="flex items-center gap-1.5 shrink-0">
       <div className={`flex items-center rounded-xl p-1 ${ac.toggleGroup}`}>
@@ -741,12 +746,10 @@ const BazaarTabComponent = ({
       )}
 
       {/* Режим стрічки: Для Вас / Нове — між категоріями та картками */}
-      {!searchQuery.trim() &&
-        !selectedCategory &&
-        sortBy === 'newest' &&
-        !hasActiveFilters && (
-          <div className="animate-content-in w-full max-w-[1680px] mx-auto px-4 sm:px-6 pb-3 pt-1">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:mx-auto lg:max-w-xl xl:max-w-2xl">
+      {showHomeFeedModeTabs && (
+          <div className={`animate-content-in pb-3 pt-1 ${homeFeedColumnWrap}`}>
+            <div className={homeFeedColumnShell}>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {(['forYou', 'new'] as const).map((mode) => {
                 const active = pickBazaarTabField(savedState, 'feedMode') === mode;
                 return (
@@ -779,14 +782,23 @@ const BazaarTabComponent = ({
                   </button>
                 );
               })}
+              </div>
             </div>
           </div>
         )}
 
       {/* Сітка або список оголошень */}
       {initialLoading && filteredAndSortedListings.length === 0 ? (
-        <div className="animate-content-in px-4 pb-4 sm:px-6 w-full max-w-[1680px] mx-auto">
-          <ListingGridSkeleton count={6} compact />
+        <div
+          className={`animate-content-in pb-4 ${
+            showHomeFeedModeTabs
+              ? homeFeedColumnWrap
+              : 'px-4 sm:px-6 w-full max-w-[1680px] mx-auto'
+          }`}
+        >
+          <div className={showHomeFeedModeTabs ? homeFeedColumnShell : 'w-full'}>
+            <ListingGridSkeleton count={6} compact />
+          </div>
         </div>
       ) : filteredAndSortedListings.length > 0 ? (
         <>
@@ -797,8 +809,19 @@ const BazaarTabComponent = ({
           >
             {isRefreshing && <ListingsRefreshOverlay />}
             {viewMode === 'grid' ? (
-              <div className="px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 [grid-auto-rows:1fr]">
+              <div
+                className={
+                  showHomeFeedModeTabs
+                    ? `${homeFeedColumnWrap} pb-4`
+                    : 'px-4 sm:px-6 pb-4 w-full max-w-[1680px] mx-auto'
+                }
+              >
+                <div className={showHomeFeedModeTabs ? homeFeedColumnShell : 'w-full'}>
+                  <div
+                    className={`grid grid-cols-2 gap-3 sm:gap-4 [grid-auto-rows:1fr] ${
+                      showHomeFeedModeTabs ? '' : 'lg:grid-cols-3'
+                    }`}
+                  >
                   {filteredAndSortedListings.map((listing, index) => (
                     <ListingCard
                       key={listing.id}
@@ -810,10 +833,22 @@ const BazaarTabComponent = ({
                       priority={index < 4}
                     />
                   ))}
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3 px-4 pb-4">
+              <div
+                className={
+                  showHomeFeedModeTabs
+                    ? `${homeFeedColumnWrap} pb-4`
+                    : 'space-y-3 px-4 pb-4'
+                }
+              >
+                <div
+                  className={
+                    showHomeFeedModeTabs ? `${homeFeedColumnShell} space-y-3` : 'contents'
+                  }
+                >
                 {filteredAndSortedListings.map((listing) => (
                   <ListingCardColumn
                     key={listing.id}
@@ -824,6 +859,7 @@ const BazaarTabComponent = ({
                     tg={tg}
                   />
                 ))}
+                </div>
               </div>
             )}
           </div>

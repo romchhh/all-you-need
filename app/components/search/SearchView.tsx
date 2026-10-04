@@ -54,7 +54,7 @@ import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
-import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS, OVERLAY_BACK_BUTTON_TOP_CLASS, overlayHeaderActionClass } from '@/components/layout/FixedLogoHeader';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
@@ -1498,21 +1498,22 @@ export function SearchView({
     <>
       {screenMode === 'discover' ? (
         <>
-          <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-1">
-            <h1 className={`min-w-0 flex-1 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
+          <button
+            type="button"
+            onClick={() => {
+              tg?.HapticFeedback?.impactOccurred?.('light');
+              onBack();
+            }}
+            aria-label={t('common.close')}
+            className={`fixed right-4 z-[60] flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${OVERLAY_BACK_BUTTON_TOP_CLASS} ${overlayHeaderActionClass(isLight)}`}
+          >
+            <X size={20} />
+          </button>
+
+          <div className="px-4 pb-2 pt-14">
+            <h1 className={`pr-12 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
               {t('bazaar.search.title')}
             </h1>
-            <button
-              type="button"
-              onClick={() => {
-                tg?.HapticFeedback?.impactOccurred?.('light');
-                onBack();
-              }}
-              aria-label={t('common.close')}
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${backBtnClass}`}
-            >
-              <X size={20} />
-            </button>
           </div>
 
           <div className="px-4 pb-3">
