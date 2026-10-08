@@ -8,7 +8,7 @@ import {
 } from '@/lib/businessProfileHelpers';
 import { prisma } from '@/lib/prisma';
 import { sendBusinessNewFollowerNotification } from '@/lib/telegram/telegramNotifications';
-import { parsePortfolioImages } from '@/lib/businessProfileSettings';
+import { parsePortfolioItems } from '@/lib/businessProfileSettings';
 import { fetchFormattedActiveListingsByIds } from '@/lib/business/businessSearchListings';
 import { logApiError } from '@/lib/server/logApiError';
 
@@ -106,12 +106,13 @@ export async function GET(request: NextRequest) {
       console.error('[BusinessProfile public GET] reviews', reviewErr);
     }
 
-    let portfolioImages: string[] = [];
+    let portfolioItems: Array<{ url: string; description?: string }> = [];
     try {
-      portfolioImages = parsePortfolioImages(profile.portfolioImages);
+      portfolioItems = parsePortfolioItems(profile.portfolioImages);
     } catch {
-      portfolioImages = [];
+      portfolioItems = [];
     }
+    const portfolioImages = portfolioItems.map((item) => item.url);
 
     return NextResponse.json({
       isActive: isBusinessProfileActive(profile),
@@ -145,6 +146,7 @@ export async function GET(request: NextRequest) {
         rating: Number(user.rating) || 0,
         reviewsCount: Number(user.reviewsCount) || 0,
         portfolioImages,
+        portfolioItems,
       },
       reviews,
     });

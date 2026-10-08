@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { updateUserActivity } from '@/lib/prisma';
+import { normalizeTelegramIdForDb } from '@/lib/dbSql';
 
 /**
  * Оновлює активність користувача на основі telegramId з запиту
@@ -7,57 +8,46 @@ import { updateUserActivity } from '@/lib/prisma';
  */
 export async function trackUserActivity(request: NextRequest): Promise<void> {
   try {
-    // Спробуємо отримати telegramId з різних джерел
-    let telegramId: string | number | null = null;
+    let telegramId: string | null = null;
 
-    // 1. З query параметрів
     const queryTelegramId = request.nextUrl.searchParams.get('telegramId');
     if (queryTelegramId) {
-      const parsed = parseInt(queryTelegramId, 10);
-      if (!isNaN(parsed)) {
-        telegramId = parsed;
-      }
+      telegramId = normalizeTelegramIdForDb(queryTelegramId) || null;
     }
 
-    // 2. З body (для POST/PUT запитів)
     if (!telegramId) {
       try {
         const contentType = request.headers.get('content-type');
         if (contentType?.includes('application/json')) {
           const body = await request.clone().json().catch(() => null);
-          if (body?.telegramId) {
-            const parsed = typeof body.telegramId === 'number' 
-              ? body.telegramId 
-              : parseInt(body.telegramId, 10);
-            if (!isNaN(parsed)) {
-              telegramId = parsed;
-            }
+          if (body?.telegramId != null) {
+            telegramId = normalizeTelegramIdForDb(body.telegramId) || null;
           }
         }
-      } catch (err) {
-        // Ігноруємо помилки парсингу body
+      } catch {
+        // ignore body parse errors
       }
     }
 
-    // 3. З headers (якщо передається в заголовках)
     if (!telegramId) {
       const headerTelegramId = request.headers.get('x-telegram-id');
       if (headerTelegramId) {
-        const parsed = parseInt(headerTelegramId, 10);
-        if (!isNaN(parsed)) {
-          telegramId = parsed;
-        }
+        telegramId = normalizeTelegramIdForDb(headerTelegramId) || null;
       }
     }
 
-    // Оновлюємо активність якщо знайшли telegramId
+    // viewerId / userId у каталозі теж часто є telegram id
+    if (!telegramId) {
+      const viewerId = request.nextUrl.searchParams.get('viewerId');
+      if (viewerId) {
+        telegramId = normalizeTelegramIdForDb(viewerId) || null;
+      }
+    }
+
     if (telegramId) {
       await updateUserActivity(telegramId);
     }
   } catch (error) {
-    // Тиха обробка помилок - не блокуємо запит
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Note: Could not track user activity:', error);
-    }
+    console.error('[trackUserActivity]', error);
   }
 }

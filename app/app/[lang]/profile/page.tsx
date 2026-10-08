@@ -555,7 +555,7 @@ const ProfilePage = () => {
                     </svg>
                   </div>
                 </div>
-                <span className="text-sm font-semibold text-blue-600">Відпустіть для оновлення</span>
+                <span className="text-sm font-semibold text-blue-600">{t('common.releaseToRefresh')}</span>
               </>
             ) : (
               <>
@@ -608,7 +608,7 @@ const ProfilePage = () => {
                     opacity: 0.6 + pullProgress * 0.4
                   }}
                 >
-                  {pullProgress > 0.7 ? 'Майже...' : t('common.pullToRefresh')}
+                  {pullProgress > 0.7 ? t('common.almostReady') : t('common.pullToRefresh')}
                 </span>
               </>
             )}

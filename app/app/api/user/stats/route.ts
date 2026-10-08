@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizeTelegramIdForDb, sqlUserTelegramIdWhere } from '@/lib/dbSql';
 import { getUserListingStatsForUserId } from '@/lib/userBootstrapQueries';
 
 export async function GET(request: NextRequest) {
@@ -14,13 +15,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const telegramIdNum = parseInt(telegramId);
+    const telegramIdKey = normalizeTelegramIdForDb(telegramId);
+    if (!telegramIdKey) {
+      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
+    }
 
-    // Знаходимо користувача
-    const users = await prisma.$queryRawUnsafe(
-      `SELECT id, createdAt FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-      telegramIdNum
-    ) as Array<{ id: number; createdAt: string }>;
+    const users = (await prisma.$queryRawUnsafe(
+      `SELECT id, createdAt FROM User WHERE ${sqlUserTelegramIdWhere('?')}`,
+      telegramIdKey
+    )) as Array<{ id: number; createdAt: string }>;
 
     if (!users[0]) {
       return NextResponse.json(

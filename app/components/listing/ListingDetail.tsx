@@ -794,7 +794,7 @@ export const ListingDetail = ({
                     </svg>
                   </div>
                 </div>
-                <span className="text-sm font-semibold" style={{ color: '#3F5331' }}>Відпустіть для оновлення</span>
+                <span className="text-sm font-semibold" style={{ color: '#3F5331' }}>{t('common.releaseToRefresh')}</span>
               </>
             ) : (
               <>
@@ -841,7 +841,7 @@ export const ListingDetail = ({
                     opacity: 0.6 + pullProgress * 0.4
                   }}
                 >
-                  {pullProgress > 0.7 ? 'Майже...' : t('common.pullToRefresh')}
+                  {pullProgress > 0.7 ? t('common.almostReady') : t('common.pullToRefresh')}
                 </span>
               </>
             )}

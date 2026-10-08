@@ -90,6 +90,7 @@ interface PublicBusinessProfile {
   rating: number;
   reviewsCount: number;
   portfolioImages: string[];
+  portfolioItems?: Array<{ url: string; description?: string }>;
 }
 
 interface BusinessProfilePageProps {
@@ -221,6 +222,9 @@ export function BusinessProfilePage({
         ...data.profile,
         activeListingsCount: listingsFromProfile.length,
         portfolioImages: Array.isArray(data.profile?.portfolioImages) ? data.profile.portfolioImages : [],
+        portfolioItems: Array.isArray(data.profile?.portfolioItems)
+          ? data.profile.portfolioItems
+          : undefined,
       });
       setReviews(Array.isArray(data.reviews) ? data.reviews : []);
       setVitrineListingIds(vitrineIds);
@@ -316,10 +320,18 @@ export function BusinessProfilePage({
     return vitrineListings;
   }, [vitrineListings, listingFilter]);
 
-  const portfolioUrls = useMemo(
-    () => (profile?.portfolioImages ?? []).map((path) => getResolvedImageUrl(path)),
-    [profile?.portfolioImages]
-  );
+  const portfolioEntries = useMemo(() => {
+    if (profile?.portfolioItems?.length) {
+      return profile.portfolioItems.map((item) => ({
+        url: getResolvedImageUrl(item.url),
+        description: item.description || '',
+      }));
+    }
+    return (profile?.portfolioImages ?? []).map((path) => ({
+      url: getResolvedImageUrl(path),
+      description: '',
+    }));
+  }, [profile?.portfolioImages, profile?.portfolioItems]);
 
   const profileTabs = useMemo(
     () =>
@@ -908,16 +920,26 @@ export function BusinessProfilePage({
 
         {tab === 'portfolio' && (
           <>
-            {portfolioUrls.length > 0 ? (
+            {portfolioEntries.length > 0 ? (
               <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
-                {portfolioUrls.map((url, index) => (
+                {portfolioEntries.map((entry, index) => (
                   <button
-                    key={`${url}-${index}`}
+                    key={`${entry.url}-${index}`}
                     type="button"
                     className="relative aspect-square overflow-hidden bg-black/10"
-                    onClick={() => setPortfolioPreviewUrl(url)}
+                    onClick={() => setPortfolioPreviewUrl(entry.url)}
                   >
-                    <img src={url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    <img
+                      src={entry.url}
+                      alt={entry.description || ''}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                    {entry.description ? (
+                      <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1 py-0.5 text-[10px] leading-tight text-white line-clamp-2">
+                        {entry.description}
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>

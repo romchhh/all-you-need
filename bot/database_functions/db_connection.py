@@ -580,7 +580,8 @@ class DbCursor:
         upper = adapted_sql.strip().upper()
         if is_postgres() and upper.startswith("INSERT") and "RETURNING" not in upper:
             if "INSERT OR IGNORE" in sql.upper():
-                adapted_sql += " ON CONFLICT DO NOTHING"
+                # RETURNING потрібен і при DO NOTHING — інакше lastrowid завжди None
+                adapted_sql += " ON CONFLICT DO NOTHING RETURNING id"
             elif " ON CONFLICT " not in upper:
                 adapted_sql += " RETURNING id"
 
@@ -602,7 +603,10 @@ class DbCursor:
             if is_postgres() and upper.startswith("INSERT") and "RETURNING" in adapted_sql.upper():
                 row = self._cursor.fetchone()
                 if row:
-                    self._lastrowid = row[0]
+                    if isinstance(row, dict):
+                        self._lastrowid = row.get("id")
+                    else:
+                        self._lastrowid = row[0]
             return self._cursor
 
         if is_postgres():

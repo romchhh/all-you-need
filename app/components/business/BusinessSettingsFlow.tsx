@@ -42,7 +42,7 @@ import { type ServiceArea } from '@/lib/businessProfileConstants';
 import {
   WEEKDAY_KEYS,
   parseListingDisplayConfig,
-  parsePortfolioImages,
+  parsePortfolioItems,
   parseWorkingHoursSettings,
   serializeWorkingHoursSettings,
   type ListingDisplayMode,
@@ -53,6 +53,12 @@ import { Listing } from '@/types';
 import { getResolvedImageUrl, compressImageOnClient } from '@/utils/imageUtils';
 import { getProfileShareLink } from '@/utils/botLinks';
 import { BusinessBrandIcon } from '@/components/business/BusinessBrandIcon';
+import {
+  BusinessPortfolioEditor,
+  draftToPortfolioPayload,
+  portfolioItemsToDraft,
+  type PortfolioDraftItem,
+} from '@/components/business/BusinessPortfolioEditor';
 import { BusinessContactField } from '@/components/business/BusinessContactIcons';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
 import type { BusinessProfileData } from '@/components/business/BusinessOwnerProfileView';
@@ -105,8 +111,7 @@ interface FormState {
   selectedListingIds: number[];
   savedLogoPath: string | null;
   savedCoverPath: string | null;
-  portfolioPaths: string[];
-  portfolioNewFiles: File[];
+  portfolioDraft: PortfolioDraftItem[];
 }
 
 const BUSINESS_NAME_MAX = 100;
@@ -140,8 +145,7 @@ function prefillForm(
     selectedListingIds: linkedIds,
     savedLogoPath: profile.logo || null,
     savedCoverPath: profile.coverImage || null,
-    portfolioPaths: parsePortfolioImages(profile.portfolioImages ?? null),
-    portfolioNewFiles: [],
+    portfolioDraft: portfolioItemsToDraft(parsePortfolioItems(profile.portfolioImages ?? null)),
   };
 }
 
@@ -543,14 +547,18 @@ export default function BusinessSettingsFlow({
   const savePortfolio = useCallback(async () => {
     setLoading(true);
     try {
-      const hasNew = form.portfolioNewFiles.length > 0;
+      const { kept, newFiles, newDescriptions } = draftToPortfolioPayload(form.portfolioDraft);
       let res: Response;
-      if (hasNew) {
+      if (newFiles.length > 0) {
         const fd = new FormData();
         fd.append('telegramId', telegramId);
         fd.append('partial', 'true');
-        fd.append('portfolioImages', JSON.stringify(form.portfolioPaths));
-        for (const file of form.portfolioNewFiles) {
+        fd.append('portfolioImages', JSON.stringify(kept));
+        fd.append(
+          'portfolioNewMeta',
+          JSON.stringify(newDescriptions.map((description) => ({ description })))
+        );
+        for (const file of newFiles) {
           fd.append('portfolioNew', file);
         }
         res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
@@ -561,7 +569,7 @@ export default function BusinessSettingsFlow({
           body: JSON.stringify({
             telegramId,
             partial: true,
-            portfolioImages: form.portfolioPaths,
+            portfolioImages: kept,
           }),
         });
       }
@@ -571,8 +579,9 @@ export default function BusinessSettingsFlow({
       }
       const data = await res.json();
       patch({
-        portfolioPaths: parsePortfolioImages(data.profile?.portfolioImages ?? null),
-        portfolioNewFiles: [],
+        portfolioDraft: portfolioItemsToDraft(
+          parsePortfolioItems(data.profile?.portfolioImages ?? null)
+        ),
       });
       showToast(t('businessProfile.updated'), 'success');
       onSuccess();
@@ -584,7 +593,7 @@ export default function BusinessSettingsFlow({
     } finally {
       setLoading(false);
     }
-  }, [form.portfolioNewFiles, form.portfolioPaths, onSuccess, showToast, t, telegramId]);
+  }, [form.portfolioDraft, onSuccess, showToast, t, telegramId]);
 
   const handleSave = async (fromScreen: SettingsScreen) => {
     if (fromScreen === 'portfolio') {
@@ -600,31 +609,6 @@ export default function BusinessSettingsFlow({
     }
     const ok = await saveProfile({ syncListings: fromScreen === 'listings' });
     if (ok) setScreen('hub');
-  };
-
-  const handlePortfolioPick = async (files: FileList | null) => {
-    if (!files?.length) return;
-    const nextFiles: File[] = [...form.portfolioNewFiles];
-    for (const file of Array.from(files)) {
-      if (form.portfolioPaths.length + nextFiles.length >= 30) break;
-      try {
-        nextFiles.push(await compressImageOnClient(file, 2));
-      } catch {
-        showToast(t('businessProfile.validation.photoUploadFailed'), 'error');
-      }
-    }
-    patch({ portfolioNewFiles: nextFiles });
-  };
-
-  const removePortfolioAt = (index: number) => {
-    if (index < form.portfolioPaths.length) {
-      patch({ portfolioPaths: form.portfolioPaths.filter((_, i) => i !== index) });
-      return;
-    }
-    const newIndex = index - form.portfolioPaths.length;
-    patch({
-      portfolioNewFiles: form.portfolioNewFiles.filter((_, i) => i !== newIndex),
-    });
   };
 
   const handleImagePick = async (file: File | null, kind: 'logo' | 'cover') => {
@@ -1433,45 +1417,11 @@ export default function BusinessSettingsFlow({
             {screen === 'portfolio' && (
               <div className="space-y-4 pb-28">
                 <p className={`text-sm ${ac.mutedText}`}>{t('businessProfile.settings.portfolioHint')}</p>
-                <div className="grid grid-cols-3 gap-1">
-                  {form.portfolioPaths.map((path, index) => (
-                    <div key={`saved-${path}-${index}`} className="relative aspect-square overflow-hidden rounded-lg bg-black/10">
-                      <img src={getResolvedImageUrl(path)} alt="" className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removePortfolioAt(index)}
-                        className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white"
-                        aria-label={t('common.delete')}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
-                  {form.portfolioNewFiles.map((file, index) => (
-                    <div key={`new-${file.name}-${index}`} className="relative aspect-square overflow-hidden rounded-lg bg-black/10">
-                      <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removePortfolioAt(form.portfolioPaths.length + index)}
-                        className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white"
-                        aria-label={t('common.delete')}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <label className={`${ui.btnOutline} inline-flex cursor-pointer items-center justify-center gap-2`}>
-                  <Camera size={18} />
-                  {t('businessProfile.settings.addPortfolioPhotos')}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => void handlePortfolioPick(e.target.files)}
-                  />
-                </label>
+                <BusinessPortfolioEditor
+                  items={form.portfolioDraft}
+                  onChange={(portfolioDraft) => patch({ portfolioDraft })}
+                  onError={(message) => showToast(message, 'error')}
+                />
               </div>
             )}
 

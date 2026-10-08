@@ -1,4 +1,4 @@
-import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle, Gift } from 'lucide-react';
+import { Plus, UserPlus, Package, Edit2, Trash2, Check, X, Share2, HelpCircle, Shield, ChevronRight, Filter, ChevronDown, Wallet, Megaphone, MessageCircle, Gift, Bell } from 'lucide-react';
 import { NavIcon } from '@/components/layout/NavIcon';
 import { ImageViewModal } from '@/components/modals/ImageViewModal';
 import { TelegramWebApp } from '@/types/telegram';
@@ -1015,7 +1015,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                 <div className={`flex items-center gap-2 text-sm ${ac.mutedText}`}>
                   <Megaphone size={16} className={`flex-shrink-0 ${ac.mutedText}`} />
                   <span>
-                    {dashboardStats.activeListings} {t('sales.active')}
+                    {Number(dashboardStats.activeListings) || 0} {t('sales.active')}
                   </span>
                 </div>
               )}
@@ -1321,8 +1321,43 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       </>
       )}
 
+      {/* Мої підписки — окремий блок перед нижніми налаштуваннями */}
+      <div className="px-4 pt-6 pb-2">
+        <button
+          type="button"
+          onClick={() => {
+            router.push(`/${lang}/subscriptions`);
+            tg?.HapticFeedback?.impactOccurred?.('light');
+          }}
+          className={`w-full flex items-center justify-between gap-3 px-4 py-4 rounded-2xl border transition-colors ${
+            isLight
+              ? 'border-[#3F5331]/20 bg-white hover:bg-[#E8F0E0]/50 shadow-sm'
+              : 'border-[#C8E6A0]/25 bg-white/[0.04] hover:bg-white/10'
+          }`}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                isLight ? 'bg-[#E8F0E0] text-[#3F5331]' : 'bg-[#C8E6A0]/15 text-[#C8E6A0]'
+              }`}
+            >
+              <Bell size={20} />
+            </span>
+            <div className="min-w-0 text-left">
+              <p className={`font-semibold ${ac.pageHeading}`}>{t('subscriptions.title')}</p>
+              <p className={`text-sm ${ac.mutedText}`}>{t('subscriptions.profileHint')}</p>
+            </div>
+          </div>
+          <ChevronRight size={20} className={`shrink-0 ${ac.mutedText}`} />
+        </button>
+      </div>
+
       {/* Кнопки налаштувань */}
-      <div className="px-4 py-6 space-y-3">
+      <div
+        className={`mx-4 mt-2 mb-6 space-y-3 border-t pt-5 ${
+          isLight ? 'border-gray-200' : 'border-white/10'
+        }`}
+      >
         <LanguageSwitcher tg={tg} fullWidth />
         
         <button
@@ -1754,6 +1789,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             isOpen={showBusinessSubscriptionSheet}
             onClose={() => setShowBusinessSubscriptionSheet(false)}
             businessProfile={businessProfile}
+            telegramId={String(profile.telegramId)}
+            onProfileRefresh={fetchBusinessProfile}
             onChangePlan={openBusinessChangePlan}
           />
           <BusinessStatsSheet

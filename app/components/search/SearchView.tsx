@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Briefcase, Clock, Flame, MapPin, Search, SlidersHorizontal, Sparkles, TrendingUp, X } from 'lucide-react';
+import { ArrowLeft, Bell, Briefcase, Clock, Flame, MapPin, Search, SlidersHorizontal, Sparkles, TrendingUp, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TelegramWebApp } from '@/types/telegram';
@@ -54,7 +54,7 @@ import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
-import { STICKY_BELOW_APP_HEADER_CLASS, OVERLAY_BACK_BUTTON_TOP_CLASS, overlayHeaderActionClass } from '@/components/layout/FixedLogoHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS, overlayHeaderActionClass } from '@/components/layout/FixedLogoHeader';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
@@ -279,6 +279,8 @@ export function SearchView({
   const [loadingRecommendedBusinesses, setLoadingRecommendedBusinesses] = useState(false);
   const businessRequestRef = useRef(0);
   const lastBusinessFetchKeyRef = useRef('');
+  const [searchSubscribed, setSearchSubscribed] = useState(false);
+  const [searchSubBusy, setSearchSubBusy] = useState(false);
   const [viewMode] = useState<'grid' | 'list'>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('bazaarViewMode') === 'list' ? 'list' : 'grid';
@@ -326,6 +328,11 @@ export function SearchView({
     setSearchTotal(0);
     setLoadingResults(false);
     lastFetchKeyRef.current = '';
+    setBusinessResults([]);
+    setBusinessTotal(0);
+    setLoadingBusinessResults(false);
+    lastBusinessFetchKeyRef.current = '';
+    onQueryChangeRef.current?.('');
     tg?.HapticFeedback?.impactOccurred?.('light');
     requestAnimationFrame(() => {
       inputRef.current?.focus();
@@ -650,6 +657,93 @@ export function SearchView({
     [profileTelegramId, showToast, t]
   );
 
+  // Підписка на пошуковий запит (results)
+  useEffect(() => {
+    if (screenMode !== 'results' || !activeQuery.trim() || !profileTelegramId) {
+      setSearchSubscribed(false);
+      return;
+    }
+    let cancelled = false;
+    const q = activeQuery.trim();
+    const mode = searchEntityMode;
+    const params = new URLSearchParams({
+      telegramId: profileTelegramId,
+      query: q,
+      mode,
+    });
+    fetch(`/api/search-subscriptions?${params.toString()}`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setSearchSubscribed(Boolean(data?.subscribed));
+      })
+      .catch(() => {
+        if (!cancelled) setSearchSubscribed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [screenMode, activeQuery, searchEntityMode, profileTelegramId]);
+
+  const handleToggleSearchSubscription = useCallback(async () => {
+    if (!profileTelegramId) {
+      showToast(t('bazaar.searchSubscribeNeedLogin'), 'info');
+      return;
+    }
+    const q = activeQuery.trim();
+    if (q.length < MIN_QUERY_LENGTH || searchSubBusy) return;
+
+    setSearchSubBusy(true);
+    const next = !searchSubscribed;
+    try {
+      if (next) {
+        const res = await fetch('/api/search-subscriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId: profileTelegramId,
+            query: q,
+            mode: searchEntityMode,
+          }),
+        });
+        if (!res.ok) {
+          showToast(t('common.error'), 'error');
+          return;
+        }
+        setSearchSubscribed(true);
+        showToast(t('bazaar.searchSubscribeSuccess'), 'success');
+      } else {
+        const params = new URLSearchParams({
+          telegramId: profileTelegramId,
+          query: q,
+          mode: searchEntityMode,
+        });
+        const res = await fetch(`/api/search-subscriptions?${params.toString()}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          showToast(t('common.error'), 'error');
+          return;
+        }
+        setSearchSubscribed(false);
+        showToast(t('bazaar.searchSubscribeRemoved'), 'success');
+      }
+      tg?.HapticFeedback?.impactOccurred?.('light');
+    } catch {
+      showToast(t('common.error'), 'error');
+    } finally {
+      setSearchSubBusy(false);
+    }
+  }, [
+    activeQuery,
+    profileTelegramId,
+    searchEntityMode,
+    searchSubBusy,
+    searchSubscribed,
+    showToast,
+    t,
+    tg,
+  ]);
+
   const handleCategorySelect = useCallback(
     (categoryId: string | null) => {
       const next = selectedCategory === categoryId ? null : categoryId;
@@ -735,13 +829,14 @@ export function SearchView({
     }
   }, [debouncedQuery, screenMode]);
 
+  // URL оновлюємо лише для committed-запиту (results) — без replaceState на кожен символ
   useEffect(() => {
     onUrlStateChange?.({
-      q: activeQuery || localQuery,
+      q: screenMode === 'results' ? activeQuery : '',
       cities: citiesKey,
       mode: searchEntityMode,
     });
-  }, [activeQuery, localQuery, citiesKey, searchEntityMode, onUrlStateChange]);
+  }, [activeQuery, citiesKey, searchEntityMode, screenMode, onUrlStateChange]);
 
   const activeQueryRef = useRef(activeQuery);
   activeQueryRef.current = activeQuery;
@@ -898,7 +993,7 @@ export function SearchView({
 
   const inputClass = isLight
     ? 'w-full rounded-xl border border-[#3F5331]/15 bg-white py-3 pr-10 text-[#2D3E28] placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
-    : 'w-full rounded-xl border border-white bg-transparent py-3 pr-10 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30';
+    : 'w-full rounded-xl border border-white/35 bg-white/5 py-3 pr-10 text-white placeholder:text-white/60 focus:border-[#C8E6A0]/50 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/25';
 
   const popularQueries = useMemo(() => {
     const categoryKeys =
@@ -1023,9 +1118,10 @@ export function SearchView({
   const isTypingPending =
     trimmedLocal.length >= MIN_QUERY_LENGTH && trimmedLocal !== debouncedQuery.trim();
 
+  // Як на базарі: без суцільної «плашки» під рядком пошуку — фон сторінки просвічує.
   const stickySearchBg = isLight
-    ? 'border-b border-[#3F5331]/10 bg-[#f5f7f2]/98 backdrop-blur-md'
-    : 'border-b border-white/10 bg-[#000000]/95 backdrop-blur-md';
+    ? 'border-b border-[#3F5331]/10 bg-transparent'
+    : 'border-b border-white/10 bg-transparent';
 
   const catalogListingsProps = {
     favorites,
@@ -1117,14 +1213,47 @@ export function SearchView({
         </>
       ) : (
         <>
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="min-w-0">
+              {!loadingResults && !isTypingPending && activeQuery && (
+                <p className={`text-sm ${ac.mutedText}`}>
+                  {t('bazaar.search.resultsCount', { count: String(searchTotal) })}
+                </p>
+              )}
+              {activeQuery && (loadingResults || (isTypingPending && trimmedLocal !== activeQuery)) && (
+                <p className={`text-sm ${ac.mutedText}`}>{t('bazaar.search.searching')}</p>
+              )}
+            </div>
             {!loadingResults && !isTypingPending && activeQuery && (
-              <p className={`text-sm ${ac.mutedText}`}>
-                {t('bazaar.search.resultsCount', { count: String(searchTotal) })}
-              </p>
-            )}
-            {activeQuery && (loadingResults || (isTypingPending && trimmedLocal !== activeQuery)) && (
-              <p className={`text-sm ${ac.mutedText}`}>{t('bazaar.search.searching')}</p>
+              <button
+                type="button"
+                onClick={() => void handleToggleSearchSubscription()}
+                disabled={searchSubBusy}
+                className={`inline-flex shrink-0 items-center gap-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+                  searchSubscribed
+                    ? isLight
+                      ? 'text-[#3F5331]'
+                      : 'text-[#C8E6A0]'
+                    : ac.mutedText
+                }`}
+                aria-label={
+                  searchSubscribed
+                    ? t('bazaar.searchSubscribed')
+                    : t('bazaar.searchSubscribe')
+                }
+              >
+                <Bell
+                  size={16}
+                  className="shrink-0"
+                  fill={searchSubscribed ? 'currentColor' : 'none'}
+                  strokeWidth={2}
+                />
+                <span>
+                  {searchSubscribed
+                    ? t('bazaar.searchSubscribed')
+                    : t('bazaar.searchSubscribe')}
+                </span>
+              </button>
             )}
           </div>
 
@@ -1496,25 +1625,24 @@ export function SearchView({
     <>
       {screenMode === 'discover' ? (
         <>
-          <button
-            type="button"
-            onClick={() => {
-              tg?.HapticFeedback?.impactOccurred?.('light');
-              onBack();
-            }}
-            aria-label={t('common.close')}
-            className={`fixed right-4 z-[60] flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${OVERLAY_BACK_BUTTON_TOP_CLASS} ${overlayHeaderActionClass(isLight)}`}
-          >
-            <X size={20} />
-          </button>
-
-          <div className="px-4 pb-2 pt-14">
-            <h1 className={`pr-12 text-lg font-bold leading-tight sm:text-xl ${ac.pageHeading}`}>
+          <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-2">
+            <h1 className={`min-w-0 flex-1 text-xl font-bold leading-none sm:text-2xl ${ac.pageHeading}`}>
               {t('bazaar.search.title')}
             </h1>
+            <button
+              type="button"
+              onClick={() => {
+                tg?.HapticFeedback?.impactOccurred?.('light');
+                onBack();
+              }}
+              aria-label={t('common.close')}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${overlayHeaderActionClass(isLight)}`}
+            >
+              <X size={20} />
+            </button>
           </div>
 
-          <div className="px-4 pb-3">
+          <div className="px-4 pb-3 pt-1">
             <SearchEntityToggle mode={searchEntityMode} onChange={handleEntityModeChange} />
           </div>
 

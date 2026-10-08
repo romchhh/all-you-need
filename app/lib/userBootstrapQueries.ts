@@ -31,6 +31,15 @@ export async function getUserLanguageForTelegramId(telegramId: string): Promise<
   return 'uk';
 }
 
+/** Читає число з raw-рядка (PG може віддати camelCase або lowercase аліас). */
+function readStatNumber(row: Record<string, unknown> | undefined, key: string): number {
+  if (!row) return 0;
+  const raw = row[key] ?? row[key.toLowerCase()];
+  if (raw == null) return 0;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** Та сама агрегація, що GET /api/user/stats. */
 export async function getUserListingStatsForUserId(
   userId: number,
@@ -39,31 +48,21 @@ export async function getUserListingStatsForUserId(
   const stats = (await prisma.$queryRawUnsafe(
     `SELECT 
         COUNT(*) as totalListings,
-        SUM(views) as totalViews,
-        SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) as soldListings,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings
+        COALESCE(SUM(views), 0) as totalViews,
+        COALESCE(SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END), 0) as soldListings,
+        COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) as activeListings
       FROM Listing
       WHERE userId = ?`,
     userId
-  )) as Array<{
-    totalListings: bigint;
-    totalViews: bigint;
-    soldListings: bigint;
-    activeListings: bigint;
-  }>;
+  )) as Array<Record<string, unknown>>;
 
-  const stat = stats[0] || {
-    totalListings: BigInt(0),
-    totalViews: BigInt(0),
-    soldListings: BigInt(0),
-    activeListings: BigInt(0),
-  };
+  const stat = stats[0];
 
   return {
-    totalListings: Number(stat.totalListings),
-    totalViews: Number(stat.totalViews),
-    soldListings: Number(stat.soldListings),
-    activeListings: Number(stat.activeListings),
+    totalListings: readStatNumber(stat, 'totalListings'),
+    totalViews: readStatNumber(stat, 'totalViews'),
+    soldListings: readStatNumber(stat, 'soldListings'),
+    activeListings: readStatNumber(stat, 'activeListings'),
     createdAt,
   };
 }

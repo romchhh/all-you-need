@@ -486,9 +486,7 @@ const BazaarTabComponent = ({
                 variant="main"
                 searchTriggerMode
                 onOpenSearchModal={() => {
-                  const q = searchQuery.trim();
-                  const query = q ? `?q=${encodeURIComponent(q)}` : '';
-                  router.push(`/${lang}/search${query}`);
+                  router.push(`/${lang}/search`);
                   tg?.HapticFeedback?.impactOccurred?.('light');
                 }}
                 onSearchChange={(query) => {

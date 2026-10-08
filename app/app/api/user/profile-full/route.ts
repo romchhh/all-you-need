@@ -4,6 +4,7 @@ import { normalizeTelegramIdForDb, sqlListingAutoRenewSelect } from '@/lib/dbSql
 import { executeWithRetry, ensureCurrencyColumn, ensureListingApiRawColumns } from '@/lib/prisma';
 import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 import { listingTimeFieldsForApi, parseDbDate } from '@/utils/parseDbDate';
+import { getUserListingStatsForUserId } from '@/lib/userBootstrapQueries';
 
 // SQLite може повертати COUNT як number, bigint або string
 function normalizeFavoritesCount(value: number | bigint | string | undefined): number {
@@ -90,31 +91,10 @@ export async function GET(request: NextRequest) {
       viewerId.trim() !== '' &&
       normalizeTelegramIdForDb(viewerId) === telegramIdKey;
 
-    // Отримуємо статистику
-    const stats = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT 
-          COUNT(*) as totalListings,
-          SUM(views) as totalViews,
-          SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) as soldListings,
-          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeListings
-        FROM Listing
-        WHERE userId = ?`,
-        userId
-      ) as Promise<Array<{
-        totalListings: bigint;
-        totalViews: bigint;
-        soldListings: bigint;
-        activeListings: bigint;
-      }>>
-    );
-
-    const stat = stats[0] || {
-      totalListings: BigInt(0),
-      totalViews: BigInt(0),
-      soldListings: BigInt(0),
-      activeListings: BigInt(0),
-    };
+    const createdAtRaw = userData.createdAt as unknown;
+    const createdAtIso =
+      createdAtRaw instanceof Date ? createdAtRaw.toISOString() : String(createdAtRaw);
+    const listingStats = await getUserListingStatsForUserId(userId, createdAtIso);
 
     // Отримуємо оголошення користувача
     // Для чужого профілю показуємо тільки активні оголошення
@@ -287,13 +267,7 @@ export async function GET(request: NextRequest) {
         reviewsCount: userData.reviewsCount,
         createdAt: userData.createdAt,
       },
-      stats: {
-        totalListings: Number(stat.totalListings),
-        totalViews: Number(stat.totalViews),
-        soldListings: Number(stat.soldListings),
-        activeListings: Number(stat.activeListings),
-        createdAt: userData.createdAt,
-      },
+      stats: listingStats,
       listings: {
         listings: formattedListings,
         total: Number(totalCount[0]?.count || 0),

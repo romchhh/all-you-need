@@ -4,7 +4,11 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { prisma } from '@/lib/prisma';
 import { findUserByTelegramId } from '@/utils/userHelpers';
 import { isValidServiceArea } from '@/lib/businessProfileConstants';
-import { parsePortfolioImages, serializePortfolioImages } from '@/lib/businessProfileSettings';
+import {
+  parsePortfolioItems,
+  serializePortfolioItems,
+  type PortfolioImageItem,
+} from '@/lib/businessProfileSettings';
 import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile, resolveBusinessListingIds, syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
 import type { ListingDisplayMode } from '@/lib/businessProfileSettings';
 import { normalizeInstagramForStorage, normalizeWebsiteForStorage } from '@/utils/socialLinks';
@@ -74,12 +78,24 @@ export async function GET(request: NextRequest) {
       await syncBusinessListingProfileTypes(user.id);
     }
 
+    const hasProPaymentHistory =
+      (await prisma.businessSubscriptionPurchase.count({
+        where: { businessProfileId: profile.id, plan: 'business_pro' },
+      })) > 0;
+
+    const subscriptionAutoRenew =
+      'subscriptionAutoRenew' in profile && typeof profile.subscriptionAutoRenew === 'boolean'
+        ? profile.subscriptionAutoRenew
+        : true;
+
     return NextResponse.json({
       hasProfile: true,
       isActive,
       isSuspended,
       profile: {
         ...profile,
+        subscriptionAutoRenew,
+        hasProPaymentHistory,
         subscriptionEndsAt: profile.subscriptionEndsAt?.toISOString() ?? null,
         createdAt: profile.createdAt.toISOString(),
         updatedAt: profile.updatedAt.toISOString(),
@@ -99,8 +115,10 @@ export async function PUT(request: NextRequest) {
     let body: Record<string, unknown> = {};
     let logoPath: string | null | undefined;
     let coverPath: string | null | undefined;
-    let portfolioImagesParsed: string[] | undefined;
+    let portfolioImagesParsed: PortfolioImageItem[] | undefined;
     const portfolioPathsFromUpload: string[] = [];
+    let portfolioNewDescriptions: string[] = [];
+    let portfolioOrderRaw: unknown[] | undefined;
 
     if (contentType.includes('multipart/form-data')) {
       let form: FormData;
@@ -137,14 +155,38 @@ export async function PUT(request: NextRequest) {
       const coverFile = form.get('coverImage');
       const portfolioNew = form.getAll('portfolioNew').filter(isUploadFile);
       const portfolioKeepRaw = form.get('portfolioImages');
+      const portfolioOrderField = form.get('portfolioOrder');
+      const portfolioNewMetaRaw = form.get('portfolioNewMeta');
       if (portfolioKeepRaw != null && String(portfolioKeepRaw).trim() !== '') {
         try {
-          const parsed = JSON.parse(String(portfolioKeepRaw)) as unknown;
-          if (Array.isArray(parsed)) {
-            portfolioImagesParsed = parsePortfolioImages(JSON.stringify(parsed));
-          }
+          portfolioImagesParsed = parsePortfolioItems(String(portfolioKeepRaw));
         } catch {
           /* keep undefined */
+        }
+      }
+      if (portfolioOrderField != null && String(portfolioOrderField).trim() !== '') {
+        try {
+          const parsed = JSON.parse(String(portfolioOrderField)) as unknown;
+          if (Array.isArray(parsed)) portfolioOrderRaw = parsed;
+        } catch {
+          portfolioOrderRaw = undefined;
+        }
+      }
+      if (portfolioNewMetaRaw != null && String(portfolioNewMetaRaw).trim() !== '') {
+        try {
+          const meta = JSON.parse(String(portfolioNewMetaRaw)) as unknown;
+          if (Array.isArray(meta)) {
+            portfolioNewDescriptions = meta.map((entry) => {
+              if (typeof entry === 'string') return entry;
+              if (entry && typeof entry === 'object') {
+                const desc = (entry as { description?: unknown }).description;
+                return typeof desc === 'string' ? desc : '';
+              }
+              return '';
+            });
+          }
+        } catch {
+          portfolioNewDescriptions = [];
         }
       }
       try {
@@ -193,20 +235,22 @@ export async function PUT(request: NextRequest) {
           : undefined;
       if (json.portfolioImages !== undefined) {
         if (Array.isArray(json.portfolioImages)) {
-          portfolioImagesParsed = (json.portfolioImages as unknown[]).filter(
-            (p: unknown): p is string => typeof p === 'string' && p.trim().length > 0
-          );
+          portfolioImagesParsed = parsePortfolioItems(JSON.stringify(json.portfolioImages));
         } else if (typeof json.portfolioImages === 'string') {
-          portfolioImagesParsed = parsePortfolioImages(json.portfolioImages);
+          portfolioImagesParsed = parsePortfolioItems(json.portfolioImages);
         }
       }
     }
 
     if (portfolioPathsFromUpload.length > 0) {
-      const merged = [...(portfolioImagesParsed ?? []), ...portfolioPathsFromUpload];
-      portfolioImagesParsed = parsePortfolioImages(serializePortfolioImages(merged));
+      const uploadedItems: PortfolioImageItem[] = portfolioPathsFromUpload.map((url, index) => {
+        const description = portfolioNewDescriptions[index]?.trim();
+        return description ? { url, description } : { url };
+      });
+      const merged = [...(portfolioImagesParsed ?? []), ...uploadedItems];
+      portfolioImagesParsed = parsePortfolioItems(serializePortfolioItems(merged));
     } else if (portfolioImagesParsed !== undefined) {
-      portfolioImagesParsed = parsePortfolioImages(serializePortfolioImages(portfolioImagesParsed));
+      portfolioImagesParsed = parsePortfolioItems(serializePortfolioItems(portfolioImagesParsed));
     }
 
     if (!telegramIdRaw) {

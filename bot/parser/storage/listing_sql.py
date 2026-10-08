@@ -123,12 +123,13 @@ INSERT INTO "Listing" (
     images, "optimizedImages",
     "createdAt", "updatedAt", "publishedAt", "expiresAt"
 ) VALUES (
-    ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?::boolean,
     ?, ?, ?, ?,
     'active', 'approved',
     ?, NULL,
     NOW(), NOW(), NOW(), NOW() + INTERVAL '30 days'
 )
+RETURNING id
 """
     return """
 INSERT INTO Listing (
@@ -190,7 +191,7 @@ def parsed_item_blocks_duplicates_sql(alias: str = "pi") -> str:
 
 def is_created_at_within_dedup_window_sql() -> str:
     if is_postgres():
-        return "SELECT 1 WHERE ?::timestamp >= NOW() + CAST(? AS INTERVAL)"
+        return "SELECT 1 WHERE ?::timestamptz >= NOW() + CAST(? AS INTERVAL)"
     return "SELECT 1 WHERE datetime(?) >= datetime('now', ?)"
 
 

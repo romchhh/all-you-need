@@ -1,14 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Clover,
   CreditCard,
   Crown,
-  Heart,
-  Percent,
   X,
   Zap,
 } from 'lucide-react';
@@ -26,13 +24,15 @@ import {
 } from '@/lib/businessProfileConstants';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
 import type { BusinessProfileData } from '@/components/business/BusinessOwnerProfileView';
+import { IosSwitch } from '@/components/ui/IosSwitch';
 
 interface BusinessSubscriptionSheetProps {
   isOpen: boolean;
   onClose: () => void;
   businessProfile: BusinessProfileData;
+  telegramId: string;
   onChangePlan: () => void;
-  onCancelSubscription?: () => void;
+  onProfileRefresh?: () => void;
 }
 
 function formatSubscriptionDate(iso: string, lang: string): string {
@@ -49,14 +49,16 @@ export function BusinessSubscriptionSheet({
   isOpen,
   onClose,
   businessProfile,
+  telegramId,
   onChangePlan,
-  onCancelSubscription,
+  onProfileRefresh,
 }: BusinessSubscriptionSheetProps) {
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   const planLang = language === 'ru' ? 'ru' : 'uk';
   const ui = getBusinessProfileUi(isLight);
+  const [autoRenewSaving, setAutoRenewSaving] = useState(false);
 
   useBodyScrollLock(isOpen);
   useHideBottomNav(isOpen);
@@ -73,40 +75,38 @@ export function BusinessSubscriptionSheet({
   const renewalDate = businessProfile.subscriptionEndsAt
     ? formatSubscriptionDate(businessProfile.subscriptionEndsAt, language)
     : null;
+  const autoRenew = businessProfile.subscriptionAutoRenew ?? true;
+  const showPaymentBlocks = isPro || Boolean(businessProfile.hasProPaymentHistory);
 
   const shell = isLight ? 'bg-white text-gray-900' : 'bg-[#0a0a0a] text-white';
   const headerBorder = ui.divider;
 
-  const planFeatures = parsePlanFeatureLines(t(plan.featuresKey));
+  const sheetTitle = isPro
+    ? t('businessProfile.subscription.manageSubscriptionTitle')
+    : t('businessProfile.subscription.manageTariffTitle');
 
-  const perkRows = [
-    ...(planCredits.highlight > 0
-      ? [
-          {
-            icon: Zap,
-            label: t('businessProfile.owner.highlightSlots'),
-            value: `${highlightRemaining} / ${planCredits.highlight}`,
-            hint: t('businessProfile.subscription.perkRenewal', { date: renewalDate ?? '—' }),
-          },
-        ]
-      : []),
-    ...(planCredits.top > 0
-      ? [
-          {
-            icon: Crown,
-            label: t('businessProfile.owner.topSlots'),
-            value: `${topRemaining} / ${planCredits.top}`,
-            hint: t('businessProfile.subscription.perkRenewal', { date: renewalDate ?? '—' }),
-          },
-        ]
-      : []),
-    {
-      icon: Percent,
-      label: t('businessProfile.subscription.discountLabel'),
-      value: `${promoDiscount}%`,
-      hint: t('businessProfile.owner.promoDiscount', { percent: String(promoDiscount) }),
-    },
-  ];
+  const freeFeatures = parsePlanFeatureLines(t('businessProfile.subscription.freeManageFeatures'));
+  const proCapabilities = parsePlanFeatureLines(t('businessProfile.subscription.proCapabilities'));
+
+  const handleAutoRenewToggle = async (next: boolean) => {
+    if (!telegramId || autoRenewSaving) return;
+    setAutoRenewSaving(true);
+    try {
+      const res = await fetch('/api/user/business-profile/auto-renew', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramId, autoRenew: next }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error('[auto-renew]', data.error || res.status);
+        return;
+      }
+      onProfileRefresh?.();
+    } finally {
+      setAutoRenewSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[99990] flex flex-col justify-end">
@@ -130,7 +130,7 @@ export function BusinessSubscriptionSheet({
           >
             <ChevronLeft size={22} />
           </button>
-          <h2 className={`text-base font-bold ${ac.pageHeading}`}>{t('businessProfile.subscription.title')}</h2>
+          <h2 className={`text-base font-bold ${ac.pageHeading}`}>{sheetTitle}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -150,91 +150,176 @@ export function BusinessSubscriptionSheet({
                 </p>
                 <p className={`mt-1 text-lg font-bold ${ac.pageHeading}`}>{t(plan.labelKey)}</p>
                 <p className={`mt-0.5 text-sm font-semibold ${ui.limeText}`}>
-                  {formatBusinessPlanPrice(planId, planLang)}
+                  {isPro ? formatBusinessPlanPrice(planId, planLang) : t('businessProfile.tariff.free')}
                 </p>
+                {!isPro ? (
+                  <p className={`mt-1 text-sm ${ac.mutedText}`}>
+                    {t('businessProfile.subscription.freePlanForever')}
+                  </p>
+                ) : renewalDate ? (
+                  <p className={`mt-1 text-sm ${ac.mutedText}`}>
+                    {t('businessProfile.subscription.renewsOn', { date: renewalDate })}
+                  </p>
+                ) : null}
               </div>
-              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${ui.limeBgSoft} ${ui.limeText}`}>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${ui.limeBgSoft} ${ui.limeText}`}
+              >
                 <Check size={14} />
-                {t('businessProfile.subscription.active')}
+                {t('businessProfile.subscription.activeBadge')}
               </span>
             </div>
-            {renewalDate ? (
-              <p className={`text-sm ${ac.mutedText}`}>
-                {t('businessProfile.subscription.renewsOn', { date: renewalDate })}
-              </p>
-            ) : null}
           </div>
 
           <div className={`${ui.cardShell} p-4`}>
             <p className={`mb-3 text-xs font-semibold uppercase tracking-wide ${ac.mutedText}`}>
               {t('businessProfile.subscription.inYourPlan')}
             </p>
-            <div className="space-y-3">
-              {perkRows.map(({ icon: Icon, label, value, hint }) => (
-                <div key={label} className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ui.limeBgSoft}`}>
-                    <Icon size={18} className={ui.limeText} />
+
+            {isPro ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Zap size={18} className={ui.limeText} />
+                    <span className={`text-sm font-semibold ${ac.pageHeading}`}>
+                      {t('businessProfile.owner.highlightSlots')}
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-sm font-semibold ${ac.pageHeading}`}>{label}</span>
-                      <span className={`text-sm font-bold tabular-nums ${ui.limeText}`}>{value}</span>
-                    </div>
-                    <p className={`mt-0.5 text-xs ${ac.mutedText}`}>{hint}</p>
-                  </div>
+                  <span className={`text-sm font-bold tabular-nums ${ui.limeText}`}>
+                    {t('businessProfile.subscription.creditsLeft', {
+                      remaining: String(highlightRemaining),
+                      total: String(planCredits.highlight),
+                    })}
+                  </span>
                 </div>
-              ))}
-            </div>
-            <ul className={`mt-4 space-y-1.5 border-t pt-4 ${ui.divider}`}>
-              {planFeatures.map((line) => (
-                <li key={line} className={`text-sm ${ac.mutedText}`}>
-                  {line}
-                </li>
-              ))}
-            </ul>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Crown size={18} className={ui.limeText} />
+                    <span className={`text-sm font-semibold ${ac.pageHeading}`}>
+                      {t('businessProfile.owner.topSlots')}
+                    </span>
+                  </div>
+                  <span className={`text-sm font-bold tabular-nums ${ui.limeText}`}>
+                    {t('businessProfile.subscription.creditsLeft', {
+                      remaining: String(topRemaining),
+                      total: String(planCredits.top),
+                    })}
+                  </span>
+                </div>
+                <div className={`flex items-center justify-between gap-3 border-t pt-4 ${ui.divider}`}>
+                  <span className={`text-sm font-semibold ${ac.pageHeading}`}>
+                    {t('businessProfile.subscription.discountLabel')}
+                    <span className={`mt-0.5 block text-xs font-normal ${ac.mutedText}`}>
+                      {t('businessProfile.owner.promoDiscountShort')}
+                    </span>
+                  </span>
+                  <span className={`text-lg font-bold ${ui.limeText}`}>{promoDiscount}%</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${ui.limeBgSoft} ${ui.limeText}`}
+                >
+                  {promoDiscount}%
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${ac.pageHeading}`}>
+                    {t('businessProfile.subscription.discountLabel')}
+                  </p>
+                  <p className={`text-sm ${ac.mutedText}`}>{t('businessProfile.owner.promoDiscountShort')}</p>
+                </div>
+              </div>
+            )}
+
+            {!isPro ? (
+              <ul className={`mt-4 space-y-1.5 border-t pt-4 ${ui.divider}`}>
+                {freeFeatures.map((line) => (
+                  <li key={line} className={`flex gap-2 text-sm ${ac.mutedText}`}>
+                    <Check size={14} className={`mt-0.5 shrink-0 ${ui.limeText}`} />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
 
+          {isPro ? (
+            <div className={`${ui.cardShell} p-4`}>
+              <p className={`mb-3 text-xs font-semibold uppercase tracking-wide ${ac.mutedText}`}>
+                {t('businessProfile.subscription.planCapabilities')}
+              </p>
+              <ul className="space-y-1.5">
+                {proCapabilities.map((line) => (
+                  <li key={line} className={`flex gap-2 text-sm ${ac.mutedText}`}>
+                    <Check size={14} className={`mt-0.5 shrink-0 ${ui.limeText}`} />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <button type="button" onClick={onChangePlan} className={`${ui.btnOutline} w-full`}>
-            {t('businessProfile.subscription.changePlan')}
+            {isPro ? t('businessProfile.subscription.changePlan') : t('businessProfile.subscription.upgradeToProCta')}
             <ChevronRight size={18} />
           </button>
 
-          <div className={`${ui.cardShell} divide-y ${ui.divider}`}>
-            <div className="px-4 py-3.5">
-              <p className={`mb-3 text-xs font-semibold uppercase tracking-wide ${ac.mutedText}`}>
-                {t('businessProfile.subscription.paymentSection')}
-              </p>
-              <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ui.limeBgSoft}`}>
-                  <CreditCard size={18} className={ui.limeText} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-semibold ${ac.pageHeading}`}>
-                    {t('businessProfile.subscription.paymentMethod')}
-                  </p>
-                  <p className={`text-xs ${ac.mutedText}`}>{t('businessProfile.subscription.cardEnding')}</p>
+          {showPaymentBlocks ? (
+            <div className={`${ui.cardShell} divide-y ${ui.divider}`}>
+              <div className="px-4 py-3.5">
+                <p className={`mb-3 text-xs font-semibold uppercase tracking-wide ${ac.mutedText}`}>
+                  {t('businessProfile.subscription.paymentSection')}
+                </p>
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ui.limeBgSoft}`}
+                  >
+                    <CreditCard size={18} className={ui.limeText} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold ${ac.pageHeading}`}>
+                      {t('businessProfile.subscription.paymentMethod')}
+                    </p>
+                    <p className={`text-xs ${ac.mutedText}`}>{t('businessProfile.subscription.cardEnding')}</p>
+                  </div>
                 </div>
               </div>
+              <button
+                type="button"
+                className={`flex w-full items-center justify-between px-4 py-3.5 text-left ${isLight ? 'hover:bg-gray-50' : 'hover:bg-white/5'}`}
+              >
+                <span className={`text-sm ${ac.pageHeading}`}>{t('businessProfile.subscription.paymentHistory')}</span>
+                <ChevronRight size={18} className={ac.mutedText} />
+              </button>
             </div>
-            <button
-              type="button"
-              className={`flex w-full items-center justify-between px-4 py-3.5 text-left ${isLight ? 'hover:bg-gray-50' : 'hover:bg-white/5'}`}
-            >
-              <span className={`text-sm ${ac.pageHeading}`}>{t('businessProfile.subscription.paymentHistory')}</span>
-              <ChevronRight size={18} className={ac.mutedText} />
-            </button>
-          </div>
-
-          {onCancelSubscription ? (
-            <button type="button" onClick={onCancelSubscription} className={ui.btnDangerOutline}>
-              {t('businessProfile.subscription.cancel')}
-            </button>
           ) : null}
 
           {isPro ? (
-            <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${ui.limeBgSoft} ${ui.limeText}`}>
-              <Clover size={14} className="mt-0.5 shrink-0" />
-              <span>{t('businessProfile.tariff.disclaimerPro')}</span>
+            <div className={`${ui.cardShell} p-4`}>
+              <div className="flex items-center justify-between gap-3">
+                <span className={`text-sm font-semibold ${ac.pageHeading}`}>
+                  {t('businessProfile.subscription.autoRenew')}
+                </span>
+                <IosSwitch
+                  checked={autoRenew}
+                  disabled={autoRenewSaving}
+                  onChange={handleAutoRenewToggle}
+                  aria-label={t('businessProfile.subscription.autoRenew')}
+                />
+              </div>
+              {renewalDate ? (
+                <p className={`mt-3 text-sm ${ac.mutedText}`}>
+                  {autoRenew
+                    ? t('businessProfile.subscription.renewsOn', { date: renewalDate })
+                    : t('businessProfile.subscription.validUntil', { date: renewalDate })}
+                </p>
+              ) : null}
+              {!autoRenew ? (
+                <p className={`mt-2 text-xs leading-relaxed ${ac.mutedText}`}>
+                  {t('businessProfile.subscription.afterPeriodFreeBusiness')}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>

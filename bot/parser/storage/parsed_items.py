@@ -882,8 +882,20 @@ def list_pending_for_auto_approve(max_age_hours: int, limit: int = 400) -> list[
     hours = max(1, int(max_age_hours))
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        f"""
+    from database_functions.db_connection import is_postgres
+
+    if is_postgres():
+        sql = """
+        SELECT * FROM parsed_items
+        WHERE status = 'pending'
+          AND marketplace_listing_id IS NULL
+          AND COALESCE(auto_approved, 0) = 0
+          AND created_at >= NOW() + CAST(? AS INTERVAL)
+        ORDER BY created_at ASC
+        LIMIT ?
+        """
+    else:
+        sql = """
         SELECT * FROM parsed_items
         WHERE status = 'pending'
           AND marketplace_listing_id IS NULL
@@ -891,10 +903,16 @@ def list_pending_for_auto_approve(max_age_hours: int, limit: int = 400) -> list[
           AND datetime(created_at) >= datetime('now', ?)
         ORDER BY datetime(created_at) ASC
         LIMIT ?
-        """,
-        (f"-{hours} hours", int(limit)),
-    )
-    rows = [hydrate_parsed_item(dict(r)) for r in cursor.fetchall()]
+        """
+    cursor.execute(sql, (f"-{hours} hours", int(limit)))
+    rows = []
+    for r in cursor.fetchall():
+        if isinstance(r, dict):
+            rows.append(hydrate_parsed_item(r))
+        elif hasattr(r, "keys"):
+            rows.append(hydrate_parsed_item({k: r[k] for k in r.keys()}))
+        else:
+            rows.append(hydrate_parsed_item(dict(r)))
     conn.close()
     return rows
 

@@ -3,13 +3,11 @@
 import type { ReactNode } from 'react';
 import {
   ChevronRight,
-  Crown,
   Eye,
   Heart,
   MessageCircle,
-  Percent,
   Rocket,
-  Settings2,
+  Settings,
   Star,
   Users,
 } from 'lucide-react';
@@ -49,6 +47,9 @@ export type BusinessProfileData = {
   portfolioImages?: string | null;
   updatedAt?: string;
   subscriptionEndsAt?: string | null;
+  subscriptionStatus?: string;
+  subscriptionAutoRenew?: boolean;
+  hasProPaymentHistory?: boolean;
   highlightCreditsRemaining?: number;
   topCreditsRemaining?: number;
 };
@@ -73,52 +74,6 @@ interface BusinessOwnerProfileViewProps {
   renderListings: () => ReactNode;
   hasMoreListings?: boolean;
   onLoadMore?: () => void;
-}
-
-function CreditRing({
-  remaining,
-  total,
-  label,
-  icon: Icon,
-  isLight,
-}: {
-  remaining: number;
-  total: number;
-  label: string;
-  icon: typeof Heart;
-  isLight: boolean;
-}) {
-  const pct = total > 0 ? Math.min(100, (remaining / total) * 100) : 0;
-  const r = 18;
-  const c = 2 * Math.PI * r;
-  const dash = (pct / 100) * c;
-
-  return (
-    <div className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${isLight ? 'bg-gray-50' : 'bg-white/[0.05]'}`}>
-      <div className="relative h-12 w-12 shrink-0">
-        <svg viewBox="0 0 44 44" className="h-full w-full -rotate-90">
-          <circle cx="22" cy="22" r={r} fill="transparent" stroke={isLight ? '#E5E7EB' : 'rgba(255,255,255,0.12)'} strokeWidth="4" />
-          <circle
-            cx="22"
-            cy="22"
-            r={r}
-            fill="transparent"
-            stroke="#C8E6A0"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeDasharray={`${dash} ${c}`}
-          />
-        </svg>
-        <Icon size={14} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[#C8E6A0]" />
-      </div>
-      <div className="min-w-0">
-        <p className={`text-xs ${isLight ? 'text-gray-500' : 'text-white/55'}`}>{label}</p>
-        <p className={`text-base font-bold tabular-nums ${isLight ? 'text-gray-900' : 'text-white'}`}>
-          {remaining} / {total}
-        </p>
-      </div>
-    </div>
-  );
 }
 
 function formatRatingLine(
@@ -175,12 +130,18 @@ export function BusinessOwnerProfileView({
 
   const logoUrl = businessProfile.logo ? getResolvedImageUrl(businessProfile.logo) : null;
   const isPro = businessProfile.plan === 'business_pro';
-  const planId = (businessProfile.plan === 'business_pro' ? 'business_pro' : 'business') as BusinessPlanId;
+  const planId = (isPro ? 'business_pro' : 'business') as BusinessPlanId;
   const planCredits = BUSINESS_PLAN_MONTHLY_CREDITS[planId];
   const highlightRemaining = businessProfile.highlightCreditsRemaining ?? 0;
   const topRemaining = businessProfile.topCreditsRemaining ?? 0;
   const promoDiscount = isPro ? 20 : 10;
   const showRating = reviewsCount > 0 && rating > 0;
+  const planBadgeLabel = isPro
+    ? t('businessProfile.plans.businessPro.name')
+    : t('businessProfile.plans.business.name');
+  const renewalDate = businessProfile.subscriptionEndsAt
+    ? formatSubscriptionDate(businessProfile.subscriptionEndsAt, language)
+    : null;
 
   const kpiItems = [
     {
@@ -230,7 +191,7 @@ export function BusinessOwnerProfileView({
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <h2 className={`truncate text-xl font-bold ${ac.pageHeading}`}>{businessProfile.businessName}</h2>
               <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${ui.limeBg} text-[#1a1a1a]`}>
-                BUSINESS
+                {planBadgeLabel}
               </span>
             </div>
             {businessProfile.city ? (
@@ -268,49 +229,71 @@ export function BusinessOwnerProfileView({
             aria-label={t('businessProfile.editTitle')}
             className={ui.btnIconOutline}
           >
-            <Settings2 size={20} />
+            <Settings size={20} />
           </button>
         </div>
       </div>
 
-      {/* Subscription */}
-      {businessProfile.subscriptionEndsAt && (
-        <div className={`${ui.cardShell} border-2 ${ui.limeBorder} p-4`}>
-          <p className={`mb-3 text-sm font-medium leading-snug ${ac.pageHeading}`}>
-            {t('businessProfile.owner.subscriptionActiveUntil', {
-              date: formatSubscriptionDate(businessProfile.subscriptionEndsAt, language),
-            })}
-          </p>
-          <button type="button" onClick={onManageSubscription} className={`${ui.btnSolidSm} mb-3`}>
-            {t('businessProfile.owner.manage')}
-            <ChevronRight size={16} />
-          </button>
-          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {planCredits.highlight > 0 ? (
-              <CreditRing
-                remaining={highlightRemaining}
-                total={planCredits.highlight}
-                label={t('businessProfile.owner.highlightSlots')}
-                icon={Heart}
-                isLight={isLight}
-              />
-            ) : null}
-            {planCredits.top > 0 ? (
-              <CreditRing
-                remaining={topRemaining}
-                total={planCredits.top}
-                label={t('businessProfile.owner.topSlots')}
-                icon={Crown}
-                isLight={isLight}
-              />
-            ) : null}
-          </div>
-          <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${ui.limeBgSoft} ${ui.limeText}`}>
-            <Percent size={14} className="shrink-0" />
-            <span>{t('businessProfile.owner.promoDiscount', { percent: String(promoDiscount) })}</span>
+      {/* Tariff / subscription */}
+      <div className={`${ui.cardShell} p-4`}>
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className={`text-sm font-semibold ${ac.pageHeading}`}>
+              {t('businessProfile.owner.yourPlan', { plan: planBadgeLabel })}
+            </p>
+            <p className={`mt-1 text-xs font-medium ${ui.limeText}`}>
+              {isPro && renewalDate
+                ? t('businessProfile.owner.statusActiveUntil', { date: renewalDate })
+                : t('businessProfile.owner.statusActive')}
+            </p>
           </div>
         </div>
-      )}
+
+        {isPro ? (
+          <>
+            {renewalDate ? (
+              <p className={`mb-3 text-sm ${ac.mutedText}`}>
+                {(businessProfile.subscriptionAutoRenew ?? true)
+                  ? t('businessProfile.subscription.renewsOn', { date: renewalDate })
+                  : t('businessProfile.subscription.validUntil', { date: renewalDate })}
+              </p>
+            ) : null}
+            <div className="mb-3 grid grid-cols-2 gap-3">
+              <div>
+                <p className={`text-xs ${ac.mutedText}`}>{t('businessProfile.owner.highlightLeft')}</p>
+                <p className={`text-sm font-bold tabular-nums ${ac.pageHeading}`}>
+                  {highlightRemaining} / {planCredits.highlight}
+                </p>
+              </div>
+              <div>
+                <p className={`text-xs ${ac.mutedText}`}>{t('businessProfile.owner.topLeft')}</p>
+                <p className={`text-sm font-bold tabular-nums ${ac.pageHeading}`}>
+                  {topRemaining} / {planCredits.top}
+                </p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className={`mb-1 text-sm font-semibold ${ac.pageHeading}`}>
+              {t('businessProfile.owner.freeProfileTitle')}
+            </p>
+            <p className={`mb-3 text-sm leading-relaxed ${ac.mutedText}`}>
+              {t('businessProfile.owner.freeProfileDescription')}
+            </p>
+          </>
+        )}
+
+        <div className={`mb-4 flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm ${ui.limeBgSoft}`}>
+          <span className={ac.pageHeading}>{t('businessProfile.owner.promoDiscountRow')}</span>
+          <span className={`font-bold tabular-nums ${ui.limeText}`}>{promoDiscount}%</span>
+        </div>
+
+        <button type="button" onClick={onManageSubscription} className={`${ui.btnOutline} w-full`}>
+          {isPro ? t('businessProfile.owner.manageSubscription') : t('businessProfile.owner.manageTariff')}
+          <ChevronRight size={16} />
+        </button>
+      </div>
 
       {/* 30-day stats */}
       <div className={ui.cardShell}>

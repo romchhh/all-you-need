@@ -167,16 +167,28 @@ def create_marketplace_listing(
     images_json = json.dumps(images, ensure_ascii=False)
     default_condition = "new" if cat == "services_work" else "used"
 
+    from database_functions.db_connection import bool_param, is_postgres
+
     cursor.execute(
         create_listing_insert_sql(),
         (
-            user_id, title, description, price_str, currency, bool(is_free),
+            user_id, title, description, price_str, currency, bool_param(bool(is_free)),
             category, subcategory, condition or default_condition, loc,
             images_json,
         ),
     )
     conn.commit()
     listing_id = cursor.lastrowid
+    if not listing_id:
+        select_sql = (
+            'SELECT id FROM "Listing" WHERE "userId" = ? ORDER BY id DESC LIMIT 1'
+            if is_postgres()
+            else "SELECT id FROM Listing WHERE userId = ? ORDER BY id DESC LIMIT 1"
+        )
+        cursor.execute(select_sql, (user_id,))
+        row = cursor.fetchone()
+        if row is not None:
+            listing_id = row["id"] if hasattr(row, "keys") else row[0]
     conn.close()
     if not listing_id:
         raise RuntimeError("INSERT Listing did not return id (PostgreSQL RETURNING)")

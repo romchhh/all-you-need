@@ -127,14 +127,8 @@ export function useBazaarPage() {
     }
   }, []);
 
-  const [searchQuery, setSearchQuery] = useState(() => {
-    // Завантажуємо збережений пошуковий запит з localStorage
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bazaarSearchQuery');
-      return saved || '';
-    }
-    return '';
-  });
+  // Пошук на окремій сторінці /search — на головній базару рядок лише відкриває пошук
+  const [searchQuery, setSearchQuery] = useState('');
 
   const debouncedSearchQuery = useDebounce(searchQuery, 800);
   const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
@@ -173,23 +167,11 @@ export function useBazaarPage() {
     }
   }, []);
   
-  // Зберігаємо пошуковий запит в localStorage (debounce — не блокуємо main thread при наборі)
-  const debouncedSearchForStorage = useDebounce(searchQuery, 500);
+  // Не тримаємо bazaarSearchQuery — інакше після /search на головній з’являється «проміжний» відфільтрований екран
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('bazaarSearchQuery', debouncedSearchForStorage);
-    }
-  }, [debouncedSearchForStorage]);
-
-  // Синхронізуємо пошук після повернення зі сторінки /search
-  useEffect(() => {
-    const syncSearchFromStorage = () => {
-      if (typeof window === 'undefined') return;
-      const saved = localStorage.getItem('bazaarSearchQuery') ?? '';
-      setSearchQuery(saved);
-    };
-    window.addEventListener('pageshow', syncSearchFromStorage);
-    return () => window.removeEventListener('pageshow', syncSearchFromStorage);
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem('bazaarSearchQuery');
+    setSearchQuery('');
   }, []);
 
   // Deep-link: ?create=1 відкриває форму створення оголошення (товари) одразу

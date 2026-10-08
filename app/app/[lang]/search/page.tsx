@@ -143,7 +143,8 @@ export default function SearchPage() {
 
   const handleQueryChange = useCallback((query: string) => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem('bazaarSearchQuery', query);
+    // Пошук живе лише на /search — не залишаємо фільтр на головній базару
+    localStorage.removeItem('bazaarSearchQuery');
     const url = new URL(window.location.href);
     url.searchParams.delete('listing');
     url.searchParams.delete('user');
@@ -184,7 +185,10 @@ export default function SearchPage() {
 
   const handleBack = useCallback(() => {
     tg?.HapticFeedback?.impactOccurred?.('light');
-    router.push(`/${lang}/bazaar`);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('bazaarSearchQuery');
+    }
+    router.replace(`/${lang}/bazaar`);
   }, [router, lang, tg]);
 
   const toggleFavorite = async (id: number) => {
@@ -319,7 +323,7 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen pb-6 animate-content-crossfade">
+    <div className="min-h-screen pb-6">
       <AppHeader />
       <SearchView
           initialQuery={initialQuery}

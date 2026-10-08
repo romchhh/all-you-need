@@ -141,20 +141,82 @@ export function parseLinkedListingIds(raw: string | null | undefined): number[] 
   return parseListingDisplayConfig(raw).ids;
 }
 
-export function parsePortfolioImages(raw: string | null | undefined): string[] {
+export type PortfolioImageItem = {
+  url: string;
+  description?: string;
+};
+
+export const PORTFOLIO_MAX = 12;
+export const PORTFOLIO_DESCRIPTION_MAX = 200;
+
+function normalizePortfolioUrl(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim();
+}
+
+function normalizePortfolioDescription(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim().slice(0, PORTFOLIO_DESCRIPTION_MAX);
+  return trimmed || undefined;
+}
+
+/** Парсить JSON портфоліо: рядки або об'єкти { url, description }. */
+export function parsePortfolioItems(raw: string | null | undefined): PortfolioImageItem[] {
   if (!raw?.trim()) return [];
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+
+    const items: PortfolioImageItem[] = [];
+    const seen = new Set<string>();
+    for (const entry of parsed) {
+      let url = '';
+      let description: string | undefined;
+      if (typeof entry === 'string') {
+        url = normalizePortfolioUrl(entry);
+      } else if (entry && typeof entry === 'object') {
+        const obj = entry as Record<string, unknown>;
+        url = normalizePortfolioUrl(obj.url ?? obj.path ?? obj.src);
+        description = normalizePortfolioDescription(obj.description ?? obj.caption);
+      }
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      items.push(description ? { url, description } : { url });
+      if (items.length >= PORTFOLIO_MAX) break;
+    }
+    return items;
   } catch {
     return [];
   }
 }
 
-const PORTFOLIO_MAX = 30;
+/** Лише URL (для зворотної сумісності). */
+export function parsePortfolioImages(raw: string | null | undefined): string[] {
+  return parsePortfolioItems(raw).map((item) => item.url);
+}
+
+export function serializePortfolioItems(
+  items: Array<PortfolioImageItem | string | null | undefined>
+): string {
+  const seen = new Set<string>();
+  const normalized: PortfolioImageItem[] = [];
+  for (const entry of items) {
+    if (entry == null) continue;
+    const url = typeof entry === 'string' ? normalizePortfolioUrl(entry) : normalizePortfolioUrl(entry.url);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    const description =
+      typeof entry === 'string' ? undefined : normalizePortfolioDescription(entry.description);
+    normalized.push(description ? { url, description } : { url });
+    if (normalized.length >= PORTFOLIO_MAX) break;
+  }
+  // Якщо описів немає — зберігаємо як масив рядків (компактніше / сумісність)
+  if (normalized.every((item) => !item.description)) {
+    return JSON.stringify(normalized.map((item) => item.url));
+  }
+  return JSON.stringify(normalized);
+}
 
 export function serializePortfolioImages(paths: string[]): string {
-  const unique = [...new Set(paths.map((p) => p.trim()).filter(Boolean))].slice(0, PORTFOLIO_MAX);
-  return JSON.stringify(unique);
+  return serializePortfolioItems(paths);
 }

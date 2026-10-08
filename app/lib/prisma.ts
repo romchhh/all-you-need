@@ -690,6 +690,77 @@ export async function ensureCitySubscriptionTable(): Promise<void> {
   }
 }
 
+let searchSubscriptionTableChecked = false;
+
+/** Підписки на пошукові запити (ensure для PG/SQLite без окремої migrate на старих інстансах). */
+export async function ensureSearchSubscriptionTable(): Promise<void> {
+  if (searchSubscriptionTableChecked) {
+    return;
+  }
+
+  try {
+    const tableInfo = await executeWithRetry(() =>
+      queryRawUnsafe<Array<{ name: string }>>(tableExistsQuery('SearchSubscription'))
+    );
+
+    if (tableInfo.length === 0) {
+      try {
+        await executeWithRetry(() =>
+          prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS SearchSubscription (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              userId INTEGER NOT NULL,
+              queryKey TEXT NOT NULL,
+              queryText TEXT NOT NULL,
+              entityMode TEXT NOT NULL DEFAULT 'listings',
+              createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
+              UNIQUE(userId, queryKey, entityMode)
+            )
+          `)
+        );
+      } catch (error: any) {
+        if (
+          !error.message?.includes('Execute returned results') &&
+          !error.message?.includes('already exists')
+        ) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Note: Could not create SearchSubscription table:', error.message);
+          }
+        }
+      }
+    }
+
+    const createIndexSafely = async (indexName: string, sql: string) => {
+      try {
+        await executeWithRetry(() => prisma.$executeRawUnsafe(sql));
+      } catch (error: any) {
+        if (!error.message?.includes('Execute returned results')) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Note: Could not create ${indexName}:`, error.message);
+          }
+        }
+      }
+    };
+
+    await createIndexSafely(
+      'idx_searchsubscription_userId',
+      `CREATE INDEX IF NOT EXISTS idx_searchsubscription_userId ON SearchSubscription(userId)`
+    );
+    await createIndexSafely(
+      'idx_searchsubscription_queryKey',
+      `CREATE INDEX IF NOT EXISTS idx_searchsubscription_queryKey ON SearchSubscription(queryKey)`
+    );
+
+    searchSubscriptionTableChecked = true;
+  } catch (error: any) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Note: Could not ensure SearchSubscription table:', error.message);
+    }
+    searchSubscriptionTableChecked = true;
+  }
+}
+
 let promotionPurchaseTableChecked = false;
 
 /** Таблиця реклами (старі SQLite без prisma migrate). */
@@ -796,7 +867,7 @@ export async function ensureUserSessionTable(): Promise<void> {
             CREATE TABLE IF NOT EXISTS UserSession (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               userId INTEGER NOT NULL,
-              telegramId INTEGER NOT NULL,
+              telegramId BIGINT NOT NULL,
               lastActiveAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
@@ -826,18 +897,27 @@ export async function ensureUserSessionTable(): Promise<void> {
       } catch (error: any) {
         if (!error.message?.includes('Execute returned results') && 
             !error.message?.includes('already exists')) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Note: Could not create UserSession table:', error.message);
-          }
+          console.error('[UserSession] create table failed:', error.message);
         }
+      }
+    } else if (isPostgres()) {
+      // Старі інстанси могли створити telegramId як INTEGER — Telegram id не вміщаються.
+      try {
+        await executeWithRetry(() =>
+          prisma.$executeRawUnsafe(`
+            ALTER TABLE "UserSession"
+            ALTER COLUMN "telegramId" TYPE BIGINT
+            USING "telegramId"::bigint
+          `)
+        );
+      } catch {
+        // already BIGINT or locked — ignore
       }
     }
     
     userSessionTableChecked = true;
   } catch (error: any) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Note: Could not ensure UserSession table:', error.message);
-    }
+    console.error('[UserSession] ensure table failed:', error.message);
     userSessionTableChecked = true;
   }
 }
@@ -863,20 +943,27 @@ export async function updateUserActivity(telegramId: string | number | bigint): 
     }
 
     const now = new Date();
+    // telegramId у UserSession — BIGINT; рядок без ::bigint на PG тихо ламає INSERT.
+    const telegramIdParam = (() => {
+      try {
+        return BigInt(telegramIdKey);
+      } catch {
+        return telegramIdKey;
+      }
+    })();
+
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
         `INSERT INTO UserSession (userId, telegramId, lastActiveAt, createdAt)
          VALUES (?, ?, ?, ?)
          ON CONFLICT(userId, telegramId) DO UPDATE SET lastActiveAt = excluded.lastActiveAt`,
         users[0].id,
-        telegramIdKey,
+        telegramIdParam,
         now,
         now
       )
     );
   } catch (error: any) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Note: Could not update user activity:', error.message);
-    }
+    console.error('[UserSession] updateUserActivity failed:', error?.message || error);
   }
 }

@@ -15,10 +15,11 @@ type SearchEntityToggleProps = {
 export function SearchEntityToggle({ mode, onChange, count, className = '' }: SearchEntityToggleProps) {
   const { t } = useLanguage();
   const { isLight } = useTheme();
+  const showCount = typeof count === 'number';
 
   return (
-    <div className={`flex items-end justify-between gap-3 ${className}`}>
-      <div className="flex min-w-0 gap-8">
+    <div className={`flex items-end gap-3 ${className}`}>
+      <div className={`flex min-w-0 flex-1 ${showCount ? 'gap-6 sm:gap-8' : 'gap-0'}`}>
         {(['listings', 'businesses'] as const).map((item) => {
           const active = mode === item;
           return (
@@ -29,7 +30,9 @@ export function SearchEntityToggle({ mode, onChange, count, className = '' }: Se
                 if (active) return;
                 onChange(item);
               }}
-              className={`relative pb-2 text-sm font-semibold transition-colors ${
+              className={`relative pb-2.5 text-base font-semibold transition-colors sm:text-[1.0625rem] ${
+                showCount ? 'shrink-0' : 'flex-1 text-center'
+              } ${
                 active
                   ? isLight
                     ? 'text-[#3F5331] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-[#3F5331]'
@@ -46,9 +49,9 @@ export function SearchEntityToggle({ mode, onChange, count, className = '' }: Se
           );
         })}
       </div>
-      {typeof count === 'number' && (
+      {showCount && (
         <span
-          className={`shrink-0 pb-2 text-sm font-medium ${
+          className={`shrink-0 pb-2.5 text-base font-medium ${
             isLight ? 'text-[#5A6B52]' : 'text-white/55'
           }`}
         >

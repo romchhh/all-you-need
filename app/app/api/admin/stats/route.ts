@@ -9,7 +9,8 @@ async function countActiveSessions(since: Date): Promise<number> {
       since
     );
     return Number(rows[0]?.count ?? 0);
-  } catch {
+  } catch (error) {
+    console.error('[admin/stats] countActiveSessions failed:', error);
     return 0;
   }
 }
@@ -22,7 +23,8 @@ async function countActiveSessionsBetween(from: Date, to: Date): Promise<number>
       to
     );
     return Number(rows[0]?.count ?? 0);
-  } catch {
+  } catch (error) {
+    console.error('[admin/stats] countActiveSessionsBetween failed:', error);
     return 0;
   }
 }

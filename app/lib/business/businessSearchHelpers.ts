@@ -280,3 +280,76 @@ export async function getRecommendedBusinessProfiles(
   });
   return items;
 }
+
+/** Бізнеси, на які підписаний користувач (BusinessFollow). */
+export async function listFollowedBusinessProfiles(
+  viewerTelegramId: string,
+  options?: { limit?: number; offset?: number }
+): Promise<{ items: BusinessSearchResultRow[]; total: number }> {
+  const viewerUserId = await resolveViewerUserId(viewerTelegramId);
+  if (viewerUserId == null) {
+    return { items: [], total: 0 };
+  }
+
+  const limit = Math.min(Math.max(options?.limit ?? 50, 1), 100);
+  const offset = Math.max(options?.offset ?? 0, 0);
+
+  const countRows = await rawQuery<Array<{ cnt: bigint | number }>>(
+    prisma,
+    `SELECT COUNT(*) as cnt
+     FROM BusinessFollow bf
+     JOIN BusinessProfile bp ON bp.id = bf.businessProfileId
+     JOIN User u ON u.id = bp.userId
+     WHERE bf.followerUserId = ?
+       AND ${activeBusinessWhere()}`,
+    [viewerUserId]
+  );
+  const total = Number(countRows[0]?.cnt ?? 0);
+  if (total === 0) {
+    return { items: [], total: 0 };
+  }
+
+  const rows = await rawQuery<Array<Record<string, unknown>>>(
+    prisma,
+    `SELECT
+       bp.id,
+       bp.businessName,
+       bp.logo,
+       bp.category,
+       bp.subcategory,
+       bp.description,
+       bp.city,
+       bp.address,
+       CAST(u.telegramId AS TEXT) as sellerTelegramId,
+       COALESCE(u.rating, 0) as rating,
+       COALESCE(u.reviewsCount, 0) as reviewsCount,
+       COALESCE(bp.followersCount, 0) as followersCount,
+       1 as isFollowing
+     FROM BusinessFollow bf
+     JOIN BusinessProfile bp ON bp.id = bf.businessProfileId
+     JOIN User u ON u.id = bp.userId
+     WHERE bf.followerUserId = ?
+       AND ${activeBusinessWhere()}
+     ORDER BY bf.createdAt DESC
+     LIMIT ? OFFSET ?`,
+    [viewerUserId, limit, offset]
+  );
+
+  const items: BusinessSearchResultRow[] = rows.map((row) => ({
+    id: Number(row.id),
+    businessName: String(row.businessName),
+    logo: (row.logo as string | null) ?? null,
+    category: String(row.category),
+    subcategory: (row.subcategory as string | null) ?? null,
+    description: String(row.description),
+    city: String(row.city),
+    address: (row.address as string | null) ?? null,
+    sellerTelegramId: String(row.sellerTelegramId),
+    rating: Number(row.rating) || 0,
+    reviewsCount: Number(row.reviewsCount) || 0,
+    followersCount: Number(row.followersCount) || 0,
+    isFollowing: true,
+  }));
+
+  return { items, total };
+}

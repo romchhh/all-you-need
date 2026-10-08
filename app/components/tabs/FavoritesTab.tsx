@@ -91,8 +91,8 @@ export const FavoritesTab = ({
         onTouchEnd={handleTouchEnd}
         style={{ touchAction: 'pan-y' }}
       >
-        <h2 className={`text-2xl font-bold mb-2 pt-2 ${ac.pageHeading}`}>Обране</h2>
-        <p className={`text-sm mb-8 ${ac.nothingFound}`}>Тут товари, які вам сподобалися</p>
+        <h2 className={`text-2xl font-bold mb-2 pt-2 ${ac.pageHeading}`}>{t('favorites.title')}</h2>
+        <p className={`text-sm mb-8 ${ac.nothingFound}`}>{t('favorites.subtitle')}</p>
         
         <div className="flex-1 flex items-start justify-center pt-8 pb-20">
           <div className="max-w-sm mx-auto px-4">
@@ -109,8 +109,8 @@ export const FavoritesTab = ({
                   strokeWidth={2}
                 />
               </div>
-              <h3 className={`text-xl font-bold mb-3 ${ac.pageHeading}`}>У вас ще немає обраних</h3>
-              <p className="text-sm text-gray-400">Додайте товари до списку обраного, щоб швидко знаходити улюблене</p>
+              <h3 className={`text-xl font-bold mb-3 ${ac.pageHeading}`}>{t('favorites.emptyTitle')}</h3>
+              <p className="text-sm text-gray-400">{t('favorites.emptyHint')}</p>
             </div>
           </div>
         </div>
@@ -127,8 +127,8 @@ export const FavoritesTab = ({
       style={{ touchAction: 'pan-y' }}
     >
       <div className="px-4 pt-1 pb-3 max-lg:pt-0">
-        <h2 className={`text-2xl font-bold mb-2 ${ac.pageHeading}`}>Обране</h2>
-        <p className={`text-sm mb-4 ${ac.nothingFound}`}>Тут товари, які вам сподобалися</p>
+        <h2 className={`text-2xl font-bold mb-2 ${ac.pageHeading}`}>{t('favorites.title')}</h2>
+        <p className={`text-sm mb-4 ${ac.nothingFound}`}>{t('favorites.subtitle')}</p>
         
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           {favoritedListings.map(listing => (

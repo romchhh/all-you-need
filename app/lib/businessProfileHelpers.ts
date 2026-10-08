@@ -13,7 +13,7 @@ import {
   parseLinkedListingIds,
   parseListingDisplayConfig,
   serializeListingDisplayConfig,
-  serializePortfolioImages,
+  serializePortfolioItems,
   type ListingDisplayMode,
 } from '@/lib/businessProfileSettings';
 import {
@@ -42,7 +42,7 @@ export type BusinessProfileInput = {
   plan?: BusinessPlanId | null;
   listingIds?: number[];
   listingDisplayMode?: ListingDisplayMode;
-  portfolioImages?: string[] | null;
+  portfolioImages?: Array<string | { url: string; description?: string }> | null;
 };
 
 
@@ -119,7 +119,7 @@ export async function upsertBusinessProfileDraft(
     linkedListingIds: listingIdsJson,
     portfolioImages:
       data.portfolioImages !== undefined
-        ? serializePortfolioImages(data.portfolioImages ?? [])
+        ? serializePortfolioItems(data.portfolioImages ?? [])
         : partial
           ? existing?.portfolioImages ?? null
           : existing?.portfolioImages ?? null,
@@ -239,6 +239,39 @@ export async function pauseBusinessProfile(userId: number, businessProfileId: nu
   });
 }
 
+/** After PRO period ends — keep Business profile on the free tier. */
+export async function downgradeProToFreeBusiness(
+  userId: number,
+  businessProfileId: number
+): Promise<void> {
+  const now = new Date();
+  await prisma.businessProfile.update({
+    where: { id: businessProfileId },
+    data: {
+      plan: 'business',
+      subscriptionStatus: 'active',
+      subscriptionEndsAt: null,
+      subscriptionAutoRenew: true,
+      isPublished: true,
+      highlightCreditsRemaining: 0,
+      topCreditsRemaining: 0,
+      updatedAt: now,
+    },
+  });
+
+  await prisma.businessSubscriptionPurchase.updateMany({
+    where: {
+      businessProfileId,
+      status: 'active',
+    },
+    data: {
+      status: 'expired',
+    },
+  });
+
+  await syncBusinessListingProfileTypes(userId);
+}
+
 export async function deactivateBusinessProfile(
   userId: number,
   businessProfileId: number
@@ -268,19 +301,33 @@ export async function deactivateBusinessProfile(
   });
 }
 
+async function expireEndedProSubscription(
+  userId: number,
+  profile: { id: number; subscriptionAutoRenew?: boolean }
+): Promise<void> {
+  const autoRenew = profile.subscriptionAutoRenew ?? true;
+  if (!autoRenew) {
+    await downgradeProToFreeBusiness(userId, profile.id);
+    return;
+  }
+  // Recurring charge is not wired yet — profile is suspended until manual renewal.
+  await deactivateBusinessProfile(userId, profile.id);
+}
+
 export async function expireDueBusinessSubscriptions(limit = 200): Promise<number> {
   const now = new Date();
   const due = await prisma.businessProfile.findMany({
     where: {
       subscriptionStatus: 'active',
+      plan: 'business_pro',
       subscriptionEndsAt: { lt: now },
     },
     take: limit,
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, subscriptionAutoRenew: true },
   });
 
   for (const profile of due) {
-    await deactivateBusinessProfile(profile.userId, profile.id);
+    await expireEndedProSubscription(profile.userId, profile);
   }
 
   return due.length;
@@ -290,7 +337,11 @@ export async function expireBusinessProfileIfNeeded(userId: number): Promise<voi
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
   if (!profile) return;
   if (profile.subscriptionStatus === 'active' && profile.subscriptionEndsAt && profile.subscriptionEndsAt <= new Date()) {
-    await deactivateBusinessProfile(userId, profile.id);
+    if (profile.plan === 'business_pro') {
+      await expireEndedProSubscription(userId, profile);
+    } else {
+      await deactivateBusinessProfile(userId, profile.id);
+    }
   }
 }
 
@@ -329,6 +380,7 @@ export async function activateBusinessSubscription(
       plan,
       subscriptionStatus: 'active',
       subscriptionEndsAt: isFreePlan ? null : endsAt,
+      ...(isFreePlan ? {} : { subscriptionAutoRenew: true }),
       isPublished: true,
       linkedListingIds,
       highlightCreditsRemaining: credits.highlight,

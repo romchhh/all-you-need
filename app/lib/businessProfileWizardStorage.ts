@@ -6,6 +6,7 @@ export type BusinessWizardStep =
   | 'step3'
   | 'step4'
   | 'step5'
+  | 'step6'
   | 'preview'
   | 'tariff'
   | 'payment';

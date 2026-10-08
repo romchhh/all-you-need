@@ -34,6 +34,7 @@ model User {
   telegramListings        TelegramListing[]
   favorites               Favorite[]
   citySubscriptions       CitySubscription[]
+  searchSubscriptions     SearchSubscription[]
   transactions            Transaction[]
   reviews                 Review[]
   payments                Payment[]
@@ -161,6 +162,22 @@ model CitySubscription {
 
   @@unique([userId, cityKey])
   @@index([cityKey])
+}
+
+// Підписка на пошуковий запит (нові оголошення за запитом)
+model SearchSubscription {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  queryKey   String
+  queryText  String
+  entityMode String   @default("listings")
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, queryKey, entityMode])
+  @@index([queryKey])
+  @@index([userId])
 }
 
 // Обране
@@ -430,6 +447,7 @@ model BusinessProfile {
   followersCount            Int @default(0)
   subscriptionStatus String    @default("draft") // draft, pending, active, expired, cancelled
   subscriptionEndsAt DateTime?
+  subscriptionAutoRenew Boolean @default(true)
   isPublished        Boolean   @default(false)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

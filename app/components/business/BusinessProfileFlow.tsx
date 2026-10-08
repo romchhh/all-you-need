@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import { X, Upload, Check, ChevronLeft, MapPin, Phone, Image as ImageIcon, Package, AlertCircle } from 'lucide-react';
+import { X, Upload, Check, ChevronLeft, MapPin, Phone, Image as ImageIcon, Package, AlertCircle, Images } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -38,13 +38,27 @@ import { Listing } from '@/types';
 import { getResolvedImageUrl, compressImageOnClient } from '@/utils/imageUtils';
 import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
 import { BusinessBrandIcon } from '@/components/business/BusinessBrandIcon';
+import {
+  BusinessPortfolioEditor,
+  draftToPortfolioPayload,
+  type PortfolioDraftItem,
+} from '@/components/business/BusinessPortfolioEditor';
 
 const PaymentSummaryModal = dynamic(
   () => import('@/components/modals/PaymentSummaryModal').then((m) => ({ default: m.PaymentSummaryModal })),
   { ssr: false }
 );
 
-type WizardStep = 'step1' | 'step2' | 'step3' | 'step4' | 'step5' | 'preview' | 'tariff' | 'payment';
+type WizardStep =
+  | 'step1'
+  | 'step2'
+  | 'step3'
+  | 'step4'
+  | 'step5'
+  | 'step6'
+  | 'preview'
+  | 'tariff'
+  | 'payment';
 
 interface BusinessProfileFlowProps {
   isOpen: boolean;
@@ -76,8 +90,20 @@ interface BusinessProfileFlowProps {
     coverImage?: string | null;
     linkedListingIds?: string | null;
     plan?: string | null;
+    subscriptionStatus?: string;
+    subscriptionEndsAt?: string | null;
     updatedAt?: string;
   } | null;
+}
+
+function formatTariffDate(iso: string, lang: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'uk-UA', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 interface FormState {
@@ -102,6 +128,7 @@ interface FormState {
   selectedPlan: BusinessPlanId | null;
   savedLogoPath: string | null;
   savedCoverPath: string | null;
+  portfolioDraft: PortfolioDraftItem[];
 }
 
 const initialForm = (defaults: { telegram?: string; phone?: string }): FormState => ({
@@ -126,6 +153,7 @@ const initialForm = (defaults: { telegram?: string; phone?: string }): FormState
   selectedPlan: 'business',
   savedLogoPath: null,
   savedCoverPath: null,
+  portfolioDraft: [],
 });
 
 const formToStored = (form: FormState): StoredBusinessWizardForm => ({
@@ -168,8 +196,23 @@ const storedToForm = (
     phone: stored.phone || defaults.phone || '',
     logoPreview: stored.logoPreview || stored.savedLogoPath,
     coverPreview: stored.coverPreview || stored.savedCoverPath,
+    portfolioDraft: [],
   };
 };
+
+function appendPortfolioToFormData(fd: FormData, draft: PortfolioDraftItem[]) {
+  const { kept, newFiles, newDescriptions } = draftToPortfolioPayload(draft);
+  fd.append('portfolioImages', JSON.stringify(kept));
+  if (newFiles.length > 0) {
+    fd.append(
+      'portfolioNewMeta',
+      JSON.stringify(newDescriptions.map((description) => ({ description })))
+    );
+    for (const file of newFiles) {
+      fd.append('portfolioNew', file);
+    }
+  }
+}
 
 const restoreStep = (savedStep: BusinessWizardStep): WizardStep =>
   savedStep === 'payment' ? 'tariff' : savedStep;
@@ -298,11 +341,73 @@ export default function BusinessProfileFlow({
     [tg, telegramId]
   );
   const subscribeExistingProfile = renewMode || planPickerMode;
+  const existingPlanId: BusinessPlanId | null =
+    existingProfile?.plan === 'business_pro'
+      ? 'business_pro'
+      : existingProfile?.plan
+        ? 'business'
+        : null;
+  const isProSubscriptionActive =
+    existingPlanId === 'business_pro' &&
+    existingProfile?.subscriptionStatus === 'active' &&
+    (!existingProfile.subscriptionEndsAt || new Date(existingProfile.subscriptionEndsAt) > new Date());
+
   const flowHeaderTitle = editMode
     ? t('businessProfile.editTitle')
     : renewMode
       ? t('businessProfile.suspended.renewTitle')
-      : t('businessProfile.tariff.title');
+      : subscribeExistingProfile
+        ? t('businessProfile.tariff.pickTitle')
+        : t('businessProfile.tariff.title');
+
+  const tariffCta = useMemo(() => {
+    const selected = form.selectedPlan;
+    if (!selected) {
+      return { label: t('businessProfile.continue'), disabled: true };
+    }
+    if (!subscribeExistingProfile) {
+      return {
+        label:
+          selected === 'business_pro'
+            ? t('businessProfile.tariff.switchToPro')
+            : t('businessProfile.tariff.createFree'),
+        disabled: false,
+      };
+    }
+    if (renewMode) {
+      if (selected === 'business_pro') {
+        return { label: t('businessProfile.tariff.renewPro'), disabled: false };
+      }
+      return { label: t('businessProfile.tariff.switchToFreeBusiness'), disabled: false };
+    }
+    if (existingPlanId && selected === existingPlanId) {
+      return { label: t('businessProfile.tariff.currentPlanButton'), disabled: true };
+    }
+    if (existingPlanId === 'business' && selected === 'business_pro') {
+      return { label: t('businessProfile.tariff.switchToPro'), disabled: false };
+    }
+    if (existingPlanId === 'business_pro' && selected === 'business') {
+      return { label: t('businessProfile.tariff.switchToFreeBusiness'), disabled: false };
+    }
+    return { label: t('businessProfile.continue'), disabled: false };
+  }, [
+    form.selectedPlan,
+    subscribeExistingProfile,
+    renewMode,
+    existingPlanId,
+    t,
+  ]);
+
+  const isCurrentPlanCard = useCallback(
+    (planId: BusinessPlanId) =>
+      Boolean(
+        subscribeExistingProfile &&
+          !renewMode &&
+          existingPlanId === planId &&
+          (planId === 'business' || isProSubscriptionActive)
+      ),
+    [subscribeExistingProfile, renewMode, existingPlanId, isProSubscriptionActive]
+  );
 
   useHideBottomNav(isOpen);
   useBodyScrollLock(isOpen);
@@ -590,8 +695,15 @@ export default function BusinessProfileFlow({
 
   const stepNumber = useMemo(() => {
     const map: Record<WizardStep, number | null> = {
-      step1: 1, step2: 2, step3: 3, step4: 4, step5: 5,
-      preview: null, tariff: null, payment: null,
+      step1: 1,
+      step2: 2,
+      step3: 3,
+      step4: 4,
+      step5: 5,
+      step6: 6,
+      preview: null,
+      tariff: null,
+      payment: null,
     };
     return map[step];
   }, [step]);
@@ -652,18 +764,23 @@ export default function BusinessProfileFlow({
     return true;
   };
 
+  const wizardOrder: WizardStep[] = [
+    'step1',
+    'step2',
+    'step3',
+    'step4',
+    'step5',
+    'step6',
+    'preview',
+    'tariff',
+    'payment',
+  ];
+
   const goNext = () => {
-    const order: WizardStep[] = ['step1', 'step2', 'step3', 'step4', 'step5', 'preview', 'tariff', 'payment'];
-    const idx = order.indexOf(step);
-    if (idx < 0 || idx >= order.length - 1) return;
+    const idx = wizardOrder.indexOf(step);
+    if (idx < 0 || idx >= wizardOrder.length - 1) return;
     if (!validateStep(step)) return;
-    if (step === 'step5' && userListings.length === 0) {
-      setStep('preview');
-      saveDraftToLocal('preview', form);
-      void saveDraftToServer(form).catch(() => null);
-      return;
-    }
-    const nextStep = order[idx + 1];
+    const nextStep = wizardOrder[idx + 1];
     setStep(nextStep);
     saveDraftToLocal(nextStep, form);
     void saveDraftToServer(form).catch(() => null);
@@ -672,10 +789,17 @@ export default function BusinessProfileFlow({
 
   const goBack = () => {
     setFlowError(null);
-    const order: WizardStep[] = ['step1', 'step2', 'step3', 'step4', 'step5', 'preview', 'tariff', 'payment'];
-    const idx = order.indexOf(step);
+    const idx = wizardOrder.indexOf(step);
     if (idx <= 0) return;
-    setStep(order[idx - 1]);
+    setStep(wizardOrder[idx - 1]);
+  };
+
+  const skipPortfolio = () => {
+    setFlowError(null);
+    setStep('preview');
+    saveDraftToLocal('preview', form);
+    void saveDraftToServer(form).catch(() => null);
+    tg?.HapticFeedback?.impactOccurred?.('light');
   };
 
   const uploadDraft = useCallback(async (): Promise<{ logo?: string; coverImage?: string }> => {
@@ -697,6 +821,7 @@ export default function BusinessProfileFlow({
     fd.append('workingHours', form.workingHours);
     if (form.logoFile) fd.append('logo', form.logoFile);
     if (form.coverFile) fd.append('coverImage', form.coverFile);
+    appendPortfolioToFormData(fd, form.portfolioDraft);
 
     const res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
     if (!res.ok) throw new Error('Upload failed');
@@ -720,7 +845,10 @@ export default function BusinessProfileFlow({
     setFlowError(null);
     try {
       const activity = getActivityPayload(form);
-      const hasNewFiles = Boolean(form.logoFile || form.coverFile);
+      const portfolioPayload = draftToPortfolioPayload(form.portfolioDraft);
+      const hasNewFiles = Boolean(
+        form.logoFile || form.coverFile || portfolioPayload.newFiles.length > 0
+      );
       let res: Response;
       if (hasNewFiles) {
         const fd = new FormData();
@@ -744,6 +872,7 @@ export default function BusinessProfileFlow({
         }
         if (form.logoFile) fd.append('logo', form.logoFile);
         if (form.coverFile) fd.append('coverImage', form.coverFile);
+        appendPortfolioToFormData(fd, form.portfolioDraft);
         res = await fetch('/api/user/business-profile', { method: 'PUT', body: fd });
       } else {
         res = await fetch('/api/user/business-profile', {
@@ -764,6 +893,7 @@ export default function BusinessProfileFlow({
             instagram: form.instagram,
             website: form.website,
             workingHours: form.workingHours,
+            portfolioImages: portfolioPayload.kept,
             ...(form.selectedListingIds.length > 0
               ? { listingDisplayMode: 'manual' as const, listingIds: form.selectedListingIds }
               : {}),
@@ -946,7 +1076,7 @@ export default function BusinessProfileFlow({
 
   const shell = isLight ? 'bg-white text-gray-900' : 'bg-[#0a0a0a] text-white';
   const headerBorder = isLight ? 'border-gray-200' : 'border-white/10';
-  const wizardSteps: WizardStep[] = ['step1', 'step2', 'step3', 'step4', 'step5'];
+  const wizardSteps: WizardStep[] = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'];
   const wizardIndex = wizardSteps.indexOf(step);
   const showWizardProgress = wizardIndex >= 0;
 
@@ -960,7 +1090,7 @@ export default function BusinessProfileFlow({
     <div className="mb-5">
       {stepNumber != null && (
         <p className={`text-xs uppercase tracking-wide mb-2 ${isLight ? 'text-gray-500' : 'text-white/45'}`}>
-          {t('businessProfile.stepOf').replace('{current}', String(stepNumber)).replace('{total}', '5')}
+          {t('businessProfile.stepOf').replace('{current}', String(stepNumber)).replace('{total}', '6')}
         </p>
       )}
       <div className="flex items-center gap-2.5">
@@ -973,11 +1103,11 @@ export default function BusinessProfileFlow({
   const continueLabel =
     editMode && step === 'preview'
       ? t('common.save')
-      : step === 'step5'
-      ? t('businessProfile.preview.continue')
-      : step === 'preview'
-        ? t('businessProfile.preview.toTariff')
-        : `${t('businessProfile.continue')} →`;
+      : step === 'step6'
+        ? t('businessProfile.preview.continue')
+        : step === 'preview'
+          ? t('businessProfile.preview.toTariff')
+          : `${t('businessProfile.continue')} →`;
 
   const handleContinue = () => {
     if (editMode && step === 'preview') {
@@ -986,6 +1116,37 @@ export default function BusinessProfileFlow({
     }
     if (step === 'tariff') {
       if (!validateStep('tariff')) return;
+      if (tariffCta.disabled) return;
+      if (
+        planPickerMode &&
+        existingPlanId === 'business_pro' &&
+        isProSubscriptionActive &&
+        form.selectedPlan === 'business'
+      ) {
+        void (async () => {
+          setLoading(true);
+          try {
+            const res = await fetch('/api/user/business-profile/auto-renew', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ telegramId: paymentTelegramId, autoRenew: false }),
+            });
+            if (!res.ok) {
+              showToast(t('common.error'), 'error');
+              return;
+            }
+            showToast(t('businessProfile.tariff.downgradeScheduled'), 'success');
+            tg?.HapticFeedback?.notificationOccurred('success');
+            onSuccess();
+            onClose();
+          } catch {
+            showToast(t('common.error'), 'error');
+          } finally {
+            setLoading(false);
+          }
+        })();
+        return;
+      }
       if (form.selectedPlan && isFreeBusinessPlan(form.selectedPlan)) {
         void handlePayment('balance');
         tg?.HapticFeedback?.impactOccurred('light');
@@ -1362,6 +1523,31 @@ export default function BusinessProfileFlow({
             </>
           )}
 
+          {step === 'step6' && (
+            <>
+              {renderStepHeader(
+                t('businessProfile.steps.step6.title'),
+                <Images size={22} className={accentIcon} />
+              )}
+              <p className={`mb-4 text-sm ${isLight ? 'text-gray-600' : 'text-white/60'}`}>
+                {t('businessProfile.steps.step6.subtitle')}
+              </p>
+              <BusinessPortfolioEditor
+                compact
+                items={form.portfolioDraft}
+                onChange={(portfolioDraft) => patch({ portfolioDraft })}
+                onError={(message) => showToast(message, 'error')}
+              />
+              <button
+                type="button"
+                onClick={skipPortfolio}
+                className={`mt-4 w-full py-2.5 text-sm font-semibold ${ac.mutedText}`}
+              >
+                {t('businessProfile.settings.portfolioSkip')}
+              </button>
+            </>
+          )}
+
           {step === 'preview' && (
             <>
               {renderStepHeader(t('businessProfile.preview.title'), renderBusinessIcon())}
@@ -1402,14 +1588,27 @@ export default function BusinessProfileFlow({
           {step === 'tariff' && (
             <>
               <div className="mb-5">
-                <h2 className={`text-xl font-bold mb-1 ${ac.pageHeading}`}>{t('businessProfile.tariff.title')}</h2>
-                <p className={`text-sm ${isLight ? 'text-gray-600' : 'text-white/60'}`}>{t('businessProfile.tariff.subtitle')}</p>
+                <h2 className={`text-xl font-bold mb-1 ${ac.pageHeading}`}>{flowHeaderTitle}</h2>
+                {!renewMode ? (
+                  <p className={`text-sm ${isLight ? 'text-gray-600' : 'text-white/60'}`}>
+                    {t('businessProfile.tariff.subtitle')}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-4">
                 {(Object.keys(BUSINESS_PLANS) as BusinessPlanId[]).map((planId) => {
                   const plan = BUSINESS_PLANS[planId];
                   const selected = form.selectedPlan === planId;
                   const features = parsePlanFeatureLines(t(plan.featuresKey));
+                  const showCurrentBadge = isCurrentPlanCard(planId);
+                  const proEndedNote =
+                    renewMode &&
+                    planId === 'business_pro' &&
+                    existingProfile?.subscriptionEndsAt
+                      ? t('businessProfile.tariff.proEndedOn', {
+                          date: formatTariffDate(existingProfile.subscriptionEndsAt, language),
+                        })
+                      : null;
                   return (
                     <button
                       key={planId}
@@ -1423,10 +1622,24 @@ export default function BusinessProfileFlow({
                     >
                       <div className="flex justify-between items-start mb-2 gap-3">
                         <span className="font-bold">{t(plan.labelKey)}</span>
-                        <span className="font-bold text-[#C8E6A0] text-right shrink-0">
-                          {formatBusinessPlanPrice(planId, planLang)}
-                        </span>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {showCurrentBadge ? (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                isLight ? 'bg-[#3F5331]/10 text-[#3F5331]' : 'bg-[#C8E6A0]/15 text-[#C8E6A0]'
+                              }`}
+                            >
+                              {t('businessProfile.subscription.currentPlan')}
+                            </span>
+                          ) : null}
+                          <span className="font-bold text-[#C8E6A0] text-right">
+                            {formatBusinessPlanPrice(planId, planLang)}
+                          </span>
+                        </div>
                       </div>
+                      {proEndedNote ? (
+                        <p className={`text-xs mb-2 ${isLight ? 'text-gray-500' : 'text-white/50'}`}>{proEndedNote}</p>
+                      ) : null}
                       <p className={`text-sm mb-3 ${isLight ? 'text-gray-600' : 'text-white/65'}`}>
                         {t(`businessProfile.plans.${planId === 'business_pro' ? 'businessPro' : 'business'}.tagline`)}
                       </p>
@@ -1439,6 +1652,17 @@ export default function BusinessProfileFlow({
                   );
                 })}
               </div>
+              {isProSubscriptionActive &&
+              subscribeExistingProfile &&
+              !renewMode &&
+              form.selectedPlan === 'business_pro' &&
+              existingProfile?.subscriptionEndsAt ? (
+                <p className={`text-sm mt-4 ${isLight ? 'text-gray-600' : 'text-white/60'}`}>
+                  {t('businessProfile.tariff.proActiveUntil', {
+                    date: formatTariffDate(existingProfile.subscriptionEndsAt, language),
+                  })}
+                </p>
+              ) : null}
               {form.selectedPlan === 'business_pro' ? (
                 <p className={`text-xs mt-4 ${isLight ? 'text-gray-500' : 'text-white/45'}`}>
                   {t('businessProfile.tariff.disclaimerPro')}
@@ -1452,13 +1676,16 @@ export default function BusinessProfileFlow({
             <div
               className={`shrink-0 border-t px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] ${headerBorder} ${shell}`}
             >
-              <button type="button" onClick={handleContinue} disabled={loading} className={primaryBtnClass}>
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={loading || (step === 'tariff' && tariffCta.disabled)}
+                className={primaryBtnClass}
+              >
                 {loading && editMode && step === 'preview'
                   ? t('common.saving')
                   : step === 'tariff'
-                    ? form.selectedPlan === 'business_pro'
-                      ? t('businessProfile.tariff.switchToPro')
-                      : t('businessProfile.tariff.createFree')
+                    ? tariffCta.label
                     : continueLabel}
               </button>
             </div>
