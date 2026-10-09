@@ -16,8 +16,11 @@ import {
   getListingContactUrl,
   openSellerContactViaTelegramShare,
   openSellerTelegramChat,
+  openTelegramDeepLink,
   resolveSellerContactLang,
 } from '@/utils/sellerContact';
+import { isParserAggregatorListing } from '@/utils/listingDescriptionDisplay';
+import { resolveListingOriginalPostUrl } from '@/lib/listingContactResolve';
 import { resolveListingContactAction, resolveListingContactUsername } from '@/lib/listingContactResolve';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
@@ -285,6 +288,11 @@ export const ListingDetail = ({
       return;
     }
 
+    if (action.kind === 'open_url') {
+      openTelegramDeepLink(action.url, tg ?? undefined);
+      return;
+    }
+
     openSellerContactViaTelegramShare(listingUrl, message, tg ?? undefined);
   }, [
     isOwnListing,
@@ -301,9 +309,26 @@ export const ListingDetail = ({
         listing.seller.username,
         listing.seller.telegramId,
         listing.description,
-        listing.businessSeller ?? null
+        listing.businessSeller ?? null,
+        listing.parserAuthorUsername ?? null
       ),
-    [listing.seller.username, listing.seller.telegramId, listing.description, listing.businessSeller]
+    [
+      listing.seller.username,
+      listing.seller.telegramId,
+      listing.description,
+      listing.businessSeller,
+      listing.parserAuthorUsername,
+    ]
+  );
+
+  const parserOriginalPostUrl = useMemo(
+    () => resolveListingOriginalPostUrl(listing.description, listing.originalPostUrl),
+    [listing.description, listing.originalPostUrl]
+  );
+
+  const isParserAggregatorSeller = useMemo(
+    () => isParserAggregatorListing(listing.seller.username, listing.seller.telegramId),
+    [listing.seller.username, listing.seller.telegramId]
   );
 
   const viewerTelegramIdStr = String(currentUser?.id || profile?.telegramId || '');
@@ -1231,7 +1256,27 @@ export const ListingDetail = ({
               )}
             </div>
           </div>
-          {onViewSellerProfile && listing.seller.telegramId && !isOwnListing && (
+          {parserOriginalPostUrl && isParserAggregatorSeller && !isOwnListing ? (
+            <button
+              type="button"
+              onClick={() => {
+                openTelegramDeepLink(parserOriginalPostUrl, tg ?? undefined);
+                tg?.HapticFeedback?.impactOccurred('light');
+              }}
+              className={`w-full rounded-xl px-4 py-3 font-medium transition-colors flex items-center justify-center gap-2 ${
+                isLight
+                  ? 'bg-gray-100 text-gray-900 hover:bg-gray-200/80'
+                  : 'bg-white/10 text-white hover:bg-white/15'
+              }`}
+            >
+              <MessageCircle size={18} />
+              {t('listing.originalPost')}
+            </button>
+          ) : null}
+          {onViewSellerProfile &&
+            listing.seller.telegramId &&
+            !isOwnListing &&
+            !isParserAggregatorSeller && (
             <button 
               onClick={() => {
                 onViewSellerProfile(

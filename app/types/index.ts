@@ -64,6 +64,8 @@ export interface Listing {
   fromParser?: boolean;
   /** Посилання на оригінальний пост (парсер), якщо немає @ автора. */
   originalPostUrl?: string | null;
+  /** @ автора з parsed_items (не акаунт-агрегатор). */
+  parserAuthorUsername?: string | null;
 }
 
 export interface Subcategory {

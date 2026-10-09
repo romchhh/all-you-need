@@ -8,6 +8,7 @@ from parser.core.account_pool import list_parser_accounts
 from parser.moderation.formatting import (
     build_marketplace_description,
     ensure_marketplace_description_has_source,
+    preserve_parsed_source_fields,
 )
 from parser.storage.listing_dedup import active_listing_duplicate
 from parser.storage.marketplace import (
@@ -61,10 +62,14 @@ def publish_parsed_item_marketplace(
     is_service = (listing_item.get("category") or "").strip().lower() == "services_work"
     images = parsed_item_image_refs(source)
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
+    publish_ctx = preserve_parsed_source_fields(dict(listing_item), source)
     description = ensure_marketplace_description_has_source(
-        build_marketplace_description(listing_item),
-        listing_item,
+        build_marketplace_description(publish_ctx),
+        publish_ctx,
     )
+    if not (description or "").strip():
+        title = str(publish_ctx.get("title") or "").strip()
+        description = ensure_marketplace_description_has_source(title, publish_ctx)
 
     dedup_key = fingerprint_title_desc(
         str(listing_item.get("title") or ""),

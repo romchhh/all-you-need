@@ -283,6 +283,7 @@ export async function GET(
         businessSeller,
         fromParser,
         originalPostUrl: parserMsgLink,
+        parserAuthorUsername,
       };
 
     return NextResponse.json(formattedListing);

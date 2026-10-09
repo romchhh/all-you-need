@@ -354,27 +354,36 @@ def build_marketplace_description(item: dict) -> str:
     - @username автора, якщо відомий
     - інакше посилання на оригінальний post / канал-джерело
     """
-    from parser.core.text import polish_listing_description
+    from parser.core.text import format_listing_description, polish_listing_description, strip_listing_body_metadata
 
     title = str(item.get("title") or "").strip()
+    raw_text = str(item.get("raw_text") or "")
+    price = str(item.get("price") or "") if item.get("price") else None
+
     base = polish_listing_description(
         str(item.get("description") or ""),
-        raw_text=str(item.get("raw_text") or ""),
+        raw_text=raw_text,
         title=title,
-        price=str(item.get("price") or "") if item.get("price") else None,
+        price=price,
     )
     if not base:
         base = polish_listing_description(
-            str(item.get("raw_text") or ""),
-            raw_text=str(item.get("raw_text") or ""),
+            raw_text,
+            raw_text=raw_text,
             title=title,
-            price=str(item.get("price") or "") if item.get("price") else None,
+            price=price,
         )
     base = strip_original_post_link_block(base)
     if title and base.lower().startswith(title.lower()):
         remainder = base[len(title) :].lstrip(" .,\n:—-")
         if remainder:
             base = remainder
+    if not base.strip():
+        snippet = strip_listing_body_metadata(raw_text)
+        if snippet:
+            base = format_listing_description(snippet)
+    if not base.strip() and title:
+        base = title
     footer = marketplace_author_source_footer(item)
     parts = [base, footer]
     return "\n\n".join(p for p in parts if p)

@@ -54,21 +54,36 @@ export function resolveListingOriginalPostUrl(
 export type ListingContactAction =
   | { kind: 'telegram_dm'; username: string }
   | { kind: 'share_listing' }
+  | { kind: 'open_url'; url: string }
   | { kind: 'phone'; phone: string };
 
 export function resolveListingContactAction(
   listing: Pick<Listing, 'description' | 'seller' | 'businessSeller' | 'fromParser'> & {
     originalPostUrl?: string | null;
+    parserAuthorUsername?: string | null;
   }
 ): ListingContactAction {
   const username = resolveListingContactUsername(
     listing.seller.username,
     listing.seller.telegramId,
     listing.description,
-    listing.businessSeller
+    listing.businessSeller,
+    listing.parserAuthorUsername
   );
   if (username) {
     return { kind: 'telegram_dm', username };
+  }
+
+  const originalUrl = resolveListingOriginalPostUrl(
+    listing.description,
+    listing.originalPostUrl
+  );
+  if (
+    originalUrl &&
+    (listing.fromParser ||
+      isParserAggregatorListing(listing.seller.username, listing.seller.telegramId))
+  ) {
+    return { kind: 'open_url', url: originalUrl };
   }
 
   return { kind: 'share_listing' };
