@@ -1279,7 +1279,8 @@
       "statusActive": "Активний",
       "statusSuspended": "Призупинено",
       "statusDraft": "Не завершено",
-      "statusInactive": "Неактивний"
+      "statusInactive": "Неактивний",
+      "statusCreate": "Створити профіль"
     },
     "stepOf": "Крок {current} з {total}",
     "continue": "Продовжити",

@@ -1272,7 +1272,8 @@
       "statusActive": "Активен",
       "statusSuspended": "Приостановлен",
       "statusDraft": "Не завершён",
-      "statusInactive": "Неактивен"
+      "statusInactive": "Неактивен",
+      "statusCreate": "Создать профиль"
     },
     "stepOf": "Шаг {current} из {total}",
     "continue": "Продолжить",

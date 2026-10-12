@@ -318,9 +318,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const LISTINGS_PAGE_SIZE = 20;
 
   const fetchBusinessProfile = async () => {
-    if (!profile?.telegramId) return;
+    const telegramId = resolvePaymentTelegramId(tg, profile?.telegramId);
+    if (!telegramId) return;
     try {
-      const res = await fetch(`/api/user/business-profile?telegramId=${profile.telegramId}`);
+      const res = await fetch(
+        `/api/user/business-profile?telegramId=${encodeURIComponent(String(telegramId))}`
+      );
       if (!res.ok) return;
       const data = await res.json();
       setIsBusinessActive(Boolean(data.isActive));
@@ -411,10 +414,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   }, [profile, selectedStatus, selectedCategory, profileViewMode, isBusinessActive]);
 
   useEffect(() => {
-    if (profile?.telegramId) {
-      fetchBusinessProfile();
+    const telegramId = resolvePaymentTelegramId(tg, profile?.telegramId);
+    if (telegramId) {
+      void fetchBusinessProfile();
     }
-  }, [profile?.telegramId]);
+  }, [profile?.telegramId, tg?.initDataUnsafe?.user?.id]);
 
   useEffect(() => {
     if (profile?.telegramId && profileViewMode === 'business' && hasBusinessProfile) {
@@ -680,7 +684,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     return t('common.user');
   })();
   const displayUsername = profile.username ? `@${profile.username}` : '';
-  const showBusinessSwitcher = Boolean(businessProfile);
+  const profileTelegramId = resolvePaymentTelegramId(tg, profile?.telegramId);
+  const showBusinessSwitcher = Boolean(profileTelegramId);
   const businessCabinetState = businessProfile
     ? resolveBusinessCabinetState({
         subscriptionStatus: businessProfile.subscriptionStatus || 'draft',
@@ -690,7 +695,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       })
     : null;
   const businessSwitcherStatusLabel = (() => {
-    if (!businessProfile || businessCabinetState === 'active') return null;
+    if (!businessProfile) return t('businessProfile.switcher.statusCreate');
+    if (businessCabinetState === 'active') return null;
     if (businessCabinetState === 'suspended') return t('businessProfile.switcher.statusSuspended');
     if (businessCabinetState === 'draft') return t('businessProfile.switcher.statusDraft');
     if (businessCabinetState === 'inactive') return t('businessProfile.switcher.statusInactive');
@@ -698,7 +704,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   })();
   const businessDisplayName =
     businessProfile?.businessName?.trim() || t('businessProfile.switcher.business');
-  const isBusinessView = profileViewMode === 'business' && showBusinessSwitcher;
+  const isBusinessView = profileViewMode === 'business' && Boolean(businessProfile);
   const headerPhoto = profile.avatar || null;
   const headerPhotoUrl = headerPhoto ? getResolvedImageUrl(headerPhoto) : null;
   const headerInitial = displayName.charAt(0).toUpperCase();
@@ -884,6 +890,14 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   };
 
   const handleProfileModeChange = (mode: ProfileViewMode) => {
+    if (mode === 'business' && !businessProfile) {
+      setBusinessEditMode(false);
+      setBusinessRenewMode(false);
+      setBusinessPlanPickerMode(false);
+      setShowBusinessFlow(true);
+      tg?.HapticFeedback.impactOccurred('medium');
+      return;
+    }
     setProfileViewMode(mode);
     if (mode === 'business' && businessProfile) {
       void fetchBusinessStats();

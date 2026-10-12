@@ -1089,17 +1089,47 @@ export function useBazaarPage() {
     setIsCategoriesModalOpen(true);
   }, []);
 
-  const handleSelectListingFromCatalog = useCallback((listing: Listing) => {
-    showPageLoader({ minMs: 220 });
-    saveCatalogScrollPosition();
-    listingHistoryStack.current = [];
-    viewModeRef.current = 'listing';
-    catalogOriginListingIdRef.current = listing.id;
-    lastViewedListingIdRef.current = listing.id;
-    persistBazaarReturnListingId(listing.id);
-    setSelectedListing(listing);
-    void hidePageLoader({ minMs: 220 });
-  }, [saveCatalogScrollPosition, showPageLoader, hidePageLoader]);
+  const handleSelectListingFromCatalog = useCallback(
+    (listing: Listing) => {
+      showPageLoader({ minMs: 220 });
+      saveCatalogScrollPosition();
+      listingHistoryStack.current = [];
+      viewModeRef.current = 'listing';
+      catalogOriginListingIdRef.current = listing.id;
+      lastViewedListingIdRef.current = listing.id;
+      persistBazaarReturnListingId(listing.id);
+
+      const openListing = (item: Listing) => {
+        setSelectedListing(item);
+        void hidePageLoader({ minMs: 220 });
+      };
+
+      const needsDetail =
+        !listing.description || String(listing.description).trim().length === 0;
+      if (!needsDetail) {
+        openListing(listing);
+        return;
+      }
+
+      const viewerId =
+        profile?.telegramId != null
+          ? String(profile.telegramId)
+          : viewerTelegramId || '';
+      const qs = viewerId ? `?viewerId=${encodeURIComponent(viewerId)}` : '';
+
+      void fetch(`/api/listings/${listing.id}${qs}`)
+        .then((res) => (res.ok ? res.json() : listing))
+        .then((full: Listing) => openListing({ ...listing, ...full }))
+        .catch(() => openListing(listing));
+    },
+    [
+      saveCatalogScrollPosition,
+      showPageLoader,
+      hidePageLoader,
+      profile?.telegramId,
+      viewerTelegramId,
+    ]
+  );
 
   const handleBazaarStateChange = useCallback((next: Partial<BazaarTabPersistedState>) => {
     setBazaarTabState((prev) => {

@@ -163,36 +163,6 @@ export const ListingDetail = ({
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
 
-  // Каталог/стрічка не віддають description — підвантажуємо повне оголошення.
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadFullListing = async () => {
-      const viewerId =
-        profile?.telegramId ||
-        (currentUser?.id != null ? String(currentUser.id) : '');
-      const qs = viewerId ? `?viewerId=${encodeURIComponent(viewerId)}` : '';
-      try {
-        const res = await fetch(`/api/listings/${initialListing.id}${qs}`);
-        if (!res.ok || cancelled) return;
-        const full = (await res.json()) as Listing;
-        if (cancelled) return;
-        setListing((prev) => ({
-          ...prev,
-          ...full,
-          seller: { ...prev.seller, ...full.seller },
-        }));
-      } catch (e) {
-        console.error('Failed to load listing details:', e);
-      }
-    };
-
-    void loadFullListing();
-    return () => {
-      cancelled = true;
-    };
-  }, [initialListing.id, profile?.telegramId, currentUser?.id]);
-
   const { t, language } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
   const router = useRouter();
@@ -482,34 +452,39 @@ export const ListingDetail = ({
     }
   }, [tg, listing.id]);
 
-  // Повні дані оголошення (опис тощо) + фіксація перегляду
+  // Повні дані оголошення (опис, parser-поля) + фіксація перегляду
   useEffect(() => {
+    let cancelled = false;
     const loadFullListing = async () => {
       try {
-        const viewerId = currentUser?.id;
+        const viewerId = resolvePaymentTelegramId(tg, profile?.telegramId || currentUser?.id);
         const url = viewerId
-          ? `/api/listings/${listing.id}?viewerId=${viewerId}`
-          : `/api/listings/${listing.id}`;
+          ? `/api/listings/${initialListing.id}?viewerId=${encodeURIComponent(String(viewerId))}`
+          : `/api/listings/${initialListing.id}`;
 
         const response = await fetch(url, { method: 'GET' });
-        if (response.ok) {
-          const data = (await response.json()) as Listing;
-          setListing((prev) => ({
-            ...prev,
-            ...data,
-            favoritesCount: Math.max(
-              0,
-              (data.favoritesCount ?? 0) + favoriteCountDeltaRef.current
-            ),
-          }));
-        }
+        if (!response.ok || cancelled) return;
+        const data = (await response.json()) as Listing;
+        if (cancelled) return;
+        setListing((prev) => ({
+          ...prev,
+          ...data,
+          seller: { ...prev.seller, ...data.seller },
+          favoritesCount: Math.max(
+            0,
+            (data.favoritesCount ?? 0) + favoriteCountDeltaRef.current
+          ),
+        }));
       } catch (error) {
         console.error('Error loading listing details:', error);
       }
     };
 
     void loadFullListing();
-  }, [listing.id, currentUser?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [initialListing.id, tg, profile?.telegramId, currentUser?.id]);
 
   // Завантаження балансу користувача
   const fetchUserBalance = async () => {

@@ -51,7 +51,7 @@ function normalizeFavoritesCount(value: number | bigint | string | undefined): n
 }
 
 /**
- * Легкий каталог для стрічки базару: без description/tags/phone/повних images.
+ * Каталог стрічки базару: без tags/phone/повних images (description — для картки товару).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -176,6 +176,7 @@ export async function GET(request: NextRequest) {
       SELECT
         l.id,
         l.title,
+        l.description,
         l.price,
         l.previousPrice,
         l.priceChangedAt,
@@ -309,7 +310,7 @@ export async function GET(request: NextRequest) {
         },
         category: listing.category,
         subcategory: listing.subcategory,
-        description: '',
+        description: listing.description ?? '',
         location: listing.location,
         views: listing.views || 0,
         posted: timeFields.posted,

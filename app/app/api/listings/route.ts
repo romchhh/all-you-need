@@ -834,7 +834,7 @@ export async function GET(request: NextRequest) {
                },
                category: listing.category,
                subcategory: listing.subcategory,
-               description: userId ? (listing.description ?? '') : '',
+               description: listing.description ?? '',
                location: listing.location,
                views: listing.views || 0,
                posted: timeFields.posted,
