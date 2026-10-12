@@ -8,7 +8,7 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { useState, useEffect, Fragment, useRef, useCallback, useMemo, type MouseEvent } from 'react';
-import { normalizeCityInput } from '@/lib/city/cityNormalization';
+import { citiesMatch, normalizeCityInput } from '@/lib/city/cityNormalization';
 import { germanCities, fetchGermanCitiesFromAPI, isGermanCityValid } from '@/constants/german-cities';
 import { majorGermanCities } from '@/constants/major-german-cities';
 
@@ -137,11 +137,16 @@ export const CityModal = ({
     onSelectRef.current = onSelect;
   }, [onClose, onSelect]);
 
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (isOpen && openSubscriptionsSection) {
-      setSubsDropdownOpen(true);
+    if (isOpen && !wasOpenRef.current) {
+      setLocalSelectedCities(
+        selectedCities.map((city) => normalizeCityInput(city)).filter(Boolean)
+      );
+      if (openSubscriptionsSection) setSubsDropdownOpen(true);
     }
-  }, [isOpen, openSubscriptionsSection]);
+    wasOpenRef.current = isOpen;
+  }, [isOpen, openSubscriptionsSection, selectedCities]);
 
   // Загружаємо міста з API при зміні запиту
   useEffect(() => {
@@ -377,21 +382,20 @@ export const CityModal = ({
   };
 
   // Обробка вибору/зняття вибору міста
+  const isCitySelected = (city: string) => localSelectedCities.some((selected) => citiesMatch(selected, city));
+
   const toggleCity = (city: string) => {
-    if (city === '') {
-      // Якщо вибрано "Всі міста", очищаємо вибір
+    const key = normalizeCityInput(city);
+    if (!key) {
       setLocalSelectedCities([]);
-    } else {
-      setLocalSelectedCities(prev => {
-        if (prev.includes(city)) {
-          // Якщо місто вже вибрано, знімаємо вибір
-          return prev.filter(c => c !== city);
-        } else {
-          // Додаємо місто до вибраних
-          return [...prev, city];
-        }
-      });
+      return;
     }
+    setLocalSelectedCities((prev) => {
+      if (prev.some((selected) => citiesMatch(selected, key))) {
+        return prev.filter((selected) => !citiesMatch(selected, key));
+      }
+      return [...prev, key];
+    });
   };
 
   // Обробка застосування
@@ -637,7 +641,7 @@ export const CityModal = ({
                     </div>
                   )}
                   {!subsLoading && subscribedCityOptions.map(({ cityKey, label }) => {
-                    const selected = localSelectedCities.includes(label);
+                    const selected = isCitySelected(label);
                     return (
                       <div key={cityKey} className="w-full px-2 py-1.5 flex items-center gap-2">
                         <button
@@ -735,7 +739,7 @@ export const CityModal = ({
                   <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('bazaar.majorCities')}</h4>
                   <div className="space-y-2">
                     {validMajorGermanCities.map((city) => {
-                      const isSelected = localSelectedCities.includes(city);
+                      const isSelected = isCitySelected(city);
                       return (
                         <div key={city} className="flex gap-2 items-stretch">
                           <button
@@ -803,7 +807,7 @@ export const CityModal = ({
                       <h4 className={`text-sm font-semibold mb-3 ${ac.pageHeading}`}>{t('bazaar.searchResults')}</h4>
                       <div className="space-y-2">
                         {searchResults.map((city) => {
-                          const isSelected = localSelectedCities.includes(city);
+                          const isSelected = isCitySelected(city);
                           return (
                             <div key={city} className="flex gap-2 items-stretch">
                               <button

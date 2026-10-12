@@ -1,10 +1,35 @@
-import { normalizeCityInput } from '@/lib/city/cityNormalization';
+import { CITY_ALIASES, foldCityKey, normalizeCityInput } from '@/lib/city/cityNormalization';
+import { sqlLikeOp } from '@/lib/dbSql';
 
-/** LIKE patterns for catalog / business filters (canonical + raw input). */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/** LIKE patterns for catalog / business filters (canonical, aliases, ASCII без умлаута). */
 export function cityFilterPatterns(rawCity: string): string[] {
   const normalized = normalizeCityInput(rawCity);
-  const trimmed = rawCity.trim();
-  return [...new Set([normalized, trimmed].filter(Boolean))].map((p) => `%${p}%`);
+  const variants = new Set<string>();
+  const add = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed) variants.add(trimmed);
+  };
+
+  add(normalized);
+  add(rawCity);
+  if (normalized) {
+    add(
+      normalized
+        .replace(/ß/g, 'ss')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    );
+    const target = foldCityKey(normalized);
+    for (const [alias, canonical] of Object.entries(CITY_ALIASES)) {
+      if (foldCityKey(canonical) === target) add(alias);
+    }
+  }
+
+  return [...variants].map((p) => `%${escapeLike(p)}%`);
 }
 
 /**
@@ -12,12 +37,13 @@ export function cityFilterPatterns(rawCity: string): string[] {
  */
 export function listingCityOrGroupSql(patterns: string[], params: unknown[]): string {
   if (patterns.length === 0) return '1=0';
+  const like = sqlLikeOp();
   const matchParts = patterns.map(
     () =>
-      `(l.location LIKE ? OR EXISTS (
+      `(l.location ${like} ? OR EXISTS (
         SELECT 1 FROM parsed_items pi
-        WHERE pi.marketplace_listing_id = l.id
-          AND COALESCE(pi.source_city, '') LIKE ?
+        WHERE CAST(pi.marketplace_listing_id AS TEXT) = CAST(l.id AS TEXT)
+          AND COALESCE(pi.source_city, '') ${like} ?
       ))`
   );
   patterns.forEach((p) => {
@@ -29,7 +55,7 @@ export function listingCityOrGroupSql(patterns: string[], params: unknown[]): st
 /** One city: business city field OR any active listing in that city. */
 export function businessCityOrGroupSql(patterns: string[], params: unknown[]): string {
   if (patterns.length === 0) return '1=0';
-  const bpParts = patterns.map(() => 'bp.city LIKE ?');
+  const bpParts = patterns.map(() => `bp.city ${sqlLikeOp()} ?`);
   patterns.forEach((p) => params.push(p));
   const listingGroup = listingCityOrGroupSql(patterns, params);
   return `((${bpParts.join(' OR ')}) OR EXISTS (

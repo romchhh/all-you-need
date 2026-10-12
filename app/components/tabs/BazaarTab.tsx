@@ -747,7 +747,7 @@ const BazaarTabComponent = ({
       {showHomeFeedModeTabs && (
           <div className={`animate-content-in pb-3 pt-1 ${homeFeedColumnWrap}`}>
             <div className={homeFeedColumnShell}>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid w-[calc((100%-0.75rem)/2)] grid-cols-2 gap-2 sm:w-[calc((100%-1rem)/2)] sm:gap-3">
               {(['forYou', 'new'] as const).map((mode) => {
                 const active = pickBazaarTabField(savedState, 'feedMode') === mode;
                 return (
