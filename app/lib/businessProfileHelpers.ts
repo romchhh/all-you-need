@@ -179,6 +179,7 @@ export async function assignListingsToProfile(
   const ids = businessListingIds.filter((id) => Number.isFinite(id));
   const nowStr = nowSQLite();
 
+  // Скидаємо всі оголошення користувача на 'personal'
   await prisma.$executeRawUnsafe(
     `UPDATE Listing SET profileType = 'personal', updatedAt = ? WHERE userId = ?`,
     nowStr,
@@ -187,7 +188,22 @@ export async function assignListingsToProfile(
 
   if (ids.length === 0) return;
 
+  // Фільтруємо parser listings (перевіряємо parsed_items)
+  const parserCheckPlaceholders = ids.map(() => '?').join(',');
+  const parserRows = (await prisma.$queryRawUnsafe(
+    `SELECT DISTINCT marketplace_listing_id FROM parsed_items WHERE marketplace_listing_id IN (${parserCheckPlaceholders})`,
+    ...ids
+  )) as Array<{ marketplace_listing_id: number }>;
+  const parserListingIds = new Set(
+    parserRows.map((row) => Number(row.marketplace_listing_id)).filter((id) => Number.isFinite(id))
+  );
+
+  // Позначаємо як 'business' тільки не-parser listings
   for (const listingId of ids) {
+    if (parserListingIds.has(listingId)) {
+      console.log('[assignListingsToProfile] Skipping parser listing:', listingId);
+      continue;
+    }
     await prisma.$executeRawUnsafe(
       `UPDATE Listing SET profileType = 'business', updatedAt = ? WHERE id = ? AND userId = ?`,
       nowStr,
@@ -207,6 +223,24 @@ export async function linkListingToBusinessIfAllowed(
   await expireBusinessProfileIfNeeded(userId);
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
   if (!profile || !isBusinessProfileActive(profile)) return false;
+
+  // Перевірка: не прив'язуємо parser listings до бізнес-профілю
+  const listing = await prisma.listing.findUnique({
+    where: { id: listingId },
+    select: { userId: true },
+  });
+  if (!listing || listing.userId !== userId) return false;
+
+  // Перевіряємо чи це listing з parsed_items
+  const parserRows = (await prisma.$queryRawUnsafe(
+    `SELECT COUNT(*) as cnt FROM parsed_items WHERE marketplace_listing_id = ?`,
+    listingId
+  )) as Array<{ cnt: bigint | number }>;
+  const hasParserData = Number(parserRows[0]?.cnt ?? 0) > 0;
+  if (hasParserData) {
+    console.log('[linkListingToBusinessIfAllowed] Skipping parsed listing:', listingId);
+    return false;
+  }
 
   const nowStr = nowSQLite();
   await prisma.$executeRawUnsafe(
@@ -596,6 +630,19 @@ export async function resolveListingBusinessDisplay(
   businessSeller: Awaited<ReturnType<typeof getBusinessSellerSummaryForUser>>;
 }> {
   await syncBusinessListingProfileTypes(userId);
+
+  // Перевіряємо чи це parser listing
+  const parserRows = (await prisma.$queryRawUnsafe(
+    `SELECT COUNT(*) as cnt FROM parsed_items WHERE marketplace_listing_id = ?`,
+    listingId
+  )) as Array<{ cnt: bigint | number }>;
+  const hasParserData = Number(parserRows[0]?.cnt ?? 0) > 0;
+
+  // Для parser listings завжди повертаємо personal
+  if (hasParserData) {
+    return { profileType: 'personal', businessSeller: null };
+  }
+
   const row = await prisma.listing.findUnique({
     where: { id: listingId },
     select: { profileType: true },

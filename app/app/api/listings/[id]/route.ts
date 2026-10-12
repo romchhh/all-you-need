@@ -234,12 +234,15 @@ export async function GET(
     );
 
     const displayName = (() => {
+      // 1. Пріоритет: Business-профіль (якщо оголошення від бізнесу)
+      if (profileType === 'business' && businessSeller?.businessName?.trim()) {
+        return businessSeller.businessName;
+      }
+      // 2. Parser listings: автор з каналу
       if (fromParser && parserAuthorUsername) {
         return parserAuthorUsername;
       }
-      if (businessSeller?.businessName?.trim()) {
-        return businessSeller.businessName;
-      }
+      // 3. Особисте ім'я користувача
       if (listing.firstName) {
         return `${listing.firstName} ${listing.lastName || ''}`.trim();
       }

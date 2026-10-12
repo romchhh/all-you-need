@@ -1189,7 +1189,7 @@ export const ListingDetail = ({
           )}
 
         {/* Продавець */}
-        {listing.businessSeller && onViewSellerProfile && !isOwnListing ? (
+        {listing.profileType === 'business' && listing.businessSeller && onViewSellerProfile && !isOwnListing ? (
           <BusinessSellerBlock
             business={listing.businessSeller}
             tg={tg}
