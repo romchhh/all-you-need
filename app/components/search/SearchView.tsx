@@ -992,8 +992,8 @@ export function SearchView({
   }, [profileTelegramId]);
 
   const inputClass = isLight
-    ? 'w-full rounded-xl border border-[#3F5331]/15 bg-white py-3 pr-10 text-[#2D3E28] placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
-    : 'w-full rounded-xl border border-white/35 bg-white/5 py-3 pr-10 text-white placeholder:text-white/60 focus:border-[#C8E6A0]/50 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/25';
+    ? 'w-full rounded-xl border border-[#3F5331]/15 bg-white/45 py-3 pr-10 text-[#2D3E28] backdrop-blur-xl placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
+    : 'w-full rounded-xl border border-white/35 bg-black/35 py-3 pr-10 text-white backdrop-blur-xl placeholder:text-white/60 focus:border-[#C8E6A0]/50 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/25';
 
   const popularQueries = useMemo(() => {
     const categoryKeys =
@@ -1658,11 +1658,11 @@ export function SearchView({
                     className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                       hasActiveFilters
                         ? isLight
-                          ? 'border-[#3F5331] bg-white'
-                          : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
+                          ? 'border-[#3F5331] bg-white/45 backdrop-blur-xl'
+                          : 'border-[#C8E6A0] bg-black/35 backdrop-blur-xl'
                         : isLight
-                          ? 'border-[#3F5331]/15 bg-white shadow-sm hover:bg-[#E8F0E0]/60'
-                          : 'border-white bg-transparent hover:bg-white/10'
+                          ? 'border-[#3F5331]/15 bg-white/45 shadow-sm backdrop-blur-xl hover:bg-white/60'
+                          : 'border-white bg-black/35 backdrop-blur-xl hover:bg-black/45'
                     }`}
                   >
                     <SlidersHorizontal
@@ -1717,9 +1717,8 @@ export function SearchView({
         </>
       ) : (
         <>
-          <div className={`${SEARCH_STICKY_CLASS} relative`}>
-            <div aria-hidden className="pointer-events-none absolute inset-0" style={stickyFrostedBarStyle(isLight)} />
-            <div className="relative mx-auto flex w-full max-w-xl items-center gap-1.5 px-4 py-2 xl:max-w-2xl lg:mx-auto">
+          <div className={SEARCH_STICKY_CLASS} style={stickyFrostedBarStyle(isLight)}>
+            <div className="mx-auto flex w-full max-w-xl items-center gap-1.5 px-4 py-2 xl:max-w-2xl lg:mx-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -1746,11 +1745,11 @@ export function SearchView({
                 className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                   (searchEntityMode === 'businesses' ? hasActiveBusinessFilters : hasActiveFilters)
                     ? isLight
-                      ? 'border-[#3F5331] bg-white'
-                      : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
+                      ? 'border-[#3F5331] bg-white/45 backdrop-blur-xl'
+                      : 'border-[#C8E6A0] bg-black/35 backdrop-blur-xl'
                     : isLight
-                      ? 'border-[#3F5331]/15 bg-white shadow-sm hover:bg-[#E8F0E0]/60'
-                      : 'border-white bg-transparent hover:bg-white/10'
+                      ? 'border-[#3F5331]/15 bg-white/45 shadow-sm backdrop-blur-xl hover:bg-white/60'
+                      : 'border-white bg-black/35 backdrop-blur-xl hover:bg-black/45'
                 }`}
               >
                 <SlidersHorizontal

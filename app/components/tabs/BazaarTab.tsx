@@ -479,9 +479,9 @@ const BazaarTabComponent = ({
       {/* Пошук з TopBar — на десктопі вужчий і по центру */}
       <div className="relative">
         <div
-          className={`${STICKY_BELOW_APP_HEADER_CLASS} relative px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`}
+          className={`${STICKY_BELOW_APP_HEADER_CLASS} px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`}
+          style={stickyFrostedBarStyle(isLight)}
         >
-          <div aria-hidden className="pointer-events-none absolute inset-0" style={stickyFrostedBarStyle(isLight)} />
           <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl">
             <div className="flex min-w-0 items-center gap-1">
               <div className="min-w-0 flex-1">

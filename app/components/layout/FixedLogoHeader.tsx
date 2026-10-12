@@ -18,17 +18,15 @@ export const STICKY_BELOW_APP_HEADER_CLASS =
 const FROST_MASK =
   'linear-gradient(to bottom, #000 0%, #000 28%, rgba(0,0,0,0.55) 68%, transparent 100%)';
 
-/** Шар розмиття під контентом рядка пошуку: згасає до низу, саме поле не маскується. */
+/** Підкладка рядка пошуку: блюр видно крізь саме поле, донизу згасає. */
 export function stickyFrostedBarStyle(isLight: boolean): React.CSSProperties {
   return {
     backgroundColor: 'transparent',
     backgroundImage: isLight
-      ? 'linear-gradient(to bottom, rgba(250,251,248,0.82) 0%, rgba(245,247,242,0.38) 58%, rgba(250,251,248,0) 100%)'
-      : 'linear-gradient(to bottom, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.22) 58%, rgba(0,0,0,0) 100%)',
-    backdropFilter: 'saturate(160%) blur(14px)',
-    WebkitBackdropFilter: 'saturate(160%) blur(14px)',
-    maskImage: FROST_MASK,
-    WebkitMaskImage: FROST_MASK,
+      ? 'linear-gradient(to bottom, rgba(250,251,248,0.42) 0%, rgba(250,251,248,0.12) 62%, rgba(250,251,248,0) 100%)'
+      : 'linear-gradient(to bottom, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.12) 62%, rgba(0,0,0,0) 100%)',
+    backdropFilter: 'saturate(160%) blur(16px)',
+    WebkitBackdropFilter: 'saturate(160%) blur(16px)',
   };
 }
 
@@ -81,7 +79,7 @@ export function FixedLogoHeader({
 }: FixedLogoHeaderProps) {
   const { isLight, theme } = useTheme();
   const innerClasses = `${innerContentClass} ${outerClassName}`.trim();
-  const shellClass = `relative w-full max-w-full bg-transparent ${zClassName}`;
+  const shellClass = `w-full max-w-full bg-transparent ${zClassName}`;
 
   const body = (
     <>
