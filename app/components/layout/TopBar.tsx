@@ -54,8 +54,8 @@ export const TopBar = ({
 
   if (variant === 'main') {
     const inputClass = isLight
-      ? 'w-full rounded-2xl border border-[#3F5331]/15 bg-white/45 py-3 pr-10 text-[#2D3E28] shadow-sm backdrop-blur-xl transition-all placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
-      : 'w-full rounded-xl border border-white bg-black/35 py-3 pr-10 text-white backdrop-blur-xl transition-all placeholder:text-white/60 focus:border-[#C8E6A0]/50 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30';
+      ? 'w-full rounded-2xl border border-[#3F5331]/15 bg-white py-3 pr-10 text-[#2D3E28] shadow-sm transition-all placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
+      : 'w-full pr-10 py-3 bg-transparent rounded-xl border border-white focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/30 focus:border-[#C8E6A0]/50 transition-all text-white placeholder:text-white/60';
     const searchIconClass = isLight
       ? 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-[#3F5331]/70'
       : 'pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 text-white/80';
@@ -63,8 +63,8 @@ export const TopBar = ({
       ? 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-[#E8F0E0] flex items-center justify-center hover:bg-[#dce8d4] transition-colors'
       : 'absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors';
     const filterBtnClass = isLight
-      ? 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#3F5331]/15 bg-white/45 shadow-sm backdrop-blur-xl transition-colors hover:border-[#3F5331]/30 hover:bg-white/60'
-      : 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white bg-black/35 backdrop-blur-xl transition-colors hover:bg-black/45';
+      ? 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#3F5331]/15 bg-white shadow-sm transition-colors hover:border-[#3F5331]/30 hover:bg-[#E8F0E0]/60'
+      : 'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white bg-transparent transition-colors hover:bg-white/10';
 
     return (
       <div className="flex min-w-0 flex-1 items-center gap-1">

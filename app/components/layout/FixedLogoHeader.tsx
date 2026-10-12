@@ -1,8 +1,38 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { TradeGroundLogo } from '@/components/layout/TradeGroundLogo';
 import { useTheme } from '@/contexts/ThemeContext';
+
+/** Коротке згасання біля нижнього краю спільної шапки. */
+const FROST_FADE = '10px';
+const FROST_MASK = `linear-gradient(to bottom, #000 0, #000 calc(100% - ${FROST_FADE}), transparent 100%)`;
+
+let headerSlot: HTMLElement | null = null;
+const slotListeners = new Set<() => void>();
+let remeasureHeader: (() => void) | null = null;
+
+function publishHeaderSlot(el: HTMLElement | null) {
+  headerSlot = el;
+  slotListeners.forEach((fn) => fn());
+}
+
+export function useHeaderSlotElement(): HTMLElement | null {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const sync = () => setEl(headerSlot);
+    sync();
+    slotListeners.add(sync);
+    return () => {
+      slotListeners.delete(sync);
+    };
+  }, []);
+  return el;
+}
+
+export function remeasureAppHeader() {
+  remeasureHeader?.();
+}
 
 /**
  * Висота блоку шапки = safe-top + внутрішній відступ (моб pt-9) + ряд лого + pb.
@@ -15,26 +45,14 @@ export const FIXED_LOGO_SPACER_CLASS =
 export const STICKY_BELOW_APP_HEADER_CLASS =
   'sticky z-[40] max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
 
-const FROST_MASK =
-  'linear-gradient(to bottom, #000 0%, #000 28%, rgba(0,0,0,0.55) 68%, transparent 100%)';
-
-/** Підкладка рядка пошуку: блюр видно крізь саме поле, донизу згасає. */
-export function stickyFrostedBarStyle(isLight: boolean): React.CSSProperties {
-  return {
-    backgroundColor: 'transparent',
-    backgroundImage: isLight
-      ? 'linear-gradient(to bottom, rgba(250,251,248,0.42) 0%, rgba(250,251,248,0.12) 62%, rgba(250,251,248,0) 100%)'
-      : 'linear-gradient(to bottom, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.12) 62%, rgba(0,0,0,0) 100%)',
-    backdropFilter: 'saturate(160%) blur(16px)',
-    WebkitBackdropFilter: 'saturate(160%) blur(16px)',
-  };
-}
-
 function headerFrostStyle(isLight: boolean): React.CSSProperties {
+  const veil = isLight
+    ? `linear-gradient(to bottom, rgba(250,251,248,0.9) 0, rgba(250,251,248,0.9) calc(100% - ${FROST_FADE}), rgba(250,251,248,0) 100%)`
+    : `linear-gradient(to bottom, rgba(0,0,0,0.74) 0, rgba(0,0,0,0.74) calc(100% - ${FROST_FADE}), rgba(0,0,0,0) 100%)`;
   return {
     backgroundImage: isLight
-      ? 'linear-gradient(to bottom, rgba(250,251,248,0.92) 0%, rgba(245,247,242,0.4) 50%, rgba(250,251,248,0) 100%)'
-      : 'linear-gradient(to bottom, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.32) 54%, rgba(0,0,0,0) 100%), radial-gradient(ellipse 80% 90% at 18% 0%, rgba(200,230,160,0.2) 0%, transparent 52%)',
+      ? veil
+      : `${veil}, radial-gradient(ellipse 70% 55% at 18% 0%, rgba(200,230,160,0.16) 0%, transparent 42%)`,
     backdropFilter: 'saturate(160%) blur(16px)',
     WebkitBackdropFilter: 'saturate(160%) blur(16px)',
     maskImage: FROST_MASK,
@@ -68,6 +86,8 @@ export type FixedLogoHeaderProps = {
   zClassName?: string;
   mode: FixedLogoHeaderMode;
   scrollParent?: HTMLElement | null;
+  /** Слот під рядком лого: пошук стає частиною цієї ж шапки. */
+  extrasSlot?: boolean;
 };
 
 export function FixedLogoHeader({
@@ -76,18 +96,49 @@ export function FixedLogoHeader({
   outerClassName = '',
   zClassName = 'z-[45]',
   mode,
+  extrasSlot = false,
 }: FixedLogoHeaderProps) {
   const { isLight, theme } = useTheme();
+  const headerRef = useRef<HTMLElement | null>(null);
+  const [spacerPx, setSpacerPx] = useState<number | null>(null);
+  const slotNodeRef = useRef<HTMLDivElement | null>(null);
+  const setSlotNode = useCallback((node: HTMLDivElement | null) => {
+    if (slotNodeRef.current === node) return;
+    slotNodeRef.current = node;
+    publishHeaderSlot(node);
+  }, []);
   const innerClasses = `${innerContentClass} ${outerClassName}`.trim();
   const shellClass = `w-full max-w-full bg-transparent ${zClassName}`;
+
+  useLayoutEffect(() => {
+    if (mode !== 'window-fixed') return;
+    const measure = () => {
+      const el = headerRef.current;
+      if (el) setSpacerPx(el.offsetHeight);
+    };
+    remeasureHeader = measure;
+    measure();
+    const el = headerRef.current;
+    const ro = el ? new ResizeObserver(measure) : null;
+    if (el && ro) ro.observe(el);
+    return () => {
+      if (remeasureHeader === measure) remeasureHeader = null;
+      ro?.disconnect();
+    };
+  }, [mode, isLight, extrasSlot]);
 
   const body = (
     <>
       <div aria-hidden className="pointer-events-none absolute inset-0" style={headerFrostStyle(isLight)} />
-      <div className={`relative ${safeTopShellClass}`}>
-        <div className={innerClasses}>
-          <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+      <div className="relative">
+        <div className={safeTopShellClass}>
+          <div className={innerClasses}>
+            <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+          </div>
         </div>
+        {extrasSlot ? (
+          <div ref={setSlotNode} />
+        ) : null}
       </div>
     </>
   );
@@ -102,10 +153,18 @@ export function FixedLogoHeader({
 
   return (
     <>
-      <header key={`tg-app-header-${theme}`} className={`fixed left-0 right-0 top-0 ${shellClass}`}>
+      <header
+        ref={headerRef}
+        key={`tg-app-header-${theme}`}
+        className={`fixed left-0 right-0 top-0 ${shellClass}`}
+      >
         {body}
       </header>
-      <div className={FIXED_LOGO_SPACER_CLASS} aria-hidden />
+      <div
+        className={FIXED_LOGO_SPACER_CLASS}
+        style={spacerPx != null ? { height: spacerPx } : undefined}
+        aria-hidden
+      />
     </>
   );
 }

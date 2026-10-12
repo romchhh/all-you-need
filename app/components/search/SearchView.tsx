@@ -2,7 +2,8 @@
 
 import { ArrowLeft, Bell, Briefcase, Clock, Flame, MapPin, Search, SlidersHorizontal, Sparkles, TrendingUp, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category, Listing } from '@/types';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -54,7 +55,7 @@ import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
-import { STICKY_BELOW_APP_HEADER_CLASS, overlayHeaderActionClass, stickyFrostedBarStyle } from '@/components/layout/FixedLogoHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS, overlayHeaderActionClass, remeasureAppHeader, useHeaderSlotElement } from '@/components/layout/FixedLogoHeader';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
@@ -212,6 +213,7 @@ export function SearchView({
   useHideBottomNav(true);
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
+  const headerSlot = useHeaderSlotElement();
   const ac = getAppearanceClasses(isLight);
   const { toast, showToast, hideToast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -229,6 +231,9 @@ export function SearchView({
   const [screenMode, setScreenMode] = useState<SearchScreenMode>(() =>
     initialCommitted ? 'results' : 'discover'
   );
+  useLayoutEffect(() => {
+    remeasureAppHeader();
+  }, [headerSlot, screenMode]);
   const [localQuery, setLocalQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
   const [localCities, setLocalCities] = useState<string[]>(() => {
@@ -992,8 +997,8 @@ export function SearchView({
   }, [profileTelegramId]);
 
   const inputClass = isLight
-    ? 'w-full rounded-xl border border-[#3F5331]/15 bg-white/45 py-3 pr-10 text-[#2D3E28] backdrop-blur-xl placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
-    : 'w-full rounded-xl border border-white/35 bg-black/35 py-3 pr-10 text-white backdrop-blur-xl placeholder:text-white/60 focus:border-[#C8E6A0]/50 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/25';
+    ? 'w-full rounded-xl border border-[#3F5331]/15 bg-white py-3 pr-10 text-[#2D3E28] placeholder:text-[#5A6B52]/70 focus:border-[#3F5331]/35 focus:outline-none focus:ring-2 focus:ring-[#3F5331]/15'
+    : 'w-full rounded-xl border border-white/35 bg-white/5 py-3 pr-10 text-white placeholder:text-white/60 focus:border-[#C8E6A0]/50 focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/25';
 
   const popularQueries = useMemo(() => {
     const categoryKeys =
@@ -1658,11 +1663,11 @@ export function SearchView({
                     className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                       hasActiveFilters
                         ? isLight
-                          ? 'border-[#3F5331] bg-white/45 backdrop-blur-xl'
-                          : 'border-[#C8E6A0] bg-black/35 backdrop-blur-xl'
+                          ? 'border-[#3F5331] bg-white'
+                          : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
                         : isLight
-                          ? 'border-[#3F5331]/15 bg-white/45 shadow-sm backdrop-blur-xl hover:bg-white/60'
-                          : 'border-white bg-black/35 backdrop-blur-xl hover:bg-black/45'
+                          ? 'border-[#3F5331]/15 bg-white shadow-sm hover:bg-[#E8F0E0]/60'
+                          : 'border-white bg-transparent hover:bg-white/10'
                     }`}
                   >
                     <SlidersHorizontal
@@ -1717,7 +1722,12 @@ export function SearchView({
         </>
       ) : (
         <>
-          <div className={SEARCH_STICKY_CLASS} style={stickyFrostedBarStyle(isLight)}>
+          {(() => {
+          const stickySearchBg = isLight
+            ? 'border-b border-[#3F5331]/10 bg-transparent'
+            : 'border-b border-white/10 bg-transparent';
+          const resultsBar = (
+          <div className={headerSlot ? undefined : `${SEARCH_STICKY_CLASS} ${stickySearchBg}`}>
             <div className="mx-auto flex w-full max-w-xl items-center gap-1.5 px-4 py-2 xl:max-w-2xl lg:mx-auto">
               <button
                 type="button"
@@ -1745,11 +1755,11 @@ export function SearchView({
                 className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                   (searchEntityMode === 'businesses' ? hasActiveBusinessFilters : hasActiveFilters)
                     ? isLight
-                      ? 'border-[#3F5331] bg-white/45 backdrop-blur-xl'
-                      : 'border-[#C8E6A0] bg-black/35 backdrop-blur-xl'
+                      ? 'border-[#3F5331] bg-white'
+                      : 'border-[#C8E6A0] bg-[#C8E6A0]/10'
                     : isLight
-                      ? 'border-[#3F5331]/15 bg-white/45 shadow-sm backdrop-blur-xl hover:bg-white/60'
-                      : 'border-white bg-black/35 backdrop-blur-xl hover:bg-black/45'
+                      ? 'border-[#3F5331]/15 bg-white shadow-sm hover:bg-[#E8F0E0]/60'
+                      : 'border-white bg-transparent hover:bg-white/10'
                 }`}
               >
                 <SlidersHorizontal
@@ -1819,6 +1829,9 @@ export function SearchView({
               )}
             </div>
           </div>
+          );
+          return headerSlot ? createPortal(resultsBar, headerSlot) : resultsBar;
+          })()}
 
           {resultsContent}
         </>

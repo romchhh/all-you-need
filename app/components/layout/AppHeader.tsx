@@ -15,5 +15,5 @@ export const AppHeader: React.FC = () => {
     dispatchBazaarRestoreListingScroll();
   }, [lang, router]);
 
-  return <FixedLogoHeader mode="window-fixed" onClick={handleClick} />;
+  return <FixedLogoHeader mode="window-fixed" extrasSlot onClick={handleClick} />;
 };

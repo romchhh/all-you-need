@@ -7,7 +7,7 @@ import { ListingCard } from '@/components/listing/ListingCard';
 import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
 import dynamic from 'next/dynamic';
 import { SubcategoryList } from '@/components/listing/SubcategoryList';
-import { STICKY_BELOW_APP_HEADER_CLASS, stickyFrostedBarStyle } from '@/components/layout/FixedLogoHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS, remeasureAppHeader, useHeaderSlotElement } from '@/components/layout/FixedLogoHeader';
 import { TopBar } from '@/components/layout/TopBar';
 import type { PlatformOnboardingActionId } from '@/utils/platformTickerMessages';
 import { trackAnalytics } from '@/utils/analyticsClient';
@@ -20,7 +20,8 @@ import { getSearchHistory, addToSearchHistory } from '@/utils/searchHistory';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
-import { useState, useMemo, useRef, useEffect, useCallback, memo, useDeferredValue } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, memo, useDeferredValue, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import { pickBazaarTabField, type BazaarTabPersistedState } from '@/lib/bazaar/bazaarTabStateStorage';
 import { Currency } from '@/utils/currency';
@@ -100,6 +101,10 @@ const BazaarTabComponent = ({
 }: BazaarTabProps) => {
   const { t } = useLanguage();
   const { isLight, toggleTheme } = useTheme();
+  const headerSlot = useHeaderSlotElement();
+  useLayoutEffect(() => {
+    remeasureAppHeader();
+  }, [headerSlot]);
   const router = useRouter();
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
@@ -477,10 +482,14 @@ const BazaarTabComponent = ({
   return (
     <div className="pb-24">
       {/* Пошук з TopBar — на десктопі вужчий і по центру */}
-      <div className="relative">
+      {(() => {
+        const searchRow = (
         <div
-          className={`${STICKY_BELOW_APP_HEADER_CLASS} px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`}
-          style={stickyFrostedBarStyle(isLight)}
+          className={
+            headerSlot
+              ? 'px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3'
+              : `${STICKY_BELOW_APP_HEADER_CLASS} bg-transparent px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`
+          }
         >
           <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl">
             <div className="flex min-w-0 items-center gap-1">
@@ -568,7 +577,9 @@ const BazaarTabComponent = ({
             </div>
           </div>
         </div>
-      </div>
+        );
+        return headerSlot ? createPortal(searchRow, headerSlot) : <div className="relative">{searchRow}</div>;
+      })()}
 
       {!searchQuery.trim() && (
         <>
