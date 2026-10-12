@@ -233,6 +233,19 @@ export async function GET(
       parserAuthorUsername || parserMsgLink || isAggregator
     );
 
+    const displayName = (() => {
+      if (fromParser && parserAuthorUsername) {
+        return parserAuthorUsername;
+      }
+      if (businessSeller?.businessName?.trim()) {
+        return businessSeller.businessName;
+      }
+      if (listing.firstName) {
+        return `${listing.firstName} ${listing.lastName || ''}`.trim();
+      }
+      return contactUsername || listing.username || 'Користувач';
+    })();
+
     const formattedListing = {
         id: listing.id,
         title: listing.title,
@@ -250,9 +263,7 @@ export async function GET(
         })(),
         images: resolveStoredListingImages(JSON.parse(listing.images) as string[]),
         seller: {
-          name: listing.firstName 
-            ? `${listing.firstName} ${listing.lastName || ''}`.trim()
-            : contactUsername || listing.username || 'Користувач',
+          name: displayName,
           avatar: listing.avatar || '👤',
           phone: listing.phone || '',
           telegramId: listing.telegramId?.toString() || '',

@@ -1105,7 +1105,13 @@ export const ListingDetail = ({
               isLight ? 'text-gray-800' : 'text-white/95'
             }`}
           >
-            {descriptionWithLinks(displayDescription)}
+            {displayDescription.trim() ? (
+              descriptionWithLinks(displayDescription)
+            ) : (
+              <p className={`italic ${isLight ? 'text-gray-500' : 'text-white/50'}`}>
+                {t('listing.noDescription') || 'Опис відсутній'}
+              </p>
+            )}
           </div>
         </div>
 
