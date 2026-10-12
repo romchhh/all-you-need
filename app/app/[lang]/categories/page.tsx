@@ -139,10 +139,7 @@ const CategoriesPage = () => {
   useEffect(() => {
     if (tg && !selectedListing && !selectedSeller) {
       expandTelegramViewportIfMobile(tg);
-      // Увімкнення підтвердження закриття для запобігання випадковому згортанню
-      if (tg.enableClosingConfirmation) {
-        tg.enableClosingConfirmation();
-      }
+      tg.disableClosingConfirmation?.();
     }
     
     return () => {

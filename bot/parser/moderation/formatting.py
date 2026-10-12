@@ -96,20 +96,14 @@ def format_author_notify_open_links_html(
     include_channel: bool = False,
 ) -> str:
     """
-    Клікабельні посилання для DM авторам (RU): одразу в Telegram (Mini App / бот).
-    Превʼю знизу — окремий plain URL через author_notify_listing_preview_url().
+    Клікабельні посилання для DM авторам (RU).
+    «Открыть в Marketplace» веде на сторінку оголошення на сайті — ту саму, що й картка-превʼю.
+    «Открыть через бот» — deep-link у чат бота (не startapp, щоб не було картки «Веб-приложение»).
     """
     lines: list[str] = []
-    mini = listing_miniapp_url(listing_id)
-    if mini:
-        mini_esc = html.escape(mini, quote=True)
-        lines.append(f'📱 <a href="{mini_esc}">Открыть в Marketplace</a>')
-    else:
-        mp = html.escape(
-            author_notify_outbound_url(listing_id, "marketplace", lang=lang),
-            quote=True,
-        )
-        lines.append(f'📱 <a href="{mp}">Открыть в Marketplace</a>')
+    # Сайт, не t.me?startapp: інакше Telegram малює картку «Веб-приложение» замість TradeGround.
+    site = html.escape(author_notify_listing_preview_url(listing_id, lang=lang), quote=True)
+    lines.append(f'📱 <a href="{site}">Открыть в Marketplace</a>')
 
     if include_channel and channel_url:
         ch_target = channel_url.strip()
@@ -121,8 +115,6 @@ def format_author_notify_open_links_html(
     if bot:
         bot_esc = html.escape(bot, quote=True)
         lines.append(f'🤖 <a href="{bot_esc}">Открыть через бот</a>')
-    elif mini:
-        lines.append(f'🤖 <a href="{html.escape(mini, quote=True)}">Открыть через бот</a>')
     return "\n".join(lines)
 
 

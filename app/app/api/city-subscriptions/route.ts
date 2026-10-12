@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureCitySubscriptionTable } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
+import { normalizeTelegramIdForDb, sqlUserTelegramIdWhere } from '@/lib/dbSql';
 import { trackUserActivity } from '@/utils/trackActivity';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,21 @@ let initPromise: Promise<void> | null = null;
 async function ensureTable() {
   if (!initPromise) initPromise = ensureCitySubscriptionTable();
   await initPromise;
+}
+
+/** Telegram id лишається рядком: інакше PostgreSQL порівнює text = bigint і запит падає. */
+async function resolveUserId(telegramId: string): Promise<number | null> {
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key || !/^\d+$/.test(key)) return null;
+
+  const users = await executeWithRetry(
+    () =>
+      prisma.$queryRawUnsafe(
+        `SELECT id FROM User WHERE ${sqlUserTelegramIdWhere()}`,
+        key
+      ) as Promise<Array<{ id: number }>>
+  );
+  return users[0]?.id ?? null;
 }
 
 export async function GET(request: NextRequest) {
@@ -23,26 +39,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'telegramId is required' }, { status: 400 });
     }
 
-    const telegramIdNum = parseInt(telegramId, 10);
-    if (Number.isNaN(telegramIdNum)) {
-      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
-    }
-
-    const users = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-    );
-
-    if (!users[0]) {
+    const userId = await resolveUserId(telegramId);
+    if (userId == null) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const rows = await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
         `SELECT cityKey FROM CitySubscription WHERE userId = ? ORDER BY cityKey ASC`,
-        users[0].id
+        userId
       ) as Promise<Array<{ cityKey: string }>>
     );
 
@@ -59,19 +64,14 @@ export async function POST(request: NextRequest) {
     await ensureTable();
 
     const body = await request.json();
-    const telegramId = body.telegramId as string | undefined;
+    const telegramId = body.telegramId as string | number | undefined;
     const city = body.city as string | undefined;
 
-    if (!telegramId || !city || typeof city !== 'string') {
+    if (telegramId == null || telegramId === '' || !city || typeof city !== 'string') {
       return NextResponse.json(
         { error: 'telegramId and city are required' },
         { status: 400 }
       );
-    }
-
-    const telegramIdNum = parseInt(telegramId, 10);
-    if (Number.isNaN(telegramIdNum)) {
-      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
     }
 
     const cityKey = normalizeCityInput(city.trim());
@@ -79,22 +79,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid city' }, { status: 400 });
     }
 
-    const users = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-    );
-
-    if (!users[0]) {
+    const userId = await resolveUserId(String(telegramId));
+    if (userId == null) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const userId = users[0].id;
-
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO CitySubscription (userId, cityKey, createdAt) VALUES (?, ?, datetime('now'))`,
+        `INSERT INTO CitySubscription (userId, cityKey, createdAt) VALUES (?, ?, datetime('now'))
+         ON CONFLICT (userId, cityKey) DO NOTHING`,
         userId,
         cityKey
       )
@@ -121,31 +114,20 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const telegramIdNum = parseInt(telegramId, 10);
-    if (Number.isNaN(telegramIdNum)) {
-      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
-    }
-
     const cityKey = normalizeCityInput(city.trim());
     if (!cityKey) {
       return NextResponse.json({ error: 'Invalid city' }, { status: 400 });
     }
 
-    const users = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-    );
-
-    if (!users[0]) {
+    const userId = await resolveUserId(telegramId);
+    if (userId == null) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
         `DELETE FROM CitySubscription WHERE userId = ? AND cityKey = ?`,
-        users[0].id,
+        userId,
         cityKey
       )
     );

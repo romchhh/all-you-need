@@ -445,11 +445,7 @@ export const ListingDetail = ({
     if (!tg) return;
 
     expandTelegramViewportIfMobile(tg);
-
-    // Увімкнення підтвердження закриття для запобігання випадковому згортанню
-    if (tg.enableClosingConfirmation) {
-      tg.enableClosingConfirmation();
-    }
+    tg.disableClosingConfirmation?.();
   }, [tg, listing.id]);
 
   // Повні дані оголошення (опис, parser-поля) + фіксація перегляду
@@ -1194,7 +1190,7 @@ export const ListingDetail = ({
           )}
 
         {/* Продавець */}
-        {listing.profileType === 'business' && listing.businessSeller && onViewSellerProfile && !isOwnListing ? (
+        {listing.profileType === 'business' && listing.businessSeller && onViewSellerProfile ? (
           <BusinessSellerBlock
             business={listing.businessSeller}
             tg={tg}

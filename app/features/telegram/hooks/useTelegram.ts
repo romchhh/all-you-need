@@ -51,8 +51,8 @@ export const useTelegram = () => {
       const handleResize = () => updateViewport();
       window.addEventListener('resize', handleResize);
 
-      if (telegram.enableClosingConfirmation) {
-        telegram.enableClosingConfirmation();
+      if (telegram.disableClosingConfirmation) {
+        telegram.disableClosingConfirmation();
       }
 
       setTg(telegram);

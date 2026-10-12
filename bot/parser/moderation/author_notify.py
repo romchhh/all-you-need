@@ -214,6 +214,8 @@ async def _send_author_dm(
     acc: PyrogramAccount,
     item: dict,
     plain_text: str,
+    *,
+    preview_url: str | None = None,
 ) -> str | int:
     from pyrogram import Client
     from pyrogram.enums import ParseMode
@@ -242,12 +244,19 @@ async def _send_author_dm(
                 except Exception as e:
                     logger.debug("warm peer before send %s: %s", target, e)
 
-            await app.send_message(
-                target,
-                plain_text,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=False,
-            )
+            send_kwargs: dict = {"parse_mode": ParseMode.HTML}
+            if preview_url:
+                from pyrogram.types import LinkPreviewOptions
+
+                # Завжди картка сайту (TradeGround), не «Веб-приложение» від startapp.
+                send_kwargs["link_preview_options"] = LinkPreviewOptions(
+                    is_disabled=False,
+                    url=preview_url,
+                )
+            else:
+                send_kwargs["disable_web_page_preview"] = True
+
+            await app.send_message(target, plain_text, **send_kwargs)
             logger.info(
                 "Pyrogram[%s …%s]: DM надіслано автору (target=%s, item=%s)",
                 acc.label,
@@ -309,6 +318,11 @@ async def try_notify_author_via_pyrogram(
         services_marketplace=is_services and not channel_only,
         channel_url=channel_url,
     )
+    preview_url = (
+        None
+        if channel_only
+        else author_notify_listing_preview_url(listing_id, lang="ru")
+    )
     last_error: Exception | None = None
 
     logger.info(
@@ -324,7 +338,7 @@ async def try_notify_author_via_pyrogram(
 
     for acc in order:
         try:
-            target = await _send_author_dm(acc, item, plain_text)
+            target = await _send_author_dm(acc, item, plain_text, preview_url=preview_url)
             accounts_db.mark_dm_result(acc.id, ok=True)
             notify_kind = "services" if is_services else "goods"
             record_author_outreach(

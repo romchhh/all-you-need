@@ -125,6 +125,9 @@ export const CityModal = ({
   const [citySubBusyKey, setCitySubBusyKey] = useState<string | null>(null);
   const [subsDropdownOpen, setSubsDropdownOpen] = useState(false);
   const [subsLoading, setSubsLoading] = useState(false);
+  const resolvedTelegramId =
+    profileTelegramId ||
+    (tg?.initDataUnsafe?.user?.id != null ? String(tg.initDataUnsafe.user.id) : null);
   
   // Зберігаємо функції в ref для гарантії актуальності
   const onCloseRef = useRef(onClose);
@@ -255,16 +258,22 @@ export const CityModal = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    if (!profileTelegramId) {
+    if (!resolvedTelegramId) {
       setCitySubCities([]);
       return;
     }
     setSubsLoading(true);
     let cancelled = false;
-    fetch(`/api/city-subscriptions?telegramId=${encodeURIComponent(profileTelegramId)}`)
+    fetch(`/api/city-subscriptions?telegramId=${encodeURIComponent(resolvedTelegramId)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
-        if (!cancelled) setCitySubCities(Array.isArray(d.cities) ? d.cities : []);
+        if (!cancelled) {
+          setCitySubCities(
+            Array.isArray(d.cities)
+              ? d.cities.map((city: string) => normalizeCityInput(String(city))).filter(Boolean)
+              : []
+          );
+        }
       })
       .catch(() => {
         if (!cancelled) setCitySubCities([]);
@@ -275,7 +284,7 @@ export const CityModal = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, profileTelegramId]);
+  }, [isOpen, resolvedTelegramId]);
 
   const cityDisplayByKey = useMemo(() => {
     const map = new Map<string, string>();
@@ -304,17 +313,17 @@ export const CityModal = ({
       e.stopPropagation();
       const cityKey = normalizeCityInput(city.trim());
       if (!cityKey) return;
-      if (!profileTelegramId) {
+      if (!resolvedTelegramId) {
         onToast?.(t('bazaar.citySubscribeNeedLogin'), 'info');
         return;
       }
       if (citySubBusyKey !== null) return;
       setCitySubBusyKey(cityKey);
       try {
-        const subscribed = citySubCities.includes(cityKey);
+        const subscribed = citySubCities.some((saved) => citiesMatch(saved, cityKey));
         if (subscribed) {
           const r = await fetch(
-            `/api/city-subscriptions?telegramId=${encodeURIComponent(profileTelegramId)}&city=${encodeURIComponent(cityKey)}`,
+            `/api/city-subscriptions?telegramId=${encodeURIComponent(resolvedTelegramId)}&city=${encodeURIComponent(cityKey)}`,
             { method: 'DELETE' }
           );
           if (r.ok) {
@@ -327,7 +336,7 @@ export const CityModal = ({
           const r = await fetch('/api/city-subscriptions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegramId: profileTelegramId, city: cityKey }),
+            body: JSON.stringify({ telegramId: resolvedTelegramId, city: cityKey }),
           });
           if (r.ok) {
             setCitySubCities((c) => [...new Set([...c, cityKey])].sort());
@@ -341,12 +350,12 @@ export const CityModal = ({
         setCitySubBusyKey(null);
       }
     },
-    [profileTelegramId, citySubBusyKey, citySubCities, onToast, t, tg]
+    [resolvedTelegramId, citySubBusyKey, citySubCities, onToast, t, tg]
   );
 
   const renderCityBell = (city: string, onLightBg: boolean) => {
     const cityKey = normalizeCityInput(city);
-    const sub = citySubCities.includes(cityKey);
+    const sub = citySubCities.some((saved) => citiesMatch(saved, cityKey));
     const busyAll = citySubBusyKey !== null;
     const wrap = onLightBg
       ? sub
@@ -575,7 +584,7 @@ export const CityModal = ({
                   />
                   <span className={`font-medium truncate ${ac.pageHeading}`}>{t('bazaar.allCities') || 'Всі міста'}</span>
                 </button>
-                {profileTelegramId && (
+                {resolvedTelegramId && (
                   <div className="shrink-0 self-stretch">
                     <button
                       type="button"
@@ -621,7 +630,7 @@ export const CityModal = ({
                   </div>
                 )}
               </div>
-              {profileTelegramId && subsDropdownOpen && (
+              {resolvedTelegramId && subsDropdownOpen && (
                 <div
                   id="subscribed-cities-inline-list"
                   className={`rounded-xl border py-1 ${
