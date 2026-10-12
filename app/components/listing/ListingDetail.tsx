@@ -462,13 +462,18 @@ export const ListingDetail = ({
           ? `/api/listings/${initialListing.id}?viewerId=${encodeURIComponent(String(viewerId))}`
           : `/api/listings/${initialListing.id}`;
 
-        const response = await fetch(url, { method: 'GET' });
-        if (!response.ok || cancelled) return;
+        const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+        if (cancelled) return;
+        if (!response.ok) {
+          console.error('Error loading listing details: HTTP', response.status, url);
+          return;
+        }
         const data = (await response.json()) as Listing;
         if (cancelled) return;
         setListing((prev) => ({
           ...prev,
           ...data,
+          description: data.description?.trim() ? data.description : prev.description ?? '',
           seller: { ...prev.seller, ...data.seller },
           favoritesCount: Math.max(
             0,

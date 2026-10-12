@@ -196,11 +196,16 @@ export async function GET(
     });
 
     const langParam = (searchParams.get('lang') || 'uk') as 'uk' | 'ru';
-    const { profileType, businessSeller } = await resolveListingBusinessDisplay(
-      listing.userId,
-      listingId,
-      langParam
-    );
+    // Бізнес-блок вторинний: його збій не повинен ламати відповідь (опис, фото, ціна)
+    let profileType: 'personal' | 'business' = 'personal';
+    let businessSeller: Awaited<ReturnType<typeof resolveListingBusinessDisplay>>['businessSeller'] = null;
+    try {
+      const resolved = await resolveListingBusinessDisplay(listing.userId, listingId, langParam);
+      profileType = resolved.profileType;
+      businessSeller = resolved.businessSeller;
+    } catch (error) {
+      console.error('[GET /api/listings/[id]] resolveListingBusinessDisplay failed:', error);
+    }
 
     let parserAuthorUsername: string | null = null;
     let parserMsgLink: string | null = null;
