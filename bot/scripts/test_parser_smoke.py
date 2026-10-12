@@ -5,8 +5,8 @@ import unittest
 from importlib import reload
 
 from parser.moderation.formatting import (
-    build_marketplace_description,
-    ensure_marketplace_description_has_source,
+    build_final_marketplace_description,
+    is_effectively_empty_marketplace_description,
     preserve_parsed_source_fields,
     resolved_author_username,
 )
@@ -24,12 +24,9 @@ class ParserSmokeTests(unittest.TestCase):
         }
         listing = {"title": "Стол", "description": ""}
         ctx = preserve_parsed_source_fields(listing, source)
-        desc = ensure_marketplace_description_has_source(
-            build_marketplace_description(ctx),
-            ctx,
-        )
+        desc = build_final_marketplace_description(ctx)
         self.assertIn("seller_x", desc)
-        self.assertTrue(len(desc.strip()) > 10)
+        self.assertFalse(is_effectively_empty_marketplace_description(desc, ctx.get("title")))
 
     def test_author_not_channel_slug(self):
         item = {

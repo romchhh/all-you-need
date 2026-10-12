@@ -173,7 +173,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const avatarLongPress = useLongPress({
     onLongPress: () => {
       const photo =
-        profileViewMode === 'business' && isBusinessActive
+        profileViewMode === 'business' && canOpenBusinessTab
           ? businessProfile?.logo
           : profile?.avatar;
       if (photo) {
@@ -326,7 +326,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       setHasBusinessProfile(Boolean(data.hasProfile));
       setIsBusinessSuspended(Boolean(data.isSuspended));
       setBusinessProfile(data.profile || null);
-      if (!data.isActive) {
+      const canAccessCabinet = Boolean(
+        data.canAccessBusinessCabinet ?? (data.isActive || data.isSuspended)
+      );
+      if (!canAccessCabinet) {
         setProfileViewMode('personal');
         setBusinessStats(null);
       } else if (profileViewMode === 'business') {
@@ -678,7 +681,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     return t('common.user');
   })();
   const displayUsername = profile.username ? `@${profile.username}` : '';
-  const isBusinessView = profileViewMode === 'business' && isBusinessActive;
+  const canOpenBusinessTab = isBusinessActive || isBusinessSuspended;
+  const isBusinessView = profileViewMode === 'business' && canOpenBusinessTab && Boolean(businessProfile);
   const headerPhoto = profile.avatar || null;
   const headerPhotoUrl = headerPhoto ? getResolvedImageUrl(headerPhoto) : null;
   const headerInitial = displayName.charAt(0).toUpperCase();
@@ -888,6 +892,20 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     <div className="min-h-screen pb-24">
       {isBusinessView ? (
         businessProfile ? (
+        <>
+        {isBusinessSuspended && (
+          <div className="px-4 pb-2">
+            <BusinessSuspendedCard
+              onRenew={() => {
+                setBusinessEditMode(false);
+                setBusinessPlanPickerMode(false);
+                setBusinessRenewMode(true);
+                setShowBusinessFlow(true);
+                tg?.HapticFeedback.impactOccurred('medium');
+              }}
+            />
+          </div>
+        )}
         <BusinessOwnerProfileView
           personalName={displayName}
           personalAvatar={profile.avatar}
@@ -909,6 +927,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           hasMoreListings={hasMore && userListings.length > 0 && userListings.length < totalListings}
           onLoadMore={loadMoreListings}
         />
+        </>
         ) : (
           <div className="px-4 py-16 text-center">
             <p className={ac.mutedText}>{t('common.loading')}</p>
@@ -916,7 +935,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         )
       ) : (
       <>
-      {isBusinessActive && businessProfile && (
+      {canOpenBusinessTab && businessProfile && (
         <div className="px-4 pb-3 pt-1">
           <ProfileModeSwitcherRich
             mode={profileViewMode}

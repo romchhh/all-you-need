@@ -9,7 +9,15 @@ import {
   serializePortfolioItems,
   type PortfolioImageItem,
 } from '@/lib/businessProfileSettings';
-import { upsertBusinessProfileDraft, expireBusinessProfileIfNeeded, isBusinessProfileActive, assignListingsToProfile, resolveBusinessListingIds, syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
+import {
+  upsertBusinessProfileDraft,
+  expireBusinessProfileIfNeeded,
+  isBusinessProfileActive,
+  assignListingsToProfile,
+  resolveBusinessListingIds,
+  syncBusinessListingProfileTypes,
+  repairFreeBusinessProfileIfNeeded,
+} from '@/lib/businessProfileHelpers';
 import type { ListingDisplayMode } from '@/lib/businessProfileSettings';
 import { normalizeInstagramForStorage, normalizeWebsiteForStorage } from '@/utils/socialLinks';
 
@@ -58,6 +66,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    await repairFreeBusinessProfileIfNeeded(user.id);
     await expireBusinessProfileIfNeeded(user.id);
 
     const profile = await prisma.businessProfile.findUnique({
@@ -88,10 +97,13 @@ export async function GET(request: NextRequest) {
         ? profile.subscriptionAutoRenew
         : true;
 
+    const canAccessBusinessCabinet = isActive || isSuspended;
+
     return NextResponse.json({
       hasProfile: true,
       isActive,
       isSuspended,
+      canAccessBusinessCabinet,
       profile: {
         ...profile,
         subscriptionAutoRenew,

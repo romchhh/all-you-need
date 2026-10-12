@@ -334,6 +334,77 @@ def marketplace_author_source_footer(item: dict) -> str:
     return f"🔗 {label}: {msg_link}"
 
 
+def marketplace_description_body_without_footer(text: str) -> str:
+    """Текст опису без службових рядків парсера (автор / оригінал)."""
+    t = (text or "").strip()
+    if not t:
+        return ""
+    t = re.sub(
+        r"(?m)^\s*👤\s*(?:Автор|Author):\s*@[\w\d_]+\s*$",
+        "",
+        t,
+        flags=re.IGNORECASE,
+    )
+    t = re.sub(
+        r"(?m)^\s*🔗\s*(?:Оригінальне оголошення|Оригинальное объявление|Original(?:\s+(?:post|listing|ad))?)\s*:?\s*https?://\S+\s*$",
+        "",
+        t,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
+
+
+def is_effectively_empty_marketplace_description(
+    description: str | None,
+    title: str | None = None,
+    *,
+    min_body_len: int = 12,
+) -> bool:
+    body = marketplace_description_body_without_footer(description or "")
+    if not body:
+        return True
+    t = (title or "").strip()
+    if t and body.lower() == t.lower():
+        return True
+    return len(body) < min_body_len
+
+
+def build_final_marketplace_description(item: dict) -> str:
+    """
+    Опис для Listing — ніколи не порожній: текст поста, заголовок, посилання/автор.
+    """
+    ctx = dict(item)
+    desc = ensure_marketplace_description_has_source(
+        build_marketplace_description(ctx),
+        ctx,
+    ).strip()
+    if not is_effectively_empty_marketplace_description(desc, ctx.get("title")):
+        return desc
+
+    from parser.core.text import format_listing_description, strip_listing_body_metadata
+
+    raw = (ctx.get("raw_text") or "").strip()
+    title = (ctx.get("title") or "").strip()
+    chunks: list[str] = []
+    if raw:
+        snippet = format_listing_description(strip_listing_body_metadata(raw))
+        if snippet and (not title or snippet.lower() != title.lower()):
+            chunks.append(snippet)
+        elif snippet:
+            chunks.append(snippet)
+    if title and not chunks:
+        chunks.append(title)
+    if not chunks:
+        chunks.append("Подробности — в оригинальном объявлении в Telegram.")
+
+    merged = "\n\n".join(chunks)
+    final = ensure_marketplace_description_has_source(merged, ctx).strip()
+    if is_effectively_empty_marketplace_description(final, title):
+        footer = marketplace_author_source_footer(ctx)
+        final = footer or merged or title or chunks[0]
+    return final.strip()
+
+
 def ensure_marketplace_description_has_source(description: str, item: dict) -> str:
     """Гарантує @автора або 🔗 посилання в описі (на approve), без дубля в тілі."""
     from parser.core.text import strip_listing_body_metadata

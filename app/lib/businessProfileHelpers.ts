@@ -333,7 +333,39 @@ export async function expireDueBusinessSubscriptions(limit = 200): Promise<numbe
   return due.length;
 }
 
+/** Free Business tier must stay active/published; fix legacy expired/suspended states after PRO. */
+export async function repairFreeBusinessProfileIfNeeded(userId: number): Promise<void> {
+  const profile = await prisma.businessProfile.findUnique({ where: { userId } });
+  if (!profile?.businessName?.trim()) return;
+
+  const plan = (profile.plan || 'business').toLowerCase();
+  if (plan === 'business_pro') return;
+
+  const needsRepair =
+    profile.subscriptionStatus !== 'active' ||
+    profile.subscriptionEndsAt != null ||
+    !profile.isPublished;
+
+  if (!needsRepair) return;
+
+  await prisma.businessProfile.update({
+    where: { id: profile.id },
+    data: {
+      plan: 'business',
+      subscriptionStatus: 'active',
+      subscriptionEndsAt: null,
+      isPublished: true,
+      highlightCreditsRemaining: 0,
+      topCreditsRemaining: 0,
+      updatedAt: new Date(),
+    },
+  });
+  await syncBusinessListingProfileTypes(userId);
+}
+
 export async function expireBusinessProfileIfNeeded(userId: number): Promise<void> {
+  await repairFreeBusinessProfileIfNeeded(userId);
+
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
   if (!profile) return;
   if (profile.subscriptionStatus === 'active' && profile.subscriptionEndsAt && profile.subscriptionEndsAt <= new Date()) {
@@ -494,6 +526,7 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
   const user = users[0];
   if (!user) return null;
 
+  await repairFreeBusinessProfileIfNeeded(user.id);
   await expireBusinessProfileIfNeeded(user.id);
 
   const profile = await prisma.businessProfile.findUnique({

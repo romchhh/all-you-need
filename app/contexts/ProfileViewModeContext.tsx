@@ -17,6 +17,7 @@ type ProfileViewModeContextValue = {
   isBusinessActive: boolean;
   hasBusinessProfile: boolean;
   isBusinessSuspended: boolean;
+  canAccessBusinessCabinet: boolean;
   isReady: boolean;
   defaultListingProfileType: 'personal' | 'business';
   refreshBusinessStatus: () => Promise<void>;
@@ -67,6 +68,7 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
   const [isBusinessActive, setIsBusinessActive] = useState(false);
   const [hasBusinessProfile, setHasBusinessProfile] = useState(false);
   const [isBusinessSuspended, setIsBusinessSuspended] = useState(false);
+  const [canAccessBusinessCabinet, setCanAccessBusinessCabinet] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -81,6 +83,7 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
       setIsBusinessActive(false);
       setHasBusinessProfile(false);
       setIsBusinessSuspended(false);
+      setCanAccessBusinessCabinet(false);
       setModeState('personal');
       setIsReady(true);
       return;
@@ -92,6 +95,7 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
         setIsBusinessActive(false);
         setHasBusinessProfile(false);
         setIsBusinessSuspended(false);
+        setCanAccessBusinessCabinet(false);
         setModeState('personal');
         return;
       }
@@ -100,12 +104,16 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
       const active = Boolean(data.isActive);
       const hasProfile = Boolean(data.hasProfile);
       const suspended = Boolean(data.isSuspended);
+      const canAccess = Boolean(
+        data.canAccessBusinessCabinet ?? (active || suspended)
+      );
 
       setIsBusinessActive(active);
       setHasBusinessProfile(hasProfile);
       setIsBusinessSuspended(suspended);
+      setCanAccessBusinessCabinet(canAccess);
 
-      if (active) {
+      if (canAccess) {
         setModeState(readStoredMode(telegramId));
       } else {
         setModeState('personal');
@@ -115,6 +123,7 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
       setIsBusinessActive(false);
       setHasBusinessProfile(false);
       setIsBusinessSuspended(false);
+      setCanAccessBusinessCabinet(false);
       setModeState('personal');
     } finally {
       setIsReady(true);
@@ -128,22 +137,23 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
 
   const setMode = useCallback(
     (next: ProfileViewMode) => {
-      if (next === 'business' && !isBusinessActive) return;
+      if (next === 'business' && !canAccessBusinessCabinet) return;
       setModeState(next);
       if (telegramId) {
         writeStoredMode(telegramId, next);
       }
     },
-    [isBusinessActive, telegramId]
+    [canAccessBusinessCabinet, telegramId]
   );
 
   const value = useMemo(
     () => ({
-      mode: isBusinessActive ? mode : 'personal',
+      mode: canAccessBusinessCabinet ? mode : 'personal',
       setMode,
       isBusinessActive,
       hasBusinessProfile,
       isBusinessSuspended,
+      canAccessBusinessCabinet,
       isReady,
       defaultListingProfileType:
         isBusinessActive && mode === 'business' ? ('business' as const) : ('personal' as const),
@@ -155,6 +165,7 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
       isBusinessActive,
       hasBusinessProfile,
       isBusinessSuspended,
+      canAccessBusinessCabinet,
       isReady,
       refreshBusinessStatus,
     ]

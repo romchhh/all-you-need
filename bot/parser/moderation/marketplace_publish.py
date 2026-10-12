@@ -6,8 +6,8 @@ import logging
 
 from parser.core.account_pool import list_parser_accounts
 from parser.moderation.formatting import (
-    build_marketplace_description,
-    ensure_marketplace_description_has_source,
+    build_final_marketplace_description,
+    is_effectively_empty_marketplace_description,
     preserve_parsed_source_fields,
 )
 from parser.storage.listing_dedup import active_listing_duplicate
@@ -63,13 +63,16 @@ def publish_parsed_item_marketplace(
     images = parsed_item_image_refs(source)
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
     publish_ctx = preserve_parsed_source_fields(dict(listing_item), source)
-    description = ensure_marketplace_description_has_source(
-        build_marketplace_description(publish_ctx),
-        publish_ctx,
-    )
-    if not (description or "").strip():
-        title = str(publish_ctx.get("title") or "").strip()
-        description = ensure_marketplace_description_has_source(title, publish_ctx)
+    description = build_final_marketplace_description(publish_ctx)
+    if is_effectively_empty_marketplace_description(
+        description, publish_ctx.get("title")
+    ):
+        logger.error(
+            "parsed_item %s: порожній опис після збірки (title=%r)",
+            item_id,
+            publish_ctx.get("title"),
+        )
+        raise MarketplacePublishError("empty_description")
 
     dedup_key = fingerprint_title_desc(
         str(listing_item.get("title") or ""),
