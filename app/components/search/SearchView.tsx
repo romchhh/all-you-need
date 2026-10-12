@@ -54,7 +54,7 @@ import { CategoryChip } from '@/components/listing/CategoryChip';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
-import { STICKY_BELOW_APP_HEADER_CLASS, overlayHeaderActionClass } from '@/components/layout/FixedLogoHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS, overlayHeaderActionClass, stickyFrostedBarStyle } from '@/components/layout/FixedLogoHeader';
 import { trackAnalytics } from '@/utils/analyticsClient';
 import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsEvents';
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
@@ -1118,11 +1118,6 @@ export function SearchView({
   const isTypingPending =
     trimmedLocal.length >= MIN_QUERY_LENGTH && trimmedLocal !== debouncedQuery.trim();
 
-  // Як на базарі: без суцільної «плашки» під рядком пошуку — фон сторінки просвічує.
-  const stickySearchBg = isLight
-    ? 'border-b border-[#3F5331]/10 bg-transparent'
-    : 'border-b border-white/10 bg-transparent';
-
   const catalogListingsProps = {
     favorites,
     onSelect: openListing,
@@ -1722,8 +1717,9 @@ export function SearchView({
         </>
       ) : (
         <>
-          <div className={`${SEARCH_STICKY_CLASS} ${stickySearchBg}`}>
-            <div className="mx-auto flex w-full max-w-xl items-center gap-1.5 px-4 py-2 xl:max-w-2xl lg:mx-auto">
+          <div className={`${SEARCH_STICKY_CLASS} relative`}>
+            <div aria-hidden className="pointer-events-none absolute inset-0" style={stickyFrostedBarStyle(isLight)} />
+            <div className="relative mx-auto flex w-full max-w-xl items-center gap-1.5 px-4 py-2 xl:max-w-2xl lg:mx-auto">
               <button
                 type="button"
                 onClick={() => {

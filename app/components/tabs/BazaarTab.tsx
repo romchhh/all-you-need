@@ -7,7 +7,7 @@ import { ListingCard } from '@/components/listing/ListingCard';
 import { ListingCardColumn } from '@/components/listing/ListingCardColumn';
 import dynamic from 'next/dynamic';
 import { SubcategoryList } from '@/components/listing/SubcategoryList';
-import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS, stickyFrostedBarStyle } from '@/components/layout/FixedLogoHeader';
 import { TopBar } from '@/components/layout/TopBar';
 import type { PlatformOnboardingActionId } from '@/utils/platformTickerMessages';
 import { trackAnalytics } from '@/utils/analyticsClient';
@@ -478,7 +478,10 @@ const BazaarTabComponent = ({
     <div className="pb-24">
       {/* Пошук з TopBar — на десктопі вужчий і по центру */}
       <div className="relative">
-        <div className={`${STICKY_BELOW_APP_HEADER_CLASS} bg-transparent px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`}>
+        <div
+          className={`${STICKY_BELOW_APP_HEADER_CLASS} relative px-4 pb-3 pt-2 max-lg:pt-1 lg:flex lg:justify-center lg:py-3`}
+        >
+          <div aria-hidden className="pointer-events-none absolute inset-0" style={stickyFrostedBarStyle(isLight)} />
           <div className="relative w-full max-w-full lg:max-w-xl xl:max-w-2xl">
             <div className="flex min-w-0 items-center gap-1">
               <div className="min-w-0 flex-1">
