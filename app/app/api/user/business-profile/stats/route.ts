@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Business profile not found' }, { status: 404 });
     }
     if (!isBusinessProfileActive(profile)) {
-      return NextResponse.json({ error: 'Business profile not active' }, { status: 404 });
+      return NextResponse.json(EMPTY_BUSINESS_PROFILE_STATS);
     }
 
     const stats = await getBusinessProfileStatsForUserId(user.id);

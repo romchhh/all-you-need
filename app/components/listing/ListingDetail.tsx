@@ -162,6 +162,37 @@ export const ListingDetail = ({
   const [showMarkSoldConfirm, setShowMarkSoldConfirm] = useState(false);
   const { user: currentUser } = useTelegram();
   const { profile } = useUser();
+
+  // Каталог/стрічка не віддають description — підвантажуємо повне оголошення.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFullListing = async () => {
+      const viewerId =
+        profile?.telegramId ||
+        (currentUser?.id != null ? String(currentUser.id) : '');
+      const qs = viewerId ? `?viewerId=${encodeURIComponent(viewerId)}` : '';
+      try {
+        const res = await fetch(`/api/listings/${initialListing.id}${qs}`);
+        if (!res.ok || cancelled) return;
+        const full = (await res.json()) as Listing;
+        if (cancelled) return;
+        setListing((prev) => ({
+          ...prev,
+          ...full,
+          seller: { ...prev.seller, ...full.seller },
+        }));
+      } catch (e) {
+        console.error('Failed to load listing details:', e);
+      }
+    };
+
+    void loadFullListing();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialListing.id, profile?.telegramId, currentUser?.id]);
+
   const { t, language } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
   const router = useRouter();

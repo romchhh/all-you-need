@@ -17,6 +17,7 @@ import {
   resolveBusinessListingIds,
   syncBusinessListingProfileTypes,
   repairFreeBusinessProfileIfNeeded,
+  resolveBusinessCabinetState,
 } from '@/lib/businessProfileHelpers';
 import type { ListingDisplayMode } from '@/lib/businessProfileSettings';
 import { normalizeInstagramForStorage, normalizeWebsiteForStorage } from '@/utils/socialLinks';
@@ -78,10 +79,8 @@ export async function GET(request: NextRequest) {
     }
 
     const isActive = isBusinessProfileActive(profile);
-    const isSuspended =
-      !isActive &&
-      profile.subscriptionStatus === 'expired' &&
-      profile.plan === 'business_pro';
+    const cabinetState = resolveBusinessCabinetState(profile);
+    const isSuspended = cabinetState === 'suspended';
 
     if (isActive) {
       await syncBusinessListingProfileTypes(user.id);
@@ -97,12 +96,14 @@ export async function GET(request: NextRequest) {
         ? profile.subscriptionAutoRenew
         : true;
 
-    const canAccessBusinessCabinet = isActive || isSuspended;
+    /** Перемикач особистий / business — для будь-якого збереженого профілю. */
+    const canAccessBusinessCabinet = true;
 
     return NextResponse.json({
       hasProfile: true,
       isActive,
       isSuspended,
+      cabinetState,
       canAccessBusinessCabinet,
       profile: {
         ...profile,

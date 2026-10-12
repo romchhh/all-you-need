@@ -42,6 +42,7 @@ import {
 import { BusinessSubscriptionSheet } from '@/components/business/BusinessSubscriptionSheet';
 import { BusinessStatsSheet } from '@/components/business/BusinessStatsSheet';
 import { EMPTY_BUSINESS_PROFILE_STATS } from '@/lib/businessProfileConstants';
+import { resolveBusinessCabinetState } from '@/lib/businessCabinetState';
 
 const EditListingModal = dynamic(
   () => import('@/components/modals/EditListingModal').then((m) => ({ default: m.EditListingModal })),
@@ -173,7 +174,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const avatarLongPress = useLongPress({
     onLongPress: () => {
       const photo =
-        profileViewMode === 'business' && canOpenBusinessTab
+        profileViewMode === 'business' && hasBusinessProfile && businessProfile
           ? businessProfile?.logo
           : profile?.avatar;
       if (photo) {
@@ -326,10 +327,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       setHasBusinessProfile(Boolean(data.hasProfile));
       setIsBusinessSuspended(Boolean(data.isSuspended));
       setBusinessProfile(data.profile || null);
-      const canAccessCabinet = Boolean(
-        data.canAccessBusinessCabinet ?? (data.isActive || data.isSuspended)
-      );
-      if (!canAccessCabinet) {
+      await refreshBusinessStatus();
+      if (!data.hasProfile) {
         setProfileViewMode('personal');
         setBusinessStats(null);
       } else if (profileViewMode === 'business') {
@@ -418,16 +417,16 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   }, [profile?.telegramId]);
 
   useEffect(() => {
-    if (profile?.telegramId && profileViewMode === 'business' && isBusinessActive) {
+    if (profile?.telegramId && profileViewMode === 'business' && hasBusinessProfile) {
       void fetchBusinessProfile();
     }
-  }, [profileViewMode, isBusinessActive, profile?.telegramId]);
+  }, [profileViewMode, hasBusinessProfile, profile?.telegramId]);
 
   useEffect(() => {
-    if (isBusinessActive && profileViewMode === 'business' && profile?.telegramId) {
+    if (hasBusinessProfile && profileViewMode === 'business' && profile?.telegramId) {
       void fetchBusinessStats();
     }
-  }, [isBusinessActive, profileViewMode, profile?.telegramId]);
+  }, [hasBusinessProfile, profileViewMode, profile?.telegramId]);
 
   useEffect(() => {
     if (profileViewMode !== 'business') return;
@@ -681,8 +680,25 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     return t('common.user');
   })();
   const displayUsername = profile.username ? `@${profile.username}` : '';
-  const canOpenBusinessTab = isBusinessActive || isBusinessSuspended;
-  const isBusinessView = profileViewMode === 'business' && canOpenBusinessTab && Boolean(businessProfile);
+  const showBusinessSwitcher = Boolean(businessProfile);
+  const businessCabinetState = businessProfile
+    ? resolveBusinessCabinetState({
+        subscriptionStatus: businessProfile.subscriptionStatus || 'draft',
+        subscriptionEndsAt: businessProfile.subscriptionEndsAt,
+        plan: businessProfile.plan,
+        businessName: businessProfile.businessName,
+      })
+    : null;
+  const businessSwitcherStatusLabel = (() => {
+    if (!businessProfile || businessCabinetState === 'active') return null;
+    if (businessCabinetState === 'suspended') return t('businessProfile.switcher.statusSuspended');
+    if (businessCabinetState === 'draft') return t('businessProfile.switcher.statusDraft');
+    if (businessCabinetState === 'inactive') return t('businessProfile.switcher.statusInactive');
+    return null;
+  })();
+  const businessDisplayName =
+    businessProfile?.businessName?.trim() || t('businessProfile.switcher.business');
+  const isBusinessView = profileViewMode === 'business' && showBusinessSwitcher;
   const headerPhoto = profile.avatar || null;
   const headerPhotoUrl = headerPhoto ? getResolvedImageUrl(headerPhoto) : null;
   const headerInitial = displayName.charAt(0).toUpperCase();
@@ -869,9 +885,11 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   const handleProfileModeChange = (mode: ProfileViewMode) => {
     setProfileViewMode(mode);
-    if (mode === 'business') {
+    if (mode === 'business' && businessProfile) {
       void fetchBusinessStats();
+      void fetchListingsWithFilters(0, true);
     }
+    void refreshBusinessStatus();
     tg?.HapticFeedback.impactOccurred('light');
   };
 
@@ -906,6 +924,20 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
             />
           </div>
         )}
+        {!isBusinessActive && !isBusinessSuspended && (
+          <div className="px-4 pb-2">
+            <BusinessPromoCard
+              variant="continue"
+              onCreate={() => {
+                setBusinessEditMode(false);
+                setBusinessRenewMode(false);
+                setBusinessPlanPickerMode(false);
+                setShowBusinessFlow(true);
+                tg?.HapticFeedback.impactOccurred('medium');
+              }}
+            />
+          </div>
+        )}
         <BusinessOwnerProfileView
           personalName={displayName}
           personalAvatar={profile.avatar}
@@ -915,6 +947,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           reviewsCount={profile.reviewsCount || 0}
           profileViewMode={profileViewMode}
           onProfileModeChange={handleProfileModeChange}
+          businessStatusLabel={businessSwitcherStatusLabel}
           listingTab={businessListingTab}
           onListingTabChange={setBusinessListingTab}
           onPreviewProfile={openBusinessPreview}
@@ -935,15 +968,16 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         )
       ) : (
       <>
-      {canOpenBusinessTab && businessProfile && (
+      {showBusinessSwitcher && (
         <div className="px-4 pb-3 pt-1">
           <ProfileModeSwitcherRich
             mode={profileViewMode}
             onChange={handleProfileModeChange}
             personalName={displayName}
             personalAvatar={profile.avatar}
-            businessName={businessProfile.businessName}
-            businessLogo={businessProfile.logo}
+            businessName={businessDisplayName}
+            businessLogo={businessProfile?.logo}
+            businessStatusLabel={businessSwitcherStatusLabel}
           />
         </div>
       )}

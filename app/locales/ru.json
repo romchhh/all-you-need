@@ -1268,7 +1268,11 @@
     },
     "switcher": {
       "personal": "Личный",
-      "business": "Business"
+      "business": "Business",
+      "statusActive": "Активен",
+      "statusSuspended": "Приостановлен",
+      "statusDraft": "Не завершён",
+      "statusInactive": "Неактивен"
     },
     "stepOf": "Шаг {current} из {total}",
     "continue": "Продолжить",

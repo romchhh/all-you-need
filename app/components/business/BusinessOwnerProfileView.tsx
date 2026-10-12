@@ -63,6 +63,7 @@ interface BusinessOwnerProfileViewProps {
   reviewsCount: number;
   profileViewMode: ProfileViewMode;
   onProfileModeChange: (mode: ProfileViewMode) => void;
+  businessStatusLabel?: string | null;
   listingTab: BusinessListingTab;
   onListingTabChange: (tab: BusinessListingTab) => void;
   onPreviewProfile: () => void;
@@ -111,6 +112,7 @@ export function BusinessOwnerProfileView({
   reviewsCount,
   profileViewMode,
   onProfileModeChange,
+  businessStatusLabel,
   listingTab,
   onListingTabChange,
   onPreviewProfile,
@@ -169,6 +171,7 @@ export function BusinessOwnerProfileView({
         personalAvatar={personalAvatar}
         businessName={businessProfile.businessName}
         businessLogo={businessProfile.logo}
+        businessStatusLabel={businessStatusLabel}
       />
 
       {/* Identity */}

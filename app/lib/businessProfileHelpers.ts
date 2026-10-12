@@ -20,8 +20,11 @@ import {
   parseBusinessDirections,
   serializeBusinessDirections,
 } from '@/lib/businessSphereConstants';
+import { isBusinessProfileActive as isBusinessProfileActiveCore } from '@/lib/businessCabinetState';
 
 export { parseLinkedListingIds } from '@/lib/businessProfileSettings';
+export type { BusinessCabinetState } from '@/lib/businessCabinetState';
+export { resolveBusinessCabinetState } from '@/lib/businessCabinetState';
 
 export type BusinessProfileInput = {
   businessName: string;
@@ -50,9 +53,7 @@ export function isBusinessProfileActive(profile: {
   subscriptionStatus: string;
   subscriptionEndsAt: Date | null | undefined;
 }): boolean {
-  if (profile.subscriptionStatus !== 'active') return false;
-  if (!profile.subscriptionEndsAt) return true;
-  return profile.subscriptionEndsAt > new Date();
+  return isBusinessProfileActiveCore(profile);
 }
 
 export async function upsertBusinessProfileDraft(

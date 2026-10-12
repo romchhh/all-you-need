@@ -104,16 +104,14 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
       const active = Boolean(data.isActive);
       const hasProfile = Boolean(data.hasProfile);
       const suspended = Boolean(data.isSuspended);
-      const canAccess = Boolean(
-        data.canAccessBusinessCabinet ?? (active || suspended)
-      );
+      const canAccess = Boolean(data.canAccessBusinessCabinet ?? hasProfile);
 
       setIsBusinessActive(active);
       setHasBusinessProfile(hasProfile);
       setIsBusinessSuspended(suspended);
       setCanAccessBusinessCabinet(canAccess);
 
-      if (canAccess) {
+      if (hasProfile) {
         setModeState(readStoredMode(telegramId));
       } else {
         setModeState('personal');
@@ -137,18 +135,17 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
 
   const setMode = useCallback(
     (next: ProfileViewMode) => {
-      if (next === 'business' && !canAccessBusinessCabinet) return;
       setModeState(next);
       if (telegramId) {
         writeStoredMode(telegramId, next);
       }
     },
-    [canAccessBusinessCabinet, telegramId]
+    [telegramId]
   );
 
   const value = useMemo(
     () => ({
-      mode: canAccessBusinessCabinet ? mode : 'personal',
+      mode,
       setMode,
       isBusinessActive,
       hasBusinessProfile,

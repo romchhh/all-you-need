@@ -16,6 +16,8 @@ type ProfileModeSwitcherRichProps = {
   personalAvatar?: string | null;
   businessName: string;
   businessLogo?: string | null;
+  /** Короткий статус (неактивний, draft, PRO призупинено) */
+  businessStatusLabel?: string | null;
   className?: string;
 };
 
@@ -26,6 +28,7 @@ export function ProfileModeSwitcherRich({
   personalAvatar,
   businessName,
   businessLogo,
+  businessStatusLabel,
   className = '',
 }: ProfileModeSwitcherRichProps) {
   const { t } = useLanguage();
@@ -96,7 +99,18 @@ export function ProfileModeSwitcherRich({
             </div>
           )}
         </div>
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{businessName}</span>
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+          {businessName}
+          {businessStatusLabel ? (
+            <span
+              className={`block truncate text-[10px] font-medium ${
+                mode === 'business' ? 'text-[#1a1a1a]/70' : ac.mutedText
+              }`}
+            >
+              {businessStatusLabel}
+            </span>
+          ) : null}
+        </span>
         <ChevronDown size={16} className="shrink-0 opacity-70" />
       </button>
     </div>
