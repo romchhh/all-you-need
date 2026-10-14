@@ -313,7 +313,13 @@ def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[b
             is_free=bool(item.get("is_free")),
         )
         try:
-            if active_listing_duplicate(dedup_key, title, description):
+            if active_listing_duplicate(
+                dedup_key,
+                title,
+                description,
+                price=str(item.get("price") or ""),
+                is_free=bool(item.get("is_free")),
+            ):
                 return False, "duplicate"
             from parser.storage.author_outreach import dedup_key_recently_published
 

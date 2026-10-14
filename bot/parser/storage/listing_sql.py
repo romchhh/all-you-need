@@ -5,25 +5,46 @@ from __future__ import annotations
 from database_functions.db_connection import is_postgres
 
 
-def active_listings_dedup_sql() -> str:
+def published_parsed_dedup_sql() -> str:
+    """Дубль за dedup_key серед уже опублікованих parsed_items."""
+    return """
+SELECT 1
+FROM parsed_items
+WHERE dedup_key = ?
+  AND marketplace_listing_id IS NOT NULL
+  AND datetime(created_at) >= datetime('now', ?)
+LIMIT 1
+"""
+
+
+def listing_title_price_duplicate_sql() -> str:
+    """Точний збіг нормалізованого заголовка і ціни серед активних Listing."""
     if is_postgres():
         return """
-SELECT id, title, description, price, "isFree"
+SELECT id
 FROM "Listing"
 WHERE status = 'active'
   AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
   AND "createdAt" >= NOW() + CAST(? AS INTERVAL)
-ORDER BY id DESC
-LIMIT 800
+  AND (lower(title) = ? OR lower(title) = ?)
+  AND (
+        lower(replace(COALESCE(price, ''), ' ', '')) = ?
+        OR (? = 'free' AND ("isFree" IS TRUE OR lower(COALESCE(price, '')) IN ('free', '0')))
+      )
+LIMIT 1
 """
     return """
-SELECT id, title, description, price, isFree
+SELECT id
 FROM Listing
 WHERE status = 'active'
   AND (expiresAt IS NULL OR datetime(expiresAt) > datetime('now'))
   AND datetime(createdAt) >= datetime('now', ?)
-ORDER BY id DESC
-LIMIT 800
+  AND (lower(title) = ? OR lower(title) = ?)
+  AND (
+        lower(replace(COALESCE(price, ''), ' ', '')) = ?
+        OR (? = 'free' AND (isFree = 1 OR lower(COALESCE(price, '')) IN ('free', '0')))
+      )
+LIMIT 1
 """
 
 

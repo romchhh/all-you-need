@@ -288,6 +288,89 @@ def _cleanup_pending_service_channel_defaults(cursor) -> None:
         logger.warning("parsed_items cleanup skipped: %s", e)
 
 
+ALBUM_PART_STATUS = "album_part"
+
+
+def parsed_message_seen(source_channel: str, message_id: int) -> bool:
+    """Чи цей message_id уже є в parsed_items (будь-який parser_type)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT 1 FROM parsed_items
+        WHERE source_channel = ? AND message_id = ?
+        LIMIT 1
+        """,
+        (source_channel, message_id),
+    )
+    seen = cursor.fetchone() is not None
+    conn.close()
+    return seen
+
+
+def album_has_listing(source_channel: str, media_group_id: str) -> bool:
+    """Чи з цього альбому вже зібране оголошення (не заглушка кадру)."""
+    if not media_group_id:
+        return False
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT 1 FROM parsed_items
+        WHERE source_channel = ? AND media_group_id = ?
+          AND COALESCE(status, '') != ?
+        LIMIT 1
+        """,
+        (source_channel, media_group_id, ALBUM_PART_STATUS),
+    )
+    seen = cursor.fetchone() is not None
+    conn.close()
+    return seen
+
+
+def mark_album_siblings(
+    *,
+    source_channel: str,
+    source_city: str,
+    media_group_id: str,
+    message_ids: list[int],
+    canonical_id: int,
+    parser_type: str,
+) -> None:
+    """Позначає інші кадри альбому, щоб наступний цикл не публікував їх окремо."""
+    if not media_group_id:
+        return
+    conn = get_connection()
+    cursor = conn.cursor()
+    for mid in message_ids:
+        mid_i = int(mid)
+        if mid_i == int(canonical_id) or mid_i == 0:
+            continue
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO parsed_items (
+                source_channel, source_city, message_id, media_group_id,
+                title, description, is_free, category, location,
+                images_json, parser_type, status
+            ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, '[]', ?, ?)
+            """,
+            (
+                source_channel,
+                source_city or "Germany",
+                mid_i,
+                media_group_id,
+                " ",
+                " ",
+                "other",
+                source_city or "Germany",
+                parser_type,
+                ALBUM_PART_STATUS,
+            ),
+        )
+    conn.commit()
+    conn.close()
+
+
 def parsed_item_exists(
     source_channel: str,
     message_id: int,

@@ -11,10 +11,10 @@ from parser.config.settings import PARSER_DEDUP_DAYS
 from parser.storage.connection import get_connection
 from parser.storage.listing_sql import (
     active_listings_context_sql,
-    active_listings_dedup_sql,
+    listing_title_price_duplicate_sql,
     location_filter_clause,
+    published_parsed_dedup_sql,
 )
-from parser.storage.parsed_items import fingerprint_title_desc
 
 logger = logging.getLogger(__name__)
 
@@ -33,34 +33,52 @@ def _row_dict(row: Any) -> dict[str, Any]:
     return dict(row)
 
 
-def active_listing_duplicate(dedup_key: Optional[str], title: str, description: str) -> bool:
-    """Чи є активне оголошення з тим самим dedup_key."""
-    if not dedup_key:
-        return False
+def _match_title(title: str) -> str:
+    return re.sub(r"\s+", " ", (title or "").strip().lower())[:220]
+
+
+def _match_price(price: str | None, is_free: bool) -> str:
+    if is_free:
+        return "free"
+    return re.sub(r"\s+", "", str(price or "").lower())[:40]
+
+
+def active_listing_duplicate(
+    dedup_key: Optional[str],
+    title: str,
+    description: str,
+    *,
+    price: str | None = None,
+    is_free: bool = False,
+) -> bool:
+    """Чи є вже опубліковане оголошення з тим самим ключем або заголовком і ціною."""
+    del description  # відбиток опису сидить у dedup_key, збереженому на етапі parse
+    window = f"-{PARSER_DEDUP_DAYS} days"
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        active_listings_dedup_sql(),
-        (f"-{PARSER_DEDUP_DAYS} days",),
-    )
-    rows = cursor.fetchall()
-    conn.close()
-    for row in rows:
-        data = _row_dict(row)
-        row_free = data.get("isFree") in (1, True, "1")
-        existing = fingerprint_title_desc(
-            str(data.get("title") or ""),
-            str(data.get("description") or ""),
-            price=str(data.get("price") or ""),
-            is_free=row_free,
-        )
-        if existing and existing == dedup_key:
-            logger.info(
-                "Marketplace dedup hit: listing #%s title=%r",
-                data.get("id"),
-                (data.get("title") or "")[:50],
-            )
+    key = (dedup_key or "").strip()
+    if key:
+        cursor.execute(published_parsed_dedup_sql(), (key, window))
+        if cursor.fetchone():
+            conn.close()
+            logger.info("Marketplace dedup hit by parsed dedup_key")
             return True
+
+    norm_title = _match_title(title)
+    raw_title = (title or "").strip().lower()[:220]
+    price_part = _match_price(price, is_free)
+    if len(norm_title) < 4 or not price_part:
+        conn.close()
+        return False
+    cursor.execute(
+        listing_title_price_duplicate_sql(),
+        (window, norm_title, raw_title, price_part, price_part),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        logger.info("Marketplace dedup hit by title+price %r", norm_title[:50])
+        return True
     return False
 
 

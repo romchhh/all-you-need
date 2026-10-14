@@ -74,7 +74,7 @@ def publish_parsed_item_marketplace(
         )
         raise MarketplacePublishError("empty_description")
 
-    dedup_key = fingerprint_title_desc(
+    dedup_key = str(source.get("dedup_key") or "").strip() or fingerprint_title_desc(
         str(listing_item.get("title") or ""),
         str(listing_item.get("description") or ""),
         price=str(listing_item.get("price") or ""),
@@ -84,6 +84,8 @@ def publish_parsed_item_marketplace(
         dedup_key,
         str(listing_item.get("title") or ""),
         description,
+        price=str(listing_item.get("price") or ""),
+        is_free=bool(listing_item.get("is_free")),
     ):
         raise MarketplacePublishError("duplicate")
 

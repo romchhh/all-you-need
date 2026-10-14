@@ -20,6 +20,7 @@ from parser.config.settings import (
     PARSER_SERVICES_IGNORE_CURSOR,
 )
 from parser.moderation.approve_routing import notify_chat_for_parsed_item
+from parser.core.album import expand_incoming_message
 from parser.core.channel_fetch import iter_new_channel_messages
 from parser.core.photos import download_photos
 from parser.core.quality import (
@@ -40,7 +41,6 @@ from parser.core.text import (
     extract_description,
     extract_title,
     parse_price,
-    to_plain_str,
 )
 from parser.core.parse_pipeline import run_ai_screen_and_dedup
 from parser.core.parse_skip import log_parse_skip
@@ -49,11 +49,13 @@ from parser.marketplace_categories import (
     should_treat_as_service,
 )
 from parser.storage.parsed_items import (
+    album_has_listing,
     ensure_parsed_items_table,
     fingerprint_parsed_text,
     fingerprint_title_desc,
     insert_parsed_item,
-    parsed_item_exists,
+    mark_album_siblings,
+    parsed_message_seen,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,30 +113,44 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         fetch_limit=fetch_limit,
         ignore_cursor=ignore_cursor,
     ):
-        if getattr(msg, "media_group_id", None):
-            gid = str(msg.media_group_id)
-            if gid in processed_groups:
+        (
+            text,
+            photos,
+            msg_for_link,
+            effective_message_id,
+            media_group_id,
+            album_ids,
+            link_override,
+        ) = await expand_incoming_message(msg)
+        if media_group_id:
+            if media_group_id in processed_groups:
                 continue
-            processed_groups.add(gid)
-            try:
-                group = await msg.get_media_group()
-            except Exception:
-                group = [msg]
-            first_with_cap = next((m for m in group if (m.text or m.caption)), group[0])
-            text = to_plain_str(first_with_cap.text or first_with_cap.caption or "")
-            photos = [m for m in group if m.photo]
-            msg_for_link = msg
-            effective_message_id = msg.id
-        else:
-            text = to_plain_str(msg.text or msg.caption or "")
-            photos = [msg] if msg.photo else []
-            msg_for_link = msg
-            effective_message_id = msg.id
+            processed_groups.add(media_group_id)
 
-        if parsed_item_exists(channel, effective_message_id, PARSER_TYPE_SERVICES_CHANNEL):
+        def _remember_album() -> None:
+            if not media_group_id:
+                return
+            mark_album_siblings(
+                source_channel=channel,
+                source_city=city,
+                media_group_id=media_group_id,
+                message_ids=album_ids,
+                canonical_id=effective_message_id,
+                parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            )
+
+        if media_group_id and album_has_listing(channel, media_group_id):
+            _remember_album()
+            stats["skipped"] += 1
+            stats["reasons"]["дублікат (альбом)"] = stats["reasons"].get("дублікат (альбом)", 0) + 1
+            continue
+
+        if parsed_message_seen(channel, effective_message_id):
+            _remember_album()
             stats["skipped"] += 1
             stats["reasons"]["дублікат (бд)"] = stats["reasons"].get("дублікат (бд)", 0) + 1
             continue
+        _remember_album()
 
         text = clean_channel_post_text(text, channel)
 
@@ -316,15 +332,12 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             final_parser_type = "default"
 
         author_username, author_id = resolve_author_contact(msg_for_link, text, channel)
-        media_group_id = getattr(msg, "media_group_id", None)
-        if media_group_id:
-            media_group_id = str(media_group_id)
 
         chan_slug = re.sub(r"[^a-z0-9]+", "_", channel.lower()).strip("_")[:24] or "ch"
         base_name = f"{chan_slug}_{effective_message_id}"
         images = await download_photos(app, photos, base_name)
 
-        post_msg_link = message_link(
+        post_msg_link = link_override or message_link(
             channel,
             effective_message_id,
             chat_id=chat_target if isinstance(chat_target, int) else None,

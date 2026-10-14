@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from utils.location_normalization import CITY_SYNONYMS, normalize_city_name
 
@@ -17,19 +18,43 @@ _WIDE_SOURCE_CITIES = frozenset({
     "нрв",
 })
 
-# Лише ці міста можна ставити в location (жодних «сіл» від AI).
-_KNOWN_CITIES: tuple[str, ...] = (
-    "Berlin", "Hamburg", "München", "Köln", "Frankfurt", "Stuttgart",
-    "Düsseldorf", "Leipzig", "Dortmund", "Essen", "Bremen", "Dresden",
-    "Hannover", "Nürnberg", "Duisburg", "Bochum", "Wuppertal", "Bielefeld",
-    "Bonn", "Münster", "Karlsruhe", "Mannheim", "Augsburg", "Wiesbaden",
-    "Aachen", "Mönchengladbach", "Gelsenkirchen", "Braunschweig", "Kiel",
-    "Freiburg im Breisgau", "Lübeck", "Erfurt", "Rostock", "Mainz", "Kassel",
-    "Potsdam", "Heidelberg", "Darmstadt", "Regensburg", "Würzburg", "Ulm",
-    "Dülmen",
-)
+def _load_app_german_cities() -> tuple[str, ...]:
+    """Канонічні назви з app/constants/german-cities.ts."""
+    path = Path(__file__).resolve().parents[3] / "app" / "constants" / "german-cities.ts"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ()
+    start = text.find("export const germanCities = [")
+    end = text.find("];", start)
+    block = text[start:end] if start >= 0 and end > start else ""
+    names = [name.strip() for name in re.findall(r"'([^']+)'", block) if name.strip()]
+    return tuple(dict.fromkeys(names))
 
-_KNOWN_CITY_LOWER = {c.lower(): c for c in _KNOWN_CITIES}
+
+_INDEX_CACHE: dict[str, str] | None = None
+_NEEDLES_CACHE: list[tuple[str, str]] | None = None
+
+
+def _city_index() -> dict[str, str]:
+    """lower/ascii → канонічне написання. Синоніми поза топ-списком теж лишаються."""
+    global _INDEX_CACHE
+    if _INDEX_CACHE is not None:
+        return _INDEX_CACHE
+    index: dict[str, str] = {}
+    for name in _KNOWN_CITIES:
+        index[name.lower()] = name
+        index[_ascii_fold(name.lower())] = name
+    for canon in CITY_SYNONYMS.values():
+        if canon.lower() in _WIDE_SOURCE_CITIES:
+            continue
+        index.setdefault(canon.lower(), canon)
+        index.setdefault(_ascii_fold(canon.lower()), canon)
+    _INDEX_CACHE = index
+    return index
+
+
+_KNOWN_CITIES: tuple[str, ...] = _load_app_german_cities()
 
 
 def _ascii_fold(text: str) -> str:
@@ -59,27 +84,24 @@ def is_local_source_city(city: str) -> bool:
 
 def canonicalize_known_city(name: str | None) -> str | None:
     """
-    Повертає канонічне місто зі whitelist або None.
-    Невідомі села / AI-галюцинації → None.
+    Канонічне місто зі словника синонімів або списку німецьких міст.
+    Germany / NRW і невідомі назви → None.
     """
     raw = (name or "").strip()
     if not raw:
         return None
     key = raw.lower()
+    if key in _WIDE_SOURCE_CITIES:
+        return None
     if key in CITY_SYNONYMS:
         canon = CITY_SYNONYMS[key]
         if canon.lower() in _WIDE_SOURCE_CITIES:
             return None
-        return _KNOWN_CITY_LOWER.get(canon.lower(), canon if canon in _KNOWN_CITIES else None)
-
-    if key in _KNOWN_CITY_LOWER:
-        return _KNOWN_CITY_LOWER[key]
+        return _city_index().get(canon.lower(), canon)
 
     folded = _ascii_fold(key)
-    for city in _KNOWN_CITIES:
-        if _ascii_fold(city.lower()) == folded:
-            return city
-    return None
+    index = _city_index()
+    return index.get(key) or index.get(folded)
 
 
 def channel_city_from_source(
@@ -104,35 +126,58 @@ def channel_city_from_source(
     return "Germany"
 
 
+def _city_needles() -> list[tuple[str, str]]:
+    """(фрагмент, канон), довші назви першими — Frankfurt (Oder) раніше за Frankfurt."""
+    global _NEEDLES_CACHE
+    if _NEEDLES_CACHE is not None:
+        return _NEEDLES_CACHE
+    pairs: dict[str, str] = {}
+    for syn, canon in CITY_SYNONYMS.items():
+        if len(syn) < 3 or canon.lower() in _WIDE_SOURCE_CITIES:
+            continue
+        accepted = canonicalize_known_city(canon)
+        if accepted:
+            pairs.setdefault(syn.lower(), accepted)
+    for city in _KNOWN_CITIES:
+        accepted = canonicalize_known_city(city)
+        if accepted:
+            pairs.setdefault(city.lower(), accepted)
+    _NEEDLES_CACHE = sorted(pairs.items(), key=lambda item: len(item[0]), reverse=True)
+    return _NEEDLES_CACHE
+
+
+def _hits_in(text: str, needles: list[tuple[str, str]]) -> list[tuple[int, str]]:
+    raw_hits: list[tuple[int, int, str]] = []
+    for needle, canon in needles:
+        pattern = rf"(?<!\w){re.escape(needle)}\w{{0,4}}(?!\w)"
+        for match in re.finditer(pattern, text):
+            raw_hits.append((match.start(), match.end(), canon))
+    raw_hits.sort(key=lambda hit: (-(hit[1] - hit[0]), hit[0]))
+    occupied: list[tuple[int, int]] = []
+    kept: list[tuple[int, str]] = []
+    for start, end, canon in raw_hits:
+        if any(not (end <= left or start >= right) for left, right in occupied):
+            continue
+        occupied.append((start, end))
+        kept.append((start, canon))
+    kept.sort()
+    return kept
+
+
 def detect_cities_in_text(text: str) -> list[str]:
     """Канонічні міста з тексту (укр/рос/нім + відмінки: в Гамбурге)."""
     if not text:
         return []
+    needles = _city_needles()
     lower = text.lower()
-    lower_ascii = _ascii_fold(lower)
     found: list[str] = []
-
-    for syn, canon in CITY_SYNONYMS.items():
-        if len(syn) < 3:
-            continue
-        if canon.lower() in _WIDE_SOURCE_CITIES:
-            continue
-        pattern = rf"(?<!\w){re.escape(syn)}\w{{0,4}}(?!\w)"
-        pattern_ascii = rf"(?<!\w){re.escape(_ascii_fold(syn))}\w{{0,4}}(?!\w)"
-        if re.search(pattern, lower) or re.search(pattern_ascii, lower_ascii):
-            name = canonicalize_known_city(canon)
-            if name and name not in found:
-                found.append(name)
-
-    for city in _KNOWN_CITIES:
-        c_lower = city.lower()
-        c_ascii = _ascii_fold(c_lower)
-        pattern = rf"(?<!\w){re.escape(c_lower)}\w{{0,4}}(?!\w)"
-        pattern_ascii = rf"(?<!\w){re.escape(c_ascii)}\w{{0,4}}(?!\w)"
-        if re.search(pattern, lower) or re.search(pattern_ascii, lower_ascii):
-            if city not in found:
-                found.append(city)
-
+    for _, canon in _hits_in(lower, needles):
+        if canon not in found:
+            found.append(canon)
+    ascii_needles = [(_ascii_fold(needle), canon) for needle, canon in needles]
+    for _, canon in _hits_in(_ascii_fold(lower), ascii_needles):
+        if canon not in found:
+            found.append(canon)
     return found
 
 

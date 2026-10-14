@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from parser.ai.screen import ai_screen_parsed_listing, apply_screen_enrichment
 from parser.core.dedup import check_parser_duplicates
+from parser.core.patterns import FREE_GIVEAWAY_RE
 from parser.core.quality import is_junk_for_marketplace
 from parser.core.text import format_listing_description, polish_listing_description
 from parser.marketplace_categories import (
@@ -60,12 +61,8 @@ def _finalize_fields(
     cat_lower = str(category or "").strip().lower()
     price_l = str(price or "").strip().lower()
     explicit_free = bool(is_free) or cat_lower in ("free", "free_stuff")
-    if not explicit_free:
-        import re
-
-        explicit_free = bool(
-            re.search(r"\b(безкоштовно|бесплатно|віддам|отдам|даром|free)\b", blob.lower())
-        )
+    if not explicit_free and FREE_GIVEAWAY_RE.search(blob):
+        explicit_free = True
 
     if explicit_free and cat_lower != "services_work":
         price = "Free"
@@ -170,7 +167,13 @@ async def run_ai_screen_and_dedup(
     if is_dup:
         return False, dup_reason, None, {}
 
-    if active_listing_duplicate(dedup_key, title, description):
+    if active_listing_duplicate(
+        dedup_key,
+        title,
+        description,
+        price=None if price is None else str(price),
+        is_free=bool(is_free),
+    ):
         return False, "дублікат (маркетплейс)", None, {}
 
     junk, junk_reason = is_junk_for_marketplace(
