@@ -64,16 +64,15 @@ def get_channel_cursor_state(
     conn.close()
     if not row:
         return 0, 0, 0
-    if isinstance(row, dict):
+    # HybridRow (Postgres) і dict мають .get; tuple/sqlite Row — індекси.
+    get = getattr(row, "get", None)
+    if callable(get):
         return (
-            int(row.get("last_message_id") or 0),
-            int(row.get("seen_head") or 0),
-            int(row.get("resume_before_id") or 0),
+            int(get("last_message_id") or get(0) or 0),
+            int(get("seen_head") or get(1) or 0),
+            int(get("resume_before_id") or get(2) or 0),
         )
-    last = int(row[0] or 0)
-    seen = int(row[1] or 0) if len(row) > 1 else 0
-    resume = int(row[2] or 0) if len(row) > 2 else 0
-    return last, seen, resume
+    return int(row[0] or 0), int(row[1] or 0), int(row[2] or 0)
 
 
 def get_resume_reply_id(source_channel: str, parser_type: str = "default") -> int:
