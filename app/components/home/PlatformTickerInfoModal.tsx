@@ -106,7 +106,7 @@ export function PlatformTickerInfoModal({
           : t('platformTicker.onboarding.brandTitle');
   const headerSubtitle =
     view === 'promotion'
-      ? t('promotions.marketplaceDescription')
+      ? t('platformTicker.onboarding.promotionDetail.subtitle')
       : view === 'business'
         ? t('platformTicker.onboarding.businessDetail.subtitle')
         : view === 'referral'
@@ -116,6 +116,15 @@ export function PlatformTickerInfoModal({
   const sectionButtonClass = isLight
     ? 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-[#3F5331]/20 bg-white px-3.5 py-2 text-xs font-semibold text-[#2D3E28] transition-colors hover:border-[#3F5331]/35 hover:bg-[#E8F0E0]/60'
     : 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-white/30 bg-transparent px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/10';
+
+  const createListingCtaClass = isLight
+    ? 'mt-4 inline-flex w-full min-h-[44px] items-center justify-center rounded-2xl bg-[#C8E6A0] px-4 py-3 text-sm font-semibold text-[#1a1a1a] transition-opacity hover:opacity-90 active:opacity-80'
+    : 'mt-4 inline-flex w-full min-h-[44px] items-center justify-center rounded-2xl bg-[#C8E6A0] px-4 py-3 text-sm font-semibold text-[#0f1408] transition-opacity hover:opacity-90 active:opacity-80';
+
+  const handleCreateListing = () => {
+    onAction('createListing');
+    onClose();
+  };
 
   const handleCreateBusiness = () => {
     onAction('businessProfile');
@@ -191,6 +200,9 @@ export function PlatformTickerInfoModal({
           {view === 'promotion' ? (
             <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               <PromotionTypeCards isLight={isLight} />
+              <button type="button" onClick={handleCreateListing} className={createListingCtaClass}>
+                {t('platformTicker.onboarding.promotionDetail.createListing')}
+              </button>
             </div>
           ) : view === 'business' ? (
             <BusinessProfileOnboardingPanel onCreate={handleCreateBusiness} />

@@ -110,7 +110,7 @@ async def iter_new_channel_messages(
     далі (до CATCHUP_CEILING) і не стрибаємо cursor на head, поки старий cursor
     не досягнуто.
     """
-    apply_pyrogram_photo_patch()
+    apply_pyrogram_photo_size_patch()
     if chat_target is None:
         raise RuntimeError(
             f"{source_channel}: chat_target=None "

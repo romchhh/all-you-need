@@ -4,9 +4,13 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { TradeGroundLogo } from '@/components/layout/TradeGroundLogo';
 import { useTheme } from '@/contexts/ThemeContext';
 
-/** Коротке згасання біля нижнього краю спільної шапки. */
-const FROST_FADE = '10px';
-const FROST_MASK = `linear-gradient(to bottom, #000 0, #000 calc(100% - ${FROST_FADE}), transparent 100%)`;
+/** Як було на сторінках без пошуку в шапці — м’яке згасання на всю висоту. */
+const LOGO_FROST_MASK =
+  'linear-gradient(to bottom, #000 0%, #000 28%, rgba(0,0,0,0.55) 68%, transparent 100%)';
+
+/** З пошуком у шапці: поле лишається в непрозорій зоні, згасання лише під ним. */
+const SEARCH_FROST_MASK =
+  'linear-gradient(to bottom, #000 0%, #000 72%, rgba(0,0,0,0.55) 88%, transparent 100%)';
 
 let headerSlot: HTMLElement | null = null;
 const slotListeners = new Set<() => void>();
@@ -45,18 +49,28 @@ export const FIXED_LOGO_SPACER_CLASS =
 export const STICKY_BELOW_APP_HEADER_CLASS =
   'sticky z-[40] max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
 
-function headerFrostStyle(isLight: boolean): React.CSSProperties {
-  const veil = isLight
-    ? `linear-gradient(to bottom, rgba(250,251,248,0.9) 0, rgba(250,251,248,0.9) calc(100% - ${FROST_FADE}), rgba(250,251,248,0) 100%)`
-    : `linear-gradient(to bottom, rgba(0,0,0,0.74) 0, rgba(0,0,0,0.74) calc(100% - ${FROST_FADE}), rgba(0,0,0,0) 100%)`;
+function headerFrostStyle(isLight: boolean, withSearch: boolean): React.CSSProperties {
+  if (!withSearch) {
+    return {
+      backgroundImage: isLight
+        ? 'linear-gradient(to bottom, rgba(250,251,248,0.92) 0%, rgba(245,247,242,0.4) 50%, rgba(250,251,248,0) 100%)'
+        : 'linear-gradient(to bottom, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.32) 54%, rgba(0,0,0,0) 100%), radial-gradient(ellipse 80% 90% at 18% 0%, rgba(200,230,160,0.2) 0%, transparent 52%)',
+      backdropFilter: 'saturate(160%) blur(16px)',
+      WebkitBackdropFilter: 'saturate(160%) blur(16px)',
+      maskImage: LOGO_FROST_MASK,
+      WebkitMaskImage: LOGO_FROST_MASK,
+    };
+  }
+
+  // Світліша підложка під пошук: блюр видно, поле не «випадає» з маски.
   return {
     backgroundImage: isLight
-      ? veil
-      : `${veil}, radial-gradient(ellipse 70% 55% at 18% 0%, rgba(200,230,160,0.16) 0%, transparent 42%)`,
+      ? 'linear-gradient(to bottom, rgba(250,251,248,0.78) 0%, rgba(250,251,248,0.42) 62%, rgba(250,251,248,0.12) 82%, rgba(250,251,248,0) 100%)'
+      : 'linear-gradient(to bottom, rgba(0,0,0,0.52) 0%, rgba(0,0,0,0.28) 62%, rgba(0,0,0,0.1) 82%, rgba(0,0,0,0) 100%), radial-gradient(ellipse 70% 55% at 18% 0%, rgba(200,230,160,0.14) 0%, transparent 42%)',
     backdropFilter: 'saturate(160%) blur(16px)',
     WebkitBackdropFilter: 'saturate(160%) blur(16px)',
-    maskImage: FROST_MASK,
-    WebkitMaskImage: FROST_MASK,
+    maskImage: SEARCH_FROST_MASK,
+    WebkitMaskImage: SEARCH_FROST_MASK,
   };
 }
 
@@ -101,11 +115,13 @@ export function FixedLogoHeader({
   const { isLight, theme } = useTheme();
   const headerRef = useRef<HTMLElement | null>(null);
   const [spacerPx, setSpacerPx] = useState<number | null>(null);
+  const [hasSearchExtras, setHasSearchExtras] = useState(false);
   const slotNodeRef = useRef<HTMLDivElement | null>(null);
   const setSlotNode = useCallback((node: HTMLDivElement | null) => {
     if (slotNodeRef.current === node) return;
     slotNodeRef.current = node;
     publishHeaderSlot(node);
+    setHasSearchExtras(Boolean(node && node.childElementCount > 0));
   }, []);
   const innerClasses = `${innerContentClass} ${outerClassName}`.trim();
   const shellClass = `w-full max-w-full bg-transparent ${zClassName}`;
@@ -115,21 +131,35 @@ export function FixedLogoHeader({
     const measure = () => {
       const el = headerRef.current;
       if (el) setSpacerPx(el.offsetHeight);
+      const slot = slotNodeRef.current;
+      setHasSearchExtras(Boolean(slot && slot.childElementCount > 0));
     };
     remeasureHeader = measure;
     measure();
     const el = headerRef.current;
-    const ro = el ? new ResizeObserver(measure) : null;
+    const slot = slotNodeRef.current;
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     if (el && ro) ro.observe(el);
+    if (slot && ro) ro.observe(slot);
+    const mo =
+      slot && typeof MutationObserver !== 'undefined'
+        ? new MutationObserver(measure)
+        : null;
+    if (slot && mo) mo.observe(slot, { childList: true });
     return () => {
       if (remeasureHeader === measure) remeasureHeader = null;
       ro?.disconnect();
+      mo?.disconnect();
     };
   }, [mode, isLight, extrasSlot]);
 
   const body = (
     <>
-      <div aria-hidden className="pointer-events-none absolute inset-0" style={headerFrostStyle(isLight)} />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={headerFrostStyle(isLight, hasSearchExtras)}
+      />
       <div className="relative">
         <div className={safeTopShellClass}>
           <div className={innerClasses}>
