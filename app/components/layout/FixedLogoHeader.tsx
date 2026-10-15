@@ -123,8 +123,8 @@ export function FixedLogoHeader({
   }, []);
 
   const innerClasses = `${innerContentClass} ${outerClassName}`.trim();
-  // relative потрібен, щоб absolute-підложка завжди заповнювала шапку
-  const shellClass = `relative w-full max-w-full bg-transparent ${zClassName}`;
+  // Не додавати relative сюди: разом із fixed/sticky Tailwind може перебити position.
+  const shellClass = `w-full max-w-full bg-transparent ${zClassName}`;
 
   useLayoutEffect(() => {
     if (mode !== 'window-fixed') return;
@@ -182,12 +182,14 @@ export function FixedLogoHeader({
         className="pointer-events-none absolute inset-0 z-0"
         style={headerFrostStyle(isLight, withSearchFrost)}
       />
-      <div className={`relative z-[1] ${safeTopShellClass}`}>
-        <div className={innerClasses}>
-          <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+      <div className="relative z-[1]">
+        <div className={safeTopShellClass}>
+          <div className={innerClasses}>
+            <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+          </div>
         </div>
+        {extrasSlot ? <div ref={setSlotNode} /> : null}
       </div>
-      {extrasSlot ? <div ref={setSlotNode} className="relative z-[1]" /> : null}
     </>
   );
 
