@@ -113,12 +113,14 @@ export function PlatformTickerInfoModal({
           ? t('platformTicker.onboarding.referralDetail.subtitle')
           : t('platformTicker.onboarding.intro');
 
+  const lightGreenButton =
+    'bg-[#C8E6A0] text-[#1a1a1a] transition-opacity hover:opacity-90 active:opacity-80';
   const sectionButtonClass = isLight
-    ? 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-[#3F5331]/20 bg-white px-3.5 py-2 text-xs font-semibold text-[#2D3E28] transition-colors hover:border-[#3F5331]/35 hover:bg-[#E8F0E0]/60'
+    ? `mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl px-3.5 py-2 text-xs font-semibold ${lightGreenButton}`
     : 'mt-2.5 inline-flex min-h-[36px] items-center justify-center rounded-xl border border-white/30 bg-transparent px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/10';
 
   const createListingCtaClass = isLight
-    ? 'mt-4 inline-flex w-full min-h-[44px] items-center justify-center rounded-2xl bg-[#C8E6A0] px-4 py-3 text-sm font-semibold text-[#1a1a1a] transition-opacity hover:opacity-90 active:opacity-80'
+    ? `mt-4 inline-flex w-full min-h-[44px] items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold ${lightGreenButton}`
     : 'mt-4 inline-flex w-full min-h-[44px] items-center justify-center rounded-2xl bg-[#C8E6A0] px-4 py-3 text-sm font-semibold text-[#0f1408] transition-opacity hover:opacity-90 active:opacity-80';
 
   const handleCreateListing = () => {
@@ -198,11 +200,39 @@ export function PlatformTickerInfoModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
           {view === 'promotion' ? (
-            <div className="pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="space-y-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               <PromotionTypeCards isLight={isLight} />
               <button type="button" onClick={handleCreateListing} className={createListingCtaClass}>
                 {t('platformTicker.onboarding.promotionDetail.createListing')}
               </button>
+              <div
+                className={`rounded-2xl px-3.5 py-3 ${
+                  isLight ? 'bg-gray-50/80' : 'bg-white/[0.04]'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 text-xl leading-none" aria-hidden>
+                    💼
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold leading-snug ${ac.pageHeading}`}>
+                      {t('platformTicker.onboarding.promotionDetail.businessTeaserTitle')}
+                    </p>
+                    <p
+                      className={`mt-1 whitespace-pre-line text-xs leading-relaxed ${ac.mutedText}`}
+                    >
+                      {t('platformTicker.onboarding.promotionDetail.businessTeaserDescription')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setView('business')}
+                      className={sectionButtonClass}
+                    >
+                      {t('platformTicker.onboarding.promotionDetail.businessTeaserButton')}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : view === 'business' ? (
             <BusinessProfileOnboardingPanel onCreate={handleCreateBusiness} />

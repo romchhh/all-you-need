@@ -4,11 +4,11 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { TradeGroundLogo } from '@/components/layout/TradeGroundLogo';
 import { useTheme } from '@/contexts/ThemeContext';
 
-/** Як було на сторінках без пошуку в шапці — м’яке згасання на всю висоту. */
+/** Класичне згасання шапки (профіль, категорії, оверлеї тощо). */
 const LOGO_FROST_MASK =
   'linear-gradient(to bottom, #000 0%, #000 28%, rgba(0,0,0,0.55) 68%, transparent 100%)';
 
-/** З пошуком у шапці: поле лишається в непрозорій зоні, згасання лише під ним. */
+/** Головна / пошук: згасання під рядком пошуку, поле лишається в зоні підложки. */
 const SEARCH_FROST_MASK =
   'linear-gradient(to bottom, #000 0%, #000 72%, rgba(0,0,0,0.55) 88%, transparent 100%)';
 
@@ -62,7 +62,6 @@ function headerFrostStyle(isLight: boolean, withSearch: boolean): React.CSSPrope
     };
   }
 
-  // Світліша підложка під пошук: блюр видно, поле не «випадає» з маски.
   return {
     backgroundImage: isLight
       ? 'linear-gradient(to bottom, rgba(250,251,248,0.78) 0%, rgba(250,251,248,0.42) 62%, rgba(250,251,248,0.12) 82%, rgba(250,251,248,0) 100%)'
@@ -100,7 +99,7 @@ export type FixedLogoHeaderProps = {
   zClassName?: string;
   mode: FixedLogoHeaderMode;
   scrollParent?: HTMLElement | null;
-  /** Слот під рядком лого: пошук стає частиною цієї ж шапки. */
+  /** Слот під рядком лого: пошук стає частиною цієї ж шапки (головна / пошук). */
   extrasSlot?: boolean;
 };
 
@@ -127,7 +126,21 @@ export function FixedLogoHeader({
   const shellClass = `w-full max-w-full bg-transparent ${zClassName}`;
 
   useLayoutEffect(() => {
-    if (mode !== 'window-fixed') return;
+    if (!extrasSlot) {
+      if (slotNodeRef.current) {
+        slotNodeRef.current = null;
+        publishHeaderSlot(null);
+      }
+      setHasSearchExtras(false);
+      setSpacerPx(null);
+    }
+  }, [extrasSlot]);
+
+  useLayoutEffect(() => {
+    if (mode !== 'window-fixed' || !extrasSlot) {
+      if (remeasureHeader) remeasureHeader = null;
+      return;
+    }
     const measure = () => {
       const el = headerRef.current;
       if (el) setSpacerPx(el.offsetHeight);
@@ -153,23 +166,40 @@ export function FixedLogoHeader({
     };
   }, [mode, isLight, extrasSlot]);
 
+  useLayoutEffect(() => {
+    return () => {
+      if (slotNodeRef.current) {
+        slotNodeRef.current = null;
+        publishHeaderSlot(null);
+      }
+    };
+  }, []);
+
+  const withSearchFrost = extrasSlot && hasSearchExtras;
+
   const body = (
     <>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
-        style={headerFrostStyle(isLight, hasSearchExtras)}
+        style={headerFrostStyle(isLight, withSearchFrost)}
       />
-      <div className="relative">
-        <div className={safeTopShellClass}>
+      {extrasSlot ? (
+        <div className="relative">
+          <div className={safeTopShellClass}>
+            <div className={innerClasses}>
+              <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
+            </div>
+          </div>
+          <div ref={setSlotNode} />
+        </div>
+      ) : (
+        <div className={`relative ${safeTopShellClass}`}>
           <div className={innerClasses}>
             <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
           </div>
         </div>
-        {extrasSlot ? (
-          <div ref={setSlotNode} />
-        ) : null}
-      </div>
+      )}
     </>
   );
 
@@ -192,7 +222,7 @@ export function FixedLogoHeader({
       </header>
       <div
         className={FIXED_LOGO_SPACER_CLASS}
-        style={spacerPx != null ? { height: spacerPx } : undefined}
+        style={extrasSlot && spacerPx != null ? { height: spacerPx } : undefined}
         aria-hidden
       />
     </>

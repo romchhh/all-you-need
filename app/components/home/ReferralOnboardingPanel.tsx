@@ -15,7 +15,7 @@ export function ReferralOnboardingPanel({ onOpenReferral }: ReferralOnboardingPa
   const ac = getAppearanceClasses(isLight);
 
   const ctaClass = isLight
-    ? 'w-full rounded-2xl bg-[#3F5331] px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#344728]'
+    ? 'w-full rounded-2xl bg-[#C8E6A0] px-4 py-3.5 text-sm font-semibold text-[#1a1a1a] transition-opacity hover:opacity-90 active:opacity-80'
     : 'w-full rounded-2xl bg-[#C8E6A0] px-4 py-3.5 text-sm font-semibold text-[#0f1408] transition-opacity hover:opacity-90';
 
   const stepKeys = ['share', 'register', 'listing', 'reward'] as const;
