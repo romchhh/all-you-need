@@ -189,19 +189,19 @@ export const PaymentSummaryModal = ({
     ? 'border-gray-200/90 bg-white hover:border-gray-300'
     : 'border-white/20 bg-[#1C1C1C] hover:border-white/35';
   const methodSelected = isLight
-    ? 'border-[#3F5331] bg-[#3F5331]/10 ring-1 ring-[#3F5331]/30'
+    ? 'border-[#C8E6A0] bg-[#C8E6A0]/10 ring-1 ring-[#3F5331]/30'
     : 'border-[#C8E6A0]/70 bg-[#3F5331]/45 ring-1 ring-[#C8E6A0]/25';
   const radioIdle = isLight ? 'border-gray-300' : 'border-white/40';
   const radioActive = isLight ? 'border-[#3F5331]' : 'border-[#C8E6A0]';
-  const radioDot = isLight ? 'bg-[#3F5331]' : 'bg-[#C8E6A0]';
+  const radioDot = 'bg-[#C8E6A0]';
   const labelStrong = isLight ? 'font-semibold text-gray-900' : 'font-semibold text-white';
   const labelSub = isLight ? 'text-sm text-gray-600' : 'text-sm text-white/70';
   const footerBar = isLight
     ? 'flex-shrink-0 bg-white border-t border-gray-200/90 px-6 py-4 rounded-b-2xl space-y-2'
     : 'flex-shrink-0 bg-[#0a0a0a] border-t border-white/15 px-6 py-4 rounded-b-2xl space-y-2';
   const primaryBtn = isLight
-    ? 'bg-[#3F5331] text-white hover:bg-[#344728] shadow-md hover:shadow-lg'
-    : 'bg-[#5A7347] text-white hover:bg-[#3F5331] shadow-md hover:shadow-lg';
+    ? 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80 shadow-md hover:shadow-lg'
+    : 'bg-[#C8E6A0] text-[#0f1408] hover:opacity-90 shadow-md';
   const primaryDisabled = isLight
     ? 'bg-gray-200 cursor-not-allowed text-gray-500'
     : 'bg-white/15 cursor-not-allowed text-white/45';

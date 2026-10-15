@@ -315,7 +315,7 @@ export const EditProfileModal = ({
             type="button"
             onClick={handleSave}
             disabled={loading || !firstName.trim()}
-            className="flex-1 px-4 py-3 bg-[#3F5331] text-white rounded-xl font-medium hover:bg-[#344728] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-[#C8E6A0] text-[#1a1a1a] rounded-xl font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (t('common.saving') || 'Збереження...') : (t('common.save') || 'Зберегти')}
           </button>

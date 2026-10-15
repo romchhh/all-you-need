@@ -91,9 +91,7 @@ export function ReferralOnboardingPanel({ onOpenReferral }: ReferralOnboardingPa
               }`}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                  isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                }`}
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold 'bg-[#C8E6A0] text-[#1a1a1a]'`}
               >
                 {index + 1}
               </span>

@@ -77,7 +77,7 @@ export function BusinessSearchFilterModal({
   }, [local.sphere]);
 
   const chipActive = isLight
-    ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 text-[#3F5331] font-semibold'
+    ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 text-[#3F5331] font-semibold'
     : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
   const chipIdle = isLight
     ? 'border border-gray-300 text-gray-800 bg-transparent hover:bg-gray-100'
@@ -301,7 +301,7 @@ export function BusinessSearchFilterModal({
                 onClose();
               }}
               className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold ${
-                isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#111]'
+                isLight ? 'bg-[#C8E6A0] text-[#1a1a1a]' : 'bg-[#C8E6A0] text-[#111]'
               }`}
             >
               {t('bazaar.search.businessFilters.apply')}

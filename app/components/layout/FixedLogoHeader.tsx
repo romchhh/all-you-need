@@ -8,7 +8,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 const LOGO_FROST_MASK =
   'linear-gradient(to bottom, #000 0%, #000 28%, rgba(0,0,0,0.55) 68%, transparent 100%)';
 
-/** Головна / пошук: згасання під рядком пошуку, поле лишається в зоні підложки. */
+/** Головна / пошук: згасання під рядком пошуку. */
 const SEARCH_FROST_MASK =
   'linear-gradient(to bottom, #000 0%, #000 72%, rgba(0,0,0,0.55) 88%, transparent 100%)';
 
@@ -83,7 +83,6 @@ export const overlayHeaderActionClass = (isLight: boolean) =>
     ? 'border-[#3F5331]/20 bg-white/95 text-[#3F5331] shadow-sm hover:bg-[#E8F0E0]/80'
     : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
 
-/** Safe area окремо — щоб не покладатися на вкладений max() у calc() у arbitrary-класах */
 const safeTopShellClass =
   'max-lg:pt-[max(env(safe-area-inset-top,0px),10px)] lg:pt-[max(env(safe-area-inset-top,0px),2px)]';
 
@@ -116,90 +115,79 @@ export function FixedLogoHeader({
   const [spacerPx, setSpacerPx] = useState<number | null>(null);
   const [hasSearchExtras, setHasSearchExtras] = useState(false);
   const slotNodeRef = useRef<HTMLDivElement | null>(null);
+
   const setSlotNode = useCallback((node: HTMLDivElement | null) => {
-    if (slotNodeRef.current === node) return;
     slotNodeRef.current = node;
     publishHeaderSlot(node);
     setHasSearchExtras(Boolean(node && node.childElementCount > 0));
   }, []);
+
   const innerClasses = `${innerContentClass} ${outerClassName}`.trim();
-  const shellClass = `w-full max-w-full bg-transparent ${zClassName}`;
+  // relative потрібен, щоб absolute-підложка завжди заповнювала шапку
+  const shellClass = `relative w-full max-w-full bg-transparent ${zClassName}`;
 
   useLayoutEffect(() => {
-    if (!extrasSlot) {
-      if (slotNodeRef.current) {
-        slotNodeRef.current = null;
-        publishHeaderSlot(null);
-      }
-      setHasSearchExtras(false);
-      setSpacerPx(null);
-    }
-  }, [extrasSlot]);
+    if (mode !== 'window-fixed') return;
 
-  useLayoutEffect(() => {
-    if (mode !== 'window-fixed' || !extrasSlot) {
-      if (remeasureHeader) remeasureHeader = null;
-      return;
-    }
     const measure = () => {
       const el = headerRef.current;
       if (el) setSpacerPx(el.offsetHeight);
       const slot = slotNodeRef.current;
       setHasSearchExtras(Boolean(slot && slot.childElementCount > 0));
     };
+
     remeasureHeader = measure;
     measure();
+
     const el = headerRef.current;
     const slot = slotNodeRef.current;
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     if (el && ro) ro.observe(el);
     if (slot && ro) ro.observe(slot);
+
     const mo =
       slot && typeof MutationObserver !== 'undefined'
         ? new MutationObserver(measure)
         : null;
-    if (slot && mo) mo.observe(slot, { childList: true });
+    if (slot && mo) mo.observe(slot, { childList: true, subtree: true });
+
     return () => {
       if (remeasureHeader === measure) remeasureHeader = null;
       ro?.disconnect();
       mo?.disconnect();
     };
-  }, [mode, isLight, extrasSlot]);
+  }, [mode, isLight, extrasSlot, theme]);
+
+  useLayoutEffect(() => {
+    if (extrasSlot) return;
+    publishHeaderSlot(null);
+    setHasSearchExtras(false);
+    setSpacerPx(null);
+  }, [extrasSlot]);
 
   useLayoutEffect(() => {
     return () => {
-      if (slotNodeRef.current) {
-        slotNodeRef.current = null;
+      if (headerSlot === slotNodeRef.current) {
         publishHeaderSlot(null);
       }
     };
   }, []);
 
-  const withSearchFrost = extrasSlot && hasSearchExtras;
+  const withSearchFrost = Boolean(extrasSlot && hasSearchExtras);
 
   const body = (
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 z-0"
         style={headerFrostStyle(isLight, withSearchFrost)}
       />
-      {extrasSlot ? (
-        <div className="relative">
-          <div className={safeTopShellClass}>
-            <div className={innerClasses}>
-              <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
-            </div>
-          </div>
-          <div ref={setSlotNode} />
+      <div className={`relative z-[1] ${safeTopShellClass}`}>
+        <div className={innerClasses}>
+          <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
         </div>
-      ) : (
-        <div className={`relative ${safeTopShellClass}`}>
-          <div className={innerClasses}>
-            <TradeGroundLogo embedInFixedHeader onClick={onClick} paddingX={paddingX} />
-          </div>
-        </div>
-      )}
+      </div>
+      {extrasSlot ? <div ref={setSlotNode} className="relative z-[1]" /> : null}
     </>
   );
 
@@ -222,7 +210,7 @@ export function FixedLogoHeader({
       </header>
       <div
         className={FIXED_LOGO_SPACER_CLASS}
-        style={extrasSlot && spacerPx != null ? { height: spacerPx } : undefined}
+        style={withSearchFrost && spacerPx != null ? { height: spacerPx } : undefined}
         aria-hidden
       />
     </>

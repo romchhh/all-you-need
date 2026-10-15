@@ -60,7 +60,7 @@ export const ConfirmModal = ({
   const confirmCls =
     confirmButtonClass === 'bg-red-500 hover:bg-red-600'
       ? 'bg-red-500 hover:bg-red-600 text-white'
-      : `${confirmButtonClass || 'bg-[#3F5331] hover:bg-[#344728]'} text-white`;
+      : `${confirmButtonClass || 'bg-[#C8E6A0] hover:opacity-90'} text-[#1a1a1a]`;
 
   return (
     <div

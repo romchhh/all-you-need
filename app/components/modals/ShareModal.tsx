@@ -174,7 +174,7 @@ export const ShareModal = ({
           {/* Основна кнопка поділу */}
           <button
             onClick={handleShare}
-            className="w-full px-6 py-5 bg-[#3F5331] text-white rounded-2xl font-semibold hover:bg-[#344728] transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mb-4"
+            className="w-full px-6 py-5 bg-[#C8E6A0] text-[#1a1a1a] rounded-2xl font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 mb-4"
           >
             <Share2 size={24} />
             <span className="text-lg">{t('share.title')}</span>

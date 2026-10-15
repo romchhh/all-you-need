@@ -31,7 +31,7 @@ export const SubcategoryList = ({
   const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const chipActive = isLight
-    ? 'border-2 border-[#3F5331] bg-[#3F5331]/18 text-[#3F5331] font-semibold shadow-sm ring-1 ring-[#3F5331]/15'
+    ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/18 text-[#3F5331] font-semibold shadow-sm ring-1 ring-[#3F5331]/15'
     : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
 
   const registerChipRef = (key: string) => (node: HTMLButtonElement | null) => {

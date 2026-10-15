@@ -84,7 +84,7 @@ export const SortModal = ({
   useHideBottomNav(isOpen);
   useBodyScrollLock(isOpen);
   const chipActive = isLight
-    ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 text-[#3F5331] font-semibold'
+    ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 text-[#3F5331] font-semibold'
     : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
   /** Активна категорія з іконкою — світла тема: обводка навколо кнопки, не навколо іконки */
   const chipActiveCategory = isLight
@@ -659,7 +659,7 @@ export const SortModal = ({
                       onCloseRef.current();
                     }, 50);
                   }}
-                  className="w-full px-4 py-3 bg-[#3F5331] text-white rounded-xl font-semibold hover:bg-[#3F5331]/80 transition-colors active:bg-[#2d3d26] cursor-pointer"
+                  className="w-full px-4 py-3 bg-[#C8E6A0] text-[#1a1a1a] rounded-xl font-semibold hover:opacity-90 transition-colors active:opacity-80 cursor-pointer"
                 >
                   {t('common.apply')}
                 </button>

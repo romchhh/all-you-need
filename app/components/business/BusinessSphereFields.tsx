@@ -144,7 +144,7 @@ export function BusinessSphereFields({
                       className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
                         selected
                           ? isLight
-                            ? 'bg-[#3F5331] text-white'
+                            ? 'bg-[#C8E6A0] text-[#1a1a1a]'
                             : 'bg-[#C8E6A0] text-[#141414]'
                           : isLight
                             ? 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'

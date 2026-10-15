@@ -197,7 +197,7 @@ export default function CompleteRegistrationPage() {
             onClick={() => {
               openBot();
             }}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#3F5331] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#344728] active:bg-[#2d3d26]"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#C8E6A0] py-3.5 text-sm font-semibold text-[#1a1a1a] transition-colors hover:opacity-90 active:opacity-80"
           >
             <ExternalLink size={18} strokeWidth={2.2} />
             {t('completeRegistration.openBot')}

@@ -109,7 +109,7 @@ export const CityModal = ({
   useHideBottomNav(isOpen);
   useBodyScrollLock(isOpen);
   const chipActive = isLight
-    ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 text-[#3F5331] font-semibold'
+    ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 text-[#3F5331] font-semibold'
     : `border border-[#C8E6A0] font-semibold ${ac.formChipSelected}`;
   const chipIdle = isLight
     ? 'border border-gray-300 text-gray-800 bg-transparent hover:bg-gray-100'
@@ -671,7 +671,7 @@ export const CityModal = ({
                             className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                               selected
                                 ? isLight
-                                  ? 'border-[#3F5331] bg-[#3F5331]'
+                                  ? 'border-[#C8E6A0] bg-[#C8E6A0]'
                                   : 'border-[#C8E6A0] bg-[#C8E6A0]'
                                 : isLight
                                   ? 'border-gray-400'
@@ -720,7 +720,7 @@ export const CityModal = ({
                         key={city}
                         className={
                           isLight
-                            ? 'inline-flex items-center gap-1 pl-2 py-1 pr-1 bg-[#3F5331] text-white rounded-lg text-sm font-medium'
+                            ? 'inline-flex items-center gap-1 pl-2 py-1 pr-1 bg-[#C8E6A0] text-[#1a1a1a] rounded-lg text-sm font-medium'
                             : 'inline-flex items-center gap-1 pl-2 py-1 pr-1 rounded-lg text-sm font-medium border border-[#C8E6A0]/55 bg-[#C8E6A0]/12 text-[#C8E6A0]'
                         }
                       >
@@ -762,7 +762,7 @@ export const CityModal = ({
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                                 isSelected
                                   ? isLight
-                                    ? 'border-[#3F5331] bg-[#3F5331]'
+                                    ? 'border-[#C8E6A0] bg-[#C8E6A0]'
                                     : 'border-[#C8E6A0] bg-[#C8E6A0]'
                                   : isLight
                                     ? 'border-gray-400'
@@ -830,7 +830,7 @@ export const CityModal = ({
                                   className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                                     isSelected
                                       ? isLight
-                                        ? 'border-[#3F5331] bg-[#3F5331]'
+                                        ? 'border-[#C8E6A0] bg-[#C8E6A0]'
                                         : 'border-[#C8E6A0] bg-[#C8E6A0]'
                                       : isLight
                                         ? 'border-gray-400'
@@ -893,7 +893,7 @@ export const CityModal = ({
                 <button
                   type="button"
                   onClick={handleApply}
-                  className="flex-1 px-4 py-3 bg-[#3F5331] text-white rounded-xl font-semibold hover:bg-[#3F5331]/80 transition-colors active:bg-[#2d3d26]"
+                  className="flex-1 px-4 py-3 bg-[#C8E6A0] text-[#1a1a1a] rounded-xl font-semibold hover:opacity-90 transition-colors active:opacity-80"
                 >
                   {t('common.apply') || 'Застосувати'}
                 </button>

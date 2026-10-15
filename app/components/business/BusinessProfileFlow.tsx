@@ -726,7 +726,7 @@ export default function BusinessProfileFlow({
   const labelCls = isLight ? 'text-sm font-medium text-gray-700 mb-1.5 block' : 'text-sm font-medium text-white/80 mb-1.5 block';
 
   const primaryBtnClass = isLight
-    ? 'w-full py-3.5 rounded-2xl font-semibold bg-[#3F5331] text-white hover:bg-[#344728] disabled:opacity-50 transition-colors'
+    ? 'w-full py-3.5 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80 disabled:opacity-50 transition-colors'
     : 'w-full py-3.5 rounded-2xl font-semibold bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0] disabled:opacity-50 transition-colors shadow-[0_0_20px_rgba(200,230,160,0.25)]';
 
   const getStepValidationError = (s: WizardStep): string | null => {
@@ -1202,7 +1202,7 @@ export default function BusinessProfileFlow({
                         className={`h-1.5 rounded-full transition-colors ${
                           done || active
                             ? isLight
-                              ? 'bg-[#3F5331]'
+                              ? 'bg-[#C8E6A0]'
                               : 'bg-[#C8E6A0]'
                             : isLight
                               ? 'bg-gray-200'
@@ -1349,7 +1349,7 @@ export default function BusinessProfileFlow({
                           className={`flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left touch-manipulation ${
                             selected
                               ? isLight
-                                ? 'border-[#3F5331] bg-[#3F5331]/8'
+                                ? 'border-[#C8E6A0] bg-[#C8E6A0]/8'
                                 : 'border-[#C8E6A0]/60 bg-white/8'
                               : isLight
                                 ? 'border-gray-200 bg-white'
@@ -1360,7 +1360,7 @@ export default function BusinessProfileFlow({
                             className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
                               selected
                                 ? isLight
-                                  ? 'border-[#3F5331] bg-[#3F5331] text-white'
+                                  ? 'border-[#3F5331] bg-[#C8E6A0] text-[#1a1a1a]'
                                   : 'border-[#C8E6A0] bg-[#C8E6A0] text-[#141414]'
                                 : isLight
                                   ? 'border-gray-300'
@@ -1392,7 +1392,7 @@ export default function BusinessProfileFlow({
                           className={`flex-1 rounded-xl border py-2 text-sm font-medium touch-manipulation ${
                             form.serviceRadiusKm === km
                               ? isLight
-                                ? 'border-[#3F5331] bg-[#3F5331] text-white'
+                                ? 'border-[#3F5331] bg-[#C8E6A0] text-[#1a1a1a]'
                                 : 'border-[#C8E6A0] bg-[#C8E6A0] text-[#141414]'
                               : isLight
                                 ? 'border-gray-200'
@@ -1482,7 +1482,7 @@ export default function BusinessProfileFlow({
                       className={`flex min-h-[3.75rem] cursor-pointer touch-manipulation items-center gap-3 rounded-2xl border p-2.5 ${
                         checked
                           ? isLight
-                            ? 'border-[#3F5331] bg-[#3F5331]/5'
+                            ? 'border-[#C8E6A0] bg-[#C8E6A0]/5'
                             : 'border-[#C8E6A0]/50 bg-white/5'
                           : isLight
                             ? 'border-gray-200'
@@ -1576,7 +1576,7 @@ export default function BusinessProfileFlow({
                 <div className="pt-12 p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-lg">{form.businessName}</h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#3F5331] text-white">BUSINESS</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#C8E6A0] text-[#1a1a1a]">BUSINESS</span>
                   </div>
                   <p className={`text-sm ${isLight ? 'text-gray-600' : 'text-white/70'}`}>{form.description}</p>
                   <p className="text-sm">{form.city}{form.address ? `, ${form.address}` : ''}</p>
@@ -1616,7 +1616,7 @@ export default function BusinessProfileFlow({
                       onClick={() => patch({ selectedPlan: planId })}
                       className={`w-full text-left p-4 rounded-2xl border-2 transition-colors ${
                         selected
-                          ? isLight ? 'border-[#3F5331] bg-[#3F5331]/5' : 'border-[#C8E6A0]/60 bg-white/5'
+                          ? isLight ? 'border-[#C8E6A0] bg-[#C8E6A0]/5' : 'border-[#C8E6A0]/60 bg-white/5'
                           : isLight ? 'border-gray-200' : 'border-white/15'
                       }`}
                     >

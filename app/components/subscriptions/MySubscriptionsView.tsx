@@ -274,7 +274,7 @@ export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscr
   );
 
   const ctaButtonClass = isLight
-    ? 'w-full rounded-xl border border-[#3F5331]/25 bg-[#3F5331] px-4 py-3.5 text-center text-sm font-semibold text-white transition-colors hover:bg-[#344528]'
+    ? 'w-full rounded-xl border border-[#C8E6A0]/40 bg-[#C8E6A0] px-4 py-3.5 text-center text-sm font-semibold text-[#1a1a1a] transition-colors hover:opacity-90'
     : 'w-full rounded-xl border border-[#C8E6A0]/40 bg-[#C8E6A0] px-4 py-3.5 text-center text-sm font-semibold text-[#0f1408] transition-colors hover:bg-[#dff5c0]';
 
   const tabs: { id: SubscriptionsTab; label: string }[] = [

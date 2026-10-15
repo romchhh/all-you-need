@@ -77,9 +77,7 @@ const ListingCardColumnComponent = ({
     if (promotionTypes.includes('vip')) {
       return (
         <div
-          className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
-            isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-          }`}
+          className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap 'bg-[#C8E6A0] text-[#1a1a1a]'`}
           style={{ width: 'auto', maxWidth: 'fit-content' }}
         >
           VIP
@@ -91,9 +89,7 @@ const ListingCardColumnComponent = ({
     if (promotionTypes.includes('top_category')) {
       return (
         <div
-          className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
-            isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-          }`}
+          className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap 'bg-[#C8E6A0] text-[#1a1a1a]'`}
           style={{ width: 'auto', maxWidth: 'fit-content' }}
         >
           TOP

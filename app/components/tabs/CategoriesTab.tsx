@@ -191,7 +191,7 @@ export const CategoriesTab = ({
               className={`p-4 rounded-2xl transition-all text-left relative overflow-hidden ${
                 selectedCategory === category.id
                   ? isLight
-                    ? 'border-2 border-[#3F5331] bg-[#3F5331]/12'
+                    ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/12'
                     : 'border border-[#C8E6A0] bg-[#C8E6A0]/12 shadow-[0_0_14px_rgba(200,230,160,0.18)]'
                   : isLight
                     ? 'border border-gray-200 bg-white hover:border-gray-300'

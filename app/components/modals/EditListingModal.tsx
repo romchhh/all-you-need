@@ -1101,7 +1101,7 @@ export const EditListingModal = ({
                       : 'border-white/10 bg-[#1C1C1C]/50 text-white/50 cursor-not-allowed opacity-50'
                     : status === 'sold'
                     ? isLight
-                      ? 'border-[#3F5331] bg-[#3F5331]/12 text-[#3F5331] shadow-sm'
+                      ? 'border-[#C8E6A0] bg-[#C8E6A0]/12 text-[#3F5331] shadow-sm'
                       : ac.formChipSelected
                     : isLight ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50' : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/5'
                 }`}
@@ -1166,7 +1166,7 @@ export const EditListingModal = ({
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex-1 px-4 py-3 bg-[#3F5331] text-white rounded-xl text-sm font-medium hover:bg-[#344728] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-3 bg-[#C8E6A0] text-[#1a1a1a] rounded-xl text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>

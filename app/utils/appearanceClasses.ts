@@ -42,18 +42,32 @@ export type AppearanceClasses = {
   pageBackground: string;
   /** Tailwind клас фону для fixed-оверлеїв (listing, профіль продавця) */
   overlayShell: string;
+  /** Основна CTA-кнопка (світло-зелена в обох темах). */
+  primaryButton: string;
 };
+
+/** Єдиний формат primary CTA для світлої теми. */
+export const LIGHT_PRIMARY_BUTTON =
+  'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80';
+
+/** Єдиний формат primary CTA для темної теми. */
+export const DARK_PRIMARY_BUTTON =
+  'bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_16px_rgba(200,230,160,0.35)] hover:opacity-90 active:opacity-80';
+
+export function primaryButtonClass(isLight: boolean): string {
+  return isLight ? LIGHT_PRIMARY_BUTTON : DARK_PRIMARY_BUTTON;
+}
 
 export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
   if (isLight) {
     return {
-      formChipSelected: 'border-[#3F5331] bg-[#3F5331]/20 text-[#3F5331] shadow-sm',
-      formCheckboxFilled: 'border-[#3F5331] bg-[#3F5331]',
+      formChipSelected: 'border-[#C8E6A0] bg-[#C8E6A0]/35 text-[#2D3E28] shadow-sm',
+      formCheckboxFilled: 'border-[#C8E6A0] bg-[#C8E6A0]',
       formPhotoActiveRing:
-        'ring-2 ring-[#3F5331] ring-offset-2 ring-offset-gray-100 border-[#3F5331]/30',
-      formFocusRing: 'focus:outline-none focus:ring-2 focus:ring-[#3F5331]/50 focus:border-[#3F5331]',
-      segmentedActive: 'bg-[#3F5331] text-white shadow-sm',
-      formMenuRowSelected: 'bg-[#3F5331]/20 text-[#3F5331] font-semibold',
+        'ring-2 ring-[#C8E6A0] ring-offset-2 ring-offset-gray-100 border-[#C8E6A0]/40',
+      formFocusRing: 'focus:outline-none focus:ring-2 focus:ring-[#C8E6A0]/50 focus:border-[#3F5331]',
+      segmentedActive: 'bg-[#C8E6A0] text-[#1a1a1a] shadow-sm',
+      formMenuRowSelected: 'bg-[#C8E6A0]/35 text-[#2D3E28] font-semibold',
       formAccentFg: 'text-[#3F5331]',
       toggleGroup: 'bg-[#3F5331]/8 ring-1 ring-[#3F5331]/12',
       toggleInactive: 'text-[#5A6B52] hover:text-[#3F5331]',
@@ -66,9 +80,9 @@ export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
       suggestionIcon: 'text-gray-400',
       ghostIconButton:
         'relative flex h-12 w-12 items-center justify-center rounded-xl border border-[#3F5331]/15 bg-white shadow-sm transition-colors hover:border-[#3F5331]/30 hover:bg-[#E8F0E0]/50',
-      ghostIconButtonActiveBorder: 'border-[#3F5331]/40 bg-[#E8F0E0] ring-1 ring-[#3F5331]/20',
+      ghostIconButtonActiveBorder: 'border-[#C8E6A0] bg-[#C8E6A0]/35 ring-1 ring-[#C8E6A0]/40',
       ghostIconButtonInactiveIcon: 'text-[#3F5331]',
-      ghostIconButtonActiveIcon: 'text-[#3F5331]',
+      ghostIconButtonActiveIcon: 'text-[#1a1a1a]',
       categoryRowLabel: 'text-[#3F5331]',
       outlineButton:
         'rounded-xl border border-[#3F5331]/20 bg-white px-4 py-2 text-sm font-medium text-[#2D3E28] shadow-sm transition-colors hover:border-[#3F5331]/35 hover:bg-[#E8F0E0]/60 hover:shadow',
@@ -88,6 +102,7 @@ export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
       pageBackground:
         'radial-gradient(ellipse 100% 80% at 50% -20%, rgba(63, 83, 49, 0.08) 0%, transparent 55%), linear-gradient(180deg, #fafbf8 0%, #f5f7f2 100%)',
       overlayShell: 'bg-[#f5f7f2]',
+      primaryButton: LIGHT_PRIMARY_BUTTON,
     };
   }
   // Dark accents: BRAND_GREEN_ON_DARK (#C8E6A0) — same as primary CTA on listing page (ListingDetail listingPrimaryCtaClass).
@@ -134,5 +149,6 @@ export function getAppearanceClasses(isLight: boolean): AppearanceClasses {
     pageBackground:
       'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 88% 100%, rgba(200, 230, 160, 0.18) 0%, transparent 42%), #000000',
     overlayShell: 'bg-[#000000]',
+    primaryButton: DARK_PRIMARY_BUTTON,
   };
 }

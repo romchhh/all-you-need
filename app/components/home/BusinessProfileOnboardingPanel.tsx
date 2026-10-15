@@ -76,9 +76,7 @@ export function BusinessProfileOnboardingPanel({ onCreate }: BusinessProfileOnbo
             ].map(({ icon: Icon, label }) => (
               <span
                 key={label}
-                className={`flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[9px] font-medium ${
-                  isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                }`}
+                className={`flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[9px] font-medium 'bg-[#C8E6A0] text-[#1a1a1a]'`}
               >
                 <Icon size={14} />
                 {label}

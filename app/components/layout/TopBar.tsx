@@ -160,7 +160,7 @@ export const TopBar = ({
             <span
               className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
                 isLight
-                  ? 'bg-[#3F5331] ring-gray-100'
+                  ? 'bg-[#C8E6A0] ring-gray-100'
                   : 'bg-[#C8E6A0] ring-black/50 shadow-[0_0_8px_rgba(200,230,160,0.75)]'
               }`}
               aria-hidden

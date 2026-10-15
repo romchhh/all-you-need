@@ -128,9 +128,7 @@ export const ProfileListingCard = ({
             return (
               <span
                 key="vip"
-                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap ${
-                  isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                }`}
+                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap 'bg-[#C8E6A0] text-[#1a1a1a]'`}
               >
                 VIP
               </span>
@@ -140,9 +138,7 @@ export const ProfileListingCard = ({
             return (
               <span
                 key="top"
-                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap ${
-                  isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                }`}
+                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap 'bg-[#C8E6A0] text-[#1a1a1a]'`}
               >
                 TOP
               </span>
@@ -152,9 +148,7 @@ export const ProfileListingCard = ({
             return (
               <span
                 key="highlighted"
-                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap ${
-                  isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                }`}
+                className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded mr-1.5 whitespace-nowrap 'bg-[#C8E6A0] text-[#1a1a1a]'`}
               >
                 {t('promotions.highlighted')}
               </span>
@@ -312,9 +306,7 @@ export const ProfileListingCard = ({
                   return (
                     <div
                       key="vip"
-                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg ${
-                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                      }`}
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg 'bg-[#C8E6A0] text-[#1a1a1a]'`}
                     >
                       VIP
                     </div>
@@ -324,9 +316,7 @@ export const ProfileListingCard = ({
                   return (
                     <div
                       key="top"
-                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg ${
-                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                      }`}
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg 'bg-[#C8E6A0] text-[#1a1a1a]'`}
                     >
                       TOP
                     </div>
@@ -336,9 +326,7 @@ export const ProfileListingCard = ({
                   return (
                     <div
                       key="highlighted"
-                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg ${
-                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                      }`}
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-lg 'bg-[#C8E6A0] text-[#1a1a1a]'`}
                     >
                       {t('promotions.highlighted')}
                     </div>
@@ -656,7 +644,7 @@ export const ProfileListingCard = ({
                   ? isLight
                     ? 'bg-transparent border-2 border-gray-300 text-gray-400 cursor-not-allowed'
                     : 'bg-transparent border-2 border-[#FFFFFFA6] text-[#FFFFFFA6] cursor-not-allowed'
-                  : 'bg-[#3F5331] text-white hover:bg-[#344728]'
+                  : 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80'
               }`}
             >
               <Megaphone size={16} />

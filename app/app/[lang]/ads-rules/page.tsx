@@ -179,7 +179,7 @@ export default function AdsRulesPage() {
             <button
               type="button"
               onClick={openBot}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#3F5331] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#344728]"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C8E6A0] px-4 py-2.5 text-sm font-semibold text-[#1a1a1a] transition-colors hover:opacity-90"
             >
               Настроить продвижение в @TradeGroundBot
             </button>

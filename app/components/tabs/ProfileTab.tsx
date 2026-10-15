@@ -634,7 +634,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                       window.location.href = botLink;
                     }
                   }}
-                  className="inline-flex w-full items-center justify-center rounded-2xl bg-[#3F5331] px-4 py-3 text-sm font-semibold text-white hover:bg-[#344728]"
+                  className="inline-flex w-full items-center justify-center rounded-2xl bg-[#C8E6A0] px-4 py-3 text-sm font-semibold text-[#1a1a1a] hover:opacity-90"
                 >
                   {t('profileNotFound.createButton')}
                 </button>
@@ -1128,7 +1128,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
       <div className="px-4 space-y-3 pb-4">
         <button 
-          className="w-full bg-[#3F5331] hover:bg-[#344728] text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-[#C8E6A0] hover:opacity-90 active:opacity-80 text-[#1a1a1a] font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
           onClick={() => {
             setShowTopUpModal(true);
             tg?.HapticFeedback.impactOccurred('medium');

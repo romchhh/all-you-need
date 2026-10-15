@@ -113,7 +113,7 @@ export default function BusinessPage() {
                 router.push(businessInfo.catalogUrl);
                 tg?.HapticFeedback.impactOccurred('medium');
               }}
-              className="w-full bg-[#3F5331] hover:bg-[#344728] text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+              className="w-full bg-[#C8E6A0] hover:opacity-90 active:opacity-80 text-[#1a1a1a] font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
             >
               <ShoppingBag size={20} />
               <span>{t('business.catalog.button') || 'Відкрити каталог'}</span>

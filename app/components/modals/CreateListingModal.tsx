@@ -132,7 +132,7 @@ export const CreateListingModal = ({
 
   /** Нижня кнопка «Створити оголошення»: у темній темі — світло-зелений акцент */
   const createPrimaryCtaClass = isLight
-    ? 'bg-[#3F5331] text-white hover:bg-[#344728]'
+    ? 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80'
     : 'bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_22px_rgba(200,230,160,0.48)] hover:bg-[#dff5c0] hover:shadow-[0_0_28px_rgba(200,230,160,0.58)]';
 
   // Ліміти для Telegram (caption до фото має ліміт 1024 символи)
@@ -637,7 +637,7 @@ export const CreateListingModal = ({
                   className={`flex-1 min-h-[2.75rem] px-2 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 touch-manipulation ${
                     profileType === 'personal'
                       ? isLight
-                        ? 'bg-[#3F5331] text-white shadow-sm'
+                        ? 'bg-[#C8E6A0] text-[#1a1a1a] shadow-sm'
                         : 'bg-[#C8E6A0] text-[#1a1a1a]'
                       : isLight
                         ? 'bg-transparent text-gray-700 hover:bg-gray-200/80'
@@ -658,7 +658,7 @@ export const CreateListingModal = ({
                   className={`flex-1 min-h-[2.75rem] px-2 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 touch-manipulation ${
                     profileType === 'business'
                       ? isLight
-                        ? 'bg-[#3F5331] text-white shadow-sm'
+                        ? 'bg-[#C8E6A0] text-[#1a1a1a] shadow-sm'
                         : 'bg-[#C8E6A0] text-[#1a1a1a]'
                       : isLight
                         ? 'bg-transparent text-gray-700 hover:bg-gray-200/80'

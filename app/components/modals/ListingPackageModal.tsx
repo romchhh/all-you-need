@@ -118,7 +118,7 @@ export default function ListingPackageModal({
           {!hasUsedFreeAd && (
             <div className="bg-[#1C1C1C] rounded-xl p-4 border-2 border-[#3F5331]/30">
               <div className="flex items-start gap-3">
-                <div className="bg-[#3F5331] rounded-full p-2 flex-shrink-0">
+                <div className="bg-[#C8E6A0] rounded-full p-2 flex-shrink-0">
                   <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -140,7 +140,7 @@ export default function ListingPackageModal({
               onClick={() => setSelectedPackage(pkg.type)}
               className={`w-full text-left rounded-xl p-4 border-2 transition-all ${
                 selectedPackage === pkg.type
-                  ? 'border-[#3F5331] bg-[#3F5331]/20 shadow-md scale-[1.02]'
+                  ? 'border-[#C8E6A0] bg-[#C8E6A0]/20 shadow-md scale-[1.02]'
                   : 'border-white/20 bg-[#1C1C1C] hover:border-white/40 hover:bg-white/5'
               }`}
             >
@@ -180,7 +180,7 @@ export default function ListingPackageModal({
                 </div>
                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                   selectedPackage === pkg.type
-                    ? 'border-[#3F5331] bg-[#3F5331]'
+                    ? 'border-[#C8E6A0] bg-[#C8E6A0]'
                     : 'border-white/30'
                 }`}>
                   {selectedPackage === pkg.type && (
@@ -202,7 +202,7 @@ export default function ListingPackageModal({
             className={`w-full py-4 rounded-xl font-semibold transition-all ${
               !selectedPackage || loading
                 ? 'bg-white/20 cursor-not-allowed text-white/50'
-                : 'bg-[#3F5331] text-white hover:bg-[#344728] shadow-lg hover:shadow-xl'
+                : 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80 shadow-lg hover:shadow-xl'
             }`}
           >
             {loading ? t('common.loading') : t('common.continue')}

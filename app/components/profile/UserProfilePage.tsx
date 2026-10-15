@@ -409,7 +409,7 @@ export const UserProfilePage = ({
             e.stopPropagation();
             handleContactSeller();
           }}
-          className="w-full bg-[#3F5331] hover:bg-[#344728] text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-[#C8E6A0] hover:opacity-90 active:opacity-80 text-[#1a1a1a] font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors"
         >
           {((userData?.username || sellerUsername) ?? '').trim() !== '' ? (
             <>

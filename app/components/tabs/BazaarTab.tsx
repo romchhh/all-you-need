@@ -557,7 +557,7 @@ const BazaarTabComponent = ({
                     <span
                       className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
                         isLight
-                          ? 'bg-[#3F5331] ring-gray-100'
+                          ? 'bg-[#C8E6A0] ring-gray-100'
                           : 'bg-[#C8E6A0] ring-black/50 shadow-[0_0_8px_rgba(200,230,160,0.75)]'
                       }`}
                       aria-hidden
@@ -565,7 +565,7 @@ const BazaarTabComponent = ({
                     <span
                       className={`absolute bottom-0.5 right-0.5 z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-xs font-bold ${
                         isLight
-                          ? 'bg-[#3F5331] text-white'
+                          ? 'bg-[#C8E6A0] text-[#1a1a1a]'
                           : 'bg-[#C8E6A0] text-[#0f1408]'
                       }`}
                     >

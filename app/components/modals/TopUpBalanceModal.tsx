@@ -111,7 +111,7 @@ export const TopUpBalanceModal = ({
   const amountIdle = isLight
     ? 'border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50'
     : 'border-white/20 bg-[#1C1C1C] text-white hover:border-white/40 hover:bg-white/10';
-  const amountActive = 'border-[#3F5331] bg-[#3F5331] text-white shadow-lg';
+  const amountActive = 'border-[#C8E6A0] bg-[#C8E6A0] text-[#1a1a1a] shadow-lg';
   const footerBorder = isLight ? 'border-gray-200' : 'border-white/20';
   const cancelBtn = isLight
     ? 'border-gray-300 text-gray-900 hover:bg-gray-100'
@@ -198,7 +198,7 @@ export const TopUpBalanceModal = ({
             <button
               onClick={handleSubmit}
               disabled={loading || !amount || parseFloat(amount) <= 0}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#3F5331] px-4 py-3 font-semibold text-white transition-colors hover:bg-[#344728] disabled:cursor-not-allowed ${submitDisabled}`}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#C8E6A0] px-4 py-3 font-semibold text-[#1a1a1a] transition-colors hover:opacity-90 disabled:cursor-not-allowed ${submitDisabled}`}
             >
               {loading ? (
                 <>

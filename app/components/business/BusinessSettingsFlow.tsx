@@ -1096,7 +1096,7 @@ export default function BusinessSettingsFlow({
                           className={`flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left ${
                             selected
                               ? isLight
-                                ? 'border-[#3F5331] bg-[#3F5331]/8'
+                                ? 'border-[#C8E6A0] bg-[#C8E6A0]/8'
                                 : 'border-[#C8E6A0]/60 bg-white/8'
                               : isLight
                                 ? 'border-gray-200 bg-white'
@@ -1107,7 +1107,7 @@ export default function BusinessSettingsFlow({
                             className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
                               selected
                                 ? isLight
-                                  ? 'border-[#3F5331] bg-[#3F5331] text-white'
+                                  ? 'border-[#3F5331] bg-[#C8E6A0] text-[#1a1a1a]'
                                   : 'border-[#C8E6A0] bg-[#C8E6A0] text-[#141414]'
                                 : isLight
                                   ? 'border-gray-300'
@@ -1142,7 +1142,7 @@ export default function BusinessSettingsFlow({
                           className={`flex-1 rounded-xl border py-2 text-sm font-medium ${
                             form.serviceRadiusKm === km
                               ? isLight
-                                ? 'border-[#3F5331] bg-[#3F5331] text-white'
+                                ? 'border-[#3F5331] bg-[#C8E6A0] text-[#1a1a1a]'
                                 : 'border-[#C8E6A0] bg-[#C8E6A0] text-[#141414]'
                               : isLight
                                 ? 'border-gray-200'
@@ -1214,7 +1214,7 @@ export default function BusinessSettingsFlow({
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                             day.open
                               ? isLight
-                                ? 'border-[#3F5331] bg-[#3F5331] text-white'
+                                ? 'border-[#3F5331] bg-[#C8E6A0] text-[#1a1a1a]'
                                 : 'border-[#C8E6A0] bg-[#C8E6A0] text-[#141414]'
                               : isLight
                                 ? 'border-gray-300'
@@ -1285,7 +1285,7 @@ export default function BusinessSettingsFlow({
                             className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
                               selected
                                 ? isLight
-                                  ? 'border-[#3F5331] bg-[#3F5331]'
+                                  ? 'border-[#C8E6A0] bg-[#C8E6A0]'
                                   : 'border-[#C8E6A0] bg-[#C8E6A0]'
                                 : isLight
                                   ? 'border-gray-300'

@@ -85,7 +85,7 @@ export const PhoneModal = ({ isOpen, onClose, phoneNumber, tg }: PhoneModalProps
             <a
               href={telUrl}
               onClick={handleCallClick}
-              className="w-full px-6 py-4 bg-[#3F5331] text-white rounded-2xl font-semibold hover:bg-[#344728] transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 no-underline"
+              className="w-full px-6 py-4 bg-[#C8E6A0] text-[#1a1a1a] rounded-2xl font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3 no-underline"
             >
               <Phone size={24} />
               <span className="text-lg">{t('phone.call')}</span>

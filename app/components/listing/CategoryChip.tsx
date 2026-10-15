@@ -23,7 +23,7 @@ export const CategoryChip = ({ category, isActive = false, onClick }: CategoryCh
         className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all relative overflow-hidden ${
           isActive
             ? isLight
-              ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
+              ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 shadow-sm'
               : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
             : isLight
               ? 'border-2 border-[#3F5331]/20 bg-[#E8F0E0]'

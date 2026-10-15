@@ -238,7 +238,7 @@ export default function PromotionModal({
                     key={promoType}
                     className={
                       isLight
-                        ? 'px-2.5 py-1 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap'
+                        ? 'px-2.5 py-1 bg-[#C8E6A0] text-[#1a1a1a] text-xs font-bold rounded whitespace-nowrap'
                         : 'px-2.5 py-1 bg-[#C8E6A0] text-[#0f1408] text-xs font-bold rounded whitespace-nowrap'
                     }
                   >
@@ -276,7 +276,7 @@ export default function PromotionModal({
                     : 'border-white/10 bg-[#1C1C1C]/50 opacity-50 cursor-not-allowed'
                   : selectedPromotion === promo.type
                   ? isLight
-                    ? 'border-[#3F5331] bg-[#3F5331]/10 shadow-lg scale-[1.02]'
+                    ? 'border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-lg scale-[1.02]'
                     : 'border-[#C8E6A0] bg-[#C8E6A0]/12 shadow-lg scale-[1.02]'
                   : isLight
                   ? 'border-gray-200/90 bg-gray-50/90 hover:border-[#3F5331]/35 hover:bg-white'
@@ -388,7 +388,7 @@ export default function PromotionModal({
                     className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ml-3 ${
                     selectedPromotion === promo.type
                       ? isLight
-                        ? 'border-[#3F5331] bg-[#3F5331]'
+                        ? 'border-[#C8E6A0] bg-[#C8E6A0]'
                         : 'border-[#C8E6A0] bg-[#C8E6A0]'
                       : isLight
                         ? 'border-gray-400'
@@ -423,7 +423,7 @@ export default function PromotionModal({
                 ? isLight
                   ? 'bg-gray-200 cursor-not-allowed text-gray-500'
                   : 'bg-white/20 cursor-not-allowed text-white/50'
-                : 'bg-[#3F5331] text-white hover:bg-[#344728] shadow-lg hover:shadow-xl'
+                : 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80 shadow-lg hover:shadow-xl'
             }`}
           >
             {loading ? t('common.loading') : t('common.continue')}
@@ -450,7 +450,7 @@ export default function PromotionModal({
                 <>
               <span>{t('promotions.noPromotion')}</span>
               <span 
-                className="px-2 py-0.5 bg-[#3F5331] text-white text-xs font-bold rounded whitespace-nowrap inline-block"
+                className="px-2 py-0.5 bg-[#C8E6A0] text-[#1a1a1a] text-xs font-bold rounded whitespace-nowrap inline-block"
                 style={{ transform: 'rotate(-8deg)' }}
               >
                 {t('common.free') || 'Free'}

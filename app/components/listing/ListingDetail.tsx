@@ -175,7 +175,7 @@ export const ListingDetail = ({
   const ac = getAppearanceClasses(isLight);
   /** Нижня CTA на сторінці товару: у темній темі — фірмовий світло-зелений (BRAND_GREEN_ON_DARK) */
   const listingPrimaryCtaClass = isLight
-    ? 'bg-[#3F5331] text-white hover:bg-[#344728] [&_svg]:text-white'
+    ? 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80 [&_svg]:text-[#1a1a1a]'
     : 'border-none bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_22px_rgba(200,230,160,0.48)] hover:bg-[#dff5c0] hover:shadow-[0_0_28px_rgba(200,230,160,0.58)] [&_svg]:text-[#0f1408]';
   const isGuestBrowserView = isSeoListingRoute || !isTelegramEnv;
   const guestTelegramCtaClass = `w-full rounded-xl border-none px-4 py-2.5 font-montserrat text-sm font-semibold flex cursor-pointer flex-row items-center justify-center gap-2 text-center transition-colors ${listingPrimaryCtaClass}`;
@@ -1140,9 +1140,7 @@ export const ListingDetail = ({
                   return (
                     <div
                       key="vip"
-                      className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
-                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                      }`}
+                      className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap 'bg-[#C8E6A0] text-[#1a1a1a]'`}
                     >
                       VIP
                     </div>
@@ -1152,9 +1150,7 @@ export const ListingDetail = ({
                   return (
                     <div
                       key="top"
-                      className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap ${
-                        isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
-                      }`}
+                      className={`px-2.5 py-1 text-xs font-bold rounded whitespace-nowrap 'bg-[#C8E6A0] text-[#1a1a1a]'`}
                     >
                       TOP
                     </div>

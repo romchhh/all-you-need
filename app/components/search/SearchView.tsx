@@ -1451,7 +1451,7 @@ export function SearchView({
               className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl transition-all ${
                 !selectedBusinessSphere
                   ? isLight
-                    ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
+                    ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 shadow-sm'
                     : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
                   : isLight
                     ? 'border-2 border-[#3F5331] bg-white'
@@ -1488,7 +1488,7 @@ export function SearchView({
                   className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl px-1 transition-all ${
                     active
                       ? isLight
-                        ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
+                        ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 shadow-sm'
                         : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
                       : isLight
                         ? 'border-2 border-[#3F5331] bg-white'
@@ -1538,7 +1538,7 @@ export function SearchView({
             className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl transition-all ${
               !selectedCategory
                 ? isLight
-                  ? 'border-2 border-[#3F5331] bg-[#3F5331]/15 shadow-sm'
+                  ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 shadow-sm'
                   : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
                 : isLight
                   ? 'border-2 border-[#3F5331] bg-white'
@@ -1778,7 +1778,7 @@ export function SearchView({
                   <span
                     className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
                       isLight
-                        ? 'bg-[#3F5331] ring-gray-100'
+                        ? 'bg-[#C8E6A0] ring-gray-100'
                         : 'bg-[#C8E6A0] ring-black/50'
                     }`}
                     aria-hidden
@@ -1819,7 +1819,7 @@ export function SearchView({
                   <span
                     className={`pointer-events-none absolute top-1 right-1 z-20 h-2 w-2 rounded-full ring-2 ${
                       isLight
-                        ? 'bg-[#3F5331] ring-gray-100'
+                        ? 'bg-[#C8E6A0] ring-gray-100'
                         : 'bg-[#C8E6A0] ring-black/50'
                     }`}
                     aria-hidden

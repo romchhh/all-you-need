@@ -558,7 +558,7 @@ export function BusinessProfilePage({
   const actionBtnBase =
     'flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-3 text-xs font-medium transition-colors';
   const actionPrimary = isLight
-    ? 'bg-[#3F5331] text-white hover:bg-[#344728]'
+    ? 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80'
     : 'bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0]';
   const actionSecondary = isLight
     ? 'bg-gray-100 text-gray-900 hover:bg-gray-200/80'
@@ -613,7 +613,7 @@ export function BusinessProfilePage({
   }>;
 
   const listingsCountBadgeClass = isLight
-    ? 'bg-[#3F5331] text-white'
+    ? 'bg-[#C8E6A0] text-[#1a1a1a]'
     : 'bg-[#C8E6A0] text-[#0f1408]';
   const reviewsCountBadgeClass = isLight
     ? 'border border-[#3F5331]/25 bg-[#E8F0E0] text-[#3F5331]'
@@ -823,7 +823,7 @@ export function BusinessProfilePage({
                 {active && (
                   <span
                     className={`absolute bottom-0 left-1 right-1 h-0.5 rounded-full ${
-                      isLight ? 'bg-[#3F5331]' : 'bg-[#C8E6A0]'
+                      'bg-[#C8E6A0]'
                     }`}
                   />
                 )}
@@ -849,7 +849,7 @@ export function BusinessProfilePage({
                   className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     listingFilter === id
                       ? isLight
-                        ? 'bg-[#3F5331] text-white'
+                        ? 'bg-[#C8E6A0] text-[#1a1a1a]'
                         : 'bg-[#C8E6A0] text-[#0f1408]'
                       : isLight
                         ? 'bg-gray-100 text-gray-700'
@@ -1010,7 +1010,7 @@ export function BusinessProfilePage({
                   disabled={reviewSubmitting}
                   onClick={() => void handleSubmitReview()}
                   className={`w-full rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60 ${
-                    isLight ? 'bg-[#3F5331] text-white' : 'bg-[#C8E6A0] text-[#0f1408]'
+                    'bg-[#C8E6A0] text-[#1a1a1a]'
                   }`}
                 >
                   {t('businessProfile.public.reviewSubmit')}
