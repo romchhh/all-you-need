@@ -6,57 +6,120 @@
 export type CoverSchemeColors = {
   bg: string;
   bgAccent: string;
+  bgDeep: string;
   fg: string;
   muted: string;
 };
 
 export type CoverScheme = {
   id: string;
+  /** Базовий кут градієнта; фінальний кут ще зміщується від listing id. */
+  angle: number;
   light: CoverSchemeColors;
   dark: CoverSchemeColors;
 };
 
-/** Фірмові схеми (sage / forest / olive) — без типових AI-фіолетових/кремових палітр. */
+/**
+ * Фірмові схеми з помітною різницею відтінків:
+ * sage / lime (#C8E6A0) / forest (#3F5331) / olive / mint / cool teal /
+ * muted telegram-blue — без AI-фіолетових і «кремово-теракотових» палітр.
+ */
 export const LISTING_COVER_SCHEMES: CoverScheme[] = [
   {
-    id: 'sage',
-    light: { bg: '#E8F0E0', bgAccent: '#D4E4C8', fg: '#2D3E28', muted: '#5A6B52' },
-    dark: { bg: '#243020', bgAccent: '#2F3F28', fg: '#E8F0E0', muted: '#A8B89A' },
+    id: 'sage-mist',
+    angle: 148,
+    light: { bg: '#E8F0E0', bgAccent: '#F3F7EE', bgDeep: '#D4E4C8', fg: '#2D3E28', muted: '#5A6B52' },
+    dark: { bg: '#243020', bgAccent: '#2F3F28', bgDeep: '#1A2418', fg: '#E8F0E0', muted: '#A8B89A' },
   },
   {
-    id: 'forest',
-    light: { bg: '#D8E6CC', bgAccent: '#C5D9B4', fg: '#152A12', muted: '#3F5331' },
-    dark: { bg: '#1A2416', bgAccent: '#2A3522', fg: '#C8E6A0', muted: '#8FA878' },
+    id: 'lime-glow',
+    angle: 162,
+    light: { bg: '#E4F2C8', bgAccent: '#F0F8DC', bgDeep: '#C8E6A0', fg: '#1A2810', muted: '#3F5331' },
+    dark: { bg: '#2A3A1C', bgAccent: '#3A4E28', bgDeep: '#1C2814', fg: '#C8E6A0', muted: '#9ABA70' },
   },
   {
-    id: 'olive',
-    light: { bg: '#E4EAD8', bgAccent: '#D2DBC4', fg: '#2A3520', muted: '#556348' },
-    dark: { bg: '#22281C', bgAccent: '#2E3624', fg: '#E2EBD4', muted: '#9AA888' },
+    id: 'brand-forest',
+    angle: 200,
+    light: { bg: '#C5D4B8', bgAccent: '#D8E4CC', bgDeep: '#A8BC98', fg: '#152A12', muted: '#3F5331' },
+    dark: { bg: '#3F5331', bgAccent: '#4A6140', bgDeep: '#2A3824', fg: '#EAF4DC', muted: '#C8E6A0' },
   },
   {
-    id: 'moss',
-    light: { bg: '#DEE8D6', bgAccent: '#CBD9C0', fg: '#1E2C1A', muted: '#4A5C42' },
-    dark: { bg: '#1C2618', bgAccent: '#2A3424', fg: '#D4E6C0', muted: '#8FA07C' },
+    id: 'deep-pine',
+    angle: 185,
+    light: { bg: '#B8CFA8', bgAccent: '#D0E0C4', bgDeep: '#96B484', fg: '#0F1C0C', muted: '#2A4020' },
+    dark: { bg: '#1A2C18', bgAccent: '#284024', bgDeep: '#101C10', fg: '#B8D49A', muted: '#7A9A68' },
   },
   {
-    id: 'pine',
-    light: { bg: '#D2DFC8', bgAccent: '#BFD0B0', fg: '#143018', muted: '#3A5238' },
-    dark: { bg: '#162018', bgAccent: '#223024', fg: '#B8D49A', muted: '#7A9A68' },
+    id: 'olive-khaki',
+    angle: 135,
+    light: { bg: '#E2E6D0', bgAccent: '#EEF0E4', bgDeep: '#C8CDB0', fg: '#2A3020', muted: '#5A6048' },
+    dark: { bg: '#2A2E20', bgAccent: '#3A4030', bgDeep: '#1C2018', fg: '#E2E8D0', muted: '#A8B090' },
   },
   {
-    id: 'fern',
-    light: { bg: '#EAF2E4', bgAccent: '#D8E6CE', fg: '#253528', muted: '#5C6E54' },
-    dark: { bg: '#202820', bgAccent: '#2C3826', fg: '#DCECD0', muted: '#A0B494' },
+    id: 'mint-fresh',
+    angle: 120,
+    light: { bg: '#D8F0E4', bgAccent: '#ECF8F2', bgDeep: '#B4E0D0', fg: '#143028', muted: '#3A5A4C' },
+    dark: { bg: '#1A3028', bgAccent: '#28483C', bgDeep: '#102018', fg: '#B8E8D4', muted: '#78B09A' },
   },
   {
-    id: 'cedar',
-    light: { bg: '#E6EDE0', bgAccent: '#D4DEC8', fg: '#2C3A26', muted: '#627056' },
-    dark: { bg: '#1E261A', bgAccent: '#2A3424', fg: '#D0E0C0', muted: '#96A888' },
+    id: 'apple-soft',
+    angle: 210,
+    light: { bg: '#D6E8B8', bgAccent: '#E8F4D0', bgDeep: '#B8D890', fg: '#1C2C10', muted: '#3F5331' },
+    dark: { bg: '#283818', bgAccent: '#3A5024', bgDeep: '#182410', fg: '#D0ECA0', muted: '#8ABA60' },
   },
   {
-    id: 'leaf',
-    light: { bg: '#DCE8D4', bgAccent: '#C8D8BC', fg: '#1A2816', muted: '#465A40' },
-    dark: { bg: '#182018', bgAccent: '#242C20', fg: '#C4DEA8', muted: '#849C70' },
+    id: 'moss-gold',
+    angle: 95,
+    light: { bg: '#E8ECC8', bgAccent: '#F4F6E0', bgDeep: '#D0D8A0', fg: '#2C3418', muted: '#586038' },
+    dark: { bg: '#2C3218', bgAccent: '#3E4624', bgDeep: '#1C2010', fg: '#E4ECB8', muted: '#A8B070' },
+  },
+  {
+    id: 'cool-teal',
+    angle: 175,
+    light: { bg: '#D0E8E4', bgAccent: '#E8F4F2', bgDeep: '#B0D4D0', fg: '#143028', muted: '#3A5A54' },
+    dark: { bg: '#1A2E2C', bgAccent: '#284440', bgDeep: '#101E1C', fg: '#B8E0D8', muted: '#70A89C' },
+  },
+  {
+    id: 'telegram-mist',
+    angle: 220,
+    light: { bg: '#D6EAF6', bgAccent: '#EAF4FA', bgDeep: '#B4D8EC', fg: '#143048', muted: '#3A5A70' },
+    dark: { bg: '#1A2C3A', bgAccent: '#243E52', bgDeep: '#101C28', fg: '#B8DCF0', muted: '#6A9AB8' },
+  },
+  {
+    id: 'sky-sage',
+    angle: 155,
+    light: { bg: '#DCECE8', bgAccent: '#EEF6F2', bgDeep: '#C0DCD4', fg: '#1C3430', muted: '#4A6860' },
+    dark: { bg: '#203430', bgAccent: '#2E4840', bgDeep: '#142420', fg: '#D0E8E0', muted: '#88B0A4' },
+  },
+  {
+    id: 'charcoal-lime',
+    angle: 190,
+    light: { bg: '#D8DED0', bgAccent: '#E8ECE4', bgDeep: '#B8C4B0', fg: '#1A2416', muted: '#3F5331' },
+    dark: { bg: '#1C2218', bgAccent: '#2A3424', bgDeep: '#101410', fg: '#C8E6A0', muted: '#8AAA70' },
+  },
+  {
+    id: 'fern-bright',
+    angle: 110,
+    light: { bg: '#C8E8C0', bgAccent: '#E0F4DA', bgDeep: '#A4D898', fg: '#143018', muted: '#2E4A28' },
+    dark: { bg: '#1E3A1C', bgAccent: '#2E5228', bgDeep: '#122814', fg: '#B8E8A8', muted: '#70B060' },
+  },
+  {
+    id: 'cedar-warm',
+    angle: 140,
+    light: { bg: '#E6E4D4', bgAccent: '#F2F0E8', bgDeep: '#D0CCB4', fg: '#2C2A20', muted: '#5A5648' },
+    dark: { bg: '#2A2820', bgAccent: '#3A3830', bgDeep: '#1C1A16', fg: '#E8E4D4', muted: '#A8A490' },
+  },
+  {
+    id: 'meadow',
+    angle: 168,
+    light: { bg: '#D0E8C8', bgAccent: '#E4F4DE', bgDeep: '#B0D8A4', fg: '#183018', muted: '#3F5331' },
+    dark: { bg: '#223822', bgAccent: '#324E30', bgDeep: '#142414', fg: '#C4E8B8', muted: '#7ABA70' },
+  },
+  {
+    id: 'ink-green',
+    angle: 205,
+    light: { bg: '#C0D0B8', bgAccent: '#D8E4D0', bgDeep: '#9CB490', fg: '#101C0C', muted: '#2A4020' },
+    dark: { bg: '#141C12', bgAccent: '#24301E', bgDeep: '#0A100A', fg: '#C8E6A0', muted: '#7A9A60' },
   },
 ];
 
@@ -146,6 +209,28 @@ export function coverSchemeForListingId(
 ): CoverScheme {
   const idx = hashListingId(id) % LISTING_COVER_SCHEMES.length;
   return LISTING_COVER_SCHEMES[idx];
+}
+
+/** Кут градієнта: база схеми + зміщення від id (±0…48°), щоб сусідні картки не «збігалися». */
+export function coverGradientAngle(
+  id: string | number | null | undefined,
+  scheme: CoverScheme
+): number {
+  const shift = (hashListingId(id) >>> 8) % 49;
+  return (scheme.angle + shift) % 360;
+}
+
+export function coverBackgroundStyle(
+  id: string | number | null | undefined,
+  isLight: boolean
+): { background: string; color: string } {
+  const scheme = coverSchemeForListingId(id);
+  const colors = isLight ? scheme.light : scheme.dark;
+  const angle = coverGradientAngle(id, scheme);
+  return {
+    background: `linear-gradient(${angle}deg, ${colors.bgAccent} 0%, ${colors.bg} 42%, ${colors.bgDeep} 100%)`,
+    color: colors.fg,
+  };
 }
 
 export function resolveCoverIconCategoryId(

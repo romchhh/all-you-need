@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
+  coverBackgroundStyle,
   coverIconPath,
   coverSchemeForListingId,
   resolveCoverIconCategoryId,
@@ -59,6 +60,10 @@ export function ListingAutoCover({
   const cfg = SIZE_CFG[size];
   const scheme = useMemo(() => coverSchemeForListingId(listingId), [listingId]);
   const colors = isLight ? scheme.light : scheme.dark;
+  const bgStyle = useMemo(
+    () => coverBackgroundStyle(listingId, isLight),
+    [listingId, isLight]
+  );
   const iconCategoryId = useMemo(
     () => resolveCoverIconCategoryId(category, subcategory),
     [category, subcategory]
@@ -69,17 +74,14 @@ export function ListingAutoCover({
   return (
     <div
       className={`absolute inset-0 flex flex-col items-center justify-center text-center overflow-hidden select-none ${cfg.pad} ${cfg.gap} ${className}`}
-      style={{
-        background: `linear-gradient(165deg, ${colors.bgAccent} 0%, ${colors.bg} 55%, ${colors.bgAccent} 100%)`,
-        color: colors.fg,
-      }}
+      style={bgStyle}
       aria-hidden
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.14]"
+        className="pointer-events-none absolute inset-0 opacity-[0.18]"
         style={{
-          backgroundImage: `radial-gradient(circle at 18% 22%, ${colors.fg}22 0%, transparent 42%),
-            radial-gradient(circle at 82% 78%, ${colors.fg}18 0%, transparent 46%)`,
+          backgroundImage: `radial-gradient(circle at 16% 20%, ${colors.bgAccent}99 0%, transparent 45%),
+            radial-gradient(circle at 84% 78%, ${colors.bgDeep}88 0%, transparent 48%)`,
         }}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
