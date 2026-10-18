@@ -4,7 +4,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/lib/listings/viewsDisplay';
@@ -161,9 +161,8 @@ export const ProfileListingCard = ({
   };
 
   const imageUrl = useMemo(() => {
-    const raw = listing.image || (listing.images && listing.images.length > 0 ? listing.images[0] : '');
-    return buildListingImageUrl(raw);
-  }, [listing.image, listing.images]);
+    return resolveListingCardImageUrl(listing);
+  }, [listing.image, listing.images, listing.category]);
 
   // Розраховуємо дати
   const createdDate = listing.createdAt ? new Date(listing.createdAt) : null;

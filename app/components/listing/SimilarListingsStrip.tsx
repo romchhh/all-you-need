@@ -3,8 +3,9 @@
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
+import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 
 interface SimilarListingsStripProps {
   listings: Listing[];
@@ -47,7 +48,7 @@ export function SimilarListingsStrip({
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {visible.map((item) => {
-          const imageSrc = buildListingImageUrl(item.image || item.images?.[0]);
+          const imageSrc = resolveListingCardImageUrl(item);
 
           return (
             <button
@@ -69,10 +70,12 @@ export function SimilarListingsStrip({
                   fadeIn={false}
                 />
               ) : (
-                <div
-                  className={`absolute inset-0 ${
-                    isLight ? 'bg-gray-200' : 'bg-[#2A2A2A]'
-                  }`}
+                <ListingAutoCover
+                  listingId={item.id}
+                  title={item.title}
+                  category={item.category}
+                  subcategory={item.subcategory}
+                  size="sm"
                 />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/5" />

@@ -13,7 +13,7 @@ import { useMemo, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
-import { getResolvedImageUrl } from '@/utils/imageUtils';
+import { buildListingImageUrl } from '@/lib/listings/imageUrl';
 import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
 import {
@@ -40,7 +40,7 @@ function ListingThumb({
   listingId: number | string;
   category?: string | null;
 }) {
-  const resolved = image ? getResolvedImageUrl(image) : null;
+  const resolved = image ? buildListingImageUrl(image) : '';
 
   return (
     <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl">

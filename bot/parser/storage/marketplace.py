@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -> list[str]:
     rel_paths = list(rel_paths or [])[:PARSER_MAX_PHOTOS]
     if not rel_paths:
-        return _copy_default_listing_photo(prefix)
+        # Без фото — порожній список; веб малює ListingAutoCover.
+        return []
     dest_dir = BASE_DIR / "app" / "public" / "listings" / "originals"
     dest_dir.mkdir(parents=True, exist_ok=True)
     out: list[str] = []
@@ -55,8 +56,7 @@ def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -
             out.append(f"/listings/originals/{name}")
         except OSError as e:
             logger.error("Не вдалося скопіювати фото %s → %s: %s", src, dest, e)
-    if not out:
-        return _copy_default_listing_photo(prefix)
+    # Без фото — порожній список; веб показує ListingAutoCover (без копії tgground).
     return out
 
 

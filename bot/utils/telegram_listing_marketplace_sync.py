@@ -106,11 +106,7 @@ async def _download_telegram_images(bot: Bot, images: list[Any]) -> list[str]:
         except Exception as e:
             logger.warning("Не вдалося завантажити фото TelegramListing: %s", e)
 
-    if not out:
-        # fallback як у парсері
-        from parser.storage.marketplace import _copy_default_listing_photo
-
-        return _copy_default_listing_photo("tgbot")
+    # Без фото — порожній список; веб малює ListingAutoCover (без tgground).
     return out
 
 
