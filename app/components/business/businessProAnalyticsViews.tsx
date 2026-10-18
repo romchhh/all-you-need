@@ -14,7 +14,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { getResolvedImageUrl } from '@/utils/imageUtils';
-import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
+import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 import { getBusinessProfileUi } from '@/components/business/businessProfileUi';
 import {
   BusinessContactBrandIcon,
@@ -29,8 +29,17 @@ import {
 
 type ListingSort = 'inquiries' | 'views' | 'favorites';
 
-function ListingThumb({ image, title }: { image: string | null; title: string }) {
-  const { isLight } = useTheme();
+function ListingThumb({
+  image,
+  title,
+  listingId,
+  category,
+}: {
+  image: string | null;
+  title: string;
+  listingId: number | string;
+  category?: string | null;
+}) {
   const resolved = image ? getResolvedImageUrl(image) : null;
 
   return (
@@ -39,7 +48,12 @@ function ListingThumb({ image, title }: { image: string | null; title: string })
         // eslint-disable-next-line @next/next/no-img-element
         <img src={resolved} alt={title} className="h-full w-full object-cover" />
       ) : (
-        <ListingImagePlaceholder isLight={isLight} size="sm" />
+        <ListingAutoCover
+          listingId={listingId}
+          title={title}
+          category={category}
+          size="sm"
+        />
       )}
     </div>
   );
@@ -279,7 +293,7 @@ export function AnalyticsListingsTab({ data }: { data: AnalyticsPayload }) {
           {sorted.map((row, index) => (
             <div key={row.id} className={`${ui.cardShell} flex items-center gap-3 p-3`}>
               <span className={`w-5 shrink-0 text-center text-xs font-bold ${ac.mutedText}`}>{index + 1}</span>
-              <ListingThumb image={row.image} title={row.title} />
+              <ListingThumb image={row.image} title={row.title} listingId={row.id} />
               <div className="min-w-0 flex-1">
                 <p className={`truncate text-sm font-semibold ${ac.pageHeading}`}>{row.title}</p>
                 <p className={`text-xs font-semibold ${ui.limeText}`}>{formatPrice(row, language)}</p>
@@ -377,7 +391,11 @@ export function AnalyticsPromotionTab({ data }: { data: AnalyticsPayload }) {
           <div className="space-y-2">
             {data.promotionHistory.map((item) => (
               <div key={item.id} className={`${ui.cardShell} flex items-center gap-3 p-3`}>
-                <ListingThumb image={item.image} title={item.listingTitle} />
+                <ListingThumb
+                  image={item.image}
+                  title={item.listingTitle}
+                  listingId={item.id}
+                />
                 <div className="min-w-0 flex-1">
                   <p className={`truncate text-sm font-semibold ${ac.pageHeading}`}>{item.listingTitle}</p>
                   <p className={`text-[11px] ${ac.mutedText}`}>

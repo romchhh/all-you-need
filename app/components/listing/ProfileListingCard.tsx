@@ -6,7 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
-import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
+import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
 import { ListingAutoRenewSection } from '@/components/listing/ListingAutoRenewSection';
@@ -295,7 +295,13 @@ export const ProfileListingCard = ({
               style={{ width: '100%', height: '100%' }}
             />
           ) : (
-            <ListingImagePlaceholder isLight={isLight} size="sm" />
+            <ListingAutoCover
+              listingId={listing.id}
+              title={listing.title}
+              category={listing.category}
+              subcategory={listing.subcategory}
+              size="sm"
+            />
           )}
           
           {/* Бейдж реклами - справа знизу на фото (тільки якщо реклама ще активна) */}

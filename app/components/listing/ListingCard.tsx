@@ -9,7 +9,7 @@ import { getListingDisplayDate } from '@/utils/parseDbDate';
 import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
-import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
+import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 import { shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -195,7 +195,13 @@ const ListingCardComponent = ({
         
         {/* Placeholder або зображення */}
         {imageError || !imageUrl ? (
-          <ListingImagePlaceholder isLight={isLight} size="lg" />
+          <ListingAutoCover
+            listingId={listing.id}
+            title={listing.title}
+            category={listing.category}
+            subcategory={listing.subcategory}
+            size="lg"
+          />
         ) : (
           <CachedListingImage
             src={imageUrl}

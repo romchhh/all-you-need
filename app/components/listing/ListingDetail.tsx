@@ -903,9 +903,12 @@ export const ListingDetail = ({
           }}
         >
           <div className="h-full w-full min-h-0 lg:max-h-full">
-          <ImageGallery 
-            images={images} 
+          <ImageGallery
+            images={images}
             title={listing.title}
+            listingId={listing.id}
+            category={listing.category}
+            subcategory={listing.subcategory}
             onImageClick={(index) => setSelectedImageIndex(index)}
           />
           </div>

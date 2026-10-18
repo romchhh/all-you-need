@@ -101,7 +101,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (images.length === 0) {
+    const { listingAllowsEmptyPhotos } = await import('@/lib/listings/autoCover');
+    if (images.length === 0 && !listingAllowsEmptyPhotos(category)) {
       console.error('[Create Listing] No images provided');
       return NextResponse.json(
         { error: 'At least one image is required' },

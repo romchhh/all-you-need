@@ -9,7 +9,7 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
-import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
+import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 import { shouldShowListingViews } from '@/lib/listings/viewsDisplay';
 import { displayListingViews } from '@/lib/listings/displayStats';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -146,7 +146,13 @@ const ListingCardColumnComponent = ({
               style={{ width: '100%', height: '100%' }}
             />
           ) : (
-            <ListingImagePlaceholder isLight={isLight} size="sm" />
+            <ListingAutoCover
+              listingId={listing.id}
+              title={listing.title}
+              category={listing.category}
+              subcategory={listing.subcategory}
+              size="sm"
+            />
           )}
         </div>
 

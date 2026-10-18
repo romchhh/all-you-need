@@ -334,7 +334,7 @@ export const EditListingModal = ({
       newErrors.category = t('editListing.errors.categoryRequired');
     }
 
-    if (imagePreviews.length === 0) {
+    if (imagePreviews.length === 0 && category !== 'services_work') {
       newErrors.images = t('createListing.addPhoto');
     }
 
@@ -480,8 +480,16 @@ export const EditListingModal = ({
           {/* Фото */}
           <div>
             <label className={`block text-sm font-medium mb-3 ${isLight ? 'text-gray-800' : 'text-white'}`}>
-              {t('editListing.photosLabel')} {imagePreviews.length}/10
+              {category === 'services_work'
+                ? t('editListing.photosLabelOptional')
+                : t('editListing.photosLabel')}{' '}
+              {imagePreviews.length}/10
             </label>
+            {category === 'services_work' && (
+              <p className={`mb-2 text-xs ${isLight ? 'text-gray-500' : 'text-white/50'}`}>
+                {t('editListing.photosHintServices')}
+              </p>
+            )}
             {/* Прогрес-бар стиснення зображень */}
             <div className="grid grid-cols-3 gap-2 relative">
               {imagePreviews.map((preview, index) => {

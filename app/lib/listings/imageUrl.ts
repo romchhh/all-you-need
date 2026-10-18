@@ -2,9 +2,6 @@
  * URL для відображення фото оголошення у веб-додатку.
  */
 
-/** Fallback для послуг без фото (як у каналі / боті). */
-export const DEFAULT_SERVICES_LISTING_IMAGE = '/images/tgground.jpg';
-
 export function buildListingImageUrl(imagePath: string | null | undefined): string {
   if (!imagePath) return '';
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
@@ -22,32 +19,30 @@ export function buildListingImageUrl(imagePath: string | null | undefined): stri
     return `/${cleanPath}`;
   }
 
-  // Public static (напр. /images/tgground.jpg)
+  // Public static (напр. /images/…)
   if (cleanPath.startsWith('images/')) {
     return `/${cleanPath}`;
+  }
+
+  // Застарілий fallback tgground — більше не підставляємо як «фото»
+  if (cleanPath === 'images/tgground.jpg' || cleanPath.endsWith('/tgground.jpg')) {
+    return '';
   }
 
   return `/api/images/${cleanPath}`;
 }
 
-function isServicesWork(category?: string | null): boolean {
-  return (category || '').trim().toLowerCase() === 'services_work';
-}
-
-/** URL обкладинки картки: для services_work без фото — tgground. */
+/** URL реального фото картки; порожньо → UI малює ListingAutoCover. */
 export function resolveListingCardImageUrl(listing: {
   image?: string | null;
   images?: string[] | null;
   category?: string | null;
 }): string {
   const raw = listing.image || listing.images?.[0] || '';
-  const built = buildListingImageUrl(raw);
-  if (built) return built;
-  if (isServicesWork(listing.category)) return DEFAULT_SERVICES_LISTING_IMAGE;
-  return '';
+  return buildListingImageUrl(raw);
 }
 
-/** Галерея detail: порожній список для послуг → tgground. */
+/** Галерея detail: лише реальні фото (без статичної заглушки). */
 export function resolveListingGalleryImages(listing: {
   image?: string | null;
   images?: string[] | null;
@@ -59,7 +54,8 @@ export function resolveListingGalleryImages(listing: {
       : listing.image
         ? [listing.image]
         : [];
-  if (fromList.length > 0) return fromList;
-  if (isServicesWork(listing.category)) return [DEFAULT_SERVICES_LISTING_IMAGE];
-  return [];
+  return fromList.filter((path) => {
+    const built = buildListingImageUrl(path);
+    return Boolean(built);
+  });
 }

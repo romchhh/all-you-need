@@ -3,19 +3,30 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
-import { ListingImagePlaceholder } from '@/components/listing/ListingImagePlaceholder';
+import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface ImageGalleryProps {
   images: string[];
   title: string;
+  listingId?: string | number;
+  category?: string | null;
+  subcategory?: string | null;
   onImageClick?: (index: number) => void;
 }
 
-export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps) => {
+export const ImageGallery = ({
+  images,
+  title,
+  listingId = 0,
+  category,
+  subcategory,
+  onImageClick,
+}: ImageGalleryProps) => {
   const { isLight } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [failedIndexes, setFailedIndexes] = useState<Set<number>>(new Set());
 
   const slideBgClass = isLight ? 'bg-white' : 'bg-black';
 
@@ -25,6 +36,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
 
   useEffect(() => {
     setActiveIndex(0);
+    setFailedIndexes(new Set());
     if (containerRef.current) {
       containerRef.current.scrollLeft = 0;
     }
@@ -47,17 +59,17 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
   };
 
   if (!images.length) {
-    const placeholderHeight = typeof window !== 'undefined' && window.innerWidth < 768 ? '280px' : '360px';
+    const placeholderHeight =
+      typeof window !== 'undefined' && window.innerWidth < 768 ? '280px' : '360px';
     return (
-      <div className="relative w-full" style={{ height: placeholderHeight }}>
-        <ListingImagePlaceholder isLight={isLight} size="lg" />
-        <p
-          className={`absolute bottom-8 left-0 right-0 text-center text-sm ${
-            isLight ? 'text-gray-500' : 'text-white/70'
-          }`}
-        >
-          Немає фото
-        </p>
+      <div className="relative w-full overflow-hidden" style={{ height: placeholderHeight }}>
+        <ListingAutoCover
+          listingId={listingId}
+          title={title}
+          category={category}
+          subcategory={subcategory}
+          size="lg"
+        />
       </div>
     );
   }
@@ -72,47 +84,43 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {imageUrls.map((src, index) => (
-          <div
-            key={`${images[index]}-${index}`}
-            className={`relative flex h-full w-full shrink-0 snap-start items-center justify-center ${slideBgClass}`}
-            style={{ minWidth: '100%' }}
-            onClick={() => onImageClick?.(index)}
-          >
-            {src ? (
-              <CachedListingImage
-                src={src}
-                alt={`${title} ${index + 1}`}
-                className="block h-auto max-h-full w-full max-w-full select-none object-contain"
-                draggable={false}
-                priority={index === 0}
-                fadeIn={false}
-                onError={(e) => {
-                  console.error('Error loading image:', images[index], src);
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const placeholder = target.parentElement?.querySelector('.error-placeholder');
-                  if (placeholder) {
-                    (placeholder as HTMLElement).style.display = 'flex';
-                  }
-                }}
-              />
-            ) : null}
+        {imageUrls.map((src, index) => {
+          const showCover = !src || failedIndexes.has(index);
+          return (
             <div
-              className="error-placeholder absolute inset-0"
-              style={{ display: src ? 'none' : 'flex' }}
+              key={`${images[index]}-${index}`}
+              className={`relative flex h-full w-full shrink-0 snap-start items-center justify-center ${slideBgClass}`}
+              style={{ minWidth: '100%' }}
+              onClick={() => onImageClick?.(index)}
             >
-              <ListingImagePlaceholder isLight={isLight} size="lg" />
-              <p
-                className={`absolute bottom-8 left-0 right-0 text-center text-sm ${
-                  isLight ? 'text-gray-500' : 'text-white/70'
-                }`}
-              >
-                Помилка завантаження
-              </p>
+              {showCover ? (
+                <ListingAutoCover
+                  listingId={listingId}
+                  title={title}
+                  category={category}
+                  subcategory={subcategory}
+                  size="lg"
+                />
+              ) : (
+                <CachedListingImage
+                  src={src}
+                  alt={`${title} ${index + 1}`}
+                  className="block h-auto max-h-full w-full max-w-full select-none object-contain"
+                  draggable={false}
+                  priority={index === 0}
+                  fadeIn={false}
+                  onError={() => {
+                    setFailedIndexes((prev) => {
+                      const next = new Set(prev);
+                      next.add(index);
+                      return next;
+                    });
+                  }}
+                />
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {images.length > 1 && (
@@ -120,6 +128,7 @@ export const ImageGallery = ({ images, title, onImageClick }: ImageGalleryProps)
           {images.map((_, i) => (
             <button
               key={i}
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 goToImage(i);

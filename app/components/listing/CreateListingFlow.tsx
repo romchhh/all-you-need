@@ -139,7 +139,8 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
 
   const cloneListingPayload = async (data: any) => {
     const images: File[] = Array.isArray(data?.images) ? data.images.filter(Boolean) : [];
-    if (images.length === 0) {
+    const allowsEmpty = data?.category === 'services_work';
+    if (images.length === 0 && !allowsEmpty) {
       throw new Error(t('createListing.addPhoto') || 'Додайте хоча б одне фото');
     }
 
@@ -215,7 +216,8 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
       }
       
       const images: File[] = Array.isArray(data?.images) ? data.images.filter(Boolean) : [];
-      if (images.length === 0) {
+      const allowsEmpty = data?.category === 'services_work';
+      if (images.length === 0 && !allowsEmpty) {
         throw new Error(t('createListing.addPhoto') || 'Додайте хоча б одне фото');
       }
 

@@ -519,7 +519,7 @@ export const CreateListingModal = ({
       newErrors.category = t('createListing.errors.categoryRequired');
     }
 
-    if (images.length === 0) {
+    if (images.length === 0 && category !== 'services_work') {
       newErrors.images = t('createListing.errors.imagesRequired');
     } else if (images.length > 10) {
       newErrors.images = t('createListing.errors.imagesMax');
@@ -679,8 +679,15 @@ export const CreateListingModal = ({
           {/* Фото */}
           <div>
             <label className={`block text-sm font-medium mb-2 ${ac.pageHeading}`}>
-              {t('createListing.photosLabel')}
+              {category === 'services_work'
+                ? t('createListing.photosLabelOptional')
+                : t('createListing.photosLabel')}
             </label>
+            {category === 'services_work' && (
+              <p className={`mb-2 text-xs ${isLight ? 'text-gray-500' : 'text-white/50'}`}>
+                {t('createListing.photosHintServices')}
+              </p>
+            )}
             {/* Прогрес-бар стиснення зображень */}
             {imagePreviews.length === 0 ? (
               <label
@@ -692,7 +699,10 @@ export const CreateListingModal = ({
               >
                 <Upload size={32} className={`mb-2 ${isLight ? 'text-gray-600' : 'text-white'}`} />
                 <span className={`text-sm ${isLight ? 'text-gray-800' : 'text-white'}`}>
-                  {t('createListing.photosLabel')?.replace(' *', '') || 'Додати фото'}
+                  {(category === 'services_work'
+                    ? t('createListing.photosLabelOptional')
+                    : t('createListing.photosLabel')
+                  )?.replace(' *', '') || 'Додати фото'}
                 </span>
                 <input
                   type="file"
