@@ -74,8 +74,8 @@ def is_quality(text: str, has_photo: bool, relaxed: bool = False) -> tuple[bool,
             return False, "замало тексту"
         return True, ""
 
-    # Без фото: достатньо оферу/ціни + мінімум тексту
-    if has_offer and len(t) >= 16:
+    # Без фото: офер/ціна + короткий мінімум (аудит: «Продам по 6€» різало як замало тексту)
+    if has_offer and len(t) >= 12:
         return True, ""
     if len(t) >= 32:
         return True, ""

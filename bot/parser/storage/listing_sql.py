@@ -17,6 +17,48 @@ LIMIT 1
 """
 
 
+def pending_or_published_dedup_sql() -> str:
+    """
+    Дубль за dedup_key серед опублікованих АБО раніше вставлених pending/approved.
+    exclude_id — поточний parsed_items.id (0 якщо ще немає).
+    """
+    return """
+SELECT id
+FROM parsed_items
+WHERE dedup_key = ?
+  AND id != ?
+  AND datetime(created_at) >= datetime('now', ?)
+  AND (
+        marketplace_listing_id IS NOT NULL
+        OR LOWER(COALESCE(status, '')) IN ('pending', 'approved')
+      )
+ORDER BY id ASC
+LIMIT 1
+"""
+
+
+def author_title_price_parsed_duplicate_sql() -> str:
+    """Той самий автор + нормалізований title + ціна в parsed_items."""
+    return """
+SELECT id
+FROM parsed_items
+WHERE author_id = ?
+  AND id != ?
+  AND datetime(created_at) >= datetime('now', ?)
+  AND (
+        marketplace_listing_id IS NOT NULL
+        OR LOWER(COALESCE(status, '')) IN ('pending', 'approved')
+      )
+  AND (lower(title) = ? OR lower(title) = ?)
+  AND (
+        lower(replace(COALESCE(price, ''), ' ', '')) = ?
+        OR (? = 'free' AND (is_free = 1 OR lower(COALESCE(price, '')) IN ('free', '0')))
+      )
+ORDER BY id ASC
+LIMIT 1
+"""
+
+
 def listing_title_price_duplicate_sql() -> str:
     """Точний збіг нормалізованого заголовка і ціни серед активних Listing."""
     if is_postgres():

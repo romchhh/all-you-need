@@ -184,6 +184,8 @@ ACCEPT / REJECT
 ACCEPT (accept=true) when there is a REAL offer:
 - GOODS: concrete item (phone, car, sofa, shoes, appliance…) with price and/or sell/give wording,
   or a typical flea caption like "iPhone 13 300€" / "Диван, самовывоз"
+- SHORT but real: item + price/size is enough — e.g. "Яйцевартка 15€", "Размер 68, 50€",
+  "Учебник исписан, 5€", "Шкаф 330/220". Accept these; do NOT mark junk/not_listing.
 - SERVICE: provider offers a service (nails, tattoo, repair, cleaning, tutoring…)
 
 REJECT (accept=false):
@@ -192,6 +194,7 @@ REJECT (accept=false):
 - channel meta / subscribe / pins
 - jobs, hiring, salary, vacancy bots, MLM, “$150/day”
 - wanted-only (“куплю / ищу”) with no own offer
+- currency exchange / “грн на карте → cash €” / cigarette wholesale spam
 - empty / spam
 If unsure NEWS/JOB vs listing → reject. If item+price is obvious → accept.
 Duplicates vs queues above → accept=false, is_duplicate=true, reject_reason="duplicate".

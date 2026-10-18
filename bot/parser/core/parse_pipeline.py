@@ -150,6 +150,7 @@ async def run_ai_screen_and_dedup(
     is_free: bool,
     condition: Optional[str],
     force_service: bool = False,
+    author_id: Optional[int] = None,
 ) -> tuple[bool, str, Optional[str], dict[str, Any]]:
     """
     Повертає (ok, reason, embedding_json, fields_for_insert).
@@ -173,8 +174,9 @@ async def run_ai_screen_and_dedup(
         description,
         price=None if price is None else str(price),
         is_free=bool(is_free),
+        author_id=author_id,
     ):
-        return False, "дублікат (маркетплейс)", None, {}
+        return False, "дублікат (крос-канал)", None, {}
 
     junk, junk_reason = is_junk_for_marketplace(
         title, description, raw_text, category, subcategory

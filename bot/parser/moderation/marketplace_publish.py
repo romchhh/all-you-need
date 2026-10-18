@@ -10,14 +10,13 @@ from parser.moderation.formatting import (
     is_effectively_empty_marketplace_description,
     preserve_parsed_source_fields,
 )
-from parser.storage.listing_dedup import active_listing_duplicate
+from parser.storage.listing_dedup import active_listing_duplicate, resolve_stable_dedup_key
 from parser.storage.marketplace import (
     copy_parser_images_to_public,
     create_marketplace_listing,
     get_or_create_bot_user,
 )
 from parser.storage.parsed_items import (
-    fingerprint_title_desc,
     parsed_item_image_refs,
     set_marketplace_listing_id,
 )
@@ -74,18 +73,32 @@ def publish_parsed_item_marketplace(
         )
         raise MarketplacePublishError("empty_description")
 
-    dedup_key = str(source.get("dedup_key") or "").strip() or fingerprint_title_desc(
-        str(listing_item.get("title") or ""),
-        str(listing_item.get("description") or ""),
+    dedup_key = resolve_stable_dedup_key(
+        source,
+        title=str(listing_item.get("title") or ""),
+        description=str(listing_item.get("description") or ""),
         price=str(listing_item.get("price") or ""),
         is_free=bool(listing_item.get("is_free")),
     )
+    author_id = None
+    try:
+        if source.get("author_id") not in (None, "", 0, "0"):
+            author_id = int(source.get("author_id"))
+    except (TypeError, ValueError):
+        author_id = None
+    exclude_id = 0
+    try:
+        exclude_id = int(source.get("id") or item_id or 0)
+    except (TypeError, ValueError):
+        exclude_id = int(item_id or 0)
     if not skip_duplicate_check and active_listing_duplicate(
         dedup_key,
         str(listing_item.get("title") or ""),
         description,
         price=str(listing_item.get("price") or ""),
         is_free=bool(listing_item.get("is_free")),
+        author_id=author_id,
+        exclude_parsed_id=exclude_id,
     ):
         raise MarketplacePublishError("duplicate")
 

@@ -16,8 +16,14 @@ from parser.moderation.formatting import (
     preserve_parsed_source_fields,
     resolved_author_username,
 )
-from parser.storage.listing_sql import listing_title_price_duplicate_sql, published_parsed_dedup_sql
-from parser.storage.parsed_items import parsed_item_row_blocks_duplicate
+from parser.storage.listing_dedup import resolve_stable_dedup_key
+from parser.storage.listing_sql import (
+    author_title_price_parsed_duplicate_sql,
+    listing_title_price_duplicate_sql,
+    pending_or_published_dedup_sql,
+    published_parsed_dedup_sql,
+)
+from parser.storage.parsed_items import fingerprint_title_desc, parsed_item_row_blocks_duplicate
 
 
 class ParserSmokeTests(unittest.TestCase):
@@ -115,6 +121,15 @@ class ParserSmokeTests(unittest.TestCase):
         self.assertEqual(len(photos), 3)
         self.assertIsNone(link)
 
+    def test_short_priced_offer_passes_quality(self):
+        from parser.core.quality import is_quality
+
+        ok, reason = is_quality("Продам по 6€", has_photo=False)
+        self.assertTrue(ok, reason)
+        ok_stub, reason_stub = is_quality("20€", has_photo=False)
+        self.assertFalse(ok_stub)
+        self.assertIn(reason_stub, ("замало тексту", "немає фото"))
+
     def test_free_shipping_is_not_a_giveaway(self):
         fields = _finalize_fields(
             title="Велосипед",
@@ -168,6 +183,105 @@ class ParserSmokeTests(unittest.TestCase):
         self.assertNotIn("800", key_sql)
         self.assertIn("dedup_key", key_sql)
         self.assertIn("LIMIT 1", title_sql)
+
+    def test_stable_dedup_key_prefers_stored(self):
+        stored = fingerprint_title_desc("Стіл дубовий", "Стан хороший", price="50", is_free=False)
+        item = {
+            "dedup_key": stored,
+            "title": "AI rewritten title about oak table",
+            "description": "Completely different AI description",
+            "price": "999",
+            "is_free": False,
+        }
+        self.assertEqual(resolve_stable_dedup_key(item), stored)
+        recomputed = fingerprint_title_desc(
+            item["title"], item["description"], price=item["price"], is_free=False
+        )
+        self.assertNotEqual(stored, recomputed)
+        self.assertEqual(
+            resolve_stable_dedup_key(
+                {"title": "Стіл дубовий", "description": "Стан хороший", "price": "50"}
+            ),
+            stored,
+        )
+
+    def test_cross_channel_pending_dedup_sql(self):
+        sql = pending_or_published_dedup_sql()
+        self.assertIn("dedup_key = ?", sql)
+        self.assertIn("pending", sql.lower())
+        self.assertNotIn("source_channel", sql)
+        author_sql = author_title_price_parsed_duplicate_sql()
+        self.assertIn("author_id = ?", author_sql)
+        self.assertNotIn("source_channel", author_sql)
+
+    def test_check_parser_duplicates_semantic_is_global(self):
+        from unittest.mock import patch
+
+        from parser.core.dedup import check_parser_duplicates
+
+        with (
+            patch("parser.core.dedup.clear_repostable_parsed_item"),
+            patch("parser.core.dedup.parsed_item_exists", return_value=False),
+            patch("parser.core.dedup.parsed_item_claimed_by_other_parser", return_value=False),
+            patch("parser.core.dedup._text_dedup_enabled", return_value=True),
+            patch("parser.core.dedup.is_fuzzy_dedup_enabled", return_value=False),
+            patch(
+                "parser.core.dedup.parsed_item_is_semantic_duplicate",
+                return_value=True,
+            ) as semantic,
+        ):
+            is_dup, reason, _emb = check_parser_duplicates(
+                source_channel="@channel_b",
+                message_id=99,
+                content_hash="abc",
+                dedup_key="same-key-from-channel-a",
+                title="Стіл",
+                description="Продам стіл 50€",
+                parser_type="default",
+            )
+        self.assertTrue(is_dup)
+        self.assertEqual(reason, "дублікат (крос-канал)")
+        semantic.assert_called_once()
+        kwargs = semantic.call_args.kwargs
+        self.assertIsNone(kwargs.get("source_channel"))
+        self.assertEqual(semantic.call_args.args[0], "same-key-from-channel-a")
+
+    def test_outreach_uses_stable_dedup_key(self):
+        from unittest.mock import MagicMock, patch
+
+        from parser.storage import author_outreach as ao
+
+        stored = fingerprint_title_desc(
+            "Лампа настільна біла",
+            "Стан новий IKEA модель",
+            price="20",
+            is_free=False,
+        )
+        self.assertTrue(stored)
+        item = {
+            "source_channel": "@ch_b",
+            "message_id": 7,
+            "dedup_key": stored,
+            "title": "AI Lamp Title Completely Different",
+            "description": "rewritten by model",
+            "price": "20",
+            "author_id": 12345,
+        }
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.side_effect = [
+            None,  # message
+            {"notified_at": "2099-01-01T00:00:00+00:00"},  # dedup hit
+        ]
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        with (
+            patch.object(ao, "ensure_author_outreach_table"),
+            patch.object(ao, "get_connection", return_value=mock_conn),
+        ):
+            reason = ao.should_skip_author_dm(item, listing_id=0)
+        self.assertEqual(reason, "already_notified_dedup")
+        dedup_call = mock_cursor.execute.call_args_list[1]
+        self.assertEqual(dedup_call.args[1][0], stored)
 
 
 if __name__ == "__main__":

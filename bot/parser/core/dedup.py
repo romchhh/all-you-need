@@ -184,22 +184,26 @@ def check_parser_duplicates(
 
     scope = parser_type if parser_type == PARSER_TYPE_SERVICES_CHANNEL else None
 
-    # Лише dedup_key (title+desc+price), без content_hash — менше хибних «дублікат (текст)».
+    # dedup_key між усіма каналами: той самий пост у різних групах — один раз.
+    # source_channel лишається лише для message_id / claim іншого парсера вище.
     if parsed_item_is_semantic_duplicate(
         dedup_key,
         parser_type=scope,
-        source_channel=source_channel,
+        source_channel=None,
     ):
-        return True, "дублікат (оголошення)", None
+        return True, "дублікат (крос-канал)", None
 
     embedding_json: Optional[str] = None
     if is_fuzzy_dedup_enabled():
         vec = compute_listing_embedding(title, description)
+        # Fuzzy за замовчуванням same-channel (PARSER_FUZZY_DEDUP_SAME_CHANNEL);
+        # exact крос-канал уже закритий dedup_key вище.
+        channel_filter = source_channel if PARSER_FUZZY_DEDUP_SAME_CHANNEL else None
         if vec and is_fuzzy_semantic_duplicate(
             title,
             description,
             vec,
-            source_channel=source_channel,
+            source_channel=channel_filter,
         ):
             return True, "дублікат (схожий текст)", None
         embedding_json = embedding_to_json(vec)

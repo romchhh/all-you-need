@@ -246,6 +246,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             subcategory = subcategory or "other_services"
 
         condition = detect_condition(text, category)
+        author_username, author_id = resolve_author_contact(msg_for_link, text, channel)
 
         ok, skip_reason, embedding_json, ai_fields = await run_ai_screen_and_dedup(
             source_channel=channel,
@@ -264,6 +265,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             is_free=is_free,
             condition=condition,
             force_service=force_service_channel or is_service,
+            author_id=author_id,
         )
         if not ok:
             stats["skipped"] += 1
@@ -330,8 +332,6 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             final_parser_type = PARSER_TYPE_SERVICES_CHANNEL
         else:
             final_parser_type = "default"
-
-        author_username, author_id = resolve_author_contact(msg_for_link, text, channel)
 
         chan_slug = re.sub(r"[^a-z0-9]+", "_", channel.lower()).strip("_")[:24] or "ch"
         base_name = f"{chan_slug}_{effective_message_id}"

@@ -498,7 +498,7 @@ def parsed_item_is_semantic_duplicate(
     parser_type: str | None = None,
     source_channel: str | None = None,
 ) -> bool:
-    """Дублікат за title+desc+price — у межах каналу, м'яке вікно для pending."""
+    """Дублікат за title+desc+price між каналами; м'яке вікно для pending."""
     if not dedup_key:
         return False
     conn = get_connection()

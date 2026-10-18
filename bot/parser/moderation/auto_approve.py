@@ -53,11 +53,10 @@ from parser.moderation.marketplace_publish import (
     MarketplacePublishError,
     publish_parsed_item_marketplace,
 )
-from parser.storage.listing_dedup import active_listing_duplicate
+from parser.storage.listing_dedup import active_listing_duplicate, resolve_stable_dedup_key
 from parser.storage.parsed_items import (
     count_auto_approve_in_flight,
     ensure_parsed_items_table,
-    fingerprint_title_desc,
     get_parsed_item_by_id,
     hydrate_parsed_item,
     list_auto_approved_since,
@@ -301,24 +300,35 @@ def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[b
         if not has_listing_offer_signal(blob):
             return False, "no_offer"
 
-        images = parsed_item_image_refs(item)
-        if not _is_service_item(item) and not images:
-            if len(blob.strip()) < 28:
-                return False, "no_photos"
+        # Короткі офери з ціною/«віддам» без фото — валідні (аудит: no_photos різав їх).
 
-        dedup_key = fingerprint_title_desc(
-            title,
-            description,
+        dedup_key = resolve_stable_dedup_key(
+            item,
+            title=title,
+            description=description,
             price=str(item.get("price") or ""),
             is_free=bool(item.get("is_free")),
         )
         try:
+            author_id = None
+            try:
+                if item.get("author_id") not in (None, "", 0, "0"):
+                    author_id = int(item.get("author_id"))
+            except (TypeError, ValueError):
+                author_id = None
+            exclude_id = 0
+            try:
+                exclude_id = int(item.get("id") or 0)
+            except (TypeError, ValueError):
+                exclude_id = 0
             if active_listing_duplicate(
                 dedup_key,
                 title,
                 description,
                 price=str(item.get("price") or ""),
                 is_free=bool(item.get("is_free")),
+                author_id=author_id,
+                exclude_parsed_id=exclude_id,
             ):
                 return False, "duplicate"
             from parser.storage.author_outreach import dedup_key_recently_published
@@ -510,7 +520,21 @@ async def _publish_and_notify(
             skip_duplicate_check=aggressive,
         )
     except MarketplacePublishError as e:
-        logger.info("auto-approve publish skip parsed_item %s: %s", item_id, e)
+        err = str(e)
+        logger.info("auto-approve publish skip parsed_item %s: %s", item_id, err)
+        if err == "duplicate":
+            try:
+                from parser.storage.parsed_items import update_parsed_item_status
+
+                update_parsed_item_status(item_id, "rejected", moderated_by=None)
+                logger.info(
+                    "auto-approve rejected parsed_item %s as cross-channel duplicate",
+                    item_id,
+                )
+            except Exception:
+                logger.exception(
+                    "auto-approve failed to reject duplicate parsed_item %s", item_id
+                )
         return False
 
     mark_auto_approved(item_id)
@@ -793,6 +817,17 @@ async def run_auto_approve_drain(
                     if reason:
                         round_skip[reason] += 1
                         skip_reasons[reason] += 1
+                    if reason in ("duplicate", "duplicate_outreach") and item_id:
+                        try:
+                            from parser.storage.parsed_items import update_parsed_item_status
+
+                            update_parsed_item_status(
+                                item_id, "rejected", moderated_by=None
+                            )
+                        except Exception:
+                            logger.exception(
+                                "auto-approve failed to reject duplicate %s", item_id
+                            )
 
             if round_skip and not eligible:
                 top = round_skip.most_common(5)
