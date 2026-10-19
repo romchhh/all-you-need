@@ -62,7 +62,7 @@ export const ImageGallery = ({
 
   if (!images.length) {
     return (
-      <div className="relative aspect-[3/4] w-full max-h-[min(72svh,560px)] overflow-hidden sm:aspect-[4/5]">
+      <div className="relative h-full min-h-[260px] w-full overflow-hidden">
         <ListingAutoCover
           listingId={listingId}
           title={title}

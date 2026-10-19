@@ -78,36 +78,43 @@ const LUCIDE_MAP: Record<CoverLucideIconName, LucideIcon> = {
 
 const SIZE_CFG: Record<
   ListingAutoCoverSize,
-  { icon: number; titleClass: string; padX: string; padY: string; lines: number; maxTitle: number }
+  {
+    icon: number;
+    titleClass: string;
+    padX: string;
+    gap: string;
+    lines: number;
+    maxTitle: number;
+  }
 > = {
   sm: {
-    icon: 28,
-    titleClass: 'text-[11px] leading-snug font-semibold',
-    padX: 'px-2.5',
-    padY: 'py-3',
+    icon: 26,
+    titleClass: 'text-[10px] leading-[1.25] font-semibold',
+    padX: 'px-2',
+    gap: 'gap-2',
     lines: 2,
-    maxTitle: 36,
+    maxTitle: 32,
   },
   md: {
-    icon: 40,
-    titleClass: 'text-sm leading-snug font-semibold',
-    padX: 'px-3.5',
-    padY: 'py-4',
+    icon: 36,
+    titleClass: 'text-xs leading-snug font-semibold sm:text-sm',
+    padX: 'px-3',
+    gap: 'gap-2.5',
     lines: 3,
-    maxTitle: 48,
+    maxTitle: 44,
   },
   lg: {
-    icon: 52,
-    titleClass: 'text-[15px] sm:text-base leading-snug font-semibold',
-    padX: 'px-4 sm:px-5',
-    padY: 'py-5 sm:py-6',
+    icon: 48,
+    titleClass: 'text-sm leading-snug font-semibold sm:text-[15px]',
+    padX: 'px-5',
+    gap: 'gap-3 sm:gap-3.5',
     lines: 3,
-    maxTitle: 56,
+    maxTitle: 52,
   },
 };
 
 /**
- * Вертикальна текстова обкладинка: іконка (за ключовими словами послуги) + короткий title.
+ * Вертикальна обкладинка: іконка + короткий title по центру, без накладання.
  */
 function ListingAutoCoverInner({
   listingId,
@@ -148,62 +155,67 @@ function ListingAutoCoverInner({
     [title, description, cfg.maxTitle]
   );
 
+  const iconNode = LucideIconComp ? (
+    <LucideIconComp
+      size={cfg.icon}
+      strokeWidth={1.75}
+      className="shrink-0 opacity-90"
+      style={{ color: colors.fg }}
+      aria-hidden
+    />
+  ) : (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={iconSrc}
+      alt=""
+      width={cfg.icon}
+      height={cfg.icon}
+      className="shrink-0 object-contain opacity-90"
+      style={{ width: cfg.icon, height: cfg.icon }}
+      draggable={false}
+    />
+  );
+
   return (
     <div
-      className={`absolute inset-0 flex flex-col overflow-hidden select-none ${cfg.padX} ${cfg.padY} ${className}`}
+      className={`absolute inset-0 flex select-none overflow-hidden ${className}`}
       style={bgStyle}
       aria-hidden
     >
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.2]"
         style={{
-          backgroundImage: `radial-gradient(ellipse 80% 55% at 50% 12%, ${colors.bgAccent}aa 0%, transparent 70%),
-            radial-gradient(ellipse 70% 50% at 50% 100%, ${colors.bgDeep}99 0%, transparent 65%)`,
+          backgroundImage: `radial-gradient(ellipse 80% 55% at 50% 18%, ${colors.bgAccent}aa 0%, transparent 70%),
+            radial-gradient(ellipse 70% 45% at 50% 100%, ${colors.bgDeep}99 0%, transparent 65%)`,
         }}
       />
 
-      <div
-        className={`relative z-[1] flex flex-1 justify-center ${
-          showTitle ? 'items-end pb-2 sm:pb-3' : 'items-center pb-8 pt-2'
-        }`}
-      >
-        {LucideIconComp ? (
-          <LucideIconComp
-            size={cfg.icon}
-            strokeWidth={1.75}
-            className="shrink-0 opacity-90"
-            style={{ color: colors.fg }}
-            aria-hidden
-          />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={iconSrc}
-            alt=""
-            width={cfg.icon}
-            height={cfg.icon}
-            className="shrink-0 object-contain opacity-90"
-            draggable={false}
-          />
-        )}
-      </div>
-
       {showTitle ? (
-        <div className="relative z-[1] flex w-full shrink-0 items-start justify-center pt-1">
+        <div
+          className={`relative z-[1] flex h-full w-full flex-col items-center justify-center ${cfg.padX} py-6 ${cfg.gap}`}
+        >
+          <div className="flex shrink-0 items-center justify-center">{iconNode}</div>
           <p
-            className={`w-full max-w-[16rem] text-center break-words ${cfg.titleClass}`}
+            className={`w-full max-w-[14rem] shrink-0 text-center ${cfg.titleClass}`}
             style={{
               color: colors.fg,
               display: '-webkit-box',
               WebkitLineClamp: cfg.lines,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
+              wordBreak: 'break-word',
+              hyphens: 'auto',
             }}
           >
             {displayTitle}
           </p>
         </div>
-      ) : null}
+      ) : (
+        /* Мініатюри зі своїм підписом знизу — іконка по центру верхньої зони */
+        <div className="relative z-[1] flex h-full w-full items-center justify-center pb-9 pt-2">
+          {iconNode}
+        </div>
+      )}
     </div>
   );
 }
