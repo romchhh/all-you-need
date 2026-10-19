@@ -415,47 +415,72 @@ export function resolveCoverLucideIcon(opts: {
 const TITLE_NOISE_PREFIX =
   /^(?:продам|продаю|продажа|продаж|отдам|віддам|ищу|шукаю|куплю|предлагаю|пропоную|вакансия|вакансія|срочно|терміново|🚨+|✨+|🔥+)\s*[:\-–—,]?\s*/i;
 
+/** Ціна, URL, контакт — не показуємо як «назву» на обкладинці. */
+const COVER_TITLE_JUNK =
+  /^(?:https?:\/\/|www\.|t\.me\/|telegram\.me\/|@[\w.]+$|\+?\d[\d\s\-()]{6,}|\d+[.,]?\d*\s*(?:€|eur|euro|грн|uah|\$|usd)\b|(?:€|eur|euro|грн|uah|\$)\s*\d)/i;
+
+function cleanCoverSnippet(s: string): string {
+  return s
+    .replace(/\s+/g, ' ')
+    .replace(TITLE_NOISE_PREFIX, '')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/(?:www\.|t\.me\/|telegram\.me\/)\S+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s\W]+/, '')
+    .trim();
+}
+
+function isJunkCoverText(s: string): boolean {
+  if (!s || s.length < 3) return true;
+  if (COVER_TITLE_JUNK.test(s)) return true;
+  // майже лише цифри/валюта/символи
+  const letters = s.replace(/[^\p{L}]/gu, '');
+  return letters.length < 3;
+}
+
+function firstMeaningfulSnippet(text: string): string {
+  const parts = text.split(/[.!?\n|;]+/).map((p) => cleanCoverSnippet(p)).filter(Boolean);
+  for (const part of parts) {
+    if (!isJunkCoverText(part) && part.length >= 4) {
+      return part;
+    }
+  }
+  return '';
+}
+
+function truncateCoverTitle(base: string, maxLen: number): string {
+  if (base.length <= maxLen) return base || '—';
+  const sliced = base.slice(0, maxLen + 1);
+  const cut = sliced.lastIndexOf(' ');
+  const wordSafe = cut > maxLen * 0.45 ? sliced.slice(0, cut) : base.slice(0, maxLen);
+  return `${wordSafe.replace(/[,\-–—:;]+$/, '').trim()}…`;
+}
+
 /**
- * Короткий заголовок для обкладинки: прибирає шум, обрізає по словах;
- * якщо title занадто загальний/довгий — бере перше змістовне речення з description.
+ * Короткий заголовок для обкладинки: завжди віддає перевагу title;
+ * description — лише якщо title порожній/загальний і рядок не ціна/лінк.
  */
 export function shortenCoverTitle(
   title: string,
   description?: string | null,
   maxLen = 52
 ): string {
-  const clean = (s: string) =>
-    s
-      .replace(/\s+/g, ' ')
-      .replace(TITLE_NOISE_PREFIX, '')
-      .replace(/^[\s\W]+/, '')
-      .trim();
-
-  let base = clean(title || '');
-  const desc = clean(description || '');
+  let base = cleanCoverSnippet(title || '');
 
   const tooGeneric =
     !base ||
-    base.length < 4 ||
+    isJunkCoverText(base) ||
     /^(объявление|оголошення|услуга|послуга|товар|товар дня)$/i.test(base);
 
-  if (tooGeneric && desc.length >= 8) {
-    const sentence = desc.split(/[.!?\n]/)[0]?.trim() || desc;
-    base = sentence;
+  if (tooGeneric) {
+    const fromDesc = firstMeaningfulSnippet(description || '');
+    if (fromDesc) base = fromDesc;
   }
 
-  // Якщо title дуже довгий і в описі є коротша «квінтесенція» (перший рядок)
-  if (base.length > maxLen && desc.length >= 12 && desc.length < base.length) {
-    const firstLine = desc.split(/[.!?\n]/)[0]?.trim() || '';
-    if (firstLine.length >= 8 && firstLine.length <= maxLen + 8) {
-      base = firstLine;
-    }
+  // Довгий title не замінюємо описом (там часто ціна / посилання)
+  if (!base || isJunkCoverText(base)) {
+    base = cleanCoverSnippet(title || '') || '—';
   }
 
-  if (base.length <= maxLen) return base || '—';
-
-  const sliced = base.slice(0, maxLen + 1);
-  const cut = sliced.lastIndexOf(' ');
-  const wordSafe = cut > maxLen * 0.45 ? sliced.slice(0, cut) : base.slice(0, maxLen);
-  return `${wordSafe.replace(/[,\-–—:;]+$/, '').trim()}…`;
+  return truncateCoverTitle(base, maxLen);
 }

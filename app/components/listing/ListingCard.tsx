@@ -202,7 +202,6 @@ const ListingCardComponent = ({
             category={listing.category}
             subcategory={listing.subcategory}
             size="md"
-            showTitle={false}
           />
         ) : (
           <CachedListingImage
