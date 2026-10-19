@@ -70,6 +70,9 @@ export async function GET(request: NextRequest) {
       createdAt: string;
       authorName: string;
       authorAvatar: string | null;
+      hadTradeGroundContact: boolean;
+      ownerReply: string | null;
+      ownerRepliedAt: string | null;
     }> = [];
 
     try {
@@ -93,6 +96,11 @@ export async function GET(request: NextRequest) {
         const authorName =
           [row.user.firstName, row.user.lastName].filter(Boolean).join(' ').trim() ||
           (row.user.username ? `@${row.user.username}` : '');
+        const ext = row as typeof row & {
+          hadTradeGroundContact?: boolean;
+          ownerReply?: string | null;
+          ownerRepliedAt?: Date | null;
+        };
         return {
           id: row.id,
           rating: row.rating,
@@ -100,6 +108,9 @@ export async function GET(request: NextRequest) {
           createdAt: row.createdAt.toISOString(),
           authorName,
           authorAvatar: row.user.avatar,
+          hadTradeGroundContact: Boolean(ext.hadTradeGroundContact),
+          ownerReply: ext.ownerReply ?? null,
+          ownerRepliedAt: ext.ownerRepliedAt ? ext.ownerRepliedAt.toISOString() : null,
         };
       });
     } catch (reviewErr) {

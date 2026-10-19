@@ -1612,6 +1612,20 @@
         "publicLink": {
           "title": "Публичная ссылка",
           "subtitle": "Ссылка на ваш Business-профиль"
+        },
+        "reviews": {
+          "title": "Отзывы",
+          "subtitle": "Просмотр и ответы на отзывы",
+          "count": "Отзывы {count}",
+          "filterAll": "Все",
+          "filterUnreplied": "Без ответа",
+          "reply": "Ответить",
+          "replyPlaceholder": "Ваш ответ…",
+          "replySubmit": "Отправить ответ",
+          "replySaved": "Ответ сохранён",
+          "empty": "Пока нет отзывов",
+          "contactBadge": "Был контакт через TradeGround",
+          "yourReply": "Ваш ответ"
         }
       }
     },
@@ -1640,6 +1654,8 @@
       "memberSince": "На платформе",
       "aboutTitle": "О компании",
       "noListings": "Пока нет активных объявлений",
+      "noListingsTitle": "Пока нет объявлений",
+      "noListingsHint": "Компания ещё не разместила объявления. Посмотрите информацию о компании или её работы.",
       "noDescription": "Компания пока не добавила описание.",
       "proBadge": "PRO",
       "tabs": {
@@ -1657,8 +1673,11 @@
       "reviewCommentPlaceholder": "Комментарий (необязательно)",
       "reviewSubmit": "Отправить отзыв",
       "reviewSubmitted": "Спасибо! Отзыв опубликован.",
-      "reviewAlreadyLeft": "Вы уже оставляли отзыв этому продавцу.",
+      "reviewAlreadyLeft": "Вы уже оставляли отзыв этой компании.",
       "loginToReview": "Войдите через Telegram, чтобы оставить отзыв",
+      "registerToReview": "Пройдите регистрацию в боте, чтобы оставить отзыв",
+      "contactBadge": "Был контакт через TradeGround",
+      "ownerReplyLabel": "Ответ компании",
       "filters": {
         "all": "Все",
         "services": "Услуги",

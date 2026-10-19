@@ -188,18 +188,23 @@ export const LanguageProvider = ({ children, initialLanguage, userTelegramId }: 
     const delay = hasTelegramId ? 0 : 300;
     const timer = setTimeout(loadLanguageFromDB, delay);
 
+    // Коротким бустом чекаємо пізній __userTelegramId (не кожні 400ms вічно)
+    let ticks = 0;
     const checkInterval = setInterval(() => {
+      ticks += 1;
       if ((window as any).__userTelegramId && !userTelegramId) {
         loadLanguageFromDB();
         clearInterval(checkInterval);
+      } else if (ticks >= 8) {
+        clearInterval(checkInterval);
       }
-    }, 400);
+    }, 500);
 
     return () => {
       clearTimeout(timer);
       clearInterval(checkInterval);
     };
-  }, [userTelegramId, pathname, router]);
+  }, [userTelegramId]);
 
   useEffect(() => {
     setTranslations(BUNDLED_TRANSLATIONS[language] ?? BUNDLED_TRANSLATIONS.uk);

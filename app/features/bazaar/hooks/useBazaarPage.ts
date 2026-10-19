@@ -99,7 +99,7 @@ export function useBazaarPage() {
     const query = telegramId ? `?telegramId=${encodeURIComponent(telegramId)}` : '';
     router.replace(`/${lang}/profile${query}`);
   }, [lang, router]);
-  
+
   // Отримуємо категорії з перекладами (мемо — інакше ефект deep-link зациклюється)
   const categories = useMemo(() => getCategories(t), [t]);
   
@@ -1080,6 +1080,15 @@ export function useBazaarPage() {
   const handleCreateListing = useCallback(() => {
     setIsCreateListingModalOpen(true);
   }, []);
+
+  // Deep-link startapp=create / ?openCreate=1 → форма створення оголошення
+  useEffect(() => {
+    if (typeof window === 'undefined' || !profile) return;
+    const fromQuery = new URLSearchParams(window.location.search).get('openCreate') === '1';
+    if (sessionStorage.getItem('openCreateListing') !== '1' && !fromQuery) return;
+    sessionStorage.removeItem('openCreateListing');
+    setIsCreateListingModalOpen(true);
+  }, [profile]);
   
   const handleNavigateToCategories = useCallback(() => {
     router.push(`/${lang}/categories`);

@@ -377,9 +377,9 @@ export const ListingDetail = ({
   ]);
 
   const buildCategoryListingsSearchParams = useCallback(
-    (offset: number) => {
+    (offset: number, opts?: { withSubcategory?: boolean }) => {
       const params = new URLSearchParams({
-        limit: '16',
+        limit: '12',
         offset: String(offset),
       });
       const resolved = resolveListingCategoryFilter(
@@ -389,7 +389,9 @@ export const ListingDetail = ({
       );
       if (resolved) {
         params.set('category', resolved.categoryId);
-        if (resolved.subcategoryId) {
+        // Для «схожих» беремо батьківську категорію (як «дивитись ще»),
+        // щоб стрічка не була порожньою на рідкісних підкатегоріях.
+        if (opts?.withSubcategory && resolved.subcategoryId) {
           params.set('subcategory', resolved.subcategoryId);
         }
       }
@@ -582,53 +584,72 @@ export const ListingDetail = ({
   const sellerListingsProfileQuery =
     listing.profileType === 'business' ? '&profileType=business' : '';
 
+  // Стабільні ключі — без refetch при гідрації listing / зміні categories через t()
+  const relatedSellerId = listing.seller.telegramId || '';
+  const relatedCategory = listing.category || '';
+  const relatedSubcategory = listing.subcategory || '';
+  const relatedProfileType = listing.profileType || 'personal';
+  const relatedViewerId = currentUser?.id?.toString() || '';
+
   useEffect(() => {
+    const abort = new AbortController();
+    const listingId = listing.id;
+    const profileQuery = relatedProfileType === 'business' ? '&profileType=business' : '';
+
     const fetchRelatedListings = async () => {
       try {
         setLoading(true);
-        // Завантажуємо оголошення продавця (тільки активні)
-        if (listing.seller.telegramId) {
-          const viewerId = currentUser?.id?.toString() || '';
-          const sellerResponse = await fetch(
-            `/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=16&offset=0${sellerListingsProfileQuery}`
-          );
-          if (sellerResponse.ok) {
-            const sellerData = await sellerResponse.json();
-            const filtered = (sellerData.listings || []).filter((l: Listing) => l.id !== listing.id);
-            setSellerListings(filtered);
-            setSellerTotal(sellerData.total || 0);
-            setSellerHasMore(filtered.length < ((sellerData.total || 0) - 1));
-            setSellerOffset(16);
-          }
-        }
-        
-        const categoryResponse = await fetch(
-          `/api/listings?${buildCategoryListingsSearchParams(0).toString()}`
-        );
-        if (categoryResponse.ok) {
+        const sellerPromise = relatedSellerId
+          ? fetch(
+              `/api/listings?userId=${relatedSellerId}&viewerId=${relatedViewerId}&status=active&limit=12&offset=0${profileQuery}`,
+              { signal: abort.signal }
+            ).then(async (sellerResponse) => {
+              if (!sellerResponse.ok) return;
+              const sellerData = await sellerResponse.json();
+              const filtered = (sellerData.listings || []).filter(
+                (l: Listing) => l.id !== listingId
+              );
+              setSellerListings(filtered);
+              setSellerTotal(sellerData.total || 0);
+              setSellerHasMore(filtered.length < (sellerData.total || 0) - 1);
+              setSellerOffset(12);
+            })
+          : Promise.resolve();
+
+        const params = buildCategoryListingsSearchParams(0);
+        const categoryPromise = fetch(`/api/listings?${params.toString()}`, {
+          signal: abort.signal,
+        }).then(async (categoryResponse) => {
+          if (!categoryResponse.ok) return;
           const categoryData = await categoryResponse.json();
-          const filtered = (categoryData.listings || []).filter((l: Listing) => l.id !== listing.id);
+          const filtered = (categoryData.listings || []).filter(
+            (l: Listing) => l.id !== listingId
+          );
           setCategoryListings(filtered);
           setCategoryTotal(categoryData.total || 0);
-          setCategoryHasMore(filtered.length < ((categoryData.total || 0) - 1));
-          setCategoryOffset(16);
-        }
+          setCategoryHasMore(filtered.length < (categoryData.total || 0) - 1);
+          setCategoryOffset(12);
+        });
+
+        await Promise.all([sellerPromise, categoryPromise]);
       } catch (error) {
+        if ((error as { name?: string })?.name === 'AbortError') return;
         console.error('Error fetching related listings:', error);
       } finally {
-        setLoading(false);
+        if (!abort.signal.aborted) setLoading(false);
       }
     };
 
-    fetchRelatedListings();
+    void fetchRelatedListings();
+    return () => abort.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- навмисно лише стабільні примітиви
   }, [
     listing.id,
-    listing.seller.telegramId,
-    listing.profileType,
-    listing.category,
-    listing.subcategory,
-    currentUser?.id,
-    buildCategoryListingsSearchParams,
+    relatedSellerId,
+    relatedCategory,
+    relatedSubcategory,
+    relatedProfileType,
+    relatedViewerId,
   ]);
 
   const loadMoreSellerListings = async () => {
@@ -637,14 +658,14 @@ export const ListingDetail = ({
       const viewerId = currentUser?.id?.toString() || '';
       // Додаємо фільтр status=active, щоб показувати тільки активні оголошення
       const response = await fetch(
-        `/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=16&offset=${sellerOffset}${sellerListingsProfileQuery}`
+        `/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerId}&status=active&limit=12&offset=${sellerOffset}${sellerListingsProfileQuery}`
       );
       if (response.ok) {
         const data = await response.json();
         const filtered = (data.listings || []).filter((l: Listing) => l.id !== listing.id);
         setSellerListings(prev => [...prev, ...filtered]);
         setSellerHasMore((sellerOffset + filtered.length) < ((data.total || 0) - 1));
-        setSellerOffset(prev => prev + 16);
+        setSellerOffset(prev => prev + 12);
         tg?.HapticFeedback.impactOccurred('light');
       }
     } catch (error) {
@@ -662,7 +683,7 @@ export const ListingDetail = ({
         const filtered = (data.listings || []).filter((l: Listing) => l.id !== listing.id);
         setCategoryListings(prev => [...prev, ...filtered]);
         setCategoryHasMore((categoryOffset + filtered.length) < ((data.total || 0) - 1));
-        setCategoryOffset(prev => prev + 16);
+        setCategoryOffset(prev => prev + 12);
         tg?.HapticFeedback.impactOccurred('light');
       }
     } catch (error) {
@@ -702,7 +723,7 @@ export const ListingDetail = ({
         const viewerIdStr = currentUser?.id?.toString() || '';
         // Додаємо фільтр status=active, щоб показувати тільки активні оголошення
         const sellerResponse = await fetch(
-          `/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerIdStr}&status=active&limit=16&offset=0${sellerListingsProfileQuery}`
+          `/api/listings?userId=${listing.seller.telegramId}&viewerId=${viewerIdStr}&status=active&limit=12&offset=0${sellerListingsProfileQuery}`
         );
         if (sellerResponse.ok) {
           const sellerData = await sellerResponse.json();
@@ -783,7 +804,7 @@ export const ListingDetail = ({
         type="button"
         onClick={handleBack}
         aria-label={t('common.back')}
-        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)] ${listingHeaderActionClass}`}
+        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors max-lg:top-[calc(max(env(safe-area-inset-top,0px),3rem)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)] ${listingHeaderActionClass}`}
       >
         <ArrowLeft size={20} />
       </button>
@@ -791,7 +812,7 @@ export const ListingDetail = ({
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 
-          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+0.35rem)]"
+          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),3rem)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+0.35rem)]"
           style={{
             height: `${Math.min(pullDistance * 0.8, 100)}px`,
             opacity: Math.min(pullProgress * 1.2, 1),
@@ -906,6 +927,7 @@ export const ListingDetail = ({
           <ImageGallery
             images={images}
             title={listing.title}
+            description={listing.description}
             listingId={listing.id}
             category={listing.category}
             subcategory={listing.subcategory}

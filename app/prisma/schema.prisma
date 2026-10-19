@@ -242,19 +242,42 @@ model Payment {
 
 // Відгуки
 model Review {
-  id        Int      @id @default(autoincrement())
-  userId    Int      // хто залишив відгук
-  targetId  Int      // про кого відгук (User.id)
-  listingId Int?
-  rating    Int      // 1-5
-  comment   String?
-  createdAt DateTime @default(now())
+  id                    Int       @id @default(autoincrement())
+  userId                Int // хто залишив відгук
+  targetId              Int // про кого відгук (User.id)
+  listingId             Int?
+  rating                Int // 1-5
+  comment               String?
+  hadTradeGroundContact Boolean   @default(false) // був контакт через TradeGround
+  ownerReply            String?
+  ownerRepliedAt        DateTime?
+  createdAt             DateTime  @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([targetId])
   @@index([listingId])
   @@index([createdAt])
+}
+
+/** Запрошення залишити відгук через 3 дні після «Написати» компанії */
+model BusinessReviewInvite {
+  id                Int       @id @default(autoincrement())
+  viewerUserId      Int
+  businessUserId    Int
+  businessProfileId Int?
+  businessName      String?
+  contactedAt       DateTime  @default(now())
+  inviteDueAt       DateTime
+  inviteSentAt      DateTime?
+  /// pending | sent | completed | declined
+  status            String    @default("pending")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([viewerUserId, businessUserId])
+  @@index([status, inviteDueAt])
+  @@index([businessUserId])
 }
 
 // Історія переглядів

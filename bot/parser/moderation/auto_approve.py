@@ -256,9 +256,14 @@ def _mod_group_id(item: dict) -> int:
 
 
 def _is_service_item(item: dict) -> bool:
-    if (item.get("category") or "").strip().lower() == "services_work":
-        return True
-    return (item.get("parser_type") or "") == "services_channel"
+    from parser.marketplace_categories import should_treat_as_service
+
+    blob = "\n".join(str(item.get(k) or "") for k in ("raw_text", "title", "description"))
+    return should_treat_as_service(
+        blob,
+        force_service_channel=(item.get("parser_type") or "") == "services_channel",
+        category=str(item.get("category") or ""),
+    )
 
 
 def is_auto_approve_eligible(item: dict, *, aggressive: bool = False) -> tuple[bool, str]:

@@ -272,3 +272,190 @@ export function listingHasDisplayPhoto(listing: {
   const raw = listing.image || listing.images?.[0] || '';
   return Boolean(String(raw).trim());
 }
+
+/** Lucide icon names for service keyword matches (title/description). */
+export type CoverLucideIconName =
+  | 'Hand'
+  | 'Eye'
+  | 'Scissors'
+  | 'HeartPulse'
+  | 'Paintbrush'
+  | 'SprayCan'
+  | 'Languages'
+  | 'Laptop'
+  | 'Wrench'
+  | 'Truck'
+  | 'GraduationCap'
+  | 'HeartHandshake'
+  | 'Briefcase'
+  | 'Sparkles'
+  | 'Camera'
+  | 'Car'
+  | 'Home'
+  | 'Baby'
+  | 'Shirt'
+  | 'Sofa'
+  | 'Smartphone'
+  | 'PawPrint';
+
+type ServiceIconRule = { icon: CoverLucideIconName; patterns: RegExp[] };
+
+/** Порядок важливий: перший збіг виграє (специфічніші правила вище). */
+const SERVICE_ICON_RULES: ServiceIconRule[] = [
+  {
+    icon: 'Hand',
+    patterns: [
+      /маникюр|манікюр|педикюр|ногт|нігт|гель[\s-]?лак|nail/i,
+    ],
+  },
+  {
+    icon: 'Eye',
+    patterns: [
+      /ресниц|вії|вій\b|ламинир|ламінув|наращиван.*ресн|наращуван.*вій|lash/i,
+    ],
+  },
+  {
+    icon: 'Scissors',
+    patterns: [
+      /кератин|ботокс\s*волос|стрижк|перук|парикмах|волос|hair|ботокс.*вол/i,
+    ],
+  },
+  {
+    icon: 'HeartPulse',
+    patterns: [/массаж|масаж|массажист|масажист|massage/i],
+  },
+  {
+    icon: 'Paintbrush',
+    patterns: [/макияж|макіяж|визажист|візажист|makeup|make[\s-]?up/i],
+  },
+  {
+    icon: 'SprayCan',
+    patterns: [/уборк|прибиран|клининг|клінінг|cleaning|haushalt/i],
+  },
+  {
+    icon: 'Languages',
+    patterns: [/переводчик|перекладач|перевод[ыі]|переклад[ии]|dolmetsch|translator/i],
+  },
+  {
+    icon: 'Laptop',
+    patterns: [
+      /сайт|разработк|розробк|smm|web[\s-]?design|программист|програміст|frontend|backend/i,
+    ],
+  },
+  {
+    icon: 'Wrench',
+    patterns: [/ремонт|монтаж|сантехн|электрик|електрик|мастер\s*на\s*час|майстер\s*на\s*час/i],
+  },
+  {
+    icon: 'Truck',
+    patterns: [
+      /перевозк|перевезен|грузоперевоз|вантажоперевез|транспорт|умз[уу]г|umzug|lieferung/i,
+    ],
+  },
+  {
+    icon: 'GraduationCap',
+    patterns: [/репетитор|обучен|навчан|урок|tutor|nachhilfe|школ/i],
+  },
+  {
+    icon: 'HeartHandshake',
+    patterns: [/сиделк|догляд|уход\s*за\s*пожил|pflege|betreu/i],
+  },
+  {
+    icon: 'Camera',
+    patterns: [/фото|видео|відео|съ[её]мк|зйомк|photographer|video/i],
+  },
+  {
+    icon: 'Car',
+    patterns: [/автосервис|автосервіс|шиномонтаж|СТО\b|тюнинг|авто\s*мастер/i],
+  },
+  {
+    icon: 'Briefcase',
+    patterns: [/ваканс|ищу\s*работ|шукаю\s*робот|подработ|підробіт|job\b|stelle/i],
+  },
+];
+
+const CATEGORY_FALLBACK_LUCIDE: Record<string, CoverLucideIconName> = {
+  fashion: 'Shirt',
+  furniture: 'Sofa',
+  electronics: 'Smartphone',
+  appliances: 'Home',
+  kids: 'Baby',
+  home: 'Home',
+  auto: 'Car',
+  pets: 'PawPrint',
+  realestate: 'Home',
+  beauty_wellness: 'Sparkles',
+  services_work: 'Briefcase',
+  free: 'Sparkles',
+  hobby_sports: 'Sparkles',
+};
+
+/**
+ * Іконка обкладинки за ключовими словами title/description (послуги),
+ * інакше — дефолт за категорією. Повертає Lucide-ім'я або null (лишити SVG категорії).
+ */
+export function resolveCoverLucideIcon(opts: {
+  title?: string | null;
+  description?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+}): CoverLucideIconName | null {
+  // Лише title + короткий snippet — повний description гальмує стрічку карток
+  const desc = (opts.description || '').trim().slice(0, 120);
+  const blob = `${opts.title || ''}\n${desc}`;
+  for (const rule of SERVICE_ICON_RULES) {
+    if (rule.patterns.some((re) => re.test(blob))) {
+      return rule.icon;
+    }
+  }
+  const catId = resolveCoverIconCategoryId(opts.category, opts.subcategory);
+  return CATEGORY_FALLBACK_LUCIDE[catId] || null;
+}
+
+const TITLE_NOISE_PREFIX =
+  /^(?:продам|продаю|продажа|продаж|отдам|віддам|ищу|шукаю|куплю|предлагаю|пропоную|вакансия|вакансія|срочно|терміново|🚨+|✨+|🔥+)\s*[:\-–—,]?\s*/i;
+
+/**
+ * Короткий заголовок для обкладинки: прибирає шум, обрізає по словах;
+ * якщо title занадто загальний/довгий — бере перше змістовне речення з description.
+ */
+export function shortenCoverTitle(
+  title: string,
+  description?: string | null,
+  maxLen = 52
+): string {
+  const clean = (s: string) =>
+    s
+      .replace(/\s+/g, ' ')
+      .replace(TITLE_NOISE_PREFIX, '')
+      .replace(/^[\s\W]+/, '')
+      .trim();
+
+  let base = clean(title || '');
+  const desc = clean(description || '');
+
+  const tooGeneric =
+    !base ||
+    base.length < 4 ||
+    /^(объявление|оголошення|услуга|послуга|товар|товар дня)$/i.test(base);
+
+  if (tooGeneric && desc.length >= 8) {
+    const sentence = desc.split(/[.!?\n]/)[0]?.trim() || desc;
+    base = sentence;
+  }
+
+  // Якщо title дуже довгий і в описі є коротша «квінтесенція» (перший рядок)
+  if (base.length > maxLen && desc.length >= 12 && desc.length < base.length) {
+    const firstLine = desc.split(/[.!?\n]/)[0]?.trim() || '';
+    if (firstLine.length >= 8 && firstLine.length <= maxLen + 8) {
+      base = firstLine;
+    }
+  }
+
+  if (base.length <= maxLen) return base || '—';
+
+  const sliced = base.slice(0, maxLen + 1);
+  const cut = sliced.lastIndexOf(' ');
+  const wordSafe = cut > maxLen * 0.45 ? sliced.slice(0, cut) : base.slice(0, maxLen);
+  return `${wordSafe.replace(/[,\-–—:;]+$/, '').trim()}…`;
+}

@@ -80,6 +80,9 @@ export async function GET(request: NextRequest) {
     case 'business_profile':
       destination = `${botBaseUrl()}?startapp=business`;
       break;
+    case 'create_listing':
+      destination = `${botBaseUrl()}?startapp=create`;
+      break;
     case 'channel': {
       const target = (channelUrl || '').trim();
       if (!target.startsWith('http')) {

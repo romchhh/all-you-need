@@ -183,10 +183,9 @@ GROUPS: tuple[ParserGroup, ...] = (
     ParserGroup(
         "DortmundBaraholka1",
         "Dortmund",
-        "services",
+        "goods",
         label="Dortmund Baraholka",
-        default_subcategory="other_services",
-        notes="Більше послуг: перевезення / подорожі",
+        notes="Барахолка (товари + окремі послуги) — не форсити services_work",
     ),
     ParserGroup(
         "BeautyNRW",

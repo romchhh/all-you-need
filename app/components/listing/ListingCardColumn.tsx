@@ -129,7 +129,7 @@ const ListingCardColumnComponent = ({
       <div className="flex gap-3 p-3.5 pb-4">
         {/* Фото */}
         <div
-          className={`relative w-28 h-28 flex-shrink-0 rounded-xl overflow-hidden ${
+          className={`relative h-[7.5rem] w-[5.5rem] flex-shrink-0 overflow-hidden rounded-xl sm:h-32 sm:w-24 ${
             isLight ? 'bg-white' : 'bg-[#1A1A1A]'
           }`}
         >
@@ -149,9 +149,11 @@ const ListingCardColumnComponent = ({
             <ListingAutoCover
               listingId={listing.id}
               title={listing.title}
+              description={listing.description}
               category={listing.category}
               subcategory={listing.subcategory}
               size="sm"
+              showTitle={false}
             />
           )}
         </div>

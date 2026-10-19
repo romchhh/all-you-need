@@ -42,12 +42,16 @@ export function remeasureAppHeader() {
  * Висота блоку шапки = safe-top + внутрішній відступ (моб pt-9) + ряд лого + pb.
  * Дублюйте ці ж calc у STICKY_BELOW_APP_HEADER_CLASS, щоб sticky-панелі не заходили під лого.
  */
+/**
+ * Мін. safe-top на мобілі 3rem: Dynamic Island / notch, коли env() = 0 у Telegram WebView.
+ * Класи — повні літерали (Tailwind JIT).
+ */
 export const FIXED_LOGO_SPACER_CLASS =
-  'w-full shrink-0 max-lg:h-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem)] lg:h-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
+  'w-full shrink-0 max-lg:h-[calc(max(env(safe-area-inset-top,0px),3rem)+2.25rem+2.25rem+0.625rem)] lg:h-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
 
 /** Sticky-елементи під фіксованим AppHeader (базар, категорії тощо) */
 export const STICKY_BELOW_APP_HEADER_CLASS =
-  'sticky z-[40] max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
+  'sticky z-[40] max-lg:top-[calc(max(env(safe-area-inset-top,0px),3rem)+2.25rem+2.25rem+0.625rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
 
 function headerFrostStyle(isLight: boolean, withSearch: boolean): React.CSSProperties {
   if (!withSearch) {
@@ -55,8 +59,9 @@ function headerFrostStyle(isLight: boolean, withSearch: boolean): React.CSSPrope
       backgroundImage: isLight
         ? 'linear-gradient(to bottom, rgba(250,251,248,0.92) 0%, rgba(245,247,242,0.4) 50%, rgba(250,251,248,0) 100%)'
         : 'linear-gradient(to bottom, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.32) 54%, rgba(0,0,0,0) 100%), radial-gradient(ellipse 80% 90% at 18% 0%, rgba(200,230,160,0.2) 0%, transparent 52%)',
-      backdropFilter: 'saturate(160%) blur(16px)',
-      WebkitBackdropFilter: 'saturate(160%) blur(16px)',
+      // Легший blur — 16px сильно гальмує Telegram WebView на скролі
+      backdropFilter: 'saturate(140%) blur(8px)',
+      WebkitBackdropFilter: 'saturate(140%) blur(8px)',
       maskImage: LOGO_FROST_MASK,
       WebkitMaskImage: LOGO_FROST_MASK,
     };
@@ -66,8 +71,8 @@ function headerFrostStyle(isLight: boolean, withSearch: boolean): React.CSSPrope
     backgroundImage: isLight
       ? 'linear-gradient(to bottom, rgba(250,251,248,0.78) 0%, rgba(250,251,248,0.42) 62%, rgba(250,251,248,0.12) 82%, rgba(250,251,248,0) 100%)'
       : 'linear-gradient(to bottom, rgba(0,0,0,0.52) 0%, rgba(0,0,0,0.28) 62%, rgba(0,0,0,0.1) 82%, rgba(0,0,0,0) 100%), radial-gradient(ellipse 70% 55% at 18% 0%, rgba(200,230,160,0.14) 0%, transparent 42%)',
-    backdropFilter: 'saturate(160%) blur(16px)',
-    WebkitBackdropFilter: 'saturate(160%) blur(16px)',
+    backdropFilter: 'saturate(140%) blur(8px)',
+    WebkitBackdropFilter: 'saturate(140%) blur(8px)',
     maskImage: SEARCH_FROST_MASK,
     WebkitMaskImage: SEARCH_FROST_MASK,
   };
@@ -75,7 +80,7 @@ function headerFrostStyle(isLight: boolean, withSearch: boolean): React.CSSPrope
 
 /** Фіксована кнопка «Назад» під лого в оверлеях (ListingDetail, профіль продавця). */
 export const OVERLAY_BACK_BUTTON_TOP_CLASS =
-  'max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)]';
+  'max-lg:top-[calc(max(env(safe-area-inset-top,0px),3rem)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)]';
 
 /** Напівпрозорий стиль круглої кнопки «Назад» (як на сторінці товару). */
 export const overlayHeaderActionClass = (isLight: boolean) =>
@@ -84,7 +89,7 @@ export const overlayHeaderActionClass = (isLight: boolean) =>
     : 'border-white/25 bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
 
 const safeTopShellClass =
-  'max-lg:pt-[max(env(safe-area-inset-top,0px),10px)] lg:pt-[max(env(safe-area-inset-top,0px),2px)]';
+  'max-lg:pt-[max(env(safe-area-inset-top,0px),3rem)] lg:pt-[max(env(safe-area-inset-top,0px),2px)]';
 
 const innerContentClass =
   'mx-auto w-full max-w-2xl pb-2.5 max-lg:pt-9 lg:pt-2 lg:max-w-5xl xl:max-w-6xl';
@@ -131,9 +136,13 @@ export function FixedLogoHeader({
 
     const measure = () => {
       const el = headerRef.current;
-      if (el) setSpacerPx(el.offsetHeight);
+      if (el) {
+        const h = el.offsetHeight;
+        setSpacerPx((prev) => (prev === h ? prev : h));
+      }
       const slot = slotNodeRef.current;
-      setHasSearchExtras(Boolean(slot && slot.childElementCount > 0));
+      const hasExtras = Boolean(slot && slot.childElementCount > 0);
+      setHasSearchExtras((prev) => (prev === hasExtras ? prev : hasExtras));
     };
 
     remeasureHeader = measure;
@@ -145,11 +154,12 @@ export function FixedLogoHeader({
     if (el && ro) ro.observe(el);
     if (slot && ro) ro.observe(slot);
 
+    // Лише прямі діти слота — subtree дає thrash при кожному оновленні пошуку
     const mo =
       slot && typeof MutationObserver !== 'undefined'
         ? new MutationObserver(measure)
         : null;
-    if (slot && mo) mo.observe(slot, { childList: true, subtree: true });
+    if (slot && mo) mo.observe(slot, { childList: true, subtree: false });
 
     return () => {
       if (remeasureHeader === measure) remeasureHeader = null;

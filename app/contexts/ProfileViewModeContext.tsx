@@ -72,10 +72,26 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const syncId = () => setTelegramId(resolveTelegramId());
-    syncId();
-    const timer = window.setInterval(syncId, 1500);
-    return () => window.clearInterval(timer);
+    let attempts = 0;
+    const syncId = () => {
+      const next = resolveTelegramId();
+      setTelegramId((prev) => (prev === next ? prev : next));
+      return Boolean(next);
+    };
+    if (syncId()) return;
+
+    // Полінг лише до появи telegramId (макс ~12 с), далі — тільки focus
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      if (syncId() || attempts >= 6) {
+        window.clearInterval(timer);
+      }
+    }, 2000);
+    window.addEventListener('focus', syncId);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', syncId);
+    };
   }, []);
 
   const refreshBusinessStatus = useCallback(async () => {
@@ -106,15 +122,16 @@ export function ProfileViewModeProvider({ children }: { children: ReactNode }) {
       const suspended = Boolean(data.isSuspended);
       const canAccess = Boolean(data.canAccessBusinessCabinet ?? hasProfile);
 
-      setIsBusinessActive(active);
-      setHasBusinessProfile(hasProfile);
-      setIsBusinessSuspended(suspended);
-      setCanAccessBusinessCabinet(canAccess);
+      setIsBusinessActive((prev) => (prev === active ? prev : active));
+      setHasBusinessProfile((prev) => (prev === hasProfile ? prev : hasProfile));
+      setIsBusinessSuspended((prev) => (prev === suspended ? prev : suspended));
+      setCanAccessBusinessCabinet((prev) => (prev === canAccess ? prev : canAccess));
 
       if (hasProfile) {
-        setModeState(readStoredMode(telegramId));
+        const stored = readStoredMode(telegramId);
+        setModeState((prev) => (prev === stored ? prev : stored));
       } else {
-        setModeState('personal');
+        setModeState((prev) => (prev === 'personal' ? prev : 'personal'));
         writeStoredMode(telegramId, 'personal');
       }
     } catch {

@@ -18,32 +18,67 @@ from parser.core.telegram_meta import resolve_pyrogram_chat_ref
 from parser.moderation.formatting import (
     author_notify_listing_preview_url,
     business_profile_signup_url,
+    create_listing_signup_url,
     format_author_notify_open_links_html,
 )
 from parser.storage import parser_accounts_db as accounts_db
 
 logger = logging.getLogger(__name__)
 
-NOTIFY_AUTHOR_GOODS_TEXT_RU = (
+# ── Нові користувачі (ще не в TradeGround) ────────────────────────────
+
+NOTIFY_AUTHOR_GOODS_NEW_RU = (
     "Привет! 👋\n\n"
     "Мы нашли ваше объявление «{title}» и добавили его в TradeGround — "
-    "маркетплейс товаров и услуг для украино- и русскоязычных в Германии.\n\n"
-    "🔗 Ваше объявление:\n"
+    "маркетплейс товаров и услуг в Германии.\n\n"
+    "🔗 Ваше объявление:\n\n"
     "{open_links}\n\n"
+    "✨ Размещайте объявления бесплатно!\n\n"
+    "Публикуйте свои товары на TradeGround и находите новых покупателей "
+    "по всей Германии.\n\n"
+    '➕ <a href="{create_url}">Разместить объявление</a>\n\n'
     "Если хотите изменить или удалить объявление — просто напишите нам.\n\n"
     "{preview_url}"
 )
 
-NOTIFY_AUTHOR_SERVICES_TEXT_RU = (
+NOTIFY_AUTHOR_SERVICES_NEW_RU = (
     "Привет! 👋\n\n"
     "Мы нашли ваше объявление «{title}» и добавили его в TradeGround — "
-    "маркетплейс товаров и услуг для украино- и русскоязычных в Германии.\n\n"
-    "🔗 Ваше объявление:\n"
+    "маркетплейс товаров и услуг в Германии.\n\n"
+    "🔗 Ваше объявление:\n\n"
     "{open_links}\n\n"
-    "💼 Оказываете услуги регулярно?\n"
-    "Создайте бесплатный Business-профиль — расскажите о себе или компании, "
-    "добавьте контакты и соберите свои объявления в одном месте.\n\n"
-    "👉 <a href=\"{business_url}\">Создать Business-профиль бесплатно</a>\n\n"
+    "💼 Привлекайте больше клиентов!\n\n"
+    "Размещайте свои услуги бесплатно или создайте Business-профиль — "
+    "профессиональную страницу с вашими услугами, контактами, портфолио "
+    "и отзывами.\n\n"
+    '🚀 <a href="{business_url}">Создать Business-профиль бесплатно</a>\n\n'
+    "Если хотите изменить или удалить объявление — просто напишите нам.\n\n"
+    "{preview_url}"
+)
+
+# ── Вже зареєстровані ─────────────────────────────────────────────────
+
+NOTIFY_AUTHOR_GOODS_KNOWN_RU = (
+    "Привет! 👋\n\n"
+    "Мы нашли ваше объявление «{title}» и добавили его в TradeGround.\n\n"
+    "🔗 Ваше объявление:\n\n"
+    "{open_links}\n\n"
+    "✨ Размещайте объявления бесплатно!\n\n"
+    "Публикуйте свои товары и находите новых покупателей по всей Германии.\n\n"
+    '➕ <a href="{create_url}">Разместить объявление</a>\n\n'
+    "Если хотите изменить или удалить объявление — просто напишите нам.\n\n"
+    "{preview_url}"
+)
+
+NOTIFY_AUTHOR_SERVICES_KNOWN_RU = (
+    "Привет! 👋\n\n"
+    "Мы нашли ваше объявление «{title}» и добавили его в TradeGround.\n\n"
+    "🔗 Ваше объявление:\n\n"
+    "{open_links}\n\n"
+    "💼 Привлекайте больше клиентов!\n\n"
+    "Размещайте услуги бесплатно или создайте Business-профиль с портфолио, "
+    "контактами и отзывами.\n\n"
+    '🚀 <a href="{business_url}">Создать Business-профиль бесплатно</a>\n\n'
     "Если хотите изменить или удалить объявление — просто напишите нам.\n\n"
     "{preview_url}"
 )
@@ -168,6 +203,37 @@ async def _resolve_dm_target(app: Any, item: dict) -> str | int | None:
         return None
 
 
+def _author_telegram_id(item: dict) -> int | None:
+    raw = item.get("author_id")
+    if raw in (None, "", 0, "0"):
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def author_is_registered_user(item: dict) -> bool:
+    """Чи є автор уже в User (відкривав TradeGround / реєструвався)."""
+    telegram_id = _author_telegram_id(item)
+    if not telegram_id:
+        return False
+    try:
+        from parser.storage.connection import get_connection
+        from parser.storage.listing_sql import bot_user_select_by_telegram_sql
+
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(bot_user_select_by_telegram_sql(), (telegram_id,))
+        row = cur.fetchone()
+        conn.close()
+        return row is not None
+    except Exception as e:
+        logger.info("author_is_registered_user(%s) failed: %s", telegram_id, e)
+        return False
+
+
 def _build_notify_text(
     item: dict,
     listing_id: int,
@@ -176,8 +242,6 @@ def _build_notify_text(
     services_marketplace: bool = False,
     channel_url: str | None = None,
 ) -> str:
-    from parser.config.tuning import PARSER_AUTHOR_DM_BUSINESS_CTA
-
     title = html.escape(str(item.get("title") or "").strip() or "объявление")
     if channel_only:
         return NOTIFY_AUTHOR_CHANNEL_TEXT_RU.format(title=title)
@@ -191,21 +255,34 @@ def _build_notify_text(
         author_notify_listing_preview_url(listing_id, lang="ru"),
         quote=False,
     )
-    show_business_cta = services_marketplace and PARSER_AUTHOR_DM_BUSINESS_CTA
-    if show_business_cta:
+    known = author_is_registered_user(item)
+
+    if services_marketplace:
         business_url = html.escape(
             business_profile_signup_url(listing_id=listing_id, lang="ru"),
             quote=True,
         )
-        return NOTIFY_AUTHOR_SERVICES_TEXT_RU.format(
+        tpl = (
+            NOTIFY_AUTHOR_SERVICES_KNOWN_RU
+            if known
+            else NOTIFY_AUTHOR_SERVICES_NEW_RU
+        )
+        return tpl.format(
             title=title,
             open_links=open_links,
             business_url=business_url,
             preview_url=preview_url,
         )
-    return NOTIFY_AUTHOR_GOODS_TEXT_RU.format(
+
+    create_url = html.escape(
+        create_listing_signup_url(listing_id=listing_id, lang="ru"),
+        quote=True,
+    )
+    tpl = NOTIFY_AUTHOR_GOODS_KNOWN_RU if known else NOTIFY_AUTHOR_GOODS_NEW_RU
+    return tpl.format(
         title=title,
         open_links=open_links,
+        create_url=create_url,
         preview_url=preview_url,
     )
 

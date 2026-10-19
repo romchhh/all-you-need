@@ -34,6 +34,7 @@ import {
   type BusinessPlanId,
   type ServiceArea,
 } from '@/lib/businessProfileConstants';
+import { parseListingDisplayConfig } from '@/lib/businessProfileSettings';
 import { Listing } from '@/types';
 import { getResolvedImageUrl, compressImageOnClient } from '@/utils/imageUtils';
 import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
@@ -592,16 +593,7 @@ export default function BusinessProfileFlow({
     openedRef.current = true;
 
     const prefillFromExisting = (profile: NonNullable<BusinessProfileFlowProps['existingProfile']>) => {
-      const linkedIds = (() => {
-        try {
-          const parsed = JSON.parse(profile.linkedListingIds || '[]') as unknown;
-          return Array.isArray(parsed)
-            ? parsed.map((id) => parseInt(String(id), 10)).filter((id) => Number.isFinite(id))
-            : [];
-        } catch {
-          return [];
-        }
-      })();
+      const linkedIds = parseListingDisplayConfig(profile.linkedListingIds).ids;
       return {
         ...initialForm({ telegram: defaultTelegram, phone: defaultPhone }),
         businessName: profile.businessName || '',

@@ -26,6 +26,7 @@ export interface UserData {
   reviewsCount: number;
   listingPackagesBalance?: number;
   hasUsedFreeAd?: boolean;
+  agreementAccepted?: boolean;
 }
 
 function mapUserRow(user: Record<string, unknown>): UserData {
@@ -41,6 +42,7 @@ function mapUserRow(user: Record<string, unknown>): UserData {
     reviewsCount: Number(user.reviewsCount) || 0,
     listingPackagesBalance: Number(user.listingPackagesBalance) || 0,
     hasUsedFreeAd: Boolean(user.hasUsedFreeAd),
+    agreementAccepted: normalizePgBoolean(user.agreementAccepted),
   };
 }
 
@@ -66,7 +68,8 @@ export async function findUserByTelegramId(
       rating,
       reviewsCount,
       listingPackagesBalance,
-      hasUsedFreeAd
+      hasUsedFreeAd,
+      agreementAccepted
     FROM User
     WHERE ${sqlUserTelegramIdWhere('?')}`,
     key

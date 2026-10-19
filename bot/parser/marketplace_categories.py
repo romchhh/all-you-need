@@ -1071,6 +1071,24 @@ def force_services_marketplace_categories(item: dict) -> dict:
     return out
 
 
+_GOODS_ESCAPE_CATEGORIES = frozenset(
+    {
+        "electronics",
+        "furniture",
+        "appliances",
+        "auto",
+        "hobby_sports",
+        "fashion",
+        "kids",
+        "home",
+        "free",
+        "realestate",
+        "pets",
+        "beauty_wellness",
+    }
+)
+
+
 def should_treat_as_service(
     text: str,
     *,
@@ -1078,21 +1096,34 @@ def should_treat_as_service(
     category: str | None = None,
 ) -> bool:
     """Чи пост має йти як послуга (мод послуг + dual publish), а не як товар."""
+    from parser.core.patterns import FREE_GIVEAWAY_RE, SELL_OR_OFFER_RE
     from parser.core.quality import is_likely_service_ad
 
+    blob = text or ""
+    service_like = is_likely_service_ad(blob)
+    strong = detect_strong_item_category(blob)
+
     if force_service_channel:
-        # На service-каналі товар (iPhone тощо) без сервісних маркерів — лишаємо товаром
-        strong = detect_strong_item_category(text or "")
+        # На service-каналі (часто мішані барахолки) товар без сервісних маркерів — лишаємо товаром
+        if strong and strong[0] in _GOODS_ESCAPE_CATEGORIES and not service_like:
+            return False
         if (
-            strong
-            and strong[0] in ("electronics", "furniture", "appliances", "auto", "hobby_sports")
-            and not is_likely_service_ad(text or "")
+            not service_like
+            and (SELL_OR_OFFER_RE.search(blob) or FREE_GIVEAWAY_RE.search(blob))
+            and not re.search(
+                r"(?i)послуг|услуг|ремонт\s|мастер\s|майстер\s|запис\s+на|запись\s+на",
+                blob,
+            )
         ):
             return False
         return True
+
+    # Категорія services_work сама по собі не фіксує товар із сильними сигналами
     if (category or "").strip().lower() == "services_work":
+        if strong and strong[0] in _GOODS_ESCAPE_CATEGORIES and not service_like:
+            return False
         return True
-    return is_likely_service_ad(text or "")
+    return service_like
 
 
 def apply_marketplace_categories_to_item(item: dict) -> dict:

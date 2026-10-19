@@ -234,20 +234,35 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
         category, subcategory = detect_category(
             text, skip_free=(price_str is not None and not is_free)
         )
-        if force_service_channel:
+        # Не форсимо services_work до AI: на мішаних каналах багато товарів.
+        # Після AI / should_treat_as_service вирішимо фінальну категорію.
+        as_service_early = should_treat_as_service(
+            text,
+            force_service_channel=force_service_channel,
+            category=category,
+        )
+        if as_service_early:
             detected_sub = subcategory if category == "services_work" else None
-            category = "services_work"
-            if channel_key in BEAUTY_SERVICE_CHANNELS:
-                subcategory = detected_sub or "beauty_services"
-            else:
-                subcategory = detected_sub or "other_services"
+            locked = force_services_marketplace_categories(
+                {
+                    "raw_text": text,
+                    "title": title,
+                    "description": description,
+                    "subcategory": detected_sub,
+                }
+            )
+            category = locked["category"]
+            subcategory = locked.get("subcategory")
+            if channel_key in BEAUTY_SERVICE_CHANNELS and not subcategory:
+                subcategory = "beauty_services"
+            condition = "new"
         else:
-            category = "services_work"
-            subcategory = subcategory or "other_services"
-
-        condition = detect_condition(text, category)
+            condition = detect_condition(text, category)
         author_username, author_id = resolve_author_contact(msg_for_link, text, channel)
 
+        item_parser_type = (
+            PARSER_TYPE_SERVICES_CHANNEL if as_service_early else "default"
+        )
         ok, skip_reason, embedding_json, ai_fields = await run_ai_screen_and_dedup(
             source_channel=channel,
             message_id=effective_message_id,
@@ -255,7 +270,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             dedup_key=dedup_key,
             title=title,
             description=description,
-            parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+            parser_type=item_parser_type,
             raw_text=text[:4000],
             source_city=city,
             category=category,
@@ -264,7 +279,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
             currency=currency,
             is_free=is_free,
             condition=condition,
-            force_service=force_service_channel or is_service,
+            force_service=as_service_early,
             author_id=author_id,
         )
         if not ok:
@@ -279,7 +294,7 @@ async def parse_services_ai_channel(app, channel: str, city: str, notify_callbac
                 description=description,
                 category=category,
                 raw_text=text[:4000],
-                parser_type=PARSER_TYPE_SERVICES_CHANNEL,
+                parser_type=item_parser_type,
             )
             continue
 

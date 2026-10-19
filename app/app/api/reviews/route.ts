@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findUserByTelegramId, parseTelegramId } from '@/utils/userHelpers';
+import { findUserByTelegramId } from '@/utils/userHelpers';
 import { prisma } from '@/lib/prisma';
-import { recomputeUserRating } from '@/lib/reviews/reviewService';
+import {
+  afterReviewCreated,
+  ensureReviewExtraColumns,
+  recomputeUserRating,
+} from '@/lib/reviews/reviewService';
+import { viewerHadTradeGroundContact } from '@/lib/reviews/reviewInvite';
 import { logApiError } from '@/lib/server/logApiError';
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureReviewExtraColumns();
+
     const body = await request.json();
     const authorTelegramId = String(body.authorTelegramId || '').trim();
     const targetTelegramId = String(body.targetTelegramId || '').trim();
@@ -37,6 +44,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    if (!author.agreementAccepted) {
+      return NextResponse.json(
+        { error: 'Registration required', code: 'NOT_REGISTERED' },
+        { status: 403 }
+      );
+    }
+
     const existing = await prisma.review.findFirst({
       where: {
         userId: author.id,
@@ -48,6 +62,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Review already exists' }, { status: 409 });
     }
 
+    const hadContact = await viewerHadTradeGroundContact(author.id, target.id);
+
     const review = await prisma.review.create({
       data: {
         userId: author.id,
@@ -55,10 +71,23 @@ export async function POST(request: NextRequest) {
         listingId,
         rating,
         comment,
-      },
+        hadTradeGroundContact: hadContact,
+      } as Parameters<typeof prisma.review.create>[0]['data'],
     });
 
     await recomputeUserRating(target.id);
+
+    const authorName =
+      [author.firstName, author.lastName].filter(Boolean).join(' ').trim() ||
+      (author.username ? `@${author.username}` : 'User');
+
+    void afterReviewCreated({
+      reviewId: review.id,
+      authorUserId: author.id,
+      targetUserId: target.id,
+      rating,
+      authorName,
+    });
 
     return NextResponse.json({
       success: true,
@@ -67,6 +96,8 @@ export async function POST(request: NextRequest) {
         rating: review.rating,
         comment: review.comment,
         createdAt: review.createdAt.toISOString(),
+        hadTradeGroundContact: hadContact,
+        authorName,
       },
     });
   } catch (error) {

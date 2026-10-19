@@ -179,8 +179,8 @@ const ListingCardComponent = ({
       <div
         className={
           isStacked
-            ? 'relative z-[1] h-[220px] w-full shrink-0 overflow-hidden rounded-t-2xl sm:h-[240px]'
-            : 'relative z-[1] h-[220px] w-full shrink-0 overflow-hidden rounded-t-2xl sm:h-[240px] lg:h-full lg:min-h-[220px] lg:w-52 lg:self-stretch lg:rounded-l-2xl lg:rounded-t-none lg:rounded-tr-none xl:w-56'
+            ? 'relative z-[1] aspect-[3/4] w-full shrink-0 overflow-hidden rounded-t-2xl sm:aspect-[4/5]'
+            : 'relative z-[1] aspect-[4/5] w-full shrink-0 overflow-hidden rounded-t-2xl sm:aspect-[3/4] lg:aspect-auto lg:h-full lg:min-h-[260px] lg:w-52 lg:self-stretch lg:rounded-l-2xl lg:rounded-t-none lg:rounded-tr-none xl:w-56'
         }
       >
         {/* Бейдж реклами (VIP/TOP) - лівий верхній кут */}
@@ -198,6 +198,7 @@ const ListingCardComponent = ({
           <ListingAutoCover
             listingId={listing.id}
             title={listing.title}
+            description={listing.description}
             category={listing.category}
             subcategory={listing.subcategory}
             size="lg"

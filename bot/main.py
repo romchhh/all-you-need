@@ -36,6 +36,7 @@ async def main():
     from handlers.client_handlers.client_handlers import router as client_router, on_startup, on_shutdown
     from handlers.client_handlers.about_us_handlers import router as about_us_router
     from handlers.client_handlers.create_listing_handlers import router as create_listing_router
+    from handlers.client_handlers.review_invite_handlers import router as review_invite_router
     from handlers.admin_handlers.admin_handlers import router as admin_router
     from handlers.admin_handlers.parser_handlers import router as parser_admin_router
     from handlers.admin_handlers.parser_accounts_handlers import router as parser_accounts_router
@@ -75,6 +76,7 @@ async def main():
     dp.include_router(client_router)
     dp.include_router(about_us_router)
     dp.include_router(create_listing_router)
+    dp.include_router(review_invite_router)
     dp.include_router(admin_router)
     dp.include_router(parser_admin_router)
     dp.include_router(parser_accounts_router)

@@ -26,6 +26,13 @@ const AYNMarketplace = () => {
         router.replace(`/${lang}/bazaar`);
         return true;
       }
+      if (sp === 'create') {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('openCreateListing', '1');
+        }
+        router.replace(`/${lang}/bazaar`);
+        return true;
+      }
       return false;
     };
     if (tryListing()) return;

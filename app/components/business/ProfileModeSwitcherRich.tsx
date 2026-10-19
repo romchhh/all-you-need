@@ -1,6 +1,5 @@
 'use client';
 
-import { ChevronDown } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
@@ -38,21 +37,33 @@ export function ProfileModeSwitcherRich({
 
   const personalAvatarUrl = personalAvatar ? getResolvedImageUrl(personalAvatar) : null;
   const logoUrl = businessLogo ? getResolvedImageUrl(businessLogo) : null;
+  const isBusiness = mode === 'business';
 
   return (
     <div
-      className={`flex items-center gap-2 rounded-2xl p-1.5 ${
+      role="tablist"
+      aria-label={t('businessProfile.switcher.personal')}
+      className={`relative grid grid-cols-2 gap-1 rounded-2xl p-1.5 ${
         isLight ? 'bg-gray-100/90' : 'border border-white/10 bg-black/30'
       } ${className}`}
     >
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-y-1.5 left-1.5 w-[calc(50%-0.375rem)] rounded-xl ${ui.limeBg} shadow-sm transition-transform duration-300 ease-out ${
+          isBusiness ? 'translate-x-[calc(100%+0.25rem)]' : 'translate-x-0'
+        }`}
+      />
+
       <button
         type="button"
+        role="tab"
+        aria-selected={!isBusiness}
         onClick={() => onChange('personal')}
-        className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors ${
-          mode === 'personal'
-            ? `${ui.tabActive} shadow-sm`
+        className={`relative z-10 flex min-w-0 items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors ${
+          !isBusiness
+            ? 'text-[#1a1a1a]'
             : isLight
-              ? 'text-gray-700 hover:bg-white/70'
+              ? 'text-gray-700 hover:bg-white/50'
               : 'text-white/75 hover:bg-white/10'
         }`}
       >
@@ -67,11 +78,11 @@ export function ProfileModeSwitcherRich({
             </div>
           )}
         </div>
-        <span className="truncate text-xs font-semibold">
+        <span className="min-w-0 truncate text-xs font-semibold">
           {personalName}
           <span
             className={`block text-[10px] font-medium ${
-              mode === 'personal' ? 'text-[#1a1a1a]/70' : ac.mutedText
+              !isBusiness ? 'text-[#1a1a1a]/70' : ac.mutedText
             }`}
           >
             {t('businessProfile.switcher.personal')}
@@ -81,12 +92,14 @@ export function ProfileModeSwitcherRich({
 
       <button
         type="button"
+        role="tab"
+        aria-selected={isBusiness}
         onClick={() => onChange('business')}
-        className={`flex min-w-0 flex-[1.15] items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors ${
-          mode === 'business'
-            ? `${ui.tabActive} shadow-sm`
+        className={`relative z-10 flex min-w-0 items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors ${
+          isBusiness
+            ? 'text-[#1a1a1a]'
             : isLight
-              ? 'text-gray-700 hover:bg-white/70'
+              ? 'text-gray-700 hover:bg-white/50'
               : 'text-white/75 hover:bg-white/10'
         }`}
       >
@@ -104,14 +117,21 @@ export function ProfileModeSwitcherRich({
           {businessStatusLabel ? (
             <span
               className={`block truncate text-[10px] font-medium ${
-                mode === 'business' ? 'text-[#1a1a1a]/70' : ac.mutedText
+                isBusiness ? 'text-[#1a1a1a]/70' : ac.mutedText
               }`}
             >
               {businessStatusLabel}
             </span>
-          ) : null}
+          ) : (
+            <span
+              className={`block truncate text-[10px] font-medium ${
+                isBusiness ? 'text-[#1a1a1a]/70' : ac.mutedText
+              }`}
+            >
+              {t('businessProfile.switcher.business')}
+            </span>
+          )}
         </span>
-        <ChevronDown size={16} className="shrink-0 opacity-70" />
       </button>
     </div>
   );

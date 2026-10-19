@@ -1619,6 +1619,20 @@
         "publicLink": {
           "title": "Публічне посилання",
           "subtitle": "Посилання на ваш Business-профіль"
+        },
+        "reviews": {
+          "title": "Відгуки",
+          "subtitle": "Перегляд і відповіді на відгуки",
+          "count": "Відгуки {count}",
+          "filterAll": "Всі",
+          "filterUnreplied": "Без відповіді",
+          "reply": "Відповісти",
+          "replyPlaceholder": "Ваша відповідь…",
+          "replySubmit": "Надіслати відповідь",
+          "replySaved": "Відповідь збережено",
+          "empty": "Поки немає відгуків",
+          "contactBadge": "Був контакт через TradeGround",
+          "yourReply": "Ваша відповідь"
         }
       }
     },
@@ -1647,6 +1661,8 @@
       "memberSince": "На платформі",
       "aboutTitle": "Про компанію",
       "noListings": "Поки немає активних оголошень",
+      "noListingsTitle": "Поки немає оголошень",
+      "noListingsHint": "Компанія ще не розмістила оголошення. Подивіться інформацію про компанію або її роботи.",
       "noDescription": "Компанія ще не додала опис.",
       "proBadge": "PRO",
       "tabs": {
@@ -1664,8 +1680,11 @@
       "reviewCommentPlaceholder": "Коментар (необов’язково)",
       "reviewSubmit": "Надіслати відгук",
       "reviewSubmitted": "Дякуємо! Відгук опубліковано.",
-      "reviewAlreadyLeft": "Ви вже залишали відгук цьому продавцю.",
+      "reviewAlreadyLeft": "Ви вже залишали відгук цій компанії.",
       "loginToReview": "Увійдіть через Telegram, щоб залишити відгук",
+      "registerToReview": "Пройдіть реєстрацію в боті, щоб залишити відгук",
+      "contactBadge": "Був контакт через TradeGround",
+      "ownerReplyLabel": "Відповідь компанії",
       "filters": {
         "all": "Всі",
         "services": "Послуги",

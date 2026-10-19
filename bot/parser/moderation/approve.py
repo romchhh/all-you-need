@@ -63,11 +63,19 @@ async def _ack_processing(callback: CallbackQuery) -> None:
 
 async def _prepare_listing_for_publish(item: dict, source: dict) -> dict:
     """Завжди AI enrich + категорії + локація + фінальний title/description."""
+    from parser.marketplace_categories import should_treat_as_service
+
     working = await ensure_parsed_item_ai_screened(dict(item))
     listing_item = preserve_parsed_source_fields(working, source)
-    force_service = (
-        (listing_item.get("category") or "").strip().lower() == "services_work"
-        or (source.get("parser_type") or "") == "services_channel"
+    blob = "\n".join(
+        str(listing_item.get(k) or "")
+        for k in ("raw_text", "title", "description")
+    )
+    # parser_type=services_channel сам по собі не перетирає товар — перевіряємо текст
+    force_service = should_treat_as_service(
+        blob,
+        force_service_channel=(source.get("parser_type") or "") == "services_channel",
+        category=str(listing_item.get("category") or ""),
     )
     listing_item = finalize_listing_item_for_publish(
         listing_item, force_service=force_service
@@ -142,12 +150,6 @@ async def _approve_services_both(
     listing_item = await _prepare_listing_for_publish_or_alert(callback, dict(item), item)
     if not listing_item:
         return
-
-    item_category = (listing_item.get("category") or "").strip().lower()
-    if item_category != "services_work":
-        listing_item["category"] = "services_work"
-        listing_item = force_services_marketplace_categories(listing_item)
-        listing_item["condition"] = "new"
 
     images = parsed_item_image_refs(item)
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
@@ -304,10 +306,6 @@ async def _approve_marketplace(
         return
 
     item_category = (listing_item.get("category") or "").strip().lower()
-    if item_category == "services_work" or (item.get("parser_type") or "") == "services_channel":
-        listing_item = force_services_marketplace_categories(listing_item)
-        listing_item["condition"] = "new"
-        item_category = "services_work"
 
     try:
         listing_id, _, _ = publish_parsed_item_marketplace(

@@ -97,24 +97,23 @@ def format_author_notify_open_links_html(
 ) -> str:
     """
     Клікабельні посилання для DM авторам (RU).
-    «Открыть в Marketplace» веде на сторінку оголошення на сайті — ту саму, що й картка-превʼю.
-    «Открыть через бот» — deep-link у чат бота (не startapp, щоб не було картки «Веб-приложение»).
+    Порядок: Marketplace → бот → канал (для послуг).
     """
     lines: list[str] = []
     # Сайт, не t.me?startapp: інакше Telegram малює картку «Веб-приложение» замість TradeGround.
     site = html.escape(author_notify_listing_preview_url(listing_id, lang=lang), quote=True)
     lines.append(f'📱 <a href="{site}">Открыть в Marketplace</a>')
 
+    bot = listing_bot_url(listing_id)
+    if bot:
+        bot_esc = html.escape(bot, quote=True)
+        lines.append(f'🤖 <a href="{bot_esc}">Открыть через бота</a>')
+
     if include_channel and channel_url:
         ch_target = channel_url.strip()
         if ch_target.startswith("http"):
             ch = html.escape(ch_target, quote=True)
-            lines.append(f'📢 <a href="{ch}">Открыть в Канале</a>')
-
-    bot = listing_bot_url(listing_id)
-    if bot:
-        bot_esc = html.escape(bot, quote=True)
-        lines.append(f'🤖 <a href="{bot_esc}">Открыть через бот</a>')
+            lines.append(f'📢 <a href="{ch}">Открыть в канале</a>')
     return "\n".join(lines)
 
 
@@ -123,6 +122,16 @@ def business_profile_signup_url(*, listing_id: int, lang: str = "ru") -> str:
     if BOT_USERNAME:
         return f"https://t.me/{BOT_USERNAME.lstrip('@')}?startapp=business"
     return author_notify_outbound_url(listing_id, "business_profile", lang=lang)
+
+
+def create_listing_signup_url(*, listing_id: int = 0, lang: str = "ru") -> str:
+    """Deep-link у Mini App: створення оголошення."""
+    if BOT_USERNAME:
+        return f"https://t.me/{BOT_USERNAME.lstrip('@')}?startapp=create"
+    if listing_id:
+        return author_notify_outbound_url(listing_id, "create_listing", lang=lang)
+    base = WEBAPP_URL.rstrip("/")
+    return f"{base}/{lang}/bazaar?openCreate=1"
 
 
 def format_listing_open_links_html(listing_id: int, *, lang: str = "uk") -> str:

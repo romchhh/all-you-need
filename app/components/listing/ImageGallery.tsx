@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 interface ImageGalleryProps {
   images: string[];
   title: string;
+  description?: string | null;
   listingId?: string | number;
   category?: string | null;
   subcategory?: string | null;
@@ -18,6 +19,7 @@ interface ImageGalleryProps {
 export const ImageGallery = ({
   images,
   title,
+  description,
   listingId = 0,
   category,
   subcategory,
@@ -59,13 +61,12 @@ export const ImageGallery = ({
   };
 
   if (!images.length) {
-    const placeholderHeight =
-      typeof window !== 'undefined' && window.innerWidth < 768 ? '280px' : '360px';
     return (
-      <div className="relative w-full overflow-hidden" style={{ height: placeholderHeight }}>
+      <div className="relative aspect-[3/4] w-full max-h-[min(72svh,560px)] overflow-hidden sm:aspect-[4/5]">
         <ListingAutoCover
           listingId={listingId}
           title={title}
+          description={description}
           category={category}
           subcategory={subcategory}
           size="lg"
@@ -97,6 +98,7 @@ export const ImageGallery = ({
                 <ListingAutoCover
                   listingId={listingId}
                   title={title}
+                  description={description}
                   category={category}
                   subcategory={subcategory}
                   size="lg"

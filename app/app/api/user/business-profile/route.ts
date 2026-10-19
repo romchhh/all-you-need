@@ -296,13 +296,17 @@ export async function PUT(request: NextRequest) {
         ? parseInt(String(radiusRaw), 10)
         : null;
 
-    const listingIdsRaw = body.listingIds;
     let listingIds: number[] | undefined;
     let listingDisplayMode: ListingDisplayMode | undefined;
     if (body.listingDisplayMode === 'all' || body.listingDisplayMode === 'manual') {
       listingDisplayMode = body.listingDisplayMode;
     }
-    if (listingIdsRaw != null && String(listingIdsRaw).trim() !== '') {
+    const listingIdsRaw = body.listingIds;
+    if (Array.isArray(listingIdsRaw)) {
+      listingIds = listingIdsRaw
+        .map((id: unknown) => parseInt(String(id), 10))
+        .filter((id: number) => Number.isFinite(id));
+    } else if (listingIdsRaw != null && String(listingIdsRaw).trim() !== '') {
       try {
         const parsed = JSON.parse(String(listingIdsRaw)) as unknown;
         if (Array.isArray(parsed)) {
@@ -315,6 +319,9 @@ export async function PUT(request: NextRequest) {
           .filter((id) => Number.isFinite(id));
       }
     }
+
+    const listingConfigTouched =
+      listingDisplayMode !== undefined || listingIds !== undefined;
 
     const planRaw = body.plan;
     const plan =
@@ -345,10 +352,6 @@ export async function PUT(request: NextRequest) {
       },
       { partial: isPartial }
     );
-
-    const listingConfigTouched =
-      listingDisplayMode !== undefined ||
-      (listingIdsRaw != null && String(listingIdsRaw).trim() !== '');
 
     const profile = await prisma.businessProfile.findUnique({ where: { id: profileId } });
 

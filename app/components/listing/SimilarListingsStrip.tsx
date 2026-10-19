@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { shortenCoverTitle } from '@/lib/listings/autoCover';
 import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
@@ -15,6 +17,68 @@ interface SimilarListingsStripProps {
   tg?: TelegramWebApp | null;
   /** Скільки мініатюр показати перед карткою «ще». */
   maxVisible?: number;
+}
+
+function SimilarThumb({
+  item,
+  onSelect,
+  tg,
+  thumbSize,
+}: {
+  item: Listing;
+  onSelect?: (listing: Listing) => void;
+  tg?: TelegramWebApp | null;
+  thumbSize: string;
+}) {
+  const imageSrc = resolveListingCardImageUrl(item);
+  const [imageFailed, setImageFailed] = useState(false);
+  const showPhoto = Boolean(imageSrc) && !imageFailed;
+  const caption = shortenCoverTitle(item.title, item.description, 34);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        tg?.HapticFeedback.impactOccurred('light');
+        onSelect?.(item);
+      }}
+      className={`${thumbSize} text-left`}
+      aria-label={item.title}
+    >
+      {showPhoto ? (
+        <CachedListingImage
+          src={imageSrc!}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          draggable={false}
+          fadeIn={false}
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <ListingAutoCover
+          listingId={item.id}
+          title={item.title}
+          description={item.description}
+          category={item.category}
+          subcategory={item.subcategory}
+          size="sm"
+          showTitle={false}
+          className="!pb-9"
+        />
+      )}
+      <div
+        className={`pointer-events-none absolute inset-x-0 bottom-0 z-[2] px-1.5 pb-1.5 pt-7 ${
+          showPhoto
+            ? 'bg-gradient-to-t from-black/80 via-black/45 to-transparent'
+            : 'bg-gradient-to-t from-black/55 via-black/25 to-transparent'
+        }`}
+      >
+        <p className="line-clamp-2 text-[9px] font-medium leading-[1.15] text-white sm:text-[10px]">
+          {caption}
+        </p>
+      </div>
+    </button>
+  );
 }
 
 export function SimilarListingsStrip({
@@ -32,7 +96,7 @@ export function SimilarListingsStrip({
   if (visible.length === 0) return null;
 
   const thumbSize =
-    'relative h-[5.75rem] w-[5.75rem] shrink-0 overflow-hidden rounded-md sm:h-[6.25rem] sm:w-[6.25rem]';
+    'relative h-[7.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-md sm:h-[8.25rem] sm:w-[6rem]';
 
   return (
     <section className="w-full min-w-0 px-4 pb-2 pt-4 max-lg:px-4 lg:px-2 lg:pb-4 lg:pt-5">
@@ -47,46 +111,15 @@ export function SimilarListingsStrip({
         className="scrollbar-hide flex gap-2.5 overflow-x-auto pb-1"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {visible.map((item) => {
-          const imageSrc = resolveListingCardImageUrl(item);
-
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                tg?.HapticFeedback.impactOccurred('light');
-                onSelect?.(item);
-              }}
-              className={`${thumbSize} text-left`}
-              aria-label={item.title}
-            >
-              {imageSrc ? (
-                <CachedListingImage
-                  src={imageSrc}
-                  alt=""
-                  className="absolute inset-0 h-full w-full object-cover"
-                  draggable={false}
-                  fadeIn={false}
-                />
-              ) : (
-                <ListingAutoCover
-                  listingId={item.id}
-                  title={item.title}
-                  category={item.category}
-                  subcategory={item.subcategory}
-                  size="sm"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/5" />
-              <div className="absolute inset-x-0 bottom-0 px-1.5 pb-1.5 pt-6">
-                <p className="line-clamp-2 text-[9px] font-medium leading-[1.15] text-white sm:text-[10px]">
-                  {item.title}
-                </p>
-              </div>
-            </button>
-          );
-        })}
+        {visible.map((item) => (
+          <SimilarThumb
+            key={item.id}
+            item={item}
+            onSelect={onSelect}
+            tg={tg}
+            thumbSize={thumbSize}
+          />
+        ))}
 
         {showSeeMore && (
           <button

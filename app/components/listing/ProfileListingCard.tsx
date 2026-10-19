@@ -276,7 +276,7 @@ export const ProfileListingCard = ({
         {/* Фото + перегляди / лайки під фото */}
         <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
         <div 
-          className={`relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden cursor-pointer ${isLight ? 'bg-white' : 'bg-[#2A2A2A]'}`}
+          className={`relative h-[6.75rem] w-[5rem] flex-shrink-0 cursor-pointer overflow-hidden rounded-xl sm:h-28 sm:w-20 ${isLight ? 'bg-white' : 'bg-[#2A2A2A]'}`}
           onClick={() => {
             if (!isPendingModeration && !isDeactivated && !isSold) {
               onSelect(listing);
@@ -297,9 +297,11 @@ export const ProfileListingCard = ({
             <ListingAutoCover
               listingId={listing.id}
               title={listing.title}
+              description={listing.description}
               category={listing.category}
               subcategory={listing.subcategory}
               size="sm"
+              showTitle={false}
             />
           )}
           

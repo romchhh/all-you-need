@@ -39,6 +39,7 @@ import { PhoneModal } from '@/components/modals/PhoneModal';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { ImageViewModal } from '@/components/modals/ImageViewModal';
 import { FixedLogoHeader, overlayHeaderActionClass } from '@/components/layout/FixedLogoHeader';
+import { TradeGroundLogo } from '@/components/layout/TradeGroundLogo';
 import { formatWorkingHoursForDisplay, WEEKDAY_KEYS } from '@/lib/businessProfileSettings';
 import {
   getBusinessDirectionLabel,
@@ -52,6 +53,7 @@ import {
   BusinessContactBrandIcon,
   type BusinessContactChannel,
 } from '@/components/business/BusinessContactIcons';
+import { formatTimeAgo } from '@/utils/formatTime';
 
 type TabId = 'listings' | 'about' | 'portfolio' | 'reviews';
 type ListingFilter = 'all' | 'services' | 'products';
@@ -63,6 +65,9 @@ interface PublicBusinessReview {
   createdAt: string;
   authorName: string;
   authorAvatar: string | null;
+  hadTradeGroundContact?: boolean;
+  ownerReply?: string | null;
+  ownerRepliedAt?: string | null;
 }
 
 interface PublicBusinessProfile {
@@ -167,7 +172,14 @@ export function BusinessProfilePage({
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [tab, setTab] = useState<TabId>('listings');
+  const [tab, setTab] = useState<TabId>(() => {
+    if (typeof window === 'undefined') return 'listings';
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    if (tabParam === 'reviews' || tabParam === 'about' || tabParam === 'portfolio' || tabParam === 'listings') {
+      return tabParam;
+    }
+    return 'listings';
+  });
   const [listingFilter, setListingFilter] = useState<ListingFilter>('all');
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -358,6 +370,17 @@ export function BusinessProfilePage({
   const handleMessage = () => {
     if (!profile) return;
     trackBusinessContact('telegram');
+    if (currentUser?.id) {
+      void fetch('/api/business-profile/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          viewerTelegramId: String(currentUser.id),
+          sellerTelegramId,
+          channel: 'telegram',
+        }),
+      }).catch(() => undefined);
+    }
     const message = buildSellerProfileContactMessage(
       getProfileShareLink(sellerTelegramId),
       resolveSellerContactLang(language)
@@ -462,6 +485,10 @@ export function BusinessProfilePage({
           setViewerHasReviewed(true);
           return;
         }
+        if (res.status === 403 && data.code === 'NOT_REGISTERED') {
+          showToast(t('businessProfile.public.registerToReview'), 'info');
+          return;
+        }
         showToast(t('common.error'), 'error');
         return;
       }
@@ -474,8 +501,11 @@ export function BusinessProfilePage({
             rating: data.review.rating,
             comment: data.review.comment,
             createdAt: data.review.createdAt,
-            authorName: t('common.user'),
+            authorName: data.review.authorName || t('common.user'),
             authorAvatar: null,
+            hadTradeGroundContact: Boolean(data.review.hadTradeGroundContact),
+            ownerReply: null,
+            ownerRepliedAt: null,
           },
           ...prev,
         ]);
@@ -502,9 +532,6 @@ export function BusinessProfilePage({
   };
 
   const handleBack = onBackToPreviousListing || onClose;
-  const navBtnClass = isLight
-    ? 'flex h-10 w-10 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm hover:bg-black/35'
-    : 'flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
   const pageBackBtnClass = `flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${overlayHeaderActionClass(isLight)}`;
 
   if (loadError) {
@@ -619,16 +646,56 @@ export function BusinessProfilePage({
     ? 'border border-[#3F5331]/25 bg-[#E8F0E0] text-[#3F5331]'
     : 'border border-[#C8E6A0]/30 bg-[#C8E6A0]/15 text-[#C8E6A0]';
 
+  const goHome = () => {
+    if (typeof window !== 'undefined') window.location.href = `/${lang}/bazaar`;
+  };
+
   return (
     <div className={`min-h-screen pb-24 ${ac.pageBackground}`}>
-      <FixedLogoHeader
-        mode="window-fixed"
-        zClassName="z-[50]"
-        paddingX={false}
-        outerClassName="px-4 lg:px-6"
-        onClick={() => {
-          if (typeof window !== 'undefined') window.location.href = `/${lang}/bazaar`;
-        }}
+      {/* Один рядок: назад | лого | ⋯ — з урахуванням Dynamic Island */}
+      <header className="fixed inset-x-0 top-0 z-[50]">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage: isLight
+              ? 'linear-gradient(to bottom, rgba(250,251,248,0.92) 0%, rgba(245,247,242,0.35) 55%, rgba(250,251,248,0) 100%)'
+              : 'linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.28) 55%, rgba(0,0,0,0) 100%)',
+          }}
+        />
+        <div className="relative pt-[max(env(safe-area-inset-top,0px),3rem)]">
+          <div className="mx-auto flex h-11 w-full max-w-2xl items-center gap-2 px-4 lg:max-w-5xl lg:px-6 xl:max-w-6xl">
+            <button
+              type="button"
+              onClick={handleBack}
+              aria-label={t('common.back')}
+              className={`shrink-0 ${pageBackBtnClass}`}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex min-w-0 flex-1 items-center justify-center px-1">
+              <TradeGroundLogo
+                embedInFixedHeader
+                paddingX={false}
+                onClick={goHome}
+                className="!w-auto max-w-[10.5rem]"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              aria-label={t('common.share')}
+              title={t('common.share')}
+              className={`shrink-0 ${pageBackBtnClass}`}
+            >
+              <MoreHorizontal size={18} />
+            </button>
+          </div>
+        </div>
+      </header>
+      <div
+        className="w-full shrink-0 max-lg:h-[calc(max(env(safe-area-inset-top,0px),3rem)+2.75rem)] lg:h-[calc(max(env(safe-area-inset-top,0px),2px)+2.75rem)]"
+        aria-hidden
       />
 
       <div className="relative">
@@ -654,24 +721,6 @@ export function BusinessProfilePage({
                 : 'bg-gradient-to-b from-transparent to-[#000000]'
             }`}
           />
-
-          <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-4 py-3">
-            <button type="button" onClick={handleBack} aria-label={t('common.back')} className={navBtnClass}>
-              <ArrowLeft size={20} />
-            </button>
-            <div className="flex min-w-0 flex-1 justify-center px-1">
-              <span className="truncate text-base font-semibold text-white">{profile.businessName}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowShareModal(true)}
-              aria-label={t('common.share')}
-              title={t('common.share')}
-              className={navBtnClass}
-            >
-              <MoreHorizontal size={18} />
-            </button>
-          </div>
         </div>
 
         <div className="relative z-10 flex items-end gap-3 px-4 sm:pl-6">
@@ -696,37 +745,11 @@ export function BusinessProfilePage({
               isLight ? 'bg-[#1a2414]/90 text-white shadow-md' : 'bg-black/75 text-white backdrop-blur-sm'
             }`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
-                <Users size={16} className="shrink-0 text-[#C8E6A0]" />
-                <span className="font-bold tabular-nums">{profile.followersCount}</span>
-                <span className="truncate text-xs text-white/75">{t('businessProfile.public.followersLabel')}</span>
-              </span>
-              {!viewingOwn && (
-                <button
-                  type="button"
-                  onClick={() => void handleFollow()}
-                  disabled={followBusy}
-                  className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60 ${
-                    isFollowing
-                      ? 'border border-white/25 bg-white/10 text-white'
-                      : 'bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0]'
-                  }`}
-                >
-                  {isFollowing ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Check size={13} />
-                      {t('businessProfile.public.subscribed')}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1">
-                      <UserPlus size={13} />
-                      {t('businessProfile.public.subscribe')}
-                    </span>
-                  )}
-                </button>
-              )}
-            </div>
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
+              <Users size={16} className="shrink-0 text-[#C8E6A0]" />
+              <span className="font-bold tabular-nums">{profile.followersCount}</span>
+              <span className="truncate text-xs text-white/75">{t('businessProfile.public.followersLabel')}</span>
+            </span>
             <div className="flex min-w-0 items-center gap-1.5 text-sm">
               <Star size={15} className="shrink-0 fill-amber-400 text-amber-400" />
               {showRating ? (
@@ -740,23 +763,64 @@ export function BusinessProfilePage({
       </div>
 
       <div className="px-4 pb-4 pt-3 text-left">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          <h1 className={`min-w-0 text-xl font-bold ${ac.pageHeading}`}>{profile.businessName}</h1>
-          <span
-            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${
-              isLight
-                ? 'border border-[#3F5331]/50 text-[#3F5331]'
-                : 'border border-[#C8E6A0]/50 text-[#C8E6A0]'
-            }`}
-          >
-            BUSINESS
-          </span>
-        </div>
+        <div className="mb-3 flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-start gap-2">
+              <h1
+                className={`min-w-0 flex-1 text-xl font-bold leading-snug ${ac.pageHeading}`}
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                {profile.businessName}
+              </h1>
+              <span
+                className={`mt-1 shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${
+                  isLight
+                    ? 'border border-[#3F5331]/50 text-[#3F5331]'
+                    : 'border border-[#C8E6A0]/50 text-[#C8E6A0]'
+                }`}
+              >
+                BUSINESS
+              </span>
+            </div>
 
-        <p className={`mb-2 text-sm ${ac.mutedText}`}>
-          {sphereLabel}
-          {profile.city ? ` · ${profile.city}` : ''}
-        </p>
+            <p className={`text-sm ${ac.mutedText}`}>
+              {sphereLabel}
+              {profile.city ? ` · ${profile.city}` : ''}
+            </p>
+          </div>
+
+          {!viewingOwn ? (
+            <button
+              type="button"
+              onClick={() => void handleFollow()}
+              disabled={followBusy}
+              className={`mt-0.5 shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                isFollowing
+                  ? isLight
+                    ? 'border border-[#3F5331]/30 bg-[#E8F0E0]/80 text-[#3F5331]'
+                    : 'border border-[#C8E6A0]/35 bg-[#C8E6A0]/10 text-[#C8E6A0]'
+                  : 'bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0]'
+              }`}
+            >
+              {isFollowing ? (
+                <span className="inline-flex items-center gap-1">
+                  <Check size={14} />
+                  {t('businessProfile.public.subscribed')}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1">
+                  <UserPlus size={14} />
+                  {t('businessProfile.public.subscribe')}
+                </span>
+              )}
+            </button>
+          ) : null}
+        </div>
 
         {directionLabels.length > 0 ? (
           <div className="mb-3 flex flex-wrap gap-2">
@@ -834,49 +898,64 @@ export function BusinessProfilePage({
 
         {tab === 'listings' && (
           <>
-            <div className="mb-4 flex items-center gap-2 overflow-x-auto scrollbar-hide">
-              {(
-                [
-                  ['all', t('businessProfile.public.filters.all')],
-                  ['services', t('businessProfile.public.filters.services')],
-                  ['products', t('businessProfile.public.filters.products')],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setListingFilter(id)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    listingFilter === id
-                      ? isLight
-                        ? 'bg-[#C8E6A0] text-[#1a1a1a]'
-                        : 'bg-[#C8E6A0] text-[#0f1408]'
-                      : isLight
-                        ? 'bg-gray-100 text-gray-700'
-                        : 'bg-[#1C1C1C] text-white/70'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {filteredListings.map((listing) => (
-                <div key={listing.id} className="relative">
-                  <ListingCard
-                    listing={listing}
-                    layout="stacked"
-                    isFavorite={favorites.has(listing.id)}
-                    onSelect={onSelectListing}
-                    onToggleFavorite={onToggleFavorite}
-                    showBusinessBadge
-                    tg={tg}
-                  />
+            {vitrineListings.length === 0 ? (
+              <div className="px-2 py-10 text-center">
+                <p className={`text-base font-semibold ${ac.pageHeading}`}>
+                  {t('businessProfile.public.noListingsTitle')}
+                </p>
+                <p className={`mx-auto mt-2 max-w-sm text-sm leading-relaxed ${ac.mutedText}`}>
+                  {t('businessProfile.public.noListingsHint')}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                  {(
+                    [
+                      ['all', t('businessProfile.public.filters.all')],
+                      ['services', t('businessProfile.public.filters.services')],
+                      ['products', t('businessProfile.public.filters.products')],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setListingFilter(id)}
+                      className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                        listingFilter === id
+                          ? isLight
+                            ? 'bg-[#C8E6A0] text-[#1a1a1a]'
+                            : 'bg-[#C8E6A0] text-[#0f1408]'
+                          : isLight
+                            ? 'bg-gray-100 text-gray-700'
+                            : 'bg-[#1C1C1C] text-white/70'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
-              ))}
-            </div>
-            {filteredListings.length === 0 && (
-              <p className={`py-8 text-center text-sm ${ac.mutedText}`}>{t('businessProfile.public.noListings')}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {filteredListings.map((listing) => (
+                    <div key={listing.id} className="relative">
+                      <ListingCard
+                        listing={listing}
+                        layout="stacked"
+                        isFavorite={favorites.has(listing.id)}
+                        onSelect={onSelectListing}
+                        onToggleFavorite={onToggleFavorite}
+                        showBusinessBadge
+                        tg={tg}
+                      />
+                    </div>
+                  ))}
+                </div>
+                {filteredListings.length === 0 ? (
+                  <p className={`py-8 text-center text-sm ${ac.mutedText}`}>
+                    {t('businessProfile.public.noListings')}
+                  </p>
+                ) : null}
+              </>
             )}
           </>
         )}
@@ -1021,17 +1100,42 @@ export function BusinessProfilePage({
               <ul className="space-y-2">
                 {reviews.map((review) => (
                   <li key={review.id} className={aboutCard}>
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className={`text-sm font-medium ${ac.pageHeading}`}>
-                        {review.authorName || t('common.user')}
+                    <p className={`text-sm font-semibold ${ac.pageHeading}`}>
+                      {review.authorName || t('common.user')}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="inline-flex items-center gap-0.5 text-amber-400">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star
+                            key={i}
+                            size={12}
+                            className={
+                              i < review.rating ? 'fill-amber-400 text-amber-400' : isLight ? 'text-gray-300' : 'text-white/20'
+                            }
+                          />
+                        ))}
                       </span>
-                      <span className="inline-flex items-center gap-0.5 text-xs text-amber-500">
-                        <Star size={12} className="fill-amber-400 text-amber-400" />
-                        {review.rating}
-                      </span>
+                      <span className={`text-xs ${ac.mutedText}`}>· {formatTimeAgo(review.createdAt, t)}</span>
                     </div>
+                    {review.hadTradeGroundContact ? (
+                      <p className={`mt-1.5 text-xs ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>
+                        ✓ {t('businessProfile.public.contactBadge')}
+                      </p>
+                    ) : null}
                     {review.comment?.trim() ? (
-                      <p className={`text-sm leading-relaxed ${ac.mutedText}`}>{review.comment}</p>
+                      <p className={`mt-2 text-sm leading-relaxed ${ac.mutedText}`}>{review.comment}</p>
+                    ) : null}
+                    {review.ownerReply?.trim() ? (
+                      <div
+                        className={`mt-3 rounded-xl px-3 py-2 text-sm ${
+                          isLight ? 'bg-[#E8F0E0]/70' : 'bg-white/5'
+                        }`}
+                      >
+                        <p className={`mb-1 text-xs font-semibold ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>
+                          {t('businessProfile.public.ownerReplyLabel')}
+                        </p>
+                        <p className={ac.mutedText}>{review.ownerReply}</p>
+                      </div>
                     ) : null}
                   </li>
                 ))}

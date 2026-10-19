@@ -14,6 +14,7 @@ import {
   Info,
   Link2,
   MapPin,
+  MessageSquare,
   MinusCircle,
   Package,
   Phone,
@@ -23,6 +24,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { formatTimeAgo } from '@/utils/formatTime';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -71,8 +73,19 @@ type SettingsScreen =
   | 'workingHours'
   | 'listings'
   | 'portfolio'
+  | 'reviews'
   | 'publicLink'
   | 'deactivate';
+
+type OwnerReviewItem = {
+  id: number;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  authorName: string;
+  hadTradeGroundContact: boolean;
+  ownerReply: string | null;
+};
 
 interface BusinessSettingsFlowProps {
   isOpen: boolean;
@@ -279,6 +292,7 @@ function ToggleSwitch({
   onChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
+  const { isLight } = useTheme();
   return (
     <button
       type="button"
@@ -286,13 +300,13 @@ function ToggleSwitch({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-        checked ? 'bg-[#C8E6A0]' : 'bg-white/20'
-      } ${disabled ? 'opacity-50' : ''}`}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ${
+        checked ? 'bg-[#C8E6A0]' : isLight ? 'bg-gray-300' : 'bg-white/25'
+      } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
     >
       <span
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-          checked ? 'left-[1.375rem]' : 'left-0.5'
+        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ease-out ${
+          checked ? 'translate-x-5' : 'translate-x-0'
         }`}
       />
     </button>
@@ -320,6 +334,14 @@ export default function BusinessSettingsFlow({
   const { toast, showToast, hideToast } = useToast();
 
   const [screen, setScreen] = useState<SettingsScreen>('hub');
+  const [ownerReviews, setOwnerReviews] = useState<OwnerReviewItem[]>([]);
+  const [ownerReviewsTotal, setOwnerReviewsTotal] = useState(reviewsCount);
+  const [ownerUnrepliedCount, setOwnerUnrepliedCount] = useState(0);
+  const [reviewsFilter, setReviewsFilter] = useState<'all' | 'unreplied'>('all');
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
+  const [replyOpenId, setReplyOpenId] = useState<number | null>(null);
+  const [replyBusyId, setReplyBusyId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(() =>
     prefillForm(existingProfile, { telegram: defaultTelegram, phone: defaultPhone })
   );
@@ -727,6 +749,8 @@ export default function BusinessSettingsFlow({
         return t('businessProfile.settings.menu.listings.title');
       case 'portfolio':
         return t('businessProfile.settings.menu.portfolio.title');
+      case 'reviews':
+        return t('businessProfile.settings.menu.reviews.title');
       case 'publicLink':
         return t('businessProfile.settings.menu.publicLink.title');
       case 'deactivate':
@@ -735,6 +759,61 @@ export default function BusinessSettingsFlow({
         return t('businessProfile.settings.title');
     }
   })();
+
+  const loadOwnerReviews = useCallback(
+    async (filter: 'all' | 'unreplied' = reviewsFilter) => {
+      setReviewsLoading(true);
+      try {
+        const res = await fetch(
+          `/api/user/business-profile/reviews?telegramId=${encodeURIComponent(telegramId)}&filter=${filter}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        setOwnerReviews(Array.isArray(data.reviews) ? data.reviews : []);
+        setOwnerReviewsTotal(Number(data.total) || 0);
+        setOwnerUnrepliedCount(Number(data.unrepliedCount) || 0);
+      } catch {
+        /* ignore */
+      } finally {
+        setReviewsLoading(false);
+      }
+    },
+    [telegramId, reviewsFilter]
+  );
+
+  useEffect(() => {
+    if (!isOpen || screen !== 'reviews') return;
+    void loadOwnerReviews(reviewsFilter);
+  }, [isOpen, screen, reviewsFilter, loadOwnerReviews]);
+
+  const submitOwnerReply = async (reviewId: number) => {
+    const reply = (replyDrafts[reviewId] || '').trim();
+    if (!reply || replyBusyId) return;
+    setReplyBusyId(reviewId);
+    try {
+      const res = await fetch('/api/user/business-profile/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramId, reviewId, reply }),
+      });
+      if (!res.ok) {
+        showToast(t('common.error'), 'error');
+        return;
+      }
+      showToast(t('businessProfile.settings.menu.reviews.replySaved'), 'success');
+      setReplyOpenId(null);
+      setReplyDrafts((prev) => {
+        const next = { ...prev };
+        delete next[reviewId];
+        return next;
+      });
+      await loadOwnerReviews(reviewsFilter);
+    } catch {
+      showToast(t('common.error'), 'error');
+    } finally {
+      setReplyBusyId(null);
+    }
+  };
 
   const menuItems: Array<{
     id: SettingsScreen;
@@ -777,6 +856,12 @@ export default function BusinessSettingsFlow({
       icon: ImageIcon,
       title: t('businessProfile.settings.menu.portfolio.title'),
       subtitle: t('businessProfile.settings.menu.portfolio.subtitle'),
+    },
+    {
+      id: 'reviews',
+      icon: MessageSquare,
+      title: t('businessProfile.settings.menu.reviews.title'),
+      subtitle: t('businessProfile.settings.menu.reviews.subtitle'),
     },
     {
       id: 'publicLink',
@@ -1425,6 +1510,128 @@ export default function BusinessSettingsFlow({
               </div>
             )}
 
+            {screen === 'reviews' && (
+              <div className="space-y-4 pb-8">
+                <p className={`text-base font-semibold ${ac.pageHeading}`}>
+                  {t('businessProfile.settings.menu.reviews.count', {
+                    count: String(ownerReviewsTotal),
+                  })}
+                </p>
+
+                <div className="flex gap-2">
+                  {(
+                    [
+                      ['all', t('businessProfile.settings.menu.reviews.filterAll')],
+                      [
+                        'unreplied',
+                        `${t('businessProfile.settings.menu.reviews.filterUnreplied')}${
+                          ownerUnrepliedCount > 0 ? ` (${ownerUnrepliedCount})` : ''
+                        }`,
+                      ],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setReviewsFilter(id)}
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                        reviewsFilter === id
+                          ? 'bg-[#C8E6A0] text-[#1a1a1a]'
+                          : isLight
+                            ? 'bg-gray-100 text-gray-700'
+                            : 'bg-[#1C1C1C] text-white/70'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {reviewsLoading ? (
+                  <p className={`py-8 text-center text-sm ${ac.mutedText}`}>{t('common.loading')}</p>
+                ) : ownerReviews.length === 0 ? (
+                  <p className={`py-8 text-center text-sm ${ac.mutedText}`}>
+                    {t('businessProfile.settings.menu.reviews.empty')}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {ownerReviews.map((review) => (
+                      <div key={review.id} className={`${ui.cardShell} p-4`}>
+                        <div className="mb-1 flex items-center gap-1 text-amber-400">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              size={14}
+                              className={i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-white/20'}
+                            />
+                          ))}
+                        </div>
+                        <p className={`text-sm font-semibold ${ac.pageHeading}`}>
+                          {review.authorName || t('common.user')}
+                          <span className={`font-normal ${ac.mutedText}`}>
+                            {' '}
+                            · {formatTimeAgo(review.createdAt, t)}
+                          </span>
+                        </p>
+                        {review.hadTradeGroundContact ? (
+                          <p className={`mt-1 text-xs ${ui.limeText}`}>
+                            ✓ {t('businessProfile.settings.menu.reviews.contactBadge')}
+                          </p>
+                        ) : null}
+                        {review.comment?.trim() ? (
+                          <p className={`mt-2 text-sm leading-relaxed ${ac.mutedText}`}>{review.comment}</p>
+                        ) : null}
+
+                        {review.ownerReply?.trim() ? (
+                          <div
+                            className={`mt-3 rounded-xl px-3 py-2 text-sm ${
+                              isLight ? 'bg-[#E8F0E0]/70' : 'bg-white/5'
+                            }`}
+                          >
+                            <p className={`mb-1 text-xs font-semibold ${ui.limeText}`}>
+                              {t('businessProfile.settings.menu.reviews.yourReply')}
+                            </p>
+                            <p className={ac.mutedText}>{review.ownerReply}</p>
+                          </div>
+                        ) : replyOpenId === review.id ? (
+                          <div className="mt-3 space-y-2">
+                            <textarea
+                              value={replyDrafts[review.id] || ''}
+                              onChange={(e) =>
+                                setReplyDrafts((prev) => ({ ...prev, [review.id]: e.target.value }))
+                              }
+                              placeholder={t('businessProfile.settings.menu.reviews.replyPlaceholder')}
+                              rows={3}
+                              maxLength={2000}
+                              className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                                isLight ? 'border-gray-200 bg-white' : 'border-white/15 bg-white/5'
+                              }`}
+                            />
+                            <button
+                              type="button"
+                              disabled={replyBusyId === review.id || !(replyDrafts[review.id] || '').trim()}
+                              onClick={() => void submitOwnerReply(review.id)}
+                              className={`${ui.btnSolidSm} w-full disabled:opacity-50`}
+                            >
+                              {t('businessProfile.settings.menu.reviews.replySubmit')}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setReplyOpenId(review.id)}
+                            className={`mt-3 text-sm font-semibold ${ui.limeText}`}
+                          >
+                            {t('businessProfile.settings.menu.reviews.reply')}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {screen === 'deactivate' && (
               <div className="space-y-4 pb-8">
                 <div className={`rounded-2xl border p-5 ${isLight ? 'border-red-200 bg-red-50' : 'border-red-500/40 bg-red-500/10'}`}>
@@ -1464,7 +1671,10 @@ export default function BusinessSettingsFlow({
             )}
           </div>
 
-          {screen !== 'hub' && screen !== 'publicLink' && screen !== 'deactivate' && (
+          {screen !== 'hub' &&
+            screen !== 'publicLink' &&
+            screen !== 'deactivate' &&
+            screen !== 'reviews' && (
             <div
               className={`shrink-0 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${headerBorder} ${
                 isLight ? 'bg-white' : 'bg-[#0a0a0a]'

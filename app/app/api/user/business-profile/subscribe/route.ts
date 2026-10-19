@@ -8,9 +8,9 @@ import {
   activateBusinessSubscription,
   processBusinessSubscriptionFromBalance,
   createBusinessSubscriptionRecord,
-  parseLinkedListingIds,
   type BusinessProfileInput,
 } from '@/lib/businessProfileHelpers';
+import { parseListingDisplayConfig } from '@/lib/businessProfileSettings';
 import { createMonobankInvoice } from '@/lib/monobank';
 
 export async function POST(request: NextRequest) {
@@ -90,10 +90,17 @@ export async function POST(request: NextRequest) {
     const planId = plan as BusinessPlanId;
     const price = BUSINESS_PLANS[planId].price;
     const effectivePaymentMethod = price <= 0 ? 'balance' : paymentMethod;
-    const storedListingIds = existingProfile ? parseLinkedListingIds(existingProfile.linkedListingIds) : [];
-    const normalizedListingIds = Array.isArray(listingIds) && listingIds.length > 0
-      ? listingIds.map((id: unknown) => parseInt(String(id), 10)).filter((id: number) => Number.isFinite(id))
-      : storedListingIds;
+    // Порожній масив → activateBusinessSubscription резолвить «усі» і зберігає mode=all.
+    // Не передаємо parseLinkedListingIds при mode=all (там ids=[] і псувало вітрину).
+    const storedConfig = existingProfile
+      ? parseListingDisplayConfig(existingProfile.linkedListingIds)
+      : null;
+    const normalizedListingIds =
+      Array.isArray(listingIds) && listingIds.length > 0
+        ? listingIds.map((id: unknown) => parseInt(String(id), 10)).filter((id: number) => Number.isFinite(id))
+        : storedConfig?.mode === 'manual'
+          ? storedConfig.ids
+          : [];
     const subscriptionMetadata = { listingIds: normalizedListingIds, renew: Boolean(renew) };
 
     if (effectivePaymentMethod === 'balance') {

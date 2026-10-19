@@ -53,6 +53,7 @@ function ListingThumb({
           title={title}
           category={category}
           size="sm"
+          showTitle={false}
         />
       )}
     </div>
