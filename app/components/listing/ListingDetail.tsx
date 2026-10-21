@@ -274,15 +274,8 @@ export const ListingDetail = ({
 
     const contactLang = resolveSellerContactLang(language);
     const listingUrl = getListingContactUrl(listing.id);
+    const message = buildSellerContactMessage(listing.title, listingUrl, contactLang);
     const action = resolveListingContactAction(listing);
-    // Для open_url (немає @) — заготовка з лінком на оригінал, інакше текст зникав
-    const extraLink = action.kind === 'open_url' ? action.url : parserOriginalPostUrl;
-    const message = buildSellerContactMessage(
-      listing.title,
-      listingUrl,
-      contactLang,
-      extraLink
-    );
 
     trackAnalytics({
       eventName: ANALYTICS_EVENTS.contactSeller,
@@ -296,12 +289,13 @@ export const ListingDetail = ({
       },
     });
 
+    // Є @ — чат із заготовкою (як раніше)
     if (action.kind === 'telegram_dm') {
       openSellerTelegramChat(action.username, message, tg ?? undefined);
       return;
     }
 
-    // Немає @ автора: завжди share з готовим текстом (не «голий» open_url без заготовки)
+    // Немає @ — share з тим самим текстом (не відкривати «голий» пост без заготовки)
     openSellerContactViaTelegramShare(listingUrl, message, tg ?? undefined);
   }, [
     isOwnListing,
@@ -310,7 +304,6 @@ export const ListingDetail = ({
     tg,
     currentUser?.id,
     profile?.telegramId,
-    parserOriginalPostUrl,
   ]);
 
   const contactUsernameForDisplay = useMemo(
