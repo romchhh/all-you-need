@@ -17,6 +17,17 @@ function normalizeFavoritesCount(value: number | bigint | string | undefined): n
   return Number.isNaN(n) ? 0 : n;
 }
 
+function parseJsonStringArray(value: unknown): string[] {
+  if (value == null || value === '') return [];
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
 /** Пакетне завантаження оголошень за списком id (обране) — формат як у feed. */
 export async function GET(request: NextRequest) {
   try {
@@ -53,7 +64,7 @@ export async function GET(request: NextRequest) {
           u.avatar as sellerAvatar,
           CAST(u.telegramId AS TEXT) as sellerTelegramId
         FROM Listing l
-        JOIN User u ON l.userId = u.id
+        LEFT JOIN User u ON l.userId = u.id
         WHERE l.id IN (${placeholders})
           AND l.status = 'active'
         `,
@@ -67,62 +78,58 @@ export async function GET(request: NextRequest) {
       .map((id) => byId.get(id))
       .filter(Boolean)
       .map((listing) => {
-        const row = listing as Record<string, unknown>;
-        const originalImages =
-          typeof row.images === 'string'
-            ? JSON.parse(row.images as string)
-            : row.images || [];
-        const optimizedImages = row.optimizedImages
-          ? typeof row.optimizedImages === 'string'
-            ? JSON.parse(row.optimizedImages as string)
-            : row.optimizedImages
-          : null;
-        const source =
-          Array.isArray(optimizedImages) && optimizedImages.length > 0
-            ? optimizedImages
-            : (originalImages as string[]);
-        const images = resolveStoredListingImages(source as string[]);
-        const timeFields = listingTimeFieldsForApi(row as any);
-        const sellerName = row.sellerFirstName
-          ? `${row.sellerFirstName} ${row.sellerLastName || ''}`.trim()
-          : (row.sellerUsername as string) || 'Користувач';
-        const isFree = row.isFree === 1 || row.isFree === true;
+        try {
+          const row = listing as Record<string, unknown>;
+          const originalImages = parseJsonStringArray(row.images);
+          const optimizedImages = parseJsonStringArray(row.optimizedImages);
+          const source = optimizedImages.length > 0 ? optimizedImages : originalImages;
+          const images = resolveStoredListingImages(source);
+          const timeFields = listingTimeFieldsForApi(row as any);
+          const sellerName = row.sellerFirstName
+            ? `${row.sellerFirstName} ${row.sellerLastName || ''}`.trim()
+            : (row.sellerUsername as string) || 'Користувач';
+          const isFree = row.isFree === 1 || row.isFree === true;
 
-        return {
-          id: Number(row.id),
-          title: row.title,
-          price: isFree ? 'Free' : row.price,
-          previousPrice: row.previousPrice || null,
-          priceChangedAt: row.priceChangedAt
-            ? parseDbDate(String(row.priceChangedAt))?.toISOString() ?? row.priceChangedAt
-            : null,
-          currency: (row.currency as string) || undefined,
-          image: images[0] || '',
-          images,
-          seller: {
-            name: sellerName,
-            avatar: (row.sellerAvatar as string) || '👤',
-            phone: '',
-            telegramId: String(row.sellerTelegramId || ''),
-            username: (row.sellerUsername as string) || null,
-          },
-          category: row.category,
-          subcategory: row.subcategory,
-          description: row.description || '',
-          location: row.location,
-          views: Number(row.views || 0),
-          posted: timeFields.posted,
-          publishedAt: timeFields.publishedAt,
-          createdAt: timeFields.createdAt,
-          condition: normalizeCondition((row.condition as string) || null),
-          tags: [],
-          isFree,
-          status: (row.status as string) ?? 'active',
-          promotionType: (row.promotionType as string) || null,
-          promotionEnds: (row.promotionEnds as string) || null,
-          favoritesCount: normalizeFavoritesCount(row.favoritesCount as number),
-        };
-      });
+          return {
+            id: Number(row.id),
+            title: row.title,
+            price: isFree ? 'Free' : row.price,
+            previousPrice: row.previousPrice || null,
+            priceChangedAt: row.priceChangedAt
+              ? parseDbDate(String(row.priceChangedAt))?.toISOString() ?? row.priceChangedAt
+              : null,
+            currency: (row.currency as string) || undefined,
+            image: images[0] || '',
+            images,
+            seller: {
+              name: sellerName,
+              avatar: (row.sellerAvatar as string) || '👤',
+              phone: '',
+              telegramId: String(row.sellerTelegramId || ''),
+              username: (row.sellerUsername as string) || null,
+            },
+            category: row.category,
+            subcategory: row.subcategory,
+            description: row.description || '',
+            location: row.location,
+            views: Number(row.views || 0),
+            posted: timeFields.posted,
+            publishedAt: timeFields.publishedAt,
+            createdAt: timeFields.createdAt,
+            condition: normalizeCondition((row.condition as string) || null),
+            tags: [],
+            isFree,
+            status: (row.status as string) ?? 'active',
+            promotionType: (row.promotionType as string) || null,
+            promotionEnds: (row.promotionEnds as string) || null,
+            favoritesCount: normalizeFavoritesCount(row.favoritesCount as number),
+          };
+        } catch (rowError) {
+          console.error('[Favorites listings batch] skip row', rowError);
+          return null;
+        }
+      })
+      .filter(Boolean);
 
     return NextResponse.json({ listings });
   } catch (error) {

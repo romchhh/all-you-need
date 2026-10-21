@@ -6,7 +6,12 @@ import { Listing } from '@/types';
 import { getCategories } from '@/constants/categories';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { useToast } from '@/features/ui/hooks/useToast';
-import { getFavoritesFromStorage, addFavoriteToStorage, removeFavoriteFromStorage } from '@/utils/favorites';
+import {
+  getFavoritesFromStorage,
+  addFavoriteToStorage,
+  removeFavoriteFromStorage,
+  normalizeFavoriteId,
+} from '@/utils/favorites';
 import { getCachedData, setCachedData, invalidateCache } from '@/utils/cache';
 import { useUser } from '@/features/user/hooks/useUser';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -937,18 +942,21 @@ export function useBazaarPage() {
 
   const toggleFavorite = useCallback(
     async (id: number) => {
-      const isFavorite = favorites.has(id);
+      const listingId = normalizeFavoriteId(id);
+      if (listingId == null) return;
+
+      const isFavorite = favorites.has(listingId);
 
       setFavorites((prev) => {
         const next = new Set(prev);
-        if (isFavorite) next.delete(id);
-        else next.add(id);
+        if (isFavorite) next.delete(listingId);
+        else next.add(listingId);
         return next;
       });
 
       const delta = isFavorite ? -1 : 1;
       setListings((prev) => {
-        const idx = prev.findIndex((l) => l.id === id);
+        const idx = prev.findIndex((l) => Number(l.id) === listingId);
         if (idx < 0) return prev;
         const listing = prev[idx];
         const next = prev.slice();
@@ -959,7 +967,7 @@ export function useBazaarPage() {
         return next;
       });
       setSelectedListing((prev) =>
-        prev && prev.id === id
+        prev && Number(prev.id) === listingId
           ? { ...prev, favoritesCount: Math.max(0, (prev.favoritesCount ?? 0) + delta) }
           : prev
       );
@@ -971,14 +979,14 @@ export function useBazaarPage() {
         eventGroup: ANALYTICS_EVENT_GROUPS.engagement,
         telegramId: profile?.telegramId,
         entityType: 'listing',
-        entityId: String(id),
+        entityId: String(listingId),
       });
 
       if (isFavorite) {
-        await removeFavoriteFromStorage(id, profile?.telegramId);
+        await removeFavoriteFromStorage(listingId, profile?.telegramId);
         showToast(t('listing.removeFromFavorites'), 'success');
       } else {
-        await addFavoriteToStorage(id, profile?.telegramId);
+        await addFavoriteToStorage(listingId, profile?.telegramId);
         showToast(t('listing.addToFavorites'), 'success');
       }
     },

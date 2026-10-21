@@ -53,7 +53,13 @@ function VitrineThumb({
   const imageSrc = resolveListingCardImageUrl(item);
   const [imageFailed, setImageFailed] = useState(false);
   const showPhoto = Boolean(imageSrc) && !imageFailed;
-  const caption = shortenCoverTitle(item.title, item.description, 34);
+  const caption = shortenCoverTitle(
+    item.title,
+    item.description,
+    28,
+    item.category,
+    item.subcategory
+  );
 
   return (
     <button
@@ -66,14 +72,21 @@ function VitrineThumb({
       aria-label={item.title}
     >
       {showPhoto ? (
-        <CachedListingImage
-          src={imageSrc!}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          draggable={false}
-          fadeIn={false}
-          onError={() => setImageFailed(true)}
-        />
+        <>
+          <CachedListingImage
+            src={imageSrc!}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            draggable={false}
+            fadeIn={false}
+            onError={() => setImageFailed(true)}
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-black/85 via-black/50 to-transparent px-1.5 pb-1.5 pt-7">
+            <p className="line-clamp-2 text-center text-[9px] font-medium leading-[1.15] text-white sm:text-[10px]">
+              {caption}
+            </p>
+          </div>
+        </>
       ) : (
         <ListingAutoCover
           listingId={item.id}
@@ -82,21 +95,9 @@ function VitrineThumb({
           category={item.category}
           subcategory={item.subcategory}
           size="sm"
-          showTitle={false}
-          className="!pb-9"
+          showTitle
         />
       )}
-      <div
-        className={`pointer-events-none absolute inset-x-0 bottom-0 z-[2] px-1.5 pb-1.5 pt-7 ${
-          showPhoto
-            ? 'bg-gradient-to-t from-black/80 via-black/45 to-transparent'
-            : 'bg-gradient-to-t from-black/55 via-black/25 to-transparent'
-        }`}
-      >
-        <p className="line-clamp-2 text-[9px] font-medium leading-[1.15] text-white sm:text-[10px]">
-          {caption}
-        </p>
-      </div>
     </button>
   );
 }

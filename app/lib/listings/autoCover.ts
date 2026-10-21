@@ -415,72 +415,187 @@ export function resolveCoverLucideIcon(opts: {
 const TITLE_NOISE_PREFIX =
   /^(?:продам|продаю|продажа|продаж|отдам|віддам|ищу|шукаю|куплю|предлагаю|пропоную|вакансия|вакансія|срочно|терміново|🚨+|✨+|🔥+)\s*[:\-–—,]?\s*/i;
 
-/** Ціна, URL, контакт — не показуємо як «назву» на обкладинці. */
+/** Ціна, URL, @username, контакт — не показуємо на обкладинці. */
 const COVER_TITLE_JUNK =
   /^(?:https?:\/\/|www\.|t\.me\/|telegram\.me\/|@[\w.]+$|\+?\d[\d\s\-()]{6,}|\d+[.,]?\d*\s*(?:€|eur|euro|грн|uah|\$|usd)\b|(?:€|eur|euro|грн|uah|\$)\s*\d)/i;
+
+/** Короткі підписи послуги за ключовими словами (не дубль повного title). */
+const SERVICE_LABEL_RULES: { label: string; patterns: RegExp[] }[] = [
+  { label: 'Манікюр', patterns: [/маникюр|манікюр|гель[\s-]?лак|ногт|нігт|nail/i] },
+  { label: 'Педикюр', patterns: [/педикюр/i] },
+  { label: 'Вії', patterns: [/ресниц|вії|вій\b|ламинир|ламінув|lash/i] },
+  { label: 'Волосся', patterns: [/кератин|ботокс\s*волос|стрижк|перук|парикмах|волос|hair/i] },
+  { label: 'Масаж', patterns: [/массаж|масаж|массажист|масажист|massage/i] },
+  { label: 'Макіяж', patterns: [/макияж|макіяж|визажист|візажист|makeup|make[\s-]?up/i] },
+  { label: 'Прибирання', patterns: [/уборк|прибиран|клининг|клінінг|cleaning|haushalt/i] },
+  { label: 'Переклад', patterns: [/переводчик|перекладач|перевод[ыі]|переклад[ии]|dolmetsch|translator/i] },
+  { label: 'IT / сайти', patterns: [/сайт|разработк|розробк|smm|web[\s-]?design|программист|програміст|frontend|backend/i] },
+  { label: 'Ремонт', patterns: [/ремонт|монтаж|сантехн|электрик|електрик|мастер\s*на\s*час|майстер\s*на\s*час/i] },
+  { label: 'Переїзд', patterns: [/перевозк|перевезен|грузоперевоз|вантажоперевез|умз[уу]г|umzug|lieferung/i] },
+  { label: 'Репетитор', patterns: [/репетитор|обучен|навчан|урок|tutor|nachhilfe/i] },
+  { label: 'Догляд', patterns: [/сиделк|догляд|уход\s*за\s*пожил|pflege|betreu/i] },
+  { label: 'Фото / відео', patterns: [/фотограф|відеозйом|видеосъем|съ[её]мк|зйомк|photographer/i] },
+  { label: 'Автосервіс', patterns: [/автосервис|автосервіс|шиномонтаж|СТО\b|тюнинг|авто\s*мастер/i] },
+  { label: 'Робота', patterns: [/ваканс|ищу\s*работ|шукаю\s*робот|подработ|підробіт|job\b|stelle/i] },
+];
+
+const SUBCATEGORY_COVER_LABEL: Record<string, string> = {
+  beauty_health: 'Краса',
+  beauty_services: 'Краса',
+  auto_services: 'Авто',
+  repair_installation: 'Ремонт',
+  cleaning: 'Прибирання',
+  transportation: 'Перевезення',
+  photo_video: 'Фото / відео',
+  it_design_websites: 'IT / дизайн',
+  education_tutors: 'Навчання',
+  translations: 'Переклад',
+  consultations: 'Консультація',
+  other_services: 'Послуга',
+  services: 'Послуга',
+  vacancies: 'Вакансія',
+  part_time: 'Підробіток',
+  looking_for_work: 'Шукаю роботу',
+  other_work: 'Робота',
+};
+
+const CATEGORY_COVER_LABEL: Record<string, string> = {
+  services_work: 'Послуга',
+  beauty_wellness: 'Краса',
+  fashion: 'Одяг',
+  furniture: 'Меблі',
+  electronics: 'Техніка',
+  appliances: 'Техніка',
+  kids: 'Дитяче',
+  home: 'Дім',
+  auto: 'Авто',
+  pets: 'Тварини',
+  realestate: 'Нерухомість',
+  free: 'Безкоштовно',
+  hobby_sports: 'Хобі',
+};
 
 function cleanCoverSnippet(s: string): string {
   return s
     .replace(/\s+/g, ' ')
     .replace(TITLE_NOISE_PREFIX, '')
+    // посилання, @user, телефони
     .replace(/https?:\/\/\S+/gi, ' ')
     .replace(/(?:www\.|t\.me\/|telegram\.me\/)\S+/gi, ' ')
+    .replace(/@[a-zA-Z0-9_]{3,}/g, ' ')
+    .replace(/\+?\d[\d\s\-()]{7,}\d/g, ' ')
     .replace(/\s+/g, ' ')
-    .replace(/^[\s\W]+/, '')
+    .replace(/^[\s\W]+|[\s\W]+$/g, '')
     .trim();
 }
 
 function isJunkCoverText(s: string): boolean {
   if (!s || s.length < 3) return true;
   if (COVER_TITLE_JUNK.test(s)) return true;
-  // майже лише цифри/валюта/символи
+  if (/^@/.test(s)) return true;
+  if (/t\.me|telegram|http/i.test(s)) return true;
   const letters = s.replace(/[^\p{L}]/gu, '');
   return letters.length < 3;
 }
 
-function firstMeaningfulSnippet(text: string): string {
-  const parts = text.split(/[.!?\n|;]+/).map((p) => cleanCoverSnippet(p)).filter(Boolean);
-  for (const part of parts) {
-    if (!isJunkCoverText(part) && part.length >= 4) {
-      return part;
-    }
-  }
-  return '';
+function normalizeForCompare(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function truncateCoverTitle(base: string, maxLen: number): string {
-  if (base.length <= maxLen) return base || '—';
+  if (base.length <= maxLen) return base || 'Послуга';
   const sliced = base.slice(0, maxLen + 1);
   const cut = sliced.lastIndexOf(' ');
   const wordSafe = cut > maxLen * 0.45 ? sliced.slice(0, cut) : base.slice(0, maxLen);
-  return `${wordSafe.replace(/[,\-–—:;]+$/, '').trim()}…`;
+  return `${wordSafe.replace(/[,\-–—:;]+$/g, '').trim()}…`;
+}
+
+/** Витягує коротку назву послуги з ключових слів. */
+function matchServiceLabel(blob: string): string | null {
+  for (const rule of SERVICE_LABEL_RULES) {
+    if (rule.patterns.some((re) => re.test(blob))) {
+      return rule.label;
+    }
+  }
+  return null;
 }
 
 /**
- * Короткий заголовок для обкладинки: завжди віддає перевагу title;
- * description — лише якщо title порожній/загальний і рядок не ціна/лінк.
+ * Коротка фраза з title/description (2–3 слова), без сміття.
+ * Не повертає рядок, ідентичний повному title оголошення.
+ */
+function phraseFromText(text: string, fullTitle: string, maxLen: number): string {
+  const cleaned = cleanCoverSnippet(text);
+  if (!cleaned || isJunkCoverText(cleaned)) return '';
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  // Коротша «послуга», не весь заголовок картки
+  const take = words.length <= 2 ? words.length : 3;
+  let phrase = words.slice(0, take).join(' ');
+
+  const fullNorm = normalizeForCompare(fullTitle);
+  let phraseNorm = normalizeForCompare(phrase);
+
+  // Повний дубль назви — стискаємо; якщо все одно те саме — відмовляємось
+  if (phraseNorm && fullNorm && phraseNorm === fullNorm) {
+    if (words.length > 2) {
+      phrase = words.slice(0, 2).join(' ');
+      phraseNorm = normalizeForCompare(phrase);
+    }
+    if (phraseNorm === fullNorm) return '';
+  }
+
+  if (isJunkCoverText(phrase)) return '';
+  return truncateCoverTitle(phrase, maxLen);
+}
+
+/**
+ * Текст на авто-обкладинці: коротка послуга з title/description,
+ * без @username, посилань і без повного дубля назви картки.
  */
 export function shortenCoverTitle(
   title: string,
   description?: string | null,
-  maxLen = 52
+  maxLen = 40,
+  category?: string | null,
+  subcategory?: string | null
 ): string {
-  let base = cleanCoverSnippet(title || '');
+  const rawTitle = (title || '').trim();
+  const descSlice = (description || '').trim().slice(0, 220);
+  const blob = `${rawTitle}\n${descSlice}`;
 
-  const tooGeneric =
-    !base ||
-    isJunkCoverText(base) ||
-    /^(объявление|оголошення|услуга|послуга|товар|товар дня)$/i.test(base);
-
-  if (tooGeneric) {
-    const fromDesc = firstMeaningfulSnippet(description || '');
-    if (fromDesc) base = fromDesc;
+  // 1) Відома послуга за ключовими словами
+  const serviceLabel = matchServiceLabel(blob);
+  if (serviceLabel) {
+    return truncateCoverTitle(serviceLabel, maxLen);
   }
 
-  // Довгий title не замінюємо описом (там часто ціна / посилання)
-  if (!base || isJunkCoverText(base)) {
-    base = cleanCoverSnippet(title || '') || '—';
+  // 2) Коротка фраза з заголовка (не ідентична повній назві)
+  const fromTitle = phraseFromText(rawTitle, rawTitle, maxLen);
+  if (fromTitle) return fromTitle;
+
+  // 3) З опису — перший змістовний шматок
+  const descParts = descSlice.split(/[.!?\n|;]+/);
+  for (const part of descParts) {
+    const fromDesc = phraseFromText(part, rawTitle, maxLen);
+    if (fromDesc && normalizeForCompare(fromDesc) !== normalizeForCompare(rawTitle)) {
+      return fromDesc;
+    }
   }
 
-  return truncateCoverTitle(base, maxLen);
+  // 4) Підкатегорія / категорія
+  const sub = (subcategory || '').trim().toLowerCase();
+  if (sub && SUBCATEGORY_COVER_LABEL[sub]) {
+    return SUBCATEGORY_COVER_LABEL[sub];
+  }
+  const cat = (category || '').trim().toLowerCase();
+  if (cat && CATEGORY_COVER_LABEL[cat]) {
+    return CATEGORY_COVER_LABEL[cat];
+  }
+
+  return 'Послуга';
 }

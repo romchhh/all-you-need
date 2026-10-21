@@ -1,55 +1,83 @@
 const FAVORITES_STORAGE_KEY = 'ayn_marketplace_favorites';
 
-// Отримати favorites з localStorage (швидко)
+export function normalizeFavoriteId(id: unknown): number | null {
+  const n = typeof id === 'number' ? id : parseInt(String(id ?? ''), 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function normalizeFavoriteIds(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const item of raw) {
+    const id = normalizeFavoriteId(item);
+    if (id != null && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+}
+
+/** Отримати favorites з localStorage (швидко). Id завжди number. */
 export const getFavoritesFromStorage = (): Set<number> => {
   if (typeof window === 'undefined') {
-    console.log('[getFavoritesFromStorage] window is undefined (SSR)');
     return new Set();
   }
-  
+
   try {
     const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
-    console.log('[getFavoritesFromStorage] Raw data from localStorage:', stored);
-    
     if (stored) {
-      const favorites = JSON.parse(stored) as number[];
-      console.log('[getFavoritesFromStorage] Parsed favorites:', favorites);
-      return new Set(favorites);
+      return new Set(normalizeFavoriteIds(JSON.parse(stored)));
     }
   } catch (error) {
     console.error('[getFavoritesFromStorage] Error reading favorites from localStorage:', error);
   }
-  
-  console.log('[getFavoritesFromStorage] Returning empty Set');
+
   return new Set();
 };
 
-// Зберегти favorites в localStorage
+/** Зберегти favorites в localStorage */
 export const saveFavoritesToStorage = (favorites: Set<number>): void => {
   if (typeof window === 'undefined') return;
-  
+
   try {
-    const favoritesArray = Array.from(favorites);
+    const favoritesArray = normalizeFavoriteIds(Array.from(favorites));
     localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoritesArray));
   } catch (error) {
     console.error('Error saving favorites to localStorage:', error);
   }
 };
 
-// Додати favorite - зберігає в localStorage і відправляє в БД для статистики
-export const addFavoriteToStorage = async (id: number, telegramId?: number | string): Promise<boolean> => {
+/** Злити локальні id з відповіддю API і зберегти. */
+export const mergeFavoritesToStorage = (ids: Iterable<unknown>): Set<number> => {
+  const merged = getFavoritesFromStorage();
+  for (const raw of ids) {
+    const id = normalizeFavoriteId(raw);
+    if (id != null) merged.add(id);
+  }
+  saveFavoritesToStorage(merged);
+  return merged;
+};
+
+/** Додати favorite — localStorage + БД для статистики */
+export const addFavoriteToStorage = async (
+  id: number,
+  telegramId?: number | string
+): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
-  
-  // Оновлюємо localStorage (швидко, синхронно)
+
+  const listingId = normalizeFavoriteId(id);
+  if (listingId == null) return false;
+
   try {
     const favorites = getFavoritesFromStorage();
-    favorites.add(id);
+    favorites.add(listingId);
     saveFavoritesToStorage(favorites);
   } catch (error) {
     console.error('Error updating localStorage:', error);
   }
-  
-  // Відправляємо в БД для статистики (асинхронно, не чекаємо)
+
   if (telegramId) {
     fetch('/api/favorites', {
       method: 'POST',
@@ -58,37 +86,41 @@ export const addFavoriteToStorage = async (id: number, telegramId?: number | str
       },
       body: JSON.stringify({
         telegramId,
-        listingId: id,
+        listingId,
       }),
-    }).catch(error => {
+    }).catch((error) => {
       console.error('Error saving favorite to DB (non-critical):', error);
     });
   }
-  
+
   return true;
 };
 
-// Видалити favorite - видаляє з localStorage і з БД
-export const removeFavoriteFromStorage = async (id: number, telegramId?: number | string): Promise<boolean> => {
+/** Видалити favorite — localStorage + БД */
+export const removeFavoriteFromStorage = async (
+  id: number,
+  telegramId?: number | string
+): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
-  
-  // Оновлюємо localStorage (швидко, синхронно)
+
+  const listingId = normalizeFavoriteId(id);
+  if (listingId == null) return false;
+
   try {
     const favorites = getFavoritesFromStorage();
-    favorites.delete(id);
+    favorites.delete(listingId);
     saveFavoritesToStorage(favorites);
   } catch (error) {
     console.error('Error updating localStorage:', error);
   }
-  
-  // Видаляємо з БД (асинхронно, не чекаємо)
+
   if (telegramId) {
-    fetch(`/api/favorites?telegramId=${telegramId}&listingId=${id}`, {
+    fetch(`/api/favorites?telegramId=${telegramId}&listingId=${listingId}`, {
       method: 'DELETE',
-    }).catch(error => {
+    }).catch((error) => {
       console.error('Error removing favorite from DB (non-critical):', error);
     });
   }
-  
+
   return true;
 };

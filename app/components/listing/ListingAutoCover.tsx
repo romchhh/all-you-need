@@ -88,33 +88,33 @@ const SIZE_CFG: Record<
   }
 > = {
   sm: {
-    icon: 26,
-    titleClass: 'text-[10px] leading-[1.25] font-semibold',
-    padX: 'px-2',
-    gap: 'gap-2',
+    icon: 22,
+    titleClass: 'text-[9px] leading-tight font-semibold tracking-tight sm:text-[10px]',
+    padX: 'px-1.5',
+    gap: 'gap-1',
     lines: 2,
-    maxTitle: 32,
+    maxTitle: 26,
   },
   md: {
-    icon: 36,
-    titleClass: 'text-xs leading-snug font-semibold sm:text-sm',
+    icon: 34,
+    titleClass: 'text-xs leading-snug font-semibold tracking-tight sm:text-[13px]',
     padX: 'px-3',
-    gap: 'gap-2.5',
-    lines: 3,
-    maxTitle: 44,
+    gap: 'gap-2',
+    lines: 2,
+    maxTitle: 36,
   },
   lg: {
-    icon: 48,
-    titleClass: 'text-sm leading-snug font-semibold sm:text-[15px]',
-    padX: 'px-5',
-    gap: 'gap-3 sm:gap-3.5',
-    lines: 3,
-    maxTitle: 52,
+    icon: 44,
+    titleClass: 'text-sm leading-snug font-semibold tracking-tight sm:text-[15px]',
+    padX: 'px-6',
+    gap: 'gap-2.5',
+    lines: 2,
+    maxTitle: 40,
   },
 };
 
 /**
- * Вертикальна обкладинка: іконка + короткий title по центру, без накладання.
+ * Вертикальна обкладинка: іконка + коротка назва послуги по центру.
  */
 function ListingAutoCoverInner({
   listingId,
@@ -151,8 +151,8 @@ function ListingAutoCoverInner({
   );
   const iconSrc = coverIconPath(iconCategoryId, isLight);
   const displayTitle = useMemo(
-    () => shortenCoverTitle(title, description, cfg.maxTitle),
-    [title, description, cfg.maxTitle]
+    () => shortenCoverTitle(title, description, cfg.maxTitle, category, subcategory),
+    [title, description, cfg.maxTitle, category, subcategory]
   );
 
   const iconNode = LucideIconComp ? (
@@ -170,7 +170,7 @@ function ListingAutoCoverInner({
       alt=""
       width={cfg.icon}
       height={cfg.icon}
-      className="shrink-0 object-contain opacity-90"
+      className="mx-auto shrink-0 object-contain opacity-90"
       style={{ width: cfg.icon, height: cfg.icon }}
       draggable={false}
     />
@@ -178,25 +178,29 @@ function ListingAutoCoverInner({
 
   return (
     <div
-      className={`absolute inset-0 flex select-none overflow-hidden ${className}`}
+      className={`absolute inset-0 select-none overflow-hidden ${className}`}
       style={bgStyle}
       aria-hidden
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.2]"
+        className="pointer-events-none absolute inset-0 opacity-[0.18]"
         style={{
-          backgroundImage: `radial-gradient(ellipse 80% 55% at 50% 18%, ${colors.bgAccent}aa 0%, transparent 70%),
-            radial-gradient(ellipse 70% 45% at 50% 100%, ${colors.bgDeep}99 0%, transparent 65%)`,
+          backgroundImage: `radial-gradient(ellipse 75% 50% at 50% 20%, ${colors.bgAccent}aa 0%, transparent 70%),
+            radial-gradient(ellipse 65% 40% at 50% 100%, ${colors.bgDeep}99 0%, transparent 65%)`,
         }}
       />
 
       {showTitle ? (
         <div
-          className={`relative z-[1] flex h-full w-full flex-col items-center justify-center ${cfg.padX} py-6 ${cfg.gap}`}
+          className={`absolute inset-0 z-[1] flex flex-col items-center justify-center text-center ${cfg.padX} ${
+            size === 'sm' ? 'py-2' : 'py-5'
+          } ${cfg.gap}`}
         >
           <div className="flex shrink-0 items-center justify-center">{iconNode}</div>
           <p
-            className={`w-full max-w-[14rem] shrink-0 text-center ${cfg.titleClass}`}
+            className={`mx-auto w-full shrink-0 text-center ${
+              size === 'sm' ? 'max-w-[5rem]' : 'max-w-[12rem]'
+            } ${cfg.titleClass}`}
             style={{
               color: colors.fg,
               display: '-webkit-box',
@@ -204,15 +208,15 @@ function ListingAutoCoverInner({
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
               wordBreak: 'break-word',
-              hyphens: 'auto',
+              overflowWrap: 'anywhere',
+              textAlign: 'center',
             }}
           >
             {displayTitle}
           </p>
         </div>
       ) : (
-        /* Мініатюри зі своїм підписом знизу — іконка по центру верхньої зони */
-        <div className="relative z-[1] flex h-full w-full items-center justify-center pb-9 pt-2">
+        <div className="absolute inset-0 z-[1] flex items-center justify-center">
           {iconNode}
         </div>
       )}

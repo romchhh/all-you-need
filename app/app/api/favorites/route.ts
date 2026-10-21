@@ -55,7 +55,9 @@ export async function GET(request: NextRequest) {
       ) as Promise<Array<{ listingId: number }>>
     );
 
-    const favoriteIds = favorites.map(f => f.listingId);
+    const favoriteIds = favorites
+      .map((f) => Number(f.listingId))
+      .filter((id) => Number.isFinite(id) && id > 0);
 
     return NextResponse.json({ favorites: favoriteIds });
   } catch (error) {

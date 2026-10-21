@@ -33,7 +33,12 @@ export const FavoritesTab = ({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  const favoritedListings = listings.filter(l => favorites.has(l.id));
+  // listings уже з /api/favorites/listings — не відсікаємо через Set.has (string/number mismatch).
+  // Лише прибираємо ті, що користувач щойно прибрав з серця в цій сесії.
+  const favoritedListings =
+    favorites.size === 0
+      ? []
+      : listings.filter((l) => favorites.has(Number(l.id)));
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const touchStartScrollY = useRef<number | null>(null);
@@ -130,15 +135,17 @@ export const FavoritesTab = ({
         <h2 className={`text-2xl font-bold mb-2 ${ac.pageHeading}`}>{t('favorites.title')}</h2>
         <p className={`text-sm mb-4 ${ac.nothingFound}`}>{t('favorites.subtitle')}</p>
         
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          {favoritedListings.map(listing => (
-            <ListingCard 
-              key={listing.id} 
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+          {favoritedListings.map((listing, index) => (
+            <ListingCard
+              key={listing.id}
               listing={listing}
-              isFavorite={favorites.has(listing.id)}
+              isFavorite={favorites.has(Number(listing.id))}
               onSelect={onSelectListing}
               onToggleFavorite={onToggleFavorite}
               tg={tg}
+              priority={index < 4}
+              layout="stacked"
             />
           ))}
         </div>

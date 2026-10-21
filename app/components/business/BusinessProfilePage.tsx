@@ -39,7 +39,6 @@ import { PhoneModal } from '@/components/modals/PhoneModal';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { ImageViewModal } from '@/components/modals/ImageViewModal';
 import { FixedLogoHeader, overlayHeaderActionClass } from '@/components/layout/FixedLogoHeader';
-import { TradeGroundLogo } from '@/components/layout/TradeGroundLogo';
 import { formatWorkingHoursForDisplay, WEEKDAY_KEYS } from '@/lib/businessProfileSettings';
 import {
   getBusinessDirectionLabel,
@@ -532,6 +531,9 @@ export function BusinessProfilePage({
   };
 
   const handleBack = onBackToPreviousListing || onClose;
+  const navBtnClass = isLight
+    ? 'flex h-10 w-10 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm hover:bg-black/35'
+    : 'flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md hover:bg-black/60';
   const pageBackBtnClass = `flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${overlayHeaderActionClass(isLight)}`;
 
   if (loadError) {
@@ -646,56 +648,16 @@ export function BusinessProfilePage({
     ? 'border border-[#3F5331]/25 bg-[#E8F0E0] text-[#3F5331]'
     : 'border border-[#C8E6A0]/30 bg-[#C8E6A0]/15 text-[#C8E6A0]';
 
-  const goHome = () => {
-    if (typeof window !== 'undefined') window.location.href = `/${lang}/bazaar`;
-  };
-
   return (
     <div className={`min-h-screen pb-24 ${ac.pageBackground}`}>
-      {/* Один рядок: назад | лого | ⋯ — з урахуванням Dynamic Island */}
-      <header className="fixed inset-x-0 top-0 z-[50]">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage: isLight
-              ? 'linear-gradient(to bottom, rgba(250,251,248,0.92) 0%, rgba(245,247,242,0.35) 55%, rgba(250,251,248,0) 100%)'
-              : 'linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.28) 55%, rgba(0,0,0,0) 100%)',
-          }}
-        />
-        <div className="relative pt-[max(env(safe-area-inset-top,0px),3rem)]">
-          <div className="mx-auto flex h-11 w-full max-w-2xl items-center gap-2 px-4 lg:max-w-5xl lg:px-6 xl:max-w-6xl">
-            <button
-              type="button"
-              onClick={handleBack}
-              aria-label={t('common.back')}
-              className={`shrink-0 ${pageBackBtnClass}`}
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div className="flex min-w-0 flex-1 items-center justify-center px-1">
-              <TradeGroundLogo
-                embedInFixedHeader
-                paddingX={false}
-                onClick={goHome}
-                className="!w-auto max-w-[10.5rem]"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowShareModal(true)}
-              aria-label={t('common.share')}
-              title={t('common.share')}
-              className={`shrink-0 ${pageBackBtnClass}`}
-            >
-              <MoreHorizontal size={18} />
-            </button>
-          </div>
-        </div>
-      </header>
-      <div
-        className="w-full shrink-0 max-lg:h-[calc(max(env(safe-area-inset-top,0px),3rem)+2.75rem)] lg:h-[calc(max(env(safe-area-inset-top,0px),2px)+2.75rem)]"
-        aria-hidden
+      <FixedLogoHeader
+        mode="window-fixed"
+        zClassName="z-[50]"
+        paddingX={false}
+        outerClassName="px-4 lg:px-6"
+        onClick={() => {
+          if (typeof window !== 'undefined') window.location.href = `/${lang}/bazaar`;
+        }}
       />
 
       <div className="relative">
@@ -721,6 +683,24 @@ export function BusinessProfilePage({
                 : 'bg-gradient-to-b from-transparent to-[#000000]'
             }`}
           />
+
+          <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-4 py-3">
+            <button type="button" onClick={handleBack} aria-label={t('common.back')} className={navBtnClass}>
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex min-w-0 flex-1 justify-center px-1">
+              <span className="truncate text-base font-semibold text-white">{profile.businessName}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              aria-label={t('common.share')}
+              title={t('common.share')}
+              className={navBtnClass}
+            >
+              <MoreHorizontal size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="relative z-10 flex items-end gap-3 px-4 sm:pl-6">

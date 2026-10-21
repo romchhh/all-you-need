@@ -804,7 +804,7 @@ export const ListingDetail = ({
         type="button"
         onClick={handleBack}
         aria-label={t('common.back')}
-        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors max-lg:top-[calc(max(env(safe-area-inset-top,0px),3rem)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)] ${listingHeaderActionClass}`}
+        className={`fixed left-4 z-[60] flex h-10 w-10 items-center justify-center rounded-full border transition-colors max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+1.25rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+1.25rem)] ${listingHeaderActionClass}`}
       >
         <ArrowLeft size={20} />
       </button>
@@ -812,7 +812,7 @@ export const ListingDetail = ({
       {/* Покращений pull-to-refresh індикатор */}
       {isPulling && (
         <div 
-          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),3rem)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+0.35rem)]"
+          className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem+0.35rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem+0.35rem)]"
           style={{
             height: `${Math.min(pullDistance * 0.8, 100)}px`,
             opacity: Math.min(pullProgress * 1.2, 1),
