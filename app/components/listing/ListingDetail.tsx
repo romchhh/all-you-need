@@ -260,6 +260,11 @@ export const ListingDetail = ({
     return currentIdStr === sellerIdStr;
   }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
 
+  const parserOriginalPostUrl = useMemo(
+    () => resolveListingOriginalPostUrl(listing.description, listing.originalPostUrl),
+    [listing.description, listing.originalPostUrl]
+  );
+
   const handleContactSeller = useCallback(() => {
     if (isOwnListing) {
       setShowPromotionModal(true);
@@ -269,8 +274,15 @@ export const ListingDetail = ({
 
     const contactLang = resolveSellerContactLang(language);
     const listingUrl = getListingContactUrl(listing.id);
-    const message = buildSellerContactMessage(listing.title, listingUrl, contactLang);
     const action = resolveListingContactAction(listing);
+    // Для open_url (немає @) — заготовка з лінком на оригінал, інакше текст зникав
+    const extraLink = action.kind === 'open_url' ? action.url : parserOriginalPostUrl;
+    const message = buildSellerContactMessage(
+      listing.title,
+      listingUrl,
+      contactLang,
+      extraLink
+    );
 
     trackAnalytics({
       eventName: ANALYTICS_EVENTS.contactSeller,
@@ -289,11 +301,7 @@ export const ListingDetail = ({
       return;
     }
 
-    if (action.kind === 'open_url') {
-      openTelegramDeepLink(action.url, tg ?? undefined);
-      return;
-    }
-
+    // Немає @ автора: завжди share з готовим текстом (не «голий» open_url без заготовки)
     openSellerContactViaTelegramShare(listingUrl, message, tg ?? undefined);
   }, [
     isOwnListing,
@@ -302,6 +310,7 @@ export const ListingDetail = ({
     tg,
     currentUser?.id,
     profile?.telegramId,
+    parserOriginalPostUrl,
   ]);
 
   const contactUsernameForDisplay = useMemo(
@@ -320,11 +329,6 @@ export const ListingDetail = ({
       listing.businessSeller,
       listing.parserAuthorUsername,
     ]
-  );
-
-  const parserOriginalPostUrl = useMemo(
-    () => resolveListingOriginalPostUrl(listing.description, listing.originalPostUrl),
-    [listing.description, listing.originalPostUrl]
   );
 
   const isParserAggregatorSeller = useMemo(

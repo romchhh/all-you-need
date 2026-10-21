@@ -15,7 +15,7 @@ describe('resolveListingContactUsername', () => {
     expect(resolveListingContactUsername('@seller', '999', null, null, null)).toBe('seller');
   });
 
-  it('opens original post for parser aggregator without author', () => {
+  it('falls back to open_url for parser aggregator without author (UI still shares with text)', () => {
     const action = resolveListingContactAction({
       description: '',
       seller: { name: 'Bot', avatar: '', phone: '', telegramId: '8590825131', username: 'parser_bot' },
