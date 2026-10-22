@@ -1,58 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureFavoriteTable } from '@/lib/prisma';
+import { normalizeTelegramIdForDb, sqlUserTelegramIdWhere } from '@/lib/dbSql';
 import { trackUserActivity } from '@/utils/trackActivity';
 
-// Глобальна змінна для відстеження ініціалізації таблиці Favorite
 let favoriteTableInitPromise: Promise<void> | null = null;
 
-// Отримати всі favorites користувача
+async function ensureFavoriteReady() {
+  if (!favoriteTableInitPromise) {
+    favoriteTableInitPromise = ensureFavoriteTable();
+  }
+  await favoriteTableInitPromise;
+}
+
+/** Telegram id лишається рядком: інакше PostgreSQL порівнює text = bigint і запит падає. */
+async function resolveUserId(telegramId: string | number): Promise<number | null> {
+  const key = normalizeTelegramIdForDb(telegramId);
+  if (!key || !/^\d+$/.test(key)) return null;
+
+  const users = await executeWithRetry(
+    () =>
+      prisma.$queryRawUnsafe(
+        `SELECT id FROM User WHERE ${sqlUserTelegramIdWhere()}`,
+        key
+      ) as Promise<Array<{ id: number }>>
+  );
+  return users[0]?.id != null ? Number(users[0].id) : null;
+}
+
+/** Отримати всі favorites користувача */
 export async function GET(request: NextRequest) {
   try {
-    // Відстежуємо активність користувача
     await trackUserActivity(request);
-    
-    const searchParams = request.nextUrl.searchParams;
-    const telegramId = searchParams.get('telegramId');
 
+    const telegramId = request.nextUrl.searchParams.get('telegramId');
     if (!telegramId) {
-      return NextResponse.json(
-        { error: 'telegramId is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'telegramId is required' }, { status: 400 });
     }
 
-    // Перевіряємо та створюємо таблицю Favorite тільки один раз
-    if (!favoriteTableInitPromise) {
-      favoriteTableInitPromise = ensureFavoriteTable();
-    }
-    await favoriteTableInitPromise;
+    await ensureFavoriteReady();
 
-    const telegramIdNum = parseInt(telegramId);
-
-    // Знаходимо користувача
-    const users = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-    );
-
-    if (!users[0]) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    const userId = await resolveUserId(telegramId);
+    if (userId == null) {
+      return NextResponse.json({ favorites: [] });
     }
 
-    const userId = users[0].id;
-
-    // Отримуємо всі favorites користувача
-    const favorites = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT listingId FROM Favorite WHERE userId = ?`,
-        userId
-      ) as Promise<Array<{ listingId: number }>>
+    const favorites = await executeWithRetry(
+      () =>
+        prisma.$queryRawUnsafe(
+          `SELECT listingId FROM Favorite WHERE userId = ?`,
+          userId
+        ) as Promise<Array<{ listingId: number }>>
     );
 
     const favoriteIds = favorites
@@ -62,69 +60,49 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ favorites: favoriteIds });
   } catch (error) {
     console.error('Error fetching favorites:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch favorites' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch favorites' }, { status: 500 });
   }
 }
 
-// Додати favorite
+/** Додати favorite */
 export async function POST(request: NextRequest) {
   try {
-    // Відстежуємо активність користувача
     await trackUserActivity(request);
     const body = await request.json();
     const { telegramId, listingId } = body;
 
-    if (!telegramId || !listingId) {
+    if (telegramId == null || listingId == null) {
       return NextResponse.json(
         { error: 'telegramId and listingId are required' },
         { status: 400 }
       );
     }
 
-    // Перевіряємо та створюємо таблицю Favorite тільки один раз
-    if (!favoriteTableInitPromise) {
-      favoriteTableInitPromise = ensureFavoriteTable();
-    }
-    await favoriteTableInitPromise;
+    await ensureFavoriteReady();
 
-    const telegramIdNum = parseInt(telegramId);
-    const listingIdNum = parseInt(listingId);
-
-    // Знаходимо користувача
-    const users = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-    );
-
-    if (!users[0]) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    const listingIdNum = Number(listingId);
+    if (!Number.isFinite(listingIdNum) || listingIdNum <= 0) {
+      return NextResponse.json({ error: 'Invalid listingId' }, { status: 400 });
     }
 
-    const userId = users[0].id;
+    const userId = await resolveUserId(telegramId);
+    if (userId == null) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
 
-    // Перевіряємо, чи favorite вже існує
-    const existing = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM Favorite WHERE userId = ? AND listingId = ?`,
-        userId,
-        listingIdNum
-      ) as Promise<Array<{ id: number }>>
+    const existing = await executeWithRetry(
+      () =>
+        prisma.$queryRawUnsafe(
+          `SELECT id FROM Favorite WHERE userId = ? AND listingId = ?`,
+          userId,
+          listingIdNum
+        ) as Promise<Array<{ id: number }>>
     );
 
     if (existing.length > 0) {
-      // Вже існує
       return NextResponse.json({ success: true, message: 'Already favorited' });
     }
 
-    // Додаємо favorite
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
         `INSERT INTO Favorite (userId, listingId, createdAt) VALUES (?, ?, CURRENT_TIMESTAMP)`,
@@ -135,25 +113,20 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    const err = error as any;
+    const err = error as { message?: string };
     console.error('Error adding favorite:', err);
-    // Якщо помилка через UNIQUE constraint - це нормально (вже існує)
-    if (err.message?.includes('UNIQUE constraint') || err.message?.includes('unique')) {
+    if (err.message?.includes('UNIQUE') || err.message?.includes('unique')) {
       return NextResponse.json({ success: true, message: 'Already favorited' });
     }
-    return NextResponse.json(
-      { error: 'Failed to add favorite' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to add favorite' }, { status: 500 });
   }
 }
 
-// Видалити favorite
+/** Видалити favorite */
 export async function DELETE(request: NextRequest) {
   try {
-    // Відстежуємо активність користувача
     await trackUserActivity(request);
-    
+
     const searchParams = request.nextUrl.searchParams;
     const telegramId = searchParams.get('telegramId');
     const listingId = searchParams.get('listingId');
@@ -165,33 +138,18 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Перевіряємо та створюємо таблицю Favorite тільки один раз
-    if (!favoriteTableInitPromise) {
-      favoriteTableInitPromise = ensureFavoriteTable();
-    }
-    await favoriteTableInitPromise;
+    await ensureFavoriteReady();
 
-    const telegramIdNum = parseInt(telegramId);
-    const listingIdNum = parseInt(listingId);
-
-    // Знаходимо користувача
-    const users = await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-    );
-
-    if (!users[0]) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    const listingIdNum = Number(listingId);
+    if (!Number.isFinite(listingIdNum) || listingIdNum <= 0) {
+      return NextResponse.json({ error: 'Invalid listingId' }, { status: 400 });
     }
 
-    const userId = users[0].id;
+    const userId = await resolveUserId(telegramId);
+    if (userId == null) {
+      return NextResponse.json({ success: true });
+    }
 
-    // Видаляємо favorite
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
         `DELETE FROM Favorite WHERE userId = ? AND listingId = ?`,
@@ -203,9 +161,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error removing favorite:', error);
-    return NextResponse.json(
-      { error: 'Failed to remove favorite' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to remove favorite' }, { status: 500 });
   }
 }

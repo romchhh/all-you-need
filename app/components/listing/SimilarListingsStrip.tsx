@@ -20,7 +20,7 @@ interface SimilarListingsStripProps {
 }
 
 const THUMB_CLASS =
-  'relative h-[7.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-md sm:h-[8.25rem] sm:w-[6rem]';
+  'relative h-[5.75rem] w-[5.75rem] shrink-0 overflow-hidden rounded-md sm:h-[6.25rem] sm:w-[6.25rem]';
 
 function SimilarThumb({
   item,

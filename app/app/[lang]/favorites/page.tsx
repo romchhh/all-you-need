@@ -119,14 +119,22 @@ const FavoritesPage = () => {
     prefetchListingsImages(validListings);
   }, []);
 
-  // Завантажуємо обране: localStorage + (коли є профіль) злиття з БД
+  // localStorage одразу + злиття з БД після профілю
   useEffect(() => {
     let cancelled = false;
 
-    const loadFavoritesAndListings = async () => {
+    const load = async () => {
       try {
         setLoading(true);
         let merged = getFavoritesFromStorage();
+        setFavorites(new Set(merged));
+
+        // Поки профіль вантажиться — показуємо локальне обране
+        if (profileLoading) {
+          await fetchListingsForIds(Array.from(merged));
+          if (!cancelled) setLoading(false);
+          return;
+        }
 
         const telegramId =
           profile?.telegramId ||
@@ -137,7 +145,7 @@ const FavoritesPage = () => {
 
         if (telegramId) {
           try {
-            const favRes = await fetch(`/api/favorites?telegramId=${telegramId}`);
+            const favRes = await fetch(`/api/favorites?telegramId=${encodeURIComponent(String(telegramId))}`);
             if (favRes.ok) {
               const favData = await favRes.json();
               const fromDb = (favData.favorites || []) as unknown[];
@@ -162,23 +170,7 @@ const FavoritesPage = () => {
       }
     };
 
-    // Чекаємо профіль (або його відсутність після завантаження), щоб один раз злити з БД
-    if (profileLoading && !favoritesLoadedRef.current) {
-      const local = getFavoritesFromStorage();
-      setFavorites(local);
-      if (local.size > 0) {
-        void fetchListingsForIds(Array.from(local)).finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-      } else {
-        setLoading(false);
-      }
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void loadFavoritesAndListings();
+    void load();
     return () => {
       cancelled = true;
     };

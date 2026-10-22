@@ -276,7 +276,7 @@ export const ProfileListingCard = ({
         {/* Фото + перегляди / лайки під фото */}
         <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
         <div 
-          className={`relative h-[6.75rem] w-[5rem] flex-shrink-0 cursor-pointer overflow-hidden rounded-xl sm:h-28 sm:w-20 ${isLight ? 'bg-white' : 'bg-[#2A2A2A]'}`}
+          className={`relative h-24 w-24 flex-shrink-0 cursor-pointer overflow-hidden rounded-xl ${isLight ? 'bg-white' : 'bg-[#2A2A2A]'}`}
           onClick={() => {
             if (!isPendingModeration && !isDeactivated && !isSold) {
               onSelect(listing);

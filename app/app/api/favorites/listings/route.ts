@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { executeWithRetry } from '@/lib/prisma';
 import { listingTimeFieldsForApi, parseDbDate } from '@/utils/parseDbDate';
 import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
+import { LISTING_FAVORITES_COUNT_SQL } from '@/lib/listingFavoritesCountSql';
 
 function normalizeCondition(condition: string | null): 'new' | 'used' | null {
   if (!condition) return null;
@@ -56,7 +57,8 @@ export async function GET(request: NextRequest) {
           COALESCE(l.currency, 'EUR') as currency,
           l.category, l.subcategory, l.location, l.images,
           l.optimizedImages, l.isFree, l.condition, l.status,
-          l.createdAt, l.publishedAt, l.views, l.favoritesCount,
+          l.createdAt, l.publishedAt, l.views,
+          ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount,
           l.expiresAt, l.promotionType, l.promotionEnds,
           u.username as sellerUsername,
           u.firstName as sellerFirstName,

@@ -33,12 +33,11 @@ export const FavoritesTab = ({
   const { t } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
-  // listings уже з /api/favorites/listings — не відсікаємо через Set.has (string/number mismatch).
-  // Лише прибираємо ті, що користувач щойно прибрав з серця в цій сесії.
+  // listings уже з API обраного; favorites — щоб сховати щойно прибрані з серця.
   const favoritedListings =
-    favorites.size === 0
-      ? []
-      : listings.filter((l) => favorites.has(Number(l.id)));
+    favorites.size > 0
+      ? listings.filter((l) => favorites.has(Number(l.id)))
+      : listings;
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const touchStartScrollY = useRef<number | null>(null);

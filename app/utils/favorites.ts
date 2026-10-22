@@ -78,14 +78,15 @@ export const addFavoriteToStorage = async (
     console.error('Error updating localStorage:', error);
   }
 
-  if (telegramId) {
+  if (telegramId != null && String(telegramId).trim() !== '') {
     fetch('/api/favorites', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        telegramId,
+        // Рядок — інакше PG порівнює text = number і лайк не зберігається
+        telegramId: String(telegramId).trim(),
         listingId,
       }),
     }).catch((error) => {
@@ -114,8 +115,9 @@ export const removeFavoriteFromStorage = async (
     console.error('Error updating localStorage:', error);
   }
 
-  if (telegramId) {
-    fetch(`/api/favorites?telegramId=${telegramId}&listingId=${listingId}`, {
+  if (telegramId != null && String(telegramId).trim() !== '') {
+    const tid = encodeURIComponent(String(telegramId).trim());
+    fetch(`/api/favorites?telegramId=${tid}&listingId=${listingId}`, {
       method: 'DELETE',
     }).catch((error) => {
       console.error('Error removing favorite from DB (non-critical):', error);
