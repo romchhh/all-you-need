@@ -289,17 +289,17 @@ export const ListingDetail = ({
       },
     });
 
-    // Є @ — чат із заготовкою; фото URL в тексті → превʼю знизу
+    // Фото — перший лінк у тексті (превʼю); далі «Открыть в маркетплейс» + deep-link
+    const message = buildSellerContactMessage(listing.title, listingUrl, contactLang, {
+      imageUrl,
+    });
+
     if (action.kind === 'telegram_dm') {
-      const message = buildSellerContactMessage(listing.title, listingUrl, contactLang, {
-        imageUrl,
-      });
       openSellerTelegramChat(action.username, message, tg ?? undefined);
       return;
     }
 
-    // Немає @ — share: url=фото (превʼю знизу), у тексті — «Відкрити в маркетплейсі» + deep-link
-    const message = buildSellerContactMessage(listing.title, listingUrl, contactLang);
+    // Share: url=фото підсилює превʼю; у тексті теж фото першим
     openSellerContactViaTelegramShare(imageUrl || listingUrl, message, tg ?? undefined);
   }, [
     isOwnListing,

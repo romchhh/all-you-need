@@ -23,30 +23,23 @@ def build_seller_contact_message(
         "Відкрити в маркетплейсі" if _lang_code(lang) == "uk" else "Открыть в маркетплейс"
     )
 
+    # Порядок лінків важливий: перший URL = превʼю в Telegram → спочатку фото.
     if _lang_code(lang) == "uk":
-        text = (
-            "👋 Вітаю!\n"
-            "Знайшов(ла) ваше оголошення:\n\n"
-            f"📌 {title}\n"
-            f"🔗 {open_in_marketplace}\n"
-            f"{link}\n\n"
-            "Пропозиція ще актуальна?"
-        )
+        lines = ["Вітаю!", "Знайшов(ла) ваше оголошення:", title]
+        closing = "Пропозиція ще актуальна?"
     else:
-        text = (
-            "👋 Здравствуйте!\n"
-            "Нашёл(а) ваше объявление:\n\n"
-            f"📌 {title}\n"
-            f"🔗 {open_in_marketplace}\n"
-            f"{link}\n\n"
-            "Предложение ещё актуально?"
-        )
+        lines = ["Здравствуйте!", "Нашел(а) ваше объявление:", title]
+        closing = "Предложение ещё актуально?"
 
-    # URL фото в кінці — клієнт Telegram відкриє превʼю знизу
     if photo:
-        text = f"{text}\n\n{photo}"
+        lines.append(photo)
 
-    return text
+    lines.append(open_in_marketplace)
+    if link:
+        lines.append(link)
+
+    lines.append(closing)
+    return "\n".join(lines)
 
 
 def build_seller_telegram_url(

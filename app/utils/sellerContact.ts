@@ -8,7 +8,7 @@ export function resolveSellerContactLang(lang: string | undefined): SellerContac
 }
 
 export type BuildSellerContactMessageOptions = {
-  /** Абсолютний HTTPS URL фото — Telegram покаже превʼю знизу. */
+  /** Абсолютний HTTPS URL фото — має бути першим лінком у тексті для превʼю. */
   imageUrl?: string | null;
 };
 
@@ -25,33 +25,22 @@ export function buildSellerContactMessage(
   const openInMarketplace =
     lang === 'uk' ? 'Відкрити в маркетплейсі' : 'Открыть в маркетплейс';
 
-  const lines =
+  // Порядок лінків важливий: перший URL = превʼю в Telegram → спочатку фото.
+  const lines: string[] =
     lang === 'uk'
-      ? [
-          '👋 Вітаю!',
-          'Знайшов(ла) ваше оголошення:',
-          '',
-          `📌 ${title}`,
-          `🔗 ${openInMarketplace}`,
-          link,
-          '',
-          'Пропозиція ще актуальна?',
-        ]
-      : [
-          '👋 Здравствуйте!',
-          'Нашёл(а) ваше объявление:',
-          '',
-          `📌 ${title}`,
-          `🔗 ${openInMarketplace}`,
-          link,
-          '',
-          'Предложение ещё актуально?',
-        ];
+      ? ['Вітаю!', 'Знайшов(ла) ваше оголошення:', title]
+      : ['Здравствуйте!', 'Нашел(а) ваше объявление:', title];
 
-  // URL фото в кінці — клієнт Telegram відкриває превʼю знизу
   if (imageUrl) {
-    lines.push('', imageUrl);
+    lines.push(imageUrl);
   }
+
+  lines.push(openInMarketplace);
+  if (link) {
+    lines.push(link);
+  }
+
+  lines.push(lang === 'uk' ? 'Пропозиція ще актуальна?' : 'Предложение ещё актуально?');
 
   return lines.join('\n');
 }
@@ -64,21 +53,18 @@ export function buildSellerProfileContactMessage(
   const openInMarketplace =
     lang === 'uk' ? 'Відкрити в маркетплейсі' : 'Открыть в маркетплейс';
   if (lang === 'uk') {
-    return [
-      '👋 Вітаю!',
-      'Цікавлять ваші оголошення на Trade Ground.',
-      '',
-      `🔗 ${openInMarketplace}`,
-      link,
-    ].join('\n');
+    return ['Вітаю!', 'Цікавлять ваші оголошення на Trade Ground.', openInMarketplace, link]
+      .filter(Boolean)
+      .join('\n');
   }
   return [
-    '👋 Здравствуйте!',
+    'Здравствуйте!',
     'Интересуют ваши объявления на Trade Ground.',
-    '',
-    `🔗 ${openInMarketplace}`,
+    openInMarketplace,
     link,
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export function buildSellerTelegramLink(username: string, message: string): string {
