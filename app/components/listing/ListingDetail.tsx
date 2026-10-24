@@ -274,7 +274,7 @@ export const ListingDetail = ({
 
     const contactLang = resolveSellerContactLang(language);
     const listingUrl = getListingContactUrl(listing.id);
-    const message = buildSellerContactMessage(listing.title, listingUrl, contactLang);
+    const imageUrl = telegramShareImageUrl || undefined;
     const action = resolveListingContactAction(listing);
 
     trackAnalytics({
@@ -289,14 +289,18 @@ export const ListingDetail = ({
       },
     });
 
-    // Є @ — чат із заготовкою (як раніше)
+    // Є @ — чат із заготовкою; фото URL в тексті → превʼю знизу
     if (action.kind === 'telegram_dm') {
+      const message = buildSellerContactMessage(listing.title, listingUrl, contactLang, {
+        imageUrl,
+      });
       openSellerTelegramChat(action.username, message, tg ?? undefined);
       return;
     }
 
-    // Немає @ — share з тим самим текстом (не відкривати «голий» пост без заготовки)
-    openSellerContactViaTelegramShare(listingUrl, message, tg ?? undefined);
+    // Немає @ — share: url=фото (превʼю знизу), у тексті — «Відкрити в маркетплейсі» + deep-link
+    const message = buildSellerContactMessage(listing.title, listingUrl, contactLang);
+    openSellerContactViaTelegramShare(imageUrl || listingUrl, message, tg ?? undefined);
   }, [
     isOwnListing,
     listing,
@@ -304,6 +308,7 @@ export const ListingDetail = ({
     tg,
     currentUser?.id,
     profile?.telegramId,
+    telegramShareImageUrl,
   ]);
 
   const contactUsernameForDisplay = useMemo(

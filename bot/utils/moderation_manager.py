@@ -272,6 +272,39 @@ class ModerationManager:
 
         return images[:10]
 
+    def _public_listing_image_url(self, listing: Dict[str, Any]) -> str | None:
+        """Абсолютний URL першого фото для превʼю в заготовці «Написати продавцю» (якщо є публічний шлях)."""
+        webapp_url = (
+            os.getenv("WEBAPP_URL")
+            or os.getenv("NEXT_PUBLIC_BASE_URL")
+            or "https://tradegrnd.com"
+        ).rstrip("/")
+        for item in self._get_listing_images(listing):
+            raw = ""
+            if isinstance(item, dict):
+                raw = str(item.get("url") or item.get("file_id") or "").strip()
+            elif isinstance(item, str):
+                raw = item.strip()
+            if not raw:
+                continue
+            if raw.startswith("http://") or raw.startswith("https://"):
+                return raw
+            # Telegram file_id (не URL) — пропускаємо
+            if "/" not in raw and not raw.lower().endswith(
+                (".jpg", ".jpeg", ".png", ".webp", ".gif")
+            ):
+                continue
+            clean = raw.split("?", 1)[0].lstrip("/")
+            if not clean or "tgground" in clean.lower() or clean.lower().endswith("_default.jpg"):
+                continue
+            if "parsed_photos/" in clean:
+                suffix = clean.split("parsed_photos/", 1)[1]
+                if suffix:
+                    return f"{webapp_url}/api/parsed-images/{suffix}"
+            else:
+                return f"{webapp_url}/api/images/{clean}"
+        return None
+
     @staticmethod
     def _media_item_file_id_and_type(item: Any) -> tuple:
         """Повертає (file_id, type) для елемента: str -> (str, "photo"), dict -> (file_id, type)."""
@@ -842,6 +875,7 @@ class ModerationManager:
             # Формуємо посилання на продавця (без емодзі для каналу)
             seller_label = t(user_id_for_lang, 'listing.details.seller_channel')
             contact_listing_url = listing_open_url or bot_link
+            contact_image_url = self._public_listing_image_url(listing)
             if seller_username:
                 seller_lang = get_user_lang(int(seller_telegram_id)) if seller_telegram_id else "ru"
                 seller_href = build_seller_telegram_url(
@@ -849,6 +883,7 @@ class ModerationManager:
                     title,
                     contact_listing_url,
                     lang=seller_lang,
+                    image_url=contact_image_url,
                 )
                 seller_text = f"{seller_label} <a href=\"{seller_href}\">{seller_full_name}</a>"
             elif seller_telegram_id:

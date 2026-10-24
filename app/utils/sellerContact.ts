@@ -7,36 +7,53 @@ export function resolveSellerContactLang(lang: string | undefined): SellerContac
   return lang === 'uk' ? 'uk' : 'ru';
 }
 
-/** Класична заготовка «Написати продавцю» — як було з початку. */
+export type BuildSellerContactMessageOptions = {
+  /** Абсолютний HTTPS URL фото — Telegram покаже превʼю знизу. */
+  imageUrl?: string | null;
+};
+
+/** Класична заготовка «Написати продавцю». */
 export function buildSellerContactMessage(
   listingTitle: string,
   listingUrl: string,
   lang: SellerContactLang = 'ru',
+  options?: BuildSellerContactMessageOptions,
 ): string {
   const title = listingTitle.trim() || (lang === 'uk' ? 'Оголошення' : 'Объявление');
   const link = listingUrl.trim();
+  const imageUrl = (options?.imageUrl || '').trim();
+  const openInMarketplace =
+    lang === 'uk' ? 'Відкрити в маркетплейсі' : 'Открыть в маркетплейс';
 
-  if (lang === 'uk') {
-    return [
-      '👋 Вітаю!',
-      'Знайшов(ла) ваше оголошення:',
-      '',
-      `📌 ${title}`,
-      `🔗 ${link}`,
-      '',
-      'Пропозиція ще актуальна?',
-    ].join('\n');
+  const lines =
+    lang === 'uk'
+      ? [
+          '👋 Вітаю!',
+          'Знайшов(ла) ваше оголошення:',
+          '',
+          `📌 ${title}`,
+          `🔗 ${openInMarketplace}`,
+          link,
+          '',
+          'Пропозиція ще актуальна?',
+        ]
+      : [
+          '👋 Здравствуйте!',
+          'Нашёл(а) ваше объявление:',
+          '',
+          `📌 ${title}`,
+          `🔗 ${openInMarketplace}`,
+          link,
+          '',
+          'Предложение ещё актуально?',
+        ];
+
+  // URL фото в кінці — клієнт Telegram відкриває превʼю знизу
+  if (imageUrl) {
+    lines.push('', imageUrl);
   }
 
-  return [
-    '👋 Здравствуйте!',
-    'Нашёл(а) ваше объявление:',
-    '',
-    `📌 ${title}`,
-    `🔗 ${link}`,
-    '',
-    'Предложение ещё актуально?',
-  ].join('\n');
+  return lines.join('\n');
 }
 
 export function buildSellerProfileContactMessage(
@@ -44,10 +61,24 @@ export function buildSellerProfileContactMessage(
   lang: SellerContactLang = 'ru',
 ): string {
   const link = profileUrl.trim();
+  const openInMarketplace =
+    lang === 'uk' ? 'Відкрити в маркетплейсі' : 'Открыть в маркетплейс';
   if (lang === 'uk') {
-    return ['👋 Вітаю!', 'Цікавлять ваші оголошення на Trade Ground.', '', `🔗 ${link}`].join('\n');
+    return [
+      '👋 Вітаю!',
+      'Цікавлять ваші оголошення на Trade Ground.',
+      '',
+      `🔗 ${openInMarketplace}`,
+      link,
+    ].join('\n');
   }
-  return ['👋 Здравствуйте!', 'Интересуют ваши объявления на Trade Ground.', '', `🔗 ${link}`].join('\n');
+  return [
+    '👋 Здравствуйте!',
+    'Интересуют ваши объявления на Trade Ground.',
+    '',
+    `🔗 ${openInMarketplace}`,
+    link,
+  ].join('\n');
 }
 
 export function buildSellerTelegramLink(username: string, message: string): string {
@@ -76,15 +107,17 @@ export function openSellerTelegramChat(
   }
 }
 
-/** Вибір чату з готовим текстом (коли немає @username продавця). */
+/**
+ * Вибір чату з готовим текстом (коли немає @username продавця).
+ * `previewUrl` — що Telegram покаже знизу (краще абсолютний URL фото оголошення).
+ */
 export function openSellerContactViaTelegramShare(
-  listingUrl: string,
+  previewUrl: string,
   message: string,
   tg?: TelegramWebApp,
 ): void {
-  const url = listingUrl.trim();
+  const url = previewUrl.trim();
   const text = message.trim();
-  // Як у ShareModal: text у query; url окремо для превʼю
   const shareUrl = url
     ? `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
     : `https://t.me/share/url?text=${encodeURIComponent(text)}`;
