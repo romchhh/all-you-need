@@ -61,6 +61,7 @@ import { ANALYTICS_EVENTS, ANALYTICS_EVENT_GROUPS } from '@/constants/analyticsE
 import { ListingCardSkeleton } from '@/components/ui/SkeletonLoader';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
+import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
 
 const SortModal = dynamic(
   () => import('@/components/modals/SortModal').then((m) => ({ default: m.SortModal })),
@@ -613,11 +614,12 @@ export function SearchView({
 
   const handleToggleBusinessFollow = useCallback(
     async (business: BusinessSearchCardData) => {
-      if (!profileTelegramId) {
+      const followerId = resolveViewerTelegramId(profileTelegramId, null);
+      if (!followerId) {
         showToast(t('businessProfile.public.loginToSubscribe'), 'info');
         return;
       }
-      if (String(business.sellerTelegramId) === String(profileTelegramId)) return;
+      if (String(business.sellerTelegramId) === String(followerId)) return;
 
       const nextFollowing = !business.isFollowing;
       setFollowBusyId(business.id);
@@ -627,13 +629,17 @@ export function SearchView({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             telegramId: business.sellerTelegramId,
-            followerTelegramId: profileTelegramId,
+            followerTelegramId: followerId,
             action: nextFollowing ? 'follow' : 'unfollow',
           }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          showToast(t('businessProfile.public.subscribeError'), 'error');
+          if (data?.error === 'follower_not_found') {
+            showToast(t('businessProfile.public.registerToSubscribe'), 'info');
+          } else {
+            showToast(t('businessProfile.public.subscribeError'), 'error');
+          }
           return;
         }
         const patchBusiness = (b: BusinessSearchCardData) =>

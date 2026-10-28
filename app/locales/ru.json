@@ -1642,6 +1642,7 @@
       "unsubscribedToast": "Подписка отменена",
       "subscribeError": "Не удалось изменить подписку",
       "loginToSubscribe": "Откройте приложение в Telegram, чтобы подписаться",
+      "registerToSubscribe": "Пройдите регистрацию в боте, чтобы подписаться",
       "followersLabel": "подписчиков",
       "followersLabel_one": "подписчик",
       "followersLabel_few": "подписчика",

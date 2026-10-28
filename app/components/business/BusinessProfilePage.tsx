@@ -19,11 +19,13 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { useSwipeBack } from '@/features/ui/hooks/useSwipeBack';
 import { useTelegram } from '@/features/telegram/hooks/useTelegram';
+import { useUser } from '@/features/user/hooks/useUser';
 import { usePageTransition } from '@/contexts/PageTransitionContext';
 import { useParams } from 'next/navigation';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
+import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
 import {
   normalizeInstagramUrl,
   normalizeWebsiteUrl,
@@ -182,8 +184,14 @@ export function BusinessProfilePage({
     [t]
   );
   const { user: currentUser } = useTelegram();
+  const { profile: viewerProfile } = useUser();
   const { hide: hidePageLoader } = usePageTransition();
   const { toast, showToast, hideToast } = useToast();
+
+  const viewerTelegramId = useMemo(
+    () => resolveViewerTelegramId(viewerProfile?.telegramId, currentUser?.id ?? null),
+    [viewerProfile?.telegramId, currentUser?.id]
+  );
 
   const [profile, setProfile] = useState<PublicBusinessProfile | null>(null);
   const [reviews, setReviews] = useState<PublicBusinessReview[]>([]);
@@ -230,7 +238,7 @@ export function BusinessProfilePage({
   const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
-      const viewerId = currentUser?.id?.toString() || '';
+      const viewerId = viewerTelegramId || '';
       const viewerQuery = viewerId ? `&viewerTelegramId=${encodeURIComponent(viewerId)}` : '';
       const profileRes = await fetch(
         `/api/business-profile/public?telegramId=${encodeURIComponent(sellerTelegramId)}&lang=${lang}${viewerQuery}`
@@ -271,7 +279,7 @@ export function BusinessProfilePage({
       setLoading(false);
       hidePageLoader({ minMs: 200 });
     }
-  }, [sellerTelegramId, lang, currentUser?.id, hidePageLoader]);
+  }, [sellerTelegramId, lang, viewerTelegramId, hidePageLoader]);
 
   useEffect(() => {
     void fetchProfile();
@@ -433,16 +441,28 @@ export function BusinessProfilePage({
   };
 
   const viewingOwn =
-    isOwn || Boolean(currentUser?.id && String(currentUser.id) === String(sellerTelegramId));
+    isOwn || Boolean(viewerTelegramId && String(viewerTelegramId) === String(sellerTelegramId));
 
   const handleFollow = async () => {
     if (viewingOwn || followBusy) return;
-    if (!currentUser?.id) {
+    if (!viewerTelegramId) {
       showToast(t('businessProfile.public.loginToSubscribe'), 'info');
       return;
     }
 
     const nextFollowing = !isFollowing;
+    const prevFollowing = isFollowing;
+    const prevCount = profile?.followersCount ?? 0;
+    // Optimistic UI — одразу видно, що кнопка спрацювала
+    setIsFollowing(nextFollowing);
+    setProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            followersCount: Math.max(0, prev.followersCount + (nextFollowing ? 1 : -1)),
+          }
+        : prev
+    );
     setFollowBusy(true);
     tg?.HapticFeedback?.impactOccurred?.('light');
 
@@ -452,13 +472,21 @@ export function BusinessProfilePage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           telegramId: sellerTelegramId,
-          followerTelegramId: String(currentUser.id),
+          followerTelegramId: viewerTelegramId,
           action: nextFollowing ? 'follow' : 'unfollow',
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        showToast(t('businessProfile.public.subscribeError'), 'error');
+        setIsFollowing(prevFollowing);
+        setProfile((prev) => (prev ? { ...prev, followersCount: prevCount } : prev));
+        if (data?.error === 'follower_not_found') {
+          showToast(t('businessProfile.public.registerToSubscribe'), 'info');
+        } else if (data?.error === 'Business profile not active') {
+          showToast(t('businessProfile.public.subscribeError'), 'error');
+        } else {
+          showToast(t('businessProfile.public.subscribeError'), 'error');
+        }
         return;
       }
 
@@ -473,6 +501,8 @@ export function BusinessProfilePage({
         'success'
       );
     } catch {
+      setIsFollowing(prevFollowing);
+      setProfile((prev) => (prev ? { ...prev, followersCount: prevCount } : prev));
       showToast(t('businessProfile.public.subscribeError'), 'error');
     } finally {
       setFollowBusy(false);
@@ -821,9 +851,13 @@ export function BusinessProfilePage({
           {!viewingOwn ? (
             <button
               type="button"
-              onClick={() => void handleFollow()}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleFollow();
+              }}
               disabled={followBusy}
-              className={`mt-0.5 shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
+              className={`relative z-20 mt-0.5 shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
                 isFollowing
                   ? isLight
                     ? 'border border-[#3F5331]/30 bg-[#E8F0E0]/80 text-[#3F5331]'

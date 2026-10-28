@@ -77,14 +77,14 @@ export function BusinessSellerBlock({ business, onViewProfile, tg }: BusinessSel
           </div>
 
           <div className="min-w-0 flex-1 pt-0.5">
-            <p className={`mb-1.5 truncate text-base font-bold ${ac.pageHeading}`}>{business.businessName}</p>
             <span
-              className={`mb-2 inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${
+              className={`mb-1.5 inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${
                 isLight ? 'bg-[#C8E6A0] text-[#1a2414]' : 'bg-[#C8E6A0] text-[#0f1408]'
               }`}
             >
               BUSINESS
             </span>
+            <p className={`mb-1.5 truncate text-base font-bold ${ac.pageHeading}`}>{business.businessName}</p>
             {showRating && (
               <div className={`mb-1.5 flex items-center gap-1 text-sm ${ac.mutedText}`}>
                 <Star size={14} className="shrink-0 fill-amber-400 text-amber-400" />

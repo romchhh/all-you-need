@@ -180,8 +180,11 @@ export async function POST(request: NextRequest) {
     const businessUser = await findUserByTelegramId(businessTelegramId);
     const followerUser = await findUserByTelegramId(followerTelegramId);
 
-    if (!businessUser || !followerUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!businessUser) {
+      return NextResponse.json({ error: 'business_not_found' }, { status: 404 });
+    }
+    if (!followerUser) {
+      return NextResponse.json({ error: 'follower_not_found' }, { status: 404 });
     }
 
     if (businessUser.id === followerUser.id) {
