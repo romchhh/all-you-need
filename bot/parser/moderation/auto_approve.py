@@ -517,12 +517,14 @@ async def _publish_and_notify(
 
     item_id = int(item["id"])
     try:
+        # Dedup завжди на publish — навіть у aggressive після /parse
+        # (інакше два канали з тим самим постом пролітають на МП).
         listing_id, description, images_web = publish_parsed_item_marketplace(
             item_id,
             listing_item,
             item,
             moderated_by=None,
-            skip_duplicate_check=aggressive,
+            skip_duplicate_check=False,
         )
     except MarketplacePublishError as e:
         err = str(e)
