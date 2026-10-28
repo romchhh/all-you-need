@@ -20,6 +20,9 @@ import { getCategories } from '@/constants/categories';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
 import { AppHeader } from '@/components/layout/AppHeader';
 
+const SEARCH_SCROLL_KEY = 'searchScrollPosition';
+const SEARCH_RETURN_LISTING_KEY = 'searchReturnListingId';
+
 export default function SearchPage() {
   const params = useParams();
   const router = useRouter();
@@ -41,6 +44,17 @@ export default function SearchPage() {
   } | null>(null);
   const previousListingRef = useRef<Listing | null>(null);
   const overlayOpenRef = useRef(false);
+  const savedScrollRef = useRef(0);
+  const returnListingIdRef = useRef<number | null>(null);
+  const shouldRestoreScrollRef = useRef(false);
+  const prevSelectedListing = useRef<Listing | null>(null);
+  const prevSelectedSeller = useRef<{
+    telegramId: string;
+    name: string;
+    avatar: string;
+    username?: string;
+    phone?: string;
+  } | null>(null);
 
   const initialQuery = searchParams.get('q') ?? '';
   const initialCategory = searchParams.get('category');
@@ -143,7 +157,6 @@ export default function SearchPage() {
 
   const handleQueryChange = useCallback((query: string) => {
     if (typeof window === 'undefined') return;
-    // Пошук живе лише на /search — не залишаємо фільтр на головній базару
     localStorage.removeItem('bazaarSearchQuery');
     const url = new URL(window.location.href);
     url.searchParams.delete('listing');
@@ -219,15 +232,63 @@ export default function SearchPage() {
     }
   };
 
-  const handleSelectListing = useCallback((listing: Listing) => {
-    document.body.style.scrollBehavior = 'auto';
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    setSelectedListing(listing);
+  const saveSearchScroll = useCallback((listingId?: number) => {
+    if (typeof window === 'undefined') return;
+    const y = window.scrollY || document.documentElement.scrollTop;
+    savedScrollRef.current = y;
+    localStorage.setItem(SEARCH_SCROLL_KEY, String(y));
+    if (listingId != null) {
+      returnListingIdRef.current = listingId;
+      localStorage.setItem(SEARCH_RETURN_LISTING_KEY, String(listingId));
+    }
   }, []);
 
+  const restoreSearchScroll = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    const listingId =
+      returnListingIdRef.current ??
+      Number.parseInt(localStorage.getItem(SEARCH_RETURN_LISTING_KEY) || '', 10);
+
+    const tryScrollToListing = (attempt = 0) => {
+      if (Number.isFinite(listingId) && listingId > 0) {
+        const el = document.querySelector(
+          `[data-listing-id="${listingId}"]`
+        ) as HTMLElement | null;
+        if (el) {
+          el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+          return;
+        }
+        if (attempt < 16) {
+          setTimeout(() => tryScrollToListing(attempt + 1), 120);
+          return;
+        }
+      }
+
+      const saved =
+        savedScrollRef.current > 0
+          ? savedScrollRef.current
+          : Number.parseInt(localStorage.getItem(SEARCH_SCROLL_KEY) || '0', 10);
+      if (saved > 0) {
+        window.scrollTo({ top: saved, behavior: 'auto' });
+        document.documentElement.scrollTop = saved;
+        document.body.scrollTop = saved;
+      }
+    };
+
+    setTimeout(() => tryScrollToListing(), 80);
+  }, []);
+
+  const handleSelectListing = useCallback(
+    (listing: Listing) => {
+      saveSearchScroll(listing.id);
+      setSelectedListing(listing);
+    },
+    [saveSearchScroll]
+  );
+
   const closeOverlay = useCallback(() => {
+    shouldRestoreScrollRef.current = true;
     if (overlayOpenRef.current) {
       window.history.back();
       return;
@@ -235,6 +296,27 @@ export default function SearchPage() {
     setSelectedListing(null);
     setSelectedSeller(null);
   }, []);
+
+  // Після закриття картки — повернутись у стрічку результатів на те саме місце
+  useEffect(() => {
+    const wasOpen =
+      prevSelectedListing.current !== null || prevSelectedSeller.current !== null;
+    const isNowClosed = selectedListing === null && selectedSeller === null;
+
+    if (wasOpen && isNowClosed) {
+      shouldRestoreScrollRef.current = true;
+    }
+
+    prevSelectedListing.current = selectedListing;
+    prevSelectedSeller.current = selectedSeller;
+  }, [selectedListing, selectedSeller]);
+
+  useEffect(() => {
+    if (selectedListing || selectedSeller) return;
+    if (!shouldRestoreScrollRef.current) return;
+    shouldRestoreScrollRef.current = false;
+    restoreSearchScroll();
+  }, [selectedListing, selectedSeller, restoreSearchScroll]);
 
   if (isBlocked && !profile) {
     return (
@@ -340,6 +422,7 @@ export default function SearchPage() {
           onCategoryChange={handleCategoryChange}
           onSelectListing={handleSelectListing}
           onSelectBusiness={(payload) => {
+            saveSearchScroll();
             setSelectedSeller({
               telegramId: payload.telegramId,
               name: payload.name,

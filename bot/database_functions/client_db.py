@@ -1,9 +1,11 @@
 import sqlite3
+import threading
 from datetime import datetime
 from database_functions.db_connection import get_connection, is_postgres, bool_param, bool_assign_placeholder
 
 conn = get_connection()
 cursor = conn.cursor()
+_DB_LOCK = threading.RLock()
 
 
 def _rollback_on_error() -> None:
@@ -13,6 +15,38 @@ def _rollback_on_error() -> None:
         conn.rollback()
     except Exception:
         pass
+
+
+def ensure_db_ready() -> None:
+    """
+    Перевіряє живе з'єднання з БД; при обриві / aborted transaction — reconnect.
+    Глобальний conn/cursor у asyncio інакше легко «падає» після idle timeout PG.
+    """
+    global conn, cursor
+    with _DB_LOCK:
+        try:
+            if is_postgres():
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            return
+        except Exception as e:
+            print(f"DB unhealthy, reconnecting: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        except Exception as e:
+            print(f"DB reconnect failed: {e}")
+            raise
 
 
 def _users_legacy_next_id() -> int:
@@ -199,11 +233,24 @@ def add_user(user_id: str, user_name: str, user_first_name: str, user_last_name:
         raise
 
 def check_user(user_id: str):
-    cursor.execute('SELECT id FROM User WHERE telegramId = ?', (int(user_id),))
-    user = cursor.fetchone()
-    if user:
-        return True
-    return False
+    try:
+        ensure_db_ready()
+        cursor.execute('SELECT id FROM User WHERE telegramId = ?', (int(user_id),))
+        user = cursor.fetchone()
+        if user:
+            return True
+        return False
+    except Exception as e:
+        print(f"check_user failed for {user_id}: {e}")
+        _rollback_on_error()
+        try:
+            ensure_db_ready()
+            cursor.execute('SELECT id FROM User WHERE telegramId = ?', (int(user_id),))
+            return cursor.fetchone() is not None
+        except Exception as e2:
+            print(f"check_user retry failed for {user_id}: {e2}")
+            _rollback_on_error()
+            return False
 
 
 def is_user_active(user_id):
@@ -280,6 +327,7 @@ def update_user_username(user_id: str, username: str | None):
     current_date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     username_val = username if username else None
     try:
+        ensure_db_ready()
         cursor.execute(
             "UPDATE User SET username = ?, updatedAt = ? WHERE telegramId = ?",
             (username_val, current_date_str, int(user_id))
@@ -292,6 +340,7 @@ def update_user_username(user_id: str, username: str | None):
         conn.commit()
     except Exception as e:
         print(f"Error updating username for user {user_id}: {e}")
+        _rollback_on_error()
 
 
 def get_user_avatar(user_id: str):

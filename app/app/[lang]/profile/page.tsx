@@ -20,6 +20,7 @@ import { usePullToRefresh } from '@/features/ui/hooks/usePullToRefresh';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { getCategories } from '@/constants/categories';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
+import { useTabReturnRestore } from '@/features/ui/hooks/useTabReturnRestore';
 
 const ProfilePage = () => {
   const params = useParams();
@@ -78,6 +79,13 @@ const ProfilePage = () => {
   const isReturningFromListing = useRef(false);
   const hasScrolledOnThisMount = useRef(false);
   const didToggleFavoriteOnCurrentListing = useRef(false);
+
+  useTabReturnRestore({
+    tab: 'profile',
+    overlayOpen: Boolean(selectedListing || selectedSeller),
+    setSelectedListing,
+    ready: !profileLoading,
+  });
   
   // Завантажуємо обране з localStorage при завантаженні
   useEffect(() => {

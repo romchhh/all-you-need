@@ -4,7 +4,17 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useParams, usePathname } from 'next/navigation';
 import { NavIcon } from '@/components/layout/NavIcon';
-import { dispatchBazaarRestoreListingScroll } from '@/lib/bazaar/bazaarScrollStorage';
+import {
+  dispatchBazaarRestoreListingScroll,
+  persistBazaarReturnListingId,
+} from '@/lib/bazaar/bazaarScrollStorage';
+import {
+  type NavTab,
+  persistOpenListingFromUrl,
+  persistTabScroll,
+  peekTabReturnListing,
+  readTabScroll,
+} from '@/lib/navigation/tabNavRestore';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -186,10 +196,26 @@ export const BottomNavigation = ({
     pendingTabNavRef.current = true;
     showPageLoader({ minMs: 350 });
 
+    const sourceTab = currentActiveTab as NavTab;
     if (typeof window !== 'undefined') {
-      const currentScrollKey = `${currentActiveTab}ScrollPosition`;
       const scrollY = window.scrollY || document.documentElement.scrollTop;
-      localStorage.setItem(currentScrollKey, scrollY.toString());
+      const listingOpen = Boolean(
+        new URLSearchParams(window.location.search).get('listing')
+      );
+      // З оверлею картки window.scroll часто 0 — не затираємо збережений скрол стрічки
+      if (listingOpen) {
+        const prev = readTabScroll(sourceTab);
+        if (scrollY > 40) persistTabScroll(sourceTab, scrollY);
+        else if (prev <= 0 && scrollY > 0) persistTabScroll(sourceTab, scrollY);
+      } else {
+        persistTabScroll(sourceTab, scrollY);
+      }
+      // Якщо відкрита картка — запам'ятати, щоб повернутись у неї
+      persistOpenListingFromUrl(sourceTab);
+      if (sourceTab === 'bazaar') {
+        const id = peekTabReturnListing('bazaar');
+        if (id != null) persistBazaarReturnListingId(id);
+      }
     }
 
     if (onCloseDetail) {

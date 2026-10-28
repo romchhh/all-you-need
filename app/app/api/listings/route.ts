@@ -22,9 +22,10 @@ import {
   parseOptionalInt,
 } from '@/lib/listings/catalogFilters';
 import {
-  generateSearchVariants,
   generateSearchVariantsWithCities,
+  listingMatchesSearchQuery,
   normalizeCyrillicToLower,
+  sqlListingSearchableDescription,
 } from '@/lib/listings/searchVariants';
 
 // force-dynamic: Next route cache off; каталог прискорюємо in-memory bazaarCatalogServerCache
@@ -536,10 +537,13 @@ export async function GET(request: NextRequest) {
         
         // Для коротких пошукових запитів (до 30 символів) використовуємо SQL LIKE
         // Для довших використовуємо фільтрацію в JavaScript після отримання даних
+        const searchableDesc = sqlListingSearchableDescription('l');
         if (searchTrimmed.length <= 30) {
           // Створюємо умову з усіма варіантами для кожного поля
           const titleConditions = searchVariants.map(() => 'l.title LIKE ?').join(' OR ');
-          const descConditions = searchVariants.map(() => 'l.description LIKE ?').join(' OR ');
+          const descConditions = searchVariants
+            .map(() => `${searchableDesc} LIKE ?`)
+            .join(' OR ');
           const locationConditions = searchVariants.map(() => 'l.location LIKE ?').join(' OR ');
           
           whereClause += ` AND (
@@ -553,18 +557,17 @@ export async function GET(request: NextRequest) {
             params.push(`%${variant}%`); // title
           });
           searchVariants.forEach(variant => {
-            params.push(`%${variant}%`); // description
+            params.push(`%${variant}%`); // description (без @автора)
           });
           searchVariants.forEach(variant => {
             params.push(`%${variant}%`); // location
           });
         } else {
-          // Для довших запитів зберігаємо пошуковий запит для фільтрації в JavaScript
-          // Використовуємо тільки lowercase варіант для базового фільтру
+          // Для довших запитів — базовий LIKE + JS post-filter без ніку автора
           const searchLower = normalizeCyrillicToLower(searchTrimmed);
           whereClause += ` AND (
             (l.title LIKE ? OR l.title LIKE ?) OR
-            (l.description LIKE ? OR l.description LIKE ?) OR
+            (${searchableDesc} LIKE ? OR ${searchableDesc} LIKE ?) OR
             (l.location LIKE ? OR l.location LIKE ?)
           )`;
           params.push(
@@ -612,11 +615,14 @@ export async function GET(request: NextRequest) {
           orderByClause += " l.createdAt DESC";
       }
       
+      const searchFetchLimit = search ? Math.min(Math.max(limit * 4, limit + 40), 120) : limit;
+
       const listingsQuery = `
              SELECT 
                l.id,
                l.userId,
                l.title,
+               l.description,
                l.price,
                l.previousPrice,
                l.priceChangedAt,
@@ -661,7 +667,7 @@ export async function GET(request: NextRequest) {
       
       try {
         // Формуємо масив параметрів для основного запиту
-        const listingsParams = [...params, limit, offset];
+        const listingsParams = [...params, searchFetchLimit, offset];
         const countParams = [...params];
         
         const [data, count] = await Promise.all([
@@ -700,7 +706,7 @@ export async function GET(request: NextRequest) {
           queryFallback = queryFallback.replace(`, ${autoRenewFrag}`, '');
         }
         const [data, count] = await Promise.all([
-          prisma.$queryRawUnsafe(queryFallback, ...params, limit, offset) as any,
+          prisma.$queryRawUnsafe(queryFallback, ...params, searchFetchLimit, offset) as any,
           prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>,
         ]);
         listingsData = data.map((listing: any) => ({
@@ -713,34 +719,17 @@ export async function GET(request: NextRequest) {
 
       listings = listingsData;
       total = Number(totalCountData[0]?.count || 0);
-      
-      // Для довших пошукових запитів (>30 символів) додатково фільтруємо в JavaScript
-      // оскільки SQLite не підтримує правильну нормалізацію кирилиці
-      if (search && search.trim().length > 30) {
-        const searchTrimmed = search.trim();
-        const searchLower = normalizeCyrillicToLower(searchTrimmed);
-        const searchVariants = generateSearchVariants(searchTrimmed);
-        
-        listings = listings.filter((listing: any) => {
-          const title = listing.title || '';
-          const description = listing.description || '';
-          const location = listing.location || '';
-          
-          const titleLower = normalizeCyrillicToLower(title);
-          const descLower = normalizeCyrillicToLower(description);
-          const locationLower = normalizeCyrillicToLower(location);
-          
-          // Перевіряємо, чи містить хоча б одне поле пошуковий запит
-          return searchVariants.some(variant => {
-            const variantLower = normalizeCyrillicToLower(variant);
-            return titleLower.includes(variantLower) ||
-                   descLower.includes(variantLower) ||
-                   locationLower.includes(variantLower);
-          });
-        });
-        
-        // Оновлюємо загальну кількість після фільтрації
-        total = listings.length;
+
+      // Прибираємо false-positive по @ніку автора в описі (👤 Автор: @bmw)
+      if (search) {
+        const before = listings.length;
+        listings = listings.filter((listing: any) =>
+          listingMatchesSearchQuery(listing, search)
+        );
+        if (before > listings.length) {
+          total = Math.max(0, total - (before - listings.length));
+        }
+        listings = listings.slice(0, limit);
       }
     }
 

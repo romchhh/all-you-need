@@ -299,7 +299,7 @@ export const ListingDetail = ({
       return;
     }
 
-    // Share: url=фото підсилює превʼю; у тексті теж фото першим
+    // Немає @ (або parser open_url) — share із тим самим шаблоном (не відкривати «голий» пост)
     openSellerContactViaTelegramShare(imageUrl || listingUrl, message, tg ?? undefined);
   }, [
     isOwnListing,
@@ -583,20 +583,21 @@ export const ListingDetail = ({
     }
   };
 
-  const sellerListingsProfileQuery =
-    listing.profileType === 'business' ? '&profileType=business' : '';
+  // Завжди явный personal|business — інакше API змішує вітрину бізнесу з особистими
+  const relatedProfileType =
+    listing.profileType === 'business' ? 'business' : 'personal';
+  const sellerListingsProfileQuery = `&profileType=${relatedProfileType}`;
 
   // Стабільні ключі — без refetch при гідрації listing / зміні categories через t()
   const relatedSellerId = listing.seller.telegramId || '';
   const relatedCategory = listing.category || '';
   const relatedSubcategory = listing.subcategory || '';
-  const relatedProfileType = listing.profileType || 'personal';
   const relatedViewerId = currentUser?.id?.toString() || '';
 
   useEffect(() => {
     const abort = new AbortController();
     const listingId = listing.id;
-    const profileQuery = relatedProfileType === 'business' ? '&profileType=business' : '';
+    const profileQuery = `&profileType=${relatedProfileType}`;
 
     const fetchRelatedListings = async () => {
       try {
@@ -608,9 +609,11 @@ export const ListingDetail = ({
             ).then(async (sellerResponse) => {
               if (!sellerResponse.ok) return;
               const sellerData = await sellerResponse.json();
-              const filtered = (sellerData.listings || []).filter(
-                (l: Listing) => l.id !== listingId
-              );
+              const filtered = (sellerData.listings || []).filter((l: Listing) => {
+                if (l.id === listingId) return false;
+                const pt = l.profileType === 'business' ? 'business' : 'personal';
+                return pt === relatedProfileType;
+              });
               setSellerListings(filtered);
               setSellerTotal(sellerData.total || 0);
               setSellerHasMore(filtered.length < (sellerData.total || 0) - 1);
@@ -664,7 +667,11 @@ export const ListingDetail = ({
       );
       if (response.ok) {
         const data = await response.json();
-        const filtered = (data.listings || []).filter((l: Listing) => l.id !== listing.id);
+        const filtered = (data.listings || []).filter((l: Listing) => {
+          if (l.id === listing.id) return false;
+          const pt = l.profileType === 'business' ? 'business' : 'personal';
+          return pt === relatedProfileType;
+        });
         setSellerListings(prev => [...prev, ...filtered]);
         setSellerHasMore((sellerOffset + filtered.length) < ((data.total || 0) - 1));
         setSellerOffset(prev => prev + 12);
@@ -729,7 +736,11 @@ export const ListingDetail = ({
         );
         if (sellerResponse.ok) {
           const sellerData = await sellerResponse.json();
-          const filtered = (sellerData.listings || []).filter((l: Listing) => l.id !== listing.id);
+          const filtered = (sellerData.listings || []).filter((l: Listing) => {
+            if (l.id === listing.id) return false;
+            const pt = l.profileType === 'business' ? 'business' : 'personal';
+            return pt === relatedProfileType;
+          });
           setSellerListings(filtered);
           setSellerTotal(sellerData.total || 0);
           setSellerHasMore(filtered.length < ((sellerData.total || 0) - 1));

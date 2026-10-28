@@ -77,20 +77,39 @@ export function getListingContactUrl(listingId: number): string {
 }
 
 /**
+ * Відкрити t.me / share з заготовленим текстом.
+ * `openTelegramLink` на iOS часто відкриває чат БЕЗ ?text= —
+ * тому клікаємо <a target=_blank> / location.href, не openTelegramLink.
+ */
+export function openTelegramUrlWithPrefill(link: string, tg?: TelegramWebApp): void {
+  tg?.HapticFeedback?.impactOccurred('medium');
+  if (typeof window === 'undefined') return;
+
+  try {
+    const a = document.createElement('a');
+    a.href = link;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  } catch {
+    // fall through
+  }
+  window.location.href = link;
+}
+
+/**
  * Відкрити чат з продавцем із заготовленим текстом.
- * На iOS `openTelegramLink` часто відкриває чат БЕЗ ?text= (баг клієнта) —
- * тому для лінків з текстом використовуємо location.href.
  */
 export function openSellerTelegramChat(
   username: string,
   message: string,
   tg?: TelegramWebApp,
 ): void {
-  const link = buildSellerTelegramLink(username, message);
-  tg?.HapticFeedback?.impactOccurred('medium');
-  if (typeof window !== 'undefined') {
-    window.location.href = link;
-  }
+  openTelegramUrlWithPrefill(buildSellerTelegramLink(username, message), tg);
 }
 
 /**
@@ -107,10 +126,16 @@ export function openSellerContactViaTelegramShare(
   const shareUrl = url
     ? `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
     : `https://t.me/share/url?text=${encodeURIComponent(text)}`;
-  openTelegramDeepLink(shareUrl, tg);
+  openTelegramUrlWithPrefill(shareUrl, tg);
 }
 
 export function openTelegramDeepLink(link: string, tg?: TelegramWebApp): void {
+  // Без prefill — можна openTelegramLink; із text=/share — через location.href
+  const hasPrefill = /[?&]text=/.test(link) || /\/share\/url/i.test(link);
+  if (hasPrefill) {
+    openTelegramUrlWithPrefill(link, tg);
+    return;
+  }
   if (tg?.openTelegramLink) {
     tg.openTelegramLink(link);
     tg.HapticFeedback?.impactOccurred('medium');

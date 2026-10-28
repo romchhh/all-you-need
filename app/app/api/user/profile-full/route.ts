@@ -98,12 +98,22 @@ export async function GET(request: NextRequest) {
 
     // Отримуємо оголошення користувача
     // Для чужого профілю показуємо тільки активні оголошення
+    // personal|business — не змішувати вітрину бізнесу з особистими (дефолт: personal)
+    const profileTypeParam = searchParams.get('profileType');
+    const profileTypeFilter =
+      profileTypeParam === 'business' || profileTypeParam === 'personal'
+        ? profileTypeParam
+        : 'personal';
+
     let whereClause = "WHERE l.userId = ?";
     const queryParams: any[] = [userId];
     
     if (!isOwnProfile) {
       whereClause += " AND l.status = 'active'";
     }
+
+    whereClause += " AND COALESCE(l.profileType, 'personal') = ?";
+    queryParams.push(profileTypeFilter);
     
     const query = `SELECT 
         l.id,
@@ -250,6 +260,7 @@ export async function GET(request: NextRequest) {
         expiresAt: listing.expiresAt || null,
         autoRenew: listing.autoRenew === true || Number(listing.autoRenew) === 1,
         favoritesCount: normalizeFavoritesCount(listing.favoritesCount),
+        profileType: profileTypeFilter,
       };
     });
 

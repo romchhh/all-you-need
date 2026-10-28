@@ -1,28 +1,37 @@
 import { isPostgres } from '@/lib/dbSql';
 
 /**
- * Момент «появи на платформі» для статистики нових оголошень:
- * найпізніший з publishedAt / moderatedAt / updatedAt / createdAt.
+ * Момент «появи на платформі» для статистики нових оголошень.
+ * Лише перша публікація / модерація / створення — БЕЗ updatedAt
+ * (інакше будь-яке оновлення ціни/переглядів рахується як «нове сьогодні»).
  */
 export function listingStatsPublishedAtSql(tableAlias?: string): string {
   const p = tableAlias ? `${tableAlias}.` : '';
   if (isPostgres()) {
     return `
-    GREATEST(
-      COALESCE(NULLIF(TRIM(${p}"publishedAt"::text), ''), '1970-01-01')::timestamp,
-      COALESCE(NULLIF(TRIM(${p}"moderatedAt"::text), ''), '1970-01-01')::timestamp,
-      COALESCE(NULLIF(TRIM(${p}"updatedAt"::text), ''), '1970-01-01')::timestamp,
-      COALESCE(NULLIF(TRIM(${p}"createdAt"::text), ''), '1970-01-01')::timestamp
+    COALESCE(
+      NULLIF(TRIM(${p}"publishedAt"::text), '')::timestamp,
+      NULLIF(TRIM(${p}"moderatedAt"::text), '')::timestamp,
+      NULLIF(TRIM(${p}"createdAt"::text), '')::timestamp
     )
   `;
   }
+  // SQLite: нормалізуємо ISO «T» → пробіл для datetime()
   return `
   datetime(
-    MAX(
-      datetime(replace(substr(COALESCE(NULLIF(TRIM(${p}publishedAt), ''), '1970-01-01 00:00:00'), 1, 19), 'T', ' ')),
-      datetime(replace(substr(COALESCE(NULLIF(TRIM(${p}moderatedAt), ''), '1970-01-01 00:00:00'), 1, 19), 'T', ' ')),
-      datetime(replace(substr(COALESCE(NULLIF(TRIM(${p}updatedAt), ''), '1970-01-01 00:00:00'), 1, 19), 'T', ' ')),
-      datetime(replace(substr(COALESCE(NULLIF(TRIM(${p}createdAt), ''), '1970-01-01 00:00:00'), 1, 19), 'T', ' '))
+    replace(
+      substr(
+        COALESCE(
+          NULLIF(TRIM(${p}publishedAt), ''),
+          NULLIF(TRIM(${p}moderatedAt), ''),
+          NULLIF(TRIM(${p}createdAt), ''),
+          '1970-01-01 00:00:00'
+        ),
+        1,
+        19
+      ),
+      'T',
+      ' '
     )
   )
 `;

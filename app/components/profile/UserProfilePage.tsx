@@ -98,7 +98,7 @@ export const UserProfilePage = ({
         
         // Використовуємо комплексний endpoint для отримання всіх даних за один запит
         const viewerId = currentUser?.id?.toString() || '';
-        const response = await fetch(`/api/user/profile-full?telegramId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=0`);
+        const response = await fetch(`/api/user/profile-full?telegramId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=0&profileType=personal`);
         
         if (response.ok) {
           const data = await response.json();
@@ -126,7 +126,7 @@ export const UserProfilePage = ({
         } else {
           // Fallback до окремих запитів, якщо комплексний endpoint не працює
           const viewerId = currentUser?.id?.toString() || '';
-          const listingsResponse = await fetch(`/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=0`);
+          const listingsResponse = await fetch(`/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=0&profileType=personal`);
           if (listingsResponse.ok) {
             const listingsData = await listingsResponse.json();
             setListings(listingsData.listings || []);
@@ -194,8 +194,8 @@ export const UserProfilePage = ({
       const isOwnProfile = viewerId && parseInt(viewerId) === parseInt(sellerTelegramId);
       // Для чужого профілю використовуємо profile-full endpoint, який фільтрує тільки активні
       const endpoint = isOwnProfile 
-        ? `/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=${listingsOffset}`
-        : `/api/user/profile-full?telegramId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=${listingsOffset}`;
+        ? `/api/listings?userId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=${listingsOffset}&profileType=personal`
+        : `/api/user/profile-full?telegramId=${sellerTelegramId}&viewerId=${viewerId}&limit=16&offset=${listingsOffset}&profileType=personal`;
       
       const response = await fetch(endpoint);
       if (response.ok) {

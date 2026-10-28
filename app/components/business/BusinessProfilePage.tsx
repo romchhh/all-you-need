@@ -720,22 +720,18 @@ export function BusinessProfilePage({
             )}
           </div>
 
-          <div
-            className={`mb-1 flex min-h-[5.5rem] min-w-0 flex-1 flex-col justify-center gap-2 rounded-2xl px-3 py-2.5 sm:min-h-[6.25rem] sm:px-4 ${
-              isLight ? 'bg-[#1a2414]/90 text-white shadow-md' : 'bg-black/75 text-white backdrop-blur-sm'
-            }`}
-          >
-            <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
+          <div className="mb-1 flex min-h-[5.5rem] min-w-0 flex-1 flex-col justify-center gap-1.5 px-1 py-1 text-white sm:min-h-[6.25rem] sm:px-2">
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
               <Users size={16} className="shrink-0 text-[#C8E6A0]" />
               <span className="font-bold tabular-nums">{profile.followersCount}</span>
-              <span className="truncate text-xs text-white/75">{t('businessProfile.public.followersLabel')}</span>
+              <span className="truncate text-xs text-white/90">{t('businessProfile.public.followersLabel')}</span>
             </span>
-            <div className="flex min-w-0 items-center gap-1.5 text-sm">
+            <div className="flex min-w-0 items-center gap-1.5 text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
               <Star size={15} className="shrink-0 fill-amber-400 text-amber-400" />
               {showRating ? (
                 <span className="truncate font-medium">{formatRatingReviews(profile.rating, profile.reviewsCount, t)}</span>
               ) : (
-                <span className="truncate text-xs text-white/75">{t('businessProfile.public.noReviewsYet')}</span>
+                <span className="truncate text-xs text-white/90">{t('businessProfile.public.noReviewsYet')}</span>
               )}
             </div>
           </div>

@@ -61,6 +61,7 @@ import {
   readBazaarReturnListingId,
   BAZAAR_RESTORE_LISTING_EVENT,
 } from '@/lib/bazaar/bazaarScrollStorage';
+import { useTabReturnRestore } from '@/features/ui/hooks/useTabReturnRestore';
 
 export type BazaarSellerPreview = {
   telegramId: string;
@@ -376,6 +377,14 @@ export function useBazaarPage() {
   useEffect(() => {
     listingsCountRef.current = listings.length;
   }, [listings]);
+
+  // Повернення з меню: скрол стрічки + знову відкрити картку
+  useTabReturnRestore({
+    tab: 'bazaar',
+    overlayOpen: Boolean(selectedListing || selectedSeller),
+    setSelectedListing,
+    ready: listings.length > 0 || !initialLoading,
+  });
 
   // Якщо відкрито з браузера (поза Telegram Mini App) з параметром ?listing=,
   // одразу перенаправляємо на SEO-сторінку товару /[lang]/listing/[id]

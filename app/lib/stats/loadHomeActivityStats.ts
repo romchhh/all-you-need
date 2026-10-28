@@ -143,7 +143,8 @@ async function getCachedStatsForWindow(windowKey: string, now: Date) {
       const dayStart = startOfKyivListingsReportingWindow(now);
       return queryHomeActivityStats(toSQLiteDate(dayStart), toSQLiteDate(now));
     },
-    ['home-activity-stats-v3', windowKey],
+    // v4: publishedAt без updatedAt (не рахувати оновлення як «нові»)
+    ['home-activity-stats-v4', windowKey],
     { revalidate: 60, tags: ['home-activity'] }
   )();
 }

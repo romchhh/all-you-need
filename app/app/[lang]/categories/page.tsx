@@ -29,6 +29,7 @@ import {
   type ListingCategoryFilter,
 } from '@/lib/listings/categoryFilter';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
+import { useTabReturnRestore } from '@/features/ui/hooks/useTabReturnRestore';
 
 const CategoriesPage = () => {
   const params = useParams();
@@ -77,6 +78,13 @@ const CategoriesPage = () => {
   const savedScrollPositionRef = useRef<number>(0);
   const scrollPositionKey = 'categoriesScrollPosition';
   const lastViewedListingIdKey = 'categoriesLastViewedListingId';
+
+  useTabReturnRestore({
+    tab: 'categories',
+    overlayOpen: Boolean(selectedListing || selectedSeller),
+    setSelectedListing,
+    ready: true,
+  });
   
   // Зберігаємо позицію скролу при скролі
   useEffect(() => {

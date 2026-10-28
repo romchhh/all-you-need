@@ -24,7 +24,19 @@ load_dotenv()
 
 router = Router()
 
-BASE_CONTENT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'Content')
+_BOT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
+
+def _resolve_content_dir() -> str:
+    """Content/ або content/ — на Linux регістр важливий."""
+    for name in ("Content", "content"):
+        path = os.path.join(_BOT_ROOT, name)
+        if os.path.isdir(path):
+            return path
+    return os.path.join(_BOT_ROOT, "Content")
+
+
+BASE_CONTENT_PATH = _resolve_content_dir()
 
 # Шлях до фото привітання
 HELLO_PHOTO_PATH = os.path.join(BASE_CONTENT_PATH, 'hello.jpg')
@@ -298,11 +310,24 @@ async def _send_offer_instruction_videos(chat_id: int, user_id: int):
 async def start_command(message: types.Message):
     user = message.from_user
     user_id = user.id
+    from database_functions.client_db import ensure_db_ready
+
     try:
+        ensure_db_ready()
         await _handle_start_command(message, user, user_id)
+        return
     except Exception as e:
         import logging
         logging.exception("start_command failed for user %s: %s", user_id, e)
+
+    # Одне повторне з'єднання з БД — типові PG idle / aborted transaction
+    try:
+        ensure_db_ready()
+        await _handle_start_command(message, user, user_id)
+        return
+    except Exception as e:
+        import logging
+        logging.exception("start_command retry failed for user %s: %s", user_id, e)
         try:
             await message.answer(
                 "⚠️ Тимчасова помилка. Спробуйте /start ще раз через кілька секунд.",

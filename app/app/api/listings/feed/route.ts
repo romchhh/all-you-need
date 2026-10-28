@@ -23,8 +23,8 @@ import {
 } from '@/lib/listings/catalogFilters';
 import {
   generateSearchVariantsWithCities,
-  normalizeCyrillicToLower,
-  generateSearchVariants,
+  listingMatchesSearchQuery,
+  sqlListingSearchableDescription,
 } from '@/lib/listings/searchVariants';
 import {
   buildColdStartOrderBoost,
@@ -142,8 +142,11 @@ export async function GET(request: NextRequest) {
 
     if (search && search.trim().length <= 30) {
       const searchVariants = generateSearchVariantsWithCities(search.trim());
+      const searchableDesc = sqlListingSearchableDescription('l');
       const titleConditions = searchVariants.map(() => 'l.title LIKE ?').join(' OR ');
-      const descConditions = searchVariants.map(() => 'l.description LIKE ?').join(' OR ');
+      const descConditions = searchVariants
+        .map(() => `${searchableDesc} LIKE ?`)
+        .join(' OR ');
       const locationConditions = searchVariants.map(() => 'l.location LIKE ?').join(' OR ');
       whereClause += ` AND ((${titleConditions}) OR (${descConditions}) OR (${locationConditions}))`;
       searchVariants.forEach((v) => params.push(`%${v}%`));
@@ -171,6 +174,8 @@ export async function GET(request: NextRequest) {
       sortBy,
       personalizationBoost
     );
+
+    const searchFetchLimit = search ? Math.min(Math.max(limit * 4, limit + 40), 120) : limit;
 
     const listingsQuery = `
       SELECT
@@ -220,7 +225,13 @@ export async function GET(request: NextRequest) {
 
     try {
       const [data, countRows] = await Promise.all([
-        prisma.$queryRawUnsafe(listingsQuery, ...params, ...orderParams, limit, offset) as Promise<any[]>,
+        prisma.$queryRawUnsafe(
+          listingsQuery,
+          ...params,
+          ...orderParams,
+          searchFetchLimit,
+          offset
+        ) as Promise<any[]>,
         prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>,
       ]);
       listingsData = data;
@@ -240,23 +251,28 @@ export async function GET(request: NextRequest) {
         .replace(`, ${LISTING_FAVORITES_COUNT_FROM_JOIN_SQL} as favoritesCount`, '')
         .replace(LISTING_FAVORITES_JOIN_SQL, '');
       const [data, countRows] = await Promise.all([
-        prisma.$queryRawUnsafe(fallback, ...params, ...orderParams, limit, offset) as Promise<any[]>,
+        prisma.$queryRawUnsafe(
+          fallback,
+          ...params,
+          ...orderParams,
+          searchFetchLimit,
+          offset
+        ) as Promise<any[]>,
         prisma.$queryRawUnsafe(countQuery, ...params) as Promise<Array<{ count: bigint }>>,
       ]);
       listingsData = data.map((l) => ({ ...l, favoritesCount: 0 }));
       total = Number(countRows[0]?.count || 0);
     }
 
-    if (search && search.trim().length > 30) {
-      const searchLower = normalizeCyrillicToLower(search.trim());
-      const variants = generateSearchVariants(search.trim());
-      listingsData = listingsData.filter((listing) => {
-        const blob = normalizeCyrillicToLower(
-          `${listing.title || ''} ${listing.location || ''}`
-        );
-        return variants.some((v) => blob.includes(normalizeCyrillicToLower(v))) ||
-          blob.includes(searchLower);
-      });
+    if (search) {
+      const before = listingsData.length;
+      listingsData = listingsData.filter((listing) =>
+        listingMatchesSearchQuery(listing, search)
+      );
+      if (before > listingsData.length) {
+        total = Math.max(0, total - (before - listingsData.length));
+      }
+      listingsData = listingsData.slice(0, limit);
     }
 
     // Легке сортування по ціні в JS (price — string)
