@@ -53,6 +53,15 @@ function buildCategoryListingsSql(): string {
 `;
 }
 
+function isCountryOnlyLabel(label: string): boolean {
+  const k = label.trim().toLowerCase();
+  return !k || k === 'germany' || k === 'deutschland' || k === 'німеччина' || k === 'германия';
+}
+
+/**
+ * Лише реальні міста. «Germany» / порожня локація — не місто дня,
+ * їх не показуємо в «По містах» (це bucket без міста, не «сьогодні по країні»).
+ */
 function mergeCityRows(
   rows: Array<{ location: string; count: bigint | number }>
 ): Array<{ city: string; count: number }> {
@@ -60,7 +69,8 @@ function mergeCityRows(
   for (const row of rows) {
     const raw = (row.location || '').trim();
     const cityKey = listingCityKeyFromLocation(raw);
-    const label = cityKey || raw || FALLBACK_CITY_LABEL;
+    const label = (cityKey || raw).trim();
+    if (isCountryOnlyLabel(label)) continue;
     merged.set(label, (merged.get(label) || 0) + Number(row.count ?? 0));
   }
   return [...merged.entries()]
@@ -121,11 +131,6 @@ async function queryHomeActivityStats(
   const newListingsToday = Number(countRows[0]?.count ?? 0);
   const newListingsByCity = mergeCityRows(cityRows);
 
-  // Якщо загальний лічильник > 0, а міст немає — показуємо хоча б один bucket
-  if (newListingsToday > 0 && newListingsByCity.length === 0) {
-    newListingsByCity.push({ city: FALLBACK_CITY_LABEL, count: newListingsToday });
-  }
-
   return {
     newListingsToday,
     newListingsByCity,
@@ -143,8 +148,8 @@ async function getCachedStatsForWindow(windowKey: string, now: Date) {
       const dayStart = startOfKyivListingsReportingWindow(now);
       return queryHomeActivityStats(toSQLiteDate(dayStart), toSQLiteDate(now));
     },
-    // v4: publishedAt без updatedAt (не рахувати оновлення як «нові»)
-    ['home-activity-stats-v4', windowKey],
+    // v5: без bucket «Germany»; publishedAt без updatedAt
+    ['home-activity-stats-v5', windowKey],
     { revalidate: 60, tags: ['home-activity'] }
   )();
 }
@@ -161,14 +166,12 @@ export async function loadHomeActivityStats(
     Array.isArray(mem.newListingsByCity) &&
     Array.isArray(mem.newListingsByCategory)
   ) {
-    const cities = mem.newListingsByCity as HomeActivityStatsPayload['newListingsByCity'];
-    const today = mem.newListingsToday as number;
+    const cities = (mem.newListingsByCity as HomeActivityStatsPayload['newListingsByCity']).filter(
+      (row) => !isCountryOnlyLabel(row.city || '')
+    );
     return {
-      newListingsToday: today,
-      newListingsByCity:
-        today > 0 && cities.length === 0
-          ? [{ city: FALLBACK_CITY_LABEL, count: today }]
-          : cities,
+      newListingsToday: mem.newListingsToday as number,
+      newListingsByCity: cities,
       newListingsByCategory: mem.newListingsByCategory as HomeActivityStatsPayload['newListingsByCategory'],
       windowKey,
     };

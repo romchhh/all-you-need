@@ -111,20 +111,40 @@ interface BusinessProfilePageProps {
   onBackToPreviousListing?: (() => void) | null;
 }
 
+function slavicPluralKey(count: number, base: string, one: string, few: string): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return base;
+}
+
 function formatRatingReviews(
   rating: number,
   count: number,
   t: (key: string, params?: Record<string, string>) => string
 ): string {
   const ratingStr = rating.toFixed(1);
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  let key = 'businessProfile.public.ratingReviews';
-  if (mod10 === 1 && mod100 !== 11) key = 'businessProfile.public.ratingReviews_one';
-  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
-    key = 'businessProfile.public.ratingReviews_few';
-  }
+  const key = slavicPluralKey(
+    count,
+    'businessProfile.public.ratingReviews',
+    'businessProfile.public.ratingReviews_one',
+    'businessProfile.public.ratingReviews_few'
+  );
   return t(key, { rating: ratingStr, count: String(count) });
+}
+
+function formatFollowersLabel(
+  count: number,
+  t: (key: string, params?: Record<string, string>) => string
+): string {
+  const key = slavicPluralKey(
+    count,
+    'businessProfile.public.followersLabel',
+    'businessProfile.public.followersLabel_one',
+    'businessProfile.public.followersLabel_few'
+  );
+  return t(key);
 }
 
 function resolveBusinessProfileTelegramUsername(
@@ -720,18 +740,46 @@ export function BusinessProfilePage({
             )}
           </div>
 
-          <div className="mb-1 flex min-h-[5.5rem] min-w-0 flex-1 flex-col justify-center gap-1.5 px-1 py-1 text-white sm:min-h-[6.25rem] sm:px-2">
-            <span className="inline-flex min-w-0 items-center gap-1.5 text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
-              <Users size={16} className="shrink-0 text-[#C8E6A0]" />
-              <span className="font-bold tabular-nums">{profile.followersCount}</span>
-              <span className="truncate text-xs text-white/90">{t('businessProfile.public.followersLabel')}</span>
-            </span>
-            <div className="flex min-w-0 items-center gap-1.5 text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
-              <Star size={15} className="shrink-0 fill-amber-400 text-amber-400" />
+          <div
+            className={`mb-1 flex min-h-[5.5rem] min-w-0 flex-1 flex-col justify-center gap-2 px-1 py-1 sm:min-h-[6.25rem] sm:px-2 ${
+              isLight ? 'text-[#1a2414]' : 'text-white'
+            }`}
+          >
+            <div className="flex min-w-0 items-baseline gap-1.5">
+              <Users
+                size={15}
+                className={`mb-px shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
+                aria-hidden
+              />
+              <span className="text-[15px] font-bold leading-none tabular-nums">
+                {profile.followersCount}
+              </span>
+              <span
+                className={`text-xs font-medium leading-none ${
+                  isLight ? 'text-[#3F5331]/75' : 'text-white/70'
+                }`}
+              >
+                {formatFollowersLabel(profile.followersCount, t)}
+              </span>
+            </div>
+            <div className="flex min-w-0 items-start gap-1.5">
+              <Star
+                size={14}
+                className="mt-0.5 shrink-0 fill-amber-400 text-amber-400"
+                aria-hidden
+              />
               {showRating ? (
-                <span className="truncate font-medium">{formatRatingReviews(profile.rating, profile.reviewsCount, t)}</span>
+                <span className="text-sm font-semibold leading-snug">
+                  {formatRatingReviews(profile.rating, profile.reviewsCount, t)}
+                </span>
               ) : (
-                <span className="truncate text-xs text-white/90">{t('businessProfile.public.noReviewsYet')}</span>
+                <span
+                  className={`max-w-[12rem] whitespace-pre-line text-[11px] font-medium leading-[1.35] sm:max-w-none sm:text-xs ${
+                    isLight ? 'text-[#3F5331]/70' : 'text-white/65'
+                  }`}
+                >
+                  {t('businessProfile.public.noReviewsYet')}
+                </span>
               )}
             </div>
           </div>
