@@ -145,6 +145,33 @@ export async function upsertBusinessProfileDraft(
   return created.id;
 }
 
+function toFinitePositiveId(value: unknown): number | null {
+  if (typeof value === 'bigint') {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const n = Number(value.trim());
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
+}
+
+function normalizeIdList(ids: unknown[]): number[] {
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const raw of ids) {
+    const id = toFinitePositiveId(raw);
+    if (id == null || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
 /** ID оголошень, які показуються на Business-вітрині (режим «усі» або ручний вибір). */
 export async function resolveBusinessListingIds(
   userId: number,
@@ -152,15 +179,15 @@ export async function resolveBusinessListingIds(
 ): Promise<number[]> {
   const config = parseListingDisplayConfig(linkedListingIdsRaw);
   if (config.mode === 'manual') {
-    return config.ids.filter((id) => Number.isFinite(id));
+    return normalizeIdList(config.ids);
   }
 
   const rows = (await prisma.$queryRawUnsafe(
     `SELECT id FROM Listing WHERE userId = ? ORDER BY id DESC`,
     userId
-  )) as Array<{ id: number }>;
+  )) as Array<{ id: unknown }>;
 
-  return rows.map((row) => row.id).filter((id) => Number.isFinite(id));
+  return normalizeIdList(rows.map((row) => row.id));
 }
 
 /** Синхронізує profileType оголошень з вибраними в Business-вітрині. */
@@ -175,7 +202,7 @@ export async function assignListingsToProfile(
   userId: number,
   businessListingIds: number[]
 ): Promise<void> {
-  const ids = businessListingIds.filter((id) => Number.isFinite(id));
+  const ids = normalizeIdList(businessListingIds);
   const nowStr = nowSQLite();
 
   // Скидаємо всі оголошення користувача на 'personal'
@@ -397,7 +424,7 @@ export async function activateBusinessSubscription(
 ): Promise<void> {
   const profile = await prisma.businessProfile.findUnique({ where: { id: businessProfileId } });
   const config = parseListingDisplayConfig(profile?.linkedListingIds);
-  const explicitIds = listingIds.filter((id) => Number.isFinite(id));
+  const explicitIds = normalizeIdList(listingIds);
   const idsToAssign =
     explicitIds.length > 0
       ? explicitIds
@@ -552,18 +579,28 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
   await syncBusinessListingProfileTypes(user.id);
 
   const vitrineIds = await resolveBusinessListingIds(user.id, profile.linkedListingIds);
-  const activeListingsCount =
-    vitrineIds.length === 0
-      ? 0
-      : Number(
-          (
-            (await prisma.$queryRawUnsafe(
-              `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active'`,
-              user.id,
-              ...vitrineIds
-            )) as Array<{ cnt: bigint | number }>
-          )[0]?.cnt ?? 0
-        );
+  const config = parseListingDisplayConfig(profile.linkedListingIds);
+  let activeListingsCount = 0;
+  if (config.mode === 'all') {
+    activeListingsCount = Number(
+      (
+        (await prisma.$queryRawUnsafe(
+          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND status = 'active'`,
+          user.id
+        )) as Array<{ cnt: bigint | number | string }>
+      )[0]?.cnt ?? 0
+    );
+  } else if (vitrineIds.length > 0) {
+    activeListingsCount = Number(
+      (
+        (await prisma.$queryRawUnsafe(
+          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active'`,
+          user.id,
+          ...vitrineIds
+        )) as Array<{ cnt: bigint | number | string }>
+      )[0]?.cnt ?? 0
+    );
+  }
 
   return {
     profile,
@@ -643,18 +680,28 @@ export async function getBusinessSellerSummaryForUser(
 
   await syncBusinessListingProfileTypes(userId);
   const vitrineIds = await resolveBusinessListingIds(userId, profile.linkedListingIds);
-  const activeListingsCount =
-    vitrineIds.length === 0
-      ? 0
-      : Number(
-          (
-            (await prisma.$queryRawUnsafe(
-              `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active'`,
-              userId,
-              ...vitrineIds
-            )) as Array<{ cnt: bigint | number }>
-          )[0]?.cnt ?? 0
-        );
+  const config = parseListingDisplayConfig(profile.linkedListingIds);
+  let activeListingsCount = 0;
+  if (config.mode === 'all') {
+    activeListingsCount = Number(
+      (
+        (await prisma.$queryRawUnsafe(
+          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND status = 'active'`,
+          userId
+        )) as Array<{ cnt: bigint | number | string }>
+      )[0]?.cnt ?? 0
+    );
+  } else if (vitrineIds.length > 0) {
+    activeListingsCount = Number(
+      (
+        (await prisma.$queryRawUnsafe(
+          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active'`,
+          userId,
+          ...vitrineIds
+        )) as Array<{ cnt: bigint | number | string }>
+      )[0]?.cnt ?? 0
+    );
+  }
 
   return {
     businessName: profile.businessName,

@@ -9,7 +9,7 @@ import {
 import { prisma } from '@/lib/prisma';
 import { sendBusinessNewFollowerNotification } from '@/lib/telegram/telegramNotifications';
 import { parsePortfolioItems } from '@/lib/businessProfileSettings';
-import { fetchFormattedActiveListingsByIds } from '@/lib/business/businessSearchListings';
+import { fetchPublicBusinessVitrineListings } from '@/lib/business/businessSearchListings';
 import { logApiError } from '@/lib/server/logApiError';
 
 export async function GET(request: NextRequest) {
@@ -27,10 +27,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Business profile not found' }, { status: 404 });
     }
 
-    const { profile, user, listingIds } = data;
-    let listings: Awaited<ReturnType<typeof fetchFormattedActiveListingsByIds>> = [];
+    const { profile, user } = data;
+    let listings: Awaited<ReturnType<typeof fetchPublicBusinessVitrineListings>> = [];
     try {
-      listings = await fetchFormattedActiveListingsByIds(listingIds);
+      // mode=all: прямий SELECT по userId (не IN з bigint-пасткою).
+      // mode=manual: активні з linkedListingIds.
+      listings = await fetchPublicBusinessVitrineListings(user.id, profile.linkedListingIds);
     } catch (listingErr) {
       logApiError('business-profile/public listings', listingErr);
     }

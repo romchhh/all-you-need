@@ -8,14 +8,41 @@ import { formatPostedTimeUk } from '@/utils/formatPostedTimeUk';
 import type { Listing } from '@/types';
 
 const PREVIEW_LIMIT = 8;
+const VITRINE_LIMIT = 200;
 
-const LISTING_SELECT = `
+/** PG raw часто віддає id як bigint/string — Number.isFinite(1n|"12") === false. */
+export function toFinitePositiveId(value: unknown): number | null {
+  if (typeof value === 'bigint') {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const n = Number(value.trim());
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
+}
+
+export function normalizeListingIds(ids: unknown[]): number[] {
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const raw of ids) {
+    const id = toFinitePositiveId(raw);
+    if (id == null || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+const LISTING_SELECT_CORE = `
   l.id,
   l.title,
   l.description,
   l.price,
-  l.previousPrice,
-  l.priceChangedAt,
   l.currency,
   l.isFree,
   l.category,
@@ -31,36 +58,101 @@ const LISTING_SELECT = `
   u.lastName as sellerLastName,
   u.avatar as sellerAvatar,
   u.phone as sellerPhone,
-  CAST(u.telegramId AS TEXT) as sellerTelegramId,
+  CAST(u.telegramId AS TEXT) as sellerTelegramId
+`;
+
+const LISTING_SELECT = `
+  ${LISTING_SELECT_CORE},
+  l.previousPrice,
+  l.priceChangedAt,
   ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount
 `;
 
+async function queryListingRows(
+  sqlFull: string,
+  sqlCoreFrom: string,
+  params: unknown[]
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    return await rawQuery<Array<Record<string, unknown>>>(prisma, sqlFull, params);
+  } catch {
+    try {
+      return await rawQuery<Array<Record<string, unknown>>>(
+        prisma,
+        `SELECT ${LISTING_SELECT_CORE} ${sqlCoreFrom}`,
+        params
+      );
+    } catch {
+      const sqlNoFav = sqlFull.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
+      return await rawQuery<Array<Record<string, unknown>>>(prisma, sqlNoFav, params);
+    }
+  }
+}
+
+function rowsToListingsPreserveOrder(
+  rows: Array<Record<string, unknown>>,
+  orderedIds?: number[]
+): Listing[] {
+  const listingById = new Map<number, Listing>();
+  for (const row of rows) {
+    const id = toFinitePositiveId(row.id);
+    if (id == null) continue;
+    listingById.set(id, formatListingRow(row));
+  }
+  if (!orderedIds?.length) {
+    return [...listingById.values()];
+  }
+  return orderedIds
+    .map((id) => listingById.get(id))
+    .filter((listing): listing is Listing => Boolean(listing));
+}
+
 export async function fetchFormattedActiveListingsByIds(ids: number[]): Promise<Listing[]> {
-  const listingIds = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id)))];
+  const listingIds = normalizeListingIds(ids);
   if (listingIds.length === 0) return [];
 
   const placeholders = listingIds.map(() => '?').join(',');
-  const sql = `SELECT ${LISTING_SELECT}
-       FROM Listing l
+  const fromWhere = `FROM Listing l
        JOIN User u ON l.userId = u.id
        WHERE l.id IN (${placeholders}) AND l.status = 'active'`;
+  const sql = `SELECT ${LISTING_SELECT} ${fromWhere}`;
 
-  let rows: Array<Record<string, unknown>> = [];
-  try {
-    rows = await rawQuery<Array<Record<string, unknown>>>(prisma, sql, listingIds);
-  } catch {
-    const sqlNoFav = sql.replace(`, ${LISTING_FAVORITES_COUNT_SQL} as favoritesCount`, '');
-    rows = await rawQuery<Array<Record<string, unknown>>>(prisma, sqlNoFav, listingIds);
+  const rows = await queryListingRows(sql, fromWhere, listingIds);
+  return rowsToListingsPreserveOrder(rows, listingIds);
+}
+
+/** Активні оголошення власника (режим вітрини «усі»). */
+export async function fetchFormattedActiveListingsByUserId(
+  userId: number,
+  limit = VITRINE_LIMIT
+): Promise<Listing[]> {
+  const uid = toFinitePositiveId(userId);
+  if (uid == null) return [];
+
+  const fromWhere = `FROM Listing l
+       JOIN User u ON l.userId = u.id
+       WHERE l.userId = ? AND l.status = 'active'
+       ORDER BY l.id DESC
+       LIMIT ?`;
+  const sql = `SELECT ${LISTING_SELECT} ${fromWhere}`;
+
+  const rows = await queryListingRows(sql, fromWhere, [uid, limit]);
+  return rowsToListingsPreserveOrder(rows);
+}
+
+/**
+ * Публічна вітрина бізнесу: mode=all → активні оголошення userId;
+ * mode=manual → активні з обраних id.
+ */
+export async function fetchPublicBusinessVitrineListings(
+  userId: number,
+  linkedListingIdsRaw: string | null | undefined
+): Promise<Listing[]> {
+  const config = parseListingDisplayConfig(linkedListingIdsRaw);
+  if (config.mode === 'manual') {
+    return fetchFormattedActiveListingsByIds(config.ids);
   }
-
-  const listingById = new Map<number, Listing>();
-  for (const row of rows) {
-    listingById.set(Number(row.id), formatListingRow(row));
-  }
-
-  return listingIds
-    .map((id) => listingById.get(id))
-    .filter((listing): listing is Listing => Boolean(listing));
+  return fetchFormattedActiveListingsByUserId(userId);
 }
 
 function formatListingRow(listing: Record<string, unknown>): Listing {
@@ -136,9 +228,11 @@ export async function attachBusinessSearchListingPreviews<T extends { id: number
       userIds
     );
     for (const row of listingRows) {
-      const uid = Number(row.userId);
+      const uid = toFinitePositiveId(row.userId);
+      const lid = toFinitePositiveId(row.id);
+      if (uid == null || lid == null) continue;
       const list = listingsByUserId.get(uid) ?? [];
-      list.push(Number(row.id));
+      list.push(lid);
       listingsByUserId.set(uid, list);
     }
   }
@@ -149,7 +243,7 @@ export async function attachBusinessSearchListingPreviews<T extends { id: number
     const config = parseListingDisplayConfig(profile.linkedListingIds);
     const ids =
       config.mode === 'manual'
-        ? config.ids.filter((id) => Number.isFinite(id))
+        ? normalizeListingIds(config.ids)
         : listingsByUserId.get(profile.userId) ?? [];
     return ids.slice(0, previewLimit);
   });
