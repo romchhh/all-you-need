@@ -96,6 +96,7 @@ def ensure_bot_user_record(
 
 
 def create_table():
+    ensure_db_ready()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users_legacy (
             id INTEGER PRIMARY KEY,

@@ -10,8 +10,14 @@ from database_functions.referral_db import create_referral_table
 
 
 def create_dbs():
+    from database_functions.db_connection import ensure_db_ready, is_postgres
+
+    # Прогрів / reconnect shared PG connection до DDL
+    if is_postgres():
+        ensure_db_ready()
+
     init_prisma_tables()
-    
+
     create_table()
     create_table_links()
     create_admins_table()
@@ -19,7 +25,7 @@ def create_dbs():
     apply_new_categories()
     create_payments_table()
     create_referral_table()
-    
+
     if administrators:
         superadmin_id = administrators[0]
         init_superadmin(superadmin_id)

@@ -735,11 +735,19 @@ class DbConnection:
 
     def commit(self) -> None:
         if is_postgres():
-            self._conn.commit()
+            try:
+                self._conn.commit()
+            except Exception as exc:
+                msg = str(exc).lower()
+                if "connection already closed" in msg or "cursor already closed" in msg:
+                    # stale module-level conn після чужого close()/reconnect
+                    reset_postgres_connection()
+                raise
         else:
             _retry_execute(self._conn.commit, op="commit")
 
     def close(self) -> None:
+        # PG singleton: ігноруємо close() від callers (prisma_db/links_db/…).
         if not self._managed_close:
             return
         try:
@@ -784,7 +792,9 @@ def _connect_postgres() -> DbConnection:
     psycopg2, _ = _load_psycopg2()
     conn = psycopg2.connect(pg_dsn_for_psycopg2(get_database_url()))
     conn.autocommit = False
-    return DbConnection(conn, managed_close=True, is_pg=True)
+    # managed_close=False: десятки місць роблять conn.close() після запиту —
+    # для singleton це вбивало б shared connection («connection already closed»).
+    return DbConnection(conn, managed_close=False, is_pg=True)
 
 
 _pg_singleton: Optional[DbConnection] = None
@@ -801,7 +811,7 @@ def _pg_conn_closed(conn: DbConnection) -> bool:
 
 
 def reset_postgres_connection() -> DbConnection:
-    """Закрити зламане PG-з'єднання і відкрити нове (singleton)."""
+    """Примусово закрити raw PG-з'єднання і відкрити нове (singleton)."""
     global _pg_singleton
     with _pg_singleton_lock:
         if _pg_singleton is not None:
@@ -812,6 +822,14 @@ def reset_postgres_connection() -> DbConnection:
             _pg_singleton = None
         _pg_singleton = _connect_postgres()
         return _pg_singleton
+
+
+def bind_module_connection(module_globals: dict) -> "DbConnection":
+    """Оновити module-level conn/cursor після ensure/reconnect."""
+    conn = ensure_db_ready()
+    module_globals["conn"] = conn
+    module_globals["cursor"] = conn.cursor()
+    return conn
 
 
 def get_connection() -> DbConnection:

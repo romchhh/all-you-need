@@ -6,7 +6,9 @@ def get_optimized_connection():
     return get_connection()
 
 def create_table_links():
-    conn = get_connection()
+    from database_functions.db_connection import ensure_db_ready
+
+    conn = ensure_db_ready()
     cursor = conn.cursor()
     try:
         if not is_postgres():
@@ -31,10 +33,12 @@ def create_table_links():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_link_visit_visitor ON LinkVisit(visitor_user_id)')
         conn.commit()
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
-    finally:
-        conn.close()
+    # Не викликаємо conn.close() — на PG це shared singleton.
 
 
 conn = get_optimized_connection()
