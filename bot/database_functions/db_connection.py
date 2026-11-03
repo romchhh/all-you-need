@@ -591,12 +591,16 @@ class DbCursor:
                     self._cursor.execute(adapted_sql)
                 else:
                     self._cursor.execute(adapted_sql, adapted_params)
-            except Exception:
+            except Exception as exc:
                 if is_postgres():
                     try:
                         self._conn._conn.rollback()
                     except Exception:
                         pass
+                    msg = str(exc).lower()
+                    # Спільний module-level cursor часто «вмирає» після reconnect / idle
+                    if "cursor already closed" in msg or "connection already closed" in msg:
+                        raise
                 raise
             if is_postgres():
                 self._columns = [d[0] for d in (self._cursor.description or [])]
@@ -610,7 +614,17 @@ class DbCursor:
             return self._cursor
 
         if is_postgres():
-            _run()
+            try:
+                _run()
+            except Exception as exc:
+                msg = str(exc).lower()
+                if "cursor already closed" in msg or "connection already closed" in msg:
+                    fresh = ensure_db_ready()
+                    self._conn = fresh
+                    self._cursor = fresh._conn.cursor()
+                    _run()
+                else:
+                    raise
         else:
             _retry_execute(_run, op="cursor.execute")
         return self
@@ -773,9 +787,41 @@ def _connect_postgres() -> DbConnection:
     return DbConnection(conn, managed_close=True, is_pg=True)
 
 
+_pg_singleton: Optional[DbConnection] = None
+_pg_singleton_lock = threading.RLock()
+
+
+def _pg_conn_closed(conn: DbConnection) -> bool:
+    try:
+        raw = conn._conn
+        closed = getattr(raw, "closed", 1)
+        return bool(closed)
+    except Exception:
+        return True
+
+
+def reset_postgres_connection() -> DbConnection:
+    """Закрити зламане PG-з'єднання і відкрити нове (singleton)."""
+    global _pg_singleton
+    with _pg_singleton_lock:
+        if _pg_singleton is not None:
+            try:
+                _pg_singleton._conn.close()
+            except Exception:
+                pass
+            _pg_singleton = None
+        _pg_singleton = _connect_postgres()
+        return _pg_singleton
+
+
 def get_connection() -> DbConnection:
     if is_postgres():
-        return _connect_postgres()
+        global _pg_singleton
+        with _pg_singleton_lock:
+            if _pg_singleton is not None and not _pg_conn_closed(_pg_singleton):
+                return _pg_singleton
+            _pg_singleton = _connect_postgres()
+            return _pg_singleton
 
     acquired = _DB_LOCK.acquire(timeout=120.0)
     if not acquired:
@@ -785,6 +831,34 @@ def get_connection() -> DbConnection:
     except Exception:
         _DB_LOCK.release()
         raise
+
+
+def ensure_db_ready() -> DbConnection:
+    """
+    Перевіряє живе PG-з'єднання; при idle timeout / closed cursor / aborted txn — reconnect.
+    Для SQLite повертає нове з'єднання (як get_connection).
+    """
+    if not is_postgres():
+        return get_connection()
+
+    with _pg_singleton_lock:
+        conn = get_connection()
+        try:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.fetchone()
+            try:
+                cur._cursor.close()
+            except Exception:
+                pass
+            return conn
+        except Exception as e:
+            print(f"DB unhealthy, reconnecting: {e}")
+            return reset_postgres_connection()
 
 
 @contextmanager

@@ -1,16 +1,25 @@
 import sqlite3
+import threading
 from datetime import datetime, timedelta
 from config import administrators
 from database_functions.client_db import get_user_id_by_username, get_username_by_user_id
-from database_functions.db_connection import get_connection
+from database_functions.db_connection import get_connection, ensure_db_ready
 
 
 def get_optimized_connection():
     return get_connection()
 
 
+_ADMIN_DB_LOCK = threading.RLock()
 conn = get_optimized_connection()
 cursor = conn.cursor()
+
+
+def _refresh_admin_db() -> None:
+    """Новий cursor після ensure — інакше PG: InterfaceError cursor already closed."""
+    global conn, cursor
+    conn = ensure_db_ready()
+    cursor = conn.cursor()
 
 
 def get_users_count():
@@ -461,12 +470,22 @@ def init_superadmin(telegram_superadmin_id):
 
 def get_all_admin_ids():
     """Повертає список Telegram ID всіх адмінів"""
-    cursor.execute("""
-        SELECT u.telegramId 
-        FROM Admin a
-        JOIN User u ON a.userId = u.id
-    """)
-    return [row[0] for row in cursor.fetchall()]
+    with _ADMIN_DB_LOCK:
+        _refresh_admin_db()
+        cursor.execute("""
+            SELECT u.telegramId 
+            FROM Admin a
+            JOIN User u ON a.userId = u.id
+        """)
+        rows = cursor.fetchall()
+        out = []
+        for row in rows:
+            raw = row[0]
+            try:
+                out.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        return out
 
 
 def get_all_administrators():

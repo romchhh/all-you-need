@@ -1,7 +1,13 @@
 import sqlite3
 import threading
 from datetime import datetime
-from database_functions.db_connection import get_connection, is_postgres, bool_param, bool_assign_placeholder
+from database_functions.db_connection import (
+    get_connection,
+    ensure_db_ready as _ensure_db_connection,
+    is_postgres,
+    bool_param,
+    bool_assign_placeholder,
+)
 
 conn = get_connection()
 cursor = conn.cursor()
@@ -24,29 +30,8 @@ def ensure_db_ready() -> None:
     """
     global conn, cursor
     with _DB_LOCK:
-        try:
-            if is_postgres():
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-            return
-        except Exception as e:
-            print(f"DB unhealthy, reconnecting: {e}")
-        try:
-            conn.close()
-        except Exception:
-            pass
-        conn = get_connection()
+        conn = _ensure_db_connection()
         cursor = conn.cursor()
-        try:
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-        except Exception as e:
-            print(f"DB reconnect failed: {e}")
-            raise
 
 
 def _users_legacy_next_id() -> int:
