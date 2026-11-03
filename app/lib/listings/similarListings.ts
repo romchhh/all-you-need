@@ -10,7 +10,7 @@ export type SimilarSource = {
   category: string;
   subcategory?: string | null;
   price: string | number | null;
-  isFree?: boolean | number | null;
+  isFree?: boolean | number | string | null;
 };
 
 export type SimilarCandidate = SimilarSource & {
@@ -67,7 +67,10 @@ export function foldToken(value: string): string {
     .replace(/ё/g, 'е');
 }
 
-function parsePriceNumber(price: string | number | null | undefined, isFree?: boolean | number | null): number | null {
+function parsePriceNumber(
+  price: string | number | null | undefined,
+  isFree?: boolean | number | string | null
+): number | null {
   if (isFree === true || isFree === 1 || isFree === '1') return 0;
   if (price == null) return null;
   const raw = String(price).replace(/[^\d.,]/g, '').replace(',', '.');
@@ -199,11 +202,11 @@ export function scoreSimilarCandidate(source: SimilarSignals, candidate: Similar
   const sameSub =
     Boolean(source.subcategory) &&
     Boolean(candidate.subcategory) &&
-    foldToken(source.subcategory) === foldToken(candidate.subcategory);
+    foldToken(source.subcategory ?? '') === foldToken(candidate.subcategory ?? '');
   const sameCat =
     Boolean(source.category) &&
     Boolean(candidate.category) &&
-    foldToken(source.category) === foldToken(candidate.category);
+    foldToken(source.category ?? '') === foldToken(candidate.category ?? '');
   const subMismatch =
     Boolean(source.subcategory) &&
     Boolean(candidate.subcategory) &&
