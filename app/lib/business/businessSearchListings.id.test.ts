@@ -5,11 +5,11 @@ describe('toFinitePositiveId / normalizeListingIds', () => {
   it('accepts number, numeric string, and bigint from PG', () => {
     expect(toFinitePositiveId(42)).toBe(42);
     expect(toFinitePositiveId('42')).toBe(42);
-    expect(toFinitePositiveId(42n)).toBe(42);
+    expect(toFinitePositiveId(BigInt(42))).toBe(42);
   });
 
   it('rejects invalid values that Number.isFinite alone would mishandle', () => {
-    expect(Number.isFinite(42n)).toBe(false);
+    expect(Number.isFinite(BigInt(42) as unknown as number)).toBe(false);
     expect(Number.isFinite('42')).toBe(false);
     expect(toFinitePositiveId(0)).toBeNull();
     expect(toFinitePositiveId(-1)).toBeNull();
@@ -19,6 +19,6 @@ describe('toFinitePositiveId / normalizeListingIds', () => {
   });
 
   it('dedupes mixed id types', () => {
-    expect(normalizeListingIds([1, '1', 1n, 2, 'x', 0])).toEqual([1, 2]);
+    expect(normalizeListingIds([1, '1', BigInt(1), 2, 'x', 0])).toEqual([1, 2]);
   });
 });
