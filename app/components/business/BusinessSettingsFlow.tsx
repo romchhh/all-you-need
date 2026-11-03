@@ -931,7 +931,7 @@ export default function BusinessSettingsFlow({
         />
 
         <div
-          className={`relative z-10 flex max-h-[min(92dvh,760px)] w-full flex-col overflow-hidden rounded-t-[1.75rem] shadow-2xl ${shell}`}
+          className={`relative z-10 flex h-[min(92dvh,760px)] max-h-[min(92dvh,760px)] w-full flex-col overflow-hidden rounded-t-[1.75rem] shadow-2xl ${shell}`}
         >
           <div
             className={`flex shrink-0 items-center justify-between border-b px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] ${headerBorder}`}

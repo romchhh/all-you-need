@@ -182,6 +182,7 @@ const BazaarPage = () => {
 
       <BottomNavigation
         activeTab="bazaar"
+        openListingId={selectedListing?.id ?? null}
         onTabChange={(tab) => {
           const hasOpenDetails = selectedListing || selectedSeller;
           if (hasOpenDetails) {

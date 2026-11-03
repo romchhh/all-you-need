@@ -138,7 +138,7 @@ export const CATEGORY_ICON_PATHS: Record<string, string> = {
   realestate: '/images/categories_icons/realestate.svg',
   services_work: '/images/categories_icons/services_work.svg',
   free: '/images/categories_icons/free.svg',
-  food_gastro: '/images/categories_icons/home.svg',
+  food_gastro: '/images/categories_icons/food_gastro.svg',
   all_categories: '/images/categories_icons/all_categories.svg',
 };
 

@@ -5,6 +5,11 @@ export function normalizeCyrillicToLower(text: string): string {
   return text.toLowerCase();
 }
 
+/** LIKE/ILIKE contains-pattern; strips %/_ so user input cannot widen the match. */
+export function sqlLikeContainsPattern(term: string): string {
+  return `%${term.trim().replace(/[%_]/g, '')}%`;
+}
+
 /**
  * SQL-вираз опису для LIKE-пошуку без рядків «👤 Автор» / «🔗 оригінал».
  * На PG — regexp_replace; на SQLite — сирий опис (далі JS post-filter).

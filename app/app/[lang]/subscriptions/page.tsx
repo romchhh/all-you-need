@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Listing } from '@/types';
@@ -25,6 +25,7 @@ import {
   removeFavoriteFromStorage,
 } from '@/utils/favorites';
 import { useScrollToTopOnMount } from '@/features/ui/hooks/useScrollToTopOnMount';
+import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
 
 export default function SubscriptionsPage() {
   const params = useParams();
@@ -37,6 +38,10 @@ export default function SubscriptionsPage() {
   const { profile, isBlocked } = useUser();
   const { toast, showToast, hideToast } = useToast();
   useScrollToTopOnMount();
+  const viewerTelegramId = useMemo(
+    () => resolveViewerTelegramId(profile?.telegramId, tg?.initDataUnsafe?.user?.id ?? null),
+    [profile?.telegramId, tg?.initDataUnsafe?.user?.id]
+  );
 
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
@@ -229,7 +234,7 @@ export default function SubscriptionsPage() {
           <p className={`mb-6 text-sm ${ac.mutedText}`}>{t('subscriptions.subtitle')}</p>
 
           <MySubscriptionsView
-            telegramId={profile?.telegramId != null ? String(profile.telegramId) : null}
+            telegramId={viewerTelegramId}
             tg={tg}
             onOpenBusiness={(payload) => {
               setSelectedSeller({

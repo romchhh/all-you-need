@@ -19,6 +19,7 @@ import {
 import { getCategories } from '@/constants/categories';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
 import { AppHeader } from '@/components/layout/AppHeader';
+import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
 
 const SEARCH_SCROLL_KEY = 'searchScrollPosition';
 const SEARCH_RETURN_LISTING_KEY = 'searchReturnListingId';
@@ -68,6 +69,10 @@ export default function SearchPage() {
       .filter(Boolean) ?? [];
 
   const categories = useMemo(() => getCategories(t), [t]);
+  const viewerTelegramId = useMemo(
+    () => resolveViewerTelegramId(profile?.telegramId, tg?.initDataUnsafe?.user?.id ?? null),
+    [profile?.telegramId, tg?.initDataUnsafe?.user?.id]
+  );
 
   useEffect(() => {
     if (lang === 'uk' || lang === 'ru') {
@@ -416,7 +421,7 @@ export default function SearchPage() {
           categories={categories}
           searchPlaceholder={searchPlaceholder}
           favorites={favorites}
-          profileTelegramId={profile?.telegramId != null ? String(profile.telegramId) : null}
+          profileTelegramId={viewerTelegramId}
           onBack={handleBack}
           onQueryChange={handleQueryChange}
           onCategoryChange={handleCategoryChange}

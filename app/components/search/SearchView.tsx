@@ -44,10 +44,6 @@ import {
   listingToSearchPreview,
   updateSearchHistoryListings,
 } from '@/utils/searchHistory';
-import {
-  loadBazaarTabStateFromStorage,
-  persistBazaarTabState,
-} from '@/lib/bazaar/bazaarTabStateStorage';
 import { formatCityFilterLabel, normalizeCityInput } from '@/lib/city/cityNormalization';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import type { Currency } from '@/utils/currency';
@@ -88,7 +84,6 @@ interface SearchViewProps {
   onUrlStateChange?: (state: { q: string; cities: string; mode: SearchEntityMode }) => void;
   categories: Category[];
   searchPlaceholder?: string;
-  selectedCities?: string[];
   favorites: Set<number>;
   profileTelegramId?: string | null;
   onBack: () => void;
@@ -200,7 +195,6 @@ export function SearchView({
   onUrlStateChange,
   categories,
   searchPlaceholder,
-  selectedCities = [],
   favorites,
   profileTelegramId,
   onBack,
@@ -237,25 +231,30 @@ export function SearchView({
   }, [headerSlot, screenMode]);
   const [localQuery, setLocalQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
-  const [localCities, setLocalCities] = useState<string[]>(() => {
-    const fromUrl = (initialCitiesFromUrl ?? []).map((c) => normalizeCityInput(c)).filter(Boolean);
-    const fromProp = selectedCities ?? [];
-    const fromStorage = loadBazaarTabStateFromStorage().selectedCities ?? [];
-    const source = fromUrl.length > 0 ? fromUrl : fromProp.length > 0 ? fromProp : fromStorage;
-    return source.map((c) => normalizeCityInput(c)).filter(Boolean);
-  });
+  // Міста лише з URL — НЕ з кешу базару (інакше пошук «порожній», хоча оголошення є)
+  const [localCities, setLocalCities] = useState<string[]>(() =>
+    (initialCitiesFromUrl ?? []).map((c) => normalizeCityInput(c)).filter(Boolean)
+  );
   const citiesKey = localCities.join(',');
-  const savedFilters = useMemo(() => loadBazaarTabStateFromStorage(), []);
-  const [sortBy, setSortBy] = useState<SortOption>(savedFilters.sortBy ?? 'newest');
-  const [showFreeOnly, setShowFreeOnly] = useState(savedFilters.showFreeOnly ?? false);
-  const [minPrice, setMinPrice] = useState<number | null>(savedFilters.minPrice ?? null);
-  const [maxPrice, setMaxPrice] = useState<number | null>(savedFilters.maxPrice ?? null);
-  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(
-    savedFilters.selectedCondition ?? null
+  // Фільтри пошуку ізольовані від базару (freeOnly/ціна/стан з кешу давали «0 результатів»)
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [showFreeOnly, setShowFreeOnly] = useState(false);
+  const [minPrice, setMinPrice] = useState<number | null>(null);
+  const [maxPrice, setMaxPrice] = useState<number | null>(null);
+  const [selectedCondition, setSelectedCondition] = useState<'new' | 'used' | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+
+  const viewerTelegramId = useMemo(
+    () => resolveViewerTelegramId(profileTelegramId, tg?.initDataUnsafe?.user?.id ?? null),
+    [profileTelegramId, tg?.initDataUnsafe?.user?.id]
   );
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(
-    (savedFilters.selectedCurrency as Currency | null) ?? null
-  );
+
+  // Sync cities from URL (back/forward / MySubscriptions navigation)
+  const citiesUrlKey = (initialCitiesFromUrl ?? []).map((c) => normalizeCityInput(c)).filter(Boolean).join(',');
+  useEffect(() => {
+    const next = (initialCitiesFromUrl ?? []).map((c) => normalizeCityInput(c)).filter(Boolean);
+    setLocalCities((prev) => (prev.join(',') === next.join(',') ? prev : next));
+  }, [citiesUrlKey, initialCitiesFromUrl]);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [showSortModal, setShowSortModal] = useState(false);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
@@ -427,6 +426,7 @@ export function SearchView({
         } else {
           setSearchResults([]);
           setSearchTotal(0);
+          lastFetchKeyRef.current = '';
         }
       } catch {
         if (requestId === searchRequestRef.current) {
@@ -511,7 +511,7 @@ export function SearchView({
         if (businessFilters.minRating != null) {
           params.set('minRating', String(businessFilters.minRating));
         }
-        if (profileTelegramId) params.set('viewerTelegramId', profileTelegramId);
+        if (viewerTelegramId) params.set('viewerTelegramId', viewerTelegramId);
 
         const res = await fetch(`/api/search/business?${params.toString()}`, { cache: 'no-store' });
         if (requestId !== businessRequestRef.current) return;
@@ -524,6 +524,7 @@ export function SearchView({
         } else {
           setBusinessResults([]);
           setBusinessTotal(0);
+          lastBusinessFetchKeyRef.current = '';
         }
       } catch {
         if (requestId === businessRequestRef.current) {
@@ -541,7 +542,7 @@ export function SearchView({
       buildBusinessFetchKey,
       businessFilters,
       language,
-      profileTelegramId,
+      viewerTelegramId,
       refreshLocalHistory,
       selectedBusinessSphere,
       tg,
@@ -614,7 +615,7 @@ export function SearchView({
 
   const handleToggleBusinessFollow = useCallback(
     async (business: BusinessSearchCardData) => {
-      const followerId = resolveViewerTelegramId(profileTelegramId, null);
+      const followerId = viewerTelegramId;
       if (!followerId) {
         showToast(t('businessProfile.public.loginToSubscribe'), 'info');
         return;
@@ -665,12 +666,13 @@ export function SearchView({
         setFollowBusyId(null);
       }
     },
-    [profileTelegramId, showToast, t]
+    [viewerTelegramId, showToast, t]
   );
 
   // Підписка на пошуковий запит (results)
   useEffect(() => {
-    if (screenMode !== 'results' || !activeQuery.trim() || !profileTelegramId) {
+    const followerId = viewerTelegramId;
+    if (screenMode !== 'results' || !activeQuery.trim() || !followerId) {
       setSearchSubscribed(false);
       return;
     }
@@ -678,7 +680,7 @@ export function SearchView({
     const q = activeQuery.trim();
     const mode = searchEntityMode;
     const params = new URLSearchParams({
-      telegramId: profileTelegramId,
+      telegramId: followerId,
       query: q,
       mode,
     });
@@ -693,10 +695,11 @@ export function SearchView({
     return () => {
       cancelled = true;
     };
-  }, [screenMode, activeQuery, searchEntityMode, profileTelegramId]);
+  }, [screenMode, activeQuery, searchEntityMode, viewerTelegramId]);
 
   const handleToggleSearchSubscription = useCallback(async () => {
-    if (!profileTelegramId) {
+    const followerId = viewerTelegramId;
+    if (!followerId) {
       showToast(t('bazaar.searchSubscribeNeedLogin'), 'info');
       return;
     }
@@ -711,20 +714,25 @@ export function SearchView({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            telegramId: profileTelegramId,
+            telegramId: followerId,
             query: q,
             mode: searchEntityMode,
           }),
         });
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          showToast(t('common.error'), 'error');
+          if (data?.error === 'follower_not_found' || res.status === 404) {
+            showToast(t('businessProfile.public.registerToSubscribe'), 'info');
+          } else {
+            showToast(t('common.error'), 'error');
+          }
           return;
         }
         setSearchSubscribed(true);
         showToast(t('bazaar.searchSubscribeSuccess'), 'success');
       } else {
         const params = new URLSearchParams({
-          telegramId: profileTelegramId,
+          telegramId: followerId,
           query: q,
           mode: searchEntityMode,
         });
@@ -746,7 +754,7 @@ export function SearchView({
     }
   }, [
     activeQuery,
-    profileTelegramId,
+    viewerTelegramId,
     searchEntityMode,
     searchSubBusy,
     searchSubscribed,
@@ -806,30 +814,52 @@ export function SearchView({
     refreshLocalHistory();
   }, [refreshLocalHistory]);
 
-  // Зовнішня зміна initialQuery (напр. навігація назад з ?q=)
+  // Зовнішня зміна URL (напр. навігація назад з ?q=&mode=)
   const prevInitialQueryRef = useRef(initialQuery);
   const prevInitialCategoryRef = useRef(initialCategory);
+  const prevInitialEntityModeRef = useRef(initialEntityMode);
   useEffect(() => {
-    if (prevInitialQueryRef.current === initialQuery && prevInitialCategoryRef.current === initialCategory) {
+    if (
+      prevInitialQueryRef.current === initialQuery &&
+      prevInitialCategoryRef.current === initialCategory &&
+      prevInitialEntityModeRef.current === initialEntityMode
+    ) {
       return;
     }
     prevInitialQueryRef.current = initialQuery;
     prevInitialCategoryRef.current = initialCategory;
+    prevInitialEntityModeRef.current = initialEntityMode;
     setLocalQuery(initialQuery);
     setSelectedCategory(initialCategory);
+    setSearchEntityMode(initialEntityMode);
     lastFetchKeyRef.current = '';
+    lastBusinessFetchKeyRef.current = '';
     if (initialQuery.trim().length >= MIN_QUERY_LENGTH) {
       setScreenMode('results');
-      void fetchSearchResults(initialQuery, {
-        saveHistory: false,
-        force: true,
-        category: initialCategory,
-      });
+      if (initialEntityMode === 'businesses') {
+        void fetchBusinessResults(initialQuery, {
+          saveHistory: false,
+          force: true,
+        });
+      } else {
+        void fetchSearchResults(initialQuery, {
+          saveHistory: false,
+          force: true,
+          category: initialCategory,
+        });
+      }
     } else {
       resetSearchState();
       setScreenMode('discover');
     }
-  }, [initialQuery, initialCategory, fetchSearchResults, resetSearchState]);
+  }, [
+    initialQuery,
+    initialCategory,
+    initialEntityMode,
+    fetchSearchResults,
+    fetchBusinessResults,
+    resetSearchState,
+  ]);
 
   // У режимі discover URL-query оновлюємо без автопошуку
   useEffect(() => {
@@ -884,33 +914,13 @@ export function SearchView({
     [fetchBusinessResults, fetchSearchResults, screenMode, searchEntityMode, tg]
   );
 
-  // Зміна фільтрів у режимі результатів — перезавантажити (оголошення)
-  useEffect(() => {
-    if (screenMode !== 'results' || searchEntityMode !== 'listings') return;
-    const q = activeQueryRef.current.trim();
-    if (q.length < MIN_QUERY_LENGTH) return;
-    lastFetchKeyRef.current = '';
-    void fetchSearchResults(q, { saveHistory: false, force: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- лише фільтри, не activeQuery
-  }, [sortBy, showFreeOnly, citiesKey, screenMode, searchEntityMode, fetchSearchResults]);
-
-  // Зміна фільтрів у режимі результатів — перезавантажити (бізнеси)
-  useEffect(() => {
-    if (screenMode !== 'results' || searchEntityMode !== 'businesses') return;
-    const q = activeQueryRef.current.trim();
-    if (q.length < MIN_QUERY_LENGTH) return;
-    lastBusinessFetchKeyRef.current = '';
-    void fetchBusinessResults(q, { saveHistory: false, force: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- лише фільтри, не activeQuery
-  }, [businessFilters, screenMode, searchEntityMode, fetchBusinessResults]);
-
   // Discover data
   useEffect(() => {
     let cancelled = false;
     setLoadingDiscover(true);
 
     const params = new URLSearchParams({ popularLimit: '24', recentLimit: '16' });
-    if (profileTelegramId) params.set('telegramId', profileTelegramId);
+    if (viewerTelegramId) params.set('telegramId', viewerTelegramId);
 
     fetch(`/api/search/discover?${params}`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
@@ -928,7 +938,7 @@ export function SearchView({
     return () => {
       cancelled = true;
     };
-  }, [profileTelegramId]);
+  }, [viewerTelegramId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -938,7 +948,7 @@ export function SearchView({
       limit: '12',
       lang: language === 'ru' ? 'ru' : 'uk',
     });
-    if (profileTelegramId) params.set('viewerTelegramId', profileTelegramId);
+    if (viewerTelegramId) params.set('viewerTelegramId', viewerTelegramId);
 
     fetch(`/api/search/business/discover?${params}`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
@@ -958,7 +968,7 @@ export function SearchView({
     return () => {
       cancelled = true;
     };
-  }, [language, profileTelegramId]);
+  }, [language, viewerTelegramId]);
 
   useEffect(() => {
     const previews = getRecentSearchListings();
@@ -1062,35 +1072,6 @@ export function SearchView({
         ? t('bazaar.searchInCity', { city: formatCityFilterLabel(localCities[0]) })
         : searchPlaceholder || t('bazaar.whatInterestsYou');
 
-  const persistFilters = useCallback(
-    (patch: Partial<{
-      selectedCities: string[];
-      sortBy: SortOption;
-      showFreeOnly: boolean;
-      minPrice: number | null;
-      maxPrice: number | null;
-      selectedCondition: 'new' | 'used' | null;
-      selectedCurrency: Currency | null;
-    }>) => {
-      const current = loadBazaarTabStateFromStorage();
-      persistBazaarTabState({
-        ...current,
-        selectedCities: (patch.selectedCities ?? localCities)
-          .map((c) => normalizeCityInput(c))
-          .filter(Boolean),
-        sortBy: patch.sortBy ?? sortBy,
-        showFreeOnly: patch.showFreeOnly ?? showFreeOnly,
-        minPrice: patch.minPrice !== undefined ? patch.minPrice : minPrice,
-        maxPrice: patch.maxPrice !== undefined ? patch.maxPrice : maxPrice,
-        selectedCondition:
-          patch.selectedCondition !== undefined ? patch.selectedCondition : selectedCondition,
-        selectedCurrency:
-          patch.selectedCurrency !== undefined ? patch.selectedCurrency : selectedCurrency,
-      });
-    },
-    [localCities, sortBy, showFreeOnly, minPrice, maxPrice, selectedCondition, selectedCurrency]
-  );
-
   // Перезавантаження результатів при зміні фільтрів / міста (не на першому вході в results)
   const filtersReadyRef = useRef(false);
   useEffect(() => {
@@ -1121,6 +1102,8 @@ export function SearchView({
     selectedCondition,
     selectedCurrency,
     selectedSubcategory,
+    businessFilters,
+    selectedBusinessSphere,
     screenMode,
     searchEntityMode,
   ]);
@@ -1857,16 +1840,13 @@ export function SearchView({
         onClose={() => setShowSortModal(false)}
         onSelect={(sort) => {
           setSortBy(sort);
-          persistFilters({ sortBy: sort });
         }}
         onToggleFreeOnly={(value) => {
           setShowFreeOnly(value);
-          persistFilters({ showFreeOnly: value });
         }}
         onPriceRangeChange={(min, max) => {
           setMinPrice(min);
           setMaxPrice(max);
-          persistFilters({ minPrice: min, maxPrice: max });
         }}
         onCategoryChange={(categoryId, subcategoryId) => {
           setSelectedCategory(categoryId);
@@ -1875,11 +1855,9 @@ export function SearchView({
         }}
         onConditionChange={(condition) => {
           setSelectedCondition(condition);
-          persistFilters({ selectedCondition: condition });
         }}
         onCurrencyChange={(currency) => {
           setSelectedCurrency(currency);
-          persistFilters({ selectedCurrency: currency });
         }}
         tg={tg}
       />
@@ -1906,10 +1884,9 @@ export function SearchView({
         onSelect={(cities) => {
           const normalized = cities.map((c) => normalizeCityInput(c)).filter(Boolean);
           setLocalCities(normalized);
-          persistFilters({ selectedCities: normalized });
         }}
         tg={tg}
-        profileTelegramId={profileTelegramId}
+        profileTelegramId={viewerTelegramId}
       />
       )}
       <Toast message={toast.message} type={toast.type} isVisible={toast.isVisible} onClose={hideToast} />

@@ -168,7 +168,7 @@ export const getCategories = (t: (key: string) => string): Category[] => [
   {
     id: 'food_gastro',
     name: t('categories.food_gastro'),
-    icon: '🍽️',
+    icon: '🍕',
     subcategories: [
       { id: 'homemade', name: t('categories.subcategories.homemade_food') },
       { id: 'products_grocery', name: t('categories.subcategories.products_grocery') },
@@ -200,6 +200,7 @@ export const categories: Category[] = getCategories((key: string) => {
     'categories.pets': 'Улюбленці',
     'categories.realestate': 'Нерухомість',
     'categories.services_work': 'Послуги та робота',
+    'categories.food_gastro': 'Продукти',
     'categories.free': 'Безкоштовно / Віддам',
     // Додати всі підкатегорії...
   };

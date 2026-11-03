@@ -5,7 +5,8 @@
 
 import { prisma } from '@/lib/prisma';
 import { queryRawUnsafe } from '@/lib/prisma';
-import { isPostgres } from '@/lib/dbSql';
+import { isPostgres, sqlLikeOp } from '@/lib/dbSql';
+import { sqlLikeContainsPattern } from '@/lib/listings/searchVariants';
 
 export type UserPersonalizationProfile = {
   categoryScores: Record<string, number>;
@@ -297,14 +298,14 @@ export function buildPersonalizationOrderBoost(
   }
 
   for (const [city, weight] of topScores(profile.cityScores, 4)) {
-    parts.push('CASE WHEN l.location LIKE ? THEN ? ELSE 0 END');
-    params.push(`%${city}%`, Math.min(Math.round(weight * 1.5), 22));
+    parts.push(`CASE WHEN l.location ${sqlLikeOp()} ? THEN ? ELSE 0 END`);
+    params.push(sqlLikeContainsPattern(city), Math.min(Math.round(weight * 1.5), 22));
   }
 
   for (const term of profile.searchTerms.slice(0, 4)) {
     if (term.length >= 2) {
-      parts.push('CASE WHEN lower(l.title) LIKE ? THEN 12 ELSE 0 END');
-      params.push(`%${term}%`);
+      parts.push(`CASE WHEN l.title ${sqlLikeOp()} ? THEN 12 ELSE 0 END`);
+      params.push(sqlLikeContainsPattern(term));
     }
   }
 

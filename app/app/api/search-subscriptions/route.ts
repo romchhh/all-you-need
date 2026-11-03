@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureSearchSubscriptionTable } from '@/lib/prisma';
 import { trackUserActivity } from '@/utils/trackActivity';
+import { findUserByTelegramId } from '@/utils/userHelpers';
+import { sqlNow } from '@/lib/dbSql';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,18 +25,8 @@ function normalizeEntityMode(raw: string | null | undefined): 'listings' | 'busi
 }
 
 async function resolveUserId(telegramId: string): Promise<number | null> {
-  const telegramIdNum = parseInt(telegramId, 10);
-  if (Number.isNaN(telegramIdNum)) return null;
-
-  const users = await executeWithRetry(
-    () =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-        telegramIdNum
-      ) as Promise<Array<{ id: number }>>
-  );
-
-  return users[0]?.id ?? null;
+  const user = await findUserByTelegramId(String(telegramId).trim());
+  return user?.id ?? null;
 }
 
 export async function GET(request: NextRequest) {
@@ -52,10 +44,9 @@ export async function GET(request: NextRequest) {
 
     const userId = await resolveUserId(telegramId);
     if (userId == null) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'follower_not_found' }, { status: 404 });
     }
 
-    // Список усіх підписок користувача
     if (!query) {
       const rows = await executeWithRetry(
         () =>
@@ -101,11 +92,14 @@ export async function POST(request: NextRequest) {
     await ensureTable();
 
     const body = await request.json();
-    const telegramId = body.telegramId as string | undefined;
-    const query = body.query as string | undefined;
+    const telegramId =
+      body.telegramId != null && String(body.telegramId).trim()
+        ? String(body.telegramId).trim()
+        : '';
+    const query = typeof body.query === 'string' ? body.query : '';
     const mode = normalizeEntityMode(body.mode as string | undefined);
 
-    if (!telegramId || !query || typeof query !== 'string') {
+    if (!telegramId || !query.trim()) {
       return NextResponse.json(
         { error: 'telegramId and query are required' },
         { status: 400 }
@@ -120,12 +114,15 @@ export async function POST(request: NextRequest) {
 
     const userId = await resolveUserId(telegramId);
     if (userId == null) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'follower_not_found' }, { status: 404 });
     }
 
+    // SQLite + PG: ON CONFLICT DO NOTHING (INSERT OR IGNORE ламається на PG через adaptSql)
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO SearchSubscription (userId, queryKey, queryText, entityMode, createdAt) VALUES (?, ?, ?, ?, datetime('now'))`,
+        `INSERT INTO SearchSubscription (userId, queryKey, queryText, entityMode, createdAt)
+         VALUES (?, ?, ?, ?, ${sqlNow()})
+         ON CONFLICT (userId, queryKey, entityMode) DO NOTHING`,
         userId,
         queryKey,
         queryText,
@@ -163,7 +160,7 @@ export async function DELETE(request: NextRequest) {
 
     const userId = await resolveUserId(telegramId);
     if (userId == null) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'follower_not_found' }, { status: 404 });
     }
 
     await executeWithRetry(() =>

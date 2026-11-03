@@ -8,6 +8,21 @@ import {
   businessMetricPctChange,
   isBusinessProfileActive,
 } from '@/lib/businessProfileHelpers';
+import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
+
+function firstListingImage(imagesRaw: unknown): string | null {
+  try {
+    const parsed =
+      typeof imagesRaw === 'string'
+        ? (JSON.parse(imagesRaw) as string[])
+        : Array.isArray(imagesRaw)
+          ? (imagesRaw as string[])
+          : [];
+    return resolveStoredListingImages(parsed)[0] || null;
+  } catch {
+    return null;
+  }
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +95,7 @@ export async function GET(request: NextRequest) {
     };
 
     const listings = (await prisma.$queryRawUnsafe(
-      `SELECT l.id, l.title, l.price, l.isFree, l.currency, l.views, l.image,
+      `SELECT l.id, l.title, l.price, l.isFree, l.currency, l.views, l.images,
               (SELECT COUNT(*) FROM Favorite f WHERE f.listingId = l.id) as favoritesCount,
               l.promotionType, l.promotionEnds
        FROM Listing l
@@ -95,7 +110,7 @@ export async function GET(request: NextRequest) {
       isFree: number | boolean;
       currency: string | null;
       views: number | null;
-      image: string | null;
+      images: string | null;
       favoritesCount: bigint | number;
       promotionType: string | null;
       promotionEnds: string | null;
@@ -107,7 +122,7 @@ export async function GET(request: NextRequest) {
       price: row.price,
       isFree: Boolean(row.isFree),
       currency: row.currency,
-      image: row.image,
+      image: firstListingImage(row.images),
       views: Number(row.views ?? 0),
       favoritesCount: Number(row.favoritesCount ?? 0),
       inquiriesEstimate: Math.max(0, Math.round(Number(row.views ?? 0) * 0.026)),
@@ -118,7 +133,7 @@ export async function GET(request: NextRequest) {
 
     const promotionsRaw = (await prisma.$queryRawUnsafe(
       `SELECT pp.id, pp.promotionType, pp.startsAt, pp.endsAt, pp.createdAt,
-              l.title as listingTitle, l.views, l.image
+              l.title as listingTitle, l.views, l.images
        FROM PromotionPurchase pp
        JOIN Listing l ON l.id = pp.listingId
        WHERE pp.userId = ? AND pp.status IN ('paid', 'active', 'completed')
@@ -133,7 +148,7 @@ export async function GET(request: NextRequest) {
       createdAt: string;
       listingTitle: string;
       views: number | null;
-      image: string | null;
+      images: string | null;
     }>;
 
     const promotionHistory = promotionsRaw.map((row) => ({
@@ -141,7 +156,7 @@ export async function GET(request: NextRequest) {
       promotionType: row.promotionType,
       promotionLabel: promotionLabel(row.promotionType),
       listingTitle: row.listingTitle,
-      image: row.image,
+      image: firstListingImage(row.images),
       startsAt: row.startsAt || row.createdAt,
       endsAt: row.endsAt,
       views: Number(row.views ?? 0),

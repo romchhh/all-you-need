@@ -404,7 +404,7 @@ def get_category_label(category: str, subcategory: str | None = None) -> str:
         "services_work": "Послуги",
         "realestate": "Нерухомість",
         "pets": "Тварини",
-        "food_gastro": "Їжа / гастро",
+        "food_gastro": "Продукти",
         "free_stuff": "Безкоштовно",
         "free": "Безкоштовно",
         "other": "Інше",

@@ -981,6 +981,7 @@ const CategoriesPage = () => {
 
       <BottomNavigation
         activeTab="categories"
+        openListingId={selectedListing?.id ?? null}
         onTabChange={(tab) => {
           // Закриваємо деталі товару перед переходом
           const hasOpenDetails = selectedListing || selectedSeller;

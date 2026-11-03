@@ -15,14 +15,14 @@ type Options = {
   /** Не чіпати, поки відкрита картка/профіль (крім першого reopen). */
   overlayOpen: boolean;
   setSelectedListing: (listing: Listing | null) => void;
-  /** Додатковий сигнал готовності стрічки (напр. listings.length > 0). */
+  /** Стрічка готова для відновлення скролу. */
   ready?: boolean;
 };
 
 /**
  * Після повернення на вкладку з меню:
- * 1) відновлює скрол
- * 2) знову відкриває картку товару, якщо пішли з відкритої
+ * 1) знову відкриває картку товару, якщо пішли з відкритої
+ * 2) відновлює скрол стрічки
  */
 export function useTabReturnRestore({
   tab,
@@ -30,27 +30,22 @@ export function useTabReturnRestore({
   setSelectedListing,
   ready = true,
 }: Options): void {
-  const didRestoreRef = useRef(false);
+  const didReopenRef = useRef(false);
+  const didScrollRef = useRef(false);
   const reopenInFlightRef = useRef(false);
 
+  // Картка — одразу, без очікування стрічки
   useEffect(() => {
-    if (didRestoreRef.current) return;
-    if (!ready) return;
+    if (didReopenRef.current || reopenInFlightRef.current) return;
     if (typeof window === 'undefined') return;
-
-    const returnListingId = peekTabReturnListing(tab);
-    const savedScroll = readTabScroll(tab);
-
-    // Спочатку скрол каталогу (під карткою)
-    if (!overlayOpen && savedScroll > 0) {
-      const delays = [50, 150, 350, 600];
-      delays.forEach((ms) => {
-        setTimeout(() => restoreWindowScroll(savedScroll), ms);
-      });
+    if (overlayOpen) {
+      didReopenRef.current = true;
+      return;
     }
 
-    if (returnListingId == null || overlayOpen || reopenInFlightRef.current) {
-      didRestoreRef.current = true;
+    const returnListingId = peekTabReturnListing(tab);
+    if (returnListingId == null) {
+      didReopenRef.current = true;
       return;
     }
 
@@ -66,14 +61,18 @@ export function useTabReturnRestore({
     fetch(`/api/listings/${returnListingId}${qs}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (cancelled || !data?.id) return;
+        if (cancelled) return;
         consumeTabReturnListing(tab);
-        setSelectedListing(data as Listing);
-        didRestoreRef.current = true;
+        if (data?.id) {
+          setSelectedListing(data as Listing);
+        }
+        didReopenRef.current = true;
       })
       .catch(() => {
-        consumeTabReturnListing(tab);
-        didRestoreRef.current = true;
+        if (!cancelled) {
+          consumeTabReturnListing(tab);
+          didReopenRef.current = true;
+        }
       })
       .finally(() => {
         reopenInFlightRef.current = false;
@@ -82,5 +81,23 @@ export function useTabReturnRestore({
     return () => {
       cancelled = true;
     };
-  }, [tab, overlayOpen, ready, setSelectedListing]);
+  }, [tab, overlayOpen, setSelectedListing]);
+
+  // Скрол стрічки — коли є контент і немає оверлею
+  useEffect(() => {
+    if (didScrollRef.current) return;
+    if (!ready) return;
+    if (overlayOpen) return;
+    if (typeof window === 'undefined') return;
+
+    const savedScroll = readTabScroll(tab);
+    didScrollRef.current = true;
+    if (savedScroll <= 0) return;
+
+    const delays = [50, 150, 350, 600, 1000];
+    const timers = delays.map((ms) =>
+      window.setTimeout(() => restoreWindowScroll(savedScroll), ms)
+    );
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [tab, overlayOpen, ready]);
 }

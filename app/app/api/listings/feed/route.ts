@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sqlDatetimeCompare } from '@/lib/dbSql';
+import { sqlDatetimeCompare, sqlLikeOp } from '@/lib/dbSql';
 import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
@@ -24,6 +24,8 @@ import {
 import {
   generateSearchVariantsWithCities,
   listingMatchesSearchQuery,
+  normalizeCyrillicToLower,
+  sqlLikeContainsPattern,
   sqlListingSearchableDescription,
 } from '@/lib/listings/searchVariants';
 import {
@@ -140,18 +142,39 @@ export async function GET(request: NextRequest) {
     const params: unknown[] = [];
     whereClause = appendCatalogFiltersToWhere(whereClause, params, filters);
 
-    if (search && search.trim().length <= 30) {
-      const searchVariants = generateSearchVariantsWithCities(search.trim());
+    if (search?.trim()) {
+      const searchTrimmed = search.trim();
       const searchableDesc = sqlListingSearchableDescription('l');
-      const titleConditions = searchVariants.map(() => 'l.title LIKE ?').join(' OR ');
-      const descConditions = searchVariants
-        .map(() => `${searchableDesc} LIKE ?`)
-        .join(' OR ');
-      const locationConditions = searchVariants.map(() => 'l.location LIKE ?').join(' OR ');
-      whereClause += ` AND ((${titleConditions}) OR (${descConditions}) OR (${locationConditions}))`;
-      searchVariants.forEach((v) => params.push(`%${v}%`));
-      searchVariants.forEach((v) => params.push(`%${v}%`));
-      searchVariants.forEach((v) => params.push(`%${v}%`));
+      const likeOp = sqlLikeOp();
+      if (searchTrimmed.length <= 30) {
+        const searchVariants = generateSearchVariantsWithCities(searchTrimmed);
+        const titleConditions = searchVariants.map(() => `l.title ${likeOp} ?`).join(' OR ');
+        const descConditions = searchVariants
+          .map(() => `${searchableDesc} ${likeOp} ?`)
+          .join(' OR ');
+        const locationConditions = searchVariants
+          .map(() => `l.location ${likeOp} ?`)
+          .join(' OR ');
+        whereClause += ` AND ((${titleConditions}) OR (${descConditions}) OR (${locationConditions}))`;
+        searchVariants.forEach((v) => params.push(sqlLikeContainsPattern(v)));
+        searchVariants.forEach((v) => params.push(sqlLikeContainsPattern(v)));
+        searchVariants.forEach((v) => params.push(sqlLikeContainsPattern(v)));
+      } else {
+        const searchLower = normalizeCyrillicToLower(searchTrimmed);
+        whereClause += ` AND (
+          (l.title ${likeOp} ? OR l.title ${likeOp} ?) OR
+          (${searchableDesc} ${likeOp} ? OR ${searchableDesc} ${likeOp} ?) OR
+          (l.location ${likeOp} ? OR l.location ${likeOp} ?)
+        )`;
+        params.push(
+          sqlLikeContainsPattern(searchTrimmed),
+          sqlLikeContainsPattern(searchLower),
+          sqlLikeContainsPattern(searchTrimmed),
+          sqlLikeContainsPattern(searchLower),
+          sqlLikeContainsPattern(searchTrimmed),
+          sqlLikeContainsPattern(searchLower)
+        );
+      }
     }
 
     whereClause +=

@@ -627,6 +627,7 @@ const ProfilePage = () => {
       {!isEditModalOpen && !isCreateListingModalOpen && (
       <BottomNavigation
         activeTab="profile"
+        openListingId={selectedListing?.id ?? null}
         onTabChange={(tab) => {
           // Закриваємо деталі товару перед переходом
           const hasOpenDetails = selectedListing || selectedSeller;

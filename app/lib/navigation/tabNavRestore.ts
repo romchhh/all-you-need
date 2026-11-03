@@ -60,6 +60,18 @@ export function persistOpenListingFromUrl(tab: NavTab): void {
   }
 }
 
+/**
+ * ID з React state надійніший за URL: ?listing= пишеться в useEffect
+ * і може ще не встигнути до кліку по меню.
+ */
+export function persistOpenListingForTab(tab: NavTab, listingId?: number | null): void {
+  if (listingId != null && Number.isFinite(listingId) && listingId > 0) {
+    persistTabReturnListing(tab, listingId);
+    return;
+  }
+  persistOpenListingFromUrl(tab);
+}
+
 export function restoreWindowScroll(scrollY: number): void {
   if (typeof window === 'undefined' || scrollY <= 0) return;
   window.scrollTo({ top: scrollY, behavior: 'auto' });

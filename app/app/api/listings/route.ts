@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sqlDatetimeCompare, sqlListingAutoRenewSelect, normalizeTelegramIdForDb } from '@/lib/dbSql';
+import {
+  sqlDatetimeCompare,
+  sqlListingAutoRenewSelect,
+  sqlLikeOp,
+  normalizeTelegramIdForDb,
+} from '@/lib/dbSql';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { executeInClause } from '@/utils/dbHelpers';
@@ -25,6 +30,7 @@ import {
   generateSearchVariantsWithCities,
   listingMatchesSearchQuery,
   normalizeCyrillicToLower,
+  sqlLikeContainsPattern,
   sqlListingSearchableDescription,
 } from '@/lib/listings/searchVariants';
 
@@ -91,26 +97,12 @@ export async function GET(request: NextRequest) {
     const currencyFilter =
       currencyRaw && ['EUR', 'USD', 'UAH'].includes(currencyRaw) ? currencyRaw : null;
 
-    // Якщо це запит для профілю користувача (userId), показуємо всі його оголошення
-    // Інакше показуємо тільки активні оголошення для каталогу
-    const where: any = {};
+    // Raw SQL only (Prisma where/orderBy path removed — unused and case-sensitive on PG)
+    let listings: any[] = [];
+    let total = 0;
 
-    // Фільтр по користувачу
     if (userId) {
-      // Знаходимо внутрішній id користувача за telegramId
-      const telegramIdKey = normalizeTelegramIdForDb(userId);
-      const users = telegramIdKey
-        ? ((await prisma.$queryRawUnsafe(
-            `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ?`,
-            telegramIdKey
-          )) as Array<{ id: number }>)
-        : [];
-      if (users[0]) {
-        where.userId = users[0].id;
-        // Для профілю користувача показуємо всі оголошення (pending, active, sold тощо)
-        // Не додаємо фільтр по статусу
-      } else {
-        // Користувач не знайдений - повертаємо порожній список
+      if (!normalizeTelegramIdForDb(userId)) {
         return NextResponse.json({
           listings: [],
           total: 0,
@@ -118,73 +110,6 @@ export async function GET(request: NextRequest) {
           offset,
         });
       }
-    } else {
-      // Для каталогу показуємо тільки активні оголошення
-      where.status = 'active';
-    }
-
-    if (category) {
-      where.category = category;
-    }
-
-    if (subcategory) {
-      where.subcategory = subcategory;
-    }
-
-    if (isFree) {
-      where.isFree = true;
-    }
-
-    if (search) {
-      // Використовуємо нормалізацію кирилиці для пошуку
-      // JavaScript's toLowerCase() правильно працює з кирилицею
-      const searchLower = normalizeCyrillicToLower(search.trim());
-      where.OR = [
-        { title: { contains: searchLower } },
-        { description: { contains: searchLower } },
-        { location: { contains: searchLower } },
-      ];
-    }
-
-    let orderBy: any = {};
-    switch (sortBy) {
-      case 'newest':
-        // VIP > TOP > Highlighted > звичайні, всередині кожної групи по даті
-        orderBy = [
-          { promotionType: 'desc' }, // VIP буде першим (за алфавітом)
-          { createdAt: 'desc' }
-        ];
-        break;
-      case 'price_low':
-        orderBy = [
-          { promotionType: 'desc' },
-          { isFree: 'desc' }
-        ];
-        break;
-      case 'price_high':
-        orderBy = [
-          { promotionType: 'desc' },
-          { isFree: 'asc' }
-        ];
-        break;
-      case 'popular':
-        orderBy = [
-          { promotionType: 'desc' },
-          { views: 'desc' }
-        ];
-        break;
-      default:
-        orderBy = [
-          { promotionType: 'desc' },
-          { createdAt: 'desc' }
-        ];
-    }
-
-    // Використовуємо raw query для обходу проблеми з форматом дат
-    let listings: any[] = [];
-    let total = 0;
-
-    if (userId) {
       // Визначаємо, чи це власний профіль (viewerId === userId)
       const isOwnProfile =
         Boolean(viewerId) &&
@@ -538,42 +463,46 @@ export async function GET(request: NextRequest) {
         // Для коротких пошукових запитів (до 30 символів) використовуємо SQL LIKE
         // Для довших використовуємо фільтрацію в JavaScript після отримання даних
         const searchableDesc = sqlListingSearchableDescription('l');
+        // PG: ILIKE (case-insensitive). SQLite: LIKE + варіанти регістру.
+        const likeOp = sqlLikeOp();
         if (searchTrimmed.length <= 30) {
-          // Створюємо умову з усіма варіантами для кожного поля
-          const titleConditions = searchVariants.map(() => 'l.title LIKE ?').join(' OR ');
+          const titleConditions = searchVariants.map(() => `l.title ${likeOp} ?`).join(' OR ');
           const descConditions = searchVariants
-            .map(() => `${searchableDesc} LIKE ?`)
+            .map(() => `${searchableDesc} ${likeOp} ?`)
             .join(' OR ');
-          const locationConditions = searchVariants.map(() => 'l.location LIKE ?').join(' OR ');
-          
+          const locationConditions = searchVariants
+            .map(() => `l.location ${likeOp} ?`)
+            .join(' OR ');
+
           whereClause += ` AND (
             (${titleConditions}) OR
             (${descConditions}) OR
             (${locationConditions})
           )`;
-          
-          // Додаємо параметри для кожного варіанту та кожного поля
-          searchVariants.forEach(variant => {
-            params.push(`%${variant}%`); // title
+
+          searchVariants.forEach((variant) => {
+            params.push(sqlLikeContainsPattern(variant));
           });
-          searchVariants.forEach(variant => {
-            params.push(`%${variant}%`); // description (без @автора)
+          searchVariants.forEach((variant) => {
+            params.push(sqlLikeContainsPattern(variant));
           });
-          searchVariants.forEach(variant => {
-            params.push(`%${variant}%`); // location
+          searchVariants.forEach((variant) => {
+            params.push(sqlLikeContainsPattern(variant));
           });
         } else {
-          // Для довших запитів — базовий LIKE + JS post-filter без ніку автора
           const searchLower = normalizeCyrillicToLower(searchTrimmed);
           whereClause += ` AND (
-            (l.title LIKE ? OR l.title LIKE ?) OR
-            (${searchableDesc} LIKE ? OR ${searchableDesc} LIKE ?) OR
-            (l.location LIKE ? OR l.location LIKE ?)
+            (l.title ${likeOp} ? OR l.title ${likeOp} ?) OR
+            (${searchableDesc} ${likeOp} ? OR ${searchableDesc} ${likeOp} ?) OR
+            (l.location ${likeOp} ? OR l.location ${likeOp} ?)
           )`;
           params.push(
-            `%${searchTrimmed}%`, `%${searchLower}%`,
-            `%${searchTrimmed}%`, `%${searchLower}%`,
-            `%${searchTrimmed}%`, `%${searchLower}%`
+            sqlLikeContainsPattern(searchTrimmed),
+            sqlLikeContainsPattern(searchLower),
+            sqlLikeContainsPattern(searchTrimmed),
+            sqlLikeContainsPattern(searchLower),
+            sqlLikeContainsPattern(searchTrimmed),
+            sqlLikeContainsPattern(searchLower)
           );
         }
       }

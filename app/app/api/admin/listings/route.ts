@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureCurrencyColumn } from '@/lib/prisma';
 import { requireAdminAuth } from '@/utils/adminAuth';
+import { sqlLikeOp } from '@/lib/dbSql';
+import { sqlLikeContainsPattern } from '@/lib/listings/searchVariants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,8 +43,9 @@ export async function GET(request: NextRequest) {
 
     // Пошук
     if (search) {
-      whereClause += ' AND (l.title LIKE ? OR l.description LIKE ? OR l.location LIKE ?)';
-      const searchPattern = `%${search}%`;
+      const likeOp = sqlLikeOp();
+      whereClause += ` AND (l.title ${likeOp} ? OR l.description ${likeOp} ? OR l.location ${likeOp} ?)`;
+      const searchPattern = sqlLikeContainsPattern(search);
       params.push(searchPattern, searchPattern, searchPattern);
     }
 

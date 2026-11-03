@@ -621,22 +621,22 @@ export const ListingDetail = ({
             })
           : Promise.resolve();
 
-        const params = buildCategoryListingsSearchParams(0);
-        const categoryPromise = fetch(`/api/listings?${params.toString()}`, {
-          signal: abort.signal,
-        }).then(async (categoryResponse) => {
-          if (!categoryResponse.ok) return;
-          const categoryData = await categoryResponse.json();
-          const filtered = (categoryData.listings || []).filter(
+        const similarPromise = fetch(
+          `/api/listings/${listingId}/similar?limit=12&offset=0`,
+          { signal: abort.signal }
+        ).then(async (similarResponse) => {
+          if (!similarResponse.ok) return;
+          const similarData = await similarResponse.json();
+          const filtered = (similarData.listings || []).filter(
             (l: Listing) => l.id !== listingId
           );
           setCategoryListings(filtered);
-          setCategoryTotal(categoryData.total || 0);
-          setCategoryHasMore(filtered.length < (categoryData.total || 0) - 1);
-          setCategoryOffset(12);
+          setCategoryTotal(similarData.total || filtered.length);
+          setCategoryHasMore(Boolean(similarData.hasMore));
+          setCategoryOffset(filtered.length);
         });
 
-        await Promise.all([sellerPromise, categoryPromise]);
+        await Promise.all([sellerPromise, similarPromise]);
       } catch (error) {
         if ((error as { name?: string })?.name === 'AbortError') return;
         console.error('Error fetching related listings:', error);
@@ -685,14 +685,17 @@ export const ListingDetail = ({
   const loadMoreCategoryListings = async () => {
     try {
       const response = await fetch(
-        `/api/listings?${buildCategoryListingsSearchParams(categoryOffset).toString()}`
+        `/api/listings/${listing.id}/similar?limit=12&offset=${categoryOffset}`
       );
       if (response.ok) {
         const data = await response.json();
         const filtered = (data.listings || []).filter((l: Listing) => l.id !== listing.id);
-        setCategoryListings(prev => [...prev, ...filtered]);
-        setCategoryHasMore((categoryOffset + filtered.length) < ((data.total || 0) - 1));
-        setCategoryOffset(prev => prev + 12);
+        setCategoryListings((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...filtered.filter((l: Listing) => !seen.has(l.id))];
+        });
+        setCategoryHasMore(Boolean(data.hasMore));
+        setCategoryOffset((prev) => prev + filtered.length);
         tg?.HapticFeedback.impactOccurred('light');
       }
     } catch (error) {
@@ -748,14 +751,15 @@ export const ListingDetail = ({
       }
       
       const categoryResponse = await fetch(
-        `/api/listings?${buildCategoryListingsSearchParams(0).toString()}`
+        `/api/listings/${listing.id}/similar?limit=12&offset=0`
       );
       if (categoryResponse.ok) {
         const categoryData = await categoryResponse.json();
         const filtered = (categoryData.listings || []).filter((l: Listing) => l.id !== listing.id);
         setCategoryListings(filtered);
-        setCategoryTotal(categoryData.total || 0);
-        setCategoryHasMore(filtered.length < ((categoryData.total || 0) - 1));
+        setCategoryTotal(categoryData.total || filtered.length);
+        setCategoryHasMore(Boolean(categoryData.hasMore));
+        setCategoryOffset(filtered.length);
       }
     } catch (error) {
       console.error('Error refreshing listing:', error);

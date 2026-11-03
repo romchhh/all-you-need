@@ -681,6 +681,20 @@ export async function ensureCitySubscriptionTable(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_citysubscription_cityKey ON CitySubscription(cityKey)
     `);
 
+    // PG: ON CONFLICT потребує UNIQUE; таблиця могла з’явитись без нього
+    try {
+      await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `CREATE UNIQUE INDEX IF NOT EXISTS CitySubscription_userId_cityKey_key
+           ON CitySubscription(userId, cityKey)`
+        )
+      );
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Note: Could not ensure CitySubscription unique index:', error?.message);
+      }
+    }
+
     citySubscriptionTableChecked = true;
   } catch (error: any) {
     if (process.env.NODE_ENV === 'development') {
@@ -751,6 +765,20 @@ export async function ensureSearchSubscriptionTable(): Promise<void> {
       'idx_searchsubscription_queryKey',
       `CREATE INDEX IF NOT EXISTS idx_searchsubscription_queryKey ON SearchSubscription(queryKey)`
     );
+
+    // PG: ON CONFLICT потребує UNIQUE; таблиця могла з’явитись без нього
+    try {
+      await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `CREATE UNIQUE INDEX IF NOT EXISTS SearchSubscription_userId_queryKey_entityMode_key
+           ON SearchSubscription(userId, queryKey, entityMode)`
+        )
+      );
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Note: Could not ensure SearchSubscription unique index:', error?.message);
+      }
+    }
 
     searchSubscriptionTableChecked = true;
   } catch (error: any) {

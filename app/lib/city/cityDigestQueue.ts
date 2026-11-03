@@ -39,8 +39,9 @@ export async function enqueueCityDigestListing(listingId: number): Promise<void>
   if (!cityKey) return;
   const createdAt = new Date().toISOString();
   await prisma.$executeRawUnsafe(
-    `INSERT OR IGNORE INTO CityDigestQueue(listingId, cityKey, createdAt, processedAt)
-     VALUES (?, ?, ?, NULL)`,
+    `INSERT INTO CityDigestQueue(listingId, cityKey, createdAt, processedAt)
+     VALUES (?, ?, ?, NULL)
+     ON CONFLICT (listingId) DO NOTHING`,
     listingId,
     cityKey,
     createdAt

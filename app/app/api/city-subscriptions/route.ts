@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { executeWithRetry, ensureCitySubscriptionTable } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
-import { normalizeTelegramIdForDb, sqlUserTelegramIdWhere } from '@/lib/dbSql';
+import { sqlNow } from '@/lib/dbSql';
 import { trackUserActivity } from '@/utils/trackActivity';
+import { findUserByTelegramId } from '@/utils/userHelpers';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,19 +15,9 @@ async function ensureTable() {
   await initPromise;
 }
 
-/** Telegram id лишається рядком: інакше PostgreSQL порівнює text = bigint і запит падає. */
 async function resolveUserId(telegramId: string): Promise<number | null> {
-  const key = normalizeTelegramIdForDb(telegramId);
-  if (!key || !/^\d+$/.test(key)) return null;
-
-  const users = await executeWithRetry(
-    () =>
-      prisma.$queryRawUnsafe(
-        `SELECT id FROM User WHERE ${sqlUserTelegramIdWhere()}`,
-        key
-      ) as Promise<Array<{ id: number }>>
-  );
-  return users[0]?.id ?? null;
+  const user = await findUserByTelegramId(String(telegramId).trim());
+  return user?.id ?? null;
 }
 
 export async function GET(request: NextRequest) {
@@ -41,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     const userId = await resolveUserId(telegramId);
     if (userId == null) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'follower_not_found' }, { status: 404 });
     }
 
     const rows = await executeWithRetry(() =>
@@ -64,10 +55,13 @@ export async function POST(request: NextRequest) {
     await ensureTable();
 
     const body = await request.json();
-    const telegramId = body.telegramId as string | number | undefined;
-    const city = body.city as string | undefined;
+    const telegramId =
+      body.telegramId != null && String(body.telegramId).trim()
+        ? String(body.telegramId).trim()
+        : '';
+    const city = typeof body.city === 'string' ? body.city : '';
 
-    if (telegramId == null || telegramId === '' || !city || typeof city !== 'string') {
+    if (!telegramId || !city.trim()) {
       return NextResponse.json(
         { error: 'telegramId and city are required' },
         { status: 400 }
@@ -79,14 +73,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid city' }, { status: 400 });
     }
 
-    const userId = await resolveUserId(String(telegramId));
+    const userId = await resolveUserId(telegramId);
     if (userId == null) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'follower_not_found' }, { status: 404 });
     }
 
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
-        `INSERT INTO CitySubscription (userId, cityKey, createdAt) VALUES (?, ?, datetime('now'))
+        `INSERT INTO CitySubscription (userId, cityKey, createdAt) VALUES (?, ?, ${sqlNow()})
          ON CONFLICT (userId, cityKey) DO NOTHING`,
         userId,
         cityKey
@@ -121,7 +115,7 @@ export async function DELETE(request: NextRequest) {
 
     const userId = await resolveUserId(telegramId);
     if (userId == null) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'follower_not_found' }, { status: 404 });
     }
 
     await executeWithRetry(() =>

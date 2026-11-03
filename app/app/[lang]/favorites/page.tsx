@@ -813,6 +813,7 @@ const FavoritesPage = () => {
 
       <BottomNavigation
         activeTab="favorites"
+        openListingId={selectedListing?.id ?? null}
         onTabChange={(tab) => {
           // Закриваємо деталі товару перед переходом
           const hasOpenDetails = selectedListing || selectedSeller;

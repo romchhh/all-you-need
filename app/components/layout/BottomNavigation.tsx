@@ -10,7 +10,7 @@ import {
 } from '@/lib/bazaar/bazaarScrollStorage';
 import {
   type NavTab,
-  persistOpenListingFromUrl,
+  persistOpenListingForTab,
   persistTabScroll,
   peekTabReturnListing,
   readTabScroll,
@@ -28,6 +28,8 @@ interface BottomNavigationProps {
   onCloseDetail?: () => void;
   onCreateListing?: () => void;
   favoritesCount?: number;
+  /** Відкрита картка товару на поточній вкладці — щоб повернутись у неї з меню. */
+  openListingId?: number | null;
   tg: TelegramWebApp | null;
 }
 
@@ -36,6 +38,7 @@ export const BottomNavigation = ({
   onTabChange,
   onCloseDetail,
   onCreateListing,
+  openListingId = null,
   tg,
 }: BottomNavigationProps) => {
   const { t } = useLanguage();
@@ -203,15 +206,16 @@ export const BottomNavigation = ({
         new URLSearchParams(window.location.search).get('listing')
       );
       // З оверлею картки window.scroll часто 0 — не затираємо збережений скрол стрічки
-      if (listingOpen) {
+      const hasOpenListing = listingOpen || (openListingId != null && openListingId > 0);
+      if (hasOpenListing) {
         const prev = readTabScroll(sourceTab);
         if (scrollY > 40) persistTabScroll(sourceTab, scrollY);
         else if (prev <= 0 && scrollY > 0) persistTabScroll(sourceTab, scrollY);
       } else {
         persistTabScroll(sourceTab, scrollY);
       }
-      // Якщо відкрита картка — запам'ятати, щоб повернутись у неї
-      persistOpenListingFromUrl(sourceTab);
+      // Картка з state (надійніше) або з ?listing= у URL
+      persistOpenListingForTab(sourceTab, openListingId);
       if (sourceTab === 'bazaar') {
         const id = peekTabReturnListing('bazaar');
         if (id != null) persistBazaarReturnListingId(id);
