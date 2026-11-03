@@ -238,8 +238,24 @@ class ModerationManager:
                 # Додаємо повідомлення про сторіс, якщо обрано тариф "story"
                 if 'story' in tariff_list:
                     tariff_info += "\n\n📸 <b>⚠️ ПОТРІБНО ВИКЛАСТИ СТОРІС!</b>"
+
+        is_business = listing.get('profileType') == 'business'
+        business_block = ""
+        if is_business:
+            business_name = (listing.get('businessName') or "").strip()
+            name_part = f": {business_name}" if business_name else ""
+            seller_tg = listing.get('sellerTelegramId') or listing.get('telegramId')
+            bot_username = (os.getenv('BOT_USERNAME') or os.getenv('NEXT_PUBLIC_BOT_USERNAME') or 'TradeGroundBot').lstrip('@')
+            link_part = (
+                f'\n🔗 <a href="https://t.me/{bot_username}?start=user_{seller_tg}">Сторінка бізнесу</a>'
+                if seller_tg
+                else ""
+            )
+            business_block = f"\n\n🏢 <b>Бізнес-оголошення</b>{name_part}{link_part}"
+
+        title_label = "Бізнес-оголошення на модерацію" if is_business else t(user_id, 'moderation.title')
         
-        text = f"""{source_emoji} <b>{t(user_id, 'moderation.title')}</b> #{listing_id}
+        text = f"""{source_emoji} <b>{title_label}</b> #{listing_id}
 
 <b>{t(user_id, 'listing.details.title')}</b> {listing.get('title', t(user_id, 'moderation.no_title'))}
 
@@ -251,7 +267,7 @@ class ModerationManager:
 {t(user_id, 'listing.details.location')} {location}{tariff_info}
 
 {t(user_id, 'listing.details.seller')} {seller_info}
-        {t(user_id, 'listing.details.created')} {self._format_date(listing.get('createdAt'), user_id)}
+        {t(user_id, 'listing.details.created')} {self._format_date(listing.get('createdAt'), user_id)}{business_block}
 
 <i>{source_text}</i>"""
         
@@ -705,9 +721,12 @@ class ModerationManager:
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT l.*, u.username, u.firstName, u.lastName, CAST(u.telegramId AS INTEGER) as sellerTelegramId
+            SELECT l.*, u.username, u.firstName, u.lastName,
+                   CAST(u.telegramId AS INTEGER) as sellerTelegramId,
+                   bp.businessName as businessName
             FROM Listing l
             JOIN User u ON l.userId = u.id
+            LEFT JOIN BusinessProfile bp ON bp.userId = u.id
             WHERE l.id = ?
         """, (listing_id,))
         

@@ -3,6 +3,7 @@
  */
 
 import { loadModerationImageBuffer } from '@/lib/server/moderationImageLoader';
+import { getProfileShareLink } from '@/utils/botLinks';
 
 const MODERATION_GROUP_ID = process.env.MODERATION_GROUP_ID;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -22,6 +23,10 @@ interface ListingData {
   firstName?: string;
   lastName?: string;
   createdAt: string;
+  profileType?: string | null;
+  telegramId?: string | number | null;
+  sellerTelegramId?: string | number | null;
+  businessName?: string | null;
 }
 
 /**
@@ -48,10 +53,13 @@ export async function sendListingToModerationGroup(
         `SELECT 
           l.id, l.title, l.description, l.price, l.currency,
           l.category, l.subcategory, l.condition, l.location,
-          l.images, l.createdAt,
-          u.username, u.firstName, u.lastName
+          l.images, l.createdAt, l.profileType,
+          u.username, u.firstName, u.lastName,
+          CAST(u.telegramId AS TEXT) as telegramId,
+          bp.businessName as businessName
         FROM Listing l
         JOIN User u ON l.userId = u.id
+        LEFT JOIN BusinessProfile bp ON bp.userId = u.id
         WHERE l.id = ?`,
         listingId
       ) as any[];
@@ -799,6 +807,7 @@ function formatListingText(
 ): string {
   const sourceEmoji = source === 'marketplace' ? '🌐' : '📱';
   const sourceText = source === 'marketplace' ? 'Маркетплейс' : 'Telegram бот';
+  const isBusiness = listing.profileType === 'business';
 
   const username = listing.username || '';
   const firstName = listing.firstName || '';
@@ -826,10 +835,22 @@ function formatListingText(
     ? `\n\n🔗 <a href="${webappUrl}/admin/listings/${listingId}">Переглянути в адмінці</a>`
     : '';
 
+  const sellerTelegramId = listing.telegramId ?? listing.sellerTelegramId;
+  let businessBlock = '';
+  if (isBusiness) {
+    const businessName = (listing.businessName || '').trim();
+    const namePart = businessName ? `: ${businessName}` : '';
+    const linkPart = sellerTelegramId
+      ? `\n🔗 <a href="${getProfileShareLink(sellerTelegramId)}">Сторінка бізнесу</a>`
+      : '';
+    businessBlock = `\n\n🏢 <b>Бізнес-оголошення</b>${namePart}${linkPart}`;
+  }
+
   // Додаємо пометку про редагування якщо потрібно
   const editNote = isEdit ? '\n\n⚠️ <b>ОГОЛОШЕННЯ ОНОВЛЕНО</b> - потрібна повторна модерація' : '';
+  const titleLabel = isBusiness ? 'Бізнес-оголошення на модерацію' : 'Оголошення на модерацію';
 
-  return `${sourceEmoji} <b>Оголошення на модерацію</b> #${listingId}${editNote}
+  return `${sourceEmoji} <b>${titleLabel}</b> #${listingId}${editNote}
 
 📌 <b>Назва:</b> ${listing.title || 'Без назви'}
 
@@ -841,7 +862,7 @@ ${listing.description || 'Без опису'}
 📍 <b>Розташування:</b> ${location}
 
 👤 <b>Продавець:</b> ${sellerInfo}
-📅 <b>Створено:</b> ${createdAt}
+📅 <b>Створено:</b> ${createdAt}${businessBlock}
 
 <i>Джерело: ${sourceText}</i>${adminLink}`;
 }
