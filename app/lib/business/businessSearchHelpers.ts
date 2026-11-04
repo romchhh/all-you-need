@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { rawQuery, sqlBooleanIsTrue, sqlLikeOp, sqlNow } from '@/lib/dbSql';
 import { ensureBusinessSearchCatalogFresh } from '@/lib/business/businessProfileConsistency';
+import { syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
 import { businessCityOrGroupSql, cityFilterPatterns } from '@/lib/city/listingCityMatch';
 import {
   getCustomDirectionText,
@@ -236,6 +237,7 @@ export async function searchBusinessProfiles(
        bp.description,
        bp.city,
        bp.address,
+       bp.userId as ownerUserId,
        CAST(u.telegramId AS TEXT) as sellerTelegramId,
        COALESCE(u.rating, 0) as rating,
        COALESCE(u.reviewsCount, 0) as reviewsCount,
@@ -267,6 +269,15 @@ export async function searchBusinessProfiles(
     followersCount: Number(row.followersCount) || 0,
     isFollowing: Number(row.isFollowing) === 1,
   }));
+
+  const ownerIds = [
+    ...new Set(
+      rows
+        .map((row) => Number(row.ownerUserId))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    ),
+  ];
+  await Promise.all(ownerIds.map((id) => syncBusinessListingProfileTypes(id).catch(() => undefined)));
 
   return { items, total };
 }

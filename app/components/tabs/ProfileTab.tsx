@@ -336,7 +336,6 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         setBusinessStats(null);
       } else if (profileViewMode === 'business') {
         void fetchBusinessStats();
-        void fetchListingsWithFilters(0, true);
       }
     } catch (e) {
       console.error('Error fetching business profile:', e);
@@ -362,6 +361,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const fetchListingsWithFilters = async (offset = 0, reset = false) => {
     if (!profile?.telegramId) return;
 
+    const businessMode = isBusinessActive && profileViewMode === 'business';
+    const personalMode = isBusinessActive && profileViewMode === 'personal';
+
     let url = `/api/listings?userId=${profile.telegramId}&viewerId=${profile.telegramId}&limit=${LISTINGS_PAGE_SIZE}&offset=${offset}`;
     if (selectedStatus !== 'all') {
       url += `&status=${selectedStatus}`;
@@ -369,9 +371,9 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     if (selectedCategory !== 'all') {
       url += `&category=${selectedCategory}`;
     }
-    if (isBusinessActive && profileViewMode === 'business') {
+    if (businessMode) {
       url += `&profileType=business`;
-    } else if (isBusinessActive && profileViewMode === 'personal') {
+    } else if (personalMode) {
       url += `&profileType=personal`;
     }
 

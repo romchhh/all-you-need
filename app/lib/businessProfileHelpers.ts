@@ -186,7 +186,10 @@ export async function resolveBusinessListingIds(
   }
 
   const rows = (await prisma.$queryRawUnsafe(
-    `SELECT id FROM Listing WHERE userId = ? AND status = 'active' ORDER BY id DESC`,
+    `SELECT id FROM Listing
+     WHERE userId = ?
+       AND status IN ('active', 'pending_moderation')
+     ORDER BY id DESC`,
     userId
   )) as Array<{ id: unknown }>;
 
@@ -196,7 +199,7 @@ export async function resolveBusinessListingIds(
 /** Синхронізує profileType оголошень з вибраними в Business-вітрині. */
 export async function syncBusinessListingProfileTypes(userId: number): Promise<void> {
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
-  if (!profile || !isBusinessProfileActive(profile)) return;
+  if (!profile || !isBusinessProfilePubliclyVisible(profile)) return;
   const ids = await resolveBusinessListingIds(userId, profile.linkedListingIds);
   await assignListingsToProfile(userId, ids);
 }
@@ -208,23 +211,27 @@ export async function assignListingsToProfile(
   const ids = normalizeIdList(businessListingIds);
   const nowStr = nowSQLite();
 
-  // Скидаємо всі оголошення користувача на 'personal'
+  if (ids.length === 0) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE Listing
+       SET profileType = 'personal', updatedAt = ?
+       WHERE userId = ? AND COALESCE(profileType, 'personal') <> 'personal'`,
+      nowStr,
+      userId
+    );
+    return;
+  }
+
+  const placeholders = ids.map(() => '?').join(',');
   await prisma.$executeRawUnsafe(
-    `UPDATE Listing SET profileType = 'personal', updatedAt = ? WHERE userId = ?`,
+    `UPDATE Listing
+     SET profileType = CASE WHEN id IN (${placeholders}) THEN 'business' ELSE 'personal' END,
+         updatedAt = ?
+     WHERE userId = ?`,
+    ...ids,
     nowStr,
     userId
   );
-
-  if (ids.length === 0) return;
-
-  for (const listingId of ids) {
-    await prisma.$executeRawUnsafe(
-      `UPDATE Listing SET profileType = 'business', updatedAt = ? WHERE id = ? AND userId = ?`,
-      nowStr,
-      listingId,
-      userId
-    );
-  }
 }
 
 /** Позначає нове оголошення як business і додає його до вітрини, якщо підписка активна. */
@@ -236,7 +243,7 @@ export async function linkListingToBusinessIfAllowed(
 
   await expireBusinessProfileIfNeeded(userId);
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
-  if (!profile || !isBusinessProfileActive(profile)) return false;
+  if (!profile || !isBusinessProfilePubliclyVisible(profile)) return false;
 
   const listing = await prisma.listing.findUnique({
     where: { id: listingId },

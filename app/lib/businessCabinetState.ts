@@ -15,12 +15,21 @@ export function isBusinessProfileActive(profile: {
 }
 
 /** Публічний Business (пошук, вітрина, SellerProfileRouter). */
+export function isPublishedFlag(value: unknown): boolean {
+  if (value === true || value === 1) return true;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 't' || normalized === '1';
+  }
+  return false;
+}
+
 export function isBusinessProfilePubliclyVisible(profile: {
   subscriptionStatus: string;
   subscriptionEndsAt?: Date | string | null;
-  isPublished: boolean;
+  isPublished: unknown;
 }): boolean {
-  return isBusinessProfileActive(profile) && profile.isPublished === true;
+  return isBusinessProfileActive(profile) && isPublishedFlag(profile.isPublished);
 }
 
 /** UI / API: стан Business-кабінету власника. */
