@@ -19,6 +19,36 @@ from parser.storage.listing_sql import (
 logger = logging.getLogger(__name__)
 
 
+def normalize_parser_image_ref(ref: str) -> str | None:
+    if not ref or not isinstance(ref, str):
+        return None
+    r = ref.replace("\\", "/").strip()
+    if not r or ".." in r:
+        return None
+    if r.startswith("http://") or r.startswith("https://"):
+        return r
+    r = r.lstrip("/")
+    if r.startswith("listings/"):
+        return "/" + r
+    if r.startswith("database/parsed_photos/"):
+        return r
+    if r.startswith("parsed_photos/"):
+        return "database/" + r
+    return r
+
+
+def resolve_parser_image_src_path(ref: str) -> Path | None:
+    """Абсолютний шлях до локального файлу парсера або public/listings."""
+    norm = normalize_parser_image_ref(ref)
+    if not norm or norm.startswith("http"):
+        return None
+    if norm.startswith("/listings/"):
+        return BASE_DIR / "app" / "public" / norm.lstrip("/")
+    if norm.startswith("database/parsed_photos/"):
+        return BASE_DIR / norm
+    return None
+
+
 def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -> list[str]:
     rel_paths = list(rel_paths or [])[:PARSER_MAX_PHOTOS]
     if not rel_paths:
@@ -31,20 +61,20 @@ def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -
     for i, rel in enumerate(rel_paths):
         if not rel:
             continue
-        r = rel.replace("\\", "/").strip()
-        if r.startswith("http://") or r.startswith("https://"):
-            out.append(r)
+        norm = normalize_parser_image_ref(str(rel))
+        if not norm:
             continue
-        if r.startswith("/listings/"):
-            out.append(r)
+        if norm.startswith("http://") or norm.startswith("https://"):
+            out.append(norm)
             continue
-        rel_norm = r.lstrip("/")
-        if rel_norm.startswith("listings/"):
-            out.append("/" + rel_norm)
+        if norm.startswith("/listings/"):
+            out.append(norm)
             continue
-        src = BASE_DIR / rel_norm
-        if not src.is_file():
-            logger.warning("Фото парсера не знайдено: %s", src)
+        src = resolve_parser_image_src_path(norm)
+        if src is None or not src.is_file():
+            logger.warning("Фото парсера не знайдено: %s", src or norm)
+            if norm.startswith("database/parsed_photos/") and norm not in out:
+                out.append(norm)
             continue
         ext = src.suffix.lower()
         if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
@@ -56,8 +86,15 @@ def copy_parser_images_to_public(rel_paths: list[str], prefix: str = "parser") -
             out.append(f"/listings/originals/{name}")
         except OSError as e:
             logger.error("Не вдалося скопіювати фото %s → %s: %s", src, dest, e)
-    # Без фото — порожній список; веб показує ListingAutoCover (без копії tgground).
-    return out
+            if norm.startswith("database/parsed_photos/") and norm not in out:
+                out.append(norm)
+    if not out:
+        for rel in rel_paths:
+            norm = normalize_parser_image_ref(str(rel))
+            if norm and norm not in out:
+                if norm.startswith("http") or norm.startswith("/listings/") or norm.startswith("database/"):
+                    out.append(norm)
+    return out[:PARSER_MAX_PHOTOS]
 
 
 def _default_listing_photo_src() -> Path | None:

@@ -15,6 +15,7 @@ from parser.storage.marketplace import (
     copy_parser_images_to_public,
     create_marketplace_listing,
     get_or_create_bot_user,
+    normalize_parser_image_ref,
 )
 from parser.storage.parsed_items import (
     parsed_item_image_refs,
@@ -61,6 +62,12 @@ def publish_parsed_item_marketplace(
     is_service = (listing_item.get("category") or "").strip().lower() == "services_work"
     images = parsed_item_image_refs(source)
     images_web = copy_parser_images_to_public(images, prefix=f"pi{item_id}")
+    if images and not images_web:
+        images_web = [
+            n
+            for n in (normalize_parser_image_ref(str(r)) for r in images)
+            if n and (n.startswith("http") or n.startswith("/listings/") or n.startswith("database/"))
+        ][: len(images)]
     publish_ctx = preserve_parsed_source_fields(dict(listing_item), source)
     description = build_final_marketplace_description(publish_ctx)
     if is_effectively_empty_marketplace_description(

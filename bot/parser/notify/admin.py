@@ -335,11 +335,13 @@ def _absolute_item_images(item: dict) -> list[str]:
         from parser.storage.parsed_items import parsed_item_image_refs
 
         images = parsed_item_image_refs(item)
+    from parser.storage.marketplace import resolve_parser_image_src_path
+
     abs_images = []
     for img in images:
-        p = BASE_DIR / img
-        if p.exists():
-            abs_images.append(str(p))
+        src = resolve_parser_image_src_path(str(img))
+        if src and src.is_file():
+            abs_images.append(str(src))
     if not abs_images and _is_services_item(item):
         logo = _tgground_logo_path()
         if logo:

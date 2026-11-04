@@ -436,6 +436,13 @@ def _channel_photo_inputs_from_images_web(images_web: list) -> list:
         if s.startswith("http://") or s.startswith("https://"):
             out.append(s)
             continue
+        if "parsed_photos/" in s.replace("\\", "/"):
+            from parser.storage.marketplace import resolve_parser_image_src_path
+
+            parsed_local = resolve_parser_image_src_path(s)
+            if parsed_local and parsed_local.is_file():
+                out.append(FSInputFile(str(parsed_local)))
+            continue
         if not s.startswith("/") or not base:
             continue
         rel = s.lstrip("/")

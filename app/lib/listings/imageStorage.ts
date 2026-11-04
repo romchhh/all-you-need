@@ -1,28 +1,35 @@
-import { existsSync } from 'fs';
-import { basename, extname, join } from 'path';
+import { basename } from 'path';
+import { isSyntheticListingImage } from '@/lib/listings/imageUrl';
 
-function publicFile(relPath: string): string {
-  return join(process.cwd(), 'public', relPath.replace(/^\/+/, ''));
-}
+/** Канонічний шлях з БД для клієнта (без перевірки existsSync — її робить /api/images). */
+function canonicalStoredListingImagePath(imagePath: string): string {
+  const clean = imagePath.split('?')[0].replace(/^\/+/, '');
+  if (!clean) return '';
 
-function parsedPhotoFile(filename: string): string {
-  return join(process.cwd(), '..', 'database', 'parsed_photos', filename);
-}
+  if (clean.includes('parsed_photos')) {
+    const match = clean.match(/(?:^|\/)parsed_photos\/(.+)$/);
+    const filename = match?.[1] ?? basename(clean);
+    if (!filename || filename.includes('..')) return '';
+    return `database/parsed_photos/${filename}`;
+  }
 
-function optimizedCandidates(originalRel: string): string[] {
-  const base = basename(originalRel);
-  const stem = base.replace(/\.[^.]+$/, '');
-  const ext = extname(base);
-  return [
-    `listings/optimized/${stem}.webp`,
-    `listings/optimized/${base}`,
-    `listings/optimized/${stem}${ext}`,
-    `listings/${base}`,
-  ];
+  if (clean.startsWith('listings/')) {
+    return `/${clean}`;
+  }
+
+  if (clean.startsWith('api/images/')) {
+    return `/${clean}`;
+  }
+
+  if (clean.startsWith('images/')) {
+    return `/${clean}`;
+  }
+
+  return '';
 }
 
 /**
- * Повертає шлях з БД, якщо файл реально є на диску; інакше '' (без 404 у клієнті).
+ * Нормалізує шлях з Listing.images для API (не відкидає парсерські фото, якщо файл тимчасово недоступний app-процесу).
  */
 export function resolveStoredListingImagePath(imagePath: string | null | undefined): string {
   if (!imagePath?.trim()) return '';
@@ -32,32 +39,9 @@ export function resolveStoredListingImagePath(imagePath: string | null | undefin
     return trimmed;
   }
 
-  const clean = trimmed.split('?')[0].replace(/^\/+/, '');
-  if (!clean) return '';
-
-  if (clean.includes('database/') || clean.includes('parsed_photos')) {
-    const match = clean.match(/(?:^|\/)parsed_photos\/(.+)$/);
-    const filename = match?.[1] ?? basename(clean);
-    return existsSync(parsedPhotoFile(filename)) ? `database/parsed_photos/${filename}` : '';
-  }
-
-  if (existsSync(publicFile(clean))) {
-    return clean.startsWith('listings/') ? `/${clean}` : `/${clean}`;
-  }
-
-  if (clean.startsWith('listings/originals/')) {
-    for (const candidate of optimizedCandidates(clean)) {
-      if (existsSync(publicFile(candidate))) {
-        return `/${candidate}`;
-      }
-    }
-    const filename = basename(clean);
-    if (existsSync(parsedPhotoFile(filename))) {
-      return `database/parsed_photos/${filename}`;
-    }
-  }
-
-  return '';
+  const canonical = canonicalStoredListingImagePath(trimmed);
+  if (!canonical || isSyntheticListingImage(canonical)) return '';
+  return canonical;
 }
 
 export function resolveStoredListingImages(images: string[] | null | undefined): string[] {

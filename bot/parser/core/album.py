@@ -5,6 +5,16 @@ from __future__ import annotations
 from parser.core.text import to_plain_str
 
 
+def message_has_photo_media(msg) -> bool:
+    """Фото в альбомі або image/* document (часто в каналах без .photo)."""
+    if getattr(msg, "photo", None):
+        return True
+    doc = getattr(msg, "document", None)
+    if doc and (getattr(doc, "mime_type", None) or "").lower().startswith("image/"):
+        return True
+    return False
+
+
 async def expand_incoming_message(msg):
     """
     Повертає text, photos, msg_for_link, canonical_message_id,
@@ -16,7 +26,7 @@ async def expand_incoming_message(msg):
     group_id = getattr(msg, "media_group_id", None)
     if not group_id:
         text = to_plain_str(getattr(msg, "text", None) or getattr(msg, "caption", None) or "")
-        photos = [msg] if getattr(msg, "photo", None) else []
+        photos = [msg] if message_has_photo_media(msg) else []
         canonical = int(storage_id) if storage_id else int(getattr(msg, "id", 0) or 0)
         own_id = int(getattr(msg, "id", 0) or 0)
         ids = [own_id] if own_id else []
@@ -31,7 +41,7 @@ async def expand_incoming_message(msg):
         group = [msg]
     caption = next((m for m in group if (getattr(m, "text", None) or getattr(m, "caption", None))), group[0])
     text = to_plain_str(getattr(caption, "text", None) or getattr(caption, "caption", None) or "")
-    photos = [m for m in group if getattr(m, "photo", None)]
+    photos = [m for m in group if message_has_photo_media(m)]
     ids = [int(m.id) for m in group if getattr(m, "id", None)]
     canonical = int(getattr(caption, "id", 0) or 0)
     if storage_id:
