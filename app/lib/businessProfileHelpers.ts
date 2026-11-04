@@ -272,6 +272,7 @@ export async function linkListingToBusinessIfAllowed(
 }
 
 export async function pauseBusinessProfile(userId: number, businessProfileId: number): Promise<void> {
+  await assignListingsToProfile(userId, []);
   await prisma.businessProfile.update({
     where: { id: businessProfileId },
     data: {
@@ -486,7 +487,8 @@ export async function activateBusinessSubscription(
     },
   });
 
-  await assignListingsToProfile(userId, idsToAssign);
+  const { ensureBusinessProfileConsistency } = await import('@/lib/business/businessProfileConsistency');
+  await ensureBusinessProfileConsistency(userId);
 }
 
 export async function processBusinessSubscriptionFromBalance(
@@ -591,18 +593,14 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
   const user = users[0];
   if (!user) return null;
 
-  await repairFreeBusinessProfileIfNeeded(user.id);
-  await expireBusinessProfileIfNeeded(user.id);
+  const { ensureBusinessProfileConsistency } = await import(
+    '@/lib/business/businessProfileConsistency'
+  );
+  const { profile, isPublic } = await ensureBusinessProfileConsistency(user.id);
 
-  const profile = await prisma.businessProfile.findUnique({
-    where: { userId: user.id },
-  });
-
-  if (!profile || !isBusinessProfilePubliclyVisible(profile)) {
+  if (!profile || !isPublic) {
     return null;
   }
-
-  await syncBusinessListingProfileTypes(user.id);
 
   const vitrineIds = await resolveBusinessListingIds(user.id, profile.linkedListingIds);
   const config = parseListingDisplayConfig(profile.linkedListingIds);

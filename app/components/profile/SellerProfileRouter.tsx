@@ -36,11 +36,11 @@ export function SellerProfileRouter(props: SellerProfileRouterProps) {
   useEffect(() => {
     let cancelled = false;
     setMode('loading');
-    fetch(`/api/business-profile/public?telegramId=${sellerTelegramId}`)
-      .then((r) => (r.ok ? r.json() : null))
+    fetch(`/api/business-profile/resolve?telegramId=${encodeURIComponent(sellerTelegramId)}`)
+      .then((r) => (r.ok ? r.json() : { mode: 'personal' }))
       .then((data) => {
         if (cancelled) return;
-        setMode(data?.showAsBusiness && data?.profile ? 'business' : 'personal');
+        setMode(data?.mode === 'business' ? 'business' : 'personal');
       })
       .catch(() => {
         if (!cancelled) setMode('personal');

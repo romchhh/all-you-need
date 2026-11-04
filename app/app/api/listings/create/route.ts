@@ -11,6 +11,7 @@ import { getUserIdAndActive } from '@/utils/userHelpers';
 import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { linkListingToBusinessIfAllowed } from '@/lib/businessProfileHelpers';
+import { ensureBusinessProfileConsistency } from '@/lib/business/businessProfileConsistency';
 
 // Збільшуємо максимальний час виконання до 5 хвилин для обробки великих файлів
 export const maxDuration = 300; // 5 хвилин
@@ -224,6 +225,7 @@ export async function POST(request: NextRequest) {
         const linked = await linkListingToBusinessIfAllowed(user.id, listingId);
         console.log('[Create Listing API] Business profileType:', linked ? 'linked' : 'skipped (no active business)');
       }
+      await ensureBusinessProfileConsistency(user.id);
     } catch (createError) {
       console.error('[Create Listing API] Failed to create listing:', createError);
       

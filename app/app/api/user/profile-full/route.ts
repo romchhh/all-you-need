@@ -85,6 +85,11 @@ export async function GET(request: NextRequest) {
 
     const userId = userData.id;
 
+    const { ensureBusinessProfileConsistency } = await import(
+      '@/lib/business/businessProfileConsistency'
+    );
+    await ensureBusinessProfileConsistency(userId);
+
     // Визначаємо, чи це власний профіль
     const isOwnProfile =
       viewerId != null &&

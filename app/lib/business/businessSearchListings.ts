@@ -150,9 +150,6 @@ export async function fetchPublicBusinessVitrineListings(
   userId: number,
   linkedListingIdsRaw: string | null | undefined
 ): Promise<Listing[]> {
-  const { syncBusinessListingProfileTypes } = await import('@/lib/businessProfileHelpers');
-  await syncBusinessListingProfileTypes(userId);
-
   const config = parseListingDisplayConfig(linkedListingIdsRaw);
   if (config.mode === 'manual') {
     return fetchFormattedActiveListingsByIds(config.ids);

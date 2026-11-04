@@ -110,6 +110,16 @@ export async function GET(request: NextRequest) {
           offset,
         });
       }
+
+      try {
+        const { ensureBusinessProfileConsistencyByTelegramId } = await import(
+          '@/lib/business/businessProfileConsistency'
+        );
+        await ensureBusinessProfileConsistencyByTelegramId(userId);
+      } catch (consistencyErr) {
+        console.error('[listings GET] business consistency', consistencyErr);
+      }
+
       // Визначаємо, чи це власний профіль (viewerId === userId)
       const isOwnProfile =
         Boolean(viewerId) &&

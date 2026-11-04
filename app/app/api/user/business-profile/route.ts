@@ -67,24 +67,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    await repairFreeBusinessProfileIfNeeded(user.id);
-    await expireBusinessProfileIfNeeded(user.id);
+    const { ensureBusinessProfileConsistency } = await import(
+      '@/lib/business/businessProfileConsistency'
+    );
+    const consistency = await ensureBusinessProfileConsistency(user.id);
 
-    const profile = await prisma.businessProfile.findUnique({
-      where: { userId: user.id },
-    });
+    const profile =
+      consistency.profile ??
+      (await prisma.businessProfile.findUnique({
+        where: { userId: user.id },
+      }));
 
     if (!profile) {
       return NextResponse.json({ profile: null, isActive: false, isSuspended: false, hasProfile: false });
     }
 
-    const isActive = isBusinessProfileActive(profile);
+    const isActive = consistency.isActive;
     const cabinetState = resolveBusinessCabinetState(profile);
     const isSuspended = cabinetState === 'suspended';
-
-    if (isActive) {
-      await syncBusinessListingProfileTypes(user.id);
-    }
 
     const hasProPaymentHistory =
       (await prisma.businessSubscriptionPurchase.count({
@@ -355,12 +355,14 @@ export async function PUT(request: NextRequest) {
 
     const profile = await prisma.businessProfile.findUnique({ where: { id: profileId } });
 
-    if (profile && isBusinessProfileActive(profile) && listingConfigTouched) {
+    if (profile) {
       try {
-        const resolvedIds = await resolveBusinessListingIds(user.id, profile.linkedListingIds);
-        await assignListingsToProfile(user.id, resolvedIds);
+        const { ensureBusinessProfileConsistency } = await import(
+          '@/lib/business/businessProfileConsistency'
+        );
+        await ensureBusinessProfileConsistency(user.id);
       } catch (assignError) {
-        console.error('[BusinessProfile PUT] assign listings failed', assignError);
+        console.error('[BusinessProfile PUT] consistency failed', assignError);
       }
     }
 

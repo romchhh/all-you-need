@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { rawQuery, sqlBooleanIsTrue, sqlLikeOp, sqlNow } from '@/lib/dbSql';
-import { repairStaleFreeBusinessProfilesForSearch } from '@/lib/businessProfileHelpers';
+import { ensureBusinessSearchCatalogFresh } from '@/lib/business/businessProfileConsistency';
 import { businessCityOrGroupSql, cityFilterPatterns } from '@/lib/city/listingCityMatch';
 import {
   getCustomDirectionText,
@@ -169,7 +169,7 @@ export function formatBusinessLocationLine(city: string, address: string | null 
 export async function searchBusinessProfiles(
   filters: BusinessSearchFilters
 ): Promise<{ items: BusinessSearchResultRow[]; total: number }> {
-  await repairStaleFreeBusinessProfilesForSearch().catch(() => {});
+  await ensureBusinessSearchCatalogFresh();
 
   const limit = Math.min(Math.max(filters.limit ?? 24, 1), 48);
   const offset = Math.max(filters.offset ?? 0, 0);
