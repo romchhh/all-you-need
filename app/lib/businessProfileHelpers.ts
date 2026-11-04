@@ -20,6 +20,7 @@ import {
   serializeBusinessDirections,
 } from '@/lib/businessSphereConstants';
 import { isBusinessProfileActive as isBusinessProfileActiveCore } from '@/lib/businessCabinetState';
+import { isBusinessProfilePubliclyVisible } from '@/lib/businessCabinetState';
 
 export { parseLinkedListingIds } from '@/lib/businessProfileSettings';
 export type { BusinessCabinetState } from '@/lib/businessCabinetState';
@@ -54,6 +55,8 @@ export function isBusinessProfileActive(profile: {
 }): boolean {
   return isBusinessProfileActiveCore(profile);
 }
+
+export { isBusinessProfilePubliclyVisible };
 
 export async function upsertBusinessProfileDraft(
   userId: number,
@@ -183,7 +186,7 @@ export async function resolveBusinessListingIds(
   }
 
   const rows = (await prisma.$queryRawUnsafe(
-    `SELECT id FROM Listing WHERE userId = ? ORDER BY id DESC`,
+    `SELECT id FROM Listing WHERE userId = ? AND status = 'active' ORDER BY id DESC`,
     userId
   )) as Array<{ id: unknown }>;
 
@@ -402,6 +405,29 @@ export async function repairFreeBusinessProfileIfNeeded(userId: number): Promise
   await syncBusinessListingProfileTypes(userId);
 }
 
+/** Free Business: відновити active + isPublished перед пошуком (legacy / після PRO). */
+export async function repairStaleFreeBusinessProfilesForSearch(limit = 80): Promise<void> {
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT userId FROM BusinessProfile
+     WHERE TRIM(COALESCE(businessName, '')) != ''
+       AND LOWER(COALESCE(plan, 'business')) != 'business_pro'
+       AND (
+         subscriptionStatus != 'active'
+         OR subscriptionEndsAt IS NOT NULL
+         OR isPublished = false
+       )
+     LIMIT ?`,
+    limit
+  )) as Array<{ userId: unknown }>;
+
+  for (const row of rows) {
+    const uid = toFinitePositiveId(row.userId);
+    if (uid != null) {
+      await repairFreeBusinessProfileIfNeeded(uid);
+    }
+  }
+}
+
 export async function expireBusinessProfileIfNeeded(userId: number): Promise<void> {
   await repairFreeBusinessProfileIfNeeded(userId);
 
@@ -572,7 +598,7 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
     where: { userId: user.id },
   });
 
-  if (!profile || !isBusinessProfileActive(profile) || !profile.isPublished) {
+  if (!profile || !isBusinessProfilePubliclyVisible(profile)) {
     return null;
   }
 
@@ -585,7 +611,7 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
     activeListingsCount = Number(
       (
         (await prisma.$queryRawUnsafe(
-          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND status = 'active'`,
+          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND status = 'active' AND COALESCE(profileType, 'personal') = 'business'`,
           user.id
         )) as Array<{ cnt: bigint | number | string }>
       )[0]?.cnt ?? 0
@@ -594,7 +620,7 @@ export async function getPublicBusinessProfileByTelegramId(telegramId: string) {
     activeListingsCount = Number(
       (
         (await prisma.$queryRawUnsafe(
-          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active'`,
+          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active' AND COALESCE(profileType, 'personal') = 'business'`,
           user.id,
           ...vitrineIds
         )) as Array<{ cnt: bigint | number | string }>
@@ -686,7 +712,7 @@ export async function getBusinessSellerSummaryForUser(
     activeListingsCount = Number(
       (
         (await prisma.$queryRawUnsafe(
-          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND status = 'active'`,
+          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND status = 'active' AND COALESCE(profileType, 'personal') = 'business'`,
           userId
         )) as Array<{ cnt: bigint | number | string }>
       )[0]?.cnt ?? 0
@@ -695,7 +721,7 @@ export async function getBusinessSellerSummaryForUser(
     activeListingsCount = Number(
       (
         (await prisma.$queryRawUnsafe(
-          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active'`,
+          `SELECT COUNT(*) as cnt FROM Listing WHERE userId = ? AND id IN (${vitrineIds.map(() => '?').join(',')}) AND status = 'active' AND COALESCE(profileType, 'personal') = 'business'`,
           userId,
           ...vitrineIds
         )) as Array<{ cnt: bigint | number | string }>

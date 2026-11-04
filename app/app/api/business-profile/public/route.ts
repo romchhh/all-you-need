@@ -129,6 +129,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       isActive: isBusinessProfileActive(profile),
+      showAsBusiness: true,
       isOwn,
       isFollowing,
       viewerHasReviewed,

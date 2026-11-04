@@ -107,6 +107,8 @@ function rowsToListingsPreserveOrder(
     .filter((listing): listing is Listing => Boolean(listing));
 }
 
+const BUSINESS_LISTING_TYPE_SQL = `COALESCE(l.profileType, 'personal') = 'business'`;
+
 export async function fetchFormattedActiveListingsByIds(ids: number[]): Promise<Listing[]> {
   const listingIds = normalizeListingIds(ids);
   if (listingIds.length === 0) return [];
@@ -114,7 +116,7 @@ export async function fetchFormattedActiveListingsByIds(ids: number[]): Promise<
   const placeholders = listingIds.map(() => '?').join(',');
   const fromWhere = `FROM Listing l
        JOIN User u ON l.userId = u.id
-       WHERE l.id IN (${placeholders}) AND l.status = 'active'`;
+       WHERE l.id IN (${placeholders}) AND l.status = 'active' AND ${BUSINESS_LISTING_TYPE_SQL}`;
   const sql = `SELECT ${LISTING_SELECT} ${fromWhere}`;
 
   const rows = await queryListingRows(sql, fromWhere, listingIds);
@@ -131,7 +133,7 @@ export async function fetchFormattedActiveListingsByUserId(
 
   const fromWhere = `FROM Listing l
        JOIN User u ON l.userId = u.id
-       WHERE l.userId = ? AND l.status = 'active'
+       WHERE l.userId = ? AND l.status = 'active' AND ${BUSINESS_LISTING_TYPE_SQL}
        ORDER BY l.id DESC
        LIMIT ?`;
   const sql = `SELECT ${LISTING_SELECT} ${fromWhere}`;
@@ -148,6 +150,9 @@ export async function fetchPublicBusinessVitrineListings(
   userId: number,
   linkedListingIdsRaw: string | null | undefined
 ): Promise<Listing[]> {
+  const { syncBusinessListingProfileTypes } = await import('@/lib/businessProfileHelpers');
+  await syncBusinessListingProfileTypes(userId);
+
   const config = parseListingDisplayConfig(linkedListingIdsRaw);
   if (config.mode === 'manual') {
     return fetchFormattedActiveListingsByIds(config.ids);
@@ -224,7 +229,7 @@ export async function attachBusinessSearchListingPreviews<T extends { id: number
     const userPh = userIds.map(() => '?').join(',');
     const listingRows = await rawQuery<Array<{ id: number; userId: number }>>(
       prisma,
-      `SELECT id, userId FROM Listing WHERE userId IN (${userPh}) AND status = 'active' ORDER BY id DESC`,
+      `SELECT id, userId FROM Listing WHERE userId IN (${userPh}) AND status = 'active' AND COALESCE(profileType, 'personal') = 'business' ORDER BY id DESC`,
       userIds
     );
     for (const row of listingRows) {

@@ -14,6 +14,15 @@ export function isBusinessProfileActive(profile: {
   return ends > new Date();
 }
 
+/** Публічний Business (пошук, вітрина, SellerProfileRouter). */
+export function isBusinessProfilePubliclyVisible(profile: {
+  subscriptionStatus: string;
+  subscriptionEndsAt?: Date | string | null;
+  isPublished: boolean;
+}): boolean {
+  return isBusinessProfileActive(profile) && profile.isPublished === true;
+}
+
 /** UI / API: стан Business-кабінету власника. */
 export function resolveBusinessCabinetState(profile: {
   subscriptionStatus: string;

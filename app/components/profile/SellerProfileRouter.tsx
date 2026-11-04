@@ -40,7 +40,7 @@ export function SellerProfileRouter(props: SellerProfileRouterProps) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled) return;
-        setMode(data?.isActive ? 'business' : 'personal');
+        setMode(data?.showAsBusiness && data?.profile ? 'business' : 'personal');
       })
       .catch(() => {
         if (!cancelled) setMode('personal');
