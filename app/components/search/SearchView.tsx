@@ -1440,10 +1440,10 @@ export function SearchView({
               className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl transition-all ${
                 !selectedBusinessSphere
                   ? isLight
-                    ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 shadow-sm'
+                    ? 'border-2 border-[#3F5331] bg-[#3F5331]/10 shadow-sm'
                     : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
                   : isLight
-                    ? 'border-2 border-[#3F5331] bg-white'
+                    ? 'border-2 border-[#3F5331]/20 bg-[#E8F0E0]'
                     : 'border border-white/25 bg-[#1C1C1C]'
               }`}
             >
@@ -1477,10 +1477,10 @@ export function SearchView({
                   className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl px-1 transition-all ${
                     active
                       ? isLight
-                        ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 shadow-sm'
+                        ? 'border-2 border-[#3F5331] bg-[#3F5331]/10 shadow-sm'
                         : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
                       : isLight
-                        ? 'border-2 border-[#3F5331] bg-white'
+                        ? 'border-2 border-[#3F5331]/20 bg-[#E8F0E0]'
                         : 'border border-white/25 bg-[#1C1C1C]'
                   }`}
                 >
@@ -1527,7 +1527,7 @@ export function SearchView({
             className={`relative mb-1.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl transition-all ${
               !selectedCategory
                 ? isLight
-                  ? 'border-2 border-[#C8E6A0] bg-[#C8E6A0]/15 shadow-sm'
+                  ? 'border-2 border-[#3F5331] bg-[#3F5331]/10 shadow-sm'
                   : 'border border-[#C8E6A0] bg-[#C8E6A0]/10 shadow-[0_0_12px_rgba(200,230,160,0.2)]'
                 : isLight
                   ? 'border-2 border-[#3F5331]/20 bg-[#E8F0E0]'

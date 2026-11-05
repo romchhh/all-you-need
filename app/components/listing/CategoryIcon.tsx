@@ -32,17 +32,18 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({
   const defaultPath =
     CATEGORY_ICON_PATHS[categoryId] || CATEGORY_ICON_PATHS.all_categories;
 
-  const useDarkAsset = isLight && !isActive;
-  const iconPath = useDarkAsset ? toDarkVariantPath(defaultPath) : defaultPath;
+  // Light theme: always #3F5331 assets. Dark theme: white assets; salad tint only when active.
+  const iconPath = isLight ? toDarkVariantPath(defaultPath) : defaultPath;
 
   const enlarge = LARGER_ICON_IDS.has(categoryId);
   const imgStyle: React.CSSProperties = {
     ...(enlarge
       ? { transform: `scale(${LARGER_ICON_SCALE})`, transformOrigin: 'center center' }
       : {}),
-    filter: isActive
-      ? 'brightness(0) saturate(100%) invert(85%) sepia(20%) saturate(500%) hue-rotate(60deg) brightness(110%)'
-      : 'none',
+    filter:
+      isActive && !isLight
+        ? 'brightness(0) saturate(100%) invert(85%) sepia(20%) saturate(500%) hue-rotate(60deg) brightness(110%)'
+        : 'none',
   };
 
   const img = (
