@@ -117,15 +117,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'follower_not_found' }, { status: 404 });
     }
 
-    // SQLite + PG: ON CONFLICT DO NOTHING (INSERT OR IGNORE ламається на PG через adaptSql)
+    // Без ON CONFLICT: на старій PG-таблиці унікального ключа може не бути, і INSERT падав.
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
         `INSERT INTO SearchSubscription (userId, queryKey, queryText, entityMode, createdAt)
-         VALUES (?, ?, ?, ?, ${sqlNow()})
-         ON CONFLICT (userId, queryKey, entityMode) DO NOTHING`,
+         SELECT ?, ?, ?, ?, ${sqlNow()}
+         WHERE NOT EXISTS (
+           SELECT 1 FROM SearchSubscription
+           WHERE userId = ? AND queryKey = ? AND entityMode = ?
+         )`,
         userId,
         queryKey,
         queryText,
+        mode,
+        userId,
+        queryKey,
         mode
       )
     );

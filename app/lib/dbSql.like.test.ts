@@ -22,3 +22,12 @@ describe('sqlLikeOp', () => {
     expect(sqlLikeOp()).toBe('LIKE');
   });
 });
+
+describe('sqlListingSearchableDescription', () => {
+  it('does not use postgres regexp_replace', async () => {
+    const { sqlListingSearchableDescription } = await import('@/lib/listings/searchVariants');
+    const sql = sqlListingSearchableDescription('l');
+    expect(sql).toBe("COALESCE(l.description, '')");
+    expect(sql).not.toMatch(/regexp_replace/i);
+  });
+});

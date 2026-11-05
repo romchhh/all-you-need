@@ -745,6 +745,16 @@ export async function ensureSearchSubscriptionTable(): Promise<void> {
       }
     }
 
+    try {
+      await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE SearchSubscription ADD COLUMN entityMode TEXT NOT NULL DEFAULT 'listings'`
+        )
+      );
+    } catch {
+      // колонка вже є
+    }
+
     const createIndexSafely = async (indexName: string, sql: string) => {
       try {
         await executeWithRetry(() => prisma.$executeRawUnsafe(sql));

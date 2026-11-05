@@ -1,5 +1,4 @@
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
-import { isPostgres } from '@/lib/dbSql';
 
 export function normalizeCyrillicToLower(text: string): string {
   return text.toLowerCase();
@@ -11,13 +10,12 @@ export function sqlLikeContainsPattern(term: string): string {
 }
 
 /**
- * SQL-вираз опису для LIKE-пошуку без рядків «👤 Автор» / «🔗 оригінал».
- * На PG — regexp_replace; на SQLite — сирий опис (далі JS post-filter).
+ * SQL-вираз опису для LIKE-пошуку.
+ * Не використовуємо regexp_replace: PostgreSQL не приймає PCRE `(?m)` / `\s` у цьому шаблоні
+ * і валить увесь пошук (каталог без search при цьому живий).
+ * Рядки «👤 Автор» відсікає listingMatchesSearchQuery після вибірки.
  */
 export function sqlListingSearchableDescription(alias = 'l'): string {
-  if (isPostgres()) {
-    return `regexp_replace(regexp_replace(COALESCE(${alias}.description, ''), '(?m)^\\s*👤\\s*(Автор|Author):\\s*@\\S+\\s*$', '', 'gi'), '(?m)^\\s*🔗\\s*[^\\n]*$', '', 'gi')`;
-  }
   return `COALESCE(${alias}.description, '')`;
 }
 
