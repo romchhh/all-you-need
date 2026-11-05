@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sqlDatetimeCompare, sqlLikeOp } from '@/lib/dbSql';
+import { sqlDatetimeCompare } from '@/lib/dbSql';
 import { prisma } from '@/lib/prisma';
 import { normalizeCityInput } from '@/lib/city/cityNormalization';
 import { trackUserActivity } from '@/utils/trackActivity';
@@ -8,7 +8,7 @@ import {
   LISTING_FAVORITES_JOIN_SQL,
   LISTING_FAVORITES_COUNT_FROM_JOIN_SQL,
 } from '@/lib/listingFavoritesCountSql';
-import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
+import { parseJsonArrayField, resolveStoredListingImages } from '@/lib/listings/imageStorage';
 import {
   buildBazaarCatalogCacheKey,
   getBazaarCatalogServerCache,
@@ -21,13 +21,7 @@ import {
   parseOptionalInt,
   type CatalogFilterParams,
 } from '@/lib/listings/catalogFilters';
-import {
-  generateSearchVariantsWithCities,
-  listingMatchesSearchQuery,
-  normalizeCyrillicToLower,
-  sqlLikeContainsPattern,
-  sqlListingSearchableDescription,
-} from '@/lib/listings/searchVariants';
+import { appendListingTextSearch, listingMatchesSearchQuery } from '@/lib/listings/searchVariants';
 import {
   buildColdStartOrderBoost,
   buildPersonalizationOrderBoost,
@@ -143,38 +137,7 @@ export async function GET(request: NextRequest) {
     whereClause = appendCatalogFiltersToWhere(whereClause, params, filters);
 
     if (search?.trim()) {
-      const searchTrimmed = search.trim();
-      const searchableDesc = sqlListingSearchableDescription('l');
-      const likeOp = sqlLikeOp();
-      if (searchTrimmed.length <= 30) {
-        const searchVariants = generateSearchVariantsWithCities(searchTrimmed);
-        const titleConditions = searchVariants.map(() => `l.title ${likeOp} ?`).join(' OR ');
-        const descConditions = searchVariants
-          .map(() => `${searchableDesc} ${likeOp} ?`)
-          .join(' OR ');
-        const locationConditions = searchVariants
-          .map(() => `l.location ${likeOp} ?`)
-          .join(' OR ');
-        whereClause += ` AND ((${titleConditions}) OR (${descConditions}) OR (${locationConditions}))`;
-        searchVariants.forEach((v) => params.push(sqlLikeContainsPattern(v)));
-        searchVariants.forEach((v) => params.push(sqlLikeContainsPattern(v)));
-        searchVariants.forEach((v) => params.push(sqlLikeContainsPattern(v)));
-      } else {
-        const searchLower = normalizeCyrillicToLower(searchTrimmed);
-        whereClause += ` AND (
-          (l.title ${likeOp} ? OR l.title ${likeOp} ?) OR
-          (${searchableDesc} ${likeOp} ? OR ${searchableDesc} ${likeOp} ?) OR
-          (l.location ${likeOp} ? OR l.location ${likeOp} ?)
-        )`;
-        params.push(
-          sqlLikeContainsPattern(searchTrimmed),
-          sqlLikeContainsPattern(searchLower),
-          sqlLikeContainsPattern(searchTrimmed),
-          sqlLikeContainsPattern(searchLower),
-          sqlLikeContainsPattern(searchTrimmed),
-          sqlLikeContainsPattern(searchLower)
-        );
-      }
+      whereClause = appendListingTextSearch(whereClause, params, search, 'l');
     }
 
     whereClause +=
@@ -313,13 +276,10 @@ export async function GET(request: NextRequest) {
     }
 
     const formatted = listingsData.map((listing) => {
-      const originalImages =
-        typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+      const originalImages = parseJsonArrayField(listing.images);
       const optimizedImages = listing.optimizedImages
-        ? typeof listing.optimizedImages === 'string'
-          ? JSON.parse(listing.optimizedImages)
-          : listing.optimizedImages
-        : null;
+        ? parseJsonArrayField(listing.optimizedImages)
+        : [];
       const source =
         optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
       const images = resolveStoredListingImages(source);

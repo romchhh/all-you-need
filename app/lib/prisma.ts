@@ -706,6 +706,31 @@ export async function ensureCitySubscriptionTable(): Promise<void> {
 
 let searchSubscriptionTableChecked = false;
 
+async function searchSubscriptionHasEntityMode(): Promise<boolean> {
+  if (isPostgres()) {
+    const cols = await queryRawUnsafe<Array<{ column_name: string }>>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND lower(table_name) = lower(?)
+         AND lower(column_name) = lower(?)`,
+      'SearchSubscription',
+      'entityMode'
+    );
+    return cols.length > 0;
+  }
+  const cols = await queryRawUnsafe<Array<{ name: string }>>(tableInfoQuery('SearchSubscription'));
+  return cols.some((col) => String(col.name).toLowerCase() === 'entitymode');
+}
+
+function isBenignSearchSubscriptionAlterError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes('already exists') ||
+    msg.includes('duplicate column') ||
+    msg.includes('execute returned results')
+  );
+}
+
 /** Підписки на пошукові запити (ensure для PG/SQLite без окремої migrate на старих інстансах). */
 export async function ensureSearchSubscriptionTable(): Promise<void> {
   if (searchSubscriptionTableChecked) {
@@ -727,7 +752,7 @@ export async function ensureSearchSubscriptionTable(): Promise<void> {
               queryKey TEXT NOT NULL,
               queryText TEXT NOT NULL,
               entityMode TEXT NOT NULL DEFAULT 'listings',
-              createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
               UNIQUE(userId, queryKey, entityMode)
             )
@@ -745,14 +770,29 @@ export async function ensureSearchSubscriptionTable(): Promise<void> {
       }
     }
 
+    let entityModeReady = false;
     try {
       await executeWithRetry(() =>
         prisma.$executeRawUnsafe(
           `ALTER TABLE SearchSubscription ADD COLUMN entityMode TEXT NOT NULL DEFAULT 'listings'`
         )
       );
-    } catch {
-      // колонка вже є
+      entityModeReady = true;
+    } catch (error: any) {
+      if (isBenignSearchSubscriptionAlterError(String(error?.message || ''))) {
+        entityModeReady = true;
+      } else {
+        try {
+          entityModeReady = await searchSubscriptionHasEntityMode();
+        } catch {
+          entityModeReady = false;
+        }
+      }
+    }
+
+    if (!entityModeReady) {
+      console.error('[SearchSubscription] entityMode column is missing; subscribe insert skipped until repair');
+      return;
     }
 
     const createIndexSafely = async (indexName: string, sql: string) => {
@@ -792,10 +832,7 @@ export async function ensureSearchSubscriptionTable(): Promise<void> {
 
     searchSubscriptionTableChecked = true;
   } catch (error: any) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Note: Could not ensure SearchSubscription table:', error.message);
-    }
-    searchSubscriptionTableChecked = true;
+    console.error('[SearchSubscription] ensure failed:', error?.message || error);
   }
 }
 

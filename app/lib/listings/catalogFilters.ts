@@ -4,6 +4,7 @@
 
 
 import { cityFilterPatterns, listingCityOrGroupSql } from '@/lib/city/listingCityMatch';
+import { sqlDatetimeCompare } from '@/lib/dbSql';
 
 export type CatalogFilterParams = {
   category: string | null;
@@ -90,10 +91,11 @@ export function appendCatalogFiltersToWhere(
 
 /** Активна платна реклама: потрібна дата закінчення в майбутньому (NULL ≠ вічний VIP). */
 export function catalogPromotionPriorityCaseSql(): string {
+  const stillActive = `l.promotionEnds IS NOT NULL AND ${sqlDatetimeCompare('l.promotionEnds')}`;
   return `CASE
-    WHEN l.promotionType = 'vip' AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 0
-    WHEN l.promotionType = 'top' AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 1
-    WHEN l.promotionType = 'top_category' AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 1
+    WHEN l.promotionType = 'vip' AND ${stillActive} THEN 0
+    WHEN l.promotionType = 'top' AND ${stillActive} THEN 1
+    WHEN l.promotionType = 'top_category' AND ${stillActive} THEN 1
     ELSE 2
   END`;
 }

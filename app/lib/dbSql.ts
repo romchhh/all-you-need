@@ -470,6 +470,8 @@ function quotePgIdentifiers(sql: string): string {
     s = s.replace(new RegExp(`\\bUPDATE ${table}\\b`, 'gi'), `UPDATE "${table}"`);
     s = s.replace(new RegExp(`\\bINTO ${table}\\b`, 'gi'), `INTO "${table}"`);
     s = s.replace(new RegExp(`\\bDELETE FROM ${table}\\b`, 'gi'), `DELETE FROM "${table}"`);
+    s = s.replace(new RegExp(`\\bALTER TABLE ${table}\\b`, 'gi'), `ALTER TABLE "${table}"`);
+    s = s.replace(new RegExp(`\\bREFERENCES ${table}\\(`, 'gi'), `REFERENCES "${table}"(`);
     s = s.replace(new RegExp(`\\bON ${table}\\(`, 'gi'), `ON "${table}"(`);
   }
 

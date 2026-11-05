@@ -9,11 +9,13 @@ export const dynamic = 'force-dynamic';
 
 const MIN_QUERY_LENGTH = 2;
 
-let initPromise: Promise<void> | null = null;
-
 async function ensureTable() {
-  if (!initPromise) initPromise = ensureSearchSubscriptionTable();
-  await initPromise;
+  await ensureSearchSubscriptionTable();
+}
+
+function isDuplicateSubscriptionError(error: unknown): boolean {
+  const msg = String((error as { message?: string })?.message || '').toLowerCase();
+  return msg.includes('unique') || msg.includes('duplicate');
 }
 
 function normalizeQueryKey(raw: string): string {
@@ -118,23 +120,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Без ON CONFLICT: на старій PG-таблиці унікального ключа може не бути, і INSERT падав.
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(
-        `INSERT INTO SearchSubscription (userId, queryKey, queryText, entityMode, createdAt)
-         SELECT ?, ?, ?, ?, ${sqlNow()}
-         WHERE NOT EXISTS (
-           SELECT 1 FROM SearchSubscription
-           WHERE userId = ? AND queryKey = ? AND entityMode = ?
-         )`,
-        userId,
-        queryKey,
-        queryText,
-        mode,
-        userId,
-        queryKey,
-        mode
-      )
-    );
+    try {
+      await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `INSERT INTO SearchSubscription (userId, queryKey, queryText, entityMode, createdAt)
+           SELECT ?, ?, ?, ?, ${sqlNow()}
+           WHERE NOT EXISTS (
+             SELECT 1 FROM SearchSubscription
+             WHERE userId = ? AND queryKey = ? AND entityMode = ?
+           )`,
+          userId,
+          queryKey,
+          queryText,
+          mode,
+          userId,
+          queryKey,
+          mode
+        )
+      );
+    } catch (error) {
+      if (!isDuplicateSubscriptionError(error)) throw error;
+    }
 
     return NextResponse.json({ success: true, queryKey, mode, subscribed: true });
   } catch (error) {

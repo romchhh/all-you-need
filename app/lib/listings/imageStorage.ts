@@ -31,6 +31,18 @@ function canonicalStoredListingImagePath(imagePath: string): string {
 /**
  * Нормалізує шлях з Listing.images для API (не відкидає парсерські фото, якщо файл тимчасово недоступний app-процесу).
  */
+/** JSON-масив з колонки (images/tags). Битий JSON не валить увесь каталог. */
+export function parseJsonArrayField(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function resolveStoredListingImagePath(imagePath: string | null | undefined): string {
   if (!imagePath?.trim()) return '';
 
@@ -44,10 +56,11 @@ export function resolveStoredListingImagePath(imagePath: string | null | undefin
   return canonical;
 }
 
-export function resolveStoredListingImages(images: string[] | null | undefined): string[] {
-  if (!images?.length) return [];
+export function resolveStoredListingImages(images: unknown): string[] {
+  if (!Array.isArray(images) || images.length === 0) return [];
   const out: string[] = [];
   for (const img of images) {
+    if (typeof img !== 'string') continue;
     const resolved = resolveStoredListingImagePath(img);
     if (resolved) out.push(resolved);
   }

@@ -15,7 +15,7 @@ import {
   LISTING_FAVORITES_JOIN_SQL,
   LISTING_FAVORITES_COUNT_FROM_JOIN_SQL,
 } from '@/lib/listingFavoritesCountSql';
-import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
+import { parseJsonArrayField, resolveStoredListingImages } from '@/lib/listings/imageStorage';
 import {
   buildBazaarCatalogCacheKey,
   getBazaarCatalogServerCache,
@@ -26,13 +26,7 @@ import {
   parseConditionParam,
   parseOptionalInt,
 } from '@/lib/listings/catalogFilters';
-import {
-  generateSearchVariantsWithCities,
-  listingMatchesSearchQuery,
-  normalizeCyrillicToLower,
-  sqlLikeContainsPattern,
-  sqlListingSearchableDescription,
-} from '@/lib/listings/searchVariants';
+import { appendListingTextSearch, listingMatchesSearchQuery } from '@/lib/listings/searchVariants';
 
 // force-dynamic: Next route cache off; каталог прискорюємо in-memory bazaarCatalogServerCache
 export const dynamic = 'force-dynamic';
@@ -359,9 +353,9 @@ export async function GET(request: NextRequest) {
 
       // Форматуємо дані для профілю користувача
       listings = userListings.map((listing: any) => {
-        const rawImages = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
+        const rawImages = parseJsonArrayField(listing.images);
         const images = resolveStoredListingImages(rawImages);
-        const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
+        const tags = parseJsonArrayField(listing.tags);
         const timeFields = listingTimeFieldsForApi(listing);
         let status = listing.status ?? 'active';
         if (status === 'active' && listing.expiresAt) {
@@ -464,57 +458,7 @@ export async function GET(request: NextRequest) {
       });
       
       if (search) {
-        const searchTrimmed = search.trim();
-        // Генеруємо всі можливі варіанти регістру для пошуку
-        // + додаємо варіанти для синонімів міст (Гамбург/Hamburg, Munich/München тощо)
-        // Це необхідно, оскільки SQLite не підтримує case-insensitive порівняння для кирилиці
-        const searchVariants = generateSearchVariantsWithCities(searchTrimmed);
-        
-        // Для коротких пошукових запитів (до 30 символів) використовуємо SQL LIKE
-        // Для довших використовуємо фільтрацію в JavaScript після отримання даних
-        const searchableDesc = sqlListingSearchableDescription('l');
-        // PG: ILIKE (case-insensitive). SQLite: LIKE + варіанти регістру.
-        const likeOp = sqlLikeOp();
-        if (searchTrimmed.length <= 30) {
-          const titleConditions = searchVariants.map(() => `l.title ${likeOp} ?`).join(' OR ');
-          const descConditions = searchVariants
-            .map(() => `${searchableDesc} ${likeOp} ?`)
-            .join(' OR ');
-          const locationConditions = searchVariants
-            .map(() => `l.location ${likeOp} ?`)
-            .join(' OR ');
-
-          whereClause += ` AND (
-            (${titleConditions}) OR
-            (${descConditions}) OR
-            (${locationConditions})
-          )`;
-
-          searchVariants.forEach((variant) => {
-            params.push(sqlLikeContainsPattern(variant));
-          });
-          searchVariants.forEach((variant) => {
-            params.push(sqlLikeContainsPattern(variant));
-          });
-          searchVariants.forEach((variant) => {
-            params.push(sqlLikeContainsPattern(variant));
-          });
-        } else {
-          const searchLower = normalizeCyrillicToLower(searchTrimmed);
-          whereClause += ` AND (
-            (l.title ${likeOp} ? OR l.title ${likeOp} ?) OR
-            (${searchableDesc} ${likeOp} ? OR ${searchableDesc} ${likeOp} ?) OR
-            (l.location ${likeOp} ? OR l.location ${likeOp} ?)
-          )`;
-          params.push(
-            sqlLikeContainsPattern(searchTrimmed),
-            sqlLikeContainsPattern(searchLower),
-            sqlLikeContainsPattern(searchTrimmed),
-            sqlLikeContainsPattern(searchLower),
-            sqlLikeContainsPattern(searchTrimmed),
-            sqlLikeContainsPattern(searchLower)
-          );
-        }
+        whereClause = appendListingTextSearch(whereClause, params, search, 'l');
       }
       
       // Фільтруємо тільки активні оголошення (не закінчені)
@@ -529,10 +473,10 @@ export async function GET(request: NextRequest) {
       const hasCategoryFilter = !!(category || subcategory);
       let orderByClause = `ORDER BY 
         CASE 
-          WHEN (l.promotionType = 'vip' OR l.promotionType LIKE '%vip%') AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 1
+          WHEN (l.promotionType = 'vip' OR l.promotionType ${sqlLikeOp()} '%vip%') AND l.promotionEnds IS NOT NULL AND ${sqlDatetimeCompare('l.promotionEnds')} THEN 1
           ${hasCategoryFilter 
-            ? "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 2"
-            : "WHEN (l.promotionType = 'top_category' OR l.promotionType LIKE '%top_category%') AND l.promotionEnds IS NOT NULL AND datetime(l.promotionEnds) > datetime('now') THEN 4"
+            ? `WHEN (l.promotionType = 'top_category' OR l.promotionType ${sqlLikeOp()} '%top_category%') AND l.promotionEnds IS NOT NULL AND ${sqlDatetimeCompare('l.promotionEnds')} THEN 2`
+            : `WHEN (l.promotionType = 'top_category' OR l.promotionType ${sqlLikeOp()} '%top_category%') AND l.promotionEnds IS NOT NULL AND ${sqlDatetimeCompare('l.promotionEnds')} THEN 4`
           }
           ELSE 4
         END,`;
@@ -686,8 +630,8 @@ export async function GET(request: NextRequest) {
         }
 
         // Парсимо ціну
-        const priceA = parseFloat(a.price.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-        const priceB = parseFloat(b.price.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        const priceA = parseFloat(String(a?.price ?? '').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+        const priceB = parseFloat(String(b?.price ?? '').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
 
         return sortBy === 'price_low' ? priceA - priceB : priceB - priceA;
       });
@@ -701,14 +645,11 @@ export async function GET(request: NextRequest) {
     // Форматуємо дані для фронтенду
     const formattedListings = sortedListings.map((listing: any) => {
       // Обробляємо різні формати даних (з Prisma або raw query)
-      const originalImages = typeof listing.images === 'string' ? JSON.parse(listing.images) : listing.images || [];
-      const optimizedImages = listing.optimizedImages 
-        ? (typeof listing.optimizedImages === 'string' ? JSON.parse(listing.optimizedImages) : listing.optimizedImages)
-        : null;
-      const sourceImages =
-        optimizedImages && optimizedImages.length > 0 ? optimizedImages : originalImages;
+      const originalImages = parseJsonArrayField(listing.images);
+      const optimizedImages = listing.optimizedImages ? parseJsonArrayField(listing.optimizedImages) : [];
+      const sourceImages = optimizedImages.length > 0 ? optimizedImages : originalImages;
       const images = resolveStoredListingImages(sourceImages);
-      const tags = listing.tags ? (typeof listing.tags === 'string' ? JSON.parse(listing.tags) : listing.tags) : [];
+      const tags = parseJsonArrayField(listing.tags);
       const timeFields = listingTimeFieldsForApi(listing);
 
       // Отримуємо дані користувача

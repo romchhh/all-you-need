@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { rawQuery, sqlBooleanIsTrue, sqlLikeOp, sqlNow } from '@/lib/dbSql';
+import { sqlListingSearchableDescription } from '@/lib/listings/searchVariants';
 import { ensureBusinessSearchCatalogFresh } from '@/lib/business/businessProfileConsistency';
 import { syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
 import { businessCityOrGroupSql, cityFilterPatterns } from '@/lib/city/listingCityMatch';
@@ -57,14 +58,27 @@ function buildSearchPattern(term: string): string {
   return `%${term.trim().replace(/[%_]/g, '')}%`;
 }
 
+function businessSearchTokens(search: string): string[] {
+  const trimmed = search.trim().replace(/\s+/g, ' ');
+  if (trimmed.length < 2) return [];
+  const parts = trimmed
+    .split(' ')
+    .map((token) => token.replace(/[%_]/g, ''))
+    .filter((token) => token.length >= 2);
+  if (parts.length === 0) return [trimmed.replace(/[%_]/g, '')].filter((t) => t.length >= 2);
+  return parts.slice(0, 6);
+}
+
 function appendSearchClause(search: string | undefined, params: unknown[]): string {
-  if (!search?.trim()) return '';
+  const tokens = businessSearchTokens(search || '');
+  if (tokens.length === 0) return '';
 
-  const pattern = buildSearchPattern(search);
-  params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern);
   const like = sqlLikeOp();
-
-  return ` AND (
+  const listingDescription = sqlListingSearchableDescription('l');
+  const groups = tokens.map((token) => {
+    const pattern = buildSearchPattern(token);
+    params.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern);
+    return `(
     bp.businessName ${like} ?
     OR bp.category ${like} ?
     OR bp.subcategory ${like} ?
@@ -76,12 +90,15 @@ function appendSearchClause(search: string | undefined, params: unknown[]): stri
         AND l.status = 'active'
         AND (
           l.title ${like} ?
-          OR l.description ${like} ?
+          OR ${listingDescription} ${like} ?
           OR l.category ${like} ?
           OR l.subcategory ${like} ?
         )
     )
   )`;
+  });
+
+  return ` AND ${groups.join(' AND ')}`;
 }
 
 function appendFilterClauses(filters: BusinessSearchFilters, params: unknown[]): string {
