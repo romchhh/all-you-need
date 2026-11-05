@@ -814,41 +814,58 @@ export function SearchView({
     refreshLocalHistory();
   }, [refreshLocalHistory]);
 
-  // Зовнішня зміна URL (напр. навігація назад з ?q=&mode=)
+  // URL hydrate: перший mount з ?q= (з «Мої підписки») + подальші зміни q/mode/category
+  const hydratedFromUrlRef = useRef(false);
   const prevInitialQueryRef = useRef(initialQuery);
   const prevInitialCategoryRef = useRef(initialCategory);
   const prevInitialEntityModeRef = useRef(initialEntityMode);
   useEffect(() => {
+    const isFirstHydration = !hydratedFromUrlRef.current;
     if (
+      !isFirstHydration &&
       prevInitialQueryRef.current === initialQuery &&
       prevInitialCategoryRef.current === initialCategory &&
       prevInitialEntityModeRef.current === initialEntityMode
     ) {
       return;
     }
+    hydratedFromUrlRef.current = true;
     prevInitialQueryRef.current = initialQuery;
     prevInitialCategoryRef.current = initialCategory;
     prevInitialEntityModeRef.current = initialEntityMode;
-    setLocalQuery(initialQuery);
-    setSelectedCategory(initialCategory);
-    setSearchEntityMode(initialEntityMode);
+
+    if (!isFirstHydration) {
+      setLocalQuery(initialQuery);
+      setSelectedCategory(initialCategory);
+      setSearchEntityMode(initialEntityMode);
+    }
+
     lastFetchKeyRef.current = '';
     lastBusinessFetchKeyRef.current = '';
-    if (initialQuery.trim().length >= MIN_QUERY_LENGTH) {
+
+    const trimmed = initialQuery.trim();
+    if (trimmed.length >= MIN_QUERY_LENGTH) {
       setScreenMode('results');
+      setActiveQuery(trimmed);
       if (initialEntityMode === 'businesses') {
-        void fetchBusinessResults(initialQuery, {
+        void fetchBusinessResults(trimmed, {
           saveHistory: false,
           force: true,
+          haptic: false,
         });
       } else {
-        void fetchSearchResults(initialQuery, {
+        void fetchSearchResults(trimmed, {
           saveHistory: false,
           force: true,
+          haptic: false,
           category: initialCategory,
         });
       }
-    } else {
+      return;
+    }
+
+    // Перший захід без q — лишаємо discover; очищення URL після mount скидає results
+    if (!isFirstHydration) {
       resetSearchState();
       setScreenMode('discover');
     }
