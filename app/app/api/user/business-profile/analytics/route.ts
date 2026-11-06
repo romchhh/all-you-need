@@ -9,6 +9,7 @@ import {
   isBusinessProfileActive,
 } from '@/lib/businessProfileHelpers';
 import { resolveStoredListingImages } from '@/lib/listings/imageStorage';
+import { isProPeriodCurrent } from '@/lib/businessCabinetState';
 
 function firstListingImage(imagesRaw: unknown): string | null {
   try {
@@ -189,7 +190,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       period,
-      isPro: profile.plan === 'business_pro',
+      isPro: isProPeriodCurrent(profile),
       metrics,
       changes,
       funnel,

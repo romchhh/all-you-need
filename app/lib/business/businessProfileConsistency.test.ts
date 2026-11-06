@@ -1,19 +1,50 @@
 import { describe, expect, it } from 'vitest';
-import { isPublishedFlag } from '@/lib/businessCabinetState';
+import {
+  isBusinessProfilePubliclyVisible,
+  isProPeriodCurrent,
+  isPublishedFlag,
+} from '@/lib/businessCabinetState';
 import { resolveListingProfileSyncAction } from '@/lib/business/businessProfileConsistency';
 
 describe('resolveListingProfileSyncAction', () => {
-  it('syncs vitrine when subscription active and published', () => {
-    expect(resolveListingProfileSyncAction(true, true)).toBe('sync_vitrine');
+  it('syncs vitrine when the business page is published', () => {
+    expect(resolveListingProfileSyncAction(true)).toBe('sync_vitrine');
   });
 
-  it('demotes listings when paused (active but not published)', () => {
-    expect(resolveListingProfileSyncAction(true, false)).toBe('demote_all_personal');
+  it('demotes listings when the page is paused', () => {
+    expect(resolveListingProfileSyncAction(false)).toBe('demote_all_personal');
+  });
+});
+
+describe('free business stays public after PRO ends', () => {
+  const ended = new Date(Date.now() - 86_400_000).toISOString();
+
+  it('does not treat a published free profile as hidden', () => {
+    expect(
+      isBusinessProfilePubliclyVisible({
+        subscriptionStatus: 'active',
+        plan: 'business',
+        subscriptionEndsAt: ended,
+        isPublished: true,
+      })
+    ).toBe(true);
   });
 
-  it('demotes listings when subscription inactive', () => {
-    expect(resolveListingProfileSyncAction(false, false)).toBe('demote_all_personal');
-    expect(resolveListingProfileSyncAction(false, true)).toBe('demote_all_personal');
+  it('turns analytics off when the PRO date is in the past', () => {
+    expect(
+      isProPeriodCurrent({
+        plan: 'business_pro',
+        subscriptionStatus: 'active',
+        subscriptionEndsAt: ended,
+      })
+    ).toBe(false);
+    expect(
+      isProPeriodCurrent({
+        plan: 'business',
+        subscriptionStatus: 'active',
+        subscriptionEndsAt: ended,
+      })
+    ).toBe(false);
   });
 });
 

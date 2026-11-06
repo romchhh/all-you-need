@@ -144,6 +144,10 @@ export function BusinessOwnerProfileView({
   const renewalDate = businessProfile.subscriptionEndsAt
     ? formatSubscriptionDate(businessProfile.subscriptionEndsAt, language)
     : null;
+  const subscriptionEndsMs = businessProfile.subscriptionEndsAt
+    ? new Date(businessProfile.subscriptionEndsAt).getTime()
+    : NaN;
+  const proEnded = Number.isFinite(subscriptionEndsMs) && subscriptionEndsMs <= Date.now();
 
   const kpiItems = [
     {
@@ -244,10 +248,12 @@ export function BusinessOwnerProfileView({
             <p className={`text-sm font-semibold ${ac.pageHeading}`}>
               {t('businessProfile.owner.yourPlan', { plan: planBadgeLabel })}
             </p>
-            <p className={`mt-1 text-xs font-medium ${ui.limeText}`}>
-              {isPro && renewalDate
-                ? t('businessProfile.owner.statusActiveUntil', { date: renewalDate })
-                : t('businessProfile.owner.statusActive')}
+            <p className={`mt-1 text-xs font-medium ${proEnded ? 'text-red-600' : ui.limeText}`}>
+              {proEnded && renewalDate
+                ? t('businessProfile.tariff.proEndedOn', { date: renewalDate })
+                : isPro && renewalDate
+                  ? t('businessProfile.owner.statusActiveUntil', { date: renewalDate })
+                  : t('businessProfile.owner.statusActive')}
             </p>
           </div>
         </div>
@@ -255,10 +261,12 @@ export function BusinessOwnerProfileView({
         {isPro ? (
           <>
             {renewalDate ? (
-              <p className={`mb-3 text-sm ${ac.mutedText}`}>
-                {(businessProfile.subscriptionAutoRenew ?? true)
-                  ? t('businessProfile.subscription.renewsOn', { date: renewalDate })
-                  : t('businessProfile.subscription.validUntil', { date: renewalDate })}
+              <p className={`mb-3 text-sm ${proEnded ? 'font-medium text-red-600' : ac.mutedText}`}>
+                {proEnded
+                  ? t('businessProfile.tariff.proEndedOn', { date: renewalDate })
+                  : (businessProfile.subscriptionAutoRenew ?? true)
+                    ? t('businessProfile.subscription.renewsOn', { date: renewalDate })
+                    : t('businessProfile.subscription.validUntil', { date: renewalDate })}
               </p>
             ) : null}
             <div className="mb-3 grid grid-cols-2 gap-3">

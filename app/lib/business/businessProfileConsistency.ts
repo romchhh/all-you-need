@@ -23,16 +23,13 @@ export type BusinessProfileConsistencyState = {
 export type ListingProfileSyncAction = 'sync_vitrine' | 'demote_all_personal';
 
 /** Чиста логіка — коли тегати оголошення як business. */
-export function resolveListingProfileSyncAction(
-  isActive: boolean,
-  isPublic: boolean
-): ListingProfileSyncAction {
-  return isActive && isPublic ? 'sync_vitrine' : 'demote_all_personal';
+export function resolveListingProfileSyncAction(isPublic: boolean): ListingProfileSyncAction {
+  return isPublic ? 'sync_vitrine' : 'demote_all_personal';
 }
 
 /**
  * Виправляє legacy-стан профілю, прострочення PRO, profileType оголошень.
- * Публічний business (пошук + вітрина) = active підписка + isPublished.
+ * Публічний business (пошук + вітрина) = isPublished. PRO лише вмикає аналітику.
  */
 export async function ensureBusinessProfileConsistency(
   userId: number
@@ -51,7 +48,7 @@ export async function ensureBusinessProfileConsistency(
 
   const isActive = isBusinessProfileActive(profile);
   const isPublic = isBusinessProfilePubliclyVisible(profile);
-  const action = resolveListingProfileSyncAction(isActive, isPublic);
+  const action = resolveListingProfileSyncAction(isPublic);
 
   try {
     if (action === 'sync_vitrine') {

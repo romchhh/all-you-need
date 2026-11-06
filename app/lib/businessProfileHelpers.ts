@@ -19,6 +19,7 @@ import {
   parseBusinessDirections,
   serializeBusinessDirections,
 } from '@/lib/businessSphereConstants';
+import { sqlNow } from '@/lib/dbSql';
 import { isBusinessProfileActive as isBusinessProfileActiveCore } from '@/lib/businessCabinetState';
 import { isBusinessProfilePubliclyVisible } from '@/lib/businessCabinetState';
 
@@ -289,10 +290,11 @@ export async function pauseBusinessProfile(userId: number, businessProfileId: nu
   });
 }
 
-/** After PRO period ends — keep Business profile on the free tier. */
+/** After PRO period ends — keep the free Business profile public. Date of the ended PRO stays for the cabinet. */
 export async function downgradeProToFreeBusiness(
   userId: number,
-  businessProfileId: number
+  businessProfileId: number,
+  endedAt?: Date | null
 ): Promise<void> {
   const now = new Date();
   await prisma.businessProfile.update({
@@ -300,7 +302,7 @@ export async function downgradeProToFreeBusiness(
     data: {
       plan: 'business',
       subscriptionStatus: 'active',
-      subscriptionEndsAt: null,
+      subscriptionEndsAt: endedAt ?? null,
       subscriptionAutoRenew: true,
       isPublished: true,
       highlightCreditsRemaining: 0,
@@ -353,15 +355,9 @@ export async function deactivateBusinessProfile(
 
 async function expireEndedProSubscription(
   userId: number,
-  profile: { id: number; subscriptionAutoRenew?: boolean }
+  profile: { id: number; subscriptionEndsAt?: Date | null }
 ): Promise<void> {
-  const autoRenew = profile.subscriptionAutoRenew ?? true;
-  if (!autoRenew) {
-    await downgradeProToFreeBusiness(userId, profile.id);
-    return;
-  }
-  // Recurring charge is not wired yet — profile is suspended until manual renewal.
-  await deactivateBusinessProfile(userId, profile.id);
+  await downgradeProToFreeBusiness(userId, profile.id, profile.subscriptionEndsAt ?? null);
 }
 
 export async function expireDueBusinessSubscriptions(limit = 200): Promise<number> {
@@ -373,7 +369,7 @@ export async function expireDueBusinessSubscriptions(limit = 200): Promise<numbe
       subscriptionEndsAt: { lt: now },
     },
     take: limit,
-    select: { id: true, userId: true, subscriptionAutoRenew: true },
+    select: { id: true, userId: true, subscriptionEndsAt: true },
   });
 
   for (const profile of due) {
@@ -389,13 +385,17 @@ export async function repairFreeBusinessProfileIfNeeded(userId: number): Promise
   if (!profile?.businessName?.trim()) return;
 
   const plan = (profile.plan || 'business').toLowerCase();
-  if (plan === 'business_pro') return;
+  const endedAt = profile.subscriptionEndsAt;
+  const proEnded = Boolean(endedAt && endedAt <= new Date());
 
-  const needsRepair =
-    profile.subscriptionStatus !== 'active' ||
-    profile.subscriptionEndsAt != null ||
-    !profile.isPublished;
+  if (plan === 'business_pro') {
+    if (proEnded || profile.subscriptionStatus === 'expired') {
+      await downgradeProToFreeBusiness(userId, profile.id, endedAt);
+    }
+    return;
+  }
 
+  const needsRepair = profile.subscriptionStatus !== 'active' || !profile.isPublished;
   if (!needsRepair) return;
 
   await prisma.businessProfile.update({
@@ -403,7 +403,6 @@ export async function repairFreeBusinessProfileIfNeeded(userId: number): Promise
     data: {
       plan: 'business',
       subscriptionStatus: 'active',
-      subscriptionEndsAt: null,
       isPublished: true,
       highlightCreditsRemaining: 0,
       topCreditsRemaining: 0,
@@ -418,11 +417,14 @@ export async function repairStaleFreeBusinessProfilesForSearch(limit = 80): Prom
   const rows = (await prisma.$queryRawUnsafe(
     `SELECT userId FROM BusinessProfile
      WHERE TRIM(COALESCE(businessName, '')) != ''
-       AND LOWER(COALESCE(plan, 'business')) != 'business_pro'
        AND (
          subscriptionStatus != 'active'
-         OR subscriptionEndsAt IS NOT NULL
          OR isPublished = false
+         OR (
+           LOWER(COALESCE(plan, 'business')) = 'business_pro'
+           AND subscriptionEndsAt IS NOT NULL
+           AND subscriptionEndsAt <= ${sqlNow()}
+         )
        )
      LIMIT ?`,
     limit
@@ -441,12 +443,8 @@ export async function expireBusinessProfileIfNeeded(userId: number): Promise<voi
 
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
   if (!profile) return;
-  if (profile.subscriptionStatus === 'active' && profile.subscriptionEndsAt && profile.subscriptionEndsAt <= new Date()) {
-    if (profile.plan === 'business_pro') {
-      await expireEndedProSubscription(userId, profile);
-    } else {
-      await deactivateBusinessProfile(userId, profile.id);
-    }
+  if (profile.subscriptionEndsAt && profile.subscriptionEndsAt <= new Date() && profile.plan === 'business_pro') {
+    await expireEndedProSubscription(userId, profile);
   }
 }
 

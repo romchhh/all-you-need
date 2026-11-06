@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { rawQuery, sqlBooleanIsTrue, sqlLikeOp, sqlNow } from '@/lib/dbSql';
+import { rawQuery, sqlBooleanIsTrue, sqlLikeOp } from '@/lib/dbSql';
 import { sqlListingSearchableDescription } from '@/lib/listings/searchVariants';
 import { ensureBusinessSearchCatalogFresh } from '@/lib/business/businessProfileConsistency';
 import { syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
@@ -48,8 +48,7 @@ export type BusinessSearchResultRow = {
 
 function activeBusinessWhere(): string {
   return `
-  bp.subscriptionStatus = 'active'
-  AND (bp.subscriptionEndsAt IS NULL OR bp.subscriptionEndsAt > ${sqlNow()})
+    TRIM(COALESCE(bp.businessName, '')) <> ''
   AND ${sqlBooleanIsTrue('bp.isPublished')}
 `;
 }

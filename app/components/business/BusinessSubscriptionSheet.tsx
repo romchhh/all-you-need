@@ -75,6 +75,10 @@ export function BusinessSubscriptionSheet({
   const renewalDate = businessProfile.subscriptionEndsAt
     ? formatSubscriptionDate(businessProfile.subscriptionEndsAt, language)
     : null;
+  const subscriptionEndsMs = businessProfile.subscriptionEndsAt
+    ? new Date(businessProfile.subscriptionEndsAt).getTime()
+    : NaN;
+  const proEnded = Number.isFinite(subscriptionEndsMs) && subscriptionEndsMs <= Date.now();
   const autoRenew = businessProfile.subscriptionAutoRenew ?? true;
   const showPaymentBlocks = isPro || Boolean(businessProfile.hasProPaymentHistory);
 
@@ -152,7 +156,11 @@ export function BusinessSubscriptionSheet({
                 <p className={`mt-0.5 text-sm font-semibold ${ui.limeText}`}>
                   {isPro ? formatBusinessPlanPrice(planId, planLang) : t('businessProfile.tariff.free')}
                 </p>
-                {!isPro ? (
+                {proEnded && renewalDate ? (
+                  <p className="mt-1 text-sm font-medium text-red-600">
+                    {t('businessProfile.tariff.proEndedOn', { date: renewalDate })}
+                  </p>
+                ) : !isPro ? (
                   <p className={`mt-1 text-sm ${ac.mutedText}`}>
                     {t('businessProfile.subscription.freePlanForever')}
                   </p>
@@ -163,10 +171,16 @@ export function BusinessSubscriptionSheet({
                 ) : null}
               </div>
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${ui.limeBgSoft} ${ui.limeText}`}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  proEnded
+                    ? 'bg-red-500/10 text-red-600'
+                    : `${ui.limeBgSoft} ${ui.limeText}`
+                }`}
               >
                 <Check size={14} />
-                {t('businessProfile.subscription.activeBadge')}
+                {proEnded
+                  ? t('businessProfile.tariff.proEndedBadge')
+                  : t('businessProfile.subscription.activeBadge')}
               </span>
             </div>
           </div>
@@ -309,10 +323,12 @@ export function BusinessSubscriptionSheet({
                 />
               </div>
               {renewalDate ? (
-                <p className={`mt-3 text-sm ${ac.mutedText}`}>
-                  {autoRenew
-                    ? t('businessProfile.subscription.renewsOn', { date: renewalDate })
-                    : t('businessProfile.subscription.validUntil', { date: renewalDate })}
+                <p className={`mt-3 text-sm ${proEnded ? 'font-medium text-red-600' : ac.mutedText}`}>
+                  {proEnded
+                    ? t('businessProfile.tariff.proEndedOn', { date: renewalDate })
+                    : autoRenew
+                      ? t('businessProfile.subscription.renewsOn', { date: renewalDate })
+                      : t('businessProfile.subscription.validUntil', { date: renewalDate })}
                 </p>
               ) : null}
               {!autoRenew ? (

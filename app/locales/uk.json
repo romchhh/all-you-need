@@ -1351,6 +1351,7 @@
       "currentPlanButton": "Поточний тариф",
       "proActiveUntil": "PRO активний до {date}",
       "proEndedOn": "PRO закінчився {date}",
+      "proEndedBadge": "PRO закінчився",
       "downgradeScheduled": "PRO залишиться активним до кінця оплаченого періоду, потім ви перейдете на безкоштовний Business.",
       "disclaimerPro": "Підписку можна скасувати будь-коли. PRO діє до кінця оплаченого періоду."
     },
