@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { CATEGORY_ICON_PATHS } from '@/lib/listings/autoCover';
+import { CATEGORY_ICON_CACHE_BUST, CATEGORY_ICON_PATHS } from '@/lib/listings/autoCover';
 
 interface CategoryIconProps {
   categoryId: string;
@@ -48,7 +48,7 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({
 
   const img = (
     <img
-      src={iconPath}
+      src={`${iconPath}?v=${CATEGORY_ICON_CACHE_BUST}`}
       alt=""
       width={size}
       height={size}

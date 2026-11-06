@@ -138,9 +138,12 @@ export const CATEGORY_ICON_PATHS: Record<string, string> = {
   realestate: '/images/categories_icons/realestate.svg',
   services_work: '/images/categories_icons/services_work.svg',
   free: '/images/categories_icons/free.svg',
-  food_gastro: '/images/categories_icons/food_gastro.svg',
+  food_gastro: '/images/categories_icons/food_utensils.svg',
   all_categories: '/images/categories_icons/all_categories.svg',
 };
+
+/** Bust Telegram/WebView cache when category SVG assets change. */
+export const CATEGORY_ICON_CACHE_BUST = '20261106a';
 
 const UNIVERSAL_ICON_ID = 'all_categories';
 
@@ -256,13 +259,10 @@ export function coverIconPath(
   forLightTheme: boolean
 ): string {
   const base = CATEGORY_ICON_PATHS[iconCategoryId] || CATEGORY_ICON_PATHS[UNIVERSAL_ICON_ID];
-  if (forLightTheme) {
-    return base.replace(
-      '/images/categories_icons/',
-      '/images/categories_icons/dark/'
-    );
-  }
-  return base;
+  const path = forLightTheme
+    ? base.replace('/images/categories_icons/', '/images/categories_icons/dark/')
+    : base;
+  return `${path}?v=${CATEGORY_ICON_CACHE_BUST}`;
 }
 
 export function listingHasDisplayPhoto(listing: {
