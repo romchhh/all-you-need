@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { ListingCard } from '@/components/listing/ListingCard';
+import { BusinessListingSquare } from '@/components/business/BusinessListingSquare';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
@@ -22,7 +22,6 @@ import { useTelegram } from '@/features/telegram/hooks/useTelegram';
 import { useUser } from '@/features/user/hooks/useUser';
 import { usePageTransition } from '@/contexts/PageTransitionContext';
 import { useParams } from 'next/navigation';
-import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import { Toast } from '@/components/ui/Toast';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
@@ -621,8 +620,13 @@ export function BusinessProfilePage({
     return (
       <div className={`min-h-screen ${ac.pageBackground}`}>
         <FixedLogoHeader mode="window-fixed" zClassName="z-[50]" paddingX={false} outerClassName="px-4 lg:px-6" />
-        <div className="px-4 pt-4">
-          <ListingGridSkeleton count={4} />
+        <div className="grid grid-cols-3 gap-1 px-4 pt-4">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={index}
+              className={`aspect-square animate-pulse rounded-xl ${isLight ? 'bg-gray-200/80' : 'bg-white/10'}`}
+            />
+          ))}
         </div>
       </div>
     );
@@ -993,19 +997,16 @@ export function BusinessProfilePage({
                     </button>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-1">
                   {filteredListings.map((listing) => (
-                    <div key={listing.id} className="relative">
-                      <ListingCard
-                        listing={listing}
-                        layout="stacked"
-                        isFavorite={favorites.has(listing.id)}
-                        onSelect={onSelectListing}
-                        onToggleFavorite={onToggleFavorite}
-                        showBusinessBadge
-                        tg={tg}
-                      />
-                    </div>
+                    <BusinessListingSquare
+                      key={listing.id}
+                      listing={listing}
+                      isFavorite={favorites.has(listing.id)}
+                      onSelect={onSelectListing}
+                      onToggleFavorite={onToggleFavorite}
+                      tg={tg}
+                    />
                   ))}
                 </div>
                 {filteredListings.length === 0 ? (

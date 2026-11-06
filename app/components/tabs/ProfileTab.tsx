@@ -5,6 +5,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useUser } from '@/features/user/hooks/useUser';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { ProfileListingCard } from '@/components/listing/ProfileListingCard';
+import { BusinessListingSquare } from '@/components/business/BusinessListingSquare';
 import { EditProfileModal } from '@/components/modals/EditProfileModal';
 import { ShareModal } from '@/components/modals/ShareModal';
 import { ReferralModal } from '@/components/modals/ReferralModal';
@@ -723,12 +724,115 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
     return (
       <>
-        <div className="space-y-3">
+        <div className={isBusinessView ? 'grid grid-cols-3 gap-1' : 'space-y-3'}>
           {userListings.map((listing) => {
             const isSold = listing.status === 'sold';
             const isDeactivated =
               (listing.status as string) === 'deactivated' || (listing.status as string) === 'hidden';
             const isExpired = listing.status === 'expired';
+            if (isBusinessView) {
+              return (
+                <BusinessListingSquare
+                  key={listing.id}
+                  listing={{ ...listing, favoritesCount: listing.favoritesCount || 0 }}
+                  tg={tg}
+                  onSelect={(selectedListing) => {
+                    if (onSelectListing) {
+                      fetch(`/api/listings/${selectedListing.id}`)
+                        .then((res) => res.json())
+                        .then((data) => {
+                          onSelectListing({ ...selectedListing, ...data });
+                        })
+                        .catch((err) => console.error('Error loading listing:', err));
+                    }
+                  }}
+                  onEdit={() => {
+                    if (listing.status === 'pending_moderation') {
+                      showToast(
+                        t('editListing.cannotEditOnModeration') || 'Не можна редагувати оголошення під час модерації',
+                        'error'
+                      );
+                      tg?.HapticFeedback.notificationOccurred('error');
+                      return;
+                    }
+                    setEditingListing(listing);
+                  }}
+                  onReactivate={() => {
+                    setSelectedListingForReactivation(listing.id);
+                    setShowReactivateFlow(true);
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  onPromote={() => {
+                    setSelectedListingForPromotion(listing);
+                    setShowPromotionModal(true);
+                    setPromotionOpenSource('manual');
+                    tg?.HapticFeedback.impactOccurred('light');
+                  }}
+                  onMarkAsSold={() => {
+                    if (listing.status === 'pending_moderation') {
+                      showToast(
+                        t('editListing.cannotEditOnModeration') || 'Не можна позначати як продане під час модерації',
+                        'error'
+                      );
+                      return;
+                    }
+                    if (listing.status === 'rejected') {
+                      showToast(
+                        t('editListing.cannotMarkSoldRejected') || 'Не можна позначати як продане відхилене оголошення',
+                        'error'
+                      );
+                      return;
+                    }
+                    setConfirmModal({
+                      isOpen: true,
+                      title: t('editListing.markAsSold'),
+                      message: t('editListing.confirmMarkSold'),
+                      onConfirm: async () => {
+                        try {
+                          const formData = new FormData();
+                          formData.append('title', listing.title);
+                          formData.append('description', listing.description);
+                          formData.append('price', listing.isFree ? '0' : listing.price);
+                          formData.append('isFree', listing.isFree ? 'true' : 'false');
+                          formData.append('category', listing.category);
+                          if (listing.subcategory) {
+                            formData.append('subcategory', listing.subcategory);
+                          }
+                          formData.append('location', listing.location);
+                          formData.append('condition', listing.condition || '');
+                          formData.append('telegramId', profile.telegramId);
+                          formData.append('status', 'sold');
+
+                          const response = await fetch(`/api/listings/${listing.id}/update`, {
+                            method: 'PUT',
+                            body: formData,
+                          });
+
+                          if (response.ok) {
+                            showToast(t('editListing.listingMarkedSold'), 'success');
+                            tg?.HapticFeedback.notificationOccurred('success');
+                            setConfirmModal({ ...confirmModal, isOpen: false });
+                            await fetchListingsWithFilters(0, true);
+                            void refetchStats();
+                            router.refresh();
+                          } else {
+                            const errorData = await response.json().catch(() => ({}));
+                            console.error('Error updating listing:', errorData);
+                            showToast(t('editListing.updateError'), 'error');
+                          }
+                        } catch (error) {
+                          console.error('Error marking listing as sold:', error);
+                          showToast(t('editListing.updateError'), 'error');
+                        }
+                      },
+                      confirmText: t('editListing.markAsSold'),
+                      cancelText: t('common.cancel'),
+                      confirmButtonClass: 'bg-green-500 hover:bg-green-600',
+                    });
+                  }}
+                />
+              );
+            }
             return (
               <ProfileListingCard
                 key={listing.id}
