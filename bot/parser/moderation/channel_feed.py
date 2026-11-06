@@ -49,6 +49,23 @@ COVER_BY_BUCKET = {
     "events": "/images/channel_covers/events.png",
 }
 
+
+def _marketplace_cover_path(row, listing_id: int) -> str:
+    """Обкладинка як у маркетплейсі. Якщо намалювати не вийшло — стара тематична."""
+    from parser.moderation.marketplace_cover import render_marketplace_cover
+
+    subcategory = _row_get(row, "subcategory")
+    path = render_marketplace_cover(
+        listing_id=listing_id,
+        title=str(_row_get(row, "title") or ""),
+        description=str(_row_get(row, "description") or ""),
+        category=str(_row_get(row, "category") or "") or None,
+        subcategory=subcategory if isinstance(subcategory, str) else None,
+    )
+    if path:
+        return path
+    return COVER_BY_BUCKET["services"]
+
 _CHANNELS = (
     ("hamburg", TRADE_SERVICES_CHANNEL_HAMBURG_ID),
     ("germany", TRADE_SERVICES_CHANNEL_GERMANY_ID),
@@ -185,7 +202,7 @@ async def _publish_one(bot, channel_key: str, chat_id: int) -> None:
     title = str(_row_get(row, "title") or "")
     description = str(_row_get(row, "description") or "")
     images = listing_image_paths(_row_get(row, "images"))
-    cover = COVER_BY_BUCKET.get(picked.bucket) or COVER_BY_BUCKET["services"]
+    cover = _marketplace_cover_path(row, picked.id)
     photo = images[:1] or [cover]
 
     item = {

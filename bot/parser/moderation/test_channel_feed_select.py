@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -255,6 +256,41 @@ class QueueSqlTests(unittest.TestCase):
         self.assertEqual(sql.count("?"), 4)
 
 
+class CoverTests(unittest.TestCase):
+    def test_hash_and_cleaning_icon_match_marketplace(self):
+        from parser.moderation.marketplace_cover import (
+            cover_scheme_index,
+            hash_listing_id,
+            render_marketplace_cover,
+            resolve_cover_icon_name,
+            shorten_cover_title,
+        )
+
+        self.assertEqual(hash_listing_id(1), 873244444)
+        self.assertEqual(cover_scheme_index(1), 12)
+        self.assertEqual(hash_listing_id(7), 839689206)
+        self.assertEqual(cover_scheme_index(7), 6)
+        self.assertEqual(
+            resolve_cover_icon_name(
+                title="Прибирання квартир",
+                description=LONG,
+                category="services_work",
+                subcategory="cleaning",
+            ),
+            "SprayCan",
+        )
+        self.assertEqual(shorten_cover_title("Прибирання квартир"), "Прибирання квартир")
+        path = render_marketplace_cover(
+            listing_id=7,
+            title="Прибирання квартир",
+            description=LONG,
+            category="services_work",
+            subcategory="cleaning",
+        )
+        self.assertIsNotNone(path)
+        self.assertGreater(Path(path).stat().st_size, 10_000)
+
+
 class _FakeBot:
     def __init__(self, fail_urls=False):
         self.calls = []
@@ -321,7 +357,9 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
         bot, saved, skipped = await self._run(row)
         self.assertEqual(len(bot.calls), 1)
         photo = str(getattr(bot.calls[0]["photo"], "path", ""))
-        self.assertIn("channel_covers/services.png", photo)
+        self.assertIn("allyouneed-marketplace-covers", photo)
+        self.assertTrue(photo.endswith(".jpg"))
+        self.assertIn("7-", Path(photo).name)
         buttons = [btn for row_btns in bot.calls[0]["reply_markup"].inline_keyboard for btn in row_btns]
         self.assertEqual(len(buttons), 2)
         self.assertIn("Маркетплейс", buttons[0].text)
@@ -386,7 +424,9 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved["listing_id"], 8)
         self.assertEqual(saved["city_key"], "hamburg")
         self.assertEqual(len(bot.calls), 1)
-        self.assertIn("channel_covers/services.png", str(getattr(bot.calls[0]["photo"], "path", "")))
+        cover = str(getattr(bot.calls[0]["photo"], "path", ""))
+        self.assertIn("allyouneed-marketplace-covers", cover)
+        self.assertIn("8-", Path(cover).name)
 
 
 if __name__ == "__main__":

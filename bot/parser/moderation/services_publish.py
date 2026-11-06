@@ -461,6 +461,10 @@ def _channel_photo_inputs_from_images_web(images_web: list) -> list:
         if not img or not isinstance(img, str):
             continue
         s = img.strip()
+        local_file = Path(s)
+        if local_file.is_file():
+            out.append(FSInputFile(str(local_file)))
+            continue
         if s.startswith("http://") or s.startswith("https://"):
             out.append(s)
             continue
@@ -800,6 +804,18 @@ async def publish_services_listing_to_channel(
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
 
     photo_inputs = _channel_photo_inputs_from_images_web(list(images_web) if images_web else [])
+    if not photo_inputs:
+        from parser.moderation.marketplace_cover import render_marketplace_cover
+
+        cover_path = render_marketplace_cover(
+            listing_id=marketplace_listing_id or listing_id,
+            title=title,
+            description=raw_desc or marketplace_description,
+            category=category,
+            subcategory=subcategory if isinstance(subcategory, str) else None,
+        )
+        if cover_path:
+            photo_inputs = [FSInputFile(cover_path)]
 
     published: list[int] = []
     primary_post_url: str | None = None
