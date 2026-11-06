@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Bell, Building2, MapPin, Search, Trash2 } from 'lucide-react';
+import { Building2, MapPin, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { TelegramWebApp } from '@/types/telegram';
@@ -369,13 +369,11 @@ export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscr
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <span
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                        isLight ? 'bg-[#E8F0E0] text-[#3F5331]' : 'bg-[#C8E6A0]/15 text-[#C8E6A0]'
-                      }`}
-                    >
-                      <Bell size={18} fill="currentColor" />
-                    </span>
+                    <MapPin
+                      size={20}
+                      className={`shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
+                      strokeWidth={2}
+                    />
                     <span className={`truncate font-medium ${ac.pageHeading}`}>
                       {formatCityFilterLabel(cityKey)}
                     </span>
@@ -423,13 +421,11 @@ export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscr
                     onClick={() => openSearchQuery(item)}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                   >
-                    <span
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                        isLight ? 'bg-[#E8F0E0] text-[#3F5331]' : 'bg-[#C8E6A0]/15 text-[#C8E6A0]'
-                      }`}
-                    >
-                      <Search size={18} />
-                    </span>
+                    <Search
+                      size={20}
+                      className={`shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
+                      strokeWidth={2}
+                    />
                     <div className="min-w-0">
                       <p className={`truncate font-medium ${ac.pageHeading}`}>{item.queryText}</p>
                       <p className={`text-xs ${ac.mutedText}`}>
