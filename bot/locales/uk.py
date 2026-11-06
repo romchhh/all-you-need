@@ -521,7 +521,7 @@ TEXTS = {
         "approval_platform_soon": "⏱ Оголошення з'явиться на платформі (маркетплейсі) найближчим часом — оновіть сторінку каталогу через кілька хвилин.",
         "approval_expires_marketplace": "\n\n📅 Термін дії: до {date}",
         "approval_active_days": "Ваше оголошення буде активним протягом 30 днів.",
-        "view_listing_button": "🛒 Відкрити в Marketplace",
+        "view_listing_button": "🛒 Відкрити в Маркетплейс",
         "view_profile_button": "🔗 Переглянути профіль"
     },
     "tariffs": {

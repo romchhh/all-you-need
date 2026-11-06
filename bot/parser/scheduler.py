@@ -340,6 +340,12 @@ def register_parser_job(scheduler):
     except Exception:
         logger.exception("Не вдалося зареєструвати auto-approve job")
     try:
+        from parser.moderation.channel_feed import register_channel_feed_job
+
+        register_channel_feed_job(scheduler)
+    except Exception:
+        logger.exception("Не вдалося зареєструвати channel feed job")
+    try:
         from parser.storage.marketplace_dedup_cleanup import (
             register_marketplace_dedup_cleanup_job,
         )

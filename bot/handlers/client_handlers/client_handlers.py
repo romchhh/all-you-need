@@ -134,6 +134,16 @@ async def scheduler_jobs():
         import traceback
         traceback.print_exc()
 
+    try:
+        from parser.moderation.channel_feed import register_channel_feed_job
+
+        register_channel_feed_job(scheduler)
+        print("✅ Scheduler job 'channel_feed' додано (Hamburg + Germany, кожні 10 хв)")
+    except Exception as e:
+        print(f"❌ Помилка реєстрації channel feed job: {e}")
+        import traceback
+        traceback.print_exc()
+
     # Мікросервіс плавного накручування переглядів (окремий пакет view_boost, як parser)
     try:
         from view_boost.scheduler import VIEW_BOOST_ENABLED, register_view_boost_job

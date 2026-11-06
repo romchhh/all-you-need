@@ -47,6 +47,34 @@ class ServicesChannelPublishResult(NamedTuple):
     post_url: str | None
 
 
+def _remember_channel_feed_post(
+    chat_id: int,
+    marketplace_listing_id: int | None,
+    title: str,
+    location: str,
+) -> None:
+    """Щоб стрічка каналу не виклала те саме оголошення ще раз."""
+    if not marketplace_listing_id:
+        return
+    if chat_id == TRADE_SERVICES_CHANNEL_HAMBURG_ID:
+        channel_key = "hamburg"
+    elif chat_id == TRADE_SERVICES_CHANNEL_GERMANY_ID:
+        channel_key = "germany"
+    else:
+        return
+    try:
+        from parser.moderation.channel_feed_store import remember_channel_publish
+
+        remember_channel_publish(
+            listing_id=int(marketplace_listing_id),
+            channel_key=channel_key,
+            title=title,
+            city_key=(location or "").strip().lower()[:80] or None,
+        )
+    except Exception:
+        logger.debug("channel feed remember skipped", exc_info=True)
+
+
 def channel_post_public_url(chat_id: int, message_id: int) -> str:
     cid = str(int(chat_id))
     if cid.startswith("-100"):
@@ -788,6 +816,7 @@ async def publish_services_listing_to_channel(
             published.append(chat_id)
             if primary_post_url is None:
                 primary_post_url = channel_post_public_url(chat_id, msg_id)
+            _remember_channel_feed_post(chat_id, marketplace_listing_id, title, location)
 
     if len(published) > 1:
         logger.info(
