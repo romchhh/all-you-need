@@ -1,13 +1,5 @@
-<svg width="45" height="45" viewBox="0 0 45 45" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Fork tines -->
-  <path d="M8 3.5V15" stroke="#3F5331" stroke-width="3.4" stroke-linecap="round"/>
-  <path d="M14.5 3.5V15" stroke="#3F5331" stroke-width="3.4" stroke-linecap="round"/>
-  <path d="M21 3.5V15" stroke="#3F5331" stroke-width="3.4" stroke-linecap="round"/>
-  <!-- Fork neck + handle -->
-  <path d="M8 15H21" stroke="#3F5331" stroke-width="3.4" stroke-linecap="round"/>
-  <path d="M14.5 15V41.5" stroke="#3F5331" stroke-width="3.4" stroke-linecap="round"/>
-  <!-- Knife handle -->
-  <path d="M31.5 41.5V21" stroke="#3F5331" stroke-width="3.4" stroke-linecap="round"/>
-  <!-- Knife blade -->
-  <path d="M31.5 21C31.5 21 31.8 4 39 4C38.2 11.5 35.2 17.2 31.5 21Z" fill="#3F5331"/>
+<svg width="45" height="45" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" stroke="#3F5331" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M7 2v20" stroke="#3F5331" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" stroke="#3F5331" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
