@@ -36,13 +36,19 @@ _FEED_CATEGORIES = frozenset({"services_work", "realestate", "hobby_sports"})
 
 _EVENT_RE = re.compile(
     r"(?:"
-    r"мероприят\w*|подія|події|\bзахід\b|\bзаходи\b|"
-    r"афіш\w*|афиш\w*|фестивал\w*|концерт\w*|"
-    r"вечірк\w*|вечеринк\w*|стендап|стенд-ап|"
-    r"майстер-клас\w*|мастер-класс\w*|\bворкшоп\w*|\bworkshop\b|"
-    r"квитк\w*\s+на|билет\w*\s+на|"
-    r"\bmeetup\b|івент\w*|ивент\w*"
+    r"\bмероприятие\b|\bмероприятия\b|\bподія\b|\bподії\b|\bзахід\b|\bзаходи\b|"
+    r"\bафіша\b|\bафиша\b|\bфестиваль\b|\bконцерт\b|"
+    r"\bвечірка\b|\bвечеринка\b|\bстендап\b|стенд-ап|"
+    r"\bмайстер-клас\b|\bмастер-класс\b|\bворкшоп\b|\bworkshop\b|"
+    r"\bквитки\b|\bбилеты\b|"
+    r"\bmeetup\b|\bівент\b|\bивент\b"
     r")",
+    re.IGNORECASE,
+)
+
+_BOILERPLATE_RE = re.compile(
+    r"(?:^|\n)\s*👤\s*Автор:.*|"
+    r"(?:^|\n)\s*🔗\s*(?:Оригінальне|Оригинальное|Original).*",
     re.IGNORECASE,
 )
 
@@ -72,12 +78,16 @@ class FeedCandidate(NamedTuple):
 
 
 def plain_text(value: str) -> str:
-    text = _URL_RE.sub(" ", value or "")
+    text = _BOILERPLATE_RE.sub(" ", value or "")
+    text = _URL_RE.sub(" ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
 def normalize_title_key(title: str) -> str:
-    return plain_text(title).lower()[:180]
+    text = plain_text(title).lower()
+    text = re.sub(r"[^\w\s]+", " ", text, flags=re.UNICODE)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:180]
 
 
 def is_feed_quality(title: str, description: str, *, bucket: str | None = None) -> bool:

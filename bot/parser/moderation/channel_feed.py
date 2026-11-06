@@ -27,6 +27,7 @@ from parser.moderation.channel_feed_store import (
     fetch_feed_rows,
     load_rotation,
     remember_channel_publish,
+    remember_many,
     recent_title_keys,
     save_rotation,
 )
@@ -95,10 +96,14 @@ def _row_get(row: dict, *names: str):
     return None
 
 
-def _candidates_for_channel(channel_key: str, rows: list[dict]) -> tuple[list[FeedCandidate], dict[int, dict]]:
-    blocked_titles = recent_title_keys(channel_key)
+def _candidates_for_channel(
+    channel_key: str,
+    rows: list[dict],
+    blocked_titles: set[str],
+) -> tuple[list[FeedCandidate], dict[int, dict], list[tuple[int, str]]]:
     chosen: list[FeedCandidate] = []
     by_id: dict[int, dict] = {}
+    rejected: list[tuple[int, str]] = []
     for row in rows:
         title = str(_row_get(row, "title") or "")
         description = str(_row_get(row, "description") or "")
@@ -106,22 +111,24 @@ def _candidates_for_channel(channel_key: str, rows: list[dict]) -> tuple[list[Fe
         category = str(_row_get(row, "category") or "")
         subcategory = _row_get(row, "subcategory")
         subcategory_s = str(subcategory or "")
+        listing_id = int(row["id"])
         bucket = classify_bucket(category, subcategory_s, title, description)
-        if not bucket:
-            continue
-        if not is_feed_quality(title, description, bucket=bucket):
-            continue
         online = is_online_service(title, description, location, subcategory_s)
-        if channel_key == "hamburg" and not eligible_for_hamburg(
+        hamburg_ok = channel_key != "hamburg" or eligible_for_hamburg(
             title=title,
             description=description,
             location=location,
             subcategory=subcategory_s,
-        ):
-            continue
-        listing_id = int(row["id"])
+        )
         title_key = normalize_title_key(title)
-        if title_key in blocked_titles:
+        if (
+            not bucket
+            or not is_feed_quality(title, description, bucket=bucket)
+            or not hamburg_ok
+            or not title_key
+            or title_key in blocked_titles
+        ):
+            rejected.append((listing_id, title))
             continue
         candidate = FeedCandidate(
             id=listing_id,
@@ -131,7 +138,7 @@ def _candidates_for_channel(channel_key: str, rows: list[dict]) -> tuple[list[Fe
         )
         chosen.append(candidate)
         by_id[listing_id] = row
-    return chosen, by_id
+    return chosen, by_id, rejected
 
 
 def _as_bool(value) -> bool:
@@ -143,16 +150,33 @@ def _as_bool(value) -> bool:
 
 
 async def _publish_one(bot, channel_key: str, chat_id: int) -> None:
-    rows = fetch_feed_rows(channel_key)
-    candidates, by_id = _candidates_for_channel(channel_key, rows)
+    blocked_titles = recent_title_keys(channel_key)
     last_bucket, last_city = load_rotation(channel_key)
-    picked = pick_next(
-        candidates,
-        last_bucket=last_bucket,
-        last_city=last_city,
-        blocked_ids=set(),
-        blocked_titles=set(),
-    )
+    picked = None
+    by_id: dict[int, dict] = {}
+    # Кілька проходів: непридатні рядки позначаємо skipped, інакше вони
+    # назавжди займають вікно з 400 найстаріших і глушать канал.
+    for _page in range(5):
+        rows = fetch_feed_rows(channel_key)
+        if not rows:
+            break
+        candidates, by_id, rejected = _candidates_for_channel(
+            channel_key, rows, blocked_titles
+        )
+        if rejected:
+            remember_many(
+                channel_key,
+                [(listing_id, title, None, None, "skipped") for listing_id, title in rejected],
+            )
+        picked = pick_next(
+            candidates,
+            last_bucket=last_bucket,
+            last_city=last_city,
+            blocked_ids=set(),
+            blocked_titles=set(),
+        )
+        if picked is not None:
+            break
     if picked is None:
         logger.info("channel feed %s: немає нового якісного оголошення", channel_key)
         return

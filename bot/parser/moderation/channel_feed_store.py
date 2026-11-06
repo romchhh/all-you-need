@@ -65,41 +65,46 @@ def ensure_channel_feed_tables() -> None:
     _ready = True
 
 
-def _windows() -> tuple[int, int]:
+def _windows() -> tuple[int, int, int]:
     now = int(time.time())
-    return now - REPEAT_AFTER_SEC, now - FAIL_COOLDOWN_SEC
+    ok_since = now - REPEAT_AFTER_SEC
+    return ok_since, now - FAIL_COOLDOWN_SEC, ok_since
+
+
+FEED_CANDIDATE_SQL = """
+SELECT src.id, src.title, src.description, src.price, src.currency, src.isFree,
+       src.category, src.subcategory, src.location, src.images, src.condition
+FROM Listing AS src
+WHERE src.status = 'active'
+  AND (src.expiresAt IS NULL OR src.expiresAt > datetime('now'))
+  AND (src.moderationStatus = 'approved'
+       OR src.moderationStatus IS NULL
+       OR src.moderationStatus = '')
+  AND src.category IN ('services_work', 'realestate', 'hobby_sports')
+  AND NOT EXISTS (
+        SELECT 1 FROM channel_feed_post AS feed
+        WHERE feed.listing_id = src.id
+          AND feed.channel_key = ?
+          AND (
+                (feed.status = 'ok' AND feed.posted_at >= ?)
+                OR (feed.status = 'failed' AND feed.posted_at >= ?)
+                OR (feed.status = 'skipped' AND feed.posted_at >= ?)
+          )
+  )
+ORDER BY COALESCE(src.publishedAt, src.createdAt) ASC, src.id ASC
+LIMIT 400
+"""
 
 
 def fetch_feed_rows(channel_key: str) -> list[dict]:
     """Активні оголошення, які цей канал ще не публікував у вікні повтору."""
     ensure_channel_feed_tables()
-    ok_since, fail_since = _windows()
+    ok_since, fail_since, skip_since = _windows()
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        """
-        SELECT src.id, src.title, src.description, src.price, src.currency, src.isFree,
-               src.category, src.subcategory, src.location, src.images, src.condition
-        FROM Listing AS src
-        WHERE src.status = 'active'
-          AND (src.expiresAt IS NULL OR src.expiresAt > datetime('now'))
-          AND (src.moderationStatus = 'approved'
-               OR src.moderationStatus IS NULL
-               OR src.moderationStatus = '')
-          AND src.category IN ('services_work', 'realestate', 'hobby_sports')
-          AND NOT EXISTS (
-                SELECT 1 FROM channel_feed_post AS feed
-                WHERE feed.listing_id = src.id
-                  AND feed.channel_key = ?
-                  AND (
-                        (feed.status = 'ok' AND feed.posted_at >= ?)
-                        OR (feed.status = 'failed' AND feed.posted_at >= ?)
-                  )
-          )
-        ORDER BY COALESCE(src.publishedAt, src.createdAt) ASC, src.id ASC
-        LIMIT 400
-        """,
-        (channel_key, ok_since, fail_since),
+        FEED_CANDIDATE_SQL,
+        (channel_key, ok_since, fail_since, skip_since),
     )
     rows = []
     for row in cursor.fetchall():
@@ -114,7 +119,7 @@ def fetch_feed_rows(channel_key: str) -> list[dict]:
 def recent_title_keys(channel_key: str) -> set[str]:
     """Заголовки, уже опубліковані в цей канал (щоб не дублювати той самий текст)."""
     ensure_channel_feed_tables()
-    ok_since, _fail_since = _windows()
+    ok_since, _fail_since, _skip_since = _windows()
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -171,48 +176,62 @@ def remember_channel_publish(
     if not listing_id or not channel_key:
         return
     ensure_channel_feed_tables()
-    title_key = normalize_title_key(title)
+    remember_many(
+        channel_key,
+        [(int(listing_id), title, bucket, city_key, status)],
+    )
+
+
+def remember_many(
+    channel_key: str,
+    items: list[tuple[int, str, str | None, str | None, str]],
+) -> None:
+    """items: listing_id, title, bucket, city_key, status."""
+    if not channel_key or not items:
+        return
+    ensure_channel_feed_tables()
     now = int(time.time())
-    ok_since, fail_since = _windows()
-    since = ok_since if status == "ok" else fail_since
+    ok_since, fail_since, skip_since = _windows()
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT 1 FROM channel_feed_post
-            WHERE listing_id = ?
-              AND channel_key = ?
-              AND status = ?
-              AND posted_at >= ?
-            LIMIT 1
-            """,
-            (int(listing_id), channel_key, status, since),
-        )
-        if cursor.fetchone():
-            conn.close()
-            return
-        cursor.execute(
-            """
-            INSERT INTO channel_feed_post (
-                listing_id, channel_key, title_key, bucket, city_key, status, posted_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                int(listing_id),
-                channel_key,
-                title_key,
-                bucket,
-                city_key,
-                status,
-                now,
-            ),
-        )
+        for listing_id, title, bucket, city_key, status in items:
+            if not listing_id:
+                continue
+            since = fail_since if status == "failed" else ok_since if status == "ok" else skip_since
+            cursor.execute(
+                """
+                SELECT 1 FROM channel_feed_post
+                WHERE listing_id = ?
+                  AND channel_key = ?
+                  AND status = ?
+                  AND posted_at >= ?
+                LIMIT 1
+                """,
+                (int(listing_id), channel_key, status, since),
+            )
+            if cursor.fetchone():
+                continue
+            cursor.execute(
+                """
+                INSERT INTO channel_feed_post (
+                    listing_id, channel_key, title_key, bucket, city_key, status, posted_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(listing_id),
+                    channel_key,
+                    normalize_title_key(title),
+                    bucket,
+                    city_key,
+                    status,
+                    now,
+                ),
+            )
         conn.commit()
     except Exception:
         logger.warning(
-            "channel feed: не вдалося записати listing %s → %s",
-            listing_id,
+            "channel feed: не вдалося записати журнал %s",
             channel_key,
             exc_info=True,
         )
