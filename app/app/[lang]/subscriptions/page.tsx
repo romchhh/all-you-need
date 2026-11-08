@@ -110,6 +110,14 @@ export default function SubscriptionsPage() {
     setSelectedSeller(null);
   }, []);
 
+  const closeListingOverlay = useCallback(() => {
+    if (selectedSeller) {
+      setSelectedListing(null);
+      return;
+    }
+    closeOverlay();
+  }, [selectedSeller, closeOverlay]);
+
   const handleSelectListing = useCallback((listing: Listing) => {
     setSelectedListing(listing);
   }, []);
@@ -141,6 +149,41 @@ export default function SubscriptionsPage() {
     );
   }
 
+  if (selectedListing) {
+    return (
+      <div className="min-h-screen overflow-x-hidden">
+        <ListingDetail
+          key={selectedListing.id}
+          listing={selectedListing}
+          isFavorite={favorites.has(selectedListing.id)}
+          onClose={closeListingOverlay}
+          onBack={closeListingOverlay}
+          onToggleFavorite={toggleFavorite}
+          onSelectListing={handleSelectListing}
+          onViewSellerProfile={(telegramId, name, avatar, username, phone) => {
+            previousListingRef.current = selectedListing;
+            setSelectedSeller({
+              telegramId,
+              name,
+              avatar,
+              username: username || undefined,
+              phone: phone || undefined,
+            });
+            setSelectedListing(null);
+          }}
+          favorites={favorites}
+          tg={tg}
+        />
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          isVisible={toast.isVisible}
+          onClose={hideToast}
+        />
+      </div>
+    );
+  }
+
   if (selectedSeller) {
     return (
       <div className="min-h-screen overflow-x-hidden">
@@ -162,41 +205,6 @@ export default function SubscriptionsPage() {
           }}
           onSelectListing={handleSelectListing}
           onToggleFavorite={toggleFavorite}
-          favorites={favorites}
-          tg={tg}
-        />
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          isVisible={toast.isVisible}
-          onClose={hideToast}
-        />
-      </div>
-    );
-  }
-
-  if (selectedListing) {
-    return (
-      <div className="min-h-screen overflow-x-hidden">
-        <ListingDetail
-          key={selectedListing.id}
-          listing={selectedListing}
-          isFavorite={favorites.has(selectedListing.id)}
-          onClose={closeOverlay}
-          onBack={closeOverlay}
-          onToggleFavorite={toggleFavorite}
-          onSelectListing={handleSelectListing}
-          onViewSellerProfile={(telegramId, name, avatar, username, phone) => {
-            previousListingRef.current = selectedListing;
-            setSelectedSeller({
-              telegramId,
-              name,
-              avatar,
-              username: username || undefined,
-              phone: phone || undefined,
-            });
-            setSelectedListing(null);
-          }}
           favorites={favorites}
           tg={tg}
         />

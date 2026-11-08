@@ -302,6 +302,15 @@ export default function SearchPage() {
     setSelectedSeller(null);
   }, []);
 
+  /** Закрити картку оголошення; якщо під нею відкритий профіль продавця — лишити профіль. */
+  const closeListingOverlay = useCallback(() => {
+    if (selectedSeller) {
+      setSelectedListing(null);
+      return;
+    }
+    closeOverlay();
+  }, [selectedSeller, closeOverlay]);
+
   // Після закриття картки — повернутись у стрічку результатів на те саме місце
   useEffect(() => {
     const wasOpen =
@@ -334,6 +343,47 @@ export default function SearchPage() {
 
   const searchPlaceholder = t('bazaar.whatInterestsYou');
 
+  if (selectedListing) {
+    return (
+      <div className="min-h-screen overflow-x-hidden">
+        <ListingDetail
+          key={selectedListing.id}
+          listing={selectedListing}
+          isFavorite={favorites.has(selectedListing.id)}
+          onClose={closeListingOverlay}
+          onBack={closeListingOverlay}
+          onToggleFavorite={toggleFavorite}
+          onSelectListing={handleSelectListing}
+          onViewSellerProfile={(telegramId, name, avatar, username, phone) => {
+            previousListingRef.current = selectedListing;
+            setSelectedSeller({
+              telegramId,
+              name,
+              avatar,
+              username: username || undefined,
+              phone: phone || undefined,
+            });
+            setSelectedListing(null);
+          }}
+          favorites={favorites}
+          tg={tg}
+          onAutoRenewPersist={(id, autoRenew) =>
+            setSelectedListing((prev) => (prev && prev.id === id ? { ...prev, autoRenew } : prev))
+          }
+          onNavigateToCategory={(categoryId, subcategoryId) => {
+            navigateToListingCategory(router, lang, categories, categoryId, subcategoryId);
+          }}
+        />
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          isVisible={toast.isVisible}
+          onClose={hideToast}
+        />
+      </div>
+    );
+  }
+
   if (selectedSeller) {
     return (
       <div className="min-h-screen overflow-x-hidden">
@@ -357,47 +407,6 @@ export default function SearchPage() {
           onToggleFavorite={toggleFavorite}
           favorites={favorites}
           tg={tg}
-        />
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          isVisible={toast.isVisible}
-          onClose={hideToast}
-        />
-      </div>
-    );
-  }
-
-  if (selectedListing) {
-    return (
-      <div className="min-h-screen overflow-x-hidden">
-        <ListingDetail
-          key={selectedListing.id}
-          listing={selectedListing}
-          isFavorite={favorites.has(selectedListing.id)}
-          onClose={closeOverlay}
-          onBack={closeOverlay}
-          onToggleFavorite={toggleFavorite}
-          onSelectListing={handleSelectListing}
-          onViewSellerProfile={(telegramId, name, avatar, username, phone) => {
-            previousListingRef.current = selectedListing;
-            setSelectedSeller({
-              telegramId,
-              name,
-              avatar,
-              username: username || undefined,
-              phone: phone || undefined,
-            });
-            setSelectedListing(null);
-          }}
-          favorites={favorites}
-          tg={tg}
-          onAutoRenewPersist={(id, autoRenew) =>
-            setSelectedListing((prev) => (prev && prev.id === id ? { ...prev, autoRenew } : prev))
-          }
-          onNavigateToCategory={(categoryId, subcategoryId) => {
-            navigateToListingCategory(router, lang, categories, categoryId, subcategoryId);
-          }}
         />
         <Toast
           message={toast.message}

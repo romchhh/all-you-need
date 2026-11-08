@@ -143,7 +143,7 @@ const BazaarPage = () => {
         </div>
 
         {selectedListing && (
-          <div className={`fixed inset-0 z-40 overflow-y-auto overscroll-contain ${ac.overlayShell}`}>
+          <div className={`fixed inset-0 z-[45] overflow-y-auto overscroll-contain ${ac.overlayShell}`}>
             <ListingDetail
               key={selectedListing.id}
               listing={selectedListing}
@@ -161,7 +161,7 @@ const BazaarPage = () => {
           </div>
         )}
 
-        {selectedSeller && (
+        {selectedSeller && !selectedListing && (
           <div className={`fixed inset-0 z-40 overflow-y-auto overscroll-contain ${ac.overlayShell}`}>
             <UserProfilePage
               sellerTelegramId={selectedSeller.telegramId}

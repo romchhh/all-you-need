@@ -46,7 +46,16 @@ export function BusinessSellerBlock({ business, onViewProfile, tg }: BusinessSel
   return (
     <div className={`mb-6 overflow-hidden rounded-2xl border ${shellClass}`}>
       <div className="p-4">
-        <h2 className={`mb-4 text-base font-semibold ${ac.pageHeading}`}>{t('listing.seller')}</h2>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <h2 className={`text-base font-semibold ${ac.pageHeading}`}>{t('listing.seller')}</h2>
+          <span
+            className={`rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${
+              isLight ? 'bg-[#C8E6A0] text-[#1a2414]' : 'bg-[#C8E6A0] text-[#0f1408]'
+            }`}
+          >
+            BUSINESS
+          </span>
+        </div>
 
         <button
           type="button"
@@ -77,13 +86,6 @@ export function BusinessSellerBlock({ business, onViewProfile, tg }: BusinessSel
           </div>
 
           <div className="min-w-0 flex-1 pt-0.5">
-            <span
-              className={`mb-1.5 inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide ${
-                isLight ? 'bg-[#C8E6A0] text-[#1a2414]' : 'bg-[#C8E6A0] text-[#0f1408]'
-              }`}
-            >
-              BUSINESS
-            </span>
             <p className={`mb-1.5 truncate text-base font-bold ${ac.pageHeading}`}>{business.businessName}</p>
             {showRating && (
               <div className={`mb-1.5 flex items-center gap-1 text-sm ${ac.mutedText}`}>

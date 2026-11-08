@@ -1280,8 +1280,6 @@ export function useBazaarPage() {
   const handleSelectListingFromSeller = useCallback((listing: Listing) => {
     showPageLoader({ minMs: 220 });
     lastViewedListingIdRef.current = listing.id;
-    previousListingRef.current = null;
-    setSelectedSeller(null);
     setSelectedListing(listing);
     void hidePageLoader({ minMs: 220 });
   }, [showPageLoader, hidePageLoader]);

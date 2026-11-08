@@ -767,44 +767,6 @@ const CategoriesPage = () => {
   // Тепер відновлення скролу відбувається тільки при закритті через shouldRestoreScroll
 
   const renderContent = () => {
-    if (selectedSeller) {
-      return (
-        <SellerProfileRouter
-          sellerTelegramId={selectedSeller.telegramId}
-          sellerName={selectedSeller.name}
-          sellerAvatar={selectedSeller.avatar}
-          sellerUsername={selectedSeller.username}
-          sellerPhone={selectedSeller.phone}
-          onClose={() => {
-            // Зберігаємо позицію перед закриттям
-            const currentScroll = window.scrollY || document.documentElement.scrollTop;
-            if (currentScroll > 0) {
-              savedScrollPositionRef.current = currentScroll;
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(scrollPositionKey, currentScroll.toString());
-              }
-            }
-            previousListingRef.current = null; // Очищаємо збережену картку
-            setSelectedSeller(null);
-          }}
-          onBackToPreviousListing={() => {
-            if (previousListingRef.current) {
-              setSelectedListing(previousListingRef.current);
-              previousListingRef.current = null;
-              setSelectedSeller(null);
-              return;
-            }
-            previousListingRef.current = null;
-            setSelectedSeller(null);
-          }}
-          onSelectListing={setSelectedListing}
-          onToggleFavorite={toggleFavorite}
-          favorites={favorites}
-          tg={tg}
-        />
-      );
-    }
-
     if (selectedListing) {
       return (
         <ListingDetail
@@ -849,6 +811,44 @@ const CategoriesPage = () => {
             setSelectedListing(null);
             navigateToListingCategory(router, lang, categories, rawCategory, rawSubcategory);
           }}
+        />
+      );
+    }
+
+    if (selectedSeller) {
+      return (
+        <SellerProfileRouter
+          sellerTelegramId={selectedSeller.telegramId}
+          sellerName={selectedSeller.name}
+          sellerAvatar={selectedSeller.avatar}
+          sellerUsername={selectedSeller.username}
+          sellerPhone={selectedSeller.phone}
+          onClose={() => {
+            // Зберігаємо позицію перед закриттям
+            const currentScroll = window.scrollY || document.documentElement.scrollTop;
+            if (currentScroll > 0) {
+              savedScrollPositionRef.current = currentScroll;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(scrollPositionKey, currentScroll.toString());
+              }
+            }
+            previousListingRef.current = null; // Очищаємо збережену картку
+            setSelectedSeller(null);
+          }}
+          onBackToPreviousListing={() => {
+            if (previousListingRef.current) {
+              setSelectedListing(previousListingRef.current);
+              previousListingRef.current = null;
+              setSelectedSeller(null);
+              return;
+            }
+            previousListingRef.current = null;
+            setSelectedSeller(null);
+          }}
+          onSelectListing={setSelectedListing}
+          onToggleFavorite={toggleFavorite}
+          favorites={favorites}
+          tg={tg}
         />
       );
     }

@@ -339,36 +339,6 @@ const ProfilePage = () => {
   }, [selectedListing, selectedSeller, scrollToLastViewedListing]);
 
   const renderContent = () => {
-    if (selectedSeller) {
-      return (
-        <SellerProfileRouter
-          sellerTelegramId={selectedSeller.telegramId}
-          sellerName={selectedSeller.name}
-          sellerAvatar={selectedSeller.avatar}
-          sellerUsername={selectedSeller.username}
-          sellerPhone={selectedSeller.phone}
-          onClose={() => {
-            previousListingRef.current = null; // Очищаємо збережену картку
-            setSelectedSeller(null);
-          }}
-          onBackToPreviousListing={() => {
-            if (previousListingRef.current) {
-              setSelectedListing(previousListingRef.current);
-              previousListingRef.current = null;
-              setSelectedSeller(null);
-              return;
-            }
-            previousListingRef.current = null;
-            setSelectedSeller(null);
-          }}
-          onSelectListing={setSelectedListing}
-          onToggleFavorite={toggleFavorite}
-          favorites={favorites}
-          tg={tg}
-        />
-      );
-    }
-
     if (selectedListing) {
       return (
         <ListingDetail
@@ -435,6 +405,36 @@ const ProfilePage = () => {
           onNavigateToCategory={(categoryId, subcategoryId) => {
             navigateToListingCategory(router, lang, categories, categoryId, subcategoryId);
           }}
+        />
+      );
+    }
+
+    if (selectedSeller) {
+      return (
+        <SellerProfileRouter
+          sellerTelegramId={selectedSeller.telegramId}
+          sellerName={selectedSeller.name}
+          sellerAvatar={selectedSeller.avatar}
+          sellerUsername={selectedSeller.username}
+          sellerPhone={selectedSeller.phone}
+          onClose={() => {
+            previousListingRef.current = null; // Очищаємо збережену картку
+            setSelectedSeller(null);
+          }}
+          onBackToPreviousListing={() => {
+            if (previousListingRef.current) {
+              setSelectedListing(previousListingRef.current);
+              previousListingRef.current = null;
+              setSelectedSeller(null);
+              return;
+            }
+            previousListingRef.current = null;
+            setSelectedSeller(null);
+          }}
+          onSelectListing={setSelectedListing}
+          onToggleFavorite={toggleFavorite}
+          favorites={favorites}
+          tg={tg}
         />
       );
     }
