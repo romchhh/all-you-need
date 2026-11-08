@@ -1,4 +1,4 @@
-"""Вибір оголошення для стрічки каналів послуг: якість, місто, чергування."""
+"""Вибір оголошення для стрічки каналів послуг: лише послуги, місто, чергування підкатегорій."""
 
 from __future__ import annotations
 
@@ -14,7 +14,26 @@ from parser.moderation.services_publish import (
 )
 from utils.location_normalization import normalize_city_name
 
-BUCKETS: tuple[str, ...] = ("services", "work", "realestate", "events")
+# У каналах лише підкатегорії послуг (не вакансії / «шукаю роботу»).
+SERVICE_SUBCATEGORIES = frozenset(
+    {
+        "services",
+        "repair_installation",
+        "cleaning",
+        "transportation",
+        "beauty_health",
+        "beauty_services",
+        "it_design_websites",
+        "it_services",
+        "photo_video",
+        "education_tutors",
+        "translations",
+        "auto_services",
+        "consultations",
+        "online_services",
+        "other_services",
+    }
+)
 
 JOB_SUBCATEGORIES = frozenset(
     {"vacancies", "part_time", "looking_for_work", "other_work"}
@@ -32,8 +51,6 @@ _ONLINE_SUBCATEGORIES = frozenset(
     }
 )
 
-_FEED_CATEGORIES = frozenset({"services_work", "realestate", "hobby_sports"})
-
 _EVENT_RE = re.compile(
     r"(?:"
     r"\bмероприятие\b|\bмероприятия\b|\bподія\b|\bподії\b|\bзахід\b|\bзаходи\b|"
@@ -42,6 +59,15 @@ _EVENT_RE = re.compile(
     r"\bмайстер-клас\b|\bмастер-класс\b|\bворкшоп\b|\bworkshop\b|"
     r"\bквитки\b|\bбилеты\b|"
     r"\bmeetup\b|\bівент\b|\bивент\b"
+    r")",
+    re.IGNORECASE,
+)
+
+_REALESTATE_OFFER_RE = re.compile(
+    r"(?:"
+    r"\bздам\b|\bсдам\b|\bзніму\b|\bсниму\b|\bоренд[ау]\b|\bаренд[ау]\b|"
+    r"\bпродам\s+квартир|\bпродам\s+будинок|"
+    r"\bvermiete\b|\bzu\s+vermieten\b|\bmietwohnung\b|\bwg-zimmer\b"
     r")",
     re.IGNORECASE,
 )
@@ -72,7 +98,7 @@ _LETTER_RE = re.compile(r"[A-Za-zА-Яа-яІіЇїЄєҐґ]")
 
 class FeedCandidate(NamedTuple):
     id: int
-    bucket: str
+    bucket: str  # ключ підкатегорії для чергування
     city_key: str
     title_key: str
 
@@ -91,7 +117,8 @@ def normalize_title_key(title: str) -> str:
 
 
 def is_feed_quality(title: str, description: str, *, bucket: str | None = None) -> bool:
-    """Достатньо тексту, не «куплю» і не заробіток-бот. Вакансії й пошук роботи лишаємо."""
+    """Достатньо тексту, не «куплю», не заробіток-бот, не пошук житла/роботи."""
+    del bucket  # лишилось для сумісності з тестами
     plain_title = plain_text(title)
     plain_desc = plain_text(description)
     if len(plain_title) < 6 or len(plain_desc) < 40:
@@ -101,11 +128,67 @@ def is_feed_quality(title: str, description: str, *, bucket: str | None = None) 
         return False
     if _EARN_BOT_RE.search(blob):
         return False
-    if bucket != "work" and is_wanted_only_post(blob):
+    if is_wanted_only_post(blob):
         return False
     if has_too_many_emojis(plain_desc):
         return False
     return True
+
+
+def is_marketplace_channel_service(
+    category: str,
+    subcategory: str | None,
+    title: str,
+    description: str,
+) -> bool:
+    """Чи це саме послуга для публічного каналу (не товар, не вакансія, не оренда)."""
+    cat = (category or "").strip().lower()
+    if cat != "services_work":
+        return False
+    sub = (subcategory or "").strip().lower()
+    if sub in JOB_SUBCATEGORIES:
+        return False
+    blob = f"{title or ''}\n{description or ''}"
+    if _EVENT_RE.search(blob):
+        return False
+    if _REALESTATE_OFFER_RE.search(blob):
+        return False
+    from parser.marketplace_categories import should_treat_as_service
+
+    if not should_treat_as_service(blob, category=cat):
+        return False
+    if sub and sub not in SERVICE_SUBCATEGORIES and sub not in JOB_SUBCATEGORIES:
+        return False
+    return True
+
+
+def channel_feed_topic(
+    category: str,
+    subcategory: str | None,
+    title: str,
+    description: str,
+) -> str | None:
+    """
+    Ключ підкатегорії для чергування в каналі або None, якщо в канал не йде.
+    """
+    if not is_marketplace_channel_service(category, subcategory, title, description):
+        return None
+    if not is_feed_quality(title, description):
+        return None
+    sub = (subcategory or "").strip().lower()
+    if not sub or sub not in SERVICE_SUBCATEGORIES:
+        return "other_services"
+    return sub
+
+
+def classify_bucket(
+    category: str,
+    subcategory: str | None,
+    title: str,
+    description: str,
+) -> str | None:
+    """Сумісність: bucket = підкатегорія послуги."""
+    return channel_feed_topic(category, subcategory, title, description)
 
 
 def is_online_service(
@@ -127,7 +210,6 @@ def is_online_service(
         return False
     if is_germany_wide_location(location or "") or not (location or "").strip():
         return True
-    # «Онлайн» / порожнє місто вже відсіяли конкретні міста вище.
     folded = (location or "").strip().lower()
     return folded in {"online", "онлайн", "remote", "віддалено", "удаленно"}
 
@@ -156,28 +238,6 @@ def city_key_for(location: str, *, online: bool) -> str:
     return name.strip().lower() or "unknown"
 
 
-def classify_bucket(
-    category: str,
-    subcategory: str | None,
-    title: str,
-    description: str,
-) -> str | None:
-    cat = (category or "").strip().lower()
-    if cat not in _FEED_CATEGORIES:
-        return None
-    blob = f"{title or ''}\n{description or ''}"
-    if _EVENT_RE.search(blob):
-        return "events"
-    if cat == "realestate":
-        return "realestate"
-    sub = (subcategory or "").strip().lower()
-    if cat == "services_work" and sub in JOB_SUBCATEGORIES:
-        return "work"
-    if cat == "services_work":
-        return "services"
-    return None
-
-
 def pick_next(
     candidates: list[FeedCandidate],
     *,
@@ -187,9 +247,8 @@ def pick_next(
     blocked_titles: set[str],
 ) -> FeedCandidate | None:
     """
-    Наступне оголошення іншої категорії, ніж попереднє.
-    У тій категорії — інше місто, якщо є з чого вибирати.
-    Той самий кошик лише коли інших оголошень немає.
+    Наступне оголошення іншої підкатегорії послуг, ніж попереднє.
+    У цій підкатегорії — інше місто, якщо є з чого вибирати.
     """
     fresh = [
         item
@@ -201,10 +260,11 @@ def pick_next(
     if not fresh:
         return None
 
-    start = BUCKETS.index(last_bucket) if last_bucket in BUCKETS else -1
-    for step in range(1, len(BUCKETS) + 1):
-        bucket = BUCKETS[(start + step) % len(BUCKETS)]
-        pool = [item for item in fresh if item.bucket == bucket]
+    topics = sorted({item.bucket for item in fresh})
+    start = topics.index(last_bucket) if last_bucket in topics else -1
+    for step in range(1, len(topics) + 1):
+        topic = topics[(start + step) % len(topics)]
+        pool = [item for item in fresh if item.bucket == topic]
         if not pool:
             continue
         if last_city:

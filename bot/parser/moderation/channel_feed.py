@@ -1,9 +1,11 @@
 """
 Стрічка каналів TradeGround: раз на 10 хвилин одне якісне оголошення на канал.
 
+Джерело — активні Listing на маркетплейсі (не окремий парсер-черга).
+Лише категорія services_work і підкатегорії послуг (без вакансій/роботи/нерухомості/заходів/товарів).
+
 Hamburg — лише Гамбург і онлайн-послуги.
-Germany — усі міста, міста теж чергуються.
-Категорії послуг, роботи, нерухомості й заходів не йдуть підряд.
+Germany — усі міста; міста й підкатегорії послуг чергуються.
 Той самий listing у той самий канал не раніше ніж через 21 день.
 """
 
@@ -42,12 +44,7 @@ logger = logging.getLogger(__name__)
 
 FEED_INTERVAL_MIN = 10
 
-COVER_BY_BUCKET = {
-    "services": "/images/channel_covers/services.png",
-    "work": "/images/channel_covers/work.png",
-    "realestate": "/images/channel_covers/realestate.png",
-    "events": "/images/channel_covers/events.png",
-}
+STATIC_SERVICES_COVER = "/images/channel_covers/services.png"
 
 
 def _marketplace_cover_path(row, listing_id: int) -> str:
@@ -64,7 +61,7 @@ def _marketplace_cover_path(row, listing_id: int) -> str:
     )
     if path:
         return path
-    return COVER_BY_BUCKET["services"]
+    return STATIC_SERVICES_COVER
 
 _CHANNELS = (
     ("hamburg", TRADE_SERVICES_CHANNEL_HAMBURG_ID),

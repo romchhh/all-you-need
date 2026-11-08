@@ -31,19 +31,17 @@ class QualityTests(unittest.TestCase):
             )
         )
 
-    def test_accepts_service_and_job(self):
+    def test_accepts_service_rejects_job_seeking(self):
         self.assertTrue(
             is_feed_quality(
                 "Прибирання квартир",
                 LONG,
-                bucket="services",
             )
         )
-        self.assertTrue(
+        self.assertFalse(
             is_feed_quality(
                 "Шукаю роботу бариста",
                 "Досвід два роки в кав'ярні, Гамбург, готова до зміни зранку і на підміну.",
-                bucket="work",
             )
         )
 
@@ -52,7 +50,6 @@ class QualityTests(unittest.TestCase):
             is_feed_quality(
                 "Шукаю квартиру",
                 "Шукаю двокімнатну в Гамбурзі до 900 євро, можна з меблями, на довго.",
-                bucket="realestate",
             )
         )
 
@@ -84,31 +81,32 @@ class RoutingTests(unittest.TestCase):
             )
         )
 
-    def test_buckets(self):
+    def test_service_topics_only(self):
         self.assertEqual(
             classify_bucket("services_work", "cleaning", "Прибирання", LONG),
-            "services",
+            "cleaning",
         )
-        self.assertEqual(
-            classify_bucket("services_work", "vacancies", "Бариста", LONG),
-            "work",
+        self.assertIsNone(
+            classify_bucket("services_work", "vacancies", "Бариста", LONG)
         )
-        self.assertEqual(
-            classify_bucket("realestate", "rent_apartments", "Квартира", LONG),
-            "realestate",
+        self.assertIsNone(
+            classify_bucket("realestate", "rent_apartments", "Квартира", LONG)
         )
-        self.assertEqual(
-            classify_bucket("services_work", "other_services", "Концерт", "Концерт у суботу, квитки на вході, початок о сьомій."),
-            "events",
-        )
-        self.assertEqual(
+        self.assertIsNone(
             classify_bucket(
-                "realestate",
-                "rent_apartments",
-                "Квартира біля концертного залу",
+                "services_work",
+                "other_services",
+                "Концерт",
+                "Концерт у суботу, квитки на вході, початок о сьомій.",
+            )
+        )
+        self.assertIsNone(
+            classify_bucket(
+                "services_work",
+                "other_services",
+                "Здам 2-кімнатну квартиру",
                 "Здам 2 кімнати, тихо, поруч концертний зал і парк, меблі є.",
-            ),
-            "realestate",
+            )
         )
         self.assertIsNone(classify_bucket("electronics", "smartphones", "iPhone", LONG))
 
@@ -127,41 +125,42 @@ class RotationTests(unittest.TestCase):
     def _item(self, listing_id, bucket, city, title):
         return FeedCandidate(listing_id, bucket, city, title.lower())
 
-    def test_alternates_buckets_and_cities(self):
+    def test_alternates_subcategories_and_cities(self):
         items = [
-            self._item(1, "services", "hamburg", "прибирання"),
-            self._item(2, "services", "berlin", "ремонт"),
-            self._item(3, "work", "hamburg", "бариста"),
-            self._item(4, "realestate", "münchen", "квартира"),
+            self._item(1, "cleaning", "hamburg", "прибирання"),
+            self._item(2, "repair_installation", "berlin", "ремонт"),
+            self._item(3, "beauty_health", "hamburg", "манікюр"),
         ]
         first = pick_next(
             items,
-            last_bucket="services",
+            last_bucket="cleaning",
             last_city="hamburg",
             blocked_ids=set(),
             blocked_titles=set(),
         )
         self.assertIsNotNone(first)
-        self.assertEqual(first.bucket, "work")
+        self.assertEqual(first.bucket, "repair_installation")
+        self.assertEqual(first.city_key, "berlin")
 
         second = pick_next(
             items,
-            last_bucket="work",
-            last_city="hamburg",
+            last_bucket="repair_installation",
+            last_city="berlin",
             blocked_ids={first.id},
             blocked_titles=set(),
         )
-        self.assertEqual(second.bucket, "realestate")
+        self.assertEqual(second.bucket, "beauty_health")
+        self.assertEqual(second.city_key, "hamburg")
 
-        germany_services = pick_next(
+        another_city = pick_next(
             items,
-            last_bucket="events",
+            last_bucket="beauty_health",
             last_city="hamburg",
             blocked_ids=set(),
             blocked_titles=set(),
         )
-        self.assertEqual(germany_services.id, 2)
-        self.assertEqual(germany_services.city_key, "berlin")
+        self.assertEqual(another_city.id, 1)
+        self.assertEqual(another_city.city_key, "hamburg")
 
     def test_skips_duplicate_title(self):
         items = [self._item(5, "services", "hamburg", "прибирання квартир")]
@@ -366,7 +365,7 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("listing_7", buttons[0].url)
         self.assertIn("оголошення", buttons[1].text.lower())
         self.assertEqual(saved["listing_id"], 7)
-        self.assertEqual(saved["bucket"], "services")
+        self.assertEqual(saved["bucket"], "cleaning")
         self.assertEqual(skipped, [])
         self.assertIn("Прибирання квартир", bot.calls[0]["caption"])
 
@@ -413,7 +412,7 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch("parser.moderation.channel_feed.fetch_feed_rows", fetch),
             patch("parser.moderation.channel_feed.recent_title_keys", return_value=set()),
-            patch("parser.moderation.channel_feed.load_rotation", return_value=("services", "berlin")),
+            patch("parser.moderation.channel_feed.load_rotation", return_value=("cleaning", "berlin")),
             patch("parser.moderation.channel_feed.remember_many", lambda _k, items: skipped.extend(items)),
             patch("parser.moderation.channel_feed.save_rotation", lambda _k, **kw: saved.update(kw)),
             patch("parser.moderation.channel_feed_store.remember_channel_publish", lambda **_kw: None),

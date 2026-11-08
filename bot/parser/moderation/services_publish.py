@@ -677,6 +677,31 @@ async def publish_services_listing_to_channel(
         return ServicesChannelPublishResult([], None)
 
     channel_ids = list(force_channel_ids) if force_channel_ids else resolve_services_trade_channel_ids(item)
+    trade_chats = frozenset(
+        {TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID}
+    )
+    if channel_ids and all(int(cid) in trade_chats for cid in channel_ids):
+        from parser.moderation.channel_feed_select import channel_feed_topic
+
+        title_probe = (item.get("title") or "").strip()
+        desc_probe = (
+            (item.get("description") or "").strip()
+            or (marketplace_description or "").strip()
+        )
+        sub_probe = item.get("subcategory")
+        if not channel_feed_topic(
+            str(item.get("category") or ""),
+            sub_probe if isinstance(sub_probe, str) else None,
+            title_probe,
+            desc_probe,
+        ):
+            logger.info(
+                "Listing %s: пропуск публічного каналу послуг — лише послуги (category=%r, sub=%r)",
+                listing_id,
+                item.get("category"),
+                item.get("subcategory"),
+            )
+            return ServicesChannelPublishResult([], None)
     logger.info(
         "Listing %s → канали послуг %s (location=%r, source_city=%r)",
         listing_id,

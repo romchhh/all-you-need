@@ -80,7 +80,12 @@ WHERE src.status = 'active'
   AND (src.moderationStatus = 'approved'
        OR src.moderationStatus IS NULL
        OR src.moderationStatus = '')
-  AND src.category IN ('services_work', 'realestate', 'hobby_sports')
+  AND src.category = 'services_work'
+  AND (
+        src.subcategory IS NULL
+        OR src.subcategory = ''
+        OR src.subcategory NOT IN ('vacancies', 'part_time', 'looking_for_work', 'other_work')
+  )
   AND NOT EXISTS (
         SELECT 1 FROM channel_feed_post AS feed
         WHERE feed.listing_id = src.id
