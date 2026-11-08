@@ -876,8 +876,7 @@ class ModerationManager:
             if seller_last_name:
                 seller_name_parts.append(seller_last_name)
             # Використовуємо переклад для "Продавець" якщо немає імені
-            seller_default_name = t(user_id_for_lang, 'listing.details.seller_channel').replace('<b>', '').replace('</b>', '').replace(':', '').strip()
-            seller_full_name = ' '.join(seller_name_parts).strip() if seller_name_parts else seller_default_name
+            seller_full_name = ' '.join(seller_name_parts).strip() if seller_name_parts else t(user_id_for_lang, 'common.user')
             
             # Deep-link лише на Listing маркетплейсу (не на TelegramListing.id!)
             marketplace_listing_id = await ensure_marketplace_listing_from_telegram(

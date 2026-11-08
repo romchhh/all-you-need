@@ -41,6 +41,66 @@ load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 
+_MSG_LINK_IN_TEXT_RE = re.compile(r"https?://t\.me/[^\s<>\"')\]]+", re.IGNORECASE)
+
+
+def marketplace_listing_to_channel_item(row: dict, *, is_free: bool = False) -> dict:
+    """Поля продавця для підпису каналу з Listing (+ User) або парсера в описі."""
+    description = str(row.get("description") or "")
+    title = str(row.get("title") or "")
+    msg_link = (row.get("msg_link") or "").strip()
+    if not msg_link:
+        match = _MSG_LINK_IN_TEXT_RE.search(description)
+        if match:
+            msg_link = match.group(0)
+
+    author_username = str(
+        row.get("author_username") or row.get("seller_username") or row.get("username") or ""
+    ).strip().lstrip("@")
+    telegram_raw = row.get("author_id")
+    if telegram_raw is None:
+        telegram_raw = row.get("seller_telegram_id") or row.get("telegramId")
+    try:
+        author_id = int(telegram_raw) if telegram_raw is not None else 0
+    except (TypeError, ValueError):
+        author_id = 0
+
+    item = {
+        "title": title,
+        "description": description,
+        "price": row.get("price") or "",
+        "currency": row.get("currency") or "EUR",
+        "is_free": is_free,
+        "category": row.get("category") or "services_work",
+        "subcategory": row.get("subcategory"),
+        "condition": row.get("condition") or "",
+        "location": row.get("location") or "",
+        "author_username": author_username,
+        "author_id": author_id,
+        "seller_first_name": row.get("seller_first_name") or row.get("firstName"),
+        "seller_last_name": row.get("seller_last_name") or row.get("lastName"),
+        "raw_text": row.get("raw_text") or description,
+        "msg_link": msg_link or None,
+        "source_channel": row.get("source_channel") or "",
+        "message_id": row.get("message_id"),
+    }
+    if not item["author_username"]:
+        item["author_username"] = resolved_author_username(item)
+    if not item.get("msg_link"):
+        item["msg_link"] = parsed_item_message_link(item)
+    return item
+
+
+def _seller_display_name(item: dict, user_id_for_lang: int) -> str:
+    parts = [
+        str(item.get("seller_first_name") or item.get("firstName") or "").strip(),
+        str(item.get("seller_last_name") or item.get("lastName") or "").strip(),
+    ]
+    name = " ".join(p for p in parts if p).strip()
+    if name:
+        return name
+    return t(user_id_for_lang, "common.user")
+
 
 class ServicesChannelPublishResult(NamedTuple):
     chat_ids: list[int]
@@ -676,6 +736,17 @@ async def publish_services_listing_to_channel(
         )
         return ServicesChannelPublishResult([], None)
 
+    item = dict(item)
+    if not resolved_author_username(item) and not parsed_item_message_link(item):
+        probe = marketplace_listing_to_channel_item(
+            {**item, "description": (marketplace_description or item.get("description") or "")},
+            is_free=bool(item.get("is_free")),
+        )
+        for key in ("author_username", "author_id", "msg_link", "seller_first_name", "seller_last_name"):
+            val = probe.get(key)
+            if val and not item.get(key):
+                item[key] = val
+
     channel_ids = list(force_channel_ids) if force_channel_ids else resolve_services_trade_channel_ids(item)
     trade_chats = frozenset(
         {TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID}
@@ -761,14 +832,6 @@ async def publish_services_listing_to_channel(
     author_id = item.get("author_id")
     msg_link = parsed_item_message_link(item)
 
-    seller_default_name = (
-        t(user_id_for_lang, "listing.details.seller_channel")
-        .replace("<b>", "")
-        .replace("</b>", "")
-        .replace(":", "")
-        .strip()
-    )
-
     bot_username = (os.getenv("BOT_USERNAME") or BOT_USERNAME or "TradeGroundBot").lstrip("@")
     bot_link = f"https://t.me/{bot_username}"
     listing_open_url = (
@@ -794,11 +857,12 @@ async def publish_services_listing_to_channel(
         except (TypeError, ValueError):
             aid = 0
         if aid:
-            seller_full_name = t(user_id_for_lang, "common.user")
+            seller_full_name = _seller_display_name(item, user_id_for_lang)
             seller_link = f"tg://user?id={aid}"
             seller_text = f"{seller_label} <a href=\"{seller_link}\">{html.escape(seller_full_name)}</a>"
         else:
-            seller_text = f"{seller_label} {html.escape(seller_default_name)}"
+            seller_full_name = _seller_display_name(item, user_id_for_lang)
+            seller_text = f"{seller_label} {html.escape(seller_full_name)}"
 
     safe_bot_link = html.escape(bot_link, quote=True)
     bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=safe_bot_link)}"

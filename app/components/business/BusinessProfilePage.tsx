@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
-import { BusinessListingSquare } from '@/components/business/BusinessListingSquare';
+import { ListingCard } from '@/components/listing/ListingCard';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
@@ -620,11 +620,11 @@ export function BusinessProfilePage({
     return (
       <div className={`min-h-screen ${ac.pageBackground}`}>
         <FixedLogoHeader mode="window-fixed" zClassName="z-[50]" paddingX={false} outerClassName="px-4 lg:px-6" />
-        <div className="grid grid-cols-3 gap-1 px-4 pt-4">
-          {Array.from({ length: 6 }).map((_, index) => (
+        <div className="grid grid-cols-2 gap-3 px-4 pt-4">
+          {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className={`aspect-square animate-pulse rounded-xl ${isLight ? 'bg-gray-200/80' : 'bg-white/10'}`}
+              className={`aspect-[3/4] animate-pulse rounded-xl ${isLight ? 'bg-gray-200/80' : 'bg-white/10'}`}
             />
           ))}
         </div>
@@ -715,35 +715,39 @@ export function BusinessProfilePage({
       />
 
       <div className="relative">
+        {/* Фон обкладинки + плавне затемнення до середини лого (підписники / рейтинг читаються) */}
         <div
-          className={`relative h-40 overflow-hidden sm:h-44 ${
-            coverUrl ? '' : isLight ? 'bg-gradient-to-br from-[#3F5331]/30 to-[#2a3820]/20' : 'bg-gradient-to-br from-[#3F5331]/50 to-[#1a2414]'
+          className={`pointer-events-none absolute inset-x-0 top-0 h-[13rem] overflow-hidden sm:h-[14.5rem] ${
+            coverUrl ? '' : isLight ? 'bg-gradient-to-br from-[#3F5331]/35 to-[#2a3820]/25' : 'bg-gradient-to-br from-[#3F5331]/55 to-[#1a2414]'
           }`}
+          aria-hidden
         >
           {coverUrl ? (
             <img src={coverUrl} alt="" className="h-full w-full object-cover object-center" />
           ) : null}
           <div
-            className={`pointer-events-none absolute inset-0 ${
+            className={`absolute inset-0 ${
               isLight
-                ? 'bg-gradient-to-b from-black/40 via-black/10 to-transparent'
-                : 'bg-gradient-to-b from-black/50 via-black/25 to-transparent'
+                ? 'bg-gradient-to-b from-black/35 via-black/25 to-black/15'
+                : 'bg-gradient-to-b from-black/55 via-black/45 to-black/30'
             }`}
           />
           <div
-            className={`pointer-events-none absolute inset-x-0 bottom-0 h-16 ${
+            className={`absolute inset-x-0 bottom-0 h-28 sm:h-32 ${
               isLight
-                ? 'bg-gradient-to-b from-transparent to-[#f5f7f2]'
-                : 'bg-gradient-to-b from-transparent to-[#000000]'
+                ? 'bg-gradient-to-b from-transparent via-[#f5f7f2]/85 to-[#f5f7f2]'
+                : 'bg-gradient-to-b from-transparent via-black/50 to-[#000000]'
             }`}
           />
+        </div>
 
-          <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-4 py-3">
+        <div className="relative z-10">
+          <div className="flex h-40 items-start gap-2 px-4 py-3 sm:h-44">
             <button type="button" onClick={handleBack} aria-label={t('common.back')} className={navBtnClass}>
               <ArrowLeft size={20} />
             </button>
             <div className="flex min-w-0 flex-1 justify-center px-1">
-              <span className="truncate text-base font-semibold text-white">{profile.businessName}</span>
+              <span className="truncate text-base font-semibold text-white drop-shadow-sm">{profile.businessName}</span>
             </div>
             <button
               type="button"
@@ -755,66 +759,62 @@ export function BusinessProfilePage({
               <MoreHorizontal size={18} />
             </button>
           </div>
-        </div>
 
-        <div className="relative z-10 flex items-end gap-3 px-4 sm:pl-6">
-          <div
-            className={`-mt-12 h-24 w-24 shrink-0 overflow-hidden rounded-full ring-4 ring-offset-2 sm:h-28 sm:w-28 sm:-mt-14 ${
-              isLight
-                ? 'bg-[#111] ring-white ring-offset-[#f5f7f2]'
-                : 'bg-[#141414] ring-[#C8E6A0]/30 ring-offset-[#000000]'
-            }`}
-          >
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[#3F5331]/50 text-2xl font-bold text-[#C8E6A0] sm:text-3xl">
-                {profile.businessName.charAt(0)}
-              </div>
-            )}
-          </div>
-
-          <div
-            className={`mb-1 flex min-h-[5.5rem] min-w-0 flex-1 flex-col justify-center gap-2 px-1 py-1 sm:min-h-[6.25rem] sm:px-2 ${
-              isLight ? 'text-[#1a2414]' : 'text-white'
-            }`}
-          >
-            <div className="flex min-w-0 items-baseline gap-1.5">
-              <Users
-                size={15}
-                className={`mb-px shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
-                aria-hidden
-              />
-              <span className="text-[15px] font-bold leading-none tabular-nums">
-                {profile.followersCount}
-              </span>
-              <span
-                className={`text-xs font-medium leading-none ${
-                  isLight ? 'text-[#3F5331]/75' : 'text-white/70'
-                }`}
-              >
-                {formatFollowersLabel(profile.followersCount, t)}
-              </span>
-            </div>
-            <div className="flex min-w-0 items-start gap-1.5">
-              <Star
-                size={14}
-                className="mt-0.5 shrink-0 fill-amber-400 text-amber-400"
-                aria-hidden
-              />
-              {showRating ? (
-                <span className="text-sm font-semibold leading-snug">
-                  {formatRatingReviews(profile.rating, profile.reviewsCount, t)}
-                </span>
+          <div className="flex items-end gap-3 px-4 pb-2 sm:pl-6">
+            <div
+              className={`-mt-12 h-24 w-24 shrink-0 overflow-hidden rounded-full ring-4 ring-offset-2 sm:h-28 sm:w-28 sm:-mt-14 ${
+                isLight
+                  ? 'bg-[#111] ring-white ring-offset-[#f5f7f2]/90'
+                  : 'bg-[#141414] ring-[#C8E6A0]/30 ring-offset-black/80'
+              }`}
+            >
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-full w-full object-cover" />
               ) : (
+                <div className="flex h-full w-full items-center justify-center bg-[#3F5331]/50 text-2xl font-bold text-[#C8E6A0] sm:text-3xl">
+                  {profile.businessName.charAt(0)}
+                </div>
+              )}
+            </div>
+
+            <div
+              className={`mb-1 flex min-h-[5.5rem] min-w-0 flex-1 flex-col justify-center gap-2 px-1 py-1 sm:min-h-[6.25rem] sm:px-2 ${
+                isLight ? 'text-[#1a2414]' : 'text-white'
+              }`}
+            >
+              <div className={`flex min-w-0 items-baseline gap-1.5 ${isLight ? '' : 'drop-shadow-sm'}`}>
+                <Users
+                  size={15}
+                  className={`mb-px shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
+                  aria-hidden
+                />
+                <span className="text-[15px] font-bold leading-none tabular-nums">
+                  {profile.followersCount}
+                </span>
                 <span
-                  className={`max-w-[12rem] whitespace-pre-line text-[11px] font-medium leading-[1.35] sm:max-w-none sm:text-xs ${
-                    isLight ? 'text-[#3F5331]/70' : 'text-white/65'
+                  className={`text-xs font-medium leading-none ${
+                    isLight ? 'text-[#3F5331]/80' : 'text-white/75'
                   }`}
                 >
-                  {t('businessProfile.public.noReviewsYet')}
+                  {formatFollowersLabel(profile.followersCount, t)}
                 </span>
-              )}
+              </div>
+              <div className={`flex min-w-0 items-start gap-1.5 ${isLight ? '' : 'drop-shadow-sm'}`}>
+                <Star size={14} className="mt-0.5 shrink-0 fill-amber-400 text-amber-400" aria-hidden />
+                {showRating ? (
+                  <span className="text-sm font-semibold leading-snug">
+                    {formatRatingReviews(profile.rating, profile.reviewsCount, t)}
+                  </span>
+                ) : (
+                  <span
+                    className={`max-w-[12rem] whitespace-pre-line text-[11px] font-medium leading-[1.35] sm:max-w-none sm:text-xs ${
+                      isLight ? 'text-[#3F5331]/75' : 'text-white/70'
+                    }`}
+                  >
+                    {t('businessProfile.public.noReviewsYet')}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -997,15 +997,16 @@ export function BusinessProfilePage({
                     </button>
                   ))}
                 </div>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-2 gap-3">
                   {filteredListings.map((listing) => (
-                    <BusinessListingSquare
+                    <ListingCard
                       key={listing.id}
                       listing={listing}
                       isFavorite={favorites.has(listing.id)}
                       onSelect={onSelectListing}
                       onToggleFavorite={onToggleFavorite}
                       tg={tg}
+                      layout="stacked"
                     />
                   ))}
                 </div>

@@ -4,7 +4,7 @@ import { CategoryChip } from '@/components/listing/CategoryChip';
 import { SubcategoryList } from '@/components/listing/SubcategoryList';
 import { ListingCard } from '@/components/listing/ListingCard';
 import { CategoryIcon } from '@/components/listing/CategoryIcon';
-import { STICKY_BELOW_APP_HEADER_CLASS } from '@/components/layout/FixedLogoHeader';
+import { STICKY_BELOW_APP_HEADER_CLASS, stickySubheaderFrostClass } from '@/components/layout/FixedLogoHeader';
 import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { Gift, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -112,11 +112,7 @@ export const CategoriesTab = ({
     <div className="mx-auto w-full max-w-2xl pb-24 lg:max-w-4xl xl:max-w-5xl">
       {/* Заголовок */}
       <div
-        className={`${STICKY_BELOW_APP_HEADER_CLASS} border-b px-4 pb-3 pt-2 lg:px-6 ${
-          isLight
-            ? 'border-gray-200/80 bg-white'
-            : 'border-gray-800/50 bg-black'
-        }`}
+        className={`${STICKY_BELOW_APP_HEADER_CLASS} px-4 pb-3 pt-2 lg:px-6 ${stickySubheaderFrostClass(isLight)}`}
       >
         <h1 className={`text-2xl font-bold ${ac.pageHeading}`}>{t('common.sections')}</h1>
       </div>

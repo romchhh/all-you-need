@@ -254,13 +254,15 @@ export const BottomNavigation = ({
   return createPortal(
     <nav
       data-bottom-nav
-      className={`fixed bottom-0 left-0 right-0 z-[1000] border-t pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] pt-1.5 transition-transform duration-150 ${
+      className={`fixed inset-x-0 bottom-0 z-[1000] w-full max-w-none border-t pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] pt-1.5 transition-transform duration-150 ${
         isLight
-          ? 'border-[#3F5331]/12 bg-[#E8F0E0]/95 shadow-[0_-4px_24px_-6px_rgba(63,83,49,0.12)]'
+          ? 'border-[#3F5331]/12 bg-[#E8F0E0] shadow-[0_-4px_24px_-6px_rgba(63,83,49,0.12)]'
           : 'border-white/10 bg-[#000000] shadow-[0_-8px_40px_-6px_rgba(0,0,0,0.45)]'
       }`}
       style={{
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ['--bottom-nav-safe-fill' as any]: isLight ? '#E8F0E0' : '#000000',
       }}
     >
       <div className="mx-auto flex max-w-2xl items-center justify-around px-2 sm:px-4 lg:max-w-6xl lg:px-8">

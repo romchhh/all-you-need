@@ -196,7 +196,19 @@ class QueueSqlTests(unittest.TestCase):
                 expiresAt TEXT,
                 moderationStatus TEXT,
                 publishedAt TEXT,
-                createdAt TEXT
+                createdAt TEXT,
+                userId INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE User (
+                id INTEGER PRIMARY KEY,
+                username TEXT,
+                firstName TEXT,
+                lastName TEXT,
+                telegramId INTEGER
             )
             """
         )
@@ -222,9 +234,9 @@ class QueueSqlTests(unittest.TestCase):
         conn.execute(
             """
             INSERT INTO Listing VALUES
-            (1, 'Берлін', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Berlin', '[]', '', 'active', NULL, 'approved', '2026-01-01', '2026-01-01'),
-            (2, 'Гамбург', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'sold', NULL, 'approved', '2026-01-02', '2026-01-02'),
-            (3, 'Ще Гамбург', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'active', NULL, 'approved', '2026-01-03', '2026-01-03')
+            (1, 'Берлін', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Berlin', '[]', '', 'active', NULL, 'approved', '2026-01-01', '2026-01-01', NULL),
+            (2, 'Гамбург', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'sold', NULL, 'approved', '2026-01-02', '2026-01-02', NULL),
+            (3, 'Ще Гамбург', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'active', NULL, 'approved', '2026-01-03', '2026-01-03', NULL)
             """
         )
         conn.execute(
@@ -248,6 +260,7 @@ class QueueSqlTests(unittest.TestCase):
             else:
                 os.environ["DATABASE_URL"] = previous
         self.assertIn('"Listing"', sql)
+        self.assertIn('"User"', sql)
         self.assertIn('"expiresAt"', sql)
         self.assertIn('"moderationStatus"', sql)
         self.assertIn("NOW()", sql)

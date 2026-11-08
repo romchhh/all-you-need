@@ -4,12 +4,8 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { TradeGroundLogo } from '@/components/layout/TradeGroundLogo';
 import { useTheme } from '@/contexts/ThemeContext';
 
-/** Класичне згасання шапки (профіль, категорії, оверлеї тощо). */
-const LOGO_FROST_MASK =
-  'linear-gradient(to bottom, #000 0%, #000 28%, rgba(0,0,0,0.55) 68%, transparent 100%)';
-
-/** Головна / пошук: згасання під рядком пошуку. */
-const SEARCH_FROST_MASK =
+/** Однакове згасання frost на всіх екранах (як на головній з пошуком). */
+const HEADER_FROST_MASK =
   'linear-gradient(to bottom, #000 0%, #000 72%, rgba(0,0,0,0.55) 88%, transparent 100%)';
 
 let headerSlot: HTMLElement | null = null;
@@ -49,29 +45,23 @@ export const FIXED_LOGO_SPACER_CLASS =
 export const STICKY_BELOW_APP_HEADER_CLASS =
   'sticky z-[40] max-lg:top-[calc(max(env(safe-area-inset-top,0px),10px)+2.25rem+2.25rem+0.625rem)] lg:top-[calc(max(env(safe-area-inset-top,0px),2px)+0.5rem+2.25rem+0.625rem)]';
 
-function headerFrostStyle(isLight: boolean, withSearch: boolean): React.CSSProperties {
-  if (!withSearch) {
-    return {
-      backgroundImage: isLight
-        ? 'linear-gradient(to bottom, rgba(250,251,248,0.92) 0%, rgba(245,247,242,0.4) 50%, rgba(250,251,248,0) 100%)'
-        : 'linear-gradient(to bottom, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.32) 54%, rgba(0,0,0,0) 100%), radial-gradient(ellipse 80% 90% at 18% 0%, rgba(200,230,160,0.2) 0%, transparent 52%)',
-      backdropFilter: 'saturate(160%) blur(16px)',
-      WebkitBackdropFilter: 'saturate(160%) blur(16px)',
-      maskImage: LOGO_FROST_MASK,
-      WebkitMaskImage: LOGO_FROST_MASK,
-    };
-  }
-
+function headerFrostStyle(isLight: boolean): React.CSSProperties {
   return {
     backgroundImage: isLight
       ? 'linear-gradient(to bottom, rgba(250,251,248,0.78) 0%, rgba(250,251,248,0.42) 62%, rgba(250,251,248,0.12) 82%, rgba(250,251,248,0) 100%)'
       : 'linear-gradient(to bottom, rgba(0,0,0,0.52) 0%, rgba(0,0,0,0.28) 62%, rgba(0,0,0,0.1) 82%, rgba(0,0,0,0) 100%), radial-gradient(ellipse 70% 55% at 18% 0%, rgba(200,230,160,0.14) 0%, transparent 42%)',
     backdropFilter: 'saturate(160%) blur(16px)',
     WebkitBackdropFilter: 'saturate(160%) blur(16px)',
-    maskImage: SEARCH_FROST_MASK,
-    WebkitMaskImage: SEARCH_FROST_MASK,
+    maskImage: HEADER_FROST_MASK,
+    WebkitMaskImage: HEADER_FROST_MASK,
   };
 }
+
+/** Sticky-панель одразу під AppHeader (категорії тощо) — той самий blur, не суцільний bg. */
+export const stickySubheaderFrostClass = (isLight: boolean) =>
+  isLight
+    ? 'border-b border-[#3F5331]/12 bg-[#fafbf8]/72 backdrop-blur-xl backdrop-saturate-150'
+    : 'border-b border-white/10 bg-black/40 backdrop-blur-xl backdrop-saturate-150';
 
 /** Фіксована кнопка «Назад» під лого в оверлеях (ListingDetail, профіль продавця). */
 export const OVERLAY_BACK_BUTTON_TOP_CLASS =
@@ -184,8 +174,8 @@ export function FixedLogoHeader({
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0"
-        style={headerFrostStyle(isLight, withSearchFrost)}
+        className="pointer-events-none absolute inset-0 z-0 app-header-bg-pattern"
+        style={headerFrostStyle(isLight)}
       />
       <div className="relative z-[1]">
         <div className={safeTopShellClass}>
@@ -200,7 +190,7 @@ export function FixedLogoHeader({
 
   if (mode === 'sticky') {
     return (
-      <div key={`tg-app-header-${theme}`} className={`sticky top-0 ${shellClass}`}>
+      <div key={`tg-app-header-${theme}`} className={`sticky top-0 isolate ${shellClass}`}>
         {body}
       </div>
     );
@@ -211,7 +201,7 @@ export function FixedLogoHeader({
       <header
         ref={headerRef}
         key={`tg-app-header-${theme}`}
-        className={`fixed left-0 right-0 top-0 ${shellClass}`}
+        className={`fixed left-0 right-0 top-0 isolate ${shellClass}`}
       >
         {body}
       </header>

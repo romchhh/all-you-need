@@ -36,6 +36,7 @@ from parser.moderation.channel_feed_store import (
 from parser.moderation.services_publish import (
     TRADE_SERVICES_CHANNEL_GERMANY_ID,
     TRADE_SERVICES_CHANNEL_HAMBURG_ID,
+    marketplace_listing_to_channel_item,
     publish_services_listing_to_channel,
     services_channel_quiet_hours_active,
 )
@@ -202,18 +203,10 @@ async def _publish_one(bot, channel_key: str, chat_id: int) -> None:
     cover = _marketplace_cover_path(row, picked.id)
     photo = images[:1] or [cover]
 
-    item = {
-        "title": title,
-        "description": description,
-        "price": _row_get(row, "price") or "",
-        "currency": _row_get(row, "currency") or "EUR",
-        "is_free": _as_bool(_row_get(row, "isFree", "isfree")),
-        "category": _row_get(row, "category") or "services_work",
-        "subcategory": _row_get(row, "subcategory"),
-        "condition": _row_get(row, "condition") or "",
-        "location": _row_get(row, "location") or "",
-        "author_id": 0,
-    }
+    item = marketplace_listing_to_channel_item(
+        row,
+        is_free=_as_bool(_row_get(row, "isFree", "isfree")),
+    )
 
     result = await publish_services_listing_to_channel(
         bot,

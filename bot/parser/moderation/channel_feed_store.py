@@ -73,8 +73,14 @@ def _windows() -> tuple[int, int, int]:
 
 FEED_CANDIDATE_SQL = """
 SELECT src.id, src.title, src.description, src.price, src.currency, src.isFree,
-       src.category, src.subcategory, src.location, src.images, src.condition
+       src.category, src.subcategory, src.location, src.images, src.condition,
+       src.userId,
+       u.username AS seller_username,
+       u.firstName AS seller_first_name,
+       u.lastName AS seller_last_name,
+       u.telegramId AS seller_telegram_id
 FROM Listing AS src
+LEFT JOIN User AS u ON u.id = src.userId
 WHERE src.status = 'active'
   AND (src.expiresAt IS NULL OR src.expiresAt > datetime('now'))
   AND (src.moderationStatus = 'approved'
