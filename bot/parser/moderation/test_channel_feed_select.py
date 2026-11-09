@@ -282,13 +282,17 @@ class QueueSqlTests(unittest.TestCase):
     def test_sqlite_queue_skips_posted_and_keeps_live(self):
         conn = self._db()
         now = 1_700_000_000
+        fresh = conn.execute("SELECT datetime('now', '-1 hours')").fetchone()[0]
+        stale = conn.execute("SELECT datetime('now', '-5 days')").fetchone()[0]
         conn.execute(
             """
             INSERT INTO Listing VALUES
-            (1, 'Берлін', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Berlin', '[]', '', 'active', NULL, 'approved', '2026-01-01', '2026-01-01', NULL),
-            (2, 'Гамбург', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'sold', NULL, 'approved', '2026-01-02', '2026-01-02', NULL),
-            (3, 'Ще Гамбург', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'active', NULL, 'approved', '2026-01-03', '2026-01-03', NULL)
-            """
+            (1, 'Берлін', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Berlin', '[]', '', 'active', NULL, 'approved', ?, ?, NULL),
+            (2, 'Гамбург', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'sold', NULL, 'approved', ?, ?, NULL),
+            (3, 'Ще Гамбург', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'active', NULL, 'approved', ?, ?, NULL),
+            (4, 'Старе', 'текст', '10', 'EUR', 0, 'services_work', 'cleaning', 'Hamburg', '[]', '', 'active', NULL, 'approved', ?, ?, NULL)
+            """,
+            (fresh, fresh, fresh, fresh, fresh, fresh, stale, stale),
         )
         conn.execute(
             "INSERT INTO channel_feed_post VALUES (1, 1, 'hamburg', 'берлін', 'services', 'berlin', 'ok', ?)",
@@ -316,6 +320,7 @@ class QueueSqlTests(unittest.TestCase):
         self.assertIn('"expiresAt"', sql)
         self.assertIn('"moderationStatus"', sql)
         self.assertIn("NOW()", sql)
+        self.assertIn("INTERVAL '2 days'", sql)
         self.assertNotIn("datetime(", sql.lower())
         self.assertEqual(sql.count("?"), 4)
 

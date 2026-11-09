@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 REPEAT_AFTER_SEC = 21 * 24 * 3600
 # Зламане фото не блокує стрічку надовго.
 FAIL_COOLDOWN_SEC = 6 * 3600
+# У канал лише свіжі оголошення (не старші за N днів).
+MAX_LISTING_AGE_DAYS = 2
 
 _ready = False
 
@@ -103,6 +105,7 @@ WHERE src.status = 'active'
         OR src.subcategory = ''
         OR src.subcategory NOT IN ('vacancies', 'part_time', 'looking_for_work', 'other_work')
   )
+  AND COALESCE(src.publishedAt, src.createdAt) >= datetime('now', '-2 days')
   AND NOT EXISTS (
         SELECT 1 FROM channel_feed_post AS feed
         WHERE feed.listing_id = src.id
