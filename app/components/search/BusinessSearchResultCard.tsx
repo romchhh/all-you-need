@@ -39,10 +39,10 @@ type BusinessSearchResultCardProps = {
   tg?: TelegramWebApp | null;
 };
 
-/** Скільки превʼю в рядку до кнопки «Показати ще». */
+/** Скільки превʼю в рядку перед плашкою «N оголошень у профілі». */
 const VITRINE_PREVIEW_MAX = 3;
 const VITRINE_THUMB =
-  'relative aspect-square w-[5.25rem] shrink-0 overflow-hidden rounded-xl sm:w-[5.5rem]';
+  'relative aspect-[4/5] w-[4.75rem] shrink-0 overflow-hidden rounded-xl sm:w-[5.25rem]';
 
 function formatRatingReviews(
   rating: number,
@@ -58,6 +58,20 @@ function formatRatingReviews(
     key = 'businessProfile.public.ratingReviews_few';
   }
   return t(key, { rating: ratingStr, count: String(count) });
+}
+
+function formatListingsInProfileCount(
+  count: number,
+  t: (key: string, params?: Record<string, string>) => string
+): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  let key = 'businessProfile.public.listingsCount_many';
+  if (mod10 === 1 && mod100 !== 11) key = 'businessProfile.public.listingsCount_one';
+  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+    key = 'businessProfile.public.listingsCount_few';
+  }
+  return t(key, { count: String(count) });
 }
 
 function vitrinePriceLabel(listing: Listing, t: (key: string) => string) {
@@ -156,11 +170,8 @@ export function BusinessSearchResultCard({
   const listings = (business.vitrineListings ?? []).filter((l) => l.status === 'active' || !l.status);
   const listingCount = listings.length;
   const canOpenListings = listingCount > 0 && Boolean(onSelectListing);
-  const showMoreListings = listingCount > VITRINE_PREVIEW_MAX;
-  const previewListings = showMoreListings
-    ? listings.slice(0, VITRINE_PREVIEW_MAX)
-    : listings;
-  const remainingCount = showMoreListings ? listingCount - VITRINE_PREVIEW_MAX : 0;
+  const previewListings = listings.slice(0, VITRINE_PREVIEW_MAX);
+  const plaqueCategory = previewListings[0]?.category || 'all_categories';
 
   const shellClass = isLight
     ? 'border-[#3F5331]/15 bg-white'
@@ -265,54 +276,8 @@ export function BusinessSearchResultCard({
         ) : null}
 
         {canOpenListings ? (
-          listingCount === 1 ? (
-            <div className="flex items-stretch gap-2">
-              <VitrineSquare
-                item={previewListings[0]}
-                onSelect={onSelectListing}
-                tg={tg}
-                t={t}
-                className={VITRINE_THUMB}
-              />
-              <button
-                type="button"
-                onClick={openProfile}
-                className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors ${
-                  isLight
-                    ? 'bg-[#E8F0E0]/70 text-[#2D3E28] hover:bg-[#E8F0E0]'
-                    : 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
-                }`}
-                aria-label={t('businessProfile.public.singleListingInProfile')}
-              >
-                <CategoryIcon
-                  categoryId={previewListings[0].category || 'all_categories'}
-                  size={28}
-                  className="shrink-0 opacity-90"
-                />
-                <span className="min-w-0 flex-1 leading-[1.15]">
-                  <span className="block text-[13px] font-semibold">
-                    {t('businessProfile.public.singleListingCount')}
-                  </span>
-                  <span className={`block text-[12px] ${ac.mutedText}`}>
-                    {t('businessProfile.public.inProfile')}
-                  </span>
-                </span>
-                <ChevronRight
-                  size={18}
-                  className={`shrink-0 ${isLight ? 'text-[#3F5331]/70' : 'text-white/70'}`}
-                  aria-hidden
-                />
-              </button>
-            </div>
-          ) : (
-            <div
-              className={
-                showMoreListings
-                  ? 'scrollbar-hide -mx-0.5 flex items-stretch gap-2 overflow-x-auto px-0.5 pb-0.5'
-                  : `grid gap-2 ${listingCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`
-              }
-              style={showMoreListings ? { WebkitOverflowScrolling: 'touch' } : undefined}
-            >
+          <div className="flex min-w-0 items-stretch gap-0">
+            <div className="scrollbar-hide flex min-w-0 shrink items-stretch gap-2 overflow-x-auto pr-2.5">
               {previewListings.map((listing) => (
                 <VitrineSquare
                   key={listing.id}
@@ -320,43 +285,44 @@ export function BusinessSearchResultCard({
                   onSelect={onSelectListing}
                   tg={tg}
                   t={t}
-                  className={
-                    showMoreListings
-                      ? VITRINE_THUMB
-                      : 'relative aspect-square w-full min-w-0 overflow-hidden rounded-xl'
-                  }
+                  className={VITRINE_THUMB}
                 />
               ))}
-              {showMoreListings ? (
-                <button
-                  type="button"
-                  onClick={openProfile}
-                  className={`${VITRINE_THUMB} flex flex-col items-center justify-center gap-0.5 px-1 ${
-                    isLight
-                      ? 'border border-[#3F5331]/12 bg-[#E8F0E0]/50'
-                      : 'border border-white/10 bg-white/[0.06]'
-                  }`}
-                >
-                  <span
-                    className={`px-0.5 text-center text-[10px] font-bold leading-[1.2] ${
-                      isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'
-                    }`}
-                  >
-                    {t('businessProfile.public.showMoreListings')}
-                  </span>
-                  {remainingCount > 0 ? (
-                    <span
-                      className={`text-[11px] font-bold tabular-nums ${
-                        isLight ? 'text-[#3F5331]/75' : 'text-white/60'
-                      }`}
-                    >
-                      +{remainingCount}
-                    </span>
-                  ) : null}
-                </button>
-              ) : null}
             </div>
-          )
+
+            <div
+              className={`mx-0.5 w-px shrink-0 self-stretch ${
+                isLight ? 'bg-[#3F5331]/20' : 'bg-white/15'
+              }`}
+              aria-hidden
+            />
+
+            <button
+              type="button"
+              onClick={openProfile}
+              className="flex min-w-0 flex-1 items-center gap-2.5 py-1 pl-2.5 pr-0.5 text-left transition-opacity active:opacity-80"
+              aria-label={t('businessProfile.public.singleListingInProfile')}
+            >
+              <CategoryIcon
+                categoryId={plaqueCategory}
+                size={26}
+                className="shrink-0 opacity-90"
+              />
+              <span className="min-w-0 flex-1 leading-[1.15]">
+                <span className={`block text-[13px] font-semibold ${ac.pageHeading}`}>
+                  {formatListingsInProfileCount(listingCount, t)}
+                </span>
+                <span className={`block text-[12px] ${ac.mutedText}`}>
+                  {t('businessProfile.public.inProfile')}
+                </span>
+              </span>
+              <ChevronRight
+                size={18}
+                className={`shrink-0 ${isLight ? 'text-[#3F5331]/65' : 'text-white/65'}`}
+                aria-hidden
+              />
+            </button>
+          </div>
         ) : null}
 
         <button
