@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronRight, Layers, MapPin, Star } from 'lucide-react';
+import { ChevronRight, MapPin, Star } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -38,7 +38,10 @@ type BusinessSearchResultCardProps = {
   tg?: TelegramWebApp | null;
 };
 
-const VITRINE_TILE = 'relative aspect-square w-full min-w-0 overflow-hidden rounded-xl';
+/** Скільки превʼю в рядку до кнопки «Показати ще». */
+const VITRINE_PREVIEW_MAX = 3;
+const VITRINE_THUMB =
+  'relative aspect-square w-[5.25rem] shrink-0 overflow-hidden rounded-xl sm:w-[5.5rem]';
 
 function formatRatingReviews(
   rating: number,
@@ -108,11 +111,13 @@ function VitrineSquare({
   onSelect,
   tg,
   t,
+  className,
 }: {
   item: Listing;
   onSelect?: (listing: Listing) => void;
   tg?: TelegramWebApp | null;
   t: (key: string) => string;
+  className?: string;
 }) {
   return (
     <button
@@ -121,7 +126,7 @@ function VitrineSquare({
         tg?.HapticFeedback?.impactOccurred?.('light');
         onSelect?.(item);
       }}
-      className={VITRINE_TILE}
+      className={className ?? VITRINE_THUMB}
       aria-label={item.title}
     >
       <ListingThumb item={item} className="absolute inset-0 h-full w-full" />
@@ -150,6 +155,11 @@ export function BusinessSearchResultCard({
   const listings = (business.vitrineListings ?? []).filter((l) => l.status === 'active' || !l.status);
   const listingCount = listings.length;
   const canOpenListings = listingCount > 0 && Boolean(onSelectListing);
+  const showMoreListings = listingCount > VITRINE_PREVIEW_MAX;
+  const previewListings = showMoreListings
+    ? listings.slice(0, VITRINE_PREVIEW_MAX)
+    : listings;
+  const remainingCount = showMoreListings ? listingCount - VITRINE_PREVIEW_MAX : 0;
 
   const shellClass = isLight
     ? 'border-[#3F5331]/15 bg-white'
@@ -162,16 +172,9 @@ export function BusinessSearchResultCard({
 
   const subscribeBtnClass = business.isFollowing
     ? isLight
-      ? 'shrink-0 rounded-full border border-[#3F5331]/30 bg-[#E8F0E0]/80 px-2.5 py-0.5 text-[10px] font-semibold text-[#3F5331] disabled:opacity-60'
-      : 'shrink-0 rounded-full border border-[#C8E6A0]/35 bg-[#C8E6A0]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#C8E6A0] disabled:opacity-60'
-    : isLight
-      ? 'shrink-0 rounded-full border border-[#3F5331] bg-transparent px-2.5 py-0.5 text-[10px] font-semibold text-[#3F5331] hover:bg-[#E8F0E0]/50 disabled:opacity-60'
-      : 'shrink-0 rounded-full border border-[#C8E6A0]/70 bg-transparent px-2.5 py-0.5 text-[10px] font-semibold text-[#C8E6A0] hover:bg-[#C8E6A0]/10 disabled:opacity-60';
-
-  const visibleThumbs = listingCount >= 4 ? 3 : listingCount;
-  const moreCount = listingCount >= 4 ? listingCount - 3 : 0;
-  const gridCols =
-    listingCount >= 4 ? 'grid-cols-4' : listingCount === 3 ? 'grid-cols-3' : 'grid-cols-2';
+      ? 'shrink-0 rounded-full border border-[#3F5331]/35 bg-[#E8F0E0] px-3 py-1 text-[10px] font-semibold text-[#3F5331] disabled:opacity-60'
+      : 'shrink-0 rounded-full border border-[#C8E6A0]/40 bg-[#C8E6A0]/15 px-3 py-1 text-[10px] font-semibold text-[#C8E6A0] disabled:opacity-60'
+    : 'shrink-0 rounded-full bg-[#C8E6A0] px-3 py-1 text-[10px] font-semibold text-[#0f1408] shadow-sm hover:bg-[#dff5c0] active:opacity-90 disabled:opacity-60';
 
   return (
     <section className={`overflow-hidden rounded-2xl border ${shellClass}`}>
@@ -260,59 +263,57 @@ export function BusinessSearchResultCard({
           </button>
         ) : null}
 
-        {listingCount === 1 ? (
-          <button
-            type="button"
-            onClick={openProfile}
-            className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
-              isLight
-                ? 'border-[#3F5331]/15 bg-[#E8F0E0]/35 hover:bg-[#E8F0E0]/55'
-                : 'border-white/12 bg-white/[0.04] hover:bg-white/[0.07]'
-            }`}
+        {canOpenListings ? (
+          <div
+            className={
+              showMoreListings
+                ? 'scrollbar-hide -mx-0.5 flex items-stretch gap-2 overflow-x-auto px-0.5 pb-0.5'
+                : listingCount === 1
+                  ? 'flex gap-2'
+                  : `grid gap-2 ${listingCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`
+            }
+            style={showMoreListings ? { WebkitOverflowScrolling: 'touch' } : undefined}
           >
-            <Layers
-              size={20}
-              className={`shrink-0 ${isLight ? 'text-[#3F5331]/70' : 'text-white/50'}`}
-              aria-hidden
-            />
-            <span className={`min-w-0 flex-1 text-sm font-medium ${ac.pageHeading}`}>
-              {t('businessProfile.public.singleListingInProfile')}
-            </span>
-            <ChevronRight size={18} className={`shrink-0 ${ac.mutedText}`} aria-hidden />
-          </button>
-        ) : null}
-
-        {listingCount >= 2 && canOpenListings ? (
-          <div className={`grid ${gridCols} gap-1.5`}>
-            {listings.slice(0, visibleThumbs).map((listing) => (
+            {previewListings.map((listing) => (
               <VitrineSquare
                 key={listing.id}
                 item={listing}
                 onSelect={onSelectListing}
                 tg={tg}
                 t={t}
+                className={
+                  showMoreListings || listingCount === 1
+                    ? VITRINE_THUMB
+                    : 'relative aspect-square w-full min-w-0 overflow-hidden rounded-xl'
+                }
               />
             ))}
-            {moreCount > 0 ? (
+            {showMoreListings ? (
               <button
                 type="button"
                 onClick={openProfile}
-                className={`${VITRINE_TILE} flex flex-col items-center justify-center border ${
+                className={`${VITRINE_THUMB} flex flex-col items-center justify-center gap-0.5 px-1 ${
                   isLight
-                    ? 'border-[#3F5331]/15 bg-[#E8F0E0]/60'
-                    : 'border-white/10 bg-white/[0.06] backdrop-blur-sm'
+                    ? 'border border-[#3F5331]/12 bg-[#E8F0E0]/50'
+                    : 'border border-white/10 bg-white/[0.06]'
                 }`}
-                aria-label={t('businessProfile.public.vitrineMoreWithCount', {
-                  count: String(moreCount),
-                })}
               >
                 <span
-                  className={`px-1 text-center text-[11px] font-semibold leading-tight ${
-                    isLight ? 'text-[#3F5331]/85' : 'text-white/75'
+                  className={`px-0.5 text-center text-[10px] font-bold leading-[1.2] ${
+                    isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'
                   }`}
                 >
-                  {t('businessProfile.public.vitrineMoreWithCount', { count: String(moreCount) })}
+                  {t('businessProfile.public.showMoreListings')}
                 </span>
+                {remainingCount > 0 ? (
+                  <span
+                    className={`text-[11px] font-bold tabular-nums ${
+                      isLight ? 'text-[#3F5331]/75' : 'text-white/60'
+                    }`}
+                  >
+                    +{remainingCount}
+                  </span>
+                ) : null}
               </button>
             ) : null}
           </div>
