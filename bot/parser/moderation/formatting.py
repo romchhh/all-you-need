@@ -20,8 +20,14 @@ from parser.core.telegram_meta import (
     parsed_item_message_link,
 )
 from parser.core.text import detect_lang
+from parser.moderation.aggregator_sellers import clear_aggregator_username, is_aggregator_username
 
 logger = logging.getLogger(__name__)
+
+_AUTHOR_LINE_RE = re.compile(
+    r"(?m)^\s*👤\s*(?:Автор|Author):\s*@([a-zA-Z][a-zA-Z0-9_]{3,31})\s*$",
+    re.IGNORECASE,
+)
 
 
 def _source_channel_url(item: dict) -> str:
@@ -279,21 +285,40 @@ def _source_channel_slug(item: dict) -> str:
     return clean.lstrip("@").split("/")[0].lower()
 
 
+def _author_from_description_text(text: str) -> str:
+    if not text:
+        return ""
+    match = _AUTHOR_LINE_RE.search(text)
+    if not match:
+        return ""
+    return clear_aggregator_username(match.group(1))
+
+
 def resolved_author_username(item: dict) -> str:
-    """@username автора з item або з тексту поста (не @ каналу-джерела)."""
+    """@username автора з item або з тексту поста (не @ каналу-джерела / агрегатора)."""
     channel_slug = _source_channel_slug(item)
-    author_username = (item.get("author_username") or "").strip().lstrip("@")
+    blob = "\n".join(
+        str(item.get(key) or "")
+        for key in ("raw_text", "description", "marketplace_description")
+    )
+
+    author_username = clear_aggregator_username(item.get("author_username"))
     if author_username and channel_slug and author_username.lower() == channel_slug:
         author_username = ""
+
     if not author_username:
-        author_username = (
+        author_username = _author_from_description_text(blob)
+
+    if not author_username:
+        author_username = clear_aggregator_username(
             extract_username_from_text(
-                str(item.get("raw_text") or ""),
+                blob,
                 str(item.get("source_channel") or ""),
             )
-            or ""
-        ).lstrip("@")
+        )
     if author_username and channel_slug and author_username.lower() == channel_slug:
+        return ""
+    if author_username and is_aggregator_username(author_username):
         return ""
     return author_username
 

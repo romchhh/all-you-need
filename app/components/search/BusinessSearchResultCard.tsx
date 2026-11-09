@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { MapPin, Star } from 'lucide-react';
+import { ChevronRight, Layers, MapPin, Star } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -38,7 +38,7 @@ type BusinessSearchResultCardProps = {
   tg?: TelegramWebApp | null;
 };
 
-const VITRINE_SQ = 'relative aspect-square w-[4.25rem] shrink-0 overflow-hidden rounded-lg sm:w-[4.75rem]';
+const VITRINE_TILE = 'relative aspect-square w-full min-w-0 overflow-hidden rounded-xl';
 
 function formatRatingReviews(
   rating: number,
@@ -66,31 +66,19 @@ function vitrinePriceLabel(listing: Listing, t: (key: string) => string) {
   return `${listing.price}${getCurrencySymbol(listing.currency)}`;
 }
 
-function VitrineSquare({
+function ListingThumb({
   item,
-  onSelect,
-  tg,
-  t,
+  className,
 }: {
   item: Listing;
-  onSelect?: (listing: Listing) => void;
-  tg?: TelegramWebApp | null;
-  t: (key: string) => string;
+  className: string;
 }) {
   const imageSrc = useMemo(() => resolveListingCardImageUrl(item), [item]);
   const [imageFailed, setImageFailed] = useState(false);
   const showPhoto = Boolean(imageSrc) && !imageFailed;
 
   return (
-    <button
-      type="button"
-      onClick={() => {
-        tg?.HapticFeedback?.impactOccurred?.('light');
-        onSelect?.(item);
-      }}
-      className={VITRINE_SQ}
-      aria-label={item.title}
-    >
+    <div className={`relative overflow-hidden ${className}`}>
       {showPhoto ? (
         <CachedListingImage
           src={imageSrc!}
@@ -111,8 +99,34 @@ function VitrineSquare({
           showTitle={false}
         />
       )}
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-1 pb-1 pt-4">
-        <span className="block truncate text-center text-[9px] font-bold leading-tight text-white sm:text-[10px]">
+    </div>
+  );
+}
+
+function VitrineSquare({
+  item,
+  onSelect,
+  tg,
+  t,
+}: {
+  item: Listing;
+  onSelect?: (listing: Listing) => void;
+  tg?: TelegramWebApp | null;
+  t: (key: string) => string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        tg?.HapticFeedback?.impactOccurred?.('light');
+        onSelect?.(item);
+      }}
+      className={VITRINE_TILE}
+      aria-label={item.title}
+    >
+      <ListingThumb item={item} className="absolute inset-0 h-full w-full" />
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-1 pb-1.5 pt-5">
+        <span className="block truncate text-center text-[10px] font-bold leading-tight text-white">
           {vitrinePriceLabel(item, t)}
         </span>
       </span>
@@ -134,25 +148,39 @@ export function BusinessSearchResultCard({
   const logoUrl = business.logo ? getResolvedImageUrl(business.logo) : null;
   const showRating = business.reviewsCount > 0 && business.rating > 0;
   const listings = (business.vitrineListings ?? []).filter((l) => l.status === 'active' || !l.status);
-  const hasListings = listings.length > 0 && Boolean(onSelectListing);
+  const listingCount = listings.length;
+  const canOpenListings = listingCount > 0 && Boolean(onSelectListing);
 
   const shellClass = isLight
     ? 'border-[#3F5331]/15 bg-white'
-    : 'border-[#C8E6A0]/15 bg-[#141414]';
+    : 'border-[#C8E6A0]/20 bg-[#141414]';
 
   const openProfile = () => {
     tg?.HapticFeedback?.impactOccurred?.('light');
     onOpen(business);
   };
 
+  const subscribeBtnClass = business.isFollowing
+    ? isLight
+      ? 'shrink-0 rounded-full border border-[#3F5331]/30 bg-[#E8F0E0]/80 px-2.5 py-0.5 text-[10px] font-semibold text-[#3F5331] disabled:opacity-60'
+      : 'shrink-0 rounded-full border border-[#C8E6A0]/35 bg-[#C8E6A0]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#C8E6A0] disabled:opacity-60'
+    : isLight
+      ? 'shrink-0 rounded-full border border-[#3F5331] bg-transparent px-2.5 py-0.5 text-[10px] font-semibold text-[#3F5331] hover:bg-[#E8F0E0]/50 disabled:opacity-60'
+      : 'shrink-0 rounded-full border border-[#C8E6A0]/70 bg-transparent px-2.5 py-0.5 text-[10px] font-semibold text-[#C8E6A0] hover:bg-[#C8E6A0]/10 disabled:opacity-60';
+
+  const visibleThumbs = listingCount >= 4 ? 3 : listingCount;
+  const moreCount = listingCount >= 4 ? listingCount - 3 : 0;
+  const gridCols =
+    listingCount >= 4 ? 'grid-cols-4' : listingCount === 3 ? 'grid-cols-3' : 'grid-cols-2';
+
   return (
     <section className={`overflow-hidden rounded-2xl border ${shellClass}`}>
-      <div className="p-4">
-        <div className="mb-3 flex w-full items-start gap-3">
+      <div className="flex flex-col gap-2.5 p-3.5">
+        <div className="flex items-start gap-3">
           <button
             type="button"
             onClick={openProfile}
-            className={`h-[4.75rem] w-[4.75rem] shrink-0 overflow-hidden rounded-2xl border-2 ${
+            className={`h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-2xl border-2 ${
               isLight ? 'border-white bg-white shadow-md' : 'border-[#C8E6A0]/25 bg-[#1C1C1C]'
             }`}
             aria-label={business.businessName}
@@ -170,104 +198,138 @@ export function BusinessSearchResultCard({
             )}
           </button>
 
-          <div className="min-w-0 flex-1 pt-0.5">
-            <div className="mb-1.5 flex flex-wrap items-start gap-x-2 gap-y-1">
+          <div className="min-w-0 flex-1">
+            <button type="button" onClick={openProfile} className={`w-full text-left ${ac.pageHeading}`}>
+              <span
+                className="text-[17px] font-bold leading-snug"
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                {business.businessName}
+              </span>
+            </button>
+
+            {(showRating || onToggleFollow) && (
+              <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                {showRating ? (
+                  <div className={`flex min-w-0 flex-1 items-center gap-1 text-sm ${ac.mutedText}`}>
+                    <Star size={14} className="shrink-0 fill-amber-400 text-amber-400" />
+                    <span className="min-w-0 truncate">
+                      {formatRatingReviews(business.rating, business.reviewsCount, t)}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="min-w-0 flex-1" aria-hidden />
+                )}
+                {onToggleFollow ? (
+                  <button
+                    type="button"
+                    disabled={followBusy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      tg?.HapticFeedback?.impactOccurred?.('light');
+                      onToggleFollow(business);
+                    }}
+                    className={subscribeBtnClass}
+                  >
+                    {business.isFollowing
+                      ? t('businessProfile.public.subscribed')
+                      : t('businessProfile.public.subscribe')}
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {business.activityLine || business.locationLine ? (
+          <button type="button" onClick={openProfile} className="w-full space-y-1 text-left">
+            {business.activityLine ? (
+              <p className={`line-clamp-2 text-sm leading-snug ${ac.mutedText}`}>{business.activityLine}</p>
+            ) : null}
+            {business.locationLine ? (
+              <div className={`flex items-start gap-1.5 text-sm ${ac.mutedText}`}>
+                <MapPin size={15} className="mt-0.5 shrink-0 opacity-80" />
+                <span className="line-clamp-2 min-w-0 flex-1 leading-snug">{business.locationLine}</span>
+              </div>
+            ) : null}
+          </button>
+        ) : null}
+
+        {listingCount === 1 ? (
+          <button
+            type="button"
+            onClick={openProfile}
+            className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+              isLight
+                ? 'border-[#3F5331]/15 bg-[#E8F0E0]/35 hover:bg-[#E8F0E0]/55'
+                : 'border-white/12 bg-white/[0.04] hover:bg-white/[0.07]'
+            }`}
+          >
+            <Layers
+              size={20}
+              className={`shrink-0 ${isLight ? 'text-[#3F5331]/70' : 'text-white/50'}`}
+              aria-hidden
+            />
+            <span className={`min-w-0 flex-1 text-sm font-medium ${ac.pageHeading}`}>
+              {t('businessProfile.public.singleListingInProfile')}
+            </span>
+            <ChevronRight size={18} className={`shrink-0 ${ac.mutedText}`} aria-hidden />
+          </button>
+        ) : null}
+
+        {listingCount >= 2 && canOpenListings ? (
+          <div className={`grid ${gridCols} gap-1.5`}>
+            {listings.slice(0, visibleThumbs).map((listing) => (
+              <VitrineSquare
+                key={listing.id}
+                item={listing}
+                onSelect={onSelectListing}
+                tg={tg}
+                t={t}
+              />
+            ))}
+            {moreCount > 0 ? (
               <button
                 type="button"
                 onClick={openProfile}
-                className={`min-w-0 flex-1 text-left ${ac.pageHeading}`}
+                className={`${VITRINE_TILE} flex flex-col items-center justify-center border ${
+                  isLight
+                    ? 'border-[#3F5331]/15 bg-[#E8F0E0]/60'
+                    : 'border-white/10 bg-white/[0.06] backdrop-blur-sm'
+                }`}
+                aria-label={t('businessProfile.public.vitrineMoreWithCount', {
+                  count: String(moreCount),
+                })}
               >
                 <span
-                  className="text-base font-bold leading-snug"
-                  style={{
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {business.businessName}
-                </span>
-              </button>
-              {onToggleFollow ? (
-                <button
-                  type="button"
-                  disabled={followBusy}
-                  onClick={() => {
-                    tg?.HapticFeedback?.impactOccurred?.('light');
-                    onToggleFollow(business);
-                  }}
-                  className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60 ${
-                    business.isFollowing
-                      ? isLight
-                        ? 'border border-[#3F5331]/25 bg-[#E8F0E0]/80 text-[#3F5331]'
-                        : 'border border-[#C8E6A0]/35 bg-[#C8E6A0]/10 text-[#C8E6A0]'
-                      : isLight
-                        ? 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90'
-                        : 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90'
+                  className={`px-1 text-center text-[11px] font-semibold leading-tight ${
+                    isLight ? 'text-[#3F5331]/85' : 'text-white/75'
                   }`}
                 >
-                  {business.isFollowing
-                    ? t('businessProfile.public.subscribed')
-                    : t('businessProfile.public.subscribe')}
-                </button>
-              ) : null}
-            </div>
-
-            <button type="button" onClick={openProfile} className="w-full text-left">
-              {showRating && (
-                <div className={`mb-1.5 flex items-center gap-1 text-sm ${ac.mutedText}`}>
-                  <Star size={14} className="shrink-0 fill-amber-400 text-amber-400" />
-                  <span>{formatRatingReviews(business.rating, business.reviewsCount, t)}</span>
-                </div>
-              )}
-
-              {business.activityLine ? (
-                <p className={`mb-1 line-clamp-2 text-sm leading-snug ${ac.mutedText}`}>
-                  {business.activityLine}
-                </p>
-              ) : null}
-
-              {business.locationLine ? (
-                <div className={`flex items-center gap-1 text-sm ${ac.mutedText}`}>
-                  <MapPin size={14} className="shrink-0" />
-                  <span className="line-clamp-1">{business.locationLine}</span>
-                </div>
-              ) : null}
-            </button>
+                  {t('businessProfile.public.vitrineMoreWithCount', { count: String(moreCount) })}
+                </span>
+              </button>
+            ) : null}
           </div>
-        </div>
+        ) : null}
 
         <button
           type="button"
           onClick={openProfile}
-          className={`w-full rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
+          className={`flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
             isLight
               ? 'border-[#3F5331] text-[#3F5331] hover:bg-[#E8F0E0]/70'
-              : 'border-[#C8E6A0]/60 text-[#C8E6A0] hover:bg-[#C8E6A0]/10'
+              : 'border-[#C8E6A0]/55 text-[#C8E6A0] hover:bg-[#C8E6A0]/10'
           }`}
         >
           {t('businessProfile.public.viewProfile')}
+          <ChevronRight size={18} className="opacity-90" aria-hidden />
         </button>
-
-        {hasListings ? (
-          <div
-            className="scrollbar-hide mt-3 overflow-x-auto"
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
-            <div className="flex gap-1.5">
-              {listings.slice(0, 12).map((listing) => (
-                <VitrineSquare
-                  key={listing.id}
-                  item={listing}
-                  onSelect={onSelectListing}
-                  tg={tg}
-                  t={t}
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
       </div>
     </section>
   );

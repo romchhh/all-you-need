@@ -778,42 +778,74 @@ export function BusinessProfilePage({
             </div>
 
             <div
-              className={`mb-1 flex min-h-[5.5rem] min-w-0 flex-1 flex-col justify-center gap-2 px-1 py-1 sm:min-h-[6.25rem] sm:px-2 ${
+              className={`mb-1 flex min-h-[5.5rem] min-w-0 flex-1 items-end gap-2 px-1 py-1 sm:min-h-[6.25rem] sm:gap-3 sm:px-2 ${
                 isLight ? 'text-[#1a2414]' : 'text-white'
               }`}
             >
-              <div className={`flex min-w-0 items-baseline gap-1.5 ${isLight ? '' : 'drop-shadow-sm'}`}>
-                <Users
-                  size={15}
-                  className={`mb-px shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
-                  aria-hidden
-                />
-                <span className="text-[15px] font-bold leading-none tabular-nums">
-                  {profile.followersCount}
-                </span>
-                <span
-                  className={`text-xs font-medium leading-none ${
-                    isLight ? 'text-[#3F5331]/80' : 'text-white/75'
-                  }`}
-                >
-                  {formatFollowersLabel(profile.followersCount, t)}
-                </span>
-              </div>
-              <div className={`flex min-w-0 items-start gap-1.5 ${isLight ? '' : 'drop-shadow-sm'}`}>
-                <Star size={14} className="mt-0.5 shrink-0 fill-amber-400 text-amber-400" aria-hidden />
+              <div
+                className={`flex min-w-0 flex-1 flex-col justify-center gap-2 ${
+                  isLight ? '' : 'drop-shadow-sm'
+                }`}
+              >
                 {showRating ? (
-                  <span className="text-sm font-semibold leading-snug">
-                    {formatRatingReviews(profile.rating, profile.reviewsCount, t)}
+                  <div className="flex min-w-0 items-start gap-1.5">
+                    <Star
+                      size={14}
+                      className="mt-0.5 shrink-0 fill-amber-400 text-amber-400"
+                      aria-hidden
+                    />
+                    <span className="text-sm font-semibold leading-snug">
+                      {formatRatingReviews(profile.rating, profile.reviewsCount, t)}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                  <Users
+                    size={15}
+                    className={`mb-px shrink-0 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}
+                    aria-hidden
+                  />
+                  <span className="text-[15px] font-bold leading-none tabular-nums">
+                    {profile.followersCount}
                   </span>
-                ) : (
                   <span
-                    className={`max-w-[12rem] whitespace-pre-line text-[11px] font-medium leading-[1.35] sm:max-w-none sm:text-xs ${
-                      isLight ? 'text-[#3F5331]/75' : 'text-white/70'
+                    className={`text-xs font-medium leading-snug ${
+                      isLight ? 'text-[#3F5331]/80' : 'text-white/75'
                     }`}
                   >
-                    {t('businessProfile.public.noReviewsYet')}
+                    {formatFollowersLabel(profile.followersCount, t)}
                   </span>
-                )}
+                </div>
+                {!viewingOwn ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void handleFollow();
+                    }}
+                    disabled={followBusy}
+                    className={`relative z-20 w-fit max-w-full rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-60 ${
+                      isFollowing
+                        ? isLight
+                          ? 'border border-[#3F5331]/30 bg-[#E8F0E0]/80 text-[#3F5331]'
+                          : 'border border-[#C8E6A0]/35 bg-[#C8E6A0]/10 text-[#C8E6A0]'
+                        : 'bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0]'
+                    }`}
+                  >
+                    {isFollowing ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Check size={12} />
+                        {t('businessProfile.public.subscribed')}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        <UserPlus size={12} />
+                        {t('businessProfile.public.subscribe')}
+                      </span>
+                    )}
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -821,67 +853,34 @@ export function BusinessProfilePage({
       </div>
 
       <div className="px-4 pb-4 pt-3 text-left">
-        <div className="mb-3 flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-start gap-2">
-              <h1
-                className={`min-w-0 flex-1 text-xl font-bold leading-snug ${ac.pageHeading}`}
-                style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
-                {profile.businessName}
-              </h1>
-              <span
-                className={`mt-1 shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${
-                  isLight
-                    ? 'border border-[#3F5331]/50 text-[#3F5331]'
-                    : 'border border-[#C8E6A0]/50 text-[#C8E6A0]'
-                }`}
-              >
-                BUSINESS
-              </span>
-            </div>
-
-            <p className={`text-sm ${ac.mutedText}`}>
-              {sphereLabel}
-              {profile.city ? ` · ${profile.city}` : ''}
-            </p>
-          </div>
-
-          {!viewingOwn ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                void handleFollow();
+        <div className="mb-3">
+          <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1
+              className={`min-w-0 break-words text-xl font-bold leading-snug ${ac.pageHeading}`}
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
               }}
-              disabled={followBusy}
-              className={`relative z-20 mt-0.5 shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                isFollowing
-                  ? isLight
-                    ? 'border border-[#3F5331]/30 bg-[#E8F0E0]/80 text-[#3F5331]'
-                    : 'border border-[#C8E6A0]/35 bg-[#C8E6A0]/10 text-[#C8E6A0]'
-                  : 'bg-[#C8E6A0] text-[#0f1408] hover:bg-[#dff5c0]'
+            >
+              {profile.businessName}
+            </h1>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide ${
+                isLight
+                  ? 'border border-[#3F5331]/50 text-[#3F5331]'
+                  : 'border border-[#C8E6A0]/50 text-[#C8E6A0]'
               }`}
             >
-              {isFollowing ? (
-                <span className="inline-flex items-center gap-1">
-                  <Check size={14} />
-                  {t('businessProfile.public.subscribed')}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  <UserPlus size={14} />
-                  {t('businessProfile.public.subscribe')}
-                </span>
-              )}
-            </button>
-          ) : null}
+              BUSINESS
+            </span>
+          </div>
+
+          <p className={`text-sm ${ac.mutedText}`}>
+            {sphereLabel}
+            {profile.city ? ` · ${profile.city}` : ''}
+          </p>
         </div>
 
         {directionLabels.length > 0 ? (

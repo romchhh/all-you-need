@@ -25,6 +25,11 @@ from parser.config.settings import (
 )
 from parser.core.telegram_meta import parsed_item_message_link
 from parser.core.text import detect_lang
+from parser.moderation.aggregator_sellers import (
+    clear_aggregator_username,
+    is_aggregator_telegram_id,
+    is_aggregator_username,
+)
 from parser.moderation.formatting import (
     assemble_telegram_caption,
     build_channel_hashtags,
@@ -54,15 +59,14 @@ def marketplace_listing_to_channel_item(row: dict, *, is_free: bool = False) -> 
         if match:
             msg_link = match.group(0)
 
-    author_username = str(
-        row.get("author_username") or row.get("seller_username") or row.get("username") or ""
-    ).strip().lstrip("@")
     telegram_raw = row.get("author_id")
     if telegram_raw is None:
         telegram_raw = row.get("seller_telegram_id") or row.get("telegramId")
     try:
         author_id = int(telegram_raw) if telegram_raw is not None else 0
     except (TypeError, ValueError):
+        author_id = 0
+    if is_aggregator_telegram_id(author_id):
         author_id = 0
 
     item = {
@@ -75,7 +79,7 @@ def marketplace_listing_to_channel_item(row: dict, *, is_free: bool = False) -> 
         "subcategory": row.get("subcategory"),
         "condition": row.get("condition") or "",
         "location": row.get("location") or "",
-        "author_username": author_username,
+        "author_username": "",
         "author_id": author_id,
         "seller_first_name": row.get("seller_first_name") or row.get("firstName"),
         "seller_last_name": row.get("seller_last_name") or row.get("lastName"),
@@ -84,8 +88,19 @@ def marketplace_listing_to_channel_item(row: dict, *, is_free: bool = False) -> 
         "source_channel": row.get("source_channel") or "",
         "message_id": row.get("message_id"),
     }
+
+    parsed_author = clear_aggregator_username(row.get("author_username"))
+    if parsed_author:
+        item["author_username"] = parsed_author
     if not item["author_username"]:
         item["author_username"] = resolved_author_username(item)
+    if not item["author_username"]:
+        fallback = clear_aggregator_username(
+            row.get("seller_username") or row.get("username")
+        )
+        if fallback:
+            item["author_username"] = fallback
+
     if not item.get("msg_link"):
         item["msg_link"] = parsed_item_message_link(item)
     return item
@@ -838,7 +853,7 @@ async def publish_services_listing_to_channel(
         listing_miniapp_url(marketplace_listing_id) if marketplace_listing_id else None
     )
 
-    if author_username:
+    if author_username and not is_aggregator_username(author_username):
         seller_full_name = f"@{author_username}"
         seller_href = html.escape(f"https://t.me/{author_username}", quote=True)
         seller_text = (
@@ -856,10 +871,15 @@ async def publish_services_listing_to_channel(
             aid = int(author_id) if author_id is not None else 0
         except (TypeError, ValueError):
             aid = 0
-        if aid:
+        if aid and not is_aggregator_telegram_id(aid):
             seller_full_name = _seller_display_name(item, user_id_for_lang)
             seller_link = f"tg://user?id={aid}"
             seller_text = f"{seller_label} <a href=\"{seller_link}\">{html.escape(seller_full_name)}</a>"
+        elif msg_link:
+            lang = detect_lang(f"{item.get('title') or ''}\n{item.get('description') or ''}")
+            link_label = "Оригінал оголошення" if lang == "uk" else "Оригинал объявления"
+            safe_link = html.escape(msg_link, quote=True)
+            seller_text = f"{seller_label} <a href=\"{safe_link}\">{html.escape(link_label)}</a>"
         else:
             seller_full_name = _seller_display_name(item, user_id_for_lang)
             seller_text = f"{seller_label} {html.escape(seller_full_name)}"

@@ -78,9 +78,20 @@ SELECT src.id, src.title, src.description, src.price, src.currency, src.isFree,
        u.username AS seller_username,
        u.firstName AS seller_first_name,
        u.lastName AS seller_last_name,
-       u.telegramId AS seller_telegram_id
+       u.telegramId AS seller_telegram_id,
+       pi.author_username AS author_username,
+       pi.msg_link AS msg_link,
+       pi.source_channel AS source_channel,
+       pi.message_id AS message_id,
+       pi.raw_text AS raw_text
 FROM Listing AS src
 LEFT JOIN User AS u ON u.id = src.userId
+LEFT JOIN parsed_items pi ON pi.id = (
+    SELECT pi2.id FROM parsed_items pi2
+    WHERE pi2.marketplace_listing_id = src.id
+    ORDER BY pi2.id DESC
+    LIMIT 1
+)
 WHERE src.status = 'active'
   AND (src.expiresAt IS NULL OR src.expiresAt > datetime('now'))
   AND (src.moderationStatus = 'approved'

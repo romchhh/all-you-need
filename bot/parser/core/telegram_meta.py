@@ -262,6 +262,7 @@ _IGNORE_MENTION_USERNAMES: frozenset[str] = frozenset({
     "tradeground",
     "tradeground_seller",
     "tradeground_seller2",
+    "tradeground_seller3",
 })
 
 
@@ -276,7 +277,14 @@ def extract_username_from_text(text: str, channel: str = "") -> Optional[str]:
     else:
         channel_slug = channel_key.lstrip("@").split("/")[0].lower()
 
-    ignore = _IGNORE_MENTION_USERNAMES | {channel_slug}
+    extra_ignore: set[str] = set()
+    try:
+        from parser.moderation.aggregator_sellers import aggregator_usernames
+
+        extra_ignore = set(aggregator_usernames())
+    except Exception:
+        pass
+    ignore = _IGNORE_MENTION_USERNAMES | extra_ignore | {channel_slug}
 
     for match in re.finditer(r"@([a-zA-Z][a-zA-Z0-9_]{3,31})\b", text):
         username = match.group(1)

@@ -226,6 +226,19 @@ class QueueSqlTests(unittest.TestCase):
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE parsed_items (
+                id INTEGER PRIMARY KEY,
+                marketplace_listing_id INTEGER,
+                author_username TEXT,
+                msg_link TEXT,
+                source_channel TEXT,
+                message_id INTEGER,
+                raw_text TEXT
+            )
+            """
+        )
         return conn
 
     def test_sqlite_queue_skips_posted_and_keeps_live(self):
@@ -261,11 +274,44 @@ class QueueSqlTests(unittest.TestCase):
                 os.environ["DATABASE_URL"] = previous
         self.assertIn('"Listing"', sql)
         self.assertIn('"User"', sql)
+        self.assertIn("parsed_items", sql)
         self.assertIn('"expiresAt"', sql)
         self.assertIn('"moderationStatus"', sql)
         self.assertIn("NOW()", sql)
         self.assertNotIn("datetime(", sql.lower())
         self.assertEqual(sql.count("?"), 4)
+
+
+class ChannelSellerResolveTests(unittest.TestCase):
+    def test_marketplace_row_uses_parser_author_not_aggregator(self):
+        from parser.moderation.services_publish import marketplace_listing_to_channel_item
+
+        desc = "Послуга автосервісу\n\n👤 Автор: @real_author\n"
+        row = {
+            "title": "Автосервіс",
+            "description": desc,
+            "seller_username": "tradeground_seller3",
+            "seller_telegram_id": 999999999,
+            "author_username": "tradeground_seller3",
+            "msg_link": "https://t.me/source_channel/42",
+        }
+        item = marketplace_listing_to_channel_item(row)
+        self.assertEqual(item["author_username"], "real_author")
+        self.assertEqual(item["msg_link"], "https://t.me/source_channel/42")
+
+    def test_marketplace_row_falls_back_to_original_post_link(self):
+        from parser.moderation.services_publish import marketplace_listing_to_channel_item
+
+        row = {
+            "title": "Автосервіс",
+            "description": "Опис без автора",
+            "seller_username": "tradeground_seller3",
+            "author_username": "tradeground_seller3",
+            "msg_link": "https://t.me/hh_market/100",
+        }
+        item = marketplace_listing_to_channel_item(row)
+        self.assertEqual(item["author_username"], "")
+        self.assertEqual(item["msg_link"], "https://t.me/hh_market/100")
 
 
 class CoverTests(unittest.TestCase):

@@ -7,23 +7,75 @@
 const AUTHOR_LINE_RE =
   /(?:^|\n)\s*👤\s*(?:Автор|Author):\s*@[\w\d_]+\s*/gi;
 
-/** Usernames акаунтів-агрегаторів парсера (не реальний продавець). */
-const AGGREGATOR_SELLER_USERNAMES = new Set([
-  'parser_bot',
-  'tradeground_seller',
-  'tradeground_seller2',
-]);
-
-/** Telegram ID акаунтів, під якими публікує парсер. */
-const AGGREGATOR_TELEGRAM_IDS = new Set(['8590825131', '5587484547']);
-
 function normalizeUsername(username?: string | null): string {
   return (username || '').trim().replace(/^@/, '');
 }
 
+const STATIC_AGGREGATOR_USERNAMES = [
+  'parser_bot',
+  'tradeground',
+  'tradeground_seller',
+  'tradeground_seller2',
+  'tradeground_seller3',
+] as const;
+
+function buildAggregatorUsernames(): Set<string> {
+  const names = new Set<string>(STATIC_AGGREGATOR_USERNAMES);
+  const extra = process.env.NEXT_PUBLIC_PARSER_AGGREGATOR_USERNAMES || '';
+  for (const part of extra.split(',')) {
+    const u = normalizeUsername(part).toLowerCase();
+    if (u) names.add(u);
+  }
+  for (const key of [
+    'NEXT_PUBLIC_PARSER_ACCOUNT_1_USERNAME',
+    'NEXT_PUBLIC_PARSER_ACCOUNT_2_USERNAME',
+    'NEXT_PUBLIC_PARSER_ACCOUNT_3_USERNAME',
+  ]) {
+    const u = normalizeUsername(process.env[key]).toLowerCase();
+    if (u) names.add(u);
+  }
+  return names;
+}
+
+let cachedAggregatorUsernames: Set<string> | null = null;
+
+/** Usernames акаунтів-агрегаторів парсера (не реальний продавець). */
+function aggregatorSellerUsernames(): Set<string> {
+  if (!cachedAggregatorUsernames) {
+    cachedAggregatorUsernames = buildAggregatorUsernames();
+  }
+  return cachedAggregatorUsernames;
+}
+
+function buildAggregatorTelegramIds(): Set<string> {
+  const ids = new Set<string>(['8590825131', '5587484547']);
+  for (const key of [
+    'NEXT_PUBLIC_PARSER_BOT_TELEGRAM_ID',
+    'NEXT_PUBLIC_PARSER_SERVICES_BOT_TELEGRAM_ID',
+    'NEXT_PUBLIC_PARSER_FALLBACK_BOT_TELEGRAM_ID',
+    'PARSER_BOT_TELEGRAM_ID',
+    'PARSER_SERVICES_BOT_TELEGRAM_ID',
+    'PARSER_FALLBACK_BOT_TELEGRAM_ID',
+  ]) {
+    const raw = (process.env[key] || '').trim();
+    if (raw && /^\d+$/.test(raw)) ids.add(raw);
+  }
+  return ids;
+}
+
+let cachedAggregatorTelegramIds: Set<string> | null = null;
+
+/** Telegram ID акаунтів, під якими публікує парсер. */
+function aggregatorTelegramIds(): Set<string> {
+  if (!cachedAggregatorTelegramIds) {
+    cachedAggregatorTelegramIds = buildAggregatorTelegramIds();
+  }
+  return cachedAggregatorTelegramIds;
+}
+
 export function isAggregatorSellerUsername(username?: string | null): boolean {
   const u = normalizeUsername(username).toLowerCase();
-  return Boolean(u) && AGGREGATOR_SELLER_USERNAMES.has(u);
+  return Boolean(u) && aggregatorSellerUsernames().has(u);
 }
 
 export function isParserAggregatorListing(
@@ -32,7 +84,7 @@ export function isParserAggregatorListing(
 ): boolean {
   if (isAggregatorSellerUsername(sellerUsername)) return true;
   if (sellerTelegramId == null || sellerTelegramId === '') return false;
-  return AGGREGATOR_TELEGRAM_IDS.has(String(sellerTelegramId));
+  return aggregatorTelegramIds().has(String(sellerTelegramId));
 }
 
 function hasAuthorUsernameInDescription(text: string): boolean {
