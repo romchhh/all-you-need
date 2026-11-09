@@ -555,24 +555,38 @@ async def _publish_and_notify(
     channel_post_url: str | None = None
     if PARSER_AUTO_APPROVE_SERVICES_CHANNEL and _is_service_item(listing_item):
         try:
+            from parser.moderation.channel_feed_select import is_marketplace_channel_service
             from parser.moderation.services_publish import (
                 format_services_channels_labels,
                 publish_services_listing_to_channel,
                 resolve_services_trade_channel_ids,
             )
 
-            force_ids = resolve_services_trade_channel_ids(listing_item)
-            channel_result = await publish_services_listing_to_channel(
-                bot,
-                listing_item,
-                item_id,
-                description,
-                images_web,
-                marketplace_listing_id=listing_id,
-                force_channel_ids=force_ids,
+            blob_desc = description or str(listing_item.get("description") or "")
+            channel_ok = is_marketplace_channel_service(
+                str(listing_item.get("category") or ""),
+                listing_item.get("subcategory"),
+                str(listing_item.get("title") or ""),
+                blob_desc,
             )
-            channel_published = list(channel_result.chat_ids)
-            channel_post_url = channel_result.post_url
+            if not channel_ok:
+                logger.info(
+                    "auto-approve: пропуск каналу parsed_item %s — товар або не послуга",
+                    item_id,
+                )
+            else:
+                force_ids = resolve_services_trade_channel_ids(listing_item)
+                channel_result = await publish_services_listing_to_channel(
+                    bot,
+                    listing_item,
+                    item_id,
+                    description,
+                    images_web,
+                    marketplace_listing_id=listing_id,
+                    force_channel_ids=force_ids,
+                )
+                channel_published = list(channel_result.chat_ids)
+                channel_post_url = channel_result.post_url
             if channel_published:
                 update_mod_path_status(item_id, "channel", "approved", moderated_by=None)
                 logger.info(

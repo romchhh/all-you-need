@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { TelegramWebApp } from '@/types/telegram';
 import { Listing } from '@/types';
 import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 
 const UserProfilePage = dynamic(
   () => import('@/components/profile/UserProfilePage').then((m) => ({ default: m.UserProfilePage })),
@@ -31,6 +32,7 @@ interface SellerProfileRouterProps {
 
 export function SellerProfileRouter(props: SellerProfileRouterProps) {
   const { sellerTelegramId } = props;
+  const { show: showPageLoader, hide: hidePageLoader } = usePageTransition();
   const [mode, setMode] = useState<'loading' | 'business' | 'personal'>('loading');
 
   useEffect(() => {
@@ -49,6 +51,14 @@ export function SellerProfileRouter(props: SellerProfileRouterProps) {
       cancelled = true;
     };
   }, [sellerTelegramId]);
+
+  useEffect(() => {
+    if (mode === 'loading') {
+      showPageLoader({ minMs: 320 });
+      return;
+    }
+    void hidePageLoader({ minMs: 320 });
+  }, [mode, showPageLoader, hidePageLoader]);
 
   if (mode === 'loading') {
     return (

@@ -30,6 +30,7 @@ import {
 } from '@/lib/listings/categoryFilter';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
 import { useTabReturnRestore } from '@/features/ui/hooks/useTabReturnRestore';
+import { useRoutePageLoader } from '@/hooks/useRoutePageLoader';
 
 const CategoriesPage = () => {
   const params = useParams();
@@ -137,6 +138,7 @@ const CategoriesPage = () => {
 
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  useRoutePageLoader(!loading, { enabled: !selectedListing && !selectedSeller });
   const [hasMore, setHasMore] = useState(false);
   const [listingsOffset, setListingsOffset] = useState(16);
   const [totalListings, setTotalListings] = useState(0);

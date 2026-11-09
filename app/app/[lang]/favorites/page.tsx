@@ -29,6 +29,7 @@ import { AppHeader } from '@/components/layout/AppHeader';
 import { getCategories } from '@/constants/categories';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
 import { useTabReturnRestore } from '@/features/ui/hooks/useTabReturnRestore';
+import { useRoutePageLoader } from '@/hooks/useRoutePageLoader';
 
 const FavoritesPage = () => {
   const params = useParams();
@@ -50,6 +51,10 @@ const FavoritesPage = () => {
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useRoutePageLoader(!loading && !profileLoading, {
+    enabled: !selectedListing && !selectedSeller,
+  });
 
   useTabReturnRestore({
     tab: 'favorites',

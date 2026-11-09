@@ -26,6 +26,8 @@ import {
 } from '@/utils/favorites';
 import { useScrollToTopOnMount } from '@/features/ui/hooks/useScrollToTopOnMount';
 import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
+import { useRoutePageLoader } from '@/hooks/useRoutePageLoader';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 
 export default function SubscriptionsPage() {
   const params = useParams();
@@ -37,6 +39,7 @@ export default function SubscriptionsPage() {
   const { tg } = useTelegram();
   const { profile, isBlocked } = useUser();
   const { toast, showToast, hideToast } = useToast();
+  const { show: showPageLoader } = usePageTransition();
   useScrollToTopOnMount();
   const viewerTelegramId = useMemo(
     () => resolveViewerTelegramId(profile?.telegramId, tg?.initDataUnsafe?.user?.id ?? null),
@@ -54,6 +57,11 @@ export default function SubscriptionsPage() {
   } | null>(null);
   const previousListingRef = useRef<Listing | null>(null);
   const overlayOpenRef = useRef(false);
+  const [subscriptionsShellReady, setSubscriptionsShellReady] = useState(false);
+
+  useRoutePageLoader(subscriptionsShellReady, {
+    enabled: !selectedListing && !selectedSeller,
+  });
 
   useEffect(() => {
     if (lang === 'uk' || lang === 'ru') setLanguage(lang);
@@ -225,6 +233,7 @@ export default function SubscriptionsPage() {
       <button
         type="button"
         onClick={() => {
+          showPageLoader({ minMs: 380 });
           router.push(`/${lang}/profile`);
           tg?.HapticFeedback?.impactOccurred?.('light');
         }}
@@ -244,6 +253,7 @@ export default function SubscriptionsPage() {
           <MySubscriptionsView
             telegramId={viewerTelegramId}
             tg={tg}
+            onInitialLoadSettled={() => setSubscriptionsShellReady(true)}
             onOpenBusiness={(payload) => {
               setSelectedSeller({
                 telegramId: payload.telegramId,

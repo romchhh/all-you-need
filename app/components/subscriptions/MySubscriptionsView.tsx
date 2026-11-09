@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { Building2, MapPin, Search, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -10,6 +10,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
+import { ListingGridSkeleton } from '@/components/ui/SkeletonLoader';
 import {
   BusinessSearchResultCard,
   type BusinessSearchCardData,
@@ -19,6 +20,7 @@ import {
   persistBazaarTabState,
 } from '@/lib/bazaar/bazaarTabStateStorage';
 import { formatCityFilterLabel, normalizeCityInput } from '@/lib/city/cityNormalization';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 
 const CityModal = dynamic(
   () => import('@/components/modals/CityModal').then((m) => ({ default: m.CityModal })),
@@ -41,9 +43,10 @@ type MySubscriptionsViewProps = {
     name: string;
     avatar: string;
   }) => void;
+  onInitialLoadSettled?: () => void;
 };
 
-export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscriptionsViewProps) {
+export function MySubscriptionsView({ telegramId, tg, onOpenBusiness, onInitialLoadSettled }: MySubscriptionsViewProps) {
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
@@ -51,6 +54,7 @@ export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscr
   const params = useParams();
   const lang = (params?.lang as string) || language || 'uk';
   const { toast, showToast, hideToast } = useToast();
+  const { show: showPageLoader } = usePageTransition();
 
   const [tab, setTab] = useState<SubscriptionsTab>('businesses');
   const [businesses, setBusinesses] = useState<BusinessSearchCardData[]>([]);
@@ -142,6 +146,13 @@ export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscr
   useEffect(() => {
     void reloadTab(tab);
   }, [tab, reloadTab]);
+
+  const initialLoadSettledRef = useRef(false);
+  useEffect(() => {
+    if (initialLoadSettledRef.current || loading) return;
+    initialLoadSettledRef.current = true;
+    onInitialLoadSettled?.();
+  }, [loading, onInitialLoadSettled]);
 
   const handleUnfollowBusiness = useCallback(
     async (business: BusinessSearchCardData) => {
@@ -237,6 +248,7 @@ export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscr
 
   const goFindBusiness = () => {
     tg?.HapticFeedback?.impactOccurred?.('light');
+    showPageLoader({ minMs: 380 });
     router.push(`/${lang}/search?mode=businesses`);
   };
 
@@ -247,11 +259,13 @@ export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscr
 
   const goCreateSearch = () => {
     tg?.HapticFeedback?.impactOccurred?.('light');
+    showPageLoader({ minMs: 380 });
     router.push(`/${lang}/search`);
   };
 
   const openSearchQuery = (item: SearchSubItem) => {
     tg?.HapticFeedback?.impactOccurred?.('light');
+    showPageLoader({ minMs: 380 });
     const q = encodeURIComponent(item.queryText);
     const mode = item.mode === 'businesses' ? '&mode=businesses' : '';
     router.push(`/${lang}/search?q=${q}${mode}`);
@@ -318,7 +332,7 @@ export function MySubscriptionsView({ telegramId, tg, onOpenBusiness }: MySubscr
       </div>
 
       {loading ? (
-        <div className={`py-16 text-center text-sm ${ac.mutedText}`}>{t('common.loading')}</div>
+        <ListingGridSkeleton count={4} />
       ) : tab === 'businesses' ? (
         <div className="space-y-4">
           {businesses.length === 0 ? (

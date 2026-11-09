@@ -21,6 +21,7 @@ import { AppHeader } from '@/components/layout/AppHeader';
 import { getCategories } from '@/constants/categories';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
 import { useTabReturnRestore } from '@/features/ui/hooks/useTabReturnRestore';
+import { useRoutePageLoader } from '@/hooks/useRoutePageLoader';
 
 const ProfilePage = () => {
   const params = useParams();
@@ -33,6 +34,7 @@ const ProfilePage = () => {
   const { t, setLanguage } = useLanguage();
   const categories = useMemo(() => getCategories(t), [t]);
   const { profile, refetch: refetchProfile, isBlocked, loading: profileLoading } = useUser();
+  useRoutePageLoader(!profileLoading);
   const [refreshKey, setRefreshKey] = useState(0);
 
   if (isBlocked && !profile) {

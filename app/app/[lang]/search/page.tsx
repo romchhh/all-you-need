@@ -20,6 +20,7 @@ import { getCategories } from '@/constants/categories';
 import { navigateToListingCategory } from '@/lib/listings/navigation';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 
 const SEARCH_SCROLL_KEY = 'searchScrollPosition';
 const SEARCH_RETURN_LISTING_KEY = 'searchReturnListingId';
@@ -33,6 +34,7 @@ export default function SearchPage() {
   const { tg } = useTelegram();
   const { profile, isBlocked } = useUser();
   const { toast, showToast, hideToast } = useToast();
+  const { show: showPageLoader, hide: hidePageLoader } = usePageTransition();
 
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
@@ -79,6 +81,20 @@ export default function SearchPage() {
       setLanguage(lang);
     }
   }, [lang, setLanguage]);
+
+  useEffect(() => {
+    showPageLoader({ minMs: 380 });
+  }, [showPageLoader]);
+
+  const handleSearchInitialLoadSettled = useCallback(() => {
+    void hidePageLoader({ minMs: 380 });
+  }, [hidePageLoader]);
+
+  useEffect(() => {
+    if (selectedListing || selectedSeller) {
+      void hidePageLoader({ minMs: 280 });
+    }
+  }, [selectedListing, selectedSeller, hidePageLoader]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -206,8 +222,9 @@ export default function SearchPage() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('bazaarSearchQuery');
     }
+    showPageLoader({ minMs: 380 });
     router.replace(`/${lang}/bazaar`);
-  }, [router, lang, tg]);
+  }, [router, lang, tg, showPageLoader]);
 
   const toggleFavorite = async (id: number) => {
     const isFavorite = favorites.has(id);
@@ -445,6 +462,7 @@ export default function SearchPage() {
           }}
           onToggleFavorite={toggleFavorite}
           tg={tg}
+          onInitialLoadSettled={handleSearchInitialLoadSettled}
         />
 
       <Toast

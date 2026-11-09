@@ -45,24 +45,25 @@ logger = logging.getLogger(__name__)
 
 FEED_INTERVAL_MIN = 10
 
-STATIC_SERVICES_COVER = "/images/channel_covers/services.png"
-
-
 def _marketplace_cover_path(row, listing_id: int) -> str:
-    """Обкладинка як у маркетплейсі. Якщо намалювати не вийшло — стара тематична."""
-    from parser.moderation.marketplace_cover import render_marketplace_cover
+    """Тематична обкладинка маркетплейсу для каналу (Hamburg / Germany)."""
+    from parser.moderation.services_publish import _resolve_services_channel_cover_path
 
-    subcategory = _row_get(row, "subcategory")
-    path = render_marketplace_cover(
+    item = {
+        "title": _row_get(row, "title"),
+        "description": _row_get(row, "description"),
+        "category": _row_get(row, "category"),
+        "subcategory": _row_get(row, "subcategory"),
+    }
+    path = _resolve_services_channel_cover_path(
+        item,
         listing_id=listing_id,
-        title=str(_row_get(row, "title") or ""),
-        description=str(_row_get(row, "description") or ""),
-        category=str(_row_get(row, "category") or "") or None,
-        subcategory=subcategory if isinstance(subcategory, str) else None,
+        marketplace_listing_id=listing_id,
+        marketplace_description=str(_row_get(row, "description") or ""),
     )
     if path:
         return path
-    return STATIC_SERVICES_COVER
+    return "/images/channel_covers/services.png"
 
 _CHANNELS = (
     ("hamburg", TRADE_SERVICES_CHANNEL_HAMBURG_ID),
@@ -199,9 +200,8 @@ async def _publish_one(bot, channel_key: str, chat_id: int) -> None:
     row = by_id[picked.id]
     title = str(_row_get(row, "title") or "")
     description = str(_row_get(row, "description") or "")
-    images = listing_image_paths(_row_get(row, "images"))
     cover = _marketplace_cover_path(row, picked.id)
-    photo = images[:1] or [cover]
+    photo = [cover]
 
     item = marketplace_listing_to_channel_item(
         row,
@@ -217,17 +217,6 @@ async def _publish_one(bot, channel_key: str, chat_id: int) -> None:
         marketplace_listing_id=picked.id,
         force_channel_ids=[chat_id],
     )
-    if chat_id not in result.chat_ids and photo != [cover]:
-        result = await publish_services_listing_to_channel(
-            bot,
-            item,
-            picked.id,
-            description,
-            [cover],
-            marketplace_listing_id=picked.id,
-            force_channel_ids=[chat_id],
-        )
-
     if chat_id not in result.chat_ids:
         remember_channel_publish(
             listing_id=picked.id,

@@ -23,6 +23,7 @@ import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { useState, useMemo, useRef, useEffect, useCallback, memo, useDeferredValue, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
+import { usePageTransition } from '@/contexts/PageTransitionContext';
 import { pickBazaarTabField, type BazaarTabPersistedState } from '@/lib/bazaar/bazaarTabStateStorage';
 import { Currency } from '@/utils/currency';
 
@@ -108,6 +109,7 @@ const BazaarTabComponent = ({
   const router = useRouter();
   const params = useParams();
   const lang = (params?.lang as string) || 'uk';
+  const { show: showPageLoader } = usePageTransition();
   const ac = getAppearanceClasses(isLight);
 
   useEffect(() => {
@@ -498,6 +500,7 @@ const BazaarTabComponent = ({
                 variant="main"
                 searchTriggerMode
                 onOpenSearchModal={() => {
+                  showPageLoader({ minMs: 380 });
                   router.push(`/${lang}/search`);
                   tg?.HapticFeedback?.impactOccurred?.('light');
                 }}

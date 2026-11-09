@@ -337,6 +337,15 @@ class CoverTests(unittest.TestCase):
             ),
             "SprayCan",
         )
+        self.assertEqual(
+            resolve_cover_icon_name(
+                title="Ремонт пральної",
+                description=LONG,
+                category="services_work",
+                subcategory="repair_installation",
+            ),
+            "Wrench",
+        )
         self.assertEqual(shorten_cover_title("Прибирання квартир"), "Прибирання квартир")
         path = render_marketplace_cover(
             listing_id=7,
@@ -428,7 +437,7 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(skipped, [])
         self.assertIn("Прибирання квартир", bot.calls[0]["caption"])
 
-    async def test_bad_photo_falls_back_to_cover_and_other_city_is_skipped(self):
+    async def test_listing_photo_ignored_uses_marketplace_cover(self):
         good = {
             "id": 8,
             "title": "Ремонт пралок",
@@ -439,7 +448,7 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
             "category": "services_work",
             "subcategory": "repair_installation",
             "location": "Hamburg",
-            "images": '["https://example.com/missing-photo.jpg"]',
+            "images": '["https://example.com/product-photo.jpg"]',
             "condition": "",
         }
         berlin = {

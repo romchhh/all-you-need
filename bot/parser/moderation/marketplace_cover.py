@@ -47,6 +47,8 @@ _SCHEMES: tuple[tuple[int, str, str, str, str], ...] = (
 _SUBCATEGORY_TO_ICON = {
     "beauty_health": "beauty_wellness",
     "beauty_services": "beauty_wellness",
+    "online_services": "services_work",
+    "it_services": "electronics",
     "auto_services": "auto",
     "repair_installation": "home",
     "cleaning": "home",

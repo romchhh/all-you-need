@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { rawQuery, sqlBooleanIsTrue, sqlLikeOp } from '@/lib/dbSql';
+import { normalizePgBoolean, rawQuery, sqlBooleanIsTrue, sqlLikeOp } from '@/lib/dbSql';
+import { findUserByTelegramId } from '@/utils/userHelpers';
 import { sqlListingSearchableDescription } from '@/lib/listings/searchVariants';
 import { ensureBusinessSearchCatalogFresh } from '@/lib/business/businessProfileConsistency';
 import { syncBusinessListingProfileTypes } from '@/lib/businessProfileHelpers';
@@ -143,14 +144,15 @@ function appendFilterClauses(filters: BusinessSearchFilters, params: unknown[]):
 async function resolveViewerUserId(viewerTelegramId?: string | null): Promise<number | null> {
   const trimmed = viewerTelegramId?.trim();
   if (!trimmed) return null;
+  const user = await findUserByTelegramId(trimmed);
+  return user?.id ?? null;
+}
 
-  const viewers = await rawQuery<Array<{ id: number }>>(
-    prisma,
-    `SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ? LIMIT 1`,
-    [trimmed]
-  );
-
-  return viewers[0]?.id ?? null;
+/** PG згортає camelCase-аліаси в isfollowing — читаємо обидва варіанти. */
+function rowIsFollowing(row: Record<string, unknown>): boolean {
+  const raw = row.isFollowing ?? row.isfollowing;
+  if (raw === undefined || raw === null) return false;
+  return normalizePgBoolean(raw);
 }
 
 export function formatBusinessActivityLine(
@@ -235,8 +237,8 @@ export async function searchBusinessProfiles(
 
   const followSelect =
     viewerUserId != null
-      ? `CASE WHEN bf.id IS NOT NULL THEN 1 ELSE 0 END as isFollowing`
-      : `0 as isFollowing`;
+      ? `CASE WHEN bf.id IS NOT NULL THEN 1 ELSE 0 END as "isFollowing"`
+      : `0 as "isFollowing"`;
   const followJoin =
     viewerUserId != null
       ? `LEFT JOIN BusinessFollow bf ON bf.businessProfileId = bp.id AND bf.followerUserId = ?`
@@ -283,7 +285,7 @@ export async function searchBusinessProfiles(
     rating: Number(row.rating) || 0,
     reviewsCount: Number(row.reviewsCount) || 0,
     followersCount: Number(row.followersCount) || 0,
-    isFollowing: Number(row.isFollowing) === 1,
+    isFollowing: rowIsFollowing(row),
   }));
 
   const ownerIds = [
@@ -354,7 +356,7 @@ export async function listFollowedBusinessProfiles(
        COALESCE(u.rating, 0) as rating,
        COALESCE(u.reviewsCount, 0) as reviewsCount,
        COALESCE(bp.followersCount, 0) as followersCount,
-       1 as isFollowing
+       1 as "isFollowing"
      FROM BusinessFollow bf
      JOIN BusinessProfile bp ON bp.id = bf.businessProfileId
      JOIN User u ON u.id = bp.userId

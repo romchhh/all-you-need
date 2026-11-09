@@ -93,6 +93,8 @@ interface SearchViewProps {
   onSelectBusiness?: (payload: { telegramId: string; name: string; avatar: string }) => void;
   onToggleFavorite: (id: number) => void;
   tg: TelegramWebApp | null;
+  /** Викликається один раз після першого завантаження discover або URL-пошуку. */
+  onInitialLoadSettled?: () => void;
 }
 
 function SearchSection({
@@ -204,6 +206,7 @@ export function SearchView({
   onSelectBusiness,
   onToggleFavorite,
   tg,
+  onInitialLoadSettled,
 }: SearchViewProps) {
   useHideBottomNav(true);
   const { t, language } = useLanguage();
@@ -269,7 +272,8 @@ export function SearchView({
   const [recentSearchListings, setRecentSearchListings] = useState<Listing[]>([]);
   const [popularListings, setPopularListings] = useState<Listing[]>([]);
   const [recentViewedListings, setRecentViewedListings] = useState<Listing[]>([]);
-  const [loadingDiscover, setLoadingDiscover] = useState(false);
+  const [loadingDiscoverShell, setLoadingDiscoverShell] = useState(true);
+  const [loadingRecentSearchListings, setLoadingRecentSearchListings] = useState(false);
   const [searchEntityMode, setSearchEntityMode] = useState<SearchEntityMode>(initialEntityMode);
   const [followBusyId, setFollowBusyId] = useState<number | null>(null);
   const [selectedBusinessSphere, setSelectedBusinessSphere] = useState<string | null>(null);
@@ -281,7 +285,6 @@ export function SearchView({
   const [businessTotal, setBusinessTotal] = useState(0);
   const [loadingBusinessResults, setLoadingBusinessResults] = useState(false);
   const [recommendedBusinesses, setRecommendedBusinesses] = useState<BusinessSearchCardData[]>([]);
-  const [loadingRecommendedBusinesses, setLoadingRecommendedBusinesses] = useState(false);
   const businessRequestRef = useRef(0);
   const lastBusinessFetchKeyRef = useRef('');
   const [searchSubscribed, setSearchSubscribed] = useState(false);
@@ -931,15 +934,23 @@ export function SearchView({
     [fetchBusinessResults, fetchSearchResults, screenMode, searchEntityMode, tg]
   );
 
-  // Discover data
+  // Discover shell — один запит (популярне + рекомендовані бізнеси)
   useEffect(() => {
     let cancelled = false;
-    setLoadingDiscover(true);
+    setLoadingDiscoverShell(true);
 
-    const params = new URLSearchParams({ popularLimit: '24', recentLimit: '16' });
-    if (viewerTelegramId) params.set('telegramId', viewerTelegramId);
+    const params = new URLSearchParams({
+      popularLimit: '24',
+      recentLimit: '16',
+      businessLimit: '12',
+      lang: language === 'ru' ? 'ru' : 'uk',
+    });
+    if (viewerTelegramId) {
+      params.set('telegramId', viewerTelegramId);
+      params.set('viewerTelegramId', viewerTelegramId);
+    }
 
-    fetch(`/api/search/discover?${params}`, { cache: 'no-store' })
+    fetch(`/api/search/shell?${params}`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
@@ -947,39 +958,19 @@ export function SearchView({
         setRecentViewedListings(
           Array.isArray(data.recentViewedListings) ? data.recentViewedListings : []
         );
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingDiscover(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [viewerTelegramId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingRecommendedBusinesses(true);
-
-    const params = new URLSearchParams({
-      limit: '12',
-      lang: language === 'ru' ? 'ru' : 'uk',
-    });
-    if (viewerTelegramId) params.set('viewerTelegramId', viewerTelegramId);
-
-    fetch(`/api/search/business/discover?${params}`, { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
         setRecommendedBusinesses(
           Array.isArray(data.recommendedBusinesses) ? data.recommendedBusinesses : []
         );
       })
       .catch(() => {
-        if (!cancelled) setRecommendedBusinesses([]);
+        if (!cancelled) {
+          setPopularListings([]);
+          setRecentViewedListings([]);
+          setRecommendedBusinesses([]);
+        }
       })
       .finally(() => {
-        if (!cancelled) setLoadingRecommendedBusinesses(false);
+        if (!cancelled) setLoadingDiscoverShell(false);
       });
 
     return () => {
@@ -991,38 +982,29 @@ export function SearchView({
     const previews = getRecentSearchListings();
     if (previews.length === 0) {
       setRecentSearchListings([]);
+      setLoadingRecentSearchListings(false);
       return;
     }
 
     let cancelled = false;
-    const ids = previews.map((p) => p.id);
+    const ids = previews.map((p) => p.id).slice(0, 20);
+    setLoadingRecentSearchListings(true);
 
-    const loadByIds = async () => {
-      const loaded: Listing[] = [];
-      const chunkSize = 20;
-      for (let i = 0; i < ids.length; i += chunkSize) {
-        if (cancelled) return;
-        const chunk = ids.slice(i, i + chunkSize);
-        const rows = await Promise.all(
-          chunk.map(async (id) => {
-            try {
-              const params = profileTelegramId ? `?viewerId=${profileTelegramId}` : '';
-              const res = await fetch(`/api/listings/${id}${params}`);
-              if (res.ok) return (await res.json()) as Listing;
-            } catch {
-              /* skip */
-            }
-            return null;
-          })
-        );
-        loaded.push(...(rows.filter(Boolean) as Listing[]));
-      }
-      if (!cancelled) {
-        setRecentSearchListings(loaded);
-      }
-    };
-
-    void loadByIds();
+    fetch(`/api/favorites/listings?ids=${ids.join(',')}`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const list = Array.isArray(data.listings) ? (data.listings as Listing[]) : [];
+        const order = new Map(ids.map((id, i) => [id, i]));
+        list.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+        setRecentSearchListings(list);
+      })
+      .catch(() => {
+        if (!cancelled) setRecentSearchListings([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRecentSearchListings(false);
+      });
 
     return () => {
       cancelled = true;
@@ -1129,6 +1111,20 @@ export function SearchView({
   const isTypingPending =
     trimmedLocal.length >= MIN_QUERY_LENGTH && trimmedLocal !== debouncedQuery.trim();
 
+  const initialShellReady =
+    screenMode === 'discover'
+      ? !loadingDiscoverShell && !loadingRecentSearchListings
+      : searchEntityMode === 'businesses'
+        ? !loadingBusinessResults && !isTypingPending
+        : !loadingResults && !isTypingPending;
+
+  const initialLoadSettledRef = useRef(false);
+  useEffect(() => {
+    if (!onInitialLoadSettled || initialLoadSettledRef.current || !initialShellReady) return;
+    initialLoadSettledRef.current = true;
+    onInitialLoadSettled();
+  }, [initialShellReady, onInitialLoadSettled]);
+
   const catalogListingsProps = {
     favorites,
     onSelect: openListing,
@@ -1206,7 +1202,7 @@ export function SearchView({
                 />
               ))}
             </div>
-          ) : loadingRecommendedBusinesses ? (
+          ) : loadingDiscoverShell ? (
             <div className="space-y-3 py-2">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div
@@ -1359,7 +1355,7 @@ export function SearchView({
         icon={<TrendingUp size={16} />}
         isLight={isLight}
       >
-        {loadingDiscover && popularListings.length === 0 ? (
+        {loadingDiscoverShell && popularListings.length === 0 ? (
           <CatalogListingsSkeleton count={6} />
         ) : popularListings.length > 0 ? (
           <CatalogListings items={popularListings} {...catalogListingsProps} />
@@ -1397,7 +1393,7 @@ export function SearchView({
         icon={<TrendingUp size={16} />}
         isLight={isLight}
       >
-        {loadingRecommendedBusinesses ? (
+        {loadingDiscoverShell ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div

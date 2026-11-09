@@ -528,6 +528,69 @@ def _default_channel_photo_path() -> Optional[str]:
     return None
 
 
+def _static_channel_cover_rel_path(subcategory: str | None) -> str:
+    """Резерв, якщо render_marketplace_cover недоступний (без Pillow)."""
+    sub = (subcategory or "").strip().lower()
+    if sub in {"beauty_health", "beauty_services"}:
+        return "/images/channel_covers/services.png"
+    if sub in {"vacancies", "part_time", "looking_for_work", "other_work"}:
+        return "/images/channel_covers/work.png"
+    # realestate/events не публікуємо в канал; дефолт — загальна обкладинка послуг
+    return "/images/channel_covers/services.png"
+
+
+def _resolve_services_channel_cover_path(
+    item: dict,
+    *,
+    listing_id: int,
+    marketplace_listing_id: int | None,
+    marketplace_description: str | None,
+) -> str | None:
+    """Тематична обкладинка як у маркетплейсі — завжди для каналів, не фото товару з оголошення."""
+    from parser.moderation.marketplace_cover import render_marketplace_cover
+
+    title = str(item.get("title") or "").strip()
+    raw_desc = (marketplace_description or item.get("description") or "").strip()
+    category = str(item.get("category") or "").strip() or None
+    sub = item.get("subcategory")
+    sub_s = sub if isinstance(sub, str) else None
+    lid = marketplace_listing_id or listing_id
+    rendered = render_marketplace_cover(
+        listing_id=lid,
+        title=title,
+        description=raw_desc,
+        category=category,
+        subcategory=sub_s,
+    )
+    if rendered:
+        return rendered
+
+    project_root = Path(__file__).resolve().parent.parent.parent.parent
+    rel = _static_channel_cover_rel_path(sub_s)
+    static = project_root / "app" / "public" / rel.lstrip("/")
+    if static.is_file():
+        return str(static)
+    return _default_channel_photo_path()
+
+
+def _services_channel_photo_inputs(
+    item: dict,
+    *,
+    listing_id: int,
+    marketplace_listing_id: int | None,
+    marketplace_description: str | None,
+) -> list:
+    path = _resolve_services_channel_cover_path(
+        item,
+        listing_id=listing_id,
+        marketplace_listing_id=marketplace_listing_id,
+        marketplace_description=marketplace_description,
+    )
+    if path and Path(path).is_file():
+        return [FSInputFile(path)]
+    return []
+
+
 def _channel_photo_inputs_from_images_web(images_web: list) -> list:
     out: list = []
     base = (WEBAPP_URL or "").rstrip("/")
@@ -767,7 +830,10 @@ async def publish_services_listing_to_channel(
         {TRADE_SERVICES_CHANNEL_HAMBURG_ID, TRADE_SERVICES_CHANNEL_GERMANY_ID}
     )
     if channel_ids and all(int(cid) in trade_chats for cid in channel_ids):
-        from parser.moderation.channel_feed_select import channel_feed_topic
+        from parser.moderation.channel_feed_select import (
+            channel_feed_topic,
+            is_marketplace_channel_service,
+        )
 
         title_probe = (item.get("title") or "").strip()
         desc_probe = (
@@ -775,17 +841,29 @@ async def publish_services_listing_to_channel(
             or (marketplace_description or "").strip()
         )
         sub_probe = item.get("subcategory")
-        if not channel_feed_topic(
+        sub_s = sub_probe if isinstance(sub_probe, str) else None
+        if not is_marketplace_channel_service(
             str(item.get("category") or ""),
-            sub_probe if isinstance(sub_probe, str) else None,
+            sub_s,
             title_probe,
             desc_probe,
         ):
             logger.info(
-                "Listing %s: пропуск публічного каналу послуг — лише послуги (category=%r, sub=%r)",
+                "Listing %s: пропуск публічного каналу — товар/не послуга (category=%r, sub=%r)",
                 listing_id,
                 item.get("category"),
                 item.get("subcategory"),
+            )
+            return ServicesChannelPublishResult([], None)
+        if not channel_feed_topic(
+            str(item.get("category") or ""),
+            sub_s,
+            title_probe,
+            desc_probe,
+        ):
+            logger.info(
+                "Listing %s: пропуск публічного каналу — не проходить якість стрічки",
+                listing_id,
             )
             return ServicesChannelPublishResult([], None)
     logger.info(
@@ -912,19 +990,13 @@ async def publish_services_listing_to_channel(
     keyboard_rows.append([InlineKeyboardButton(text=submit_btn, url=bot_link)])
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
 
-    photo_inputs = _channel_photo_inputs_from_images_web(list(images_web) if images_web else [])
-    if not photo_inputs:
-        from parser.moderation.marketplace_cover import render_marketplace_cover
-
-        cover_path = render_marketplace_cover(
-            listing_id=marketplace_listing_id or listing_id,
-            title=title,
-            description=raw_desc or marketplace_description,
-            category=category,
-            subcategory=subcategory if isinstance(subcategory, str) else None,
-        )
-        if cover_path:
-            photo_inputs = [FSInputFile(cover_path)]
+    del images_web  # у каналах лише тематична обкладинка маркетплейсу, не фото товару
+    photo_inputs = _services_channel_photo_inputs(
+        item,
+        listing_id=listing_id,
+        marketplace_listing_id=marketplace_listing_id,
+        marketplace_description=marketplace_description,
+    )
 
     published: list[int] = []
     primary_post_url: str | None = None
