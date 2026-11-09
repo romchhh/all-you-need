@@ -1641,6 +1641,8 @@
       "vitrineMoreWithCount": "Ещё +{count}",
       "showMoreListings": "Показать ещё",
       "singleListingInProfile": "1 объявление в профиле",
+      "singleListingCount": "1 объявление",
+      "inProfile": "в профиле",
       "subscribe": "Подписаться",
       "subscribed": "Вы подписаны",
       "unsubscribe": "Отписаться",

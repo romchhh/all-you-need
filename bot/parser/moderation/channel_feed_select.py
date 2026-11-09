@@ -67,7 +67,42 @@ _REALESTATE_OFFER_RE = re.compile(
     r"(?:"
     r"\bздам\b|\bсдам\b|\bзніму\b|\bсниму\b|\bоренд[ау]\b|\bаренд[ау]\b|"
     r"\bпродам\s+квартир|\bпродам\s+будинок|"
-    r"\bvermiete\b|\bzu\s+vermieten\b|\bmietwohnung\b|\bwg-zimmer\b"
+    r"\bvermiete\b|\bzu\s+vermieten\b|\bmietwohnung\b|\bwg-zimmer\b|"
+    r"\bжиль[её]\b|\bжитло\b|\bwohnung\b|"
+    r"мини\s*джоб|міні\s*джоб|minijob"
+    r")",
+    re.IGNORECASE,
+)
+
+# Промо чужої групи / «приєднуйтесь» — не послуга для публікації в канал.
+_CHANNEL_COMMUNITY_PROMO_RE = re.compile(
+    r"(?:"
+    r"присоединяйтесь?\s+к\s+(?:нашему\s+)?сообществ|"
+    r"приєднуйтесь?\s+до\s+(?:нашо[єї]\s+)?спільнот|"
+    r"join\s+(?:our\s+)?community|"
+    r"найд[её]те\s+проверенн\w*\s+мастер|"
+    r"знайдете\s+перевірен\w*\s+майстр|"
+    r"проверенн\w*\s+мастер(?:ов)?\s+и\s+салон|"
+    r"перевірен\w*\s+майстр(?:ів)?\s+і\s+салон|"
+    r"бьюти[- ]?услуг[аи].*(?:акци|скидк|сообществ)|"
+    r"beauty\s+nrw|"
+    r"акци[яи],?\s*скидк\w*.*(?:сообществ|присоединя)|"
+    r"скидк\w*.*интересн\w*\s+предложени"
+    r")",
+    re.IGNORECASE,
+)
+
+# Питання в чат / схема «жильё за миниджоб» — не офер послуги.
+_CHANNEL_CHAT_QUESTION_RE = re.compile(
+    r"(?:"
+    r"а\s+как\s+тогда|а\s+як\s+тоді|"
+    r"как\s+организовать|як\s+організувати|"
+    r"или\s+как\s+сделать|чи\s+як\s+зробити|"
+    r"спасибо\s+большое\s+за\s+помощь|дякую\s+велике\s+за\s+допомог|"
+    r"нужно\s+заранее\s+какое[- ]?то\s+приглашен|"
+    r"потрібно\s+заздалегідь\s+якесь\s+запрошен|"
+    r"жиль[её]\s+за\s+(?:мини|міні)|житло\s+за\s+(?:мини|міні|minijob)|"
+    r"дает\s+жиль[её]|дає\s+житло"
     r")",
     re.IGNORECASE,
 )
@@ -128,9 +163,17 @@ def is_feed_quality(title: str, description: str, *, bucket: str | None = None) 
         return False
     if _EARN_BOT_RE.search(blob):
         return False
+    if _CHANNEL_COMMUNITY_PROMO_RE.search(blob):
+        return False
+    if _CHANNEL_CHAT_QUESTION_RE.search(blob):
+        return False
     if is_wanted_only_post(blob):
         return False
     if has_too_many_emojis(plain_desc):
+        return False
+    from parser.core.quality import is_likely_not_listing
+
+    if is_likely_not_listing(plain_title, plain_desc):
         return False
     return True
 
@@ -152,6 +195,14 @@ def is_marketplace_channel_service(
     if _EVENT_RE.search(blob):
         return False
     if _REALESTATE_OFFER_RE.search(blob):
+        return False
+    if _CHANNEL_COMMUNITY_PROMO_RE.search(blob):
+        return False
+    if _CHANNEL_CHAT_QUESTION_RE.search(blob):
+        return False
+    from parser.core.quality import is_likely_not_listing
+
+    if is_likely_not_listing(title, description):
         return False
     from parser.marketplace_categories import should_treat_as_service
 

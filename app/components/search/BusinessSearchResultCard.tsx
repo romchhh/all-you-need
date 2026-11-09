@@ -11,6 +11,7 @@ import { getResolvedImageUrl } from '@/utils/imageUtils';
 import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
+import { CategoryIcon } from '@/components/listing/CategoryIcon';
 import { getCurrencySymbol } from '@/utils/currency';
 
 export type BusinessSearchCardData = {
@@ -264,59 +265,98 @@ export function BusinessSearchResultCard({
         ) : null}
 
         {canOpenListings ? (
-          <div
-            className={
-              showMoreListings
-                ? 'scrollbar-hide -mx-0.5 flex items-stretch gap-2 overflow-x-auto px-0.5 pb-0.5'
-                : listingCount === 1
-                  ? 'flex gap-2'
-                  : `grid gap-2 ${listingCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`
-            }
-            style={showMoreListings ? { WebkitOverflowScrolling: 'touch' } : undefined}
-          >
-            {previewListings.map((listing) => (
+          listingCount === 1 ? (
+            <div className="flex items-stretch gap-2">
               <VitrineSquare
-                key={listing.id}
-                item={listing}
+                item={previewListings[0]}
                 onSelect={onSelectListing}
                 tg={tg}
                 t={t}
-                className={
-                  showMoreListings || listingCount === 1
-                    ? VITRINE_THUMB
-                    : 'relative aspect-square w-full min-w-0 overflow-hidden rounded-xl'
-                }
+                className={VITRINE_THUMB}
               />
-            ))}
-            {showMoreListings ? (
               <button
                 type="button"
                 onClick={openProfile}
-                className={`${VITRINE_THUMB} flex flex-col items-center justify-center gap-0.5 px-1 ${
+                className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors ${
                   isLight
-                    ? 'border border-[#3F5331]/12 bg-[#E8F0E0]/50'
-                    : 'border border-white/10 bg-white/[0.06]'
+                    ? 'bg-[#E8F0E0]/70 text-[#2D3E28] hover:bg-[#E8F0E0]'
+                    : 'bg-white/[0.06] text-white hover:bg-white/[0.1]'
                 }`}
+                aria-label={t('businessProfile.public.singleListingInProfile')}
               >
-                <span
-                  className={`px-0.5 text-center text-[10px] font-bold leading-[1.2] ${
-                    isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'
+                <CategoryIcon
+                  categoryId={previewListings[0].category || 'all_categories'}
+                  size={28}
+                  className="shrink-0 opacity-90"
+                />
+                <span className="min-w-0 flex-1 leading-[1.15]">
+                  <span className="block text-[13px] font-semibold">
+                    {t('businessProfile.public.singleListingCount')}
+                  </span>
+                  <span className={`block text-[12px] ${ac.mutedText}`}>
+                    {t('businessProfile.public.inProfile')}
+                  </span>
+                </span>
+                <ChevronRight
+                  size={18}
+                  className={`shrink-0 ${isLight ? 'text-[#3F5331]/70' : 'text-white/70'}`}
+                  aria-hidden
+                />
+              </button>
+            </div>
+          ) : (
+            <div
+              className={
+                showMoreListings
+                  ? 'scrollbar-hide -mx-0.5 flex items-stretch gap-2 overflow-x-auto px-0.5 pb-0.5'
+                  : `grid gap-2 ${listingCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`
+              }
+              style={showMoreListings ? { WebkitOverflowScrolling: 'touch' } : undefined}
+            >
+              {previewListings.map((listing) => (
+                <VitrineSquare
+                  key={listing.id}
+                  item={listing}
+                  onSelect={onSelectListing}
+                  tg={tg}
+                  t={t}
+                  className={
+                    showMoreListings
+                      ? VITRINE_THUMB
+                      : 'relative aspect-square w-full min-w-0 overflow-hidden rounded-xl'
+                  }
+                />
+              ))}
+              {showMoreListings ? (
+                <button
+                  type="button"
+                  onClick={openProfile}
+                  className={`${VITRINE_THUMB} flex flex-col items-center justify-center gap-0.5 px-1 ${
+                    isLight
+                      ? 'border border-[#3F5331]/12 bg-[#E8F0E0]/50'
+                      : 'border border-white/10 bg-white/[0.06]'
                   }`}
                 >
-                  {t('businessProfile.public.showMoreListings')}
-                </span>
-                {remainingCount > 0 ? (
                   <span
-                    className={`text-[11px] font-bold tabular-nums ${
-                      isLight ? 'text-[#3F5331]/75' : 'text-white/60'
+                    className={`px-0.5 text-center text-[10px] font-bold leading-[1.2] ${
+                      isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'
                     }`}
                   >
-                    +{remainingCount}
+                    {t('businessProfile.public.showMoreListings')}
                   </span>
-                ) : null}
-              </button>
-            ) : null}
-          </div>
+                  {remainingCount > 0 ? (
+                    <span
+                      className={`text-[11px] font-bold tabular-nums ${
+                        isLight ? 'text-[#3F5331]/75' : 'text-white/60'
+                      }`}
+                    >
+                      +{remainingCount}
+                    </span>
+                  ) : null}
+                </button>
+              ) : null}
+            </div>
+          )
         ) : null}
 
         <button

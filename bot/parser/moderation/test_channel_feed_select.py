@@ -53,6 +53,44 @@ class QualityTests(unittest.TestCase):
             )
         )
 
+    def test_rejects_community_promo_and_minijob_chat(self):
+        self.assertIsNone(
+            classify_bucket(
+                "services_work",
+                "beauty_services",
+                "Beauty NRW",
+                "В Beauty NRW вы найдёте проверенных мастеров и салоны, "
+                "бьюти-услуги, акции, скидки и интересные предложения. "
+                "ПРИСОЕДИНЯЙТЕСЬ К НАШЕМУ СООБЩЕСТВУ",
+            )
+        )
+        self.assertFalse(
+            is_feed_quality(
+                "Beauty NRW",
+                "В Beauty NRW вы найдёте проверенных мастеров и салоны, "
+                "бьюти-услуги, акции, скидки и интересные предложения. "
+                "ПРИСОЕДИНЯЙТЕСЬ К НАШЕМУ СООБЩЕСТВУ",
+            )
+        )
+        self.assertIsNone(
+            classify_bucket(
+                "services_work",
+                "consultations",
+                "Миниджоб и жилье",
+                "Спасибо большое за помощь а как тогда организовать вариант с миниджобом? "
+                "я работаю в фирме которая дает жилье за миниджоб. стоимость 275 евро в месяц. "
+                "это нужно заранее какое-то приглашение? или как сделать",
+            )
+        )
+        self.assertFalse(
+            is_feed_quality(
+                "Миниджоб и жилье",
+                "Спасибо большое за помощь а как тогда организовать вариант с миниджобом? "
+                "я работаю в фирме которая дает жилье за миниджоб. стоимость 275 евро в месяц. "
+                "это нужно заранее какое-то приглашение? или как сделать",
+            )
+        )
+
 
 class RoutingTests(unittest.TestCase):
     def test_hamburg_only_local_and_online(self):
