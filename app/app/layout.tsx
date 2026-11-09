@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -10,20 +10,44 @@ import { RegistrationGate } from "@/components/telegram/RegistrationGate";
 import { AppProviders } from "@/components/layout/AppProviders";
 import { ListingMediaCacheScript } from "@/components/system/ListingMediaCacheScript";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const montserrat = Montserrat({
+/**
+ * Self-hosted Montserrat — next/font/google тягне fonts.googleapis.com під час
+ * `next build` і ламає Docker на VPS без доступу до Google.
+ */
+const montserrat = localFont({
+  src: [
+    {
+      path: "../fonts/montserrat-cyrillic-ext.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+    {
+      path: "../fonts/montserrat-cyrillic.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+    {
+      path: "../fonts/montserrat-latin-ext.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+    {
+      path: "../fonts/montserrat-latin.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+  ],
   variable: "--font-montserrat",
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  fallback: [
+    "-apple-system",
+    "BlinkMacSystemFont",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    "Arial",
+    "sans-serif",
+  ],
 });
 
 export const metadata: Metadata = {
@@ -46,9 +70,7 @@ export default function RootLayout({
         {/* Telegram WebApp — defer, щоб не блокувати parse HTML */}
         <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} antialiased`}
-      >
+      <body className={`${montserrat.variable} antialiased`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var k='appAppearanceTheme',t=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',t==='light'||t==='dark'?t:'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
