@@ -336,7 +336,12 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
     const hasUsableProfile = Boolean(data.hasProfile && data.profile);
     const cabinet = data.profile
-      ? resolveBusinessCabinetState(data.profile)
+      ? resolveBusinessCabinetState({
+          subscriptionStatus: data.profile.subscriptionStatus || 'draft',
+          subscriptionEndsAt: data.profile.subscriptionEndsAt ?? null,
+          plan: data.profile.plan ?? null,
+          businessName: data.profile.businessName ?? null,
+        })
       : 'inactive';
 
     // Вже створений кабінет (не чернетка) → Business-профіль; інакше — створення/продовження
