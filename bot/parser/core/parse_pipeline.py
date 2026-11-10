@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Optional
 
 from parser.ai.screen import ai_screen_parsed_listing, apply_screen_enrichment
 from parser.core.dedup import check_parser_duplicates
-from parser.core.patterns import FREE_GIVEAWAY_RE
+from parser.core.patterns import is_clear_free_giveaway
 from parser.core.quality import is_junk_for_marketplace
 from parser.core.text import format_listing_description, polish_listing_description
 from parser.marketplace_categories import (
@@ -60,9 +61,19 @@ def _finalize_fields(
 
     cat_lower = str(category or "").strip().lower()
     price_l = str(price or "").strip().lower()
-    explicit_free = bool(is_free) or cat_lower in ("free", "free_stuff")
-    if not explicit_free and FREE_GIVEAWAY_RE.search(blob):
+    has_numeric_price = False
+    if price and price_l not in ("", "0", "none", "null", "free", "договорная", "договірна"):
+        try:
+            has_numeric_price = float(str(price).replace(",", ".").replace(" ", "")) > 0
+        except (TypeError, ValueError):
+            has_numeric_price = bool(re.search(r"\d", str(price)))
+
+    # «Отдам … за 200€» — не Free; «Віддам диван» без ціни — Free
+    explicit_free = (bool(is_free) or cat_lower in ("free", "free_stuff")) and not has_numeric_price
+    if not explicit_free and not has_numeric_price and is_clear_free_giveaway(blob):
         explicit_free = True
+    if explicit_free and has_numeric_price:
+        explicit_free = False
 
     if explicit_free and cat_lower != "services_work":
         price = "Free"

@@ -163,10 +163,10 @@ PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS: int = max(0, _env_int("PARSER_PHOTOS_PUBLIC_OR
 # public/listings/originals — важкий прохід на малому VPS; за замовчуванням вимкнено в авто-режимі
 PARSER_PHOTOS_CLEANUP_PUBLIC: bool = _env_bool("PARSER_PHOTOS_CLEANUP_PUBLIC", False)
 
-# Тиша для Telegram-каналів послуг (Europe/Kyiv): з quiet_start до quiet_end не публікуємо
+# Тиша публікації парсера (канали + auto-approve): Europe/Berlin 22:00–09:00
 PARSER_CHANNEL_QUIET_START_HOUR: int = max(0, min(23, _env_int("PARSER_CHANNEL_QUIET_START_HOUR", 22)))
-PARSER_CHANNEL_QUIET_END_HOUR: int = max(0, min(23, _env_int("PARSER_CHANNEL_QUIET_END_HOUR", 6)))
-PARSER_CHANNEL_QUIET_TZ: str = _env_str("PARSER_CHANNEL_QUIET_TZ", "Europe/Kyiv") or "Europe/Kyiv"
+PARSER_CHANNEL_QUIET_END_HOUR: int = max(0, min(23, _env_int("PARSER_CHANNEL_QUIET_END_HOUR", 9)))
+PARSER_CHANNEL_QUIET_TZ: str = _env_str("PARSER_CHANNEL_QUIET_TZ", "Europe/Berlin") or "Europe/Berlin"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 PHOTOS_DIR = REPO_ROOT / "database" / "parsed_photos"

@@ -163,6 +163,58 @@ class ParserSmokeTests(unittest.TestCase):
         self.assertEqual(giveaway["category"], "free")
         self.assertEqual(giveaway["price"], "Free")
 
+    def test_otdam_za_price_is_not_free(self):
+        from parser.ai.enrich import _normalize_price_fields
+        from parser.core.patterns import is_clear_free_giveaway
+        from parser.core.text import parse_price
+        from parser.marketplace_categories import detect_strong_item_category
+
+        raw = "Отдам половину своего гардероба за 200€. В гардеробе есть куртки, теплые вещи и летние, всего более 60 позиций."
+        self.assertFalse(is_clear_free_giveaway(raw))
+        price, currency, is_free = parse_price(raw)
+        self.assertEqual(price, "200")
+        self.assertEqual(currency, "EUR")
+        self.assertFalse(is_free)
+
+        fields = _finalize_fields(
+            title="Половину своего гардероба за",
+            description=raw,
+            raw_text=raw,
+            category="furniture",
+            subcategory="wardrobes_chests",
+            price="200",
+            currency="EUR",
+            is_free=False,
+            condition="used",
+            location="München",
+        )
+        self.assertFalse(fields["is_free"])
+        self.assertEqual(fields["price"], "200")
+        self.assertNotEqual(fields["category"], "free")
+
+        n_price, n_cur, n_free = _normalize_price_fields(None, None, True, raw)
+        self.assertEqual(n_price, "200")
+        self.assertEqual(n_cur, "EUR")
+        self.assertFalse(n_free)
+
+        strong = detect_strong_item_category(raw)
+        self.assertEqual(strong, ("fashion", "women_clothing"))
+
+    def test_broken_phone_title_loses_to_brand_title(self):
+        from parser.ai.screen import _pick_best_title, _title_quality_score
+
+        raw = "Продается iPhone 17 Pro Max на 512GB, состояние как новый, батарея 100%. Город Ессен."
+        broken = "17про макс на 512гб как новый г"
+        good = "iPhone 17 Pro Max 512GB"
+        self.assertGreater(
+            _title_quality_score(good, raw),
+            _title_quality_score(broken, raw),
+        )
+        picked = _pick_best_title(good, {"title": broken}, raw)
+        self.assertRegex(picked, r"(?i)iphone")
+        self.assertNotRegex(picked, r"(?i)состояние|батаре")
+        self.assertLessEqual(len(picked), 45)
+
     def test_city_outside_top40_stays_specific(self):
         self.assertEqual(canonicalize_known_city("Magdeburg"), "Magdeburg")
         self.assertEqual(canonicalize_known_city("Marl"), "Marl")

@@ -188,6 +188,13 @@ async def ensure_marketplace_listing_from_telegram(
     images_web = await _download_telegram_images(bot, images)
     price_str, is_free = _price_fields(telegram_listing)
 
+    from utils.bot_category_map import map_bot_category_to_marketplace
+
+    category_slug, subcategory_slug = map_bot_category_to_marketplace(
+        telegram_listing.get("category"),
+        telegram_listing.get("subcategory"),
+    )
+
     try:
         marketplace_id = create_marketplace_listing(
             user_id=int(user_id),
@@ -196,8 +203,8 @@ async def ensure_marketplace_listing_from_telegram(
             price=price_str,
             currency=telegram_listing.get("currency") or "EUR",
             is_free=is_free,
-            category=str(telegram_listing.get("category") or "other"),
-            subcategory=telegram_listing.get("subcategory"),
+            category=category_slug,
+            subcategory=subcategory_slug,
             condition=telegram_listing.get("condition") or "used",
             location=str(telegram_listing.get("location") or "Germany"),
             images=images_web,

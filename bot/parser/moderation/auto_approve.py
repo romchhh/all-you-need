@@ -31,6 +31,8 @@ from parser.config.settings import (
     PARSER_AUTO_APPROVE_SCHEDULED_DRAIN_ROUNDS,
     PARSER_AUTO_APPROVE_SERVICES_CHANNEL,
     PARSER_AUTO_APPROVE_WAVE_MINUTES,
+    PARSER_CHANNEL_QUIET_END_HOUR,
+    PARSER_CHANNEL_QUIET_TZ,
 )
 from parser.core.parse_pipeline import (
     ensure_parsed_item_ai_screened,
@@ -72,7 +74,7 @@ from parser.storage.parsed_items import (
 logger = logging.getLogger(__name__)
 
 _LOCK = asyncio.Lock()
-_KYIV_TZ = ZoneInfo("Europe/Kyiv")
+_PUBLISH_TZ = ZoneInfo(PARSER_CHANNEL_QUIET_TZ or "Europe/Berlin")
 
 _STUB_TITLES = frozenset({
     "объявление",
@@ -86,17 +88,26 @@ _STUB_TITLES = frozenset({
 })
 
 
-def _kyiv_day_start_utc() -> datetime:
-    """Початок «дня» як на головній (06:00 Europe/Kyiv)."""
-    now = datetime.now(_KYIV_TZ)
-    start = now.replace(hour=6, minute=0, second=0, microsecond=0)
+def _publish_day_start_utc() -> datetime:
+    """Початок робочого дня публікації (09:00 Europe/Berlin за замовчуванням)."""
+    now = datetime.now(_PUBLISH_TZ)
+    start = now.replace(
+        hour=PARSER_CHANNEL_QUIET_END_HOUR,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
     if now < start:
         start = start - timedelta(days=1)
     return start.astimezone(timezone.utc)
 
 
+# backward-compatible alias
+_kyiv_day_start_utc = _publish_day_start_utc
+
+
 def _today_approved_count() -> int:
-    start = _kyiv_day_start_utc()
+    start = _publish_day_start_utc()
     rows = list_auto_approved_since((start - timedelta(hours=6)).isoformat())
     total = 0
     for row in rows:
@@ -107,12 +118,16 @@ def _today_approved_count() -> int:
 
 
 def _pace_budget_now() -> int:
-    """Лінійний денний бюджет (Europe/Kyiv): до півночі — повний ліміт."""
+    """Лінійний денний бюджет (Europe/Berlin): після 09:00 до півночі — повний ліміт."""
     if not PARSER_AUTO_APPROVE_PACE_ENABLED:
         return PARSER_AUTO_APPROVE_DAILY_LIMIT
-    now = datetime.now(_KYIV_TZ)
+    now = datetime.now(_PUBLISH_TZ)
+    day_start_min = PARSER_CHANNEL_QUIET_END_HOUR * 60
     mins = now.hour * 60 + now.minute + PARSER_AUTO_APPROVE_PACE_BUFFER_MIN
-    fraction = min(1.0, max(0.0, mins / (24 * 60)))
+    if mins < day_start_min:
+        return 0
+    span = max(1, (24 * 60) - day_start_min)
+    fraction = min(1.0, max(0.0, (mins - day_start_min) / span))
     return max(1, int(round(PARSER_AUTO_APPROVE_DAILY_LIMIT * fraction)))
 
 
@@ -138,7 +153,7 @@ def _parse_moderated_at(raw: Optional[str]) -> Optional[datetime]:
 
 
 def _today_counts() -> dict[str, Counter]:
-    start = _kyiv_day_start_utc()
+    start = _publish_day_start_utc()
     rows = list_auto_approved_since((start - timedelta(hours=6)).isoformat())
     channel: Counter = Counter()
     category: Counter = Counter()
@@ -776,6 +791,17 @@ async def run_auto_approve_drain(
         "pending": 0,
     }
     if not PARSER_AUTO_APPROVE_ENABLED:
+        return stats
+
+    from parser.moderation.services_publish import services_channel_quiet_hours_active
+
+    if services_channel_quiet_hours_active():
+        logger.info(
+            "auto-approve: тихі години до %02d:00 %s — пропуск публікації",
+            PARSER_CHANNEL_QUIET_END_HOUR,
+            PARSER_CHANNEL_QUIET_TZ,
+        )
+        stats["quiet"] = True
         return stats
 
     if respect_pace is None:

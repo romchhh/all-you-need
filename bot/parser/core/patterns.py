@@ -16,6 +16,44 @@ FREE_GIVEAWAY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# «отдам/віддам за 200€» — продаж, не безкоштовна роздача
+_PRICED_GIVEAWAY_RE = re.compile(
+    r"(?i)\b(?:отдам|віддам|отдаю|віддаю|подарую)\b"
+    r"[^.\n]{0,60}?"
+    r"(?:за\s*\d|\d[\d\s]*(?:[.,]\d+)?\s*(?:[€$£]|євро|евро|euro|eur\b)|"
+    r"(?:[€$£])\s*\d)",
+)
+
+_EXPLICIT_FREE_WORD_RE = re.compile(
+    r"(?i)\b(?:безкоштовно|бесплатно|даром|verschenke|for\s+free)\b"
+    r"|(?:^|[\s,:])free(?:\s|$|[,.!?])",
+)
+
+
+def is_clear_free_giveaway(text: str) -> bool:
+    """
+    True лише для справді безкоштовної віддачі.
+    «Отдам половину гардероба за 200€» → False (є ціна).
+    «Віддам диван, самовіз» → True.
+    """
+    t = text or ""
+    if _EXPLICIT_FREE_WORD_RE.search(t):
+        # «безкоштовна доставка» / free parking — не роздача товару
+        if re.search(
+            r"(?i)(?:безкоштовн\w*|бесплатн\w*|free)\s+"
+            r"(?:доставк|доставк|shipping|delivery|parking|парков)",
+            t,
+        ) and not FREE_GIVEAWAY_RE.search(t):
+            return False
+        return True
+    if not FREE_GIVEAWAY_RE.search(t):
+        return False
+    if _PRICED_GIVEAWAY_RE.search(t):
+        return False
+    if PRICE_RE.search(t):
+        return False
+    return True
+
 # Позитивний сигнал: є офер товару/послуги (не чат і не новина)
 LISTING_OFFER_RE = re.compile(
     r"\b(продам|продаю|продаж[аі]?|продажа|verkaufe|selling|for\s+sale|abzugeben)\b"

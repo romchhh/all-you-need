@@ -227,6 +227,31 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
     console.error('[approveListing] City digest enqueue:', err);
   });
 
+  // Дубль у Telegram-канали: послуги / нерухомість / робота / подія
+  try {
+    const { publishMarketplaceListingToChannels } = await import(
+      '@/lib/moderation/publishMarketplaceToChannels'
+    );
+    const channelResult = await publishMarketplaceListingToChannels({
+      id: listing.id,
+      title: listing.title,
+      description: listing.description,
+      price: listing.price,
+      currency: listing.currency,
+      category: listing.category,
+      subcategory: listing.subcategory,
+      condition: listing.condition,
+      location: listing.location,
+      images: listing.images,
+      isFree: listing.isFree,
+    });
+    console.log(
+      `[approveListing] Channel duplicate listing ${listing.id}: mode=${channelResult.mode} messageId=${channelResult.messageId}`
+    );
+  } catch (channelErr) {
+    console.error('[approveListing] Channel duplicate failed:', channelErr);
+  }
+
   // Перевіряємо реферальну винагороду (асинхронно, не блокуємо відповідь)
   if (listing.telegramId) {
     fetch('/api/referral/check', {

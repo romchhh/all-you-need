@@ -417,6 +417,19 @@ class ModerationManager:
                             await self.delete_from_channel(listing_id)
                         except Exception as del_err:
                             print(f"Не вдалося видалити старе повідомлення з каналу для {listing_id}: {del_err}")
+
+                    # Завжди дублюємо в маркетплейс (навіть якщо канал не налаштований)
+                    try:
+                        marketplace_listing_id = await ensure_marketplace_listing_from_telegram(
+                            self.bot, listing
+                        )
+                        print(
+                            f"[approve_listing] TelegramListing {listing_id} → Listing {marketplace_listing_id}"
+                        )
+                    except Exception as sync_err:
+                        print(
+                            f"[approve_listing] Marketplace sync failed for {listing_id}: {sync_err}"
+                        )
                     
                     channel_message_id = await self._publish_to_channel(listing_id)
                     
@@ -560,6 +573,24 @@ class ModerationManager:
                         enqueue_city_digest_listing(listing_id)
                     except Exception as notify_err:
                         print(f"[approve_listing] City digest enqueue error: {notify_err}")
+
+                    # Дубль у Telegram-канали: послуги → SERVICES, нерухомість/робота/подія → TRADE
+                    try:
+                        from utils.marketplace_channel_publish import (
+                            publish_marketplace_listing_to_channels,
+                        )
+
+                        channel_result = await publish_marketplace_listing_to_channels(
+                            self.bot, listing_id
+                        )
+                        print(
+                            f"[approve_listing] Marketplace listing {listing_id} → channel "
+                            f"mode={channel_result.get('mode')} chats={channel_result.get('chat_ids')}"
+                        )
+                    except Exception as channel_err:
+                        print(
+                            f"[approve_listing] Channel duplicate error for {listing_id}: {channel_err}"
+                        )
 
                 conn.close()
                 return success

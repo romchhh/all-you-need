@@ -176,8 +176,9 @@ TRADE_SERVICES_CHANNEL_GERMANY_ID: int = int(
 
 def services_channel_quiet_hours_active() -> bool:
     """
-    True якщо зараз тихі години для каналів послуг (за замовчуванням 22:00–06:00 Europe/Kyiv).
-    Вікно [start, end) через північ: start=22, end=6 → 22:00..05:59.
+    True якщо зараз тихі години публікації парсера
+    (за замовчуванням 22:00–09:00 Europe/Berlin).
+    Вікно через північ: start=22, end=9 → 22:00..08:59.
     """
     try:
         from zoneinfo import ZoneInfo
@@ -187,7 +188,7 @@ def services_channel_quiet_hours_active() -> bool:
     except Exception:
         from datetime import datetime, timezone, timedelta
 
-        now = datetime.now(timezone(timedelta(hours=3)))
+        now = datetime.now(timezone(timedelta(hours=1)))
 
     start = PARSER_CHANNEL_QUIET_START_HOUR
     end = PARSER_CHANNEL_QUIET_END_HOUR
@@ -201,9 +202,9 @@ def services_channel_quiet_hours_active() -> bool:
 
 def services_channel_quiet_hours_message() -> str:
     return (
-        f"🌙 Канали послуг: тиша {PARSER_CHANNEL_QUIET_START_HOUR:02d}:00"
+        f"🌙 Публікація парсера: тиша {PARSER_CHANNEL_QUIET_START_HOUR:02d}:00"
         f"–{PARSER_CHANNEL_QUIET_END_HOUR:02d}:00 ({PARSER_CHANNEL_QUIET_TZ}). "
-        f"Маркетплейс ок; у канал — після {PARSER_CHANNEL_QUIET_END_HOUR:02d}:00."
+        f"Канали / auto-approve — після {PARSER_CHANNEL_QUIET_END_HOUR:02d}:00."
     )
 
 _HAMBURG_RE = re.compile(r"\bhamburg\b|\bгамбург\b", re.IGNORECASE)
@@ -799,12 +800,13 @@ async def publish_services_listing_to_channel(
     *,
     marketplace_listing_id: int | None = None,
     force_channel_ids: list[int] | None = None,
+    skip_feed_quality: bool = False,
 ) -> ServicesChannelPublishResult:
     """
     listing_id — id parsed_items (для логів).
     marketplace_listing_id — id Listing на маркетплейсі (deep link); якщо None — channel-only.
     force_channel_ids — якщо задано, публікуємо лише в ці канали (група модерації).
-    У тихі години (за замовчуванням 22:00–06:00 Kyiv) нічого не публікує — повертає [].
+    У тихі години (за замовчуванням 22:00–09:00 Europe/Berlin) нічого не публікує — повертає [].
     """
     if services_channel_quiet_hours_active():
         logger.info(
@@ -855,7 +857,8 @@ async def publish_services_listing_to_channel(
                 item.get("subcategory"),
             )
             return ServicesChannelPublishResult([], None)
-        if not channel_feed_topic(
+        # User-approved marketplace listings skip feed-quality gate (still category-checked).
+        if not skip_feed_quality and not channel_feed_topic(
             str(item.get("category") or ""),
             sub_s,
             title_probe,

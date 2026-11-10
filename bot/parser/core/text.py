@@ -5,10 +5,10 @@ from typing import Optional
 
 from parser.config.channels import CHANNELS_STRIP_TRAILING_LINK, normalize_channel_key
 from parser.core.patterns import (
-    FREE_GIVEAWAY_RE,
     GENERIC_TITLE_RE,
     ONE_EMOJI_RE,
     PRICE_RE,
+    is_clear_free_giveaway,
     is_greeting_only,
 )
 
@@ -45,7 +45,7 @@ def parse_price(text: str) -> tuple[Optional[str], Optional[str], bool]:
     if re.search(r"договір|договор|торг\b|по домовленост", lower):
         return "Договірна", None, False
 
-    if FREE_GIVEAWAY_RE.search(text):
+    if is_clear_free_giveaway(text):
         return "Free", None, True
 
     return None, None, False

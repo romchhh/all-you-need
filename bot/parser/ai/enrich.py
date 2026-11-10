@@ -141,45 +141,65 @@ def _normalize_price_fields(
     category: str | None = None,
 ) -> tuple[Optional[str], Optional[str], bool]:
     """
-    Free — лише при явних маркерах у тексті.
-    Без числової ціни — «Договорная» (товари та послуги).
+    Free — лише при явних маркерах без ціни («віддам диван»).
+    «Отдам … за 200€» → 200, не Free.
+    Без числової ціни — «Договорная».
     """
+    from parser.core.patterns import PRICE_RE, is_clear_free_giveaway
+
     price_s = str(price_raw or "").strip()
     currency = (str(currency_raw or "").strip().upper() or None)
     if currency not in ("EUR", "USD", "UAH"):
         currency = "EUR" if price_s else None
 
-    lower = (text_hint or "").lower()
-    explicit_free = bool(
-        re.search(r"\b(безкоштовно|бесплатно|віддам|отдам|даром|free)\b", lower)
-    )
+    def _currency_from_window(window: str, fallback: str | None = "EUR") -> str:
+        if re.search(r"грн|uah", window, re.IGNORECASE):
+            return "UAH"
+        if re.search(r"\$|usd", window, re.IGNORECASE):
+            return "USD"
+        return fallback or "EUR"
 
-    # Не довіряємо голому is_free від AI без текстових маркерів (особливо для послуг).
-    if bool(is_free_raw) and explicit_free:
-        return "Free", None, True
-    if explicit_free and (not price_s or price_s.lower() in NEGOTIABLE_PRICES or "free" in price_s.lower()):
+    def _from_numeric(raw: str, cur: str | None) -> tuple[Optional[str], Optional[str], bool] | None:
+        cleaned = raw.replace(" ", "").replace(",", ".")
+        if cleaned.lower() in NEGOTIABLE_PRICES or cleaned.lower() in ("free", "0"):
+            return None
+        m = re.search(r"(\d+(?:[.,]\d+)?)", cleaned)
+        if not m:
+            return None
+        num = m.group(1).replace(",", ".")
+        try:
+            if float(num) <= 0:
+                return None
+        except ValueError:
+            return None
+        return num, cur or "EUR", False
+
+    # 1) Числова ціна від AI — ніколи не Free
+    if price_s and price_s.lower() not in NEGOTIABLE_PRICES and "free" not in price_s.lower():
+        got = _from_numeric(price_s, currency)
+        if got:
+            return got
+
+    # 2) Ціна з тексту («за 200€») — важливіше за слово «отдам»
+    pm = PRICE_RE.search(text_hint or "")
+    if pm:
+        raw = (pm.group(1) or pm.group(2) or pm.group(3) or "").strip()
+        if raw:
+            window = (text_hint or "")[max(0, pm.start() - 2): pm.end() + 8]
+            got = _from_numeric(raw, _currency_from_window(window, currency))
+            if got:
+                return got
+
+    # 3) Справжня безкоштовна віддача (без ціни)
+    if is_clear_free_giveaway(text_hint or "") or (
+        bool(is_free_raw) and is_clear_free_giveaway(text_hint or "")
+    ):
         return "Free", None, True
 
     if not price_s or price_s.lower() in NEGOTIABLE_PRICES or price_s.lower() in ("free", "0"):
-        if explicit_free:
-            return "Free", None, True
         return "Договорная", None, False
 
-    cleaned = price_s.replace(" ", "").replace(",", ".")
-    if cleaned.lower() in NEGOTIABLE_PRICES or cleaned.lower() == "free":
-        return "Договорная", None, False
-
-    m = re.search(r"(\d+(?:[.,]\d+)?)", cleaned)
-    if not m:
-        return "Договорная", None, False
-
-    num = m.group(1).replace(",", ".")
-    try:
-        if float(num) <= 0:
-            return "Договорная", None, False
-    except ValueError:
-        return "Договорная", None, False
-    return num, currency or "EUR", False
+    return "Договорная", None, False
 
 
 def _validate_location(
@@ -257,9 +277,13 @@ Canonical cities: {", ".join(GERMAN_CITIES[:40])}, …
 
 Rules:
 1. title — Russian, 4–80 chars. Item/service essence: brand, model, service type.
+   ALWAYS rebuild broken/translit stubs into a clean brand+model title.
    Rebuild stubs («авто», «товар», «машина», «Акційний товар», greetings).
-   FORBIDDEN in title: price (€/EUR), city, PLZ, “продам/продаю”, emoji, hashtags.
-   Examples: "Nissan Pulsar 1.5 Diesel", "iPhone 13 Pro 256GB", "Тату-мастер", "Nike Air Force 1".
+   FORBIDDEN in title: price (€/EUR), city, PLZ, “продам/продаю/отдам”, emoji, hashtags.
+   Examples:
+   ✓ "Nissan Pulsar 1.5 Diesel", "iPhone 13 Pro 256GB", "Тату-мастер", "Nike Air Force 1"
+   ✗ "17про макс на 512гб как новый г" → ✓ "iPhone 17 Pro Max 512GB"
+   ✗ "Половину своего гардероба за" → ✓ "Одежда из гардероба"
 2. description — Russian (translate from Ukrainian if needed). Keep all important info
    from raw_text: specs, terms, prices, details. 2–8 sentences; 800–2000 chars ok for long posts.
    Do not start by repeating the title. No channel promo / subscribe spam. No invented facts.
@@ -269,11 +293,15 @@ Rules:
    - Tires/rims → auto + tires_wheels
    - New Balance / Nike / sneakers → fashion + men_shoes|women_shoes (NOT home)
    - iPhone / Samsung → electronics + smartphones (NOT home)
-   - sofa / wardrobe → furniture; nails / tattoo / epilation → services_work + beauty_health
+   - sofa / шкаф / комод / wardrobe furniture → furniture
+   - «половину гардероба», одежда/куртки из гардероба → fashion (NOT furniture)
+   - nails / tattoo / epilation → services_work + beauty_health
    - NEVER invent transport/vehicles/car; NEVER vacancies/looking_for_work for goods
    Parser category hints may be wrong — do not copy them.
 4. price — numeric string ("25" or "25.50"); goods with no price → null; services with no price → null.
-5. is_free — true ONLY if text clearly says free/віддам/даром/free. Services without price → is_free=false.
+   «Отдам … за 200€» → price="200", is_free=false (NOT free).
+5. is_free — true ONLY if clearly free with NO price (бесплатно/даром/«віддам диван»).
+   «отдам/віддам за N€» is a SALE → is_free=false. Services without price → is_free=false.
 6. currency — EUR by default; UAH only if грн is explicit.
 {location_rule}
 8. condition — "new" or "used" for goods; for services_work ALWAYS "new".
@@ -417,30 +445,17 @@ async def enrich_parsed_item_with_ai(item: dict) -> Optional[AiEnrichmentResult]
 def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict:
     """Повертає копію item з полями після AI; кращий title з парсера не затираємо."""
     from parser.core.location import resolve_parsed_location
-    from parser.core.patterns import GREETING_TITLE_RE, PRICE_RE, is_greeting_only
+    from parser.core.patterns import PRICE_RE
     from parser.marketplace_categories import clean_title
     from parser.core.text import format_listing_description
 
     raw = str(item.get("raw_text") or "")
 
     def _title_score(title: str) -> int:
-        t = (title or "").strip()
-        if not t or len(t) < 4:
-            return -20
-        score = 5
-        if PRICE_RE.search(t):
-            score -= 8
-        if GREETING_TITLE_RE.match(t) or is_greeting_only(t) or re.search(
-            r"(?i)^(меня\s+зовут|мене\s+звати|здравствуй|добр)", t
-        ):
-            score -= 6
-        if t.lower() in ("объявление", "оголошення", "listing", "товар", "акційний товар"):
-            score -= 15
-        if 6 <= len(t) <= 70:
-            score += 3
-        if len(t) > 90:
-            score -= 2
-        return score
+        # Той самий скорер, що й у screen — інакше AI title з брендом програє «17про макс»
+        from parser.ai.screen import _title_quality_score
+
+        return _title_quality_score(title, raw)
 
     out = dict(item)
     old_title = str(item.get("title") or "")
@@ -449,6 +464,8 @@ def merge_enrichment_into_item(item: dict, enriched: AiEnrichmentResult) -> dict
     old_title_rawish = bool(
         re.search(r"(?i)^(продам|продаю|продаётся|продается|отдам|віддам|🚨)", old_clean)
         or PRICE_RE.search(old_clean)
+        or re.search(r"(?i)\d+\s*про\b|про\s*макс", old_clean)
+        or re.search(r"(?i)^половин\w*\s+(?:сво\w+\s+)?гардероб", old_clean)
     )
     if old_title_rawish and new_title and not re.search(
         r"(?i)^(продам|продаю|продаётся|продается|отдам|віддам)\b", new_title

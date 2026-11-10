@@ -85,26 +85,53 @@ def _title_quality_score(title: str, raw_text: str = "") -> int:
         score -= 20
     if 8 <= len(t) <= 70:
         score += 4
+    if 8 <= len(t) <= 45:
+        score += 3  # короткий brand/model title кращий за рядок-опис
     if len(t) > 90:
         score -= 4
     # Бренд / латиниця з моделлю — сильний сигнал якісного title
     if re.search(
         r"(?i)\b(?:iphone|samsung|xiaomi|nike|adidas|bmw|audi|mercedes|nissan|"
-        r"toyota|volkswagen|macbook|playstation|xbox|lego)\b",
+        r"toyota|volkswagen|macbook|playstation|xbox|lego|айфон)\b",
         t,
     ):
         score += 12
     if re.search(r"[A-Za-z]{2,}", t) and re.search(r"[а-яёіїєґА-ЯЁІЇЄҐ]", t):
         score += 2
+    # Не тягнути в title шматок опису («состояние как новый, батарея…»)
+    if re.search(
+        r"(?i)\b(?:состояние|стан\b|батаре|аккумулятор|акумулятор|город|місто|"
+        r"самовывоз|самовивіз|коробк)\b",
+        t,
+    ):
+        score -= 10
+    if t.count(",") >= 1 and len(t) > 40:
+        score -= 4
+    # Трансліт/обрізані stubs на кшталт «17про макс… г»
+    if re.search(r"(?i)\d+\s*про\b|про\s*макс|\d+\s*гб\b", t) and not re.search(
+        r"(?i)\b(?:iphone|айфон|samsung|xiaomi)\b", t
+    ):
+        score -= 14
+    if re.search(r"(?i)\bкак\s+нов\w*\s+[a-zа-яёіїєґ]$", t) or re.search(
+        r"\s[a-zа-яёіїєґ]$", t
+    ):
+        score -= 8
+    if re.search(r"(?i)^половин\w*\s+(?:сво\w+\s+)?гардероб", t):
+        score -= 10
     # Title має перетинатися з raw (не вигаданий)
     if raw_text:
-        tokens = [w for w in re.findall(r"[a-zа-яёіїєґ0-9]{3,}", t.lower()) if w]
         raw_l = raw_text.lower()
+        tokens = [w for w in re.findall(r"[a-zа-яёіїєґ0-9]{3,}", t.lower()) if w]
         hits = sum(1 for w in tokens if w in raw_l)
         if tokens and hits == 0:
             score -= 10
         elif tokens and hits >= max(1, len(tokens) // 2):
             score += 3
+        # У raw є iPhone, а в title лише «17про» — штрафуємо
+        if re.search(r"(?i)\b(?:iphone|айфон)\b", raw_l) and not re.search(
+            r"(?i)\b(?:iphone|айфон)\b", t
+        ):
+            score -= 10
     return score
 
 
@@ -216,6 +243,8 @@ TITLE EXAMPLES:
 ✗ "Nike Air Force 1 80€" → ✓ "Nike Air Force 1"
 ✗ "Лазерная эпиляция Hamburg" → ✓ "Лазерная эпиляция"
 ✗ "Акційний товар" → rebuild from text (brand/model)
+✗ "17про макс на 512гб как новый г" → ✓ "iPhone 17 Pro Max 512GB"
+✗ "Половину своего гардероба за" → ✓ "Одежда из гардероба"
 
 DESCRIPTION (critical):
 - Russian (translate UK→RU if needed). 2–8 short paragraphs/sentences.
@@ -247,7 +276,8 @@ CATEGORY MAP (memorize):
 • MacBook / laptop / iPad → electronics / computers_laptops
 • PS5 / Xbox / Nintendo → electronics / games_consoles
 • Nike / Adidas / New Balance / sneakers → fashion / men_shoes or women_shoes
-• Sofa / wardrobe / bed → furniture / …
+• Sofa / шкаф / комод / wardrobe furniture → furniture / …
+• Clothing from «гардероб» («половину гардероба», куртки/вещи) → fashion / women_clothing or men_clothing (NOT furniture)
 • Fridge / washing machine → appliances / …
 • Bicycle / e-bike (Centurion, Shimano, frame size, brakes) → hobby_sports / bikes_scooters
   (NOT electronics — Bosch motor on a bike is still a bicycle)
@@ -261,7 +291,8 @@ CATEGORY MAP (memorize):
 PRICE / LOCATION / CONDITION:
 - price: numeric string "5500" or null; if no price in post → null (stored as negotiable/Договорная)
 - currency EUR unless грн explicit
-- is_free: true ONLY if text says free/віддам/даром
+- is_free: true ONLY if clearly free with NO price (бесплатно/даром/«віддам диван»).
+  «отдам/віддам за 200€» → price="200", is_free=false (sale, NOT free)
 - {location_hint}
 - goods: condition new|used from text; services_work: ALWAYS condition="new"
 - services with no price → price=null, is_free=false
