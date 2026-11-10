@@ -6,6 +6,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { PerformanceScript } from "@/components/system/PerformanceScript";
 import { MobileOptimizationScript } from "@/components/system/MobileOptimizationScript";
 import { TelegramAccessGuard } from "@/components/telegram/TelegramAccessGuard";
+import { StartParamDeepLink } from "@/components/telegram/StartParamDeepLink";
 import { RegistrationGate } from "@/components/telegram/RegistrationGate";
 import { AppProviders } from "@/components/layout/AppProviders";
 import { ListingMediaCacheScript } from "@/components/system/ListingMediaCacheScript";
@@ -83,6 +84,7 @@ export default function RootLayout({
               <MobileOptimizationScript />
               <ListingMediaCacheScript />
               <TelegramAccessGuard>
+                <StartParamDeepLink />
                 <RegistrationGate>
                   {children}
                 </RegistrationGate>

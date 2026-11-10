@@ -30,6 +30,11 @@ import {
 import { listingToSearchPreview, updateSearchHistoryListings } from '@/utils/searchHistory';
 import { resolveViewerTelegramId } from '@/utils/viewerTelegramId';
 import { prefetchListingsImages } from '@/lib/media/listingMediaCache';
+import {
+  OPEN_BUSINESS_FLOW_KEY,
+  parseStartParam,
+  readTelegramStartParam,
+} from '@/utils/telegramStartParam';
 
 /** Збільшуйте після змін логіки каталогу — скидає застарілий localStorage-кеш. */
 const BAZAAR_LISTINGS_CACHE_VERSION = 3;
@@ -97,13 +102,37 @@ export function useBazaarPage() {
     }
   }, []);
 
+  // startapp=business може прийти вже на /bazaar (WebApp URL), не лише через /[lang]
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (sessionStorage.getItem('openBusinessFlow') !== '1') return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const telegramId = urlParams.get('telegramId') || sessionStorage.getItem('telegramId');
-    const query = telegramId ? `?telegramId=${encodeURIComponent(telegramId)}` : '';
-    router.replace(`/${lang}/profile${query}`);
+
+    const redirectBusiness = () => {
+      if (sessionStorage.getItem(OPEN_BUSINESS_FLOW_KEY) !== '1') return false;
+      const urlParams = new URLSearchParams(window.location.search);
+      const telegramId = urlParams.get('telegramId') || sessionStorage.getItem('telegramId');
+      const query = telegramId ? `?telegramId=${encodeURIComponent(telegramId)}` : '';
+      router.replace(`/${lang}/profile${query}`);
+      return true;
+    };
+
+    if (redirectBusiness()) return;
+
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      const action = parseStartParam(readTelegramStartParam());
+      if (action?.type === 'business') {
+        sessionStorage.setItem(OPEN_BUSINESS_FLOW_KEY, '1');
+        redirectBusiness();
+        window.clearInterval(timer);
+        return;
+      }
+      if (redirectBusiness() || attempts >= 20) {
+        window.clearInterval(timer);
+      }
+    }, 150);
+
+    return () => window.clearInterval(timer);
   }, [lang, router]);
 
   // Отримуємо категорії з перекладами (мемо — інакше ефект deep-link зациклюється)

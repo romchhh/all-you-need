@@ -12,6 +12,8 @@ interface TelegramInitData {
   query_id?: string;
   auth_date?: number;
   hash?: string;
+  /** Payload з t.me/Bot?startapp=… */
+  start_param?: string;
 }
 
 export interface TelegramWebApp {
