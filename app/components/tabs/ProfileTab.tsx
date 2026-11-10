@@ -101,11 +101,13 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
     }
   }, [favoritesProp]);
 
+  const pendingBusinessDeepLinkRef = useRef(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Не відкриваємо create одразу: спочатку дізнаємось, чи вже є Business-профіль.
     if (sessionStorage.getItem('openBusinessFlow') === '1') {
-      sessionStorage.removeItem('openBusinessFlow');
-      setShowBusinessFlow(true);
+      pendingBusinessDeepLinkRef.current = true;
     }
     if (sessionStorage.getItem('openReferralModal') === '1') {
       sessionStorage.removeItem('openReferralModal');
@@ -318,6 +320,42 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
 
   const LISTINGS_PAGE_SIZE = 20;
 
+  const consumeBusinessDeepLink = (data: {
+    hasProfile: boolean;
+    isActive: boolean;
+    profile: BusinessProfileData | null;
+  }) => {
+    if (typeof window === 'undefined') return;
+    const flagged =
+      pendingBusinessDeepLinkRef.current ||
+      sessionStorage.getItem('openBusinessFlow') === '1';
+    if (!flagged) return;
+
+    pendingBusinessDeepLinkRef.current = false;
+    sessionStorage.removeItem('openBusinessFlow');
+
+    const hasUsableProfile = Boolean(data.hasProfile && data.profile);
+    const cabinet = data.profile
+      ? resolveBusinessCabinetState(data.profile)
+      : 'inactive';
+
+    // Вже створений кабінет (не чернетка) → Business-профіль; інакше — створення/продовження
+    if (hasUsableProfile && cabinet !== 'draft') {
+      setProfileViewMode('business');
+      if (data.isActive) {
+        void fetchBusinessStats();
+      }
+      tg?.HapticFeedback?.impactOccurred?.('light');
+      return;
+    }
+
+    setBusinessEditMode(false);
+    setBusinessRenewMode(false);
+    setBusinessPlanPickerMode(false);
+    setShowBusinessFlow(true);
+    tg?.HapticFeedback?.impactOccurred?.('medium');
+  };
+
   const fetchBusinessProfile = async () => {
     const telegramId = resolvePaymentTelegramId(tg, profile?.telegramId);
     if (!telegramId) return;
@@ -325,21 +363,48 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
       const res = await fetch(
         `/api/user/business-profile?telegramId=${encodeURIComponent(String(telegramId))}`
       );
-      if (!res.ok) return;
+      if (!res.ok) {
+        consumeBusinessDeepLink({
+          hasProfile: false,
+          isActive: false,
+          profile: null,
+        });
+        return;
+      }
       const data = await res.json();
-      setIsBusinessActive(Boolean(data.isActive));
-      setHasBusinessProfile(Boolean(data.hasProfile));
-      setIsBusinessSuspended(Boolean(data.isSuspended));
-      setBusinessProfile(data.profile || null);
+      const hasProfile = Boolean(data.hasProfile);
+      const isActive = Boolean(data.isActive);
+      const isSuspended = Boolean(data.isSuspended);
+      const nextProfile = (data.profile || null) as BusinessProfileData | null;
+      setIsBusinessActive(isActive);
+      setHasBusinessProfile(hasProfile);
+      setIsBusinessSuspended(isSuspended);
+      setBusinessProfile(nextProfile);
       await refreshBusinessStatus();
-      if (!data.hasProfile) {
-        setProfileViewMode('personal');
+      if (!hasProfile) {
+        // Не скидаємо personal, якщо зараз відкриваємо deep-link create
+        if (
+          !pendingBusinessDeepLinkRef.current &&
+          sessionStorage.getItem('openBusinessFlow') !== '1'
+        ) {
+          setProfileViewMode('personal');
+        }
         setBusinessStats(null);
       } else if (profileViewMode === 'business') {
         void fetchBusinessStats();
       }
+      consumeBusinessDeepLink({
+        hasProfile,
+        isActive,
+        profile: nextProfile,
+      });
     } catch (e) {
       console.error('Error fetching business profile:', e);
+      consumeBusinessDeepLink({
+        hasProfile: false,
+        isActive: false,
+        profile: null,
+      });
     }
   };
 
