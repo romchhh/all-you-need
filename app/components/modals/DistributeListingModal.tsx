@@ -5,7 +5,6 @@ import {
   X,
   Send,
   Copy,
-  ChevronRight,
   MapPin,
   Info,
   Loader2,
@@ -46,7 +45,6 @@ export function DistributeListingModal({
   useBodyScrollLock(isOpen);
 
   const lang = language === 'ru' ? 'ru' : 'uk';
-  const [step, setStep] = useState<1 | 2>(1);
   const [chatText, setChatText] = useState('');
   const [loadingChats, setLoadingChats] = useState(false);
   const [chats, setChats] = useState<ShareChatItem[]>([]);
@@ -84,7 +82,6 @@ export function DistributeListingModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setStep(1);
     setChatText(defaultText);
     setSelectedCatalog(new Set());
     setSelectedCustom(new Set());
@@ -118,13 +115,13 @@ export function DistributeListingModal({
   }, [telegramId, listing.id, langFilter, categoryFilter, cityFilter, showToast, t]);
 
   useEffect(() => {
-    if (isOpen && step === 2) {
+    if (isOpen) {
       void loadChats();
     }
-  }, [isOpen, step, loadChats]);
+  }, [isOpen, loadChats]);
 
   useEffect(() => {
-    if (step !== 2 || loadingChats || chats.length === 0) return;
+    if (!isOpen || loadingChats || chats.length === 0) return;
     if (autoSelectedChatsRef.current) return;
     if (selectedCatalog.size > 0 || selectedCustom.size > 0) return;
     const top = chats.filter((c) => !c.isCustom).slice(0, 3);
@@ -132,7 +129,7 @@ export function DistributeListingModal({
       setSelectedCatalog(new Set(top.map((c) => c.id)));
       autoSelectedChatsRef.current = true;
     }
-  }, [chats, step, loadingChats, selectedCatalog.size, selectedCustom.size]);
+  }, [isOpen, chats, loadingChats, selectedCatalog.size, selectedCustom.size]);
 
   const selectedCount = selectedCatalog.size + selectedCustom.size;
 
@@ -166,30 +163,6 @@ export function DistributeListingModal({
   };
 
   const sendToBot = async () => {
-    setSending(true);
-    try {
-      const res = await fetch(`/api/listings/${listing.id}/distribute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramId,
-          chatText,
-          mode: 'bot',
-          lang,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      showToast(t('distribute.sentToBot'), 'success');
-      tg?.HapticFeedback?.notificationOccurred('success');
-    } catch {
-      showToast(t('distribute.sendError'), 'error');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const submitGroups = async () => {
     if (selectedCount === 0) {
       showToast(t('distribute.selectChatsHint'), 'info');
       return;
@@ -202,7 +175,7 @@ export function DistributeListingModal({
         body: JSON.stringify({
           telegramId,
           chatText,
-          mode: 'groups',
+          mode: 'bot',
           catalogChatIds: Array.from(selectedCatalog),
           customChatIds: Array.from(selectedCustom),
           lang,
@@ -210,7 +183,7 @@ export function DistributeListingModal({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      showToast(t('distribute.sentGroups'), 'success');
+      showToast(t('distribute.sentToBotWithGroups'), 'success');
       tg?.HapticFeedback?.notificationOccurred('success');
       onClose();
     } catch {
@@ -288,7 +261,7 @@ export function DistributeListingModal({
           <div className="flex-1 min-w-0 pr-8">
             <h2 className="text-lg font-bold leading-tight">{t('distribute.title')}</h2>
             <p className={`text-xs mt-1 ${isLight ? 'text-gray-600' : 'text-white/65'}`}>
-              {step === 1 ? t('distribute.subtitleStep1') : t('distribute.subtitleStep2')}
+              {t('distribute.subtitleUnified')}
             </p>
           </div>
           <button type="button" onClick={onClose} className="absolute right-4 top-4 p-2 rounded-full opacity-70 hover:opacity-100" aria-label={t('common.close')}>
@@ -311,198 +284,168 @@ export function DistributeListingModal({
                 {priceLabel} · {listing.location}
               </div>
             </div>
-            {step === 1 && (
-              <ChevronRight size={18} className="opacity-40 shrink-0" />
-            )}
           </div>
 
-          {step === 1 ? (
-            <>
-              <label className="block text-xs font-semibold uppercase tracking-wide opacity-70">
-                {t('distribute.editText')}
-              </label>
-              <textarea
-                value={chatText}
-                onChange={(e) => setChatText(e.target.value)}
-                rows={12}
-                className={`w-full rounded-2xl p-3 text-sm border resize-y min-h-[200px] ${
-                  isLight
-                    ? 'bg-white border-gray-200 text-gray-900'
-                    : 'bg-black/40 border-white/15 text-white'
-                }`}
-              />
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => void copyText()}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm border-2 ${
-                    isLight ? 'border-[#3F5331] text-[#3F5331]' : 'border-[#C8E6A0] text-[#C8E6A0]'
-                  }`}
-                >
-                  <Copy size={16} />
-                  {t('distribute.copy')}
-                </button>
-                <button
-                  type="button"
-                  disabled={sending}
-                  onClick={() => void sendToBot()}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm bg-[#C8E6A0] text-[#1a1a1a] disabled:opacity-60"
-                >
-                  {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                  {t('distribute.sendToBot')}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h3 className="text-sm font-bold">{t('distribute.step2GroupsTitle')}</h3>
-              <div className="flex flex-wrap items-center gap-2">
-                <FilterChip icon={<MapPin size={14} />} label={formatCityFilterLabel(cityFilter) || t('distribute.allCities')} isLight={isLight} />
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className={`text-xs rounded-full px-3 py-1.5 border ${isLight ? 'bg-white border-gray-200' : 'bg-black/40 border-white/15'}`}
-                >
-                  <option value="all">{t('distribute.allCategories')}</option>
-                  <option value={listing.category}>{listing.category}</option>
-                </select>
-                <select
-                  value={langFilter}
-                  onChange={(e) => setLangFilter(e.target.value)}
-                  className={`text-xs rounded-full px-3 py-1.5 border ${isLight ? 'bg-white border-gray-200' : 'bg-black/40 border-white/15'}`}
-                >
-                  <option value="all">{t('distribute.allLanguages')}</option>
-                  <option value="ru">Русский</option>
-                  <option value="uk">Українська</option>
-                </select>
-                <span className={`ml-auto text-xs font-semibold ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>
-                  {t('distribute.selected')}: {selectedCount}
-                </span>
-              </div>
+          <label className="block text-xs font-semibold uppercase tracking-wide opacity-70">
+            {t('distribute.editText')}
+          </label>
+          <textarea
+            value={chatText}
+            onChange={(e) => setChatText(e.target.value)}
+            rows={8}
+            className={`w-full rounded-2xl p-3 text-sm border resize-y min-h-[140px] ${
+              isLight
+                ? 'bg-white border-gray-200 text-gray-900'
+                : 'bg-black/40 border-white/15 text-white'
+            }`}
+          />
+          <button
+            type="button"
+            onClick={() => void copyText()}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm border-2 ${
+              isLight ? 'border-[#3F5331] text-[#3F5331]' : 'border-[#C8E6A0] text-[#C8E6A0]'
+            }`}
+          >
+            <Copy size={16} />
+            {t('distribute.copy')}
+          </button>
 
-              <button
-                type="button"
-                onClick={() => setShowAddChat((v) => !v)}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border border-dashed ${
-                  isLight ? 'border-gray-300 text-gray-700' : 'border-white/20 text-white/80'
-                }`}
+          <div className="border-t border-white/10 pt-3 space-y-3">
+            <h3 className="text-sm font-bold">{t('distribute.step2GroupsTitle')}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <FilterChip icon={<MapPin size={14} />} label={formatCityFilterLabel(cityFilter) || t('distribute.allCities')} isLight={isLight} />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className={`text-xs rounded-full px-3 py-1.5 border ${isLight ? 'bg-white border-gray-200' : 'bg-black/40 border-white/15'}`}
               >
-                <Plus size={16} />
-                {t('distribute.addYourChat')}
-              </button>
+                <option value="all">{t('distribute.allCategories')}</option>
+                <option value={listing.category}>{listing.category}</option>
+              </select>
+              <select
+                value={langFilter}
+                onChange={(e) => setLangFilter(e.target.value)}
+                className={`text-xs rounded-full px-3 py-1.5 border ${isLight ? 'bg-white border-gray-200' : 'bg-black/40 border-white/15'}`}
+              >
+                <option value="all">{t('distribute.allLanguages')}</option>
+                <option value="ru">Русский</option>
+                <option value="uk">Українська</option>
+              </select>
+              <span className={`ml-auto text-xs font-semibold ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>
+                {t('distribute.selected')}: {selectedCount}
+              </span>
+            </div>
 
-              {showAddChat && (
-                <div className={`space-y-2 p-3 rounded-2xl ${isLight ? 'bg-gray-50' : 'bg-white/5'}`}>
-                  <input
-                    value={newChatTitle}
-                    onChange={(e) => setNewChatTitle(e.target.value)}
-                    placeholder={t('distribute.chatNamePlaceholder')}
-                    className={`w-full rounded-xl px-3 py-2 text-sm border ${isLight ? 'border-gray-200' : 'border-white/15 bg-black/30'}`}
-                  />
-                  <input
-                    value={newChatLink}
-                    onChange={(e) => setNewChatLink(e.target.value)}
-                    placeholder={t('distribute.chatLinkPlaceholder')}
-                    className={`w-full rounded-xl px-3 py-2 text-sm border ${isLight ? 'border-gray-200' : 'border-white/15 bg-black/30'}`}
-                  />
-                  <button type="button" onClick={() => void addCustomChat()} className="w-full py-2 rounded-xl bg-[#C8E6A0] text-[#1a1a1a] font-semibold text-sm">
-                    {t('common.save')}
-                  </button>
-                </div>
-              )}
+            <button
+              type="button"
+              onClick={() => setShowAddChat((v) => !v)}
+              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border border-dashed ${
+                isLight ? 'border-gray-300 text-gray-700' : 'border-white/20 text-white/80'
+              }`}
+            >
+              <Plus size={16} />
+              {t('distribute.addYourChat')}
+            </button>
 
-              {loadingChats ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="animate-spin" size={28} />
-                </div>
-              ) : chats.length === 0 ? (
-                <p className={`text-sm text-center py-6 ${isLight ? 'text-gray-500' : 'text-white/55'}`}>
-                  {t('distribute.noChatsFound')}
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {chats.map((chat) => {
-                    const checked = chat.isCustom ? selectedCustom.has(chat.id) : selectedCatalog.has(chat.id);
-                    return (
-                      <li
-                        key={`${chat.isCustom ? 'c' : 'g'}-${chat.id}`}
-                        className={`flex items-center gap-3 p-3 rounded-2xl border ${isLight ? 'border-gray-100 bg-white' : 'border-white/10 bg-white/[0.03]'}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleChat(chat)}
-                          className="w-5 h-5 accent-[#C8E6A0]"
-                        />
-                        <ChatRowAvatar title={chat.title} />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm truncate">{chat.title}</div>
-                          <div className={`text-xs truncate ${isLight ? 'text-gray-500' : 'text-white/55'}`}>
-                            {chat.subtitle ||
-                              t('distribute.members', { count: String(chat.memberCount) })}
-                          </div>
-                        </div>
-                        {chat.postingAllowed && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C8E6A0]/20 text-[#C8E6A0]">
-                            {t('distribute.allowed')}
-                          </span>
-                        )}
-                        {!chat.isCustom && (
-                          <button
-                            type="button"
-                            onClick={() => void toggleSaved(chat)}
-                            className="p-1.5"
-                            aria-label={t('distribute.saveChat')}
-                          >
-                            <Star
-                              size={16}
-                              className={chat.isSaved ? 'fill-[#C8E6A0] text-[#C8E6A0]' : 'text-white/40'}
-                            />
-                          </button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+            {showAddChat && (
+              <div className={`space-y-2 p-3 rounded-2xl ${isLight ? 'bg-gray-50' : 'bg-white/5'}`}>
+                <input
+                  value={newChatTitle}
+                  onChange={(e) => setNewChatTitle(e.target.value)}
+                  placeholder={t('distribute.chatNamePlaceholder')}
+                  className={`w-full rounded-xl px-3 py-2 text-sm border ${isLight ? 'border-gray-200' : 'border-white/15 bg-black/30'}`}
+                />
+                <input
+                  value={newChatLink}
+                  onChange={(e) => setNewChatLink(e.target.value)}
+                  placeholder={t('distribute.chatLinkPlaceholder')}
+                  className={`w-full rounded-xl px-3 py-2 text-sm border ${isLight ? 'border-gray-200' : 'border-white/15 bg-black/30'}`}
+                />
+                <button type="button" onClick={() => void addCustomChat()} className="w-full py-2 rounded-xl bg-[#C8E6A0] text-[#1a1a1a] font-semibold text-sm">
+                  {t('common.save')}
+                </button>
+              </div>
+            )}
 
-              <p className={`flex gap-2 text-xs leading-relaxed ${isLight ? 'text-gray-600' : 'text-white/55'}`}>
-                <Info size={16} className="shrink-0 mt-0.5" />
-                {t('distribute.footerHint')}
+            {loadingChats ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="animate-spin" size={28} />
+              </div>
+            ) : chats.length === 0 ? (
+              <p className={`text-sm text-center py-6 ${isLight ? 'text-gray-500' : 'text-white/55'}`}>
+                {t('distribute.noChatsFound')}
               </p>
-            </>
-          )}
+            ) : (
+              <ul className="space-y-2">
+                {chats.map((chat) => {
+                  const checked = chat.isCustom ? selectedCustom.has(chat.id) : selectedCatalog.has(chat.id);
+                  return (
+                    <li
+                      key={`${chat.isCustom ? 'c' : 'g'}-${chat.id}`}
+                      className={`flex items-center gap-3 p-3 rounded-2xl border ${isLight ? 'border-gray-100 bg-white' : 'border-white/10 bg-white/[0.03]'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleChat(chat)}
+                        className="w-5 h-5 accent-[#C8E6A0]"
+                      />
+                      <ChatRowAvatar title={chat.title} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm truncate">{chat.title}</div>
+                        <div className={`text-xs truncate ${isLight ? 'text-gray-500' : 'text-white/55'}`}>
+                          {chat.subtitle ||
+                            t('distribute.members', { count: String(chat.memberCount) })}
+                        </div>
+                      </div>
+                      {chat.postingAllowed && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C8E6A0]/20 text-[#C8E6A0]">
+                          {t('distribute.allowed')}
+                        </span>
+                      )}
+                      {!chat.isCustom && (
+                        <button
+                          type="button"
+                          onClick={() => void toggleSaved(chat)}
+                          className="p-1.5"
+                          aria-label={t('distribute.saveChat')}
+                        >
+                          <Star
+                            size={16}
+                            className={chat.isSaved ? 'fill-[#C8E6A0] text-[#C8E6A0]' : 'text-white/40'}
+                          />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <p className={`flex gap-2 text-xs leading-relaxed ${isLight ? 'text-gray-600' : 'text-white/55'}`}>
+              <Info size={16} className="shrink-0 mt-0.5" />
+              {t('distribute.footerHint')}
+            </p>
+          </div>
         </div>
 
         <div className="p-4 border-t border-white/10 flex gap-2">
-          {step === 2 ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className={`flex-1 py-3 rounded-2xl font-semibold border-2 ${isLight ? 'border-gray-300 text-gray-800' : 'border-white/25 text-white'}`}
-            >
-              {t('common.cancel')}
-            </button>
-          ) : null}
-          {step === 1 ? (
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="flex-1 py-3 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a]"
-            >
-              {t('distribute.next')}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={sending}
-              onClick={() => void submitGroups()}
-              className="flex-[1.4] py-3 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a] disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-              {t('distribute.preparePublications', { count: String(selectedCount) })}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className={`flex-1 py-3 rounded-2xl font-semibold border-2 ${isLight ? 'border-gray-300 text-gray-800' : 'border-white/25 text-white'}`}
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            disabled={sending}
+            onClick={() => void sendToBot()}
+            className="flex-[1.4] py-3 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a] disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            {t('distribute.sendToBotWithCount', { count: String(selectedCount) })}
+          </button>
         </div>
       </div>
     </div>

@@ -5,6 +5,8 @@ import { DollarSign, Edit2, Heart, Megaphone, RotateCcw, Send } from 'lucide-rea
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { listingDistributeButtonClass } from '@/lib/ui/listingDistributeCta';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { ListingAutoCover } from '@/components/listing/ListingAutoCover';
 import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
@@ -46,6 +48,7 @@ export function BusinessListingSquare({
   onDistribute,
 }: BusinessListingSquareProps) {
   const { t } = useLanguage();
+  const { isLight } = useTheme();
   const imageUrl = useMemo(() => resolveListingCardImageUrl(listing), [listing]);
   const [imageError, setImageError] = useState(!imageUrl);
 
@@ -222,7 +225,7 @@ export function BusinessListingSquare({
           onDistribute?.();
           tg?.HapticFeedback.impactOccurred('light');
         }}
-        className="flex w-full items-center justify-center gap-1 rounded-lg bg-[#C8E6A0] px-1 py-1.5 text-[10px] font-bold leading-tight text-[#1a1a1a] active:opacity-90"
+        className={`flex w-full items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-bold leading-tight active:opacity-90 ${listingDistributeButtonClass(isLight)}`}
       >
         <Send size={11} className="shrink-0" />
         <span className="truncate">{t('sales.distribute')}</span>

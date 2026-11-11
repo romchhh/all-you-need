@@ -12,6 +12,7 @@ import { displayListingFavoritesCount, displayListingViews } from '@/lib/listing
 import { ListingAutoRenewSection } from '@/components/listing/ListingAutoRenewSection';
 import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { getCurrencySymbol } from '@/utils/currency';
+import { listingDistributeButtonClass } from '@/lib/ui/listingDistributeCta';
 
 interface ProfileListingCardProps {
   listing: Listing;
@@ -636,7 +637,7 @@ export const ProfileListingCard = ({
                   onDistribute();
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className="w-full rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors font-semibold text-sm bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80"
+                className={`w-full rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors font-semibold text-sm ${listingDistributeButtonClass(isLight)}`}
               >
                 <Send size={16} />
                 {t('sales.distribute')}

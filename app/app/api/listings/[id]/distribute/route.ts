@@ -17,6 +17,38 @@ function absoluteImageUrl(path: string): string {
   return base ? `${base}${built.startsWith('/') ? built : `/${built}`}` : built;
 }
 
+async function fetchGroupLines(
+  userId: number,
+  catalogChatIds: number[],
+  customChatIds: number[]
+): Promise<string[]> {
+  const groupLines: string[] = [];
+  if (catalogChatIds.length > 0) {
+    const cats = (await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(
+        `SELECT id, title, inviteLink FROM ShareChatCatalog WHERE id IN (${catalogChatIds.map(() => '?').join(',')})`,
+        ...catalogChatIds
+      )
+    )) as Array<{ id: number; title: string; inviteLink: string | null }>;
+    for (const c of cats) {
+      groupLines.push(`• ${c.title}${c.inviteLink ? ` — ${c.inviteLink}` : ''}`);
+    }
+  }
+  if (customChatIds.length > 0) {
+    const customs = (await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(
+        `SELECT id, title, inviteLink FROM UserShareChat WHERE userId = ? AND id IN (${customChatIds.map(() => '?').join(',')})`,
+        userId,
+        ...customChatIds
+      )
+    )) as Array<{ id: number; title: string; inviteLink: string | null }>;
+    for (const c of customs) {
+      groupLines.push(`• ${c.title}${c.inviteLink ? ` — ${c.inviteLink}` : ''}`);
+    }
+  }
+  return groupLines;
+}
+
 async function sendPhotoCaption(
   chatId: number | string,
   photoUrl: string,
@@ -101,86 +133,73 @@ export async function POST(
     }
     const photoUrl = images[0] ? absoluteImageUrl(images[0]) : '';
 
-    if (mode === 'bot') {
-      // Не чіпаємо ShareChat* — лише Telegram DM
-      const lang = body.lang === 'ru' ? 'ru' : 'uk';
-      const hint =
-        lang === 'ru'
-          ? '\n\n<i>Перешлите это сообщение в нужные чаты или сохраните как черновик в боте.</i>'
-          : '\n\n<i>Перешліть це повідомлення в потрібні чати або збережіть як чернетку в боті.</i>';
-
-      const ok = await sendPhotoCaption(
-        telegramId,
-        photoUrl,
-        `<pre>${chatText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>${hint}`
-      );
-
-      if (!ok) {
-        return NextResponse.json({ error: 'telegram_failed' }, { status: 502 });
-      }
-
-      return NextResponse.json({ success: true, mode: 'bot' });
-    }
-
-    await ensureShareChatTables();
-
-    const groupLines: string[] = [];
-    if (catalogChatIds.length > 0) {
-      const cats = (await executeWithRetry(() =>
-        prisma.$queryRawUnsafe(
-          `SELECT id, title, inviteLink FROM ShareChatCatalog WHERE id IN (${catalogChatIds.map(() => '?').join(',')})`,
-          ...catalogChatIds
-        )
-      )) as Array<{ id: number; title: string; inviteLink: string | null }>;
-      for (const c of cats) {
-        groupLines.push(`• ${c.title}${c.inviteLink ? ` — ${c.inviteLink}` : ''}`);
-      }
-    }
-    if (customChatIds.length > 0) {
-      const customs = (await executeWithRetry(() =>
-        prisma.$queryRawUnsafe(
-          `SELECT id, title, inviteLink FROM UserShareChat WHERE userId = ? AND id IN (${customChatIds.map(() => '?').join(',')})`,
-          user.id,
-          ...customChatIds
-        )
-      )) as Array<{ id: number; title: string; inviteLink: string | null }>;
-      for (const c of customs) {
-        groupLines.push(`• ${c.title}${c.inviteLink ? ` — ${c.inviteLink}` : ''}`);
-      }
-    }
-
     const lang = body.lang === 'ru' ? 'ru' : 'uk';
-    const header =
-      lang === 'ru'
-        ? `📣 <b>Распространение:</b> «${listing.title}»\n\nВыбранные группы:\n${groupLines.join('\n')}\n\n<b>Текст для публикации:</b>`
-        : `📣 <b>Поширення:</b> «${listing.title}»\n\nОбрані групи:\n${groupLines.join('\n')}\n\n<b>Текст для публікації:</b>`;
+    const hasGroups = catalogChatIds.length > 0 || customChatIds.length > 0;
 
-    const ok = await sendPhotoCaption(
-      telegramId,
-      photoUrl,
-      `${header}\n<pre>${chatText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`
-    );
+    if (mode === 'bot' && hasGroups) {
+      await ensureShareChatTables();
+    }
 
-    if (!ok) {
+    const forwardHint = hasGroups
+      ? lang === 'ru'
+        ? '\n\n<i>Перешлите это сообщение в выбранные группы (список — отдельным сообщением ниже).</i>'
+        : '\n\n<i>Перешліть це повідомлення в обрані групи (список — окремим повідомленням нижче).</i>'
+      : lang === 'ru'
+        ? '\n\n<i>Перешлите это сообщение в нужные чаты.</i>'
+        : '\n\n<i>Перешліть це повідомлення в потрібні чати.</i>';
+
+    if (mode === 'groups' && !hasGroups) {
+      return NextResponse.json({ error: 'no_groups_selected' }, { status: 400 });
+    }
+
+    const listingPayload = `<pre>${chatText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>${forwardHint}`;
+
+    const okListing = await sendPhotoCaption(telegramId, photoUrl, listingPayload);
+    if (!okListing) {
       return NextResponse.json({ error: 'telegram_failed' }, { status: 502 });
     }
 
-    await executeWithRetry(() =>
-      prisma.$executeRawUnsafe(
-        `INSERT INTO ShareDistributionLog (listingId, userId, chatText, catalogChatIds, customChatIds, createdAt)
-         VALUES (?, ?, ?, ?, ?, ${sqlNow()})`,
-        listingId,
-        user.id,
-        chatText,
-        JSON.stringify(catalogChatIds),
-        JSON.stringify(customChatIds)
-      )
-    ).catch(() => undefined);
+    if (hasGroups) {
+      await ensureShareChatTables();
+      const groupLines = await fetchGroupLines(user.id, catalogChatIds, customChatIds);
+      const groupsHeader =
+        lang === 'ru'
+          ? `📋 <b>Группы для публикации</b> («${listing.title}»)\n\nОткройте чат и перешлите объявление из сообщения выше:\n\n${groupLines.join('\n')}`
+          : `📋 <b>Групи для публікації</b> («${listing.title}»)\n\nВідкрийте чат і перешліть оголошення з повідомлення вище:\n\n${groupLines.join('\n')}`;
 
+      const okGroups = await sendTelegramMessage(telegramId, groupsHeader, {
+        disable_web_page_preview: true,
+      });
+      if (!okGroups) {
+        return NextResponse.json({ error: 'telegram_groups_failed' }, { status: 502 });
+      }
+
+      await executeWithRetry(() =>
+        prisma.$executeRawUnsafe(
+          `INSERT INTO ShareDistributionLog (listingId, userId, chatText, catalogChatIds, customChatIds, createdAt)
+           VALUES (?, ?, ?, ?, ?, ${sqlNow()})`,
+          listingId,
+          user.id,
+          chatText,
+          JSON.stringify(catalogChatIds),
+          JSON.stringify(customChatIds)
+        )
+      ).catch(() => undefined);
+    }
+
+    if (mode === 'bot') {
+      return NextResponse.json({
+        success: true,
+        mode: 'bot',
+        groups: hasGroups ? catalogChatIds.length + customChatIds.length : 0,
+      });
+    }
+
+    // legacy mode=groups — те саме, що bot із групами (лише оголошення + список окремо)
     return NextResponse.json({
       success: true,
       mode: 'groups',
-      groups: groupLines.length,
+      groups: catalogChatIds.length + customChatIds.length,
     });
   } catch (error) {
     console.error('[listings distribute]', error);

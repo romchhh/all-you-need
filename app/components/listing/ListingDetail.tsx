@@ -52,6 +52,7 @@ import { navigateToListingCategoryResolved } from '@/lib/listings/navigation';
 import { buildListingImageUrl, resolveListingGalleryImages } from '@/lib/listings/imageUrl';
 import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { useTheme } from '@/contexts/ThemeContext';
+import { listingDistributeButtonClass } from '@/lib/ui/listingDistributeCta';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { ListingAutoRenewSection } from '@/components/listing/ListingAutoRenewSection';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/lib/listings/viewsDisplay';
@@ -202,6 +203,7 @@ export const ListingDetail = ({
   const { isLight } = useTheme();
   const ac = getAppearanceClasses(isLight);
   /** Нижня CTA на сторінці товару: у темній темі — фірмовий світло-зелений (BRAND_GREEN_ON_DARK) */
+  const listingDistributeCtaClass = listingDistributeButtonClass(isLight);
   const listingPrimaryCtaClass = isLight
     ? 'bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80 [&_svg]:text-[#1a1a1a]'
     : 'border-none bg-[#C8E6A0] text-[#0f1408] shadow-[0_0_22px_rgba(200,230,160,0.48)] hover:bg-[#dff5c0] hover:shadow-[0_0_28px_rgba(200,230,160,0.58)] [&_svg]:text-[#0f1408]';
@@ -1510,7 +1512,7 @@ export const ListingDetail = ({
                   setShowDistributeModal(true);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className="w-full rounded-2xl py-3.5 font-montserrat text-base font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80"
+                className={`w-full rounded-2xl py-3.5 font-montserrat text-base font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 ${listingDistributeCtaClass}`}
               >
                 <Send size={22} />
                 {t('sales.distribute')}
