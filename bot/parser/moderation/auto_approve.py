@@ -89,7 +89,7 @@ _STUB_TITLES = frozenset({
 
 
 def _publish_day_start_utc() -> datetime:
-    """Початок робочого дня публікації (09:00 Europe/Berlin за замовчуванням)."""
+    """Початок робочого дня публікації (08:00 Europe/Berlin за замовчуванням)."""
     now = datetime.now(_PUBLISH_TZ)
     start = now.replace(
         hour=PARSER_CHANNEL_QUIET_END_HOUR,
@@ -118,7 +118,7 @@ def _today_approved_count() -> int:
 
 
 def _pace_budget_now() -> int:
-    """Лінійний денний бюджет (Europe/Berlin): після 09:00 до півночі — повний ліміт."""
+    """Лінійний денний бюджет (Europe/Berlin): після кінця тиші до півночі — повний ліміт."""
     if not PARSER_AUTO_APPROVE_PACE_ENABLED:
         return PARSER_AUTO_APPROVE_DAILY_LIMIT
     now = datetime.now(_PUBLISH_TZ)
@@ -575,46 +575,55 @@ async def _publish_and_notify(
                 format_services_channels_labels,
                 publish_services_listing_to_channel,
                 resolve_services_trade_channel_ids,
+                services_channel_quiet_hours_active,
             )
 
-            blob_desc = description or str(listing_item.get("description") or "")
-            channel_ok = is_marketplace_channel_service(
-                str(listing_item.get("category") or ""),
-                listing_item.get("subcategory"),
-                str(listing_item.get("title") or ""),
-                blob_desc,
-            )
-            if not channel_ok:
+            if services_channel_quiet_hours_active():
                 logger.info(
-                    "auto-approve: пропуск каналу parsed_item %s — товар або не послуга",
+                    "auto-approve: тихі години — канал пропущено для parsed_item %s",
                     item_id,
                 )
             else:
-                force_ids = resolve_services_trade_channel_ids(listing_item)
-                channel_result = await publish_services_listing_to_channel(
-                    bot,
-                    listing_item,
-                    item_id,
-                    description,
-                    images_web,
-                    marketplace_listing_id=listing_id,
-                    force_channel_ids=force_ids,
+                blob_desc = description or str(listing_item.get("description") or "")
+                channel_ok = is_marketplace_channel_service(
+                    str(listing_item.get("category") or ""),
+                    listing_item.get("subcategory"),
+                    str(listing_item.get("title") or ""),
+                    blob_desc,
                 )
-                channel_published = list(channel_result.chat_ids)
-                channel_post_url = channel_result.post_url
-            if channel_published:
-                update_mod_path_status(item_id, "channel", "approved", moderated_by=None)
-                logger.info(
-                    "🤖 auto-approve channel: parsed_item %s → %s",
-                    item_id,
-                    format_services_channels_labels(channel_published),
-                )
-            else:
-                logger.warning(
-                    "🤖 auto-approve: канал не опубліковано для parsed_item %s (targets=%s)",
-                    item_id,
-                    force_ids,
-                )
+                if not channel_ok:
+                    logger.info(
+                        "auto-approve: пропуск каналу parsed_item %s — товар або не послуга",
+                        item_id,
+                    )
+                else:
+                    force_ids = resolve_services_trade_channel_ids(listing_item)
+                    channel_result = await publish_services_listing_to_channel(
+                        bot,
+                        listing_item,
+                        item_id,
+                        description,
+                        images_web,
+                        marketplace_listing_id=listing_id,
+                        force_channel_ids=force_ids,
+                    )
+                    channel_published = list(channel_result.chat_ids)
+                    channel_post_url = channel_result.post_url
+                    if channel_published:
+                        update_mod_path_status(
+                            item_id, "channel", "approved", moderated_by=None
+                        )
+                        logger.info(
+                            "🤖 auto-approve channel: parsed_item %s → %s",
+                            item_id,
+                            format_services_channels_labels(channel_published),
+                        )
+                    else:
+                        logger.warning(
+                            "🤖 auto-approve: канал не опубліковано для parsed_item %s (targets=%s)",
+                            item_id,
+                            force_ids,
+                        )
         except Exception:
             logger.exception(
                 "auto-approve channel publish failed parsed_item %s", item_id

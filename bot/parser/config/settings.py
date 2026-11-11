@@ -1,4 +1,4 @@
-"""Налаштування парсера: секрети з .env, обсяг/авто — tuning.py."""
+"""Налаштування парсера: секрети/чат-ID з .env, тюнінг — tuning.py."""
 
 from __future__ import annotations
 
@@ -51,25 +51,17 @@ from parser.config import tuning as _tuning
 WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://allyouneed.de")
 BOT_USERNAME: str = (os.getenv("BOT_USERNAME") or "").lstrip("@")
 
-FETCH_LIMIT: int = max(1, _env_int("PARSER_FETCH_LIMIT", 100))
-PARSER_SERVICES_FETCH_LIMIT: int = max(
-    1,
-    _env_int("PARSER_SERVICES_FETCH_LIMIT", _env_int("PARSER_FETCH_LIMIT", 100)),
-)
-PARSER_SERVICES_IGNORE_CURSOR: bool = _env_bool("PARSER_SERVICES_IGNORE_CURSOR", False)
-# Скільки останніх message_id перечитати поверх cursor (пропущені через збій / гонки).
-PARSER_CURSOR_OVERLAP: int = max(0, _env_int("PARSER_CURSOR_OVERLAP", 25))
-# Звичайний /parse і шедулер: 0 = cursor+overlap (лише нові пости — рекомендовано).
-# >0 = завжди останні N (ignore cursor) — багато «дублікат (оголошення)» на кожному циклі.
+# ── Обсяг парсера / auto / dedup / quiet — bot/parser/config/tuning.py ──
+FETCH_LIMIT: int = max(1, int(_tuning.PARSER_FETCH_LIMIT))
+PARSER_SERVICES_FETCH_LIMIT: int = max(1, int(_tuning.PARSER_SERVICES_FETCH_LIMIT))
+PARSER_SERVICES_IGNORE_CURSOR: bool = bool(_tuning.PARSER_SERVICES_IGNORE_CURSOR)
+PARSER_CURSOR_OVERLAP: int = max(0, int(_tuning.PARSER_CURSOR_OVERLAP))
 
-# ── Обсяг парсера / автопублікація (bot/parser/config/tuning.py) ──
 PARSER_INTERVAL_MIN: float = _tuning.PARSER_INTERVAL_MIN
 PARSER_ROLLING_LOOKBACK: int = max(0, _tuning.PARSER_ROLLING_LOOKBACK)
 PARSER_DEDUP_ENABLED: bool = _tuning.PARSER_DEDUP_ENABLED
 
-PARSER_AUTO_APPROVE_ENABLED: bool = _env_bool(
-    "PARSER_AUTO_APPROVE_ENABLED", _tuning.PARSER_AUTO_APPROVE_ENABLED
-)
+PARSER_AUTO_APPROVE_ENABLED: bool = bool(_tuning.PARSER_AUTO_APPROVE_ENABLED)
 PARSER_AUTO_APPROVE_DAILY_LIMIT: int = max(
     1,
     min(_tuning.PARSER_AUTO_APPROVE_DAILY_LIMIT_MAX, _tuning.PARSER_AUTO_APPROVE_DAILY_LIMIT),
@@ -86,9 +78,7 @@ PARSER_AUTO_APPROVE_WAVE_MINUTES: int = max(
     _tuning.PARSER_AUTO_APPROVE_WAVE_MINUTES_MIN,
     min(_tuning.PARSER_AUTO_APPROVE_WAVE_MINUTES_MAX, _tuning.PARSER_AUTO_APPROVE_WAVE_MINUTES),
 )
-PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = _env_bool(
-    "PARSER_AUTO_APPROVE_SERVICES_CHANNEL", _tuning.PARSER_AUTO_APPROVE_SERVICES_CHANNEL
-)
+PARSER_AUTO_APPROVE_SERVICES_CHANNEL: bool = bool(_tuning.PARSER_AUTO_APPROVE_SERVICES_CHANNEL)
 PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS: int = max(
     1, _tuning.PARSER_AUTO_APPROVE_MANUAL_DRAIN_ROUNDS
 )
@@ -111,22 +101,14 @@ PARSER_MP_DEDUP_CLEANUP_LOOKBACK_DAYS: int = max(
     7, int(_tuning.PARSER_MP_DEDUP_CLEANUP_LOOKBACK_DAYS)
 )
 
-PARSER_SERVICES_DEDUP_ENABLED: bool = _env_bool("PARSER_SERVICES_DEDUP_ENABLED", True)
-PARSER_DEDUP_DAYS: int = max(1, _env_int("PARSER_DEDUP_DAYS", 14))
-# Вікно dedup_key (title+desc+price) для services_channel approved без MP
-PARSER_TEXT_DEDUP_DAYS: int = max(
-    1,
-    _env_int("PARSER_TEXT_DEDUP_DAYS", min(2, PARSER_DEDUP_DAYS)),
-)
-# Pending у модерації блокує повтор лише N годин (repost з новим message_id проходить швидше)
-PARSER_PENDING_DEDUP_HOURS: int = max(
-    1,
-    _env_int("PARSER_PENDING_DEDUP_HOURS", 12),
-)
+PARSER_SERVICES_DEDUP_ENABLED: bool = bool(_tuning.PARSER_SERVICES_DEDUP_ENABLED)
+PARSER_DEDUP_DAYS: int = max(1, int(_tuning.PARSER_DEDUP_DAYS))
+PARSER_TEXT_DEDUP_DAYS: int = max(1, int(_tuning.PARSER_TEXT_DEDUP_DAYS))
+PARSER_PENDING_DEDUP_HOURS: int = max(1, int(_tuning.PARSER_PENDING_DEDUP_HOURS))
 
-PARSER_FUZZY_DEDUP_ENABLED: bool = _env_bool("PARSER_FUZZY_DEDUP", False)
-PARSER_FUZZY_DEDUP_SAME_CHANNEL: bool = _env_bool("PARSER_FUZZY_DEDUP_SAME_CHANNEL", True)
-PARSER_FUZZY_DEDUP_THRESHOLD: float = float(os.getenv("PARSER_FUZZY_DEDUP_THRESHOLD", "0.96"))
+PARSER_FUZZY_DEDUP_ENABLED: bool = bool(_tuning.PARSER_FUZZY_DEDUP_ENABLED)
+PARSER_FUZZY_DEDUP_SAME_CHANNEL: bool = bool(_tuning.PARSER_FUZZY_DEDUP_SAME_CHANNEL)
+PARSER_FUZZY_DEDUP_THRESHOLD: float = float(_tuning.PARSER_FUZZY_DEDUP_THRESHOLD)
 PARSER_EMBEDDING_MODEL: str = (_env_str("PARSER_EMBEDDING_MODEL") or "text-embedding-3-small")
 
 # ── Групи модерації парсера (3 потоки) ─────────
@@ -163,10 +145,15 @@ PARSER_PHOTOS_PUBLIC_ORPHAN_DAYS: int = max(0, _env_int("PARSER_PHOTOS_PUBLIC_OR
 # public/listings/originals — важкий прохід на малому VPS; за замовчуванням вимкнено в авто-режимі
 PARSER_PHOTOS_CLEANUP_PUBLIC: bool = _env_bool("PARSER_PHOTOS_CLEANUP_PUBLIC", False)
 
-# Тиша публікації парсера (канали + auto-approve): Europe/Berlin 22:00–09:00
-PARSER_CHANNEL_QUIET_START_HOUR: int = max(0, min(23, _env_int("PARSER_CHANNEL_QUIET_START_HOUR", 22)))
-PARSER_CHANNEL_QUIET_END_HOUR: int = max(0, min(23, _env_int("PARSER_CHANNEL_QUIET_END_HOUR", 9)))
-PARSER_CHANNEL_QUIET_TZ: str = _env_str("PARSER_CHANNEL_QUIET_TZ", "Europe/Berlin") or "Europe/Berlin"
+PARSER_CHANNEL_QUIET_START_HOUR: int = max(
+    0, min(23, int(_tuning.PARSER_CHANNEL_QUIET_START_HOUR))
+)
+PARSER_CHANNEL_QUIET_END_HOUR: int = max(
+    0, min(23, int(_tuning.PARSER_CHANNEL_QUIET_END_HOUR))
+)
+PARSER_CHANNEL_QUIET_TZ: str = (
+    str(_tuning.PARSER_CHANNEL_QUIET_TZ or "").strip() or "Europe/Berlin"
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 PHOTOS_DIR = REPO_ROOT / "database" / "parsed_photos"

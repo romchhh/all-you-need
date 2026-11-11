@@ -176,11 +176,20 @@ TRADE_SERVICES_CHANNEL_GERMANY_ID: int = int(
 )
 
 
+def quiet_hours_active_for_hour(hour: int, start: int, end: int) -> bool:
+    """Чи година `hour` (0–23) потрапляє в тихе вікно [start, end) (через північ ок)."""
+    if start == end:
+        return False
+    if start < end:
+        return start <= hour < end
+    return hour >= start or hour < end
+
+
 def services_channel_quiet_hours_active() -> bool:
     """
-    True якщо зараз тихі години публікації парсера
-    (за замовчуванням 22:00–09:00 Europe/Berlin).
-    Вікно через північ: start=22, end=9 → 22:00..08:59.
+    True якщо зараз тихі години публікації парсера в канали
+    (за замовчуванням 20:00–08:00 Europe/Berlin → робота 08:00–20:00).
+    Вікно через північ: start=20, end=8 → 20:00..07:59.
     """
     try:
         from zoneinfo import ZoneInfo
@@ -192,21 +201,19 @@ def services_channel_quiet_hours_active() -> bool:
 
         now = datetime.now(timezone(timedelta(hours=1)))
 
-    start = PARSER_CHANNEL_QUIET_START_HOUR
-    end = PARSER_CHANNEL_QUIET_END_HOUR
-    hour = now.hour
-    if start == end:
-        return False
-    if start < end:
-        return start <= hour < end
-    return hour >= start or hour < end
+    return quiet_hours_active_for_hour(
+        now.hour,
+        PARSER_CHANNEL_QUIET_START_HOUR,
+        PARSER_CHANNEL_QUIET_END_HOUR,
+    )
 
 
 def services_channel_quiet_hours_message() -> str:
     return (
-        f"🌙 Публікація парсера: тиша {PARSER_CHANNEL_QUIET_START_HOUR:02d}:00"
-        f"–{PARSER_CHANNEL_QUIET_END_HOUR:02d}:00 ({PARSER_CHANNEL_QUIET_TZ}). "
-        f"Канали / auto-approve — після {PARSER_CHANNEL_QUIET_END_HOUR:02d}:00."
+        f"🌙 Публікація парсера в канали: "
+        f"{PARSER_CHANNEL_QUIET_END_HOUR:02d}:00–{PARSER_CHANNEL_QUIET_START_HOUR:02d}:00 "
+        f"({PARSER_CHANNEL_QUIET_TZ}). Зараз тиша "
+        f"{PARSER_CHANNEL_QUIET_START_HOUR:02d}:00–{PARSER_CHANNEL_QUIET_END_HOUR:02d}:00."
     )
 
 _HAMBURG_RE = re.compile(r"\bhamburg\b|\bгамбург\b", re.IGNORECASE)
@@ -808,7 +815,7 @@ async def publish_services_listing_to_channel(
     listing_id — id parsed_items (для логів).
     marketplace_listing_id — id Listing на маркетплейсі (deep link); якщо None — channel-only.
     force_channel_ids — якщо задано, публікуємо лише в ці канали (група модерації).
-    У тихі години (за замовчуванням 22:00–09:00 Europe/Berlin) нічого не публікує — повертає [].
+    У тихі години (за замовчуванням 20:00–08:00 Europe/Berlin) нічого не публікує — повертає [].
     """
     if services_channel_quiet_hours_active():
         logger.info(
