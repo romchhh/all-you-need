@@ -1510,11 +1510,7 @@ export const ListingDetail = ({
                   setShowDistributeModal(true);
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
-                className={`w-full rounded-2xl border-2 py-3.5 font-montserrat text-base font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 ${
-                  isLight
-                    ? 'border-[#3F5331] text-[#3F5331] hover:bg-[#3F5331]/10'
-                    : 'border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#C8E6A0]/10'
-                }`}
+                className="w-full rounded-2xl py-3.5 font-montserrat text-base font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 bg-[#C8E6A0] text-[#1a1a1a] hover:opacity-90 active:opacity-80"
               >
                 <Send size={22} />
                 {t('sales.distribute')}

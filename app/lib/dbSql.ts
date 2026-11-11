@@ -82,10 +82,10 @@ export function sqlListingAutoRenewEnabled(listingAlias = 'l'): string {
   return `COALESCE(${listingAlias}.autoRenew, 0) = 1`;
 }
 
-/** Boolean column is true (PG boolean / SQLite 0/1). */
+/** Truthy flag: PG boolean або INTEGER 0/1 (ShareChatCatalog.isActive тощо). */
 export function sqlBooleanIsTrue(expr: string): string {
   if (isPostgres()) {
-    return `COALESCE(${expr}, false) = true`;
+    return `COALESCE(${expr}::int, 0) = 1`;
   }
   return `COALESCE(${expr}, 0) = 1`;
 }

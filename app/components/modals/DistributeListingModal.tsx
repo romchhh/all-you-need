@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   X,
   Send,
@@ -54,7 +54,8 @@ export function DistributeListingModal({
   const [selectedCustom, setSelectedCustom] = useState<Set<number>>(new Set());
   const [cityFilter, setCityFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [langFilter, setLangFilter] = useState(lang);
+  const [langFilter, setLangFilter] = useState('all');
+  const autoSelectedChatsRef = useRef(false);
   const [sending, setSending] = useState(false);
   const [showAddChat, setShowAddChat] = useState(false);
   const [newChatTitle, setNewChatTitle] = useState('');
@@ -88,8 +89,9 @@ export function DistributeListingModal({
     setSelectedCatalog(new Set());
     setSelectedCustom(new Set());
     setCategoryFilter('all');
-    setLangFilter(lang);
-  }, [isOpen, defaultText, lang]);
+    setLangFilter('all');
+    autoSelectedChatsRef.current = false;
+  }, [isOpen, defaultText]);
 
   const loadChats = useCallback(async () => {
     setLoadingChats(true);
@@ -97,9 +99,9 @@ export function DistributeListingModal({
       const params = new URLSearchParams({
         telegramId,
         listingId: String(listing.id),
-        lang: langFilter,
         category: categoryFilter,
       });
+      if (langFilter !== 'all') params.set('lang', langFilter);
       if (cityFilter) params.set('city', cityFilter);
       const res = await fetch(`/api/share-chats?${params.toString()}`);
       const data = await res.json();
@@ -120,6 +122,17 @@ export function DistributeListingModal({
       void loadChats();
     }
   }, [isOpen, step, loadChats]);
+
+  useEffect(() => {
+    if (step !== 2 || loadingChats || chats.length === 0) return;
+    if (autoSelectedChatsRef.current) return;
+    if (selectedCatalog.size > 0 || selectedCustom.size > 0) return;
+    const top = chats.filter((c) => !c.isCustom).slice(0, 3);
+    if (top.length > 0) {
+      setSelectedCatalog(new Set(top.map((c) => c.id)));
+      autoSelectedChatsRef.current = true;
+    }
+  }, [chats, step, loadingChats, selectedCatalog.size, selectedCustom.size]);
 
   const selectedCount = selectedCatalog.size + selectedCustom.size;
 
@@ -236,7 +249,7 @@ export function DistributeListingModal({
           telegramId,
           title: newChatTitle,
           inviteLink: newChatLink,
-          language: langFilter,
+          language: langFilter === 'all' ? lang : langFilter,
         }),
       });
       if (!res.ok) throw new Error('fail');
@@ -342,6 +355,7 @@ export function DistributeListingModal({
             </>
           ) : (
             <>
+              <h3 className="text-sm font-bold">{t('distribute.step2GroupsTitle')}</h3>
               <div className="flex flex-wrap items-center gap-2">
                 <FilterChip icon={<MapPin size={14} />} label={formatCityFilterLabel(cityFilter) || t('distribute.allCities')} isLight={isLight} />
                 <select
@@ -357,6 +371,7 @@ export function DistributeListingModal({
                   onChange={(e) => setLangFilter(e.target.value)}
                   className={`text-xs rounded-full px-3 py-1.5 border ${isLight ? 'bg-white border-gray-200' : 'bg-black/40 border-white/15'}`}
                 >
+                  <option value="all">{t('distribute.allLanguages')}</option>
                   <option value="ru">Русский</option>
                   <option value="uk">Українська</option>
                 </select>
@@ -400,6 +415,10 @@ export function DistributeListingModal({
                 <div className="flex justify-center py-8">
                   <Loader2 className="animate-spin" size={28} />
                 </div>
+              ) : chats.length === 0 ? (
+                <p className={`text-sm text-center py-6 ${isLight ? 'text-gray-500' : 'text-white/55'}`}>
+                  {t('distribute.noChatsFound')}
+                </p>
               ) : (
                 <ul className="space-y-2">
                   {chats.map((chat) => {
@@ -459,10 +478,10 @@ export function DistributeListingModal({
           {step === 2 ? (
             <button
               type="button"
-              onClick={() => setStep(1)}
-              className={`flex-1 py-3 rounded-2xl font-semibold border-2 ${isLight ? 'border-gray-200' : 'border-white/15'}`}
+              onClick={onClose}
+              className={`flex-1 py-3 rounded-2xl font-semibold border-2 ${isLight ? 'border-gray-300 text-gray-800' : 'border-white/25 text-white'}`}
             >
-              {t('common.back')}
+              {t('common.cancel')}
             </button>
           ) : null}
           {step === 1 ? (
@@ -478,10 +497,10 @@ export function DistributeListingModal({
               type="button"
               disabled={sending}
               onClick={() => void submitGroups()}
-              className="flex-1 py-3 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a] disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-[1.4] py-3 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a] disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-              {t('distribute.sendToChats')}
+              {t('distribute.preparePublications', { count: String(selectedCount) })}
             </button>
           )}
         </div>

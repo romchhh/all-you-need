@@ -55,7 +55,11 @@ export async function listShareChatsForListing(params: {
 
   const langWant = params.languageFilter && params.languageFilter !== 'all' ? params.languageFilter : null;
   const catWant = params.categoryFilter && params.categoryFilter !== 'all' ? params.categoryFilter : null;
-  const cityWant = params.cityFilter ? foldCityKey(params.cityFilter) : params.listingCityFold;
+  const cityWant = params.cityFilter
+    ? foldCityKey(params.cityFilter)
+    : params.listingCityFold
+      ? foldCityKey(params.listingCityFold)
+      : '';
 
   const items: ShareChatItem[] = [];
 
@@ -65,7 +69,9 @@ export async function listShareChatsForListing(params: {
     const language = String(row.language || 'ru');
 
     if (langWant && language !== langWant) continue;
+    // Загальні групи (без categorySlug) завжди в списку
     if (catWant && categorySlug && categorySlug !== catWant) continue;
+    // Germany-wide (cityKey null) + збіг міста; інші міста ховаємо
     if (cityWant && cityKey && foldCityKey(cityKey) !== cityWant) {
       continue;
     }
@@ -119,5 +125,27 @@ export async function listShareChatsForListing(params: {
   }
 
   items.sort((a, b) => b.relevance - a.relevance || b.memberCount - a.memberCount);
+
+  if (items.length === 0 && catalog.length > 0) {
+    for (const row of catalog) {
+      items.push({
+        id: Number(row.id),
+        title: String(row.title),
+        subtitle: row.subtitle ? String(row.subtitle) : null,
+        avatarUrl: row.avatarUrl ? String(row.avatarUrl) : null,
+        cityKey: row.cityKey ? String(row.cityKey) : null,
+        categorySlug: row.categorySlug ? String(row.categorySlug) : null,
+        language: String(row.language || 'ru'),
+        memberCount: Number(row.memberCount) || 0,
+        postingAllowed: row.postingAllowed === 1 || row.postingAllowed === true,
+        inviteLink: row.inviteLink ? String(row.inviteLink) : null,
+        isSaved: row.isSaved === 1 || row.isSaved === true,
+        isCustom: false,
+        relevance: Number(row.sortOrder) || 0,
+      });
+    }
+    items.sort((a, b) => b.memberCount - a.memberCount);
+  }
+
   return items;
 }

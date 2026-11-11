@@ -1,5 +1,5 @@
 import { prisma, executeWithRetry } from '@/lib/prisma';
-import { tableExistsQuery, sqlNow } from '@/lib/dbSql';
+import { isPostgres, tableExistsQuery, sqlNow } from '@/lib/dbSql';
 import { foldCityKey } from '@/lib/city/cityNormalization';
 
 let shareChatTablesReady = false;
@@ -54,6 +54,16 @@ const SEED_CHATS: Array<{
     inviteLink: null,
     sortOrder: 15,
   },
+  {
+    title: 'Куплю-Продам Hamburg',
+    subtitle: 'Объявления и покупки — 27 100 участников',
+    cityKey: foldCityKey('Hamburg'),
+    categorySlug: null,
+    language: 'ru',
+    memberCount: 27100,
+    inviteLink: null,
+    sortOrder: 25,
+  },
 ];
 
 async function seedCatalogIfEmpty(): Promise<void> {
@@ -62,21 +72,26 @@ async function seedCatalogIfEmpty(): Promise<void> {
   )) as Array<{ id: number }>;
   if (rows.length > 0) return;
 
+  const postingAllowed = isPostgres() ? true : 1;
+  const isActive = isPostgres() ? true : 1;
+
   for (const row of SEED_CHATS) {
     await executeWithRetry(() =>
       prisma.$executeRawUnsafe(
         `INSERT INTO ShareChatCatalog (
           title, subtitle, cityKey, categorySlug, language, memberCount,
           postingAllowed, inviteLink, sortOrder, isActive, createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, 1, ${sqlNow()})`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlNow()})`,
         row.title,
         row.subtitle,
         row.cityKey,
         row.categorySlug,
         row.language,
         row.memberCount,
+        postingAllowed,
         row.inviteLink,
-        row.sortOrder
+        row.sortOrder,
+        isActive
       )
     );
   }

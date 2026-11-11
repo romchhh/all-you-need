@@ -52,7 +52,6 @@ export async function POST(
 ) {
   try {
     await trackUserActivity(request);
-    await ensureShareChatTables();
     const { id } = await context.params;
     const listingId = parseInt(id, 10);
     if (!Number.isFinite(listingId)) {
@@ -103,6 +102,7 @@ export async function POST(
     const photoUrl = images[0] ? absoluteImageUrl(images[0]) : '';
 
     if (mode === 'bot') {
+      // Не чіпаємо ShareChat* — лише Telegram DM
       const lang = body.lang === 'ru' ? 'ru' : 'uk';
       const hint =
         lang === 'ru'
@@ -121,6 +121,8 @@ export async function POST(
 
       return NextResponse.json({ success: true, mode: 'bot' });
     }
+
+    await ensureShareChatTables();
 
     const groupLines: string[] = [];
     if (catalogChatIds.length > 0) {
