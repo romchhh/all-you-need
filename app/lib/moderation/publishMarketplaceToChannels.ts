@@ -61,12 +61,12 @@ async function publishToServicesChannel(listing: MarketplaceListingLike): Promis
 
 ${escapeHtml(description)}
 
-💰 <b>Ціна:</b> ${escapeHtml(price)}
-📂 <b>Категорія:</b> ${escapeHtml(categoryText)}
-📍 <b>Локація:</b> ${escapeHtml(location)}`;
+💰 <b>Цена:</b> ${escapeHtml(price)}
+📂 <b>Категория:</b> ${escapeHtml(categoryText)}
+📍 <b>Локация:</b> ${escapeHtml(location)}`;
 
   const replyMarkup = {
-    inline_keyboard: [[{ text: 'Дивитись оголошення', url: listingUrl }]],
+    inline_keyboard: [[{ text: 'Открыть в Маркетплейс', url: listingUrl }]],
   };
 
   const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {

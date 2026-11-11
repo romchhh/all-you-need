@@ -1,4 +1,4 @@
-import { Eye, Heart, Edit2, Check, Megaphone, DollarSign, Loader2 } from 'lucide-react';
+import { Eye, Heart, Edit2, Check, Megaphone, DollarSign, Loader2, Send } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useMemo, useState, useEffect } from 'react';
@@ -22,6 +22,7 @@ interface ProfileListingCardProps {
   onEdit: () => void;
   onMarkAsSold: () => void;
   onPromote: () => void;
+  onDistribute?: () => void;
   onReactivate?: () => void;
   /** Telegram id власника для API автопродовження */
   viewerTelegramId?: string | null;
@@ -43,6 +44,7 @@ export const ProfileListingCard = ({
   onEdit,
   onMarkAsSold,
   onPromote,
+  onDistribute,
   onReactivate,
   viewerTelegramId,
   onAutoRenewChange,
@@ -622,7 +624,28 @@ export const ProfileListingCard = ({
       
       {/* Кнопка рекламувати/активувати - знизу (прихована для проданих) */}
       {!isSold && (
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 space-y-2">
+          {listing.status === 'active' &&
+            !isPendingModeration &&
+            !isDeactivated &&
+            onDistribute && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDistribute();
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={
+                  isLight
+                    ? 'w-full bg-transparent border-2 border-[#3F5331] text-[#3F5331] rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-[#3F5331]/10 transition-colors font-semibold text-sm'
+                    : 'w-full bg-transparent border-2 border-[#C8E6A0] text-[#C8E6A0] rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-[#C8E6A0]/10 transition-colors font-semibold text-sm'
+                }
+              >
+                <Send size={16} />
+                {t('sales.distribute')}
+              </button>
+            )}
           {isDeactivated && onReactivate ? (
             <button
               onClick={(e) => {

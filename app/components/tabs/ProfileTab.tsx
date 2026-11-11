@@ -59,6 +59,13 @@ const PaymentSummaryModal = dynamic(() => import('@/components/modals/PaymentSum
 const ReactivateListingFlow = dynamic(() => import('@/components/listing/ReactivateListingFlow'), {
   ssr: false,
 });
+const DistributeListingModal = dynamic(
+  () =>
+    import('@/components/modals/DistributeListingModal').then((m) => ({
+      default: m.DistributeListingModal,
+    })),
+  { ssr: false }
+);
 const BusinessProfileFlow = dynamic(() => import('@/components/business/BusinessProfileFlow'), { ssr: false });
 const BusinessSettingsFlow = dynamic(() => import('@/components/business/BusinessSettingsFlow'), { ssr: false });
 
@@ -127,6 +134,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [showReferralModal, setShowReferralModal] = useState(false);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
+  const [showDistributeModal, setShowDistributeModal] = useState(false);
+  const [selectedListingForDistribute, setSelectedListingForDistribute] = useState<Listing | null>(null);
   const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState(false);
   const [selectedListingForPromotion, setSelectedListingForPromotion] = useState<Listing | null>(null);
   const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
@@ -838,6 +847,15 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                     setPromotionOpenSource('manual');
                     tg?.HapticFeedback.impactOccurred('light');
                   }}
+                  onDistribute={
+                    listing.status === 'active'
+                      ? () => {
+                          setSelectedListingForDistribute(listing);
+                          setShowDistributeModal(true);
+                          tg?.HapticFeedback.impactOccurred('light');
+                        }
+                      : undefined
+                  }
                   onMarkAsSold={() => {
                     if (listing.status === 'pending_moderation') {
                       showToast(
@@ -1006,6 +1024,15 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                   setPromotionOpenSource('manual');
                   tg?.HapticFeedback.impactOccurred('light');
                 }}
+                onDistribute={
+                  listing.status === 'active'
+                    ? () => {
+                        setSelectedListingForDistribute(listing);
+                        setShowDistributeModal(true);
+                        tg?.HapticFeedback.impactOccurred('light');
+                      }
+                    : undefined
+                }
                 viewerTelegramId={profile.telegramId}
                 showToast={showToast}
                 onAutoRenewChange={(listingId, autoRenew) => {
@@ -1912,6 +1939,20 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         confirmButtonClass={confirmModal.confirmButtonClass}
         tg={tg}
       />
+
+      {selectedListingForDistribute && profile?.telegramId && (
+        <DistributeListingModal
+          isOpen={showDistributeModal}
+          onClose={() => {
+            setShowDistributeModal(false);
+            setSelectedListingForDistribute(null);
+          }}
+          listing={selectedListingForDistribute}
+          telegramId={profile.telegramId}
+          tg={tg}
+          showToast={showToast}
+        />
+      )}
 
       {/* Модальне вікно реклами/апгрейду */}
       {selectedListingForPromotion && (

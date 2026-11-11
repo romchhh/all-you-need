@@ -227,6 +227,20 @@ export async function approveListing(listing: ListingWithUser): Promise<void> {
     console.error('[approveListing] City digest enqueue:', err);
   });
 
+  void import('@/lib/search/searchSubscriptionNotifications')
+    .then(({ notifySearchSubscribersOfNewMarketplaceListing }) =>
+      notifySearchSubscribersOfNewMarketplaceListing({
+        listingId: listing.id,
+        userId: listing.userId,
+        title: listing.title,
+        description: listing.description || '',
+        location: listing.location || '',
+      })
+    )
+    .catch((err) => {
+      console.error('[approveListing] Search subscription notify:', err);
+    });
+
   // Дубль у Telegram-канали: послуги / нерухомість / робота / подія
   try {
     const { publishMarketplaceListingToChannels } = await import(

@@ -627,6 +627,17 @@ async def _publish_and_notify(
             "auto-approve city-digest Listing %s: %s", listing_id, notify_err
         )
 
+    try:
+        from parser.notify.search_subscription import schedule_search_subscription_notify
+
+        schedule_search_subscription_notify(listing_id)
+    except Exception as search_notify_err:
+        logger.warning(
+            "auto-approve search-subscription Listing %s: %s",
+            listing_id,
+            search_notify_err,
+        )
+
     from parser.moderation.author_notify import schedule_author_notify_if_allowed
 
     outreach_item = parsed_item_for_outreach(item, listing_item)

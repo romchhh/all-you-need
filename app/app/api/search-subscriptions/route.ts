@@ -4,6 +4,7 @@ import { executeWithRetry, ensureSearchSubscriptionTable } from '@/lib/prisma';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { findUserByTelegramId } from '@/utils/userHelpers';
 import { sqlNow } from '@/lib/dbSql';
+import { normalizeQueryKey } from '@/lib/search/normalizeQueryKey';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,10 +17,6 @@ async function ensureTable() {
 function isDuplicateSubscriptionError(error: unknown): boolean {
   const msg = String((error as { message?: string })?.message || '').toLowerCase();
   return msg.includes('unique') || msg.includes('duplicate');
-}
-
-function normalizeQueryKey(raw: string): string {
-  return raw.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 function normalizeEntityMode(raw: string | null | undefined): 'listings' | 'businesses' {

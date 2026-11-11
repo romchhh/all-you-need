@@ -18,26 +18,35 @@ def get_user_lang(user_id: int) -> str:
     return lang if lang in TRANSLATIONS else DEFAULT_LANGUAGE
 
 
-def t(user_id: int, key: str, **kwargs) -> str:
-    lang = get_user_lang(user_id)
-    translations = TRANSLATIONS.get(lang, TRANSLATIONS[DEFAULT_LANGUAGE])
-    
-    keys = key.split('.')
+def t_lang(lang: str, key: str, **kwargs) -> str:
+    """Переклад за фіксованою мовою (напр. канали завжди ru)."""
+    code = (lang or DEFAULT_LANGUAGE).lower()
+    if code.startswith("ru"):
+        code = "ru"
+    elif code.startswith("uk"):
+        code = "uk"
+    else:
+        code = DEFAULT_LANGUAGE
+    translations = TRANSLATIONS.get(code, TRANSLATIONS[DEFAULT_LANGUAGE])
+
     value = translations
-    
-    for k in keys:
+    for k in key.split("."):
         if isinstance(value, dict) and k in value:
             value = value[k]
         else:
             return key
-    
+
     if isinstance(value, str):
         try:
             return value.format(**kwargs)
         except KeyError:
             return value
-    
+
     return str(value) if value else key
+
+
+def t(user_id: int, key: str, **kwargs) -> str:
+    return t_lang(get_user_lang(user_id), key, **kwargs)
 
 
 def get_welcome_message(telegram_lang: str = None) -> str:

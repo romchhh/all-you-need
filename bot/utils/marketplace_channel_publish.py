@@ -151,7 +151,7 @@ async def _publish_trade_channel(bot: Bot, listing: dict) -> Optional[int]:
     else:
         price_text = f"{html.escape(str(price))} {html.escape(str(currency))}".strip()
 
-    category_text = html.escape(get_category_label(category, subcategory))
+    category_text = html.escape(get_category_label(category, subcategory, lang="ru"))
     hashtags = build_channel_hashtags(category, subcategory if isinstance(subcategory, str) else None, location)
     listing_id = int(listing.get("id") or 0)
     open_url = listing_miniapp_url(listing_id) if listing_id else None
@@ -159,9 +159,9 @@ async def _publish_trade_channel(bot: Bot, listing: dict) -> Optional[int]:
     caption = (
         f"<b>{html.escape(title)}</b>\n\n"
         f"{html.escape(description)}\n\n"
-        f"Ціна: {price_text}\n"
-        f"Категорія: {category_text}\n"
-        f"Локація: {html.escape(location)}\n\n"
+        f"Цена: {price_text}\n"
+        f"Категория: {category_text}\n"
+        f"Локация: {html.escape(location)}\n\n"
         f"{hashtags}"
     )
     if len(caption) > 1024:
@@ -170,7 +170,7 @@ async def _publish_trade_channel(bot: Bot, listing: dict) -> Optional[int]:
     keyboard = None
     if open_url:
         keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="Дивитись оголошення", url=open_url)]]
+            inline_keyboard=[[InlineKeyboardButton(text="Открыть в Маркетплейс", url=open_url)]]
         )
 
     images = _listing_images(listing.get("images"))

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { DollarSign, Edit2, Heart, Megaphone, RotateCcw } from 'lucide-react';
+import { DollarSign, Edit2, Heart, Megaphone, RotateCcw, Send } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -20,6 +20,7 @@ interface BusinessListingSquareProps {
   onMarkAsSold?: () => void;
   onReactivate?: () => void;
   onPromote?: () => void;
+  onDistribute?: () => void;
 }
 
 function priceLabel(listing: Listing, t: (key: string) => string) {
@@ -42,6 +43,7 @@ export function BusinessListingSquare({
   onMarkAsSold,
   onReactivate,
   onPromote,
+  onDistribute,
 }: BusinessListingSquareProps) {
   const { t } = useLanguage();
   const imageUrl = useMemo(() => resolveListingCardImageUrl(listing), [listing]);
@@ -136,7 +138,7 @@ export function BusinessListingSquare({
         </button>
       ) : null}
 
-      {(onEdit || onMarkAsSold || onReactivate || onPromote) && (
+      {(onEdit || onMarkAsSold || onReactivate || onPromote || onDistribute) && (
         <div className="absolute right-1 top-1 flex flex-col gap-1">
           {!isSold && onEdit ? (
             <button
@@ -182,6 +184,20 @@ export function BusinessListingSquare({
               aria-label={t('businessProfile.owner.promoteListings')}
             >
               <Megaphone size={13} />
+            </button>
+          ) : null}
+          {!isSold && !isDeactivated && !isPending && !isRejected && onDistribute ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDistribute();
+                tg?.HapticFeedback.impactOccurred('light');
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white"
+              aria-label={t('sales.distribute')}
+            >
+              <Send size={13} />
             </button>
           ) : null}
           {isDeactivated && !isSold && !isPending && !isRejected && onReactivate ? (

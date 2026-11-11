@@ -220,6 +220,16 @@ async def _approve_services_both(
                     notify_err,
                 )
             try:
+                from parser.notify.search_subscription import schedule_search_subscription_notify
+
+                schedule_search_subscription_notify(listing_id)
+            except Exception as search_notify_err:
+                logger.warning(
+                    "search-subscription notify Listing %s: %s",
+                    listing_id,
+                    search_notify_err,
+                )
+            try:
                 from parser.notify.home_activity import schedule_home_activity_revalidate
 
                 schedule_home_activity_revalidate()
@@ -350,6 +360,16 @@ async def _approve_marketplace(
                 "Не вдалося поставити Listing %s в city-digest чергу: %s",
                 listing_id,
                 notify_err,
+            )
+        try:
+            from parser.notify.search_subscription import schedule_search_subscription_notify
+
+            schedule_search_subscription_notify(listing_id)
+        except Exception as search_notify_err:
+            logger.warning(
+                "search-subscription notify Listing %s: %s",
+                listing_id,
+                search_notify_err,
             )
         try:
             from parser.notify.home_activity import schedule_home_activity_revalidate

@@ -230,11 +230,16 @@ Duplicates vs queues above → accept=false, is_duplicate=true, reject_reason="d
 ENRICHMENT (only if accept=true) — marketplace auto-publish quality
 ══════════════════════════════════════
 
+LANGUAGE (critical):
+- Keep the ORIGINAL language of the post for BOTH title and description.
+- Ukrainian post → Ukrainian title+description. Russian → Russian. German → German.
+- NEVER translate UK↔RU (or to English). Brand/model names (iPhone, BMW) stay as usual.
+
 TITLE (critical):
-- Russian, 4–80 chars. Name the ITEM or SERVICE: brand + model + key spec OR service type.
+- Same language as the post, 4–80 chars. Name the ITEM or SERVICE: brand + model + key spec OR service type.
 - FORBIDDEN in title: price, €, city, PLZ, greetings, “продам/продаю/отдам”, emoji spam, hashtags.
 - NEVER leave stubs: «авто», «машина», «товар», «объявление», «Акційний товар», «телефон».
-- Rebuild stubs from POST TEXT (brand/model lines).
+- Rebuild stubs from POST TEXT (brand/model lines) in the same language.
 
 TITLE EXAMPLES:
 ✗ "авто" / "Продам авто 5500€ Stuttgart"  → ✓ "Nissan Pulsar 1.5 Diesel"
@@ -242,12 +247,13 @@ TITLE EXAMPLES:
 ✗ "Меня зовут Женя я тату мастер" → ✓ "Тату-мастер"
 ✗ "Nike Air Force 1 80€" → ✓ "Nike Air Force 1"
 ✗ "Лазерная эпиляция Hamburg" → ✓ "Лазерная эпиляция"
-✗ "Акційний товар" → rebuild from text (brand/model)
+✗ "Акційний товар" → rebuild from text (brand/model) in Ukrainian if post is UK
 ✗ "17про макс на 512гб как новый г" → ✓ "iPhone 17 Pro Max 512GB"
 ✗ "Половину своего гардероба за" → ✓ "Одежда из гардероба"
+✗ UK post "Прибирання квартир Гамбург" → title "Прибирання квартир" (NOT Russian)
 
 DESCRIPTION (critical):
-- Russian (translate UK→RU if needed). 2–8 short paragraphs/sentences.
+- SAME language as the original post (do not translate). 2–8 short paragraphs/sentences.
 - Keep ALL useful facts from POST TEXT: specs, size, year, mileage, condition, pickup, extras.
 - Do NOT start with the same words as title. Do NOT invent facts not in the post.
 - Strip: subscribe spam, channel ads, endless emoji, “пиши в лс” fluff is ok once if that is the CTA.
@@ -262,6 +268,10 @@ Post: "Продам авто\\nNissan Pulsar 1,5 Diesel\\n5500€ Stuttgart"
 Post: "iPhone 13 Pro 256GB батарея 88% коробка есть 450€ Köln"
 → title "iPhone 13 Pro 256GB"
 → description "iPhone 13 Pro, память 256GB, состояние батареи 88%, коробка в комплекте. Цена 450€. Самовывоз Köln."
+
+Post (Ukrainian): "Прибирання квартир у Гамбурзі, 25€/год"
+→ title "Прибирання квартир"
+→ description "Пропоную прибирання квартир у Гамбурзі. Ціна 25€/год." (stay Ukrainian)
 
 CATEGORY / SUBCATEGORY (critical):
 - Use ONLY ids from the Allowed list above. NEVER invent: transport, vehicles, car, cars, clothing, phone…
@@ -318,9 +328,10 @@ Respond with JSON only:
 _SCREEN_SYSTEM_PROMPT = (
     "You are the listing quality engine for Trade Ground marketplace (Germany). "
     "For each Telegram flea-market post: (1) accept only real goods/service offers; "
-    "(2) write a marketplace-ready Russian title (brand/model/service — never stubs like "
+    "(2) write a marketplace-ready title in the SAME language as the post "
+    "(UK stays UK, RU stays RU — never translate; brand/model/service; never stubs like "
     "«авто»/«товар», never price/city in title); "
-    "(3) write a complete factual Russian description from the post (no invention); "
+    "(3) write a complete factual description in the SAME language as the post (no invention); "
     "(4) assign category/subcategory ONLY from the allowed id list "
     "(cars → auto/cars; phones → electronics/smartphones; tattoo/nails → "
     "services_work/beauty_health). Never invent category ids. JSON only."

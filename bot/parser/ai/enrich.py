@@ -2,7 +2,7 @@
 AI-збагачення парсованих оголошень при підтвердженні модератором (OpenAI).
 
 Аналізує лише текст і повертає:
-  - заголовок, опис (російською)
+  - заголовок, опис (мовою оригіналу поста)
   - категорію / підкатегорію (id маркетплейсу)
   - ціну (або «Договорная»)
   - місто
@@ -276,15 +276,16 @@ Marketplace category ids only (category / subcategory):
 Canonical cities: {", ".join(GERMAN_CITIES[:40])}, …
 
 Rules:
-1. title — Russian, 4–80 chars. Item/service essence: brand, model, service type.
+1. title — SAME language as raw_text (UK/RU/DE — never translate), 4–80 chars.
+   Item/service essence: brand, model, service type.
    ALWAYS rebuild broken/translit stubs into a clean brand+model title.
    Rebuild stubs («авто», «товар», «машина», «Акційний товар», greetings).
    FORBIDDEN in title: price (€/EUR), city, PLZ, “продам/продаю/отдам”, emoji, hashtags.
    Examples:
-   ✓ "Nissan Pulsar 1.5 Diesel", "iPhone 13 Pro 256GB", "Тату-мастер", "Nike Air Force 1"
+   ✓ "Nissan Pulsar 1.5 Diesel", "iPhone 13 Pro 256GB", "Тату-мастер", "Прибирання квартир"
    ✗ "17про макс на 512гб как новый г" → ✓ "iPhone 17 Pro Max 512GB"
    ✗ "Половину своего гардероба за" → ✓ "Одежда из гардероба"
-2. description — Russian (translate from Ukrainian if needed). Keep all important info
+2. description — SAME language as raw_text (do NOT translate UK↔RU). Keep all important info
    from raw_text: specs, terms, prices, details. 2–8 sentences; 800–2000 chars ok for long posts.
    Do not start by repeating the title. No channel promo / subscribe spam. No invented facts.
 3. category/subcategory — from FULL raw_text only. Use taxonomy ids only; subcategory required.
@@ -323,9 +324,11 @@ JSON only:
 
 _ENRICH_SYSTEM_PROMPT = (
     "You enrich Trade Ground marketplace listings for auto-publish quality. "
-    "Title: Russian brand/model/service essence — never stubs («авто», «товар»), "
+    "Title and description MUST stay in the original post language "
+    "(Ukrainian→Ukrainian, Russian→Russian — never translate). "
+    "Title: brand/model/service essence — never stubs («авто», «товар»), "
     "never price/city/greeting. "
-    "Description: complete factual Russian from the post, no invention, do not only repeat title. "
+    "Description: complete factual text from the post, no invention, do not only repeat title. "
     "Category: ONLY allowed marketplace ids "
     "(cars→auto/cars; phones→electronics/smartphones; "
     "tattoo/nails/epilation→services_work/beauty_health). Never invent transport/vehicles. "

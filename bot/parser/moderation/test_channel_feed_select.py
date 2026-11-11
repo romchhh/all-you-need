@@ -474,7 +474,8 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(buttons), 2)
         self.assertIn("Маркетплейс", buttons[0].text)
         self.assertIn("listing_7", buttons[0].url)
-        self.assertIn("оголошення", buttons[1].text.lower())
+        # Канал UI завжди російською
+        self.assertIn("объявлен", buttons[1].text.lower())
         self.assertEqual(saved["listing_id"], 7)
         self.assertEqual(saved["bucket"], "cleaning")
         self.assertEqual(skipped, [])

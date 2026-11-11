@@ -35,6 +35,8 @@ model User {
   favorites               Favorite[]
   citySubscriptions       CitySubscription[]
   searchSubscriptions     SearchSubscription[]
+  userShareChats          UserShareChat[]
+  shareDistributionLogs   ShareDistributionLog[]
   transactions            Transaction[]
   reviews                 Review[]
   payments                Payment[]
@@ -162,6 +164,63 @@ model CitySubscription {
 
   @@unique([userId, cityKey])
   @@index([cityKey])
+}
+
+// Каталог Telegram-чатів для розповсюдження оголошень
+model ShareChatCatalog {
+  id             Int      @id @default(autoincrement())
+  title          String
+  subtitle       String?
+  avatarUrl      String?
+  cityKey        String?
+  categorySlug   String?
+  language       String   @default("ru")
+  memberCount    Int      @default(0)
+  postingAllowed Boolean  @default(true)
+  inviteLink     String?
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  userLinks UserShareChat[]
+
+  @@index([cityKey])
+  @@index([categorySlug])
+}
+
+// Збережені користувачем групи (каталог + власні)
+model UserShareChat {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  catalogChatId Int?
+  title         String
+  subtitle      String?
+  inviteLink    String?
+  language      String   @default("ru")
+  memberCount   Int      @default(0)
+  isSaved       Boolean  @default(true)
+  source        String   @default("custom")
+  createdAt     DateTime @default(now())
+
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalog ShareChatCatalog? @relation(fields: [catalogChatId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ShareDistributionLog {
+  id              Int      @id @default(autoincrement())
+  listingId       Int
+  userId          Int
+  chatText        String
+  catalogChatIds  String?
+  customChatIds   String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([userId])
 }
 
 // Підписка на пошуковий запит (нові оголошення за запитом)

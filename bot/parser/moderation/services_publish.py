@@ -24,7 +24,6 @@ from parser.config.settings import (
     WEBAPP_URL,
 )
 from parser.core.telegram_meta import parsed_item_message_link
-from parser.core.text import detect_lang
 from parser.moderation.aggregator_sellers import (
     clear_aggregator_username,
     is_aggregator_telegram_id,
@@ -40,11 +39,14 @@ from parser.moderation.formatting import (
     truncate_telegram_html,
 )
 from utils.location_normalization import normalize_city_name
-from utils.translations import t
+from utils.translations import t, t_lang
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
+
+# UI каналів (кнопки / ціна / категорія) — завжди російською; текст оголошення лишається оригіналом
+CHANNEL_UI_LANG = "ru"
 
 _MSG_LINK_IN_TEXT_RE = re.compile(r"https?://t\.me/[^\s<>\"')\]]+", re.IGNORECASE)
 
@@ -625,8 +627,8 @@ def _channel_photo_inputs_from_images_web(images_web: list) -> list:
     return out
 
 
-def _services_channel_price_text(user_id_for_lang: int, item: dict) -> str:
-    negotiable_text = t(user_id_for_lang, "moderation.negotiable")
+def _services_channel_price_text(item: dict) -> str:
+    negotiable_text = t_lang(CHANNEL_UI_LANG, "moderation.negotiable")
     is_free = bool(item.get("is_free"))
     price_str = str(item.get("price") or "").strip()
     currency = (item.get("currency") or "EUR").strip()
@@ -635,7 +637,7 @@ def _services_channel_price_text(user_id_for_lang: int, item: dict) -> str:
         price_display = price_display.strip() or None
 
     if is_free:
-        return t(user_id_for_lang, "common.free")
+        return t_lang(CHANNEL_UI_LANG, "common.free")
     if price_display:
         if price_display in (
             negotiable_text,
@@ -877,10 +879,11 @@ async def publish_services_listing_to_channel(
         item.get("source_city"),
     )
 
+    # UI каналу фіксовано російською; title/description — мова оригіналу (AI більше не перекладає)
     try:
-        user_id_for_lang = int(item.get("author_id") or 0)
+        user_id_for_name = int(item.get("author_id") or 0)
     except (TypeError, ValueError):
-        user_id_for_lang = 0
+        user_id_for_name = 0
 
     title = (item.get("title") or "").strip()
     title_style = f"<b>{html.escape(title)}</b>"
@@ -897,19 +900,19 @@ async def publish_services_listing_to_channel(
     description_parts: list[str] = []
     if raw_desc:
         description_parts.append(html.escape(raw_desc))
-    original_link_html = format_original_post_link_html(item)
+    original_link_html = format_original_post_link_html(item, lang=CHANNEL_UI_LANG)
     if original_link_html:
         description_parts.append(original_link_html)
     description_html = "\n\n".join(description_parts)
 
     category = (item.get("category") or "services_work").strip()
     subcategory = item.get("subcategory")
-    category_text = html.escape(get_category_label(category, subcategory))
+    category_text = html.escape(get_category_label(category, subcategory, lang=CHANNEL_UI_LANG))
 
     condition = item.get("condition") or ""
     condition_map = {
-        "new": t(user_id_for_lang, "listing.details.condition_new"),
-        "used": t(user_id_for_lang, "listing.details.condition_used"),
+        "new": t_lang(CHANNEL_UI_LANG, "listing.details.condition_new"),
+        "used": t_lang(CHANNEL_UI_LANG, "listing.details.condition_used"),
     }
     condition_text = html.escape(str(condition_map.get(condition, condition or "—")))
 
@@ -919,14 +922,15 @@ async def publish_services_listing_to_channel(
     location = normalize_city_name(location) or location
     location_esc = html.escape(location)
 
-    price_text = _services_channel_price_text(user_id_for_lang, item)
+    price_text = _services_channel_price_text(item)
 
     hashtags = build_channel_hashtags(category, subcategory, location)
 
-    seller_label = t(user_id_for_lang, "listing.details.seller_channel")
+    seller_label = t_lang(CHANNEL_UI_LANG, "listing.details.seller_channel")
     author_username = resolved_author_username(item)
     author_id = item.get("author_id")
     msg_link = parsed_item_message_link(item)
+    original_link_label = "Оригинал объявления"
 
     bot_username = (os.getenv("BOT_USERNAME") or BOT_USERNAME or "TradeGroundBot").lstrip("@")
     bot_link = f"https://t.me/{bot_username}"
@@ -943,37 +947,37 @@ async def publish_services_listing_to_channel(
             f"{html.escape(seller_full_name)}</a>"
         )
     elif msg_link:
-        lang = detect_lang(f"{item.get('title') or ''}\n{item.get('description') or ''}")
-        link_label = "Оригінал оголошення" if lang == "uk" else "Оригинал объявления"
         safe_link = html.escape(msg_link, quote=True)
-        seller_text = f"{seller_label} <a href=\"{safe_link}\">{html.escape(link_label)}</a>"
+        seller_text = (
+            f"{seller_label} <a href=\"{safe_link}\">{html.escape(original_link_label)}</a>"
+        )
     else:
         try:
             aid = int(author_id) if author_id is not None else 0
         except (TypeError, ValueError):
             aid = 0
         if aid and not is_aggregator_telegram_id(aid):
-            seller_full_name = _seller_display_name(item, user_id_for_lang)
+            seller_full_name = _seller_display_name(item, user_id_for_name)
             seller_link = f"tg://user?id={aid}"
             seller_text = f"{seller_label} <a href=\"{seller_link}\">{html.escape(seller_full_name)}</a>"
         elif msg_link:
-            lang = detect_lang(f"{item.get('title') or ''}\n{item.get('description') or ''}")
-            link_label = "Оригінал оголошення" if lang == "uk" else "Оригинал объявления"
             safe_link = html.escape(msg_link, quote=True)
-            seller_text = f"{seller_label} <a href=\"{safe_link}\">{html.escape(link_label)}</a>"
+            seller_text = (
+                f"{seller_label} <a href=\"{safe_link}\">{html.escape(original_link_label)}</a>"
+            )
         else:
-            seller_full_name = _seller_display_name(item, user_id_for_lang)
+            seller_full_name = _seller_display_name(item, user_id_for_name)
             seller_text = f"{seller_label} {html.escape(seller_full_name)}"
 
     safe_bot_link = html.escape(bot_link, quote=True)
-    bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=safe_bot_link)}"
+    bot_text = f"\n\n{t_lang(CHANNEL_UI_LANG, 'listing.submit_ad_text', bot_link=safe_bot_link)}"
 
-    footer = f"""{t(user_id_for_lang, 'listing.details.price_channel')} {price_text}
-{t(user_id_for_lang, 'listing.details.category_channel')} {category_text}
-{t(user_id_for_lang, 'listing.details.location_channel')} {location_esc}
+    footer = f"""{t_lang(CHANNEL_UI_LANG, 'listing.details.price_channel')} {price_text}
+{t_lang(CHANNEL_UI_LANG, 'listing.details.category_channel')} {category_text}
+{t_lang(CHANNEL_UI_LANG, 'listing.details.location_channel')} {location_esc}
 {seller_text}
 
-{t(user_id_for_lang, 'listing.details.hashtag')} {hashtags}{bot_text}"""
+{t_lang(CHANNEL_UI_LANG, 'listing.details.hashtag')} {hashtags}{bot_text}"""
 
     text_with_bot = assemble_telegram_caption(
         title_html=title_style,
@@ -982,13 +986,13 @@ async def publish_services_listing_to_channel(
         max_len=1024,
     )
 
-    submit_btn = t(user_id_for_lang, "listing.submit_ad_button")
+    submit_btn = t_lang(CHANNEL_UI_LANG, "listing.submit_ad_button")
     keyboard_rows: list[list[InlineKeyboardButton]] = []
     if listing_open_url:
-        view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
+        view_btn = t_lang(CHANNEL_UI_LANG, "my_listings.view_listing_button")
         keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=listing_open_url)])
     if not listing_open_url and msg_link and not author_username:
-        view_btn = t(user_id_for_lang, "my_listings.view_listing_button")
+        view_btn = t_lang(CHANNEL_UI_LANG, "my_listings.view_listing_button")
         keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=msg_link)])
     keyboard_rows.append([InlineKeyboardButton(text=submit_btn, url=bot_link)])
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)

@@ -15,6 +15,7 @@
     "db:fix-location-hamburg": "tsx scripts/fix-location-hamburg.ts",
     "db:remove-description-footer": "tsx scripts/remove-description-footer.ts",
     "test:city-notify": "tsx scripts/test-city-subscription-notify.ts",
+    "test:search-notify": "tsx scripts/test-search-subscription-notify.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

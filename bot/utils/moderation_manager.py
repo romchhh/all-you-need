@@ -19,7 +19,7 @@ from keyboards.client_keyboards import get_category_translation
 from parser.moderation.formatting import listing_miniapp_url
 from utils.seller_contact import build_seller_telegram_url
 from utils.telegram_listing_marketplace_sync import ensure_marketplace_listing_from_telegram
-from utils.translations import t, get_user_lang
+from utils.translations import t, t_lang, get_user_lang
 
 load_dotenv()
 
@@ -419,6 +419,7 @@ class ModerationManager:
                             print(f"Не вдалося видалити старе повідомлення з каналу для {listing_id}: {del_err}")
 
                     # Завжди дублюємо в маркетплейс (навіть якщо канал не налаштований)
+                    marketplace_listing_id = None
                     try:
                         marketplace_listing_id = await ensure_marketplace_listing_from_telegram(
                             self.bot, listing
@@ -430,6 +431,18 @@ class ModerationManager:
                         print(
                             f"[approve_listing] Marketplace sync failed for {listing_id}: {sync_err}"
                         )
+
+                    if marketplace_listing_id:
+                        try:
+                            from parser.notify.search_subscription import (
+                                schedule_search_subscription_notify,
+                            )
+
+                            schedule_search_subscription_notify(int(marketplace_listing_id))
+                        except Exception as search_notify_err:
+                            print(
+                                f"[approve_listing] Search subscription notify error: {search_notify_err}"
+                            )
                     
                     channel_message_id = await self._publish_to_channel(listing_id)
                     
@@ -573,6 +586,17 @@ class ModerationManager:
                         enqueue_city_digest_listing(listing_id)
                     except Exception as notify_err:
                         print(f"[approve_listing] City digest enqueue error: {notify_err}")
+
+                    try:
+                        from parser.notify.search_subscription import (
+                            schedule_search_subscription_notify,
+                        )
+
+                        schedule_search_subscription_notify(listing_id)
+                    except Exception as search_notify_err:
+                        print(
+                            f"[approve_listing] Search subscription notify error: {search_notify_err}"
+                        )
 
                     # Дубль у Telegram-канали: послуги → SERVICES, нерухомість/робота/подія → TRADE
                     try:
@@ -822,10 +846,11 @@ class ModerationManager:
             price = listing.get('price', 0)
             currency = listing.get('currency', 'EUR')
             
-            # Отримуємо user_id для перекладу (потрібно отримати до формування тексту ціни)
             seller_telegram_id = listing.get('sellerTelegramId') or listing.get('telegramId')
             user_id_for_lang = seller_telegram_id if seller_telegram_id else 0
-            negotiable_text = t(user_id_for_lang, 'moderation.negotiable')
+            # Канал: UI російською; title/description автора не чіпаємо
+            channel_lang = "ru"
+            negotiable_text = t_lang(channel_lang, 'moderation.negotiable')
             
             # Формуємо текст ціни
             if price_display:
@@ -844,24 +869,17 @@ class ModerationManager:
             condition = listing.get('condition', '')
             location = listing.get('location', '')
             
-            category_text = get_category_translation(user_id_for_lang, category)
-            if subcategory:
-                from parser.category_keywords import get_subcategory_label
+            from parser.category_keywords import get_category_label, get_subcategory_label
 
-                sub_label = get_subcategory_label(category, subcategory)
-                if sub_label and sub_label != subcategory:
-                    category_text += f" / {sub_label}"
-                else:
-                    category_text += f" / {subcategory}"
+            category_text = get_category_label(category, subcategory, lang=channel_lang)
 
             from parser.moderation.formatting import build_channel_hashtags
 
             hashtags = build_channel_hashtags(category, subcategory, location)
             
-            # Використовуємо переклади для condition
             condition_map = {
-                'new': t(user_id_for_lang, 'listing.details.condition_new'),
-                'used': t(user_id_for_lang, 'listing.details.condition_used')
+                'new': t_lang(channel_lang, 'listing.details.condition_new'),
+                'used': t_lang(channel_lang, 'listing.details.condition_used')
             }
             condition_text = condition_map.get(condition, condition)
             
@@ -922,16 +940,16 @@ class ModerationManager:
             )
 
             # Формуємо посилання на продавця (без емодзі для каналу)
-            seller_label = t(user_id_for_lang, 'listing.details.seller_channel')
+            # UI каналу завжди російською; текст оголошення — як написав автор
+            seller_label = t_lang(channel_lang, 'listing.details.seller_channel')
             contact_listing_url = listing_open_url or bot_link
             contact_image_url = self._public_listing_image_url(listing)
             if seller_username:
-                seller_lang = get_user_lang(int(seller_telegram_id)) if seller_telegram_id else "ru"
                 seller_href = build_seller_telegram_url(
                     seller_username,
                     title,
                     contact_listing_url,
-                    lang=seller_lang,
+                    lang=channel_lang,
                     image_url=contact_image_url,
                 )
                 seller_text = f"{seller_label} <a href=\"{seller_href}\">{seller_full_name}</a>"
@@ -941,27 +959,26 @@ class ModerationManager:
             else:
                 seller_text = f"{seller_label} {seller_full_name}"
 
-            view_btn = t(user_id_for_lang, 'my_listings.view_listing_button')
-            submit_btn = t(user_id_for_lang, 'listing.submit_ad_button')
+            view_btn = t_lang(channel_lang, 'my_listings.view_listing_button')
+            submit_btn = t_lang(channel_lang, 'listing.submit_ad_button')
             keyboard_rows = []
             if listing_open_url:
                 keyboard_rows.append([InlineKeyboardButton(text=view_btn, url=listing_open_url)])
             keyboard_rows.append([InlineKeyboardButton(text=submit_btn, url=bot_link)])
             channel_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
             
-            # Отримуємо мову користувача для перекладу (використовуємо user_id_for_lang, який вже встановлено)
-            bot_text = f"\n\n{t(user_id_for_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
+            bot_text = f"\n\n{t_lang(channel_lang, 'listing.submit_ad_text', bot_link=bot_link)}"
             
             text = f"""{title_prefix}{title_style}
 
 {description}
 
-{t(user_id_for_lang, 'listing.details.price_channel')} {price_text}
-{t(user_id_for_lang, 'listing.details.category_channel')} {category_text}
-{t(user_id_for_lang, 'listing.details.location_channel')} {location}
+{t_lang(channel_lang, 'listing.details.price_channel')} {price_text}
+{t_lang(channel_lang, 'listing.details.category_channel')} {category_text}
+{t_lang(channel_lang, 'listing.details.location_channel')} {location}
 {seller_text}
 
-{t(user_id_for_lang, 'listing.details.hashtag')} {hashtags}"""
+{t_lang(channel_lang, 'listing.details.hashtag')} {hashtags}"""
             
             images = listing.get('images', [])
             if isinstance(images, str):

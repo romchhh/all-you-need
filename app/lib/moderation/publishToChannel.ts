@@ -99,11 +99,11 @@ export async function publishListingToChannel(
 
 📄 ${description}
 
-💰 <b>Ціна:</b> ${price} ${currency}
-📂 <b>Категорія:</b> ${categoryText}
-📍 <b>Розташування:</b> ${location}
+💰 <b>Цена:</b> ${price} ${currency}
+📂 <b>Категория:</b> ${categoryText}
+📍 <b>Локация:</b> ${location}
 
-#Оголошення ${hashtags}`;
+#Объявление ${hashtags}`;
 
     // Отримуємо зображення
     let images: string[] = [];
