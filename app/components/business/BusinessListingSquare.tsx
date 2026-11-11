@@ -73,13 +73,16 @@ export function BusinessListingSquare({
             ? t('sales.deactivated')
             : null;
 
+  const isActive = listing.status === 'active';
+  const showDistribute = Boolean(onDistribute && isActive && !isSold && !isPending && !isRejected);
+
   const openListing = () => {
-    if (dimmed && (onEdit || onMarkAsSold || onReactivate || onPromote)) return;
+    if (dimmed && (onEdit || onMarkAsSold || onReactivate || onPromote || onDistribute)) return;
     onSelect(listing);
     tg?.HapticFeedback.impactOccurred('light');
   };
 
-  return (
+  const square = (
     <div
       role="button"
       tabIndex={0}
@@ -186,20 +189,6 @@ export function BusinessListingSquare({
               <Megaphone size={13} />
             </button>
           ) : null}
-          {!isSold && !isDeactivated && !isPending && !isRejected && onDistribute ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDistribute();
-                tg?.HapticFeedback.impactOccurred('light');
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white"
-              aria-label={t('sales.distribute')}
-            >
-              <Send size={13} />
-            </button>
-          ) : null}
           {isDeactivated && !isSold && !isPending && !isRejected && onReactivate ? (
             <button
               type="button"
@@ -216,6 +205,28 @@ export function BusinessListingSquare({
           ) : null}
         </div>
       )}
+    </div>
+  );
+
+  if (!showDistribute) {
+    return square;
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-1">
+      {square}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDistribute?.();
+          tg?.HapticFeedback.impactOccurred('light');
+        }}
+        className="flex w-full items-center justify-center gap-1 rounded-lg bg-[#C8E6A0] px-1 py-1.5 text-[10px] font-bold leading-tight text-[#1a1a1a] active:opacity-90"
+      >
+        <Send size={11} className="shrink-0" />
+        <span className="truncate">{t('sales.distribute')}</span>
+      </button>
     </div>
   );
 }

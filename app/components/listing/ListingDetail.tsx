@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Share2, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone, Eye, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, Send, MessageCircle, User, MapPin, Clock, X, TrendingUp, Phone, Eye, LayoutGrid } from 'lucide-react';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { ImageGallery } from '@/components/listing/ImageGallery';
@@ -58,6 +58,7 @@ import { shouldShowListingFavorites, shouldShowListingViews } from '@/lib/listin
 import { guestListingCopy } from '@/utils/guestListingCopy';
 import { displayListingFavoritesCount, displayListingViews } from '@/lib/listings/displayStats';
 import { BRAND_GREEN_ON_DARK, BRAND_GREEN_PRICE_ON_LIGHT } from '@/constants/brandColors';
+import { normalizeTelegramIdForDb } from '@/lib/dbSql';
 
 // Динамічний імпорт PromotionModal та PaymentSummaryModal
 const PromotionModal = dynamic(() => import('@/components/modals/PromotionModal'), {
@@ -66,6 +67,13 @@ const PromotionModal = dynamic(() => import('@/components/modals/PromotionModal'
 const PaymentSummaryModal = dynamic(() => import('@/components/modals/PaymentSummaryModal').then(mod => ({ default: mod.PaymentSummaryModal })), {
   ssr: false,
 });
+const DistributeListingModal = dynamic(
+  () =>
+    import('@/components/modals/DistributeListingModal').then((m) => ({
+      default: m.DistributeListingModal,
+    })),
+  { ssr: false }
+);
 
 // Функція для форматування дати публікації
 const formatPublicationDate = (dateInput: string | Date, lang: 'uk' | 'ru'): string => {
@@ -131,6 +139,25 @@ export const ListingDetail = ({
   }, [initialListing.id]);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/listings/${initialListing.id}`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as Listing;
+        if (!cancelled) {
+          setListing((prev) => ({ ...prev, ...data }));
+        }
+      } catch {
+        // ignore — лишаємо дані зі списку
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialListing.id]);
+
+  useEffect(() => {
     trackAnalytics({
       eventName: ANALYTICS_EVENTS.listingView,
       eventGroup: ANALYTICS_EVENT_GROUPS.listing,
@@ -153,6 +180,7 @@ export const ListingDetail = ({
   const [sellerTotal, setSellerTotal] = useState(0);
   const [categoryTotal, setCategoryTotal] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
@@ -246,19 +274,34 @@ export const ListingDetail = ({
     [listing.favoritesCount, listing.createdAt, listing.publishedAt, listing.posted]
   );
   
-  // Перевіряємо, чи це власне оголошення
+  const viewerTelegramIdStr = useMemo(
+    () =>
+      normalizeTelegramIdForDb(currentUser?.id ?? profile?.telegramId) ||
+      String(currentUser?.id || profile?.telegramId || '').trim(),
+    [currentUser?.id, profile?.telegramId]
+  );
+
+  // Перевіряємо, чи це власне оголошення (особистий або business-вітрина)
   const isOwnListing = useMemo(() => {
-    const currentTelegramId = currentUser?.id || (profile?.telegramId ? parseInt(profile.telegramId) : null);
-    const sellerTelegramId = listing.seller.telegramId;
+    const viewerId = viewerTelegramIdStr;
+    if (!viewerId) return false;
 
-    if (!currentTelegramId || !sellerTelegramId) {
-      return false;
-    }
+    const sellerId = normalizeTelegramIdForDb(listing.seller.telegramId);
+    if (sellerId && sellerId === viewerId) return true;
 
-    const currentIdStr = String(currentTelegramId);
-    const sellerIdStr = String(sellerTelegramId);
-    return currentIdStr === sellerIdStr;
-  }, [currentUser?.id, profile?.telegramId, listing.seller.telegramId]);
+    const businessOwnerId = normalizeTelegramIdForDb(listing.businessSeller?.sellerTelegramId);
+    if (businessOwnerId && businessOwnerId === viewerId) return true;
+
+    return false;
+  }, [
+    viewerTelegramIdStr,
+    listing.seller.telegramId,
+    listing.businessSeller?.sellerTelegramId,
+  ]);
+
+  const listingStatusNorm = String(listing.status || 'active').trim().toLowerCase();
+  const canDistributeOwnListing =
+    isOwnListing && listingStatusNorm === 'active' && isTelegramEnv && Boolean(viewerTelegramIdStr);
 
   const parserOriginalPostUrl = useMemo(
     () => resolveListingOriginalPostUrl(listing.description, listing.originalPostUrl),
@@ -333,8 +376,6 @@ export const ListingDetail = ({
     () => isParserAggregatorListing(listing.seller.username, listing.seller.telegramId),
     [listing.seller.username, listing.seller.telegramId]
   );
-
-  const viewerTelegramIdStr = String(currentUser?.id || profile?.telegramId || '');
 
   const persistAutoRenewToParent = useCallback(
     (next: boolean) => {
@@ -1459,29 +1500,61 @@ export const ListingDetail = ({
             </span>
           </a>
         ) : isTelegramEnv ? (
-          <button 
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleContactSeller();
-            }}
-            className={`w-full rounded-2xl py-4 font-montserrat text-xl font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 ${listingPrimaryCtaClass}`}
-          >
-            {isOwnListing ? (
-              <>
-                <TrendingUp size={24} />
-                {t('sales.promote')}
-              </>
-            ) : (
-              <>
-                <MessageCircle size={24} />
-                {t('common.write')}
-              </>
-            )}
-          </button>
+          <>
+            {canDistributeOwnListing ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowDistributeModal(true);
+                  tg?.HapticFeedback.impactOccurred('light');
+                }}
+                className={`w-full rounded-2xl border-2 py-3.5 font-montserrat text-base font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 ${
+                  isLight
+                    ? 'border-[#3F5331] text-[#3F5331] hover:bg-[#3F5331]/10'
+                    : 'border-[#C8E6A0] text-[#C8E6A0] hover:bg-[#C8E6A0]/10'
+                }`}
+              >
+                <Send size={22} />
+                {t('sales.distribute')}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleContactSeller();
+              }}
+              className={`w-full rounded-2xl py-4 font-montserrat text-xl font-semibold transition-colors flex cursor-pointer items-center justify-center gap-2 ${listingPrimaryCtaClass}`}
+            >
+              {isOwnListing ? (
+                <>
+                  <TrendingUp size={24} />
+                  {t('sales.promote')}
+                </>
+              ) : (
+                <>
+                  <MessageCircle size={24} />
+                  {t('common.write')}
+                </>
+              )}
+            </button>
+          </>
         ) : null}
       </div>
+
+      {canDistributeOwnListing ? (
+        <DistributeListingModal
+          isOpen={showDistributeModal}
+          onClose={() => setShowDistributeModal(false)}
+          listing={listing}
+          telegramId={viewerTelegramIdStr}
+          tg={tg}
+          showToast={showToast}
+        />
+      ) : null}
 
       {/* Модальне вікно поділу */}
       <ShareModal
