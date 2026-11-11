@@ -16,6 +16,7 @@ import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
+import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import { buildDefaultChatListingText } from '@/lib/share/buildChatListingText';
 import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
@@ -43,6 +44,7 @@ export function DistributeListingModal({
   const { t, language } = useLanguage();
   const { isLight } = useTheme();
   useBodyScrollLock(isOpen);
+  useHideBottomNav(isOpen);
 
   const lang = language === 'ru' ? 'ru' : 'uk';
   const [chatText, setChatText] = useState('');
@@ -249,7 +251,8 @@ export function DistributeListingModal({
 
   if (!isOpen) return null;
 
-  const overlay = 'fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-sm p-0 sm:p-4';
+  // z вище BottomNavigation (z-1000); меню ховається через useHideBottomNav
+  const overlay = 'fixed inset-0 z-[1100] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-sm p-0 sm:p-4';
   const panel = isLight
     ? 'bg-white text-gray-900 w-full sm:max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl border border-gray-200 flex flex-col shadow-xl'
     : 'bg-[#0d0d0d] text-white w-full sm:max-w-lg max-h-[92vh] rounded-t-3xl sm:rounded-3xl border border-white/10 flex flex-col shadow-xl';
@@ -435,7 +438,10 @@ export function DistributeListingModal({
           </div>
         </div>
 
-        <div className="p-4 border-t border-white/10 flex gap-2">
+        <div
+          className="shrink-0 border-t border-white/10 flex gap-2 px-4 pt-3"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           <button
             type="button"
             onClick={onClose}
