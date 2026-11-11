@@ -155,6 +155,41 @@ def _media_to_image_file_ids(media: list) -> list:
     return [m["file_id"] for m in media if m.get("type") == "photo"]
 
 
+async def _flush_media_group_buffers(state: FSMContext) -> list:
+    """
+    Зливає незавершені альбоми з media_group_buffer у media.
+    Інакше «Продовжити» до закінчення sleep(2) викидає фото користувача.
+    """
+    data = await state.get_data()
+    media = _normalize_media_list(data)
+    media_group_buffer = dict(data.get('media_group_buffer') or {})
+    if not media_group_buffer:
+        return media
+
+    seen = {m.get("file_id") for m in media if isinstance(m, dict)}
+    for _gid, buffer_list in list(media_group_buffer.items()):
+        if not isinstance(buffer_list, list):
+            continue
+        sorted_buffer = sorted(buffer_list, key=lambda x: x.get("message_id") or 0)
+        for item in sorted_buffer:
+            fid = item.get("file_id")
+            if not fid or fid in seen:
+                continue
+            if len(media) >= MAX_MEDIA:
+                break
+            media.append({"type": item.get("type") or "photo", "file_id": fid})
+            seen.add(fid)
+
+    await state.update_data(
+        media=media,
+        media_group_buffer={},
+        media_group_responses={},
+        media_group_limit_notified=[],
+        processed_media_groups={},
+    )
+    return media
+
+
 def _first_channel_message_id(channel_message_id) -> str:
     """Повертає перший message_id для посилання в канал (якщо збережено JSON масив — бере перший)."""
     if not channel_message_id or channel_message_id == 'None':
@@ -581,7 +616,7 @@ async def _process_media_group_item(message: types.Message, state: FSMContext, m
 
 async def delayed_media_group_response(user_id: int, media_group_id: str, state: FSMContext):
     """Після затримки зливає буфер групи в media у правильному порядку (сортування по message_id) і відповідає один раз."""
-    await asyncio.sleep(2)
+    await asyncio.sleep(1.2)
 
     data = await state.get_data()
     media_group_responses = data.get('media_group_responses', {})
@@ -691,16 +726,14 @@ async def _process_single_media(message: types.Message, state: FSMContext, media
 @router.callback_query(F.data == "continue_after_photos", CreateListing.waiting_for_photos)
 async def continue_after_photos(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
+    # Спочатку зливаємо альбом з буфера — інакше фото губляться
+    media = await _flush_media_group_buffers(state)
     data = await state.get_data()
-    media = _normalize_media_list(data)
 
     if not media or len(media) == 0:
         default_photo_path = get_default_photo_path()
         if default_photo_path:
             await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
-    
-    # Очищаємо оброблені медіа групи та буфер при переході до наступного кроку
-    await state.update_data(processed_media_groups={}, media_group_responses={}, media_group_limit_notified=[], media_group_buffer={})
     
     # Видаляємо останнє повідомлення "Фото додано!" при переході до наступного кроку
     data = await state.get_data()
@@ -1402,8 +1435,8 @@ def build_preview(user_id: int, data: dict) -> str:
 @router.callback_query(F.data == "confirm_listing", CreateListing.waiting_for_confirmation)
 async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
+    media = await _flush_media_group_buffers(state)
     data = await state.get_data()
-    media = _normalize_media_list(data)
     image_ids = _media_to_image_file_ids(media)
 
     if not media or len(media) == 0:
@@ -1417,7 +1450,9 @@ async def confirm_listing(callback: types.CallbackQuery, state: FSMContext):
         if default_photo_path:
             await state.update_data(use_default_photo=True, default_photo_path=default_photo_path)
 
-    images_for_db = media
+    from utils.listing_images import normalize_media_for_db
+    images_for_db = normalize_media_for_db(media)
+    print(f"[confirm_listing] user={user_id} media_count={len(images_for_db)} photo_ids={len(image_ids)}")
 
     db_user_id = get_user_id_by_telegram_id(user_id)
     if not db_user_id:

@@ -5,7 +5,9 @@
 import { loadModerationImageBuffer } from '@/lib/server/moderationImageLoader';
 import { getProfileShareLink } from '@/utils/botLinks';
 
-const MODERATION_GROUP_ID = process.env.MODERATION_GROUP_ID;
+const MODERATION_GROUP_ID = (process.env.MODERATION_GROUP_ID || '')
+  .trim()
+  .replace(/^["']|["']$/g, '');
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 interface ListingData {

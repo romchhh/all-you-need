@@ -23,9 +23,9 @@ from utils.translations import t, t_lang, get_user_lang
 
 load_dotenv()
 
-MODERATION_GROUP_ID = os.getenv('MODERATION_GROUP_ID')
-if MODERATION_GROUP_ID:
-    MODERATION_GROUP_ID = int(MODERATION_GROUP_ID)
+from utils.moderation_chat import resolve_moderation_group_id
+
+MODERATION_GROUP_ID = resolve_moderation_group_id()
 
 
 def _now_sqlite_utc() -> str:
@@ -37,6 +37,63 @@ class ModerationManager:
     def __init__(self, bot: Bot):
         self.bot = bot
         self.group_id = MODERATION_GROUP_ID
+
+    async def _resolve_photo_input(self, file_id_or_url: str):
+        """file_id / URL / локальний шлях → те, що можна передати в send_photo."""
+        raw = (file_id_or_url or "").strip()
+        if not raw:
+            return None
+        if raw.startswith("http://") or raw.startswith("https://"):
+            return raw
+        if raw.startswith("/") and Path(raw).is_file():
+            return FSInputFile(raw)
+        # Telegram file_id — пробуємо як є; при fail качаємо на диск
+        return raw
+
+    async def _send_photo_with_fallback(
+        self,
+        chat_id: int,
+        file_id_or_url: str,
+        caption: str,
+        reply_markup=None,
+        parse_mode: str = "HTML",
+    ):
+        photo = await self._resolve_photo_input(file_id_or_url)
+        if photo is None:
+            raise ValueError("empty photo")
+        try:
+            return await self.bot.send_photo(
+                chat_id=chat_id,
+                photo=photo,
+                caption=caption,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup,
+            )
+        except Exception as first_err:
+            # file_id інколи невалідний для іншого чату — качаємо файл
+            try:
+                from parser.storage.connection import BASE_DIR
+
+                tg_file = await self.bot.get_file(file_id_or_url)
+                if not tg_file or not tg_file.file_path:
+                    raise first_err
+                dest_dir = BASE_DIR / "app" / "public" / "listings" / "originals"
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                ext = (Path(tg_file.file_path).suffix or ".jpg").lower()
+                if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+                    ext = ".jpg"
+                dest = dest_dir / f"mod_{tg_file.file_unique_id or 'tmp'}{ext}"
+                await self.bot.download_file(tg_file.file_path, destination=dest)
+                return await self.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=FSInputFile(str(dest)),
+                    caption=caption,
+                    parse_mode=parse_mode,
+                    reply_markup=reply_markup,
+                )
+            except Exception as e2:
+                print(f"[send_photo_fallback] failed: {first_err} / {e2}")
+                raise first_err
     
     async def send_listing_to_moderation(
         self,
@@ -45,7 +102,10 @@ class ModerationManager:
         listing_data: Optional[Dict[str, Any]] = None
     ) -> Optional[int]:
         if not self.group_id:
-            print("MODERATION_GROUP_ID не встановлено")
+            # Повторний резолв — на випадок якщо env підвантажився пізніше
+            self.group_id = resolve_moderation_group_id()
+        if not self.group_id:
+            print("MODERATION_GROUP_ID не встановлено (перевірте bot/.env)")
             return None
         
         try:
@@ -62,6 +122,10 @@ class ModerationManager:
             text = self._format_listing_text(listing_data, source, listing_id)
             
             images = self._get_listing_images(listing_data)
+            print(
+                f"[send_to_moderation] source={source} listing={listing_id} "
+                f"images_count={len(images)} raw_type={type(listing_data.get('images')).__name__}"
+            )
             
             keyboard = self._create_moderation_keyboard(listing_id, source)
             
@@ -87,12 +151,11 @@ class ModerationManager:
                             reply_markup=keyboard
                         )
                     else:
-                        message = await self.bot.send_photo(
-                            chat_id=self.group_id,
-                            photo=first_id,
-                            caption=text,
-                            parse_mode="HTML",
-                            reply_markup=keyboard
+                        message = await self._send_photo_with_fallback(
+                            self.group_id,
+                            first_id,
+                            text,
+                            reply_markup=keyboard,
                         )
                     return message.message_id
                 else:
@@ -108,10 +171,20 @@ class ModerationManager:
                         else:
                             media_group.append(InputMediaPhoto(media=file_id, caption=caption, parse_mode=parse))
 
-                    messages = await self.bot.send_media_group(
-                        chat_id=self.group_id,
-                        media=media_group
-                    )
+                    try:
+                        messages = await self.bot.send_media_group(
+                            chat_id=self.group_id,
+                            media=media_group
+                        )
+                    except Exception as mg_err:
+                        print(f"[send_to_moderation] media_group failed ({mg_err}), fallback first photo")
+                        message = await self._send_photo_with_fallback(
+                            self.group_id,
+                            first_id,
+                            text,
+                            reply_markup=keyboard,
+                        )
+                        return message.message_id
                     
                     if messages:
                         # Отримуємо user_id для перекладу
@@ -149,7 +222,19 @@ class ModerationManager:
                     return message.message_id
                 
         except Exception as e:
-            print(f"Помилка надсилання оголошення в групу модерації: {e}")
+            err = str(e)
+            print(
+                f"Помилка надсилання оголошення в групу модерації "
+                f"(chat_id={self.group_id}, listing={listing_id}, source={source}): {e}"
+            )
+            if "chat not found" in err.lower() or "chat_id is empty" in err.lower():
+                print(
+                    "→ Telegram не бачить цей chat_id для ПОТОЧНОГО бота (TOKEN у bot/.env). "
+                    "Перевірте: 1) MODERATION_GROUP_ID у bot/.env = id супергрупи (-100…); "
+                    "2) саме цей бот доданий у чат як адмін; "
+                    "3) app/.env і bot/.env мають ОДНАКОВИЙ MODERATION_GROUP_ID; "
+                    "4) перезапуск контейнера allyouneed-bot після зміни env."
+                )
             return None
     
     def _format_listing_text(self, listing: Dict[str, Any], source: str, listing_id: int) -> str:
@@ -275,18 +360,9 @@ class ModerationManager:
     
     def _get_listing_images(self, listing: Dict[str, Any]) -> List[Any]:
         """Повертає список медіа: або [file_id str], або [{"type":"photo"|"video","file_id":str}]. До 10 елементів."""
-        images = listing.get('images', [])
+        from utils.listing_images import parse_listing_images
 
-        if isinstance(images, str):
-            try:
-                images = json.loads(images)
-            except Exception:
-                images = []
-
-        if not isinstance(images, list):
-            images = []
-
-        return images[:10]
+        return parse_listing_images(listing.get('images'))[:10]
 
     def _public_listing_image_url(self, listing: Dict[str, Any]) -> str | None:
         """Абсолютний URL першого фото для превʼю в заготовці «Написати продавцю» (якщо є публічний шлях)."""
@@ -322,11 +398,12 @@ class ModerationManager:
         return None
 
     @staticmethod
+    @staticmethod
     def _media_item_file_id_and_type(item: Any) -> tuple:
         """Повертає (file_id, type) для елемента: str -> (str, "photo"), dict -> (file_id, type)."""
-        if isinstance(item, dict):
-            return (item.get('file_id') or '', (item.get('type') or 'photo').lower())
-        return (str(item), 'photo')
+        from utils.listing_images import media_item_file_id_and_type
+
+        return media_item_file_id_and_type(item)
     
     def _create_moderation_keyboard(self, listing_id: int, source: str) -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup(inline_keyboard=[
@@ -791,15 +868,11 @@ class ModerationManager:
         if not row:
             return None
         
-        result = dict(row)
-        if result.get('images'):
-            try:
-                result['images'] = json.loads(result['images'])
-            except:
-                result['images'] = []
-        else:
-            result['images'] = []
-        
+        from database_functions.db_connection import row_to_dict
+        from utils.listing_images import parse_listing_images
+
+        result = row_to_dict(row) or {}
+        result['images'] = parse_listing_images(result.get('images'))
         return result
     
     def _get_default_photo_path(self) -> Optional[str]:
@@ -963,13 +1036,13 @@ class ModerationManager:
 
 {t_lang(channel_lang, 'listing.details.hashtag')} {hashtags}"""
             
-            images = listing.get('images', [])
-            if isinstance(images, str):
-                try:
-                    images = json.loads(images)
-                except:
-                    images = []
-            
+            from utils.listing_images import parse_listing_images
+
+            images = parse_listing_images(listing.get('images'))
+            print(
+                f"[_publish_to_channel] listing={listing_id} images_count={len(images)}"
+            )
+
             if images and len(images) > 0:
                 first_id, first_type = self._media_item_file_id_and_type(images[0])
                 keyboard = channel_keyboard
@@ -985,12 +1058,11 @@ class ModerationManager:
                             reply_markup=keyboard
                         )
                     else:
-                        message = await self.bot.send_photo(
-                            chat_id=channel_id,
-                            photo=first_id,
-                            caption=text_with_bot,
-                            parse_mode="HTML",
-                            reply_markup=keyboard
+                        message = await self._send_photo_with_fallback(
+                            channel_id,
+                            first_id,
+                            text_with_bot,
+                            reply_markup=keyboard,
                         )
                     message_id = message.message_id
 
@@ -1034,10 +1106,20 @@ class ModerationManager:
 
                     if not media:
                         return None
-                    messages = await self.bot.send_media_group(
-                        chat_id=channel_id,
-                        media=media
-                    )
+                    try:
+                        messages = await self.bot.send_media_group(
+                            chat_id=channel_id,
+                            media=media
+                        )
+                    except Exception as ch_mg_err:
+                        print(f"[_publish_to_channel] media_group failed ({ch_mg_err}), fallback first photo")
+                        message = await self._send_photo_with_fallback(
+                            channel_id,
+                            first_id,
+                            text_with_bot,
+                            reply_markup=keyboard,
+                        )
+                        messages = [message] if message else []
                     message_id = messages[0].message_id if messages else None
                     
                     # Зберігаємо всі message_id з медіа-групи як JSON (завжди, навіть якщо одне повідомлення)

@@ -181,10 +181,10 @@ async def send_shared_start_link_content(chat_id: int, user_id: int, param: str)
         )
 
         try:
-            images = listing.get("images")
+            from utils.listing_images import parse_listing_images
+
+            images = parse_listing_images(listing.get("images"))
             if images:
-                if isinstance(images, str):
-                    images = json.loads(images)
                 if isinstance(images, list) and len(images) > 0:
                     first_image_item = images[0]
                     if isinstance(first_image_item, dict):

@@ -87,25 +87,41 @@ async def _download_telegram_images(bot: Bot, images: list[Any]) -> list[str]:
     dest_dir.mkdir(parents=True, exist_ok=True)
     out: list[str] = []
     token = uuid.uuid4().hex[:12]
+    logger.info("Download photos → %s (exists=%s)", dest_dir, dest_dir.is_dir())
 
     for i, item in enumerate(images[:10]):
         file_id, mtype = _media_file_id(item)
         if not file_id or mtype == "video":
             continue
+        # уже веб-шлях / URL — не качаємо з Telegram
+        if file_id.startswith("http://") or file_id.startswith("https://"):
+            out.append(file_id)
+            continue
+        if file_id.startswith("/listings/"):
+            out.append(file_id)
+            continue
         try:
             tg_file = await bot.get_file(file_id)
             if not tg_file or not tg_file.file_path:
+                logger.warning("get_file порожній для file_id=%s…", file_id[:24])
                 continue
             ext = (Path(tg_file.file_path).suffix or ".jpg").lower()
             if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
                 ext = ".jpg"
             name = f"tgbot_{token}_{i}{ext}"
             dest = dest_dir / name
-            await bot.download_file(tg_file.file_path, destination=str(dest))
+            # aiogram: destination як Path надійніший за str у деяких версіях
+            await bot.download_file(tg_file.file_path, destination=dest)
             if dest.is_file() and dest.stat().st_size > 0:
                 out.append(f"/listings/originals/{name}")
+            else:
+                logger.warning("Файл після download порожній: %s", dest)
         except Exception as e:
-            logger.warning("Не вдалося завантажити фото TelegramListing: %s", e)
+            logger.warning(
+                "Не вдалося завантажити фото TelegramListing file_id=%s…: %s",
+                file_id[:24],
+                e,
+            )
 
     # Без фото — порожній список; веб малює ListingAutoCover (без tgground).
     return out
@@ -152,16 +168,22 @@ async def ensure_marketplace_listing_from_telegram(
         logger.error("TelegramListing %s без userId — неможливо створити Listing", tl_id)
         return None
 
-    images = telegram_listing.get("images") or []
-    if isinstance(images, str):
-        try:
-            images = json.loads(images)
-        except Exception:
-            images = []
-    if not isinstance(images, list):
-        images = []
+    from utils.listing_images import parse_listing_images
 
+    images = parse_listing_images(telegram_listing.get("images"))
+    logger.info(
+        "TelegramListing %s: images_raw_count=%s before download",
+        tl_id,
+        len(images),
+    )
     images_web = await _download_telegram_images(bot, images)
+    logger.info(
+        "TelegramListing %s: downloaded %s/%s photos → %s",
+        tl_id,
+        len(images_web),
+        len(images),
+        images_web,
+    )
     price_str, is_free = marketplace_price_and_free(telegram_listing)
 
     from utils.bot_category_map import map_bot_category_to_marketplace

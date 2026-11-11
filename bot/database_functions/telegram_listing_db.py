@@ -39,10 +39,12 @@ def create_telegram_listing(
     region: Optional[str] = None
 ) -> int:
     """Створює нове оголошення для Telegram каналу. images — список file_id (str) або [{"type":"photo"|"video","file_id":str}]."""
+    from utils.listing_images import images_to_json, normalize_media_for_db
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    images_json = json.dumps(images)
+    images_json = images_to_json(normalize_media_for_db(images if isinstance(images, list) else []))
     
     # Перевіряємо чи є колонки в таблиці
     cursor.execute("PRAGMA table_info(TelegramListing)")
@@ -112,8 +114,9 @@ def get_telegram_listing_by_id(listing_id: int) -> Optional[Dict[str, Any]]:
         return None
 
     from database_functions.db_connection import row_to_dict
+    from utils.listing_images import parse_listing_images
 
-    result = row_to_dict(row) or dict(row)
+    result = row_to_dict(row) or {}
     for alt, canon in (
         ("pricedisplay", "priceDisplay"),
         ("marketplacelistingid", "marketplaceListingId"),
@@ -124,14 +127,7 @@ def get_telegram_listing_by_id(listing_id: int) -> Optional[Dict[str, Any]]:
     ):
         if alt in result and canon not in result:
             result[canon] = result[alt]
-    # Парсимо JSON images
-    if result.get('images'):
-        try:
-            result['images'] = json.loads(result['images'])
-        except:
-            result['images'] = []
-    else:
-        result['images'] = []
+    result['images'] = parse_listing_images(result.get('images'))
     
     # Перевіряємо чи є колонки publicationTariff та paymentStatus
     if 'publicationTariff' not in result:
@@ -164,24 +160,21 @@ def get_telegram_listings_for_moderation(
     rows = cursor.fetchall()
     conn.close()
     
+    from database_functions.db_connection import row_to_dict
+    from utils.listing_images import parse_listing_images
+
     result = []
     for row in rows:
-        item = dict(row)
-        # Парсимо JSON images
-        if item.get('images'):
-            try:
-                item['images'] = json.loads(item['images'])
-            except:
-                item['images'] = []
-        else:
-            item['images'] = []
-        
-        # Перевіряємо чи є колонки publicationTariff та paymentStatus
+        item = row_to_dict(row) or {}
+        item['images'] = parse_listing_images(item.get('images'))
+        if 'publicationTariff' not in item and 'publicationtariff' in item:
+            item['publicationTariff'] = item['publicationtariff']
+        if 'paymentStatus' not in item and 'paymentstatus' in item:
+            item['paymentStatus'] = item['paymentstatus']
         if 'publicationTariff' not in item:
             item['publicationTariff'] = None
         if 'paymentStatus' not in item:
             item['paymentStatus'] = 'pending'
-        
         result.append(item)
     
     return result
@@ -215,24 +208,21 @@ def get_user_telegram_listings(telegram_id: int) -> List[Dict[str, Any]]:
     rows = cursor.fetchall()
     conn.close()
     
+    from database_functions.db_connection import row_to_dict
+    from utils.listing_images import parse_listing_images
+
     result = []
     for row in rows:
-        item = dict(row)
-        # Парсимо JSON images
-        if item.get('images'):
-            try:
-                item['images'] = json.loads(item['images'])
-            except:
-                item['images'] = []
-        else:
-            item['images'] = []
-        
-        # Перевіряємо чи є колонки publicationTariff та paymentStatus
+        item = row_to_dict(row) or {}
+        item['images'] = parse_listing_images(item.get('images'))
+        if 'publicationTariff' not in item and 'publicationtariff' in item:
+            item['publicationTariff'] = item['publicationtariff']
+        if 'paymentStatus' not in item and 'paymentstatus' in item:
+            item['paymentStatus'] = item['paymentstatus']
         if 'publicationTariff' not in item:
             item['publicationTariff'] = None
         if 'paymentStatus' not in item:
             item['paymentStatus'] = 'pending'
-        
         result.append(item)
     
     return result
@@ -255,11 +245,13 @@ def update_telegram_listing(
     """Оновлює оголошення (для повторної модерації після відхилення). images — список file_id або [{"type":"photo"|"video","file_id":str}]."""
     conn = get_connection()
     cursor = conn.cursor()
+    from utils.listing_images import images_to_json, normalize_media_for_db
+
     try:
         price = float(price) if price is not None else 0.0
     except (TypeError, ValueError):
         price = 0.0
-    images_json = json.dumps(images)
+    images_json = images_to_json(normalize_media_for_db(images if isinstance(images, list) else []))
     if price_display is None:
         price_display = str(price) if price > 0 else None
     if region is None:
