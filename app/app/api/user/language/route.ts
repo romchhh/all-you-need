@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserLanguageForTelegramId } from '@/lib/userBootstrapQueries';
-import { normalizeTelegramIdForDb, usersLegacyTelegramIdWhere } from '@/lib/dbSql';
+import {
+  normalizeTelegramIdForDb,
+  sqlUserTelegramIdWhere,
+  usersLegacyTelegramIdWhere,
+} from '@/lib/dbSql';
 
 async function upsertLegacyLanguage(telegramIdKey: string, language: 'uk' | 'ru') {
   const now = new Date().toISOString();
@@ -25,6 +29,7 @@ async function upsertLegacyLanguage(telegramIdKey: string, language: 'uk' | 'ru'
   )) as Array<{ id: number | bigint }>;
   const nextId = Number(nextIdRows[0]?.id ?? 1);
 
+  // user_id NUMERIC: передаємо рядок цифр; адаптер/rewrite зробить ::numeric
   await prisma.$executeRawUnsafe(
     `INSERT INTO users_legacy (id, user_id, language, join_date, last_activity) VALUES (?, ?, ?, ?, ?)`,
     nextId,
@@ -54,19 +59,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const telegramIdNum = parseInt(telegramId, 10);
     const telegramIdKey = normalizeTelegramIdForDb(telegramId);
+    if (!telegramIdKey) {
+      return NextResponse.json({ error: 'Invalid telegramId' }, { status: 400 });
+    }
 
-    const existingUsers = await prisma.$queryRaw<Array<{ id: number }>>`
-      SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ${telegramIdNum}
-    `;
+    // TEXT = TEXT (не number/bigint — інакше PG: operator does not exist: text = bigint)
+    const existingUsers = (await prisma.$queryRawUnsafe(
+      `SELECT id FROM "User" WHERE ${sqlUserTelegramIdWhere('?')}`,
+      telegramIdKey
+    )) as Array<{ id: number }>;
 
     if (existingUsers.length === 0) {
       const now = new Date().toISOString();
       await prisma.$executeRawUnsafe(
-        `INSERT INTO User (telegramId, username, firstName, lastName, balance, rating, reviewsCount, isActive, agreementAccepted, createdAt, updatedAt)
+        `INSERT INTO "User" ("telegramId", username, "firstName", "lastName", balance, rating, "reviewsCount", "isActive", "agreementAccepted", "createdAt", "updatedAt")
          VALUES (?, ?, ?, ?, 0, 5, 0, true, false, ?, ?)`,
-        telegramIdNum,
+        telegramIdKey,
         null,
         null,
         null,

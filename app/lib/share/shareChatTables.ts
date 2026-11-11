@@ -4,6 +4,29 @@ import { foldCityKey } from '@/lib/city/cityNormalization';
 
 let shareChatTablesReady = false;
 
+/** PG: INTEGER 0/1 (runtime CREATE) або BOOLEAN (Prisma). */
+async function shareFlagPgCast(table: string, column: string): Promise<'int' | 'bool'> {
+  if (!isPostgres()) return 'int';
+  try {
+    const rows = (await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(
+        `SELECT data_type FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND lower(table_name) = lower(?)
+           AND lower(column_name) = lower(?)
+         LIMIT 1`,
+        table,
+        column
+      )
+    )) as Array<{ data_type: string }>;
+    const t = String(rows[0]?.data_type || '').toLowerCase();
+    if (t === 'boolean') return 'bool';
+  } catch {
+    // ignore
+  }
+  return 'int';
+}
+
 const SEED_CHATS: Array<{
   title: string;
   subtitle: string;
@@ -72,8 +95,13 @@ async function seedCatalogIfEmpty(): Promise<void> {
   )) as Array<{ id: number }>;
   if (rows.length > 0) return;
 
-  const postingAllowed = isPostgres() ? true : 1;
-  const isActive = isPostgres() ? true : 1;
+  const flagKind = await shareFlagPgCast('ShareChatCatalog', 'postingAllowed');
+  const flagSql = isPostgres()
+    ? flagKind === 'bool'
+      ? '?::boolean'
+      : '?::int'
+    : '?';
+  const flagVal = flagKind === 'bool' ? true : 1;
 
   for (const row of SEED_CHATS) {
     await executeWithRetry(() =>
@@ -81,17 +109,17 @@ async function seedCatalogIfEmpty(): Promise<void> {
         `INSERT INTO ShareChatCatalog (
           title, subtitle, cityKey, categorySlug, language, memberCount,
           postingAllowed, inviteLink, sortOrder, isActive, createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlNow()})`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ${flagSql}, ?, ?, ${flagSql}, ${sqlNow()})`,
         row.title,
         row.subtitle,
         row.cityKey,
         row.categorySlug,
         row.language,
         row.memberCount,
-        postingAllowed,
+        flagVal,
         row.inviteLink,
         row.sortOrder,
-        isActive
+        flagVal
       )
     );
   }

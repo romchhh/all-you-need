@@ -526,14 +526,10 @@ class ModerationManager:
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     
-                    # Перевіряємо чи є колонка channelMessageId
-                    cursor.execute("PRAGMA table_info(TelegramListing)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    has_channel_message_id = 'channelMessageId' in columns
-                    
-                    if not has_channel_message_id:
-                        cursor.execute("ALTER TABLE TelegramListing ADD COLUMN channelMessageId INTEGER")
-                    # channelMessageId вже збережено в _publish_to_channel (JSON з усіма message_id медіа-групи) — не перезаписуємо
+                    from utils.channel_message_ids import ensure_channel_message_id_column
+
+                    ensure_channel_message_id_column(cursor)
+                    # channelMessageId вже збережено в _publish_to_channel — не перезаписуємо
                     published_tl_at = datetime.now() if reset_publication else None
                     if published_tl_at is None:
                         cursor.execute(
@@ -1065,19 +1061,8 @@ class ModerationManager:
                             reply_markup=keyboard,
                         )
                     message_id = message.message_id
-
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("PRAGMA table_info(TelegramListing)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    if 'channelMessageId' in columns:
-                        cursor.execute("""
-                            UPDATE TelegramListing
-                            SET channelMessageId = ?
-                            WHERE id = ?
-                        """, (json.dumps([message_id]), listing_id))
-                        conn.commit()
-                    conn.close()
+                    from utils.channel_message_ids import save_channel_message_ids
+                    save_channel_message_ids(listing_id, [message_id])
 
                     if message_id and any(t.startswith('pinned') for t in tariffs):
                         try:
@@ -1124,23 +1109,9 @@ class ModerationManager:
                     
                     # Зберігаємо всі message_id з медіа-групи як JSON (завжди, навіть якщо одне повідомлення)
                     if messages:
+                        from utils.channel_message_ids import save_channel_message_ids
                         all_message_ids = [msg.message_id for msg in messages]
-                        # Зберігаємо JSON з усіма message_id в channelMessageId (як рядок)
-                        import json
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("PRAGMA table_info(TelegramListing)")
-                        columns = [row[1] for row in cursor.fetchall()]
-                        has_channel_message_id = 'channelMessageId' in columns
-                        
-                        if has_channel_message_id:
-                            cursor.execute("""
-                                UPDATE TelegramListing
-                                SET channelMessageId = ?
-                                WHERE id = ?
-                            """, (json.dumps(all_message_ids), listing_id))
-                            conn.commit()
-                        conn.close()
+                        save_channel_message_ids(listing_id, all_message_ids)
                     
                     # Застосовуємо всі вибрані тарифи
                     # Закріплення (pinned_12h або pinned_24h)
@@ -1167,6 +1138,7 @@ class ModerationManager:
             else:
                 # Немає фото - використовуємо дефолтне фото або текст з посиланням на бота
                 default_photo_path = self._get_default_photo_path()
+                from utils.channel_message_ids import save_channel_message_ids
                 
                 if default_photo_path:
                     # Використовуємо дефолтне фото з кнопкою посилання на бота
@@ -1182,23 +1154,7 @@ class ModerationManager:
                         reply_markup=keyboard
                     )
                     message_id = message.message_id
-                    
-                    # Зберігаємо message_id як JSON масив
-                    import json
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("PRAGMA table_info(TelegramListing)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    has_channel_message_id = 'channelMessageId' in columns
-                    
-                    if has_channel_message_id:
-                        cursor.execute("""
-                            UPDATE TelegramListing
-                            SET channelMessageId = ?
-                            WHERE id = ?
-                        """, (json.dumps([message_id]), listing_id))
-                        conn.commit()
-                    conn.close()
+                    save_channel_message_ids(listing_id, [message_id])
                 else:
                     # Якщо дефолтного фото немає, надсилаємо текст з посиланням на бота
                     text_with_bot = text + bot_text
@@ -1208,18 +1164,7 @@ class ModerationManager:
                         parse_mode="HTML"
                     )
                     message_id = message.message_id
-                    conn = get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("PRAGMA table_info(TelegramListing)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    if 'channelMessageId' in columns:
-                        cursor.execute("""
-                            UPDATE TelegramListing
-                            SET channelMessageId = ?
-                            WHERE id = ?
-                        """, (json.dumps([message_id]), listing_id))
-                        conn.commit()
-                    conn.close()
+                    save_channel_message_ids(listing_id, [message_id])
 
                 # Застосовуємо всі вибрані тарифи
                 # Закріплення (pinned_12h або pinned_24h)

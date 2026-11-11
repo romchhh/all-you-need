@@ -138,7 +138,7 @@ model TelegramListing {
   publishedAt      DateTime?
   moderatedAt      DateTime?
   moderatedBy      Int?
-  channelMessageId Int?     // ID повідомлення в Telegram каналі (додається динамічно)
+  channelMessageId String?  // JSON-масив message_id у каналі (або один id рядком)
   publicationTariff String? // Тариф публікації (standard, highlighted, top_category, vip)
   paymentStatus     String?  @default("pending") // Статус оплати (pending, paid, failed)
   createdAt        DateTime @default(now())
