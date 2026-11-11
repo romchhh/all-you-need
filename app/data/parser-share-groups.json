@@ -1,0 +1,533 @@
+[
+  {
+    "parserKey": "baraholkaberlin",
+    "title": "Барахолка Berlin",
+    "city": "Berlin",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/baraholkaberlin",
+    "notes": null
+  },
+  {
+    "parserKey": "kaufberli",
+    "title": "Kauf Berlin",
+    "city": "Berlin",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/kaufberli",
+    "notes": "Багато товарів + послуги по Берліну"
+  },
+  {
+    "parserKey": "nash_berlin_market",
+    "title": "Nash Berlin Market",
+    "city": "Berlin",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/nash_berlin_market",
+    "notes": "Товари + послуги"
+  },
+  {
+    "parserKey": "berlin_ua2",
+    "title": "Berlin UA 2",
+    "city": "Berlin",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/berlin_ua2",
+    "notes": "Товари і послуги, багато послуг"
+  },
+  {
+    "parserKey": "berlin_ua2025",
+    "title": "Berlin UA 2025",
+    "city": "Berlin",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/berlin_ua2025",
+    "notes": null
+  },
+  {
+    "parserKey": "beauty_berlin_ua",
+    "title": "Beauty Berlin UA",
+    "city": "Berlin",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/beauty_berlin_ua",
+    "notes": "Б'юті послуги в Берліні"
+  },
+  {
+    "parserKey": "secondhand_hh",
+    "title": "Secondhand HH / БарахлаНЕТ",
+    "city": "Hamburg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/secondhand_hh",
+    "notes": "Товари/послуги (~1500)"
+  },
+  {
+    "parserKey": "gamburg_baraxlanet",
+    "title": "Gamburg Baraxlanet",
+    "city": "Hamburg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/gamburg_baraxlanet",
+    "notes": null
+  },
+  {
+    "parserKey": "hamburglifeua",
+    "title": "Hamburg Life UA",
+    "city": "Hamburg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/hamburglifeua",
+    "notes": "Послуги + товари"
+  },
+  {
+    "parserKey": "alleindeutschland",
+    "title": "Allein Deutschland",
+    "city": "Hamburg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/alleindeutschland",
+    "notes": "Послуги/товари"
+  },
+  {
+    "parserKey": "nashkleinhamburg",
+    "title": "Nash Klein Hamburg",
+    "city": "Hamburg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/nashkleinhamburg",
+    "notes": null
+  },
+  {
+    "parserKey": "hamburgbeauty",
+    "title": "Hamburg Beauty",
+    "city": "Hamburg",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/hamburgbeauty",
+    "notes": "Б'юті, заходи, трохи товарів"
+  },
+  {
+    "parserKey": "hamburggggggg",
+    "title": "Hamburg Services",
+    "city": "Hamburg",
+    "kind": "services",
+    "categorySlug": "other_services",
+    "inviteLink": "https://t.me/hamburggggggg",
+    "notes": null
+  },
+  {
+    "parserKey": "komissionkadusseldorf",
+    "title": "Komissionka Düsseldorf",
+    "city": "Düsseldorf",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/komissionkadusseldorf",
+    "notes": null
+  },
+  {
+    "parserKey": "komissionkaessen",
+    "title": "Komissionka Essen",
+    "city": "Essen",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/komissionkaessen",
+    "notes": null
+  },
+  {
+    "parserKey": "baraholka_essen",
+    "title": "Барахолка Essen",
+    "city": "Essen",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/baraholka_essen",
+    "notes": "Товари, мало послуг (username @baraholka_essen04)"
+  },
+  {
+    "parserKey": "top_market_nrw",
+    "title": "Top Market NRW",
+    "city": "NRW",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/top_market_nrw",
+    "notes": "Товари/послуги"
+  },
+  {
+    "parserKey": "barahlanet2024",
+    "title": "Barahlanet 2024",
+    "city": "NRW",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/barahlanet2024",
+    "notes": "Послуги + товари"
+  },
+  {
+    "parserKey": "prodaw_tovariv_nrw",
+    "title": "Продаж товарів NRW",
+    "city": "NRW",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/prodaw_tovariv_nrw",
+    "notes": null
+  },
+  {
+    "parserKey": "prodajanrw",
+    "title": "Prodaja NRW",
+    "city": "NRW",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/prodajanrw",
+    "notes": null
+  },
+  {
+    "parserKey": "flohmarkt_marl",
+    "title": "Flohmarkt Marl",
+    "city": "NRW",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/flohmarkt_marl",
+    "notes": null
+  },
+  {
+    "parserKey": "t.me/+Bn8EvoTTQaQzYjQy",
+    "title": "NRW invite group",
+    "city": "NRW",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/+Bn8EvoTTQaQzYjQy",
+    "notes": "Послуги/товари"
+  },
+  {
+    "parserKey": "t.me/+u9VcbxuhKik1M2My",
+    "title": "Dülmen / Münster / Bochum (@khutpb)",
+    "city": "Dülmen",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/+u9VcbxuhKik1M2My",
+    "notes": "Товари/послуги"
+  },
+  {
+    "parserKey": "dortmundbaraholka1",
+    "title": "Dortmund Baraholka",
+    "city": "Dortmund",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/dortmundbaraholka1",
+    "notes": "Барахолка (товари + окремі послуги) — не форсити services_work"
+  },
+  {
+    "parserKey": "beautynrw",
+    "title": "Beauty NRW",
+    "city": "NRW",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/beautynrw",
+    "notes": null
+  },
+  {
+    "parserKey": "beautydusseldorf",
+    "title": "Beauty Düsseldorf",
+    "city": "Düsseldorf",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/beautydusseldorf",
+    "notes": null
+  },
+  {
+    "parserKey": "t.me/+Yeu9vchwu6llZmYy",
+    "title": "NRW Beauty invite",
+    "city": "NRW",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/+Yeu9vchwu6llZmYy",
+    "notes": "Б'юті послуги"
+  },
+  {
+    "parserKey": "ambestenbeauty",
+    "title": "Am Besten Beauty",
+    "city": "NRW",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/ambestenbeauty",
+    "notes": "Б'юті послуги"
+  },
+  {
+    "parserKey": "flohmark11",
+    "title": "Flohmarkt München",
+    "city": "München",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/flohmark11",
+    "notes": null
+  },
+  {
+    "parserKey": "bazarmuc5",
+    "title": "Bazar München",
+    "city": "München",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/bazarmuc5",
+    "notes": null
+  },
+  {
+    "parserKey": "beautymuenchen",
+    "title": "Beauty München",
+    "city": "München",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/beautymuenchen",
+    "notes": null
+  },
+  {
+    "parserKey": "nurnberg_ukraine",
+    "title": "Nürnberg Ukraine",
+    "city": "Nürnberg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/nurnberg_ukraine",
+    "notes": null
+  },
+  {
+    "parserKey": "nash_nurnberg_info",
+    "title": "Nash Nürnberg Info",
+    "city": "Nürnberg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/nash_nurnberg_info",
+    "notes": null
+  },
+  {
+    "parserKey": "baraholkastuttgart",
+    "title": "Барахолка Stuttgart",
+    "city": "Stuttgart",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/baraholkastuttgart",
+    "notes": null
+  },
+  {
+    "parserKey": "uastuttgart",
+    "title": "UA Stuttgart",
+    "city": "Stuttgart",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/uastuttgart",
+    "notes": null
+  },
+  {
+    "parserKey": "stuttgart_sms",
+    "title": "Stuttgart SMS",
+    "city": "Stuttgart",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/stuttgart_sms",
+    "notes": null
+  },
+  {
+    "parserKey": "prodam_stuttgart",
+    "title": "Продам Stuttgart",
+    "city": "Stuttgart",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/prodam_stuttgart",
+    "notes": null
+  },
+  {
+    "parserKey": "bwhubgermany",
+    "title": "BW Hub Germany",
+    "city": "Stuttgart",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/bwhubgermany",
+    "notes": null
+  },
+  {
+    "parserKey": "doctordior2310",
+    "title": "Doctor Dior Beauty",
+    "city": "Stuttgart",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/doctordior2310",
+    "notes": null
+  },
+  {
+    "parserKey": "leipzig_flohmarkt",
+    "title": "Leipzig Flohmarkt",
+    "city": "Leipzig",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/leipzig_flohmarkt",
+    "notes": null
+  },
+  {
+    "parserKey": "flohmarktmagdeburg",
+    "title": "Flohmarkt Magdeburg",
+    "city": "Magdeburg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/flohmarktmagdeburg",
+    "notes": null
+  },
+  {
+    "parserKey": "flohmarktregensburg",
+    "title": "Flohmarkt Regensburg",
+    "city": "Regensburg",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/flohmarktregensburg",
+    "notes": null
+  },
+  {
+    "parserKey": "ukraincifrankfurt",
+    "title": "Ukrainci Frankfurt",
+    "city": "Frankfurt",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/ukraincifrankfurt",
+    "notes": null
+  },
+  {
+    "parserKey": "frankfurtammaincity",
+    "title": "Frankfurt am Main",
+    "city": "Frankfurt",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/frankfurtammaincity",
+    "notes": null
+  },
+  {
+    "parserKey": "keln3",
+    "title": "Köln барахолка",
+    "city": "Köln",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/keln3",
+    "notes": null
+  },
+  {
+    "parserKey": "nimechyna_pidtrymka",
+    "title": "Німеччина підтримка",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/nimechyna_pidtrymka",
+    "notes": "Багато оголошень для бота"
+  },
+  {
+    "parserKey": "ukraineingermany",
+    "title": "Ukraine in Germany",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/ukraineingermany",
+    "notes": null
+  },
+  {
+    "parserKey": "deutschland_diaspora",
+    "title": "Deutschland Diaspora",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/deutschland_diaspora",
+    "notes": null
+  },
+  {
+    "parserKey": "ukrainegermaniaxxxx",
+    "title": "Ukraine Germania",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/ukrainegermaniaxxxx",
+    "notes": null
+  },
+  {
+    "parserKey": "htjjl0wqok23qynjyy",
+    "title": "Загальна барахолка",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/htjjl0wqok23qynjyy",
+    "notes": null
+  },
+  {
+    "parserKey": "inf0dorf",
+    "title": "Info Dorf",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/inf0dorf",
+    "notes": null
+  },
+  {
+    "parserKey": "ogoloschennja",
+    "title": "Оголошення",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/ogoloschennja",
+    "notes": null
+  },
+  {
+    "parserKey": "nrw_ua2025",
+    "title": "NRW UA 2025",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/nrw_ua2025",
+    "notes": "Загальна, послуги/товари"
+  },
+  {
+    "parserKey": "ua_germany_hel",
+    "title": "UA Germany Help",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/ua_germany_hel",
+    "notes": "Робота, житло і послуги — AI відсіє вакансії"
+  },
+  {
+    "parserKey": "autoclub_markt_deutschland",
+    "title": "Auto Club Markt",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/autoclub_markt_deutschland",
+    "notes": "Авто"
+  },
+  {
+    "parserKey": "auto_basar",
+    "title": "Auto Basar",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/auto_basar",
+    "notes": "Авто"
+  },
+  {
+    "parserKey": "beautyswe",
+    "title": "Beauty SWE",
+    "city": "Germany",
+    "kind": "services",
+    "categorySlug": "beauty_services",
+    "inviteLink": "https://t.me/beautyswe",
+    "notes": null
+  },
+  {
+    "parserKey": "deutschland_de478",
+    "title": "Deutschland Services",
+    "city": "Germany",
+    "kind": "services",
+    "categorySlug": "other_services",
+    "inviteLink": "https://t.me/deutschland_de478",
+    "notes": null
+  },
+  {
+    "parserKey": "germany_ukraine1",
+    "title": "Germany Ukraine News",
+    "city": "Germany",
+    "kind": "goods",
+    "categorySlug": null,
+    "inviteLink": "https://t.me/germany_ukraine1",
+    "notes": "Новини; оголошення в коментарях до постів"
+  }
+]

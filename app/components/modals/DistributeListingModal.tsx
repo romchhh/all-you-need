@@ -50,6 +50,7 @@ export function DistributeListingModal({
   const [chats, setChats] = useState<ShareChatItem[]>([]);
   const [selectedCatalog, setSelectedCatalog] = useState<Set<number>>(new Set());
   const [selectedCustom, setSelectedCustom] = useState<Set<number>>(new Set());
+  const [selectedParserKeys, setSelectedParserKeys] = useState<Set<string>>(new Set());
   const [cityFilter, setCityFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [langFilter, setLangFilter] = useState('all');
@@ -85,6 +86,7 @@ export function DistributeListingModal({
     setChatText(defaultText);
     setSelectedCatalog(new Set());
     setSelectedCustom(new Set());
+    setSelectedParserKeys(new Set());
     setCategoryFilter('all');
     setLangFilter('all');
     autoSelectedChatsRef.current = false;
@@ -123,18 +125,26 @@ export function DistributeListingModal({
   useEffect(() => {
     if (!isOpen || loadingChats || chats.length === 0) return;
     if (autoSelectedChatsRef.current) return;
-    if (selectedCatalog.size > 0 || selectedCustom.size > 0) return;
+    if (selectedCatalog.size > 0 || selectedCustom.size > 0 || selectedParserKeys.size > 0) return;
     const top = chats.filter((c) => !c.isCustom).slice(0, 3);
-    if (top.length > 0) {
-      setSelectedCatalog(new Set(top.map((c) => c.id)));
-      autoSelectedChatsRef.current = true;
-    }
-  }, [isOpen, chats, loadingChats, selectedCatalog.size, selectedCustom.size]);
+    const parserKeys = top.filter((c) => c.parserKey).map((c) => c.parserKey!);
+    const catalogIds = top.filter((c) => !c.isCustom && !c.parserKey).map((c) => c.id);
+    if (parserKeys.length > 0) setSelectedParserKeys(new Set(parserKeys));
+    if (catalogIds.length > 0) setSelectedCatalog(new Set(catalogIds));
+    if (top.length > 0) autoSelectedChatsRef.current = true;
+  }, [isOpen, chats, loadingChats, selectedCatalog.size, selectedCustom.size, selectedParserKeys.size]);
 
-  const selectedCount = selectedCatalog.size + selectedCustom.size;
+  const selectedCount = selectedCatalog.size + selectedCustom.size + selectedParserKeys.size;
 
   const toggleChat = (item: ShareChatItem) => {
-    if (item.isCustom) {
+    if (item.parserKey) {
+      setSelectedParserKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(item.parserKey!)) next.delete(item.parserKey!);
+        else next.add(item.parserKey!);
+        return next;
+      });
+    } else if (item.isCustom) {
       setSelectedCustom((prev) => {
         const next = new Set(prev);
         if (next.has(item.id)) next.delete(item.id);
@@ -178,6 +188,7 @@ export function DistributeListingModal({
           mode: 'bot',
           catalogChatIds: Array.from(selectedCatalog),
           customChatIds: Array.from(selectedCustom),
+          parserGroupKeys: Array.from(selectedParserKeys),
           lang,
         }),
       });
@@ -194,7 +205,7 @@ export function DistributeListingModal({
   };
 
   const toggleSaved = async (item: ShareChatItem) => {
-    if (item.isCustom) return;
+    if (item.isCustom || item.parserKey) return;
     try {
       const res = await fetch('/api/share-chats', {
         method: 'POST',
@@ -322,15 +333,6 @@ export function DistributeListingModal({
                 <option value="all">{t('distribute.allCategories')}</option>
                 <option value={listing.category}>{listing.category}</option>
               </select>
-              <select
-                value={langFilter}
-                onChange={(e) => setLangFilter(e.target.value)}
-                className={`text-xs rounded-full px-3 py-1.5 border ${isLight ? 'bg-white border-gray-200' : 'bg-black/40 border-white/15'}`}
-              >
-                <option value="all">{t('distribute.allLanguages')}</option>
-                <option value="ru">Русский</option>
-                <option value="uk">Українська</option>
-              </select>
               <span className={`ml-auto text-xs font-semibold ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>
                 {t('distribute.selected')}: {selectedCount}
               </span>
@@ -378,7 +380,11 @@ export function DistributeListingModal({
             ) : (
               <ul className="space-y-2">
                 {chats.map((chat) => {
-                  const checked = chat.isCustom ? selectedCustom.has(chat.id) : selectedCatalog.has(chat.id);
+                    const checked = chat.parserKey
+                      ? selectedParserKeys.has(chat.parserKey)
+                      : chat.isCustom
+                        ? selectedCustom.has(chat.id)
+                        : selectedCatalog.has(chat.id);
                   return (
                     <li
                       key={`${chat.isCustom ? 'c' : 'g'}-${chat.id}`}
@@ -403,7 +409,7 @@ export function DistributeListingModal({
                           {t('distribute.allowed')}
                         </span>
                       )}
-                      {!chat.isCustom && (
+                        {!chat.isCustom && !chat.parserKey && (
                         <button
                           type="button"
                           onClick={() => void toggleSaved(chat)}

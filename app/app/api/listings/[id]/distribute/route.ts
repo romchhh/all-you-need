@@ -5,6 +5,7 @@ import { trackUserActivity } from '@/utils/trackActivity';
 import { sendTelegramMessage } from '@/lib/telegram/telegramNotifications';
 import { buildListingImageUrl } from '@/lib/listings/imageUrl';
 import { ensureShareChatTables } from '@/lib/share/shareChatTables';
+import { findParserShareGroup } from '@/lib/share/parserShareGroups';
 import { sqlNow } from '@/lib/dbSql';
 
 export const dynamic = 'force-dynamic';
@@ -20,9 +21,16 @@ function absoluteImageUrl(path: string): string {
 async function fetchGroupLines(
   userId: number,
   catalogChatIds: number[],
-  customChatIds: number[]
+  customChatIds: number[],
+  parserGroupKeys: string[]
 ): Promise<string[]> {
   const groupLines: string[] = [];
+  for (const key of parserGroupKeys) {
+    const g = findParserShareGroup(key);
+    if (g) {
+      groupLines.push(`• ${g.title} — ${g.inviteLink}`);
+    }
+  }
   if (catalogChatIds.length > 0) {
     const cats = (await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
@@ -100,6 +108,9 @@ export async function POST(
     const customChatIds = Array.isArray(body.customChatIds)
       ? body.customChatIds.map((v: unknown) => parseInt(String(v), 10)).filter(Number.isFinite)
       : [];
+    const parserGroupKeys = Array.isArray(body.parserGroupKeys)
+      ? body.parserGroupKeys.map((v: unknown) => String(v).trim()).filter(Boolean)
+      : [];
 
     if (!telegramId || !chatText) {
       return NextResponse.json({ error: 'telegramId and chatText required' }, { status: 400 });
@@ -134,7 +145,8 @@ export async function POST(
     const photoUrl = images[0] ? absoluteImageUrl(images[0]) : '';
 
     const lang = body.lang === 'ru' ? 'ru' : 'uk';
-    const hasGroups = catalogChatIds.length > 0 || customChatIds.length > 0;
+    const hasGroups =
+      catalogChatIds.length > 0 || customChatIds.length > 0 || parserGroupKeys.length > 0;
 
     if (mode === 'bot' && hasGroups) {
       await ensureShareChatTables();
@@ -161,7 +173,7 @@ export async function POST(
 
     if (hasGroups) {
       await ensureShareChatTables();
-      const groupLines = await fetchGroupLines(user.id, catalogChatIds, customChatIds);
+      const groupLines = await fetchGroupLines(user.id, catalogChatIds, customChatIds, parserGroupKeys);
       const groupsHeader =
         lang === 'ru'
           ? `📋 <b>Группы для публикации</b> («${listing.title}»)\n\nОткройте чат и перешлите объявление из сообщения выше:\n\n${groupLines.join('\n')}`

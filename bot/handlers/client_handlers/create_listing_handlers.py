@@ -60,6 +60,16 @@ LISTINGS_PER_PAGE = 8
 _media_group_lock = asyncio.Lock()
 
 
+def _plain_text_from_message(message: types.Message) -> str | None:
+    if message.text is None:
+        return None
+    return message.text.strip()
+
+
+async def _answer_text_required(message: types.Message, user_id: int) -> None:
+    await message.answer(t(user_id, 'create_listing.text_required'), parse_mode="HTML")
+
+
 def _format_listing_date(listing: dict) -> str:
     """Повертає коротку дату/час для кнопки: dd.mm.yy HH:mm з publishedAt або createdAt."""
     dt = None
@@ -357,11 +367,16 @@ async def choose_listing_type_goods(callback: types.CallbackQuery, state: FSMCon
 @router.message(CreateListing.waiting_for_title)
 async def process_title(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    if message.text == t(user_id, 'create_listing.cancel'):
+    raw = _plain_text_from_message(message)
+    if raw is None:
+        await _answer_text_required(message, user_id)
+        return
+
+    if raw == t(user_id, 'create_listing.cancel'):
         await cancel_listing(message, state)
         return
     
-    title = message.text.strip()
+    title = raw
     
     if not title or len(title) < 3:
         await message.answer("<b>❌ Назва повинна містити мінімум 3 символи.</b>\n\nСпробуйте ще раз:", parse_mode="HTML")
@@ -420,11 +435,16 @@ async def process_title(message: types.Message, state: FSMContext):
 @router.message(CreateListing.waiting_for_description)
 async def process_description(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    if message.text == t(user_id, 'create_listing.cancel'):
+    raw = _plain_text_from_message(message)
+    if raw is None:
+        await _answer_text_required(message, user_id)
+        return
+
+    if raw == t(user_id, 'create_listing.cancel'):
         await cancel_listing(message, state)
         return
     
-    description = message.text.strip()
+    description = raw
     
     if not description or len(description) < 10:
         await message.answer("<b>❌ Опис повинен містити мінімум 10 символів.</b>\n\nСпробуйте ще раз:", parse_mode="HTML")
@@ -866,11 +886,16 @@ async def process_price_negotiable(callback: types.CallbackQuery, state: FSMCont
 async def process_price(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     
-    if message.text == t(user_id, 'create_listing.cancel'):
+    raw = _plain_text_from_message(message)
+    if raw is None:
+        await _answer_text_required(message, user_id)
+        return
+
+    if raw == t(user_id, 'create_listing.cancel'):
         await cancel_listing(message, state)
         return
     
-    text = message.text.replace(',', '.').strip()
+    text = raw.replace(',', '.').strip()
     
     # Перевіряємо чи це почасова оплата (наприклад "50/год", "25 €/год", "50/час", "50/hour")
     if '/' in text and '-' not in text:
@@ -1256,10 +1281,12 @@ async def process_location(message: types.Message, state: FSMContext):
         )
         return
     
-    if not message.text:
+    raw = _plain_text_from_message(message)
+    if raw is None:
+        await _answer_text_required(message, user_id)
         return
     
-    raw_location = message.text.strip()
+    raw_location = raw
     
     # Визначаємо яку клавіатуру показувати на основі регіону
     data = await state.get_data()
