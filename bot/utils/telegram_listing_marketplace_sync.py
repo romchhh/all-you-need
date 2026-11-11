@@ -12,6 +12,7 @@ from aiogram import Bot
 
 from parser.storage.connection import BASE_DIR, get_connection
 from parser.storage.marketplace import create_marketplace_listing
+from utils.telegram_listing_price import marketplace_price_and_free
 
 logger = logging.getLogger(__name__)
 
@@ -110,31 +111,6 @@ async def _download_telegram_images(bot: Bot, images: list[Any]) -> list[str]:
     return out
 
 
-def _price_fields(listing: dict) -> tuple[str, bool]:
-    negotiable_markers = {
-        "договірна",
-        "договорная",
-        "negotiable",
-        "договорная цена",
-    }
-    price_display = str(listing.get("priceDisplay") or "").strip()
-    raw_price = listing.get("price")
-    try:
-        price_num = float(raw_price) if raw_price is not None else 0.0
-    except (TypeError, ValueError):
-        price_num = 0.0
-
-    if price_display and price_display.lower() in negotiable_markers:
-        return price_display, False
-    if price_display and ("/год" in price_display or "/час" in price_display):
-        return price_display, False
-    if price_display and price_num == 0:
-        return price_display, False
-    if price_num == 0:
-        return "0", True
-    return str(int(price_num) if price_num == int(price_num) else price_num), False
-
-
 async def ensure_marketplace_listing_from_telegram(
     bot: Bot,
     telegram_listing: dict,
@@ -186,7 +162,7 @@ async def ensure_marketplace_listing_from_telegram(
         images = []
 
     images_web = await _download_telegram_images(bot, images)
-    price_str, is_free = _price_fields(telegram_listing)
+    price_str, is_free = marketplace_price_and_free(telegram_listing)
 
     from utils.bot_category_map import map_bot_category_to_marketplace
 

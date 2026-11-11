@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserLanguageForTelegramId } from '@/lib/userBootstrapQueries';
+import { normalizeTelegramIdForDb, usersLegacyTelegramIdWhere } from '@/lib/dbSql';
 
-async function upsertLegacyLanguage(telegramIdNum: number, language: 'uk' | 'ru') {
+async function upsertLegacyLanguage(telegramIdKey: string, language: 'uk' | 'ru') {
   const now = new Date().toISOString();
+  const legacyWhere = usersLegacyTelegramIdWhere('?');
   const legacyRows = (await prisma.$queryRawUnsafe(
-    `SELECT id FROM users_legacy WHERE user_id = ?`,
-    telegramIdNum
+    `SELECT id FROM users_legacy WHERE ${legacyWhere}`,
+    telegramIdKey
   )) as Array<{ id: number }>;
 
   if (legacyRows.length > 0) {
     await prisma.$executeRawUnsafe(
-      `UPDATE users_legacy SET language = ? WHERE user_id = ?`,
+      `UPDATE users_legacy SET language = ? WHERE ${legacyWhere}`,
       language,
-      telegramIdNum
+      telegramIdKey
     );
     return;
   }
@@ -26,7 +28,7 @@ async function upsertLegacyLanguage(telegramIdNum: number, language: 'uk' | 'ru'
   await prisma.$executeRawUnsafe(
     `INSERT INTO users_legacy (id, user_id, language, join_date, last_activity) VALUES (?, ?, ?, ?, ?)`,
     nextId,
-    telegramIdNum,
+    telegramIdKey,
     language,
     now,
     now
@@ -53,6 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const telegramIdNum = parseInt(telegramId, 10);
+    const telegramIdKey = normalizeTelegramIdForDb(telegramId);
 
     const existingUsers = await prisma.$queryRaw<Array<{ id: number }>>`
       SELECT id FROM User WHERE CAST(telegramId AS TEXT) = ${telegramIdNum}
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await upsertLegacyLanguage(telegramIdNum, language);
+    await upsertLegacyLanguage(telegramIdKey, language);
 
     return NextResponse.json({ success: true, language });
   } catch (error) {

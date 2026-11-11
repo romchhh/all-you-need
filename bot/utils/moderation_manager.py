@@ -841,29 +841,12 @@ class ModerationManager:
             
             title = listing.get('title', '')
             description = listing.get('description', '')
-            # Перевіряємо чи є priceDisplay (для "Договірна" або діапазону)
-            price_display = listing.get('priceDisplay')
-            price = listing.get('price', 0)
-            currency = listing.get('currency', 'EUR')
-            
+            from utils.telegram_listing_price import channel_price_text
+
             seller_telegram_id = listing.get('sellerTelegramId') or listing.get('telegramId')
             user_id_for_lang = seller_telegram_id if seller_telegram_id else 0
-            # Канал: UI російською; title/description автора не чіпаємо
             channel_lang = "ru"
-            negotiable_text = t_lang(channel_lang, 'moderation.negotiable')
-            
-            # Формуємо текст ціни
-            if price_display:
-                if price_display == negotiable_text or price_display == "Договірна" or price_display == "Договорная":
-                    price_text = negotiable_text
-                elif '/год' in price_display or '/час' in price_display:
-                    price_text = price_display
-                else:
-                    price_text = f"{price_display} {currency}"
-            elif float(price) == 0:
-                price_text = negotiable_text
-            else:
-                price_text = f"{price} {currency}"
+            price_text = channel_price_text(listing, lang=channel_lang)
             category = listing.get('category', '')
             subcategory = listing.get('subcategory')
             condition = listing.get('condition', '')

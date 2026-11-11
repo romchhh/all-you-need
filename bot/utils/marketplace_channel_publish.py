@@ -25,6 +25,7 @@ from parser.moderation.services_publish import (
 )
 from parser.storage.connection import BASE_DIR, get_connection
 from utils.bot_category_map import channel_publish_mode
+from utils.telegram_listing_price import channel_price_text
 
 logger = logging.getLogger(__name__)
 
@@ -146,10 +147,18 @@ async def _publish_trade_channel(bot: Bot, listing: dict) -> Optional[int]:
     currency = listing.get("currency") or "EUR"
     is_free = _as_bool(listing.get("isFree") or listing.get("isfree"))
 
-    if is_free:
-        price_text = "Безкоштовно"
-    else:
-        price_text = f"{html.escape(str(price))} {html.escape(str(currency))}".strip()
+    price_text = html.escape(
+        channel_price_text(
+            {
+                "price": price,
+                "priceDisplay": price,
+                "currency": currency,
+                "isFree": is_free,
+                "category": category,
+            },
+            lang="ru",
+        )
+    )
 
     category_text = html.escape(get_category_label(category, subcategory, lang="ru"))
     hashtags = build_channel_hashtags(category, subcategory if isinstance(subcategory, str) else None, location)

@@ -110,8 +110,20 @@ def get_telegram_listing_by_id(listing_id: int) -> Optional[Dict[str, Any]]:
     
     if not row:
         return None
-    
-    result = dict(row)
+
+    from database_functions.db_connection import row_to_dict
+
+    result = row_to_dict(row) or dict(row)
+    for alt, canon in (
+        ("pricedisplay", "priceDisplay"),
+        ("marketplacelistingid", "marketplaceListingId"),
+        ("publicationtariff", "publicationTariff"),
+        ("paymentstatus", "paymentStatus"),
+        ("moderationstatus", "moderationStatus"),
+        ("sellertelegramid", "sellerTelegramId"),
+    ):
+        if alt in result and canon not in result:
+            result[canon] = result[alt]
     # Парсимо JSON images
     if result.get('images'):
         try:
