@@ -6,6 +6,8 @@ import {
   listParserShareGroupsForListing,
   stableParserChatId,
 } from '@/lib/share/parserShareGroups';
+import { extractPublicTelegramUsername } from '@/lib/share/openShareGroup';
+import { enrichShareChatsWithTelegramMeta } from '@/lib/share/telegramChatMeta';
 
 export type ShareChatItem = {
   id: number;
@@ -82,11 +84,14 @@ export async function listShareChatsForListing(params: {
     const link = (g.inviteLink || '').toLowerCase();
     if (link) seenLinks.add(link);
     const kindLabel = g.kind === 'services' ? 'послуги' : 'товари';
+    const username = extractPublicTelegramUsername(g.inviteLink);
     items.push({
       id: stableParserChatId(g.parserKey),
       title: g.title,
       subtitle: g.notes || `${g.city} · ${kindLabel}`,
-      avatarUrl: null,
+      avatarUrl: username
+        ? `/api/share-chats/photo?u=${encodeURIComponent(username)}`
+        : null,
       cityKey: g.city,
       categorySlug: g.categorySlug,
       language: 'ru',
@@ -141,11 +146,16 @@ export async function listShareChatsForListing(params: {
     }
     if (!cityKey) relevance += 10;
 
+    const username = extractPublicTelegramUsername(inviteLink);
+    const storedAvatar = row.avatarUrl ? String(row.avatarUrl) : null;
+
     items.push({
       id: Number(row.id),
       title: String(row.title),
       subtitle: row.subtitle ? String(row.subtitle) : null,
-      avatarUrl: row.avatarUrl ? String(row.avatarUrl) : null,
+      avatarUrl:
+        storedAvatar ||
+        (username ? `/api/share-chats/photo?u=${encodeURIComponent(username)}` : null),
       cityKey,
       categorySlug,
       language,
@@ -168,11 +178,14 @@ export async function listShareChatsForListing(params: {
     if (inviteKey && seenLinks.has(inviteKey)) continue;
     if (inviteKey) seenLinks.add(inviteKey);
 
+    const username = extractPublicTelegramUsername(inviteLink);
     items.push({
       id: Number(row.id),
       title: String(row.title),
       subtitle: row.subtitle ? String(row.subtitle) : null,
-      avatarUrl: null,
+      avatarUrl: username
+        ? `/api/share-chats/photo?u=${encodeURIComponent(username)}`
+        : null,
       cityKey: null,
       categorySlug: null,
       language: String(row.language || 'ru'),
@@ -188,5 +201,6 @@ export async function listShareChatsForListing(params: {
 
   items.sort((a, b) => b.relevance - a.relevance || b.memberCount - a.memberCount || a.title.localeCompare(b.title));
 
-  return items;
+  // Підтягнути memberCount з Telegram (аватар уже через /api/share-chats/photo)
+  return enrichShareChatsWithTelegramMeta(items);
 }

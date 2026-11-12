@@ -13,7 +13,9 @@ import {
   ChevronRight,
   ChevronLeft,
   Share2,
+  Users,
 } from 'lucide-react';
+import { formatMemberCount } from '@/lib/share/formatMemberCount';
 import { Listing } from '@/types';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -322,9 +324,40 @@ export function DistributeListingModal({
       return;
     }
     tg?.HapticFeedback?.impactOccurred('light');
-    // Публічний t.me/username → ?text= (як шаблон продавцю).
-    // Invite (+/joinchat) параметр text не підтримує → clipboard + відкрити чат.
-    // Нативне «Переслати» (shareMessage) — окрема кнопка вище: не прив’язана до конкретної групи.
+
+    // Найкраще, що дозволяє Telegram Mini App: PreparedInlineMessage (фото + опис)
+    // → нативний діалог «Надіслати». Користувач обирає цю групу і жме Send.
+    // Пряму «заготовку forward саме в цей чат» API не дає.
+    if (shareMessageReady && chatText.trim()) {
+      setSharingNative(true);
+      try {
+        const res = await fetch(`/api/listings/${listing.id}/prepare-share`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId, chatText }),
+        });
+        const data = await res.json();
+        if (res.ok && data.preparedMessageId && tg?.shareMessage) {
+          showToast(
+            t('distribute.pickGroupInShare', { name: item.title }),
+            'info'
+          );
+          tg.shareMessage(String(data.preparedMessageId), (sent) => {
+            if (sent) {
+              showToast(t('distribute.shareNativeSent'), 'success');
+              tg.HapticFeedback?.notificationOccurred('success');
+            }
+          });
+          return;
+        }
+      } catch {
+        /* fallback нижче */
+      } finally {
+        setSharingNative(false);
+      }
+    }
+
+    // Fallback: публічний @username → ?text= ; інакше clipboard + invite
     const result = openShareGroupChat(item.inviteLink, chatText, tg);
     if (result.mode === 'prefill') {
       showToast(t('distribute.openedWithText'), 'success');
@@ -632,14 +665,19 @@ export function DistributeListingModal({
                           isLight ? 'hover:bg-white' : 'hover:bg-white/[0.04]'
                         }`}
                       >
-                        <ChatRowAvatar title={chat.title} />
+                        <ChatRowAvatar title={chat.title} avatarUrl={chat.avatarUrl} />
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-sm truncate">{chat.title}</div>
-                          <div className={`text-xs truncate ${muted}`}>
-                            {chat.subtitle ||
-                              (chat.memberCount
-                                ? t('distribute.members', { count: String(chat.memberCount) })
-                                : chat.cityKey || '')}
+                          <div className={`flex items-center gap-2 text-xs min-w-0 ${muted}`}>
+                            {chat.memberCount > 0 ? (
+                              <span className="inline-flex items-center gap-1 shrink-0 font-medium">
+                                <Users size={12} className="opacity-80" aria-hidden />
+                                {formatMemberCount(chat.memberCount)}
+                              </span>
+                            ) : null}
+                            <span className="truncate">
+                              {chat.subtitle || chat.cityKey || ''}
+                            </span>
                           </div>
                         </div>
                         <button
@@ -788,11 +826,26 @@ function TabBtn({
   );
 }
 
-function ChatRowAvatar({ title }: { title: string }) {
+function ChatRowAvatar({ title, avatarUrl }: { title: string; avatarUrl?: string | null }) {
   const letter = title.charAt(0).toUpperCase();
+  const [broken, setBroken] = useState(false);
+  const showImg = Boolean(avatarUrl) && !broken;
+
   return (
-    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3F5331] to-[#C8E6A0] flex items-center justify-center text-sm font-bold text-white shrink-0">
-      {letter}
+    <div className="w-11 h-11 rounded-full overflow-hidden bg-gradient-to-br from-[#3F5331] to-[#C8E6A0] flex items-center justify-center text-sm font-bold text-white shrink-0">
+      {showImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarUrl!}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        letter
+      )}
     </div>
   );
 }
