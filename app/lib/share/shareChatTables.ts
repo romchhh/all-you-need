@@ -5,7 +5,7 @@ import { foldCityKey } from '@/lib/city/cityNormalization';
 let shareChatTablesReady = false;
 
 /** PG: INTEGER 0/1 (runtime CREATE) або BOOLEAN (Prisma). */
-async function shareFlagPgCast(table: string, column: string): Promise<'int' | 'bool'> {
+export async function shareFlagPgCast(table: string, column: string): Promise<'int' | 'bool'> {
   if (!isPostgres()) return 'int';
   try {
     const rows = (await executeWithRetry(() =>
@@ -25,6 +25,17 @@ async function shareFlagPgCast(table: string, column: string): Promise<'int' | '
     // ignore
   }
   return 'int';
+}
+
+let cachedIsSavedKind: 'int' | 'bool' | null = null;
+
+/** Значення для UserShareChat.isSaved під реальний тип колонки в БД. */
+export async function userShareChatSavedValue(on: boolean): Promise<boolean | number> {
+  if (cachedIsSavedKind == null) {
+    cachedIsSavedKind = await shareFlagPgCast('UserShareChat', 'isSaved');
+  }
+  if (cachedIsSavedKind === 'bool') return on;
+  return on ? 1 : 0;
 }
 
 const SEED_CHATS: Array<{

@@ -4,15 +4,10 @@ import { findUserByTelegramId } from '@/utils/userHelpers';
 import { trackUserActivity } from '@/utils/trackActivity';
 import { listingCityKeyFromLocation, foldCityKey } from '@/lib/city/cityNormalization';
 import { listShareChatsForListing } from '@/lib/share/shareChatQuery';
-import { ensureShareChatTables } from '@/lib/share/shareChatTables';
-import { isPostgres, sqlNow } from '@/lib/dbSql';
+import { ensureShareChatTables, userShareChatSavedValue } from '@/lib/share/shareChatTables';
+import { sqlNow } from '@/lib/dbSql';
 
 export const dynamic = 'force-dynamic';
-
-/** PG Boolean vs SQLite INTEGER для UserShareChat.isSaved */
-function savedFlag(on: boolean): boolean | number {
-  return isPostgres() ? on : on ? 1 : 0;
-}
 
 function normalizeInvite(link: string): string {
   return link.trim().replace(/\/+$/, '').toLowerCase();
@@ -104,8 +99,8 @@ export async function POST(request: NextRequest) {
       const parserKey = body.parserKey != null ? String(body.parserKey).trim() : '';
       const inviteLinkIn = body.inviteLink != null ? String(body.inviteLink).trim() : '';
       const titleIn = body.title != null ? String(body.title).trim() : '';
-      const onFlag = savedFlag(true);
-      const offFlag = savedFlag(false);
+      const onFlag = await userShareChatSavedValue(true);
+      const offFlag = await userShareChatSavedValue(false);
 
       // Парсер / довільне посилання → UserShareChat source=custom
       if (parserKey || (inviteLinkIn && !Number.isFinite(catalogChatId))) {
@@ -240,7 +235,7 @@ export async function POST(request: NextRequest) {
           title,
           inviteLink,
           language,
-          savedFlag(true)
+          await userShareChatSavedValue(true)
         )
       );
 
