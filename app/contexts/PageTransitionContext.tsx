@@ -89,8 +89,9 @@ function PageTransitionOverlay({ visible }: { visible: boolean }) {
 }
 
 export function PageTransitionProvider({ children }: { children: ReactNode }) {
-  const [visible, setVisible] = useState(false);
-  const shownAtRef = useRef(0);
+  // Cold start: лоадер одразу (плюс HTML #app-boot-splash до гідрації)
+  const [visible, setVisible] = useState(true);
+  const shownAtRef = useRef(Date.now());
   const hideTokenRef = useRef(0);
   const minMsRef = useRef(DEFAULT_MIN_MS);
 

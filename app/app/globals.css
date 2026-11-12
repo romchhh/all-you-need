@@ -375,6 +375,66 @@ div {
   }
 }
 
+/* Cold-start splash (до React) — як PageTransitionOverlay */
+#app-boot-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  transition: opacity 0.2s ease;
+}
+html[data-theme='light'] #app-boot-splash {
+  background: rgba(245, 247, 242, 0.88);
+}
+#app-boot-splash.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+.app-boot-splash-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.5rem;
+}
+.app-boot-splash-logo-wrap {
+  display: flex;
+  height: 9rem;
+  width: 9rem;
+  align-items: center;
+  justify-content: center;
+  animation: tg-logo-spin 1.05s linear infinite;
+  transform-origin: center center;
+}
+#app-boot-splash-logo {
+  height: 3rem;
+  width: auto;
+  max-width: 9.5rem;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+.app-boot-splash-text {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  color: rgba(255, 255, 255, 0.75);
+}
+html[data-theme='light'] .app-boot-splash-text {
+  color: rgb(75, 85, 99);
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-boot-splash-logo-wrap {
+    animation: none;
+  }
+}
+
 .animate-tg-logo-spin {
   animation: tg-logo-spin 1.05s linear infinite !important;
   transform-origin: center center;

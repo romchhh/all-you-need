@@ -74,9 +74,26 @@ export default function RootLayout({
       <body className={`${montserrat.variable} antialiased`}>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k='appAppearanceTheme',t=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',t==='light'||t==='dark'?t:'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+            __html: `(function(){try{var k='appAppearanceTheme',t=localStorage.getItem(k);document.documentElement.setAttribute('data-theme',t==='light'||t==='dark'?t:'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}try{var L=document.getElementById('app-boot-splash-logo');if(L){var th=document.documentElement.getAttribute('data-theme');L.src=th==='light'?'/images/Group-1000007086-light.svg':'/images/Group%201000007086.svg';}}catch(e2){}})();`,
           }}
         />
+        {/* Cold-start splash до гідрації React (той самий вигляд, що page-transition) */}
+        <div id="app-boot-splash" role="status" aria-live="polite" aria-busy="true">
+          <div className="app-boot-splash-inner">
+            <div className="app-boot-splash-logo-wrap">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                id="app-boot-splash-logo"
+                src="/images/Group%201000007086.svg"
+                alt=""
+                width={408}
+                height={129}
+                draggable={false}
+              />
+            </div>
+            <p className="app-boot-splash-text">Завантаження...</p>
+          </div>
+        </div>
         <ErrorBoundary>
           <LanguageProvider>
             <AppProviders>
