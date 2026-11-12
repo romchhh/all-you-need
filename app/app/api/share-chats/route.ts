@@ -5,9 +5,18 @@ import { trackUserActivity } from '@/utils/trackActivity';
 import { listingCityKeyFromLocation, foldCityKey } from '@/lib/city/cityNormalization';
 import { listShareChatsForListing } from '@/lib/share/shareChatQuery';
 import { ensureShareChatTables } from '@/lib/share/shareChatTables';
-import { sqlNow } from '@/lib/dbSql';
+import { isPostgres, sqlNow } from '@/lib/dbSql';
 
 export const dynamic = 'force-dynamic';
+
+/** PG Boolean vs SQLite INTEGER для UserShareChat.isSaved */
+function savedFlag(on: boolean): boolean | number {
+  return isPostgres() ? on : on ? 1 : 0;
+}
+
+function normalizeInvite(link: string): string {
+  return link.trim().replace(/\/+$/, '').toLowerCase();
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -95,6 +104,8 @@ export async function POST(request: NextRequest) {
       const parserKey = body.parserKey != null ? String(body.parserKey).trim() : '';
       const inviteLinkIn = body.inviteLink != null ? String(body.inviteLink).trim() : '';
       const titleIn = body.title != null ? String(body.title).trim() : '';
+      const onFlag = savedFlag(true);
+      const offFlag = savedFlag(false);
 
       // Парсер / довільне посилання → UserShareChat source=custom
       if (parserKey || (inviteLinkIn && !Number.isFinite(catalogChatId))) {
@@ -102,37 +113,46 @@ export async function POST(request: NextRequest) {
         if (!inviteLink || inviteLink.length < 8) {
           return NextResponse.json({ error: 'inviteLink required' }, { status: 400 });
         }
-        const existing = (await executeWithRetry(() =>
-          prisma.$queryRawUnsafe(
-            `SELECT id, isSaved FROM UserShareChat
-             WHERE userId = ? AND inviteLink = ? AND source = 'custom' LIMIT 1`,
-            user.id,
-            inviteLink
-          )
-        )) as Array<{ id: number; isSaved: number }>;
+        const inviteNorm = normalizeInvite(inviteLink);
 
-        if (existing[0]) {
-          const next = existing[0].isSaved ? 0 : 1;
+        const customRows = (await executeWithRetry(() =>
+          prisma.$queryRawUnsafe(
+            `SELECT id, isSaved, inviteLink FROM UserShareChat
+             WHERE userId = ? AND source = 'custom'`,
+            user.id
+          )
+        )) as Array<{ id: number; isSaved: boolean | number | string; inviteLink: string | null }>;
+
+        const existing = customRows.find((row) => {
+          const link = String(row.inviteLink || '');
+          return link === inviteLink || normalizeInvite(link) === inviteNorm;
+        });
+
+        if (existing) {
+          const currentlyOn =
+            existing.isSaved === true || existing.isSaved === 1 || existing.isSaved === '1';
+          const nextOn = !currentlyOn;
           await executeWithRetry(() =>
             prisma.$executeRawUnsafe(
               `UPDATE UserShareChat SET isSaved = ? WHERE id = ?`,
-              next,
-              existing[0].id
+              nextOn ? onFlag : offFlag,
+              existing.id
             )
           );
-          return NextResponse.json({ success: true, isSaved: next === 1 });
+          return NextResponse.json({ success: true, isSaved: nextOn });
         }
 
         await executeWithRetry(() =>
           prisma.$executeRawUnsafe(
             `INSERT INTO UserShareChat (
               userId, catalogChatId, title, subtitle, inviteLink, language, memberCount, isSaved, source, createdAt
-            ) VALUES (?, NULL, ?, ?, ?, ?, 0, 1, 'custom', ${sqlNow()})`,
+            ) VALUES (?, NULL, ?, ?, ?, ?, 0, ?, 'custom', ${sqlNow()})`,
             user.id,
             titleIn || parserKey || 'Chat',
             parserKey ? `parser:${parserKey}` : null,
             inviteLink,
-            body.language === 'uk' ? 'uk' : 'ru'
+            body.language === 'uk' ? 'uk' : 'ru',
+            onFlag
           )
         );
         return NextResponse.json({ success: true, isSaved: true });
@@ -148,14 +168,22 @@ export async function POST(request: NextRequest) {
           user.id,
           catalogChatId
         )
-      )) as Array<{ id: number; isSaved: number }>;
+      )) as Array<{ id: number; isSaved: boolean | number | string }>;
 
       if (existing[0]) {
-        const next = existing[0].isSaved ? 0 : 1;
+        const currentlyOn =
+          existing[0].isSaved === true ||
+          existing[0].isSaved === 1 ||
+          existing[0].isSaved === '1';
+        const nextOn = !currentlyOn;
         await executeWithRetry(() =>
-          prisma.$executeRawUnsafe(`UPDATE UserShareChat SET isSaved = ? WHERE id = ?`, next, existing[0].id)
+          prisma.$executeRawUnsafe(
+            `UPDATE UserShareChat SET isSaved = ? WHERE id = ?`,
+            nextOn ? onFlag : offFlag,
+            existing[0].id
+          )
         );
-        return NextResponse.json({ success: true, isSaved: next === 1 });
+        return NextResponse.json({ success: true, isSaved: nextOn });
       }
 
       const cat = (await executeWithRetry(() =>
@@ -179,14 +207,15 @@ export async function POST(request: NextRequest) {
         prisma.$executeRawUnsafe(
           `INSERT INTO UserShareChat (
             userId, catalogChatId, title, subtitle, inviteLink, language, memberCount, isSaved, source, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'catalog', ${sqlNow()})`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'catalog', ${sqlNow()})`,
           user.id,
           catalogChatId,
           cat[0].title,
           cat[0].subtitle,
           cat[0].inviteLink,
           cat[0].language,
-          cat[0].memberCount
+          cat[0].memberCount,
+          onFlag
         )
       );
 
@@ -206,11 +235,12 @@ export async function POST(request: NextRequest) {
         prisma.$executeRawUnsafe(
           `INSERT INTO UserShareChat (
             userId, catalogChatId, title, subtitle, inviteLink, language, memberCount, isSaved, source, createdAt
-          ) VALUES (?, NULL, ?, NULL, ?, ?, 0, 1, 'custom', ${sqlNow()})`,
+          ) VALUES (?, NULL, ?, NULL, ?, ?, 0, ?, 'custom', ${sqlNow()})`,
           user.id,
           title,
           inviteLink,
-          language
+          language,
+          savedFlag(true)
         )
       );
 

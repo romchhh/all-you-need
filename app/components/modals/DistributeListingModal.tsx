@@ -287,6 +287,14 @@ export function DistributeListingModal({
 
   const toggleSaved = async (item: ShareChatItem, e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
+    const prevSaved = item.isSaved;
+    // Оптимістично одразу зелена закладка
+    setChats((list) =>
+      list.map((c) =>
+        chatRowKey(c) === chatRowKey(item) ? { ...c, isSaved: !prevSaved } : c
+      )
+    );
     try {
       const body: Record<string, unknown> = {
         action: 'toggle_saved',
@@ -305,15 +313,25 @@ export function DistributeListingModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('fail');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'fail');
+      const isSaved = Boolean(data.isSaved);
+      setChats((list) =>
+        list.map((c) => (chatRowKey(c) === chatRowKey(item) ? { ...c, isSaved } : c))
+      );
       tg?.HapticFeedback?.selectionChanged();
       showToast(
-        data.isSaved ? t('distribute.addedToMine') : t('distribute.removedFromMine'),
+        isSaved ? t('distribute.addedToMine') : t('distribute.removedFromMine'),
         'success'
       );
+      // Повний рефетч, щоб вкладка «Мої» підхопила запис
       await loadChats();
     } catch {
+      setChats((list) =>
+        list.map((c) =>
+          chatRowKey(c) === chatRowKey(item) ? { ...c, isSaved: prevSaved } : c
+        )
+      );
       showToast(t('distribute.saveError'), 'error');
     }
   };
@@ -712,7 +730,7 @@ export function DistributeListingModal({
 
             <p className={`flex gap-2 text-[11px] leading-snug shrink-0 pb-1 ${muted}`}>
               <Info size={14} className="shrink-0 mt-0.5" />
-              <span className="line-clamp-2">{t('distribute.step2Hint')}</span>
+              <span className="line-clamp-3">{t('distribute.joinThenShareHint')}</span>
             </p>
           </div>
         )}

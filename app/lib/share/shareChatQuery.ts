@@ -9,6 +9,10 @@ import {
 import { extractPublicTelegramUsername } from '@/lib/share/openShareGroup';
 import { enrichShareChatsWithTelegramMeta } from '@/lib/share/telegramChatMeta';
 
+function normalizeInviteKey(link: string): string {
+  return link.trim().replace(/\/+$/, '').toLowerCase();
+}
+
 export type ShareChatItem = {
   id: number;
   title: string;
@@ -69,8 +73,11 @@ export async function listShareChatsForListing(params: {
   }
 
   for (const row of custom) {
-    const invite = row.inviteLink ? String(row.inviteLink).toLowerCase() : '';
-    if (invite) savedInviteLinks.add(invite);
+    const invite = row.inviteLink ? String(row.inviteLink) : '';
+    if (invite) {
+      savedInviteLinks.add(invite.toLowerCase());
+      savedInviteLinks.add(normalizeInviteKey(invite));
+    }
   }
 
   const parserRows = listParserShareGroupsForListing({
@@ -81,8 +88,11 @@ export async function listShareChatsForListing(params: {
   });
 
   for (const g of parserRows) {
-    const link = (g.inviteLink || '').toLowerCase();
+    const linkRaw = g.inviteLink || '';
+    const link = linkRaw.toLowerCase();
+    const linkNorm = normalizeInviteKey(linkRaw);
     if (link) seenLinks.add(link);
+    if (linkNorm) seenLinks.add(linkNorm);
     const kindLabel = g.kind === 'services' ? 'послуги' : 'товари';
     const username = extractPublicTelegramUsername(g.inviteLink);
     items.push({
@@ -98,7 +108,10 @@ export async function listShareChatsForListing(params: {
       memberCount: 0,
       postingAllowed: true,
       inviteLink: g.inviteLink,
-      isSaved: Boolean(link && savedInviteLinks.has(link)),
+      isSaved: Boolean(
+        (link && savedInviteLinks.has(link)) ||
+          (linkNorm && savedInviteLinks.has(linkNorm))
+      ),
       isCustom: false,
       parserKey: g.parserKey,
       relevance: g.relevance + 200,
@@ -173,10 +186,13 @@ export async function listShareChatsForListing(params: {
     const source = String(row.source || 'custom');
     if (source !== 'custom') continue;
     const inviteLink = row.inviteLink ? String(row.inviteLink) : null;
-    const inviteKey = inviteLink ? inviteLink.toLowerCase() : '';
+    const inviteKey = inviteLink ? normalizeInviteKey(inviteLink) : '';
     // Не дублювати парсер/каталог з тим самим invite
     if (inviteKey && seenLinks.has(inviteKey)) continue;
-    if (inviteKey) seenLinks.add(inviteKey);
+    if (inviteKey) {
+      seenLinks.add(inviteKey);
+      seenLinks.add(inviteLink!.toLowerCase());
+    }
 
     const username = extractPublicTelegramUsername(inviteLink);
     items.push({
