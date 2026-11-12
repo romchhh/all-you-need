@@ -365,6 +365,9 @@ const ProfilePage = () => {
               }
             }
             setSelectedListing(null);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('ayn:listing-closed'));
+            }
           }}
           onBack={() => {
             if (didToggleFavoriteOnCurrentListing.current) {
@@ -384,6 +387,9 @@ const ProfilePage = () => {
               }
             }
             setSelectedListing(null);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('ayn:listing-closed'));
+            }
           }}
           onToggleFavorite={toggleFavorite}
           onSelectListing={setSelectedListing}

@@ -47,11 +47,15 @@ export function listParserShareGroupsForListing(params: {
   categoryFilter: string | null;
   cityFilter: string | null;
 }): Array<ParserShareGroup & { relevance: number; memberCount: number }> {
-  const cityWant = params.cityFilter
-    ? foldCityKey(params.cityFilter)
-    : params.listingCityFold
-      ? foldCityKey(params.listingCityFold)
-      : '';
+  const cityFilterRaw = (params.cityFilter || '').trim();
+  const cityWant =
+    cityFilterRaw === '__all__'
+      ? ''
+      : cityFilterRaw
+        ? foldCityKey(cityFilterRaw)
+        : params.listingCityFold
+          ? foldCityKey(params.listingCityFold)
+          : '';
 
   const catWant =
     params.categoryFilter && params.categoryFilter !== 'all' ? params.categoryFilter : null;

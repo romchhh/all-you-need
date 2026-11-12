@@ -53,6 +53,7 @@ import { buildListingImageUrl, resolveListingGalleryImages } from '@/lib/listing
 import { isPriceChangeFresh } from '@/lib/listings/priceChangeDisplay';
 import { useTheme } from '@/contexts/ThemeContext';
 import { listingDistributeButtonClass } from '@/lib/ui/listingDistributeCta';
+import { peekDistributeResume } from '@/lib/share/distributeResume';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
 import { ListingAutoRenewSection } from '@/components/listing/ListingAutoRenewSection';
 import { shouldShowListingFavorites, shouldShowListingViews } from '@/lib/listings/viewsDisplay';
@@ -182,6 +183,15 @@ export const ListingDetail = ({
   const [categoryTotal, setCategoryTotal] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
+  const [distributeResumeReady, setDistributeResumeReady] = useState(false);
+
+  useEffect(() => {
+    if (showDistributeModal) {
+      setDistributeResumeReady(false);
+      return;
+    }
+    setDistributeResumeReady(Boolean(peekDistributeResume(listing.id)));
+  }, [showDistributeModal, listing.id]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
@@ -1551,7 +1561,31 @@ export const ListingDetail = ({
           telegramId={viewerTelegramIdStr}
           tg={tg}
           showToast={showToast}
+          onOpenListing={() => {
+            // Картка вже відкрита — ховаємо модалку; resume підхопить кнопку нижче
+            setShowDistributeModal(false);
+          }}
         />
+      ) : null}
+
+      {canDistributeOwnListing && !showDistributeModal && distributeResumeReady ? (
+        <div
+          className="fixed left-0 right-0 z-[1050] px-4"
+          style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setShowDistributeModal(true);
+              setDistributeResumeReady(false);
+              tg?.HapticFeedback?.impactOccurred('light');
+            }}
+            className={`mx-auto flex w-full max-w-lg items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-bold shadow-lg ${listingDistributeCtaClass}`}
+          >
+            <Send size={18} />
+            {t('distribute.resumeCta')}
+          </button>
+        </div>
       ) : null}
 
       {/* Модальне вікно поділу */}

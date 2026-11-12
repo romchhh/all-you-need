@@ -136,6 +136,24 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   const [showPromotionModal, setShowPromotionModal] = useState(false);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [selectedListingForDistribute, setSelectedListingForDistribute] = useState<Listing | null>(null);
+
+  useEffect(() => {
+    const onListingClosed = () => {
+      if (!selectedListingForDistribute) return;
+      try {
+        const raw = sessionStorage.getItem('ayn:distribute-resume');
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as { listingId?: number };
+        if (parsed?.listingId === selectedListingForDistribute.id) {
+          setShowDistributeModal(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener('ayn:listing-closed', onListingClosed);
+    return () => window.removeEventListener('ayn:listing-closed', onListingClosed);
+  }, [selectedListingForDistribute]);
   const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState(false);
   const [selectedListingForPromotion, setSelectedListingForPromotion] = useState<Listing | null>(null);
   const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
@@ -1951,6 +1969,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
           telegramId={profile.telegramId}
           tg={tg}
           showToast={showToast}
+          onOpenListing={() => {
+            setShowDistributeModal(false);
+            onSelectListing?.(selectedListingForDistribute);
+          }}
         />
       )}
 

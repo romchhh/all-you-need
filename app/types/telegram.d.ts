@@ -36,6 +36,8 @@ export interface TelegramWebApp {
   openTelegramLink(url: string): void;
   openLink(url: string): void;
   share?(text: string, url?: string): Promise<void>;
+  /** Bot API 8.0+ — нативний шер PreparedInlineMessage (savePreparedInlineMessage). */
+  shareMessage?(msgId: string, callback?: (sent: boolean) => void): void;
   initData?: string;
   initDataUnsafe?: TelegramInitData;
   version?: string;

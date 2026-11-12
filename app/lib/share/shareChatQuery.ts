@@ -37,14 +37,39 @@ export async function listShareChatsForListing(params: {
 
   const langWant = params.languageFilter && params.languageFilter !== 'all' ? params.languageFilter : null;
   const catWant = params.categoryFilter && params.categoryFilter !== 'all' ? params.categoryFilter : null;
-  const cityWant = params.cityFilter
-    ? foldCityKey(params.cityFilter)
-    : params.listingCityFold
-      ? foldCityKey(params.listingCityFold)
-      : '';
+  const cityFilterRaw = (params.cityFilter || '').trim();
+  const cityWant =
+    !cityFilterRaw || cityFilterRaw === '__all__'
+      ? cityFilterRaw === '__all__'
+        ? ''
+        : params.listingCityFold
+          ? foldCityKey(params.listingCityFold)
+          : ''
+      : foldCityKey(cityFilterRaw);
 
   const items: ShareChatItem[] = [];
   const seenLinks = new Set<string>();
+  const savedInviteLinks = new Set<string>();
+
+  let custom: Array<Record<string, unknown>> = [];
+  try {
+    custom = (await executeWithRetry(() =>
+      prisma.$queryRawUnsafe(
+        `SELECT id, title, subtitle, inviteLink, language, memberCount, catalogChatId, source
+         FROM UserShareChat
+         WHERE userId = ? AND ${sqlBooleanIsTrue('isSaved')}
+         ORDER BY id DESC`,
+        params.userId
+      )
+    )) as Array<Record<string, unknown>>;
+  } catch (err) {
+    console.error('[shareChatQuery] UserShareChat', err);
+  }
+
+  for (const row of custom) {
+    const invite = row.inviteLink ? String(row.inviteLink).toLowerCase() : '';
+    if (invite) savedInviteLinks.add(invite);
+  }
 
   const parserRows = listParserShareGroupsForListing({
     listingCityFold: params.listingCityFold,
@@ -68,7 +93,7 @@ export async function listShareChatsForListing(params: {
       memberCount: 0,
       postingAllowed: true,
       inviteLink: g.inviteLink,
-      isSaved: false,
+      isSaved: Boolean(link && savedInviteLinks.has(link)),
       isCustom: false,
       parserKey: g.parserKey,
       relevance: g.relevance + 200,
@@ -134,22 +159,15 @@ export async function listShareChatsForListing(params: {
     });
   }
 
-  let custom: Array<Record<string, unknown>> = [];
-  try {
-    custom = (await executeWithRetry(() =>
-      prisma.$queryRawUnsafe(
-        `SELECT id, title, subtitle, inviteLink, language, memberCount
-         FROM UserShareChat
-         WHERE userId = ? AND source = 'custom' AND ${sqlBooleanIsTrue('isSaved')}
-         ORDER BY id DESC`,
-        params.userId
-      )
-    )) as Array<Record<string, unknown>>;
-  } catch (err) {
-    console.error('[shareChatQuery] UserShareChat', err);
-  }
-
   for (const row of custom) {
+    const source = String(row.source || 'custom');
+    if (source !== 'custom') continue;
+    const inviteLink = row.inviteLink ? String(row.inviteLink) : null;
+    const inviteKey = inviteLink ? inviteLink.toLowerCase() : '';
+    // Не дублювати парсер/каталог з тим самим invite
+    if (inviteKey && seenLinks.has(inviteKey)) continue;
+    if (inviteKey) seenLinks.add(inviteKey);
+
     items.push({
       id: Number(row.id),
       title: String(row.title),
@@ -160,7 +178,7 @@ export async function listShareChatsForListing(params: {
       language: String(row.language || 'ru'),
       memberCount: Number(row.memberCount) || 0,
       postingAllowed: true,
-      inviteLink: row.inviteLink ? String(row.inviteLink) : null,
+      inviteLink,
       isSaved: true,
       isCustom: true,
       parserKey: null,

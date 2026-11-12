@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       listingCategory,
       languageFilter: lang,
       categoryFilter: category,
-      cityFilter: city,
+      cityFilter: city === '__all__' ? '__all__' : city,
     });
 
     return NextResponse.json({
@@ -92,6 +92,52 @@ export async function POST(request: NextRequest) {
 
     if (action === 'toggle_saved') {
       const catalogChatId = parseInt(String(body.catalogChatId), 10);
+      const parserKey = body.parserKey != null ? String(body.parserKey).trim() : '';
+      const inviteLinkIn = body.inviteLink != null ? String(body.inviteLink).trim() : '';
+      const titleIn = body.title != null ? String(body.title).trim() : '';
+
+      // Парсер / довільне посилання → UserShareChat source=custom
+      if (parserKey || (inviteLinkIn && !Number.isFinite(catalogChatId))) {
+        const inviteLink = inviteLinkIn;
+        if (!inviteLink || inviteLink.length < 8) {
+          return NextResponse.json({ error: 'inviteLink required' }, { status: 400 });
+        }
+        const existing = (await executeWithRetry(() =>
+          prisma.$queryRawUnsafe(
+            `SELECT id, isSaved FROM UserShareChat
+             WHERE userId = ? AND inviteLink = ? AND source = 'custom' LIMIT 1`,
+            user.id,
+            inviteLink
+          )
+        )) as Array<{ id: number; isSaved: number }>;
+
+        if (existing[0]) {
+          const next = existing[0].isSaved ? 0 : 1;
+          await executeWithRetry(() =>
+            prisma.$executeRawUnsafe(
+              `UPDATE UserShareChat SET isSaved = ? WHERE id = ?`,
+              next,
+              existing[0].id
+            )
+          );
+          return NextResponse.json({ success: true, isSaved: next === 1 });
+        }
+
+        await executeWithRetry(() =>
+          prisma.$executeRawUnsafe(
+            `INSERT INTO UserShareChat (
+              userId, catalogChatId, title, subtitle, inviteLink, language, memberCount, isSaved, source, createdAt
+            ) VALUES (?, NULL, ?, ?, ?, ?, 0, 1, 'custom', ${sqlNow()})`,
+            user.id,
+            titleIn || parserKey || 'Chat',
+            parserKey ? `parser:${parserKey}` : null,
+            inviteLink,
+            body.language === 'uk' ? 'uk' : 'ru'
+          )
+        );
+        return NextResponse.json({ success: true, isSaved: true });
+      }
+
       if (!Number.isFinite(catalogChatId)) {
         return NextResponse.json({ error: 'catalogChatId required' }, { status: 400 });
       }
