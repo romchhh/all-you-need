@@ -9,7 +9,7 @@ import {
   Info,
   Loader2,
   Plus,
-  Mail,
+  Bookmark,
   ChevronRight,
   ChevronLeft,
   Share2,
@@ -197,10 +197,17 @@ export function DistributeListingModal({
   }, [chats, cityFilter]);
 
   const visibleChats = useMemo(() => {
-    if (groupsTab === 'mine') {
-      return chats.filter((c) => c.isSaved || c.isCustom);
-    }
-    return chats.filter((c) => !c.isCustom);
+    const list =
+      groupsTab === 'mine'
+        ? chats.filter((c) => c.isSaved || c.isCustom)
+        : chats.filter((c) => !c.isCustom);
+    // Збережені — завжди зверху
+    return [...list].sort((a, b) => {
+      const as = a.isSaved || a.isCustom ? 1 : 0;
+      const bs = b.isSaved || b.isCustom ? 1 : 0;
+      if (as !== bs) return bs - as;
+      return (b.relevance || 0) - (a.relevance || 0);
+    });
   }, [chats, groupsTab]);
 
   const copyText = async () => {
@@ -315,11 +322,16 @@ export function DistributeListingModal({
       return;
     }
     tg?.HapticFeedback?.impactOccurred('light');
+    // Публічний t.me/username → ?text= (як шаблон продавцю).
+    // Invite (+/joinchat) параметр text не підтримує → clipboard + відкрити чат.
+    // Нативне «Переслати» (shareMessage) — окрема кнопка вище: не прив’язана до конкретної групи.
     const result = openShareGroupChat(item.inviteLink, chatText, tg);
-    if (result.mode === 'invite') {
-      await copyText();
-      showToast(t('distribute.openedInviteCopied'), 'info');
+    if (result.mode === 'prefill') {
+      showToast(t('distribute.openedWithText'), 'success');
+      return;
     }
+    await copyText();
+    showToast(t('distribute.openedInviteCopied'), 'info');
   };
 
   const addCustomChat = async () => {
@@ -635,17 +647,24 @@ export function DistributeListingModal({
                           onClick={(e) => void toggleSaved(chat, e)}
                           className={`p-2 rounded-full shrink-0 relative z-[1] ${
                             chat.isSaved
-                              ? isLight
-                                ? 'bg-[#3F5331]/15 text-[#3F5331]'
-                                : 'bg-[#C8E6A0]/20 text-[#C8E6A0]'
+                              ? 'bg-[#C8E6A0]/25 text-[#7CB342]'
                               : isLight
-                                ? 'text-gray-400'
-                                : 'text-white/35'
+                                ? 'text-gray-400 hover:text-gray-600'
+                                : 'text-white/35 hover:text-white/60'
                           }`}
                           aria-label={t('distribute.saveChat')}
                         >
-                          <Mail size={18} />
+                          <Bookmark
+                            size={18}
+                            className={chat.isSaved ? 'fill-[#7CB342] text-[#7CB342]' : undefined}
+                            strokeWidth={chat.isSaved ? 2.25 : 2}
+                          />
                         </button>
+                        <ChevronRight
+                          size={18}
+                          className={`shrink-0 ${isLight ? 'text-gray-400' : 'text-white/35'}`}
+                          aria-hidden
+                        />
                       </div>
                     </li>
                   ))}
