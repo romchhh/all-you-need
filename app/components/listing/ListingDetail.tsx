@@ -1483,10 +1483,13 @@ export const ListingDetail = ({
       </div>
 
 
-      {/* Нижня панель з кнопкою — ближче до меню, з невеликим відступом */}
+      {/* Нижня панель з кнопкою — ховаємо під час поширення, щоб не накладалось */}
       <div
-        className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] left-0 right-0 z-[50] mx-auto max-w-2xl space-y-3 px-4 py-2 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8"
-        style={{ pointerEvents: 'auto' }}
+        className={`fixed bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] left-0 right-0 z-[50] mx-auto max-w-2xl space-y-3 px-4 py-2 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8 ${
+          showDistributeModal ? 'invisible pointer-events-none' : ''
+        }`}
+        style={{ pointerEvents: showDistributeModal ? 'none' : 'auto' }}
+        aria-hidden={showDistributeModal}
       >
         {isGuestBrowserView && (
           <div
@@ -1569,10 +1572,7 @@ export const ListingDetail = ({
       ) : null}
 
       {canDistributeOwnListing && !showDistributeModal && distributeResumeReady ? (
-        <div
-          className="fixed left-0 right-0 z-[1050] px-4"
-          style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' }}
-        >
+        <div className="fixed left-0 right-0 z-[60] px-4 pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom,0px)+11.5rem)' }}>
           <button
             type="button"
             onClick={() => {
@@ -1580,7 +1580,7 @@ export const ListingDetail = ({
               setDistributeResumeReady(false);
               tg?.HapticFeedback?.impactOccurred('light');
             }}
-            className={`mx-auto flex w-full max-w-lg items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-bold shadow-lg ${listingDistributeCtaClass}`}
+            className={`pointer-events-auto mx-auto flex w-full max-w-lg items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold shadow-lg ${listingDistributeCtaClass}`}
           >
             <Send size={18} />
             {t('distribute.resumeCta')}
