@@ -201,8 +201,10 @@ async def _publish_one(bot, channel_key: str, chat_id: int) -> None:
     row = by_id[picked.id]
     title = str(_row_get(row, "title") or "")
     description = str(_row_get(row, "description") or "")
-    cover = _marketplace_cover_path(row, picked.id)
-    photo = [cover]
+    photos = listing_image_paths(_row_get(row, "images"))
+    if not photos:
+        cover = _marketplace_cover_path(row, picked.id)
+        photos = [cover] if cover else []
 
     item = marketplace_listing_to_channel_item(
         row,
@@ -214,7 +216,7 @@ async def _publish_one(bot, channel_key: str, chat_id: int) -> None:
         item,
         picked.id,
         description,
-        photo,
+        photos,
         marketplace_listing_id=picked.id,
         force_channel_ids=[chat_id],
     )

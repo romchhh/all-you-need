@@ -1,7 +1,7 @@
 import { X, Upload, Image as ImageIcon, ChevronDown, MapPin, Sparkles, Wrench, Info, User, Briefcase } from 'lucide-react';
 import { TelegramWebApp } from '@/types/telegram';
 import { Category } from '@/types';
-import { useState, useRef, useEffect, useMemo, type CSSProperties } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { getCategories } from '@/constants/categories';
 import { germanCities, fetchGermanCitiesFromAPI } from '@/constants/german-cities';
@@ -26,11 +26,17 @@ import {
 import { useListingImageUpload } from '@/features/listing-form/hooks/useListingImageUpload';
 import { ListingFormPhotoGrid } from '@/features/listing-form/components/ListingFormPhotoGrid';
 import { BusinessBetaBadge } from '@/components/business/BusinessBetaBadge';
+import {
+  filesFromListingDraft,
+  type ListingDraft,
+} from '@/lib/listings/listingDrafts';
 
 interface CreateListingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (listingData: any) => void;
+  onPersistDraft?: (snapshot: Omit<ListingDraft, 'id' | 'updatedAt'>) => void | Promise<void>;
+  resumeDraft?: ListingDraft | null;
   tg: TelegramWebApp | null;
 }
 
@@ -38,6 +44,8 @@ export const CreateListingModal = ({
   isOpen,
   onClose,
   onSave,
+  onPersistDraft,
+  resumeDraft = null,
   tg
 }: CreateListingModalProps) => {
   const { t, language } = useLanguage();
@@ -47,10 +55,13 @@ export const CreateListingModal = ({
   useHideBottomNav(isOpen);
   useBodyScrollLock(isOpen);
   const { toast, showToast, hideToast } = useToast();
+  const restoredImages = useMemo(() => filesFromListingDraft(resumeDraft), [resumeDraft]);
   const imageUpload = useListingImageUpload({
     isOpen,
     maxPhotos: LISTING_MAX_PHOTOS,
     onMaxPhotos: () => showToast(t('createListing.maxPhotos'), 'error'),
+    initialPreviews: restoredImages.previews,
+    initialFiles: restoredImages.files,
   });
   const {
     images,
@@ -70,18 +81,20 @@ export const CreateListingModal = ({
     handleTouchEnd,
   } = imageUpload;
   const categories = getCategories(t);
-  const [autoRenew, setAutoRenew] = useState(false);
-  const [profileType, setProfileType] = useState<'personal' | 'business'>('personal');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState<'UAH' | 'EUR' | 'USD'>('EUR');
-  const [isFree, setIsFree] = useState(false);
-  const [isNegotiable, setIsNegotiable] = useState(false);
-  const [category, setCategory] = useState<string>('');
-  const [subcategory, setSubcategory] = useState<string>('');
-  const [location, setLocation] = useState('');
-  const [condition, setCondition] = useState<string>('new');
+  const [autoRenew, setAutoRenew] = useState(resumeDraft?.autoRenew ?? false);
+  const [profileType, setProfileType] = useState<'personal' | 'business'>(
+    resumeDraft?.profileType === 'business' ? 'business' : 'personal'
+  );
+  const [title, setTitle] = useState(resumeDraft?.title ?? '');
+  const [description, setDescription] = useState(resumeDraft?.description ?? '');
+  const [price, setPrice] = useState(resumeDraft?.price ?? '');
+  const [currency, setCurrency] = useState<'UAH' | 'EUR' | 'USD'>(resumeDraft?.currency ?? 'EUR');
+  const [isFree, setIsFree] = useState(resumeDraft?.isFree ?? false);
+  const [isNegotiable, setIsNegotiable] = useState(resumeDraft?.isNegotiable ?? false);
+  const [category, setCategory] = useState<string>(resumeDraft?.category ?? '');
+  const [subcategory, setSubcategory] = useState<string>(resumeDraft?.subcategory ?? '');
+  const [location, setLocation] = useState(resumeDraft?.location ?? '');
+  const [condition, setCondition] = useState<string>(resumeDraft?.condition || 'new');
   const [loading, setLoading] = useState(false);
   const [isConditionOpen, setIsConditionOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
@@ -95,6 +108,7 @@ export const CreateListingModal = ({
   const [currencyMenuPosition, setCurrencyMenuPosition] = useState({ top: 0, left: 0, width: 0 });
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [formScrollParent, setFormScrollParent] = useState<HTMLDivElement | null>(null);
+  const submittedRef = useRef(false);
 
   const rootOverlayStyle = useMemo(
     () =>
@@ -169,9 +183,10 @@ export const CreateListingModal = ({
       setProfileType('personal');
       return;
     }
+    if (resumeDraft) return;
 
     setProfileType(isBusinessActive ? defaultListingProfileType : 'personal');
-  }, [isOpen, isBusinessActive, defaultListingProfileType]);
+  }, [isOpen, isBusinessActive, defaultListingProfileType, resumeDraft]);
 
   // Автоматично встановлюємо isFree при виборі категорії "Безкоштовно"
   useEffect(() => {
@@ -533,6 +548,80 @@ export const CreateListingModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  const buildDraftSnapshot = useCallback((): Omit<ListingDraft, 'id' | 'updatedAt'> => {
+    const storedImages = imagePreviews
+      .map((preview, index) => {
+        if (!preview.startsWith('data:')) return null;
+        const file = images[index];
+        return {
+          name: file?.name || `photo-${index + 1}.jpg`,
+          type: file?.type || 'image/jpeg',
+          dataUrl: preview,
+        };
+      })
+      .filter((image): image is ListingDraft['images'][number] => Boolean(image));
+
+    return {
+      title,
+      description,
+      price,
+      currency,
+      isFree,
+      isNegotiable,
+      category,
+      subcategory,
+      location,
+      condition,
+      autoRenew,
+      profileType: isBusinessActive && profileType === 'business' ? 'business' : 'personal',
+      images: storedImages,
+    };
+  }, [
+    imagePreviews,
+    images,
+    title,
+    description,
+    price,
+    currency,
+    isFree,
+    isNegotiable,
+    category,
+    subcategory,
+    location,
+    condition,
+    autoRenew,
+    isBusinessActive,
+    profileType,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen || !onPersistDraft) return;
+    const save = () => {
+      if (submittedRef.current) return;
+      void onPersistDraft(buildDraftSnapshot());
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') save();
+    };
+    window.addEventListener('pagehide', save);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', save);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [isOpen, onPersistDraft, buildDraftSnapshot]);
+
+  const handleDismiss = async () => {
+    if (!submittedRef.current && onPersistDraft) {
+      try {
+        await onPersistDraft(buildDraftSnapshot());
+      } catch (error) {
+        console.error('[CreateListingModal] Failed to save draft', error);
+      }
+    }
+    onClose();
+  };
+
   const handleSave = async () => {
     if (!validate()) {
       showToast(t('createListing.fillAllFields'), 'error');
@@ -542,6 +631,14 @@ export const CreateListingModal = ({
 
     setLoading(true);
     try {
+      if (onPersistDraft) {
+        try {
+          await onPersistDraft(buildDraftSnapshot());
+        } catch (error) {
+          console.error('[CreateListingModal] Failed to save draft', error);
+        }
+      }
+      submittedRef.current = true;
       await onSave({
         title,
         description,
@@ -563,6 +660,7 @@ export const CreateListingModal = ({
       // Це буде зроблено в CreateListingFlow після завершення всього потоку
     } catch (error) {
       console.error('Error creating listing:', error);
+      submittedRef.current = false;
       showToast(t('createListing.errorCreating'), 'error');
       tg?.HapticFeedback.notificationOccurred('error');
     } finally {
@@ -1329,7 +1427,9 @@ export const CreateListingModal = ({
         >
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              void handleDismiss();
+            }}
             className={`flex-1 px-4 py-1.5 bg-transparent rounded-xl text-base font-semibold border transition-colors font-montserrat ${
               isLight
                 ? 'border-gray-300 text-gray-900 hover:bg-gray-100'

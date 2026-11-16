@@ -73,7 +73,7 @@ const ProfilePage = () => {
   const [selectedSeller, setSelectedSeller] = useState<{ telegramId: string; name: string; avatar: string; username?: string; phone?: string } | null>(null);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [, setIsEditModalOpen] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const previousListingRef = useRef<Listing | null>(null); // Зберігаємо картку товару перед відкриттям профілю продавця
   const scrollPositionKey = 'profileScrollPosition';
@@ -632,7 +632,6 @@ const ProfilePage = () => {
         {renderContent()}
       </div>
 
-      {!isEditModalOpen && !isCreateListingModalOpen && (
       <BottomNavigation
         activeTab="profile"
         openListingId={selectedListing?.id ?? null}
@@ -673,7 +672,6 @@ const ProfilePage = () => {
         favoritesCount={favorites.size}
         tg={tg}
       />
-      )}
 
       {profile && (
         <CreateListingFlow

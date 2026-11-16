@@ -556,7 +556,7 @@ def _resolve_services_channel_cover_path(
     marketplace_listing_id: int | None,
     marketplace_description: str | None,
 ) -> str | None:
-    """Тематична обкладинка як у маркетплейсі — завжди для каналів, не фото товару з оголошення."""
+    """Тематична обкладинка маркетплейсу — лише якщо немає фото з оголошення."""
     from parser.moderation.marketplace_cover import render_marketplace_cover
 
     title = str(item.get("title") or "").strip()
@@ -1004,13 +1004,17 @@ async def publish_services_listing_to_channel(
     keyboard_rows.append([InlineKeyboardButton(text=submit_btn, url=bot_link)])
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
 
-    del images_web  # у каналах лише тематична обкладинка маркетплейсу, не фото товару
-    photo_inputs = _services_channel_photo_inputs(
-        item,
-        listing_id=listing_id,
-        marketplace_listing_id=marketplace_listing_id,
-        marketplace_description=marketplace_description,
+    # Спочатку реальні фото оголошення; обкладинка — лише якщо фото немає.
+    photo_inputs = _channel_photo_inputs_from_images_web(
+        list(images_web) if images_web else []
     )
+    if not photo_inputs:
+        photo_inputs = _services_channel_photo_inputs(
+            item,
+            listing_id=listing_id,
+            marketplace_listing_id=marketplace_listing_id,
+            marketplace_description=marketplace_description,
+        )
 
     published: list[int] = []
     primary_post_url: str | None = None

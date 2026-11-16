@@ -445,6 +445,10 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
             patch("parser.moderation.channel_feed.remember_many", remember_many),
             patch("parser.moderation.channel_feed.save_rotation", save_rotation),
             patch("parser.moderation.channel_feed_store.remember_channel_publish", lambda **_kw: None),
+            patch(
+                "parser.moderation.services_publish.services_channel_quiet_hours_active",
+                return_value=False,
+            ),
             patch("utils.translations.get_user_language", return_value="uk"),
         ):
             await _publish_one(bot, "hamburg", -1003627644062)
@@ -481,7 +485,7 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(skipped, [])
         self.assertIn("Прибирання квартир", bot.calls[0]["caption"])
 
-    async def test_listing_photo_ignored_uses_marketplace_cover(self):
+    async def test_listing_photo_preferred_over_marketplace_cover(self):
         good = {
             "id": 8,
             "title": "Ремонт пралок",
@@ -520,7 +524,8 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
 
         skipped = []
         saved = {}
-        bot = _FakeBot(fail_urls=True)
+        # fail_urls=False — реальний URL фото має пройти як photo input
+        bot = _FakeBot(fail_urls=False)
         with (
             patch("parser.moderation.channel_feed.fetch_feed_rows", fetch),
             patch("parser.moderation.channel_feed.recent_title_keys", return_value=set()),
@@ -528,6 +533,10 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
             patch("parser.moderation.channel_feed.remember_many", lambda _k, items: skipped.extend(items)),
             patch("parser.moderation.channel_feed.save_rotation", lambda _k, **kw: saved.update(kw)),
             patch("parser.moderation.channel_feed_store.remember_channel_publish", lambda **_kw: None),
+            patch(
+                "parser.moderation.services_publish.services_channel_quiet_hours_active",
+                return_value=False,
+            ),
             patch("utils.translations.get_user_language", return_value="uk"),
         ):
             await _publish_one(bot, "hamburg", -1003627644062)
@@ -535,9 +544,8 @@ class PublishTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved["listing_id"], 8)
         self.assertEqual(saved["city_key"], "hamburg")
         self.assertEqual(len(bot.calls), 1)
-        cover = str(getattr(bot.calls[0]["photo"], "path", ""))
-        self.assertIn("allyouneed-marketplace-covers", cover)
-        self.assertIn("8-", Path(cover).name)
+        photo = bot.calls[0]["photo"]
+        self.assertEqual(photo, "https://example.com/product-photo.jpg")
 
 
 if __name__ == "__main__":

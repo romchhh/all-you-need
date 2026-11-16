@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { TelegramWebApp } from '@/types/telegram';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -10,12 +10,21 @@ import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { isEngineErrorMessage, toSafeListingUploadFile } from '@/utils/imageUtils';
 import { resolvePaymentTelegramId } from '@/utils/paymentTelegramId';
+import {
+  deleteListingDraft,
+  listingDraftHasContent,
+  listListingDrafts,
+  newListingDraftId,
+  saveListingDraft,
+  type ListingDraft,
+} from '@/lib/listings/listingDrafts';
 
 // Динамічні імпорти для оптимізації
 const ListingPackageModal = dynamic(() => import('@/components/modals/ListingPackageModal'), { ssr: false });
 const PromotionModal = dynamic(() => import('@/components/modals/PromotionModal'), { ssr: false });
 const CreateListingModal = dynamic(() => import('@/components/modals/CreateListingModal').then(mod => ({ default: mod.CreateListingModal })), { ssr: false });
 const PaymentSummaryModal = dynamic(() => import('@/components/modals/PaymentSummaryModal').then(mod => ({ default: mod.PaymentSummaryModal })), { ssr: false });
+const AddListingHub = dynamic(() => import('@/components/listing/AddListingHub').then(mod => ({ default: mod.AddListingHub })), { ssr: false });
 
 interface CreateListingFlowProps {
   isOpen: boolean;
@@ -25,7 +34,7 @@ interface CreateListingFlowProps {
   onSuccess?: () => void;
 }
 
-type Step = 'create_listing' | 'buy_package' | 'select_promotion' | 'payment_summary' | 'creating';
+type Step = 'hub' | 'create_listing' | 'buy_package' | 'select_promotion' | 'payment_summary' | 'creating';
 
 interface UserStatus {
   hasUsedFreeAd: boolean;
@@ -36,7 +45,7 @@ interface UserStatus {
 export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onSuccess }: CreateListingFlowProps) {
   const { t } = useLanguage();
   const { toast, showToast, hideToast } = useToast();
-  const [step, setStep] = useState<Step>('create_listing');
+  const [step, setStep] = useState<Step>('hub');
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
   const [createdListingId, setCreatedListingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,8 +55,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
   const [selectedPromotionType, setSelectedPromotionType] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'balance' | 'direct'>('balance');
   const [userBalance, setUserBalance] = useState<number>(0);
+  const [drafts, setDrafts] = useState<ListingDraft[]>([]);
+  const [draftsReady, setDraftsReady] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState<ListingDraft | null>(null);
+  const activeDraftIdRef = useRef<string | null>(null);
 
-  useHideBottomNav(isOpen);
+  useHideBottomNav(isOpen && step !== 'hub');
   useBodyScrollLock(isOpen);
 
   // Хелпер для отримання telegramId з різних джерел
@@ -57,21 +70,89 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
 
   // Блокуємо скрол при відкритті модального вікна
 
+  const reloadDrafts = useCallback(async () => {
+    const owner = resolvePaymentTelegramId(tg, telegramId || null);
+    if (!owner) {
+      setDrafts([]);
+      setDraftsReady(true);
+      return;
+    }
+    try {
+      const list = await listListingDrafts(owner);
+      setDrafts(list);
+    } catch (error) {
+      console.error('[CreateListingFlow] Failed to load drafts', error);
+      setDrafts([]);
+    } finally {
+      setDraftsReady(true);
+    }
+  }, [tg, telegramId]);
+
   useEffect(() => {
     if (isOpen) {
-      console.log('[CreateListingFlow] Modal opened, starting with create_listing form');
-      setStep('create_listing');
+      console.log('[CreateListingFlow] Modal opened, starting with hub');
+      setStep('hub');
+      setResumeDraft(null);
+      activeDraftIdRef.current = null;
+      setDraftsReady(false);
       setPendingListingData(null);
       pendingListingDataRef.current = null;
       setCreatedListingId(null);
     } else {
       console.log('[CreateListingFlow] Modal closed, resetting state');
-      setStep('create_listing');
+      setStep('hub');
+      setResumeDraft(null);
+      activeDraftIdRef.current = null;
       setPendingListingData(null);
       pendingListingDataRef.current = null;
       setCreatedListingId(null);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || step !== 'hub') return;
+    void reloadDrafts();
+  }, [isOpen, step, reloadDrafts]);
+
+  const forgetActiveDraft = useCallback(async () => {
+    const owner = resolvePaymentTelegramId(tg, telegramId || null);
+    const id = activeDraftIdRef.current;
+    activeDraftIdRef.current = null;
+    setResumeDraft(null);
+    if (!owner || !id) return;
+    try {
+      await deleteListingDraft(owner, id);
+    } catch (error) {
+      console.error('[CreateListingFlow] Failed to delete draft', error);
+    }
+  }, [tg, telegramId]);
+
+  const persistDraft = useCallback(
+    async (snapshot: Omit<ListingDraft, 'id' | 'updatedAt'>) => {
+      const owner = resolvePaymentTelegramId(tg, telegramId || null);
+      if (!owner) return;
+      if (!listingDraftHasContent(snapshot)) {
+        if (activeDraftIdRef.current) {
+          const id = activeDraftIdRef.current;
+          activeDraftIdRef.current = null;
+          await deleteListingDraft(owner, id);
+        }
+        return;
+      }
+      const id = activeDraftIdRef.current ?? newListingDraftId();
+      activeDraftIdRef.current = id;
+      await saveListingDraft(owner, { ...snapshot, id, updatedAt: Date.now() });
+    },
+    [tg, telegramId]
+  );
+
+  const backToHub = useCallback(() => {
+    setPendingListingData(null);
+    pendingListingDataRef.current = null;
+    setSelectedPromotionType(null);
+    setStep('hub');
+    void reloadDrafts();
+  }, [reloadDrafts]);
 
   const checkIfNeedPackage = async (): Promise<boolean> => {
     try {
@@ -286,6 +367,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
               if (now - createdAt < 5 * 60 * 1000) {
                 console.log('[CreateListingFlow] Found recently created listing:', latestListing.id);
                 showToast('Оголошення успішно створено!', 'success');
+                await forgetActiveDraft();
                 onSuccess?.();
                 onClose();
                 return;
@@ -356,6 +438,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
         // Показуємо повідомлення тільки якщо оплата завершена (не needsPayment)
         showToast(t('createListing.listingSentToModeration') || 'Оголошення відправлено на модерацію', 'success');
         tg?.HapticFeedback.notificationOccurred('success');
+        await forgetActiveDraft();
         onSuccess?.();
         onClose();
       } else {
@@ -365,6 +448,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
         
         showToast(t('createListing.listingSentToModeration') || 'Оголошення відправлено на модерацію', 'success');
         tg?.HapticFeedback.notificationOccurred('success');
+        await forgetActiveDraft();
         onSuccess?.();
         onClose();
       }
@@ -611,10 +695,40 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
         </div>
       )}
 
+      {step === 'hub' && (
+        <AddListingHub
+          drafts={drafts}
+          draftsReady={draftsReady}
+          tg={tg}
+          telegramId={getTelegramId()}
+          onClose={onClose}
+          onCreate={() => {
+            activeDraftIdRef.current = null;
+            setResumeDraft(null);
+            setStep('create_listing');
+          }}
+          onResume={(draft) => {
+            activeDraftIdRef.current = draft.id;
+            setResumeDraft(draft);
+            setStep('create_listing');
+          }}
+          onDelete={(id) => {
+            const owner = getTelegramId();
+            setDrafts((prev) => prev.filter((draft) => draft.id !== id));
+            if (activeDraftIdRef.current === id) activeDraftIdRef.current = null;
+            if (owner) {
+              void deleteListingDraft(owner, id).catch((error) => {
+                console.error('[CreateListingFlow] Failed to delete draft', error);
+              });
+            }
+          }}
+        />
+      )}
+
       {step === 'buy_package' && (
         <ListingPackageModal
           isOpen={true}
-          onClose={onClose}
+          onClose={backToHub}
           onSelectPackage={(packageType) => handlePackageSelect(packageType)}
           telegramId={getTelegramId() || undefined}
         />
@@ -622,9 +736,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
 
       {step === 'create_listing' && (
         <CreateListingModal
+          key={resumeDraft?.id ?? 'new'}
           isOpen={true}
-          onClose={onClose}
+          onClose={backToHub}
           onSave={handleCreateListing}
+          onPersistDraft={persistDraft}
+          resumeDraft={resumeDraft}
           tg={tg}
         />
       )}
@@ -633,12 +750,8 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
         <PromotionModal
           isOpen={true}
           onClose={() => {
-            // Якщо закриває через X - закриваємо весь флоу створення оголошення
-            console.log('[CreateListingFlow] PromotionModal closed via X - closing entire create listing flow');
-            setPendingListingData(null);
-            setSelectedPromotionType(null);
-            setStep('create_listing');
-            onClose();
+            console.log('[CreateListingFlow] PromotionModal closed — back to drafts');
+            backToHub();
           }}
           onSelectPromotion={handlePromotionSelect}
           listingId={null}
@@ -649,7 +762,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
       {step === 'payment_summary' && (
         <PaymentSummaryModal
           isOpen={true}
-          onClose={onClose}
+          onClose={backToHub}
           onConfirm={handlePaymentConfirm}
           packageType={selectedPackageType}
           promotionType={selectedPromotionType}

@@ -31,6 +31,9 @@ import {
 import { navigateToListingCategory } from '@/lib/listings/navigation';
 import { useTabReturnRestore } from '@/features/ui/hooks/useTabReturnRestore';
 import { useRoutePageLoader } from '@/hooks/useRoutePageLoader';
+import dynamic from 'next/dynamic';
+
+const CreateListingFlow = dynamic(() => import('@/components/listing/CreateListingFlow'), { ssr: false });
 
 const CategoriesPage = () => {
   const params = useParams();
@@ -143,6 +146,7 @@ const CategoriesPage = () => {
   const [listingsOffset, setListingsOffset] = useState(16);
   const [totalListings, setTotalListings] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
   const { tg } = useTelegram();
   
   // На мобільних — розгортаємо; на десктопі лишаємо вікно Telegram
@@ -1017,9 +1021,23 @@ const CategoriesPage = () => {
           setSelectedListing(null);
           setSelectedSeller(null);
         }}
+        onCreateListing={() => setIsCreateListingModalOpen(true)}
         favoritesCount={favorites.size}
         tg={tg}
       />
+
+      {profile && (
+        <CreateListingFlow
+          isOpen={isCreateListingModalOpen}
+          onClose={() => setIsCreateListingModalOpen(false)}
+          onSuccess={() => {
+            setIsCreateListingModalOpen(false);
+            showToast(t('createListing.listingCreated'), 'success');
+          }}
+          tg={tg}
+          telegramId={profile.telegramId}
+        />
+      )}
 
       <Toast
         message={toast.message}
