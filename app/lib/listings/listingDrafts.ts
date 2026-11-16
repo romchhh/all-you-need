@@ -1,4 +1,4 @@
-/** Локальні чернетки форми оголошення (IndexedDB), щоб продовжити після закриття. */
+/** Локальні чернетки форми оголошення. localStorage — запис синхронний, переживає закриття WebView. */
 
 export type ListingDraftImage = {
   name: string;
@@ -24,38 +24,54 @@ export type ListingDraft = {
   images: ListingDraftImage[];
 };
 
-const DB_NAME = 'ayn-listing-drafts';
-const STORE = 'drafts';
-const DB_VERSION = 1;
+const STORAGE_PREFIX = 'ayn-listing-drafts:v1:';
 const MAX_DRAFTS = 20;
-const MAX_IMAGE_CHARS = 1_800_000;
+const MAX_IMAGE_CHARS = 400_000;
+const memoryDrafts = new Map<string, ListingDraft[]>();
 
-type StoredDraft = ListingDraft & { ownerKey: string };
-
-function canUseIdb() {
-  return typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
+function storageKey(ownerKey: string) {
+  return `${STORAGE_PREFIX}${ownerKey}`;
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: 'id' });
+function canStore() {
+  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+}
+
+function readAll(ownerKey: string): ListingDraft[] {
+  if (!ownerKey) return [];
+  if (canStore()) {
+    try {
+      const raw = localStorage.getItem(storageKey(ownerKey));
+      if (raw) {
+        const parsed = JSON.parse(raw) as ListingDraft[];
+        if (Array.isArray(parsed)) {
+          const rows = parsed.filter((row) => row && typeof row.id === 'string');
+          memoryDrafts.set(ownerKey, rows);
+          return rows;
+        }
       }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+    } catch {
+      /* лишаємо пам'ять сесії */
+    }
+  }
+  return memoryDrafts.get(ownerKey) ?? [];
 }
 
-function txDone(tx: IDBTransaction) {
-  return new Promise<void>((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
+function writeAll(ownerKey: string, drafts: ListingDraft[]) {
+  memoryDrafts.set(ownerKey, drafts);
+  if (!canStore()) return;
+  const payload = JSON.stringify(drafts);
+  try {
+    localStorage.setItem(storageKey(ownerKey), payload);
+  } catch {
+    const slim = drafts.map((draft) => ({ ...draft, images: [] as ListingDraftImage[] }));
+    memoryDrafts.set(ownerKey, slim);
+    try {
+      localStorage.setItem(storageKey(ownerKey), JSON.stringify(slim));
+    } catch {
+      /* лишається в пам'яті сесії */
+    }
+  }
 }
 
 export function newListingDraftId() {
@@ -122,74 +138,26 @@ function trimImages(images: ListingDraftImage[]): ListingDraftImage[] {
 }
 
 export async function listListingDrafts(ownerKey: string): Promise<ListingDraft[]> {
-  if (!canUseIdb() || !ownerKey) return [];
-  const db = await openDb();
-  try {
-    const tx = db.transaction(STORE, 'readonly');
-    const store = tx.objectStore(STORE);
-    const all = await new Promise<StoredDraft[]>((resolve, reject) => {
-      const req = store.getAll();
-      req.onsuccess = () => resolve((req.result as StoredDraft[]) || []);
-      req.onerror = () => reject(req.error);
-    });
-    await txDone(tx);
-    return all
-      .filter((row) => row.ownerKey === ownerKey)
-      .map(({ ownerKey: _owner, ...draft }) => draft)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
-  } finally {
-    db.close();
-  }
+  return readAll(ownerKey).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function saveListingDraft(ownerKey: string, draft: ListingDraft): Promise<void> {
-  if (!canUseIdb() || !ownerKey) return;
-  const record: StoredDraft = {
+  if (!ownerKey) return;
+  const record: ListingDraft = {
     ...draft,
     images: trimImages(draft.images),
-    ownerKey,
   };
-  const db = await openDb();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      const req = store.getAll();
-      req.onsuccess = () => {
-        const existing = (req.result as StoredDraft[]) || [];
-        store.put(record);
-        const mine = existing
-          .filter((row) => row.ownerKey === ownerKey && row.id !== record.id)
-          .concat(record)
-          .sort((a, b) => b.updatedAt - a.updatedAt);
-        for (const extra of mine.slice(MAX_DRAFTS)) store.delete(extra.id);
-      };
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-  } finally {
-    db.close();
-  }
+  const existing = readAll(ownerKey).filter((row) => row.id !== record.id);
+  const next = [record, ...existing]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_DRAFTS);
+  writeAll(ownerKey, next);
 }
 
 export async function deleteListingDraft(ownerKey: string, id: string): Promise<void> {
-  if (!canUseIdb() || !ownerKey || !id) return;
-  const db = await openDb();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      const req = store.get(id);
-      req.onsuccess = () => {
-        const existing = req.result as StoredDraft | undefined;
-        if (existing && existing.ownerKey === ownerKey) store.delete(id);
-      };
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-  } finally {
-    db.close();
-  }
+  if (!ownerKey || !id) return;
+  writeAll(
+    ownerKey,
+    readAll(ownerKey).filter((row) => row.id !== id)
+  );
 }

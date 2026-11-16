@@ -68,15 +68,12 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
     return resolvePaymentTelegramId(tg, telegramId || null);
   };
 
+  const draftOwner = (): string => getTelegramId() || 'device';
+
   // Блокуємо скрол при відкритті модального вікна
 
   const reloadDrafts = useCallback(async () => {
-    const owner = resolvePaymentTelegramId(tg, telegramId || null);
-    if (!owner) {
-      setDrafts([]);
-      setDraftsReady(true);
-      return;
-    }
+    const owner = resolvePaymentTelegramId(tg, telegramId || null) || 'device';
     try {
       const list = await listListingDrafts(owner);
       setDrafts(list);
@@ -115,7 +112,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
   }, [isOpen, step, reloadDrafts]);
 
   const forgetActiveDraft = useCallback(async () => {
-    const owner = resolvePaymentTelegramId(tg, telegramId || null);
+    const owner = resolvePaymentTelegramId(tg, telegramId || null) || 'device';
     const id = activeDraftIdRef.current;
     activeDraftIdRef.current = null;
     setResumeDraft(null);
@@ -129,8 +126,7 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
 
   const persistDraft = useCallback(
     async (snapshot: Omit<ListingDraft, 'id' | 'updatedAt'>) => {
-      const owner = resolvePaymentTelegramId(tg, telegramId || null);
-      if (!owner) return;
+      const owner = resolvePaymentTelegramId(tg, telegramId || null) || 'device';
       if (!listingDraftHasContent(snapshot)) {
         if (activeDraftIdRef.current) {
           const id = activeDraftIdRef.current;
@@ -713,14 +709,11 @@ export default function CreateListingFlow({ isOpen, onClose, tg, telegramId, onS
             setStep('create_listing');
           }}
           onDelete={(id) => {
-            const owner = getTelegramId();
             setDrafts((prev) => prev.filter((draft) => draft.id !== id));
             if (activeDraftIdRef.current === id) activeDraftIdRef.current = null;
-            if (owner) {
-              void deleteListingDraft(owner, id).catch((error) => {
-                console.error('[CreateListingFlow] Failed to delete draft', error);
-              });
-            }
+            void deleteListingDraft(draftOwner(), id).catch((error) => {
+              console.error('[CreateListingFlow] Failed to delete draft', error);
+            });
           }}
         />
       )}

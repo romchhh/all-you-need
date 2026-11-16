@@ -6,6 +6,7 @@ import { ImageIcon, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getAppearanceClasses } from '@/utils/appearanceClasses';
+import { FIXED_LOGO_SPACER_CLASS } from '@/components/layout/FixedLogoHeader';
 import { getCurrencySymbol } from '@/utils/currency';
 import type { ListingDraft } from '@/lib/listings/listingDrafts';
 import type { TelegramWebApp } from '@/types/telegram';
@@ -93,20 +94,19 @@ export function AddListingHub({
         className={`fixed inset-0 z-[900] flex flex-col font-montserrat ${pageBg}`}
         style={{ paddingBottom: 'calc(4.75rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        <div className="flex shrink-0 items-center justify-end px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <button
-            type="button"
-            onClick={onClose}
-            className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-              isLight ? 'text-gray-500 hover:bg-black/5' : 'text-white/70 hover:bg-white/10'
-            }`}
-            aria-label={t('common.close')}
-          >
-            <X size={22} />
-          </button>
-        </div>
-
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
+          <div className={`${FIXED_LOGO_SPACER_CLASS} relative`}>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`absolute bottom-1 right-0 flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                isLight ? 'text-gray-500 hover:bg-black/5' : 'text-white/70 hover:bg-white/10'
+              }`}
+              aria-label={t('common.close')}
+            >
+              <X size={22} />
+            </button>
+          </div>
           {!draftsReady ? (
             <div className="flex h-40 items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#C8E6A0] border-t-transparent" />

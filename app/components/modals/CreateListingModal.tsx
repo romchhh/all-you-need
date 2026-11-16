@@ -594,22 +594,40 @@ export const CreateListingModal = ({
     profileType,
   ]);
 
+  const persistRef = useRef(onPersistDraft);
+  persistRef.current = onPersistDraft;
+  const snapshotRef = useRef(buildDraftSnapshot);
+  snapshotRef.current = buildDraftSnapshot;
+
   useEffect(() => {
     if (!isOpen || !onPersistDraft) return;
     const save = () => {
       if (submittedRef.current) return;
-      void onPersistDraft(buildDraftSnapshot());
+      const persist = persistRef.current;
+      if (!persist) return;
+      void persist(snapshotRef.current());
     };
+    const timer = window.setTimeout(save, 350);
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') save();
     };
     window.addEventListener('pagehide', save);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener('pagehide', save);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [isOpen, onPersistDraft, buildDraftSnapshot]);
+
+  useEffect(() => {
+    return () => {
+      if (submittedRef.current) return;
+      const persist = persistRef.current;
+      if (!persist) return;
+      void persist(snapshotRef.current());
+    };
+  }, []);
 
   const handleDismiss = async () => {
     if (!submittedRef.current && onPersistDraft) {
