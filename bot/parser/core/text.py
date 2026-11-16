@@ -26,20 +26,63 @@ def detect_lang(text: str) -> str:
     return "uk" if uk >= ru else "ru"
 
 
+def detect_currency_from_text(
+    text: str,
+    *,
+    price_hint: str | None = None,
+    fallback: str | None = "EUR",
+) -> str | None:
+    """
+    Валюта з тексту важливіша за дефолт EUR від AI.
+    «950 грн» / «Вартість … 950 грн» → UAH навіть якщо модель повернула EUR.
+    """
+    t = text or ""
+    if not t.strip():
+        return fallback
+
+    if price_hint:
+        num = re.sub(r"[^\d.,]", "", str(price_hint)).replace(",", ".")
+        if num:
+            num_pat = re.escape(num).replace(r"\.", r"[.,]")
+            near = re.search(
+                rf"(?<!\d){num_pat}\s*(?:грн\b|uah\b|€|eur\b|euro\b|євро|евро|\$|usd\b)"
+                rf"|(?:грн\b|uah\b|€|eur\b|euro\b|євро|евро|\$|usd\b)\s*{num_pat}(?!\d)",
+                t,
+                re.IGNORECASE,
+            )
+            if near:
+                w = near.group(0)
+                if re.search(r"грн|uah", w, re.IGNORECASE):
+                    return "UAH"
+                if re.search(r"\$|usd", w, re.IGNORECASE):
+                    return "USD"
+                return "EUR"
+
+    for m in PRICE_RE.finditer(t):
+        window = t[max(0, m.start() - 2) : m.end() + 12]
+        if re.search(r"грн|uah", window, re.IGNORECASE):
+            return "UAH"
+        if re.search(r"\$|usd", window, re.IGNORECASE):
+            return "USD"
+        if re.search(r"[€]|eur\b|euro|євро|евро", window, re.IGNORECASE):
+            return "EUR"
+
+    if re.search(r"\d[\d\s]*(?:[.,]\d+)?\s*(?:грн|uah)\b", t, re.IGNORECASE):
+        return "UAH"
+    if re.search(r"(?:\$|usd)\s*\d|\d[\d\s]*(?:[.,]\d+)?\s*(?:\$|usd)\b", t, re.IGNORECASE):
+        return "USD"
+    if re.search(r"(?:[€]|eur\b|euro|євро|евро)\s*\d|\d[\d\s]*(?:[.,]\d+)?\s*(?:[€]|eur\b|euro|євро|евро)", t, re.IGNORECASE):
+        return "EUR"
+    return fallback
+
+
 def parse_price(text: str) -> tuple[Optional[str], Optional[str], bool]:
     """Повертає (price_str, currency, is_free)."""
     m = PRICE_RE.search(text)
     if m:
         raw = (m.group(1) or m.group(2) or m.group(3) or "").strip().replace(" ", "").replace(",", ".")
         if raw:
-            window = text[max(0, m.start() - 2): m.end() + 8]
-            if re.search(r"грн|uah", window, re.IGNORECASE):
-                currency = "UAH"
-            elif re.search(r"\$|usd", window, re.IGNORECASE):
-                currency = "USD"
-            else:
-                currency = "EUR"
-            return raw, currency, False
+            return raw, detect_currency_from_text(text, price_hint=raw, fallback="EUR"), False
 
     lower = text.lower()
     if re.search(r"договір|договор|торг\b|по домовленост", lower):

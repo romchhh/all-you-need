@@ -44,6 +44,15 @@ const PROMOTION_PRICES: Record<string, number> = {
   vip: 4.5,
 };
 
+type PromotionQuote = {
+  basePrice: number;
+  price: number;
+  discounted: boolean;
+  discountPercent: number | null;
+  kind: 'paid' | 'credit';
+  creditType?: 'highlight' | 'top';
+};
+
 function normalizeBalance(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -68,6 +77,8 @@ export const PaymentSummaryModal = ({
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [promotionQuote, setPromotionQuote] = useState<PromotionQuote | null>(null);
+  const [promotionQuoteLoading, setPromotionQuoteLoading] = useState(false);
 
   useHideBottomNav(isOpen);
   useBodyScrollLock(isOpen);
@@ -80,7 +91,11 @@ export const PaymentSummaryModal = ({
   const effectiveBalance = fetchedBalance ?? normalizeBalance(userBalance);
 
   const packagePrice = packageType ? PACKAGE_PRICES[packageType] || 0 : 0;
-  const promotionPrice = promotionType ? PROMOTION_PRICES[promotionType] || 0 : 0;
+  const promotionBasePrice = promotionType ? PROMOTION_PRICES[promotionType] || 0 : 0;
+  const promotionPrice =
+    promotionType && promotionQuote
+      ? promotionQuote.price
+      : promotionBasePrice;
   const businessPrice = businessPlan ? BUSINESS_PLAN_PRICES[businessPlan] || 0 : 0;
   const totalPrice = packagePrice + promotionPrice + businessPrice;
   const canPayWithBalance = totalPrice <= 0 ? true : effectiveBalance >= totalPrice;
@@ -91,6 +106,8 @@ export const PaymentSummaryModal = ({
       setBalanceLoading(false);
       setConfirming(false);
       setConfirmError(null);
+      setPromotionQuote(null);
+      setPromotionQuoteLoading(false);
       return;
     }
 
@@ -129,6 +146,38 @@ export const PaymentSummaryModal = ({
       window.clearTimeout(timeoutId);
     };
   }, [isOpen, paymentTelegramId]);
+
+  useEffect(() => {
+    if (!isOpen || !promotionType || !paymentTelegramId) {
+      setPromotionQuote(null);
+      setPromotionQuoteLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPromotionQuoteLoading(true);
+    const params = new URLSearchParams({
+      quote: '1',
+      telegramId: paymentTelegramId,
+      promotionType,
+    });
+    fetch(`/api/listings/promotions?${params}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.quote) return;
+        setPromotionQuote(data.quote as PromotionQuote);
+      })
+      .catch((error) => {
+        if (!cancelled) console.error('[PaymentSummaryModal] promotion quote:', error);
+      })
+      .finally(() => {
+        if (!cancelled) setPromotionQuoteLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, promotionType, paymentTelegramId]);
 
   useEffect(() => {
     if (!isOpen || balanceLoading) return;
@@ -268,12 +317,42 @@ export const PaymentSummaryModal = ({
               )}
 
               {promotionType && (
-                <div className="flex justify-between items-center">
-                  <span className={rowMuted}>
-                    {t('payment.promotion') || 'Просування'}: {getPromotionName(promotionType)}
-                  </span>
-                  <span className={rowStrong}>{promotionPrice} €</span>
-                </div>
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className={rowMuted}>
+                      {t('payment.promotion') || 'Просування'}: {getPromotionName(promotionType)}
+                    </span>
+                    <span className={rowStrong}>
+                      {promotionQuoteLoading && !promotionQuote ? '…' : `${promotionBasePrice.toFixed(2)} €`}
+                    </span>
+                  </div>
+                  {promotionQuote?.kind === 'credit' && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className={rowMuted}>{t('payment.businessCredit')}</span>
+                      <span className={`font-semibold ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>
+                        {t('payment.includedInPlan')}
+                      </span>
+                    </div>
+                  )}
+                  {promotionQuote?.discounted && promotionQuote.discountPercent != null && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className={rowMuted}>
+                        {t('payment.subscriptionDiscount', {
+                          percent: String(promotionQuote.discountPercent),
+                        })}
+                      </span>
+                      <span className={`font-semibold ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>
+                        −{promotionQuote.discountPercent}%
+                      </span>
+                    </div>
+                  )}
+                  {promotionQuote && (promotionQuote.discounted || promotionQuote.kind === 'credit') && (
+                    <div className="flex justify-between items-center">
+                      <span className={rowMuted}>{t('payment.promotionAfterDiscount')}</span>
+                      <span className={rowStrong}>{promotionPrice.toFixed(2)} €</span>
+                    </div>
+                  )}
+                </>
               )}
 
               {businessPlan && (
@@ -294,7 +373,7 @@ export const PaymentSummaryModal = ({
               <div className={divider}>
                 <div className="flex justify-between items-center">
                   <span className={totalLabel}>{t('payment.total') || 'Всього'}</span>
-                  <span className={accentMoney}>{totalPrice} €</span>
+                  <span className={accentMoney}>{totalPrice.toFixed(2)} €</span>
                 </div>
               </div>
             </div>

@@ -937,7 +937,11 @@
     "payDirect": "Оплатить сейчас",
     "payDirectDesc": "Через Monobank",
     "insufficientBalance": "Недостаточно средств",
-    "confirm": "Подтвердить оплату"
+    "confirm": "Подтвердить оплату",
+    "subscriptionDiscount": "Скидка подписки ({percent}%)",
+    "promotionAfterDiscount": "Продвижение со скидкой",
+    "businessCredit": "По тарифу Business",
+    "includedInPlan": "Включено в тариф"
   },
   "payments": {
     "processing": "Обработка платежа...",

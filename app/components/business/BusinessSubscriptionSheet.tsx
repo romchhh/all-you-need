@@ -71,7 +71,6 @@ export function BusinessSubscriptionSheet({
   const planCredits = BUSINESS_PLAN_MONTHLY_CREDITS[planId];
   const highlightRemaining = businessProfile.highlightCreditsRemaining ?? 0;
   const topRemaining = businessProfile.topCreditsRemaining ?? 0;
-  const promoDiscount = isPro ? 20 : 10;
   const renewalDate = businessProfile.subscriptionEndsAt
     ? formatSubscriptionDate(businessProfile.subscriptionEndsAt, language)
     : null;
@@ -79,6 +78,7 @@ export function BusinessSubscriptionSheet({
     ? new Date(businessProfile.subscriptionEndsAt).getTime()
     : NaN;
   const proEnded = Number.isFinite(subscriptionEndsMs) && subscriptionEndsMs <= Date.now();
+  const promoDiscount = isPro && !proEnded ? 20 : 10;
   const autoRenew = businessProfile.subscriptionAutoRenew ?? true;
   const showPaymentBlocks = isPro || Boolean(businessProfile.hasProPaymentHistory);
 

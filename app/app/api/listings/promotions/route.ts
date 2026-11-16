@@ -86,15 +86,12 @@ export async function POST(request: NextRequest) {
       let effectivePrice: number = promotionInfo.price;
       let usedBusinessCredit = false;
 
-      if (
-        parsedListingId &&
-        (promotionType === 'highlighted' || promotionType === 'top_category' || promotionType === 'vip')
-      ) {
+      if (promotionType === 'highlighted' || promotionType === 'top_category' || promotionType === 'vip') {
         const businessPricing = await resolveBusinessPromotionPricing(
           user.id,
           promotionType as 'highlighted' | 'top_category' | 'vip'
         );
-        if (businessPricing?.kind === 'credit') {
+        if (businessPricing?.kind === 'credit' && parsedListingId) {
           const consumed = await consumeBusinessPromotionCredit(user.id, businessPricing.creditType);
           if (consumed) {
             effectivePrice = 0;
@@ -154,11 +151,21 @@ export async function POST(request: NextRequest) {
       };
       const promotionName = promotionNames[promotionType] || promotionType;
 
+      let directAmount = promotionInfo.price;
+      if (promotionType === 'highlighted' || promotionType === 'top_category' || promotionType === 'vip') {
+        const businessPricing = await resolveBusinessPromotionPricing(
+          user.id,
+          promotionType as 'highlighted' | 'top_category' | 'vip'
+        );
+        if (businessPricing?.kind === 'paid') {
+          directAmount = businessPricing.price;
+        }
+      }
+
       try {
-        // Створюємо інвойс напряму
         const invoiceData = await createMonobankInvoice({
           telegramId: telegramIdRaw,
-          amount: promotionInfo.price,
+          amount: directAmount,
           type: 'promotion',
           promotionType,
           listingId: parsedListingId,
@@ -190,7 +197,7 @@ export async function POST(request: NextRequest) {
           success: true,
           paymentRequired: true,
           invoiceId,
-          amount: promotionInfo.price,
+          amount: directAmount,
           pageUrl,
         });
       } catch (error) {
@@ -220,7 +227,55 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const listingId = searchParams.get('listingId');
-    
+    const telegramIdRaw = searchParams.get('telegramId');
+    const promotionTypeRaw = searchParams.get('promotionType');
+    const wantsQuote = searchParams.get('quote') === '1';
+
+    if (wantsQuote && telegramIdRaw && promotionTypeRaw && isValidPromotionType(promotionTypeRaw)) {
+      const telegramId = parseTelegramId(telegramIdRaw);
+      const user = await findUserByTelegramId(telegramId);
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+      const basePrice = PROMOTION_PRICES[promotionTypeRaw as PromotionType].price;
+      const businessPricing = await resolveBusinessPromotionPricing(
+        user.id,
+        promotionTypeRaw as 'highlighted' | 'top_category' | 'vip'
+      );
+      if (!businessPricing) {
+        return NextResponse.json({
+          quote: {
+            basePrice,
+            price: basePrice,
+            discounted: false,
+            discountPercent: null,
+            kind: 'paid' as const,
+          },
+        });
+      }
+      if (businessPricing.kind === 'credit') {
+        return NextResponse.json({
+          quote: {
+            basePrice: businessPricing.basePrice,
+            price: 0,
+            discounted: false,
+            discountPercent: null,
+            kind: 'credit' as const,
+            creditType: businessPricing.creditType,
+          },
+        });
+      }
+      return NextResponse.json({
+        quote: {
+          basePrice: businessPricing.basePrice,
+          price: businessPricing.price,
+          discounted: businessPricing.discounted,
+          discountPercent: businessPricing.discountPercent,
+          kind: 'paid' as const,
+        },
+      });
+    }
+
     // Якщо передано listingId, повертаємо активні реклами для цього оголошення
     if (listingId) {
       const { prisma } = await import('@/lib/prisma');

@@ -146,18 +146,12 @@ def _normalize_price_fields(
     Без числової ціни — «Договорная».
     """
     from parser.core.patterns import PRICE_RE, is_clear_free_giveaway
+    from parser.core.text import detect_currency_from_text
 
     price_s = str(price_raw or "").strip()
     currency = (str(currency_raw or "").strip().upper() or None)
     if currency not in ("EUR", "USD", "UAH"):
-        currency = "EUR" if price_s else None
-
-    def _currency_from_window(window: str, fallback: str | None = "EUR") -> str:
-        if re.search(r"грн|uah", window, re.IGNORECASE):
-            return "UAH"
-        if re.search(r"\$|usd", window, re.IGNORECASE):
-            return "USD"
-        return fallback or "EUR"
+        currency = None
 
     def _from_numeric(raw: str, cur: str | None) -> tuple[Optional[str], Optional[str], bool] | None:
         cleaned = raw.replace(" ", "").replace(",", ".")
@@ -172,7 +166,13 @@ def _normalize_price_fields(
                 return None
         except ValueError:
             return None
-        return num, cur or "EUR", False
+        # Текст з «грн» перебиває дефолт EUR від AI
+        resolved = detect_currency_from_text(
+            text_hint or "",
+            price_hint=num,
+            fallback=cur or "EUR",
+        )
+        return num, resolved or cur or "EUR", False
 
     # 1) Числова ціна від AI — ніколи не Free
     if price_s and price_s.lower() not in NEGOTIABLE_PRICES and "free" not in price_s.lower():
@@ -180,13 +180,12 @@ def _normalize_price_fields(
         if got:
             return got
 
-    # 2) Ціна з тексту («за 200€») — важливіше за слово «отдам»
+    # 2) Ціна з тексту («за 200€» / «950 грн») — важливіше за слово «отдам»
     pm = PRICE_RE.search(text_hint or "")
     if pm:
         raw = (pm.group(1) or pm.group(2) or pm.group(3) or "").strip()
         if raw:
-            window = (text_hint or "")[max(0, pm.start() - 2): pm.end() + 8]
-            got = _from_numeric(raw, _currency_from_window(window, currency))
+            got = _from_numeric(raw, currency)
             if got:
                 return got
 
@@ -303,7 +302,8 @@ Rules:
    «Отдам … за 200€» → price="200", is_free=false (NOT free).
 5. is_free — true ONLY if clearly free with NO price (бесплатно/даром/«віддам диван»).
    «отдам/віддам за N€» is a SALE → is_free=false. Services without price → is_free=false.
-6. currency — EUR by default; UAH only if грн is explicit.
+6. currency — UAH if text has грн/UAH next to the price; USD if $; else EUR.
+   NEVER return EUR when the post says «950 грн» / «грн» for that price.
 {location_rule}
 8. condition — "new" or "used" for goods; for services_work ALWAYS "new".
 

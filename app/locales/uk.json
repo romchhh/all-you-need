@@ -942,7 +942,11 @@
     "payDirect": "Оплатити зараз",
     "payDirectDesc": "Через Monobank",
     "insufficientBalance": "Недостатньо коштів",
-    "confirm": "Підтвердити оплату"
+    "confirm": "Підтвердити оплату",
+    "subscriptionDiscount": "Знижка підписки ({percent}%)",
+    "promotionAfterDiscount": "Просування зі знижкою",
+    "businessCredit": "За тарифом Business",
+    "includedInPlan": "Включено в тариф"
   },
   "payments": {
     "processing": "Обробка платежу...",

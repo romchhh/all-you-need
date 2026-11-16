@@ -759,8 +759,14 @@ const BUSINESS_EXTRA_PROMOTION_DISCOUNT: Record<BusinessPlanId, number> = {
 };
 
 export type BusinessPromotionPricing =
-  | { kind: 'credit'; creditType: 'highlight' | 'top'; price: 0 }
-  | { kind: 'paid'; price: number; discounted: boolean };
+  | { kind: 'credit'; creditType: 'highlight' | 'top'; price: 0; basePrice: number }
+  | {
+      kind: 'paid';
+      price: number;
+      basePrice: number;
+      discounted: boolean;
+      discountPercent: number | null;
+    };
 
 /** Ціна просування з урахуванням Business-кредитів або знижки тарифу. */
 export async function resolveBusinessPromotionPricing(
@@ -776,20 +782,28 @@ export async function resolveBusinessPromotionPricing(
   if (!profile || !isBusinessProfileActive(profile)) return null;
 
   if (promotionType === 'highlighted' && profile.highlightCreditsRemaining > 0) {
-    return { kind: 'credit', creditType: 'highlight', price: 0 };
+    return { kind: 'credit', creditType: 'highlight', price: 0, basePrice };
   }
   if (promotionType === 'top_category' && profile.topCreditsRemaining > 0) {
-    return { kind: 'credit', creditType: 'top', price: 0 };
+    return { kind: 'credit', creditType: 'top', price: 0, basePrice };
   }
 
-  const plan = profile.plan;
-  if (plan && plan in BUSINESS_EXTRA_PROMOTION_DISCOUNT) {
-    const discount = BUSINESS_EXTRA_PROMOTION_DISCOUNT[plan as BusinessPlanId];
+  const plan = (profile.plan || 'business').toLowerCase() as BusinessPlanId;
+  if (plan in BUSINESS_EXTRA_PROMOTION_DISCOUNT) {
+    const discount = BUSINESS_EXTRA_PROMOTION_DISCOUNT[plan];
     const price = Math.round(basePrice * (1 - discount) * 100) / 100;
-    return { kind: 'paid', price, discounted: true };
+    if (price < basePrice) {
+      return {
+        kind: 'paid',
+        price,
+        basePrice,
+        discounted: true,
+        discountPercent: Math.round(discount * 100),
+      };
+    }
   }
 
-  return { kind: 'paid', price: basePrice, discounted: false };
+  return { kind: 'paid', price: basePrice, basePrice, discounted: false, discountPercent: null };
 }
 
 export async function consumeBusinessPromotionCredit(

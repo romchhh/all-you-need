@@ -200,6 +200,26 @@ class ParserSmokeTests(unittest.TestCase):
         strong = detect_strong_item_category(raw)
         self.assertEqual(strong, ("fashion", "women_clothing"))
 
+    def test_uah_from_text_overrides_ai_eur(self):
+        from parser.ai.enrich import _normalize_price_fields
+        from parser.core.text import detect_currency_from_text, parse_price
+
+        raw = (
+            "фізичні хвороби в тілі Вартість консультації 950 грн "
+            "(оплата після консультації). Мій Інстаграм з більш детальною інформацією."
+        )
+        self.assertEqual(detect_currency_from_text(raw, price_hint="950"), "UAH")
+        price, currency, is_free = parse_price(raw)
+        self.assertEqual(price, "950")
+        self.assertEqual(currency, "UAH")
+        self.assertFalse(is_free)
+
+        # AI часто повертає EUR за замовчуванням — текст має перебити
+        n_price, n_cur, n_free = _normalize_price_fields("950", "EUR", False, raw)
+        self.assertEqual(n_price, "950")
+        self.assertEqual(n_cur, "UAH")
+        self.assertFalse(n_free)
+
     def test_broken_phone_title_loses_to_brand_title(self):
         from parser.ai.screen import _pick_best_title, _title_quality_score
 

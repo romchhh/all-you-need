@@ -300,7 +300,7 @@ CATEGORY MAP (memorize):
 
 PRICE / LOCATION / CONDITION:
 - price: numeric string "5500" or null; if no price in post → null (stored as negotiable/Договорная)
-- currency EUR unless грн explicit
+- currency: UAH if грн/UAH next to price; USD if $; else EUR. Never EUR for «950 грн»
 - is_free: true ONLY if clearly free with NO price (бесплатно/даром/«віддам диван»).
   «отдам/віддам за 200€» → price="200", is_free=false (sale, NOT free)
 - {location_hint}
@@ -317,7 +317,7 @@ Respond with JSON only:
   "category": "string",
   "subcategory": "string or null",
   "price": "string or null",
-  "currency": "EUR or null",
+  "currency": "EUR|USD|UAH|null",
   "is_free": false,
   "location": "string",
   "condition": "new|used|null",
