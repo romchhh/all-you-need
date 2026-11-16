@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'invalid_input' }, { status: 400 });
       }
 
+      const savedFlag = await userShareChatSavedValue(true);
       await executeWithRetry(() =>
         prisma.$executeRawUnsafe(
           `INSERT INTO UserShareChat (
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
           title,
           inviteLink,
           language,
-          await userShareChatSavedValue(true)
+          savedFlag
         )
       );
 
