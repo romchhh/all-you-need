@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
       };
       const promotionName = promotionNames[promotionType] || promotionType;
 
-      let directAmount = promotionInfo.price;
+      let directAmount: number = promotionInfo.price;
       if (promotionType === 'highlighted' || promotionType === 'top_category' || promotionType === 'vip') {
         const businessPricing = await resolveBusinessPromotionPricing(
           user.id,
