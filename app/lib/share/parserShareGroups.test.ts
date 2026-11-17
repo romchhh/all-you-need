@@ -9,6 +9,28 @@ describe('parserShareGroups', () => {
     expect(groups.some((g) => g.parserKey === 'secondhand_hh')).toBe(true);
   });
 
+  it('keeps service groups out of a goods category', () => {
+    const list = listParserShareGroupsForListing({
+      listingCityFold: '',
+      listingCategory: 'auto',
+      categoryFilter: 'auto',
+      cityFilter: '__all__',
+    });
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.every((g) => g.kind === 'goods')).toBe(true);
+  });
+
+  it('returns only service groups for services', () => {
+    const list = listParserShareGroupsForListing({
+      listingCityFold: '',
+      listingCategory: 'services_work',
+      categoryFilter: 'services_work',
+      cityFilter: '__all__',
+    });
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.every((g) => g.kind === 'services')).toBe(true);
+  });
+
   it('prioritizes listing city Hamburg', () => {
     const list = listParserShareGroupsForListing({
       listingCityFold: foldCityKey('Hamburg'),

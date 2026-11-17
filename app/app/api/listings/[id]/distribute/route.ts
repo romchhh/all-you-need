@@ -57,28 +57,67 @@ async function fetchGroupLines(
   return groupLines;
 }
 
+function selectedAbsolutePhotos(stored: string[], requested: unknown): string[] {
+  const byKey = new Map<string, string>();
+  for (const raw of stored) {
+    const abs = absoluteImageUrl(raw);
+    if (!abs) continue;
+    byKey.set(raw, abs);
+    byKey.set(abs, abs);
+  }
+  if (!Array.isArray(requested)) {
+    return [...new Set(byKey.values())].slice(0, 10);
+  }
+  const out: string[] = [];
+  for (const item of requested) {
+    const abs = byKey.get(String(item));
+    if (abs && !out.includes(abs)) out.push(abs);
+  }
+  return out.slice(0, 10);
+}
+
 async function sendPhotoCaption(
   chatId: number | string,
-  photoUrl: string,
+  photoUrls: string[],
   caption: string
 ): Promise<boolean> {
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  if (!BOT_TOKEN || !photoUrl) {
+  const photos = photoUrls.filter(Boolean).slice(0, 10);
+  if (!BOT_TOKEN || photos.length === 0) {
     return sendTelegramMessage(chatId, caption, { disable_web_page_preview: true });
   }
   try {
-    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+    if (photos.length === 1) {
+      const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          photo: photos[0],
+          caption: caption.slice(0, 1024),
+          parse_mode: 'HTML',
+        }),
+      });
+      if (!response.ok) {
+        return sendTelegramMessage(chatId, caption, { disable_web_page_preview: true });
+      }
+      return true;
+    }
+
+    const media = photos.map((url, index) => ({
+      type: 'photo',
+      media: url,
+      ...(index === 0
+        ? { caption: caption.slice(0, 1024), parse_mode: 'HTML' }
+        : {}),
+    }));
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        photo: photoUrl,
-        caption: caption.slice(0, 1024),
-        parse_mode: 'HTML',
-      }),
+      body: JSON.stringify({ chat_id: chatId, media }),
     });
     if (!response.ok) {
-      return sendTelegramMessage(chatId, caption, { disable_web_page_preview: true });
+      return sendPhotoCaption(chatId, [photos[0]], caption);
     }
     return true;
   } catch {
@@ -142,7 +181,7 @@ export async function POST(
     } catch {
       images = [];
     }
-    const photoUrl = images[0] ? absoluteImageUrl(images[0]) : '';
+    const photoUrls = selectedAbsolutePhotos(images, body.photoPaths);
 
     const lang = body.lang === 'ru' ? 'ru' : 'uk';
     const hasGroups =
@@ -166,7 +205,7 @@ export async function POST(
 
     const listingPayload = `<pre>${chatText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>${forwardHint}`;
 
-    const okListing = await sendPhotoCaption(telegramId, photoUrl, listingPayload);
+    const okListing = await sendPhotoCaption(telegramId, photoUrls, listingPayload);
     if (!okListing) {
       return NextResponse.json({ error: 'telegram_failed' }, { status: 502 });
     }

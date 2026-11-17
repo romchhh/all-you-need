@@ -9,8 +9,17 @@ import { sqlNow } from '@/lib/dbSql';
 
 export const dynamic = 'force-dynamic';
 
+function savedFlagOn(flag: boolean | number | string | null | undefined): boolean {
+  return flag === true || flag === 1 || flag === '1' || flag === 't' || flag === 'true';
+}
+
 function normalizeInvite(link: string): string {
-  return link.trim().replace(/\/+$/, '').toLowerCase();
+  return link
+    .trim()
+    .replace(/\/+$/, '')
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '');
 }
 
 export async function GET(request: NextRequest) {
@@ -34,8 +43,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'user_not_found' }, { status: 404 });
     }
 
-    let listingCity = city || '';
-    let listingCategory = category || '';
+    let listingCity = '';
+    let listingCategory = '';
 
     if (listingId && Number.isFinite(listingId)) {
       const rows = (await executeWithRetry(() =>
@@ -46,8 +55,8 @@ export async function GET(request: NextRequest) {
         )
       )) as Array<{ location: string; category: string }>;
       if (rows[0]) {
-        listingCity = listingCity || listingCityKeyFromLocation(rows[0].location || '');
-        listingCategory = listingCategory || rows[0].category || '';
+        listingCity = listingCityKeyFromLocation(rows[0].location || '');
+        listingCategory = rows[0].category || '';
       }
     }
 
@@ -124,8 +133,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (existing) {
-          const currentlyOn =
-            existing.isSaved === true || existing.isSaved === 1 || existing.isSaved === '1';
+          const currentlyOn = savedFlagOn(existing.isSaved);
           const nextOn = !currentlyOn;
           await executeWithRetry(() =>
             prisma.$executeRawUnsafe(
@@ -166,10 +174,7 @@ export async function POST(request: NextRequest) {
       )) as Array<{ id: number; isSaved: boolean | number | string }>;
 
       if (existing[0]) {
-        const currentlyOn =
-          existing[0].isSaved === true ||
-          existing[0].isSaved === 1 ||
-          existing[0].isSaved === '1';
+        const currentlyOn = savedFlagOn(existing[0].isSaved);
         const nextOn = !currentlyOn;
         await executeWithRetry(() =>
           prisma.$executeRawUnsafe(

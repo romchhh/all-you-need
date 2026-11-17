@@ -18,6 +18,9 @@ describe('buildDefaultChatListingText', () => {
     );
     expect(text).toContain('BMW 3');
     expect(text).toContain('14900');
-    expect(text).toContain('listing_42');
+    expect(text).toContain('startapp=listing_42');
+    expect(text).toContain('Оголошення TradeGround Marketplace');
+    expect(text).not.toContain('Посилання для чату');
+    expect(text).not.toContain('start=listing_42');
   });
 });

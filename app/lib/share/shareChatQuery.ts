@@ -4,13 +4,19 @@ import { ensureShareChatTables } from '@/lib/share/shareChatTables';
 import { sqlBooleanIsTrue } from '@/lib/dbSql';
 import {
   listParserShareGroupsForListing,
+  shareChatMatchesCategory,
   stableParserChatId,
 } from '@/lib/share/parserShareGroups';
 import { extractPublicTelegramUsername } from '@/lib/share/openShareGroup';
 import { enrichShareChatsWithTelegramMeta } from '@/lib/share/telegramChatMeta';
 
 function normalizeInviteKey(link: string): string {
-  return link.trim().replace(/\/+$/, '').toLowerCase();
+  return link
+    .trim()
+    .replace(/\/+$/, '')
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '');
 }
 
 export type ShareChatItem = {
@@ -61,9 +67,9 @@ export async function listShareChatsForListing(params: {
   try {
     custom = (await executeWithRetry(() =>
       prisma.$queryRawUnsafe(
-        `SELECT id, title, subtitle, inviteLink, language, memberCount, catalogChatId, source
+        `SELECT id, title, subtitle, inviteLink, language, memberCount, catalogChatId, source, isSaved
          FROM UserShareChat
-         WHERE userId = ? AND ${sqlBooleanIsTrue('isSaved')}
+         WHERE userId = ?
          ORDER BY id DESC`,
         params.userId
       )
@@ -72,12 +78,21 @@ export async function listShareChatsForListing(params: {
     console.error('[shareChatQuery] UserShareChat', err);
   }
 
+  const savedParserKeys = new Set<string>();
+  custom = custom.filter((row) => {
+    const flag = row.isSaved;
+    return flag === true || flag === 1 || flag === '1' || flag === 't' || flag === 'true';
+  });
+
   for (const row of custom) {
     const invite = row.inviteLink ? String(row.inviteLink) : '';
     if (invite) {
       savedInviteLinks.add(invite.toLowerCase());
       savedInviteLinks.add(normalizeInviteKey(invite));
     }
+    const subtitle = row.subtitle ? String(row.subtitle) : '';
+    const parserMark = subtitle.match(/^parser:(.+)$/i);
+    if (parserMark?.[1]) savedParserKeys.add(parserMark[1].trim().toLowerCase());
   }
 
   const parserRows = listParserShareGroupsForListing({
@@ -110,7 +125,8 @@ export async function listShareChatsForListing(params: {
       inviteLink: g.inviteLink,
       isSaved: Boolean(
         (link && savedInviteLinks.has(link)) ||
-          (linkNorm && savedInviteLinks.has(linkNorm))
+          (linkNorm && savedInviteLinks.has(linkNorm)) ||
+          savedParserKeys.has(g.parserKey.trim().toLowerCase())
       ),
       isCustom: false,
       parserKey: g.parserKey,
@@ -144,7 +160,7 @@ export async function listShareChatsForListing(params: {
     const inviteLink = row.inviteLink ? String(row.inviteLink) : null;
 
     if (langWant && language !== langWant) continue;
-    if (catWant && categorySlug && categorySlug !== catWant) continue;
+    if (!shareChatMatchesCategory(categorySlug, null, catWant)) continue;
     if (cityWant && cityKey && foldCityKey(cityKey) !== cityWant) {
       continue;
     }

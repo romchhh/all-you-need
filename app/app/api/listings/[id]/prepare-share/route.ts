@@ -68,7 +68,18 @@ export async function POST(
     } catch {
       images = [];
     }
-    const photoUrl = images[0] ? absoluteImageUrl(images[0]) : '';
+    const requested = Array.isArray(body.photoPaths) ? body.photoPaths.map((v: unknown) => String(v)) : null;
+    const allowed = new Map<string, string>();
+    for (const raw of images) {
+      const abs = absoluteImageUrl(raw);
+      if (!abs) continue;
+      allowed.set(raw, abs);
+      allowed.set(abs, abs);
+    }
+    const picked =
+      requested?.map((path: string) => allowed.get(path)).find((url: string | undefined): url is string => Boolean(url)) ||
+      '';
+    const photoUrl = picked || (images[0] ? absoluteImageUrl(images[0]) : '');
     const caption = chatText.slice(0, 1024);
     const resultId = `dist_${listingId}_${Date.now()}`;
 

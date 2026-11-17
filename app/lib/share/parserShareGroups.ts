@@ -31,6 +31,38 @@ export function stableParserChatId(parserKey: string): number {
   return 8_000_000 + (h % 1_000_000);
 }
 
+const SERVICE_CATEGORY_IDS = new Set([
+  'services_work',
+  'beauty_services',
+  'other_services',
+  'beauty_wellness',
+  'beauty_health',
+]);
+
+/** Чи група відповідає фільтру категорії маркетплейсу. */
+export function shareChatMatchesCategory(
+  categorySlug: string | null | undefined,
+  kind: 'goods' | 'services' | null | undefined,
+  catWant: string | null
+): boolean {
+  if (!catWant || catWant === 'all') return true;
+  if (categorySlug && categorySlug === catWant) return true;
+
+  const slug = (categorySlug || '').toLowerCase();
+  const isServiceGroup =
+    kind === 'services' || slug === 'beauty_services' || slug === 'other_services';
+  const wantBeauty =
+    catWant === 'beauty_wellness' ||
+    catWant === 'beauty_health' ||
+    catWant === 'beauty_services';
+  const wantService =
+    wantBeauty || SERVICE_CATEGORY_IDS.has(catWant) || /service|beauty/.test(catWant);
+
+  if (wantBeauty) return slug === 'beauty_services';
+  if (wantService) return isServiceGroup;
+  return !isServiceGroup;
+}
+
 function listingLooksLikeService(listingCategory: string): boolean {
   const c = (listingCategory || '').toLowerCase();
   return (
@@ -67,7 +99,7 @@ export function listParserShareGroupsForListing(params: {
   for (const g of PARSER_GROUPS) {
     const cityFold = foldCityKey(g.city);
 
-    if (catWant && g.categorySlug && g.categorySlug !== catWant) {
+    if (!shareChatMatchesCategory(g.categorySlug, g.kind, catWant)) {
       continue;
     }
 
@@ -94,9 +126,8 @@ export function listParserShareGroupsForListing(params: {
 
   scored.sort((a, b) => b.relevance - a.relevance || a.title.localeCompare(b.title));
 
-  if (scored.length === 0 && cityWant) {
+  if (scored.length === 0 && cityWant && !catWant) {
     for (const g of PARSER_GROUPS) {
-      if (catWant && g.categorySlug && g.categorySlug !== catWant) continue;
       scored.push({
         ...g,
         relevance: foldCityKey(g.city) === cityWant ? 50 : 0,
@@ -104,14 +135,6 @@ export function listParserShareGroupsForListing(params: {
       });
     }
     scored.sort((a, b) => b.relevance - a.relevance || a.title.localeCompare(b.title));
-  }
-
-  if (scored.length === 0) {
-    return PARSER_GROUPS.map((g) => ({
-      ...g,
-      relevance: 0,
-      memberCount: 0,
-    }));
   }
 
   return scored;

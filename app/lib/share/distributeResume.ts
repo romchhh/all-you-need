@@ -2,6 +2,8 @@ export type DistributeResumeState = {
   listingId: number;
   step: 1 | 2;
   chatText: string;
+  includeListingLink?: boolean;
+  photoPaths?: string[];
   groupsTab: 'recommended' | 'mine';
   cityFilter: string;
   categoryFilter: string;

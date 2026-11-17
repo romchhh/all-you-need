@@ -21,9 +21,42 @@ function trimDescription(desc: string, max = 900): string {
   return `${body.slice(0, max - 1)}…`;
 }
 
+export function marketplaceLinkLabel(lang: 'uk' | 'ru'): string {
+  return lang === 'ru'
+    ? 'Объявление TradeGround Marketplace'
+    : 'Оголошення TradeGround Marketplace';
+}
+
+/** Одна посилання: підпис + URL картки в маркетплейсі. */
+export function marketplaceLinkBlock(listingId: number, lang: 'uk' | 'ru'): string {
+  return `🔗 ${marketplaceLinkLabel(lang)}\n${getListingMiniAppLink(listingId)}`;
+}
+
+export function withoutMarketplaceLink(text: string, listingId: number, lang: 'uk' | 'ru'): string {
+  const url = getListingMiniAppLink(listingId);
+  const share = getListingShareLink(listingId);
+  const label = marketplaceLinkLabel(lang);
+  return text
+    .split(marketplaceLinkBlock(listingId, lang)).join('')
+    .split(url).join('')
+    .split(share).join('')
+    .split(`🔗 ${label}`).join('')
+    .replace(/\n*🔗\s*(?:Витрина|Вітрина):\s*/g, '')
+    .replace(/\n*📎\s*(?:Ссылка для чата|Посилання для чату):\s*/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+export function withMarketplaceLink(text: string, listingId: number, lang: 'uk' | 'ru'): string {
+  const body = withoutMarketplaceLink(text, listingId, lang);
+  const block = marketplaceLinkBlock(listingId, lang);
+  return body ? `${body}\n\n${block}` : block;
+}
+
 export function buildDefaultChatListingText(
   listing: ChatListingDraftInput,
-  lang: 'uk' | 'ru'
+  lang: 'uk' | 'ru',
+  options?: { includeLink?: boolean }
 ): string {
   const priceLine = listing.isFree
     ? listing.freeLabel
@@ -33,32 +66,17 @@ export function buildDefaultChatListingText(
       ? listing.negotiableLabel
       : `${listing.price}${getCurrencySymbol((listing.currency as 'EUR' | 'USD' | 'UAH' | undefined) || 'EUR')}`;
 
-  const link = getListingShareLink(listing.id);
-  const mini = getListingMiniAppLink(listing.id);
-
   const desc = trimDescription(listing.description);
-
-  if (lang === 'ru') {
-    return [
-      `📦 ${listing.title.trim()}`,
-      `💶 ${priceLine}`,
-      `📍 ${listing.location.trim() || 'Германия'}`,
-      desc ? `\n${desc}` : '',
-      `\n🔗 Витрина: ${mini}`,
-      `📎 Ссылка для чата: ${link}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  return [
+  const locationFallback = lang === 'ru' ? 'Германия' : 'Німеччина';
+  const body = [
     `📦 ${listing.title.trim()}`,
     `💶 ${priceLine}`,
-    `📍 ${listing.location.trim() || 'Німеччина'}`,
+    `📍 ${listing.location.trim() || locationFallback}`,
     desc ? `\n${desc}` : '',
-    `\n🔗 Вітрина: ${mini}`,
-    `📎 Посилання для чату: ${link}`,
   ]
     .filter(Boolean)
     .join('\n');
+
+  if (options?.includeLink === false) return body;
+  return withMarketplaceLink(body, listing.id, lang);
 }

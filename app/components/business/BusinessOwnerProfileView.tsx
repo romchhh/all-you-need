@@ -360,24 +360,24 @@ export function BusinessOwnerProfileView({
         </div>
 
         <div className="p-3">
-          <button type="button" onClick={onPromoteListings} className={`${ui.btnSolid} mb-3 w-full`}>
+          <button type="button" onClick={onPromoteListings} className={`${ui.btnSolid} w-full`}>
             <Rocket size={18} />
             {t('businessProfile.owner.promoteListings')}
           </button>
-
-          <div className="space-y-3">{renderListings()}</div>
-
-          {hasMoreListings && onLoadMore && (
-            <button
-              type="button"
-              onClick={onLoadMore}
-              className={`mt-3 flex w-full items-center justify-center gap-1 py-2 text-sm font-semibold ${ui.limeText}`}
-            >
-              {t('businessProfile.owner.allListings')} →
-            </button>
-          )}
         </div>
       </div>
+
+      <div>{renderListings()}</div>
+
+      {hasMoreListings && onLoadMore && (
+        <button
+          type="button"
+          onClick={onLoadMore}
+          className={`flex w-full items-center justify-center gap-1 py-2 text-sm font-semibold ${ui.limeText}`}
+        >
+          {t('businessProfile.owner.allListings')} →
+        </button>
+      )}
     </div>
   );
 }

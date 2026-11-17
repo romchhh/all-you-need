@@ -6,14 +6,15 @@ import {
   X,
   Send,
   Copy,
-  Info,
   Loader2,
   Plus,
-  Bookmark,
+  Mail,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Share2,
   Users,
+  Trash2,
 } from 'lucide-react';
 import { formatMemberCount } from '@/lib/share/formatMemberCount';
 import { Listing } from '@/types';
@@ -22,8 +23,12 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useBodyScrollLock } from '@/features/ui/hooks/useBodyScrollLock';
 import { useHideBottomNav } from '@/features/ui/hooks/useHideBottomNav';
-import { buildDefaultChatListingText } from '@/lib/share/buildChatListingText';
-import { resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
+import {
+  buildDefaultChatListingText,
+  withMarketplaceLink,
+  withoutMarketplaceLink,
+} from '@/lib/share/buildChatListingText';
+import { buildListingImageUrl, resolveListingCardImageUrl } from '@/lib/listings/imageUrl';
 import { CachedListingImage } from '@/components/listing/CachedListingImage';
 import { getCurrencySymbol } from '@/utils/currency';
 import type { ShareChatItem } from '@/lib/share/shareChatQuery';
@@ -77,6 +82,8 @@ export function DistributeListingModal({
 
   const [step, setStep] = useState<1 | 2>(1);
   const [chatText, setChatText] = useState('');
+  const [includeListingLink, setIncludeListingLink] = useState(true);
+  const [photoPaths, setPhotoPaths] = useState<string[]>([]);
   const [loadingChats, setLoadingChats] = useState(false);
   const [chats, setChats] = useState<ShareChatItem[]>([]);
   const [groupsTab, setGroupsTab] = useState<GroupsTab>('recommended');
@@ -85,6 +92,7 @@ export function DistributeListingModal({
   const [sending, setSending] = useState(false);
   const [sharingNative, setSharingNative] = useState(false);
   const [showAddChat, setShowAddChat] = useState(false);
+  const [otherWaysOpen, setOtherWaysOpen] = useState(false);
   const [newChatTitle, setNewChatTitle] = useState('');
   const [newChatLink, setNewChatLink] = useState('');
   const [hydrated, setHydrated] = useState(false);
@@ -95,6 +103,15 @@ export function DistributeListingModal({
   }, []);
 
   const imageUrl = useMemo(() => resolveListingCardImageUrl(listing), [listing]);
+  const listingPhotoPaths = useMemo(() => {
+    const raw =
+      listing.images && listing.images.length > 0
+        ? listing.images.filter(Boolean)
+        : listing.image
+          ? [listing.image]
+          : [];
+    return raw.filter((path) => Boolean(buildListingImageUrl(path)));
+  }, [listing]);
   const shareMessageReady = canUseShareMessage(tg);
 
   const defaultText = useMemo(
@@ -125,19 +142,27 @@ export function DistributeListingModal({
     if (resume) {
       setStep(resume.step);
       setChatText(resume.chatText || defaultText);
+      setIncludeListingLink(resume.includeListingLink !== false);
+      setPhotoPaths(
+        Array.isArray(resume.photoPaths)
+          ? resume.photoPaths.filter((path) => listingPhotoPaths.includes(path))
+          : listingPhotoPaths
+      );
       setGroupsTab(resume.groupsTab || 'recommended');
       setCityFilter(resume.cityFilter || '');
       setCategoryFilter(resume.categoryFilter || 'all');
     } else {
       setStep(1);
       setChatText(defaultText);
+      setIncludeListingLink(true);
+      setPhotoPaths(listingPhotoPaths);
       setGroupsTab('recommended');
       setCategoryFilter('all');
       setCityFilter('');
     }
     setShowAddChat(false);
     setHydrated(true);
-  }, [isOpen, listing.id, defaultText]);
+  }, [isOpen, listing.id, defaultText, listingPhotoPaths]);
 
   const persistResume = useCallback(
     (nextStep: 1 | 2 = step) => {
@@ -145,12 +170,14 @@ export function DistributeListingModal({
         listingId: listing.id,
         step: nextStep,
         chatText,
+        includeListingLink,
+        photoPaths,
         groupsTab,
         cityFilter,
         categoryFilter,
       });
     },
-    [listing.id, step, chatText, groupsTab, cityFilter, categoryFilter]
+    [listing.id, step, chatText, includeListingLink, photoPaths, groupsTab, cityFilter, categoryFilter]
   );
 
   const loadChats = useCallback(async () => {
@@ -172,7 +199,8 @@ export function DistributeListingModal({
       if (
         groupsTab === 'recommended' &&
         (!cityFilter || cityFilter === '') &&
-        data.defaults?.city
+        data.defaults?.city &&
+        data.defaults.city !== '__all__'
       ) {
         setCityFilter(data.defaults.city);
       }
@@ -212,6 +240,33 @@ export function DistributeListingModal({
     });
   }, [chats, groupsTab]);
 
+  const movePhoto = (index: number, dir: -1 | 1) => {
+    setPhotoPaths((prev) => {
+      const next = [...prev];
+      const target = index + dir;
+      if (target < 0 || target >= next.length) return prev;
+      const [item] = next.splice(index, 1);
+      next.splice(target, 0, item);
+      return next;
+    });
+    tg?.HapticFeedback?.selectionChanged();
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotoPaths((prev) => prev.filter((_, i) => i !== index));
+    tg?.HapticFeedback?.impactOccurred('light');
+  };
+
+  const toggleListingLink = (on: boolean) => {
+    setIncludeListingLink(on);
+    setChatText((prev) =>
+      on
+        ? withMarketplaceLink(prev, listing.id, lang)
+        : withoutMarketplaceLink(prev, listing.id, lang)
+    );
+    tg?.HapticFeedback?.selectionChanged();
+  };
+
   const copyText = async () => {
     try {
       await navigator.clipboard.writeText(chatText);
@@ -242,6 +297,7 @@ export function DistributeListingModal({
           customChatIds: [],
           parserGroupKeys: [],
           lang,
+          photoPaths,
         }),
       });
       const data = await res.json();
@@ -266,7 +322,7 @@ export function DistributeListingModal({
       const res = await fetch(`/api/listings/${listing.id}/prepare-share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telegramId, chatText }),
+        body: JSON.stringify({ telegramId, chatText, photoPaths }),
       });
       const data = await res.json();
       if (!res.ok || !data.preparedMessageId) {
@@ -343,39 +399,6 @@ export function DistributeListingModal({
     }
     tg?.HapticFeedback?.impactOccurred('light');
 
-    // Найкраще, що дозволяє Telegram Mini App: PreparedInlineMessage (фото + опис)
-    // → нативний діалог «Надіслати». Користувач обирає цю групу і жме Send.
-    // Пряму «заготовку forward саме в цей чат» API не дає.
-    if (shareMessageReady && chatText.trim()) {
-      setSharingNative(true);
-      try {
-        const res = await fetch(`/api/listings/${listing.id}/prepare-share`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId, chatText }),
-        });
-        const data = await res.json();
-        if (res.ok && data.preparedMessageId && tg?.shareMessage) {
-          showToast(
-            t('distribute.pickGroupInShare', { name: item.title }),
-            'info'
-          );
-          tg.shareMessage(String(data.preparedMessageId), (sent) => {
-            if (sent) {
-              showToast(t('distribute.shareNativeSent'), 'success');
-              tg.HapticFeedback?.notificationOccurred('success');
-            }
-          });
-          return;
-        }
-      } catch {
-        /* fallback нижче */
-      } finally {
-        setSharingNative(false);
-      }
-    }
-
-    // Fallback: публічний @username → ?text= ; інакше clipboard + invite
     const result = openShareGroupChat(item.inviteLink, chatText, tg);
     if (result.mode === 'prefill') {
       showToast(t('distribute.openedWithText'), 'success');
@@ -440,6 +463,9 @@ export function DistributeListingModal({
   const inputCls = isLight
     ? 'bg-white border-gray-200 text-gray-900'
     : 'bg-black/40 border-white/15 text-white';
+  const fieldCls = isLight
+    ? 'bg-white border-gray-300 text-gray-900 caret-gray-900 placeholder:text-gray-400'
+    : 'bg-[#2a2a2a] border-white/30 text-white caret-white placeholder:text-white/50';
   const footerBg = isLight ? 'bg-white border-gray-200' : 'bg-[#0d0d0d] border-white/10';
 
   const modal = (
@@ -510,6 +536,58 @@ export function DistributeListingModal({
 
         {step === 1 ? (
           <div className="overflow-y-auto flex-1 px-4 py-3 space-y-3 min-h-0">
+            {photoPaths.length > 0 ? (
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide opacity-70">
+                  {t('distribute.photosTitle')}
+                </label>
+                <p className={`text-[11px] mt-1 ${muted}`}>{t('distribute.photosHint')}</p>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {photoPaths.map((path, index) => {
+                    const src = buildListingImageUrl(path);
+                    return (
+                      <div key={`${path}-${index}`} className="relative w-[4.5rem] shrink-0">
+                        <div className="h-[4.5rem] w-[4.5rem] overflow-hidden rounded-xl bg-black/20">
+                          {src ? (
+                            <CachedListingImage src={src} alt="" className="h-full w-full object-cover" />
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(index)}
+                          className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white"
+                          aria-label={t('common.delete')}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                        {photoPaths.length > 1 ? (
+                          <div className="mt-1 flex justify-between">
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={() => movePhoto(index, -1)}
+                              className="flex h-6 w-6 items-center justify-center rounded-md disabled:opacity-30"
+                              aria-label={t('common.back')}
+                            >
+                              <ChevronLeft size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === photoPaths.length - 1}
+                              onClick={() => movePhoto(index, 1)}
+                              className="flex h-6 w-6 items-center justify-center rounded-md disabled:opacity-30"
+                              aria-label={t('distribute.continue')}
+                            >
+                              <ChevronRight size={14} />
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide opacity-70">
                 {t('distribute.editText')}
@@ -524,44 +602,52 @@ export function DistributeListingModal({
             />
             <button
               type="button"
-              onClick={() => void copyText()}
-              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm border-2 ${
-                isLight ? 'border-[#3F5331] text-[#3F5331]' : 'border-[#C8E6A0] text-[#C8E6A0]'
+              role="switch"
+              aria-checked={includeListingLink}
+              onClick={() => toggleListingLink(!includeListingLink)}
+              className={`w-full flex items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 text-left ${
+                isLight ? 'border-gray-200 bg-white' : 'border-white/15 bg-white/5'
               }`}
             >
-              <Copy size={16} />
-              {t('distribute.copy')}
+              <span className="text-sm font-medium">{t('distribute.addListingLink')}</span>
+              <span
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  includeListingLink ? 'bg-[#C8E6A0]' : isLight ? 'bg-gray-300' : 'bg-white/20'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    includeListingLink ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
+            </button>
+            <button
+              type="button"
+              disabled={sending}
+              onClick={() => void sendToBot()}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-[#C8E6A0] text-[#1a1a1a] disabled:opacity-60"
+            >
+              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              {t('distribute.saveInBot')}
             </button>
           </div>
         ) : (
           <div className="flex flex-col flex-1 min-h-0 px-4 pt-3 gap-2">
-            <div className="flex gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => void copyText()}
-                className={`min-w-0 flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-semibold text-xs leading-none border-2 ${
-                  isLight ? 'border-[#3F5331] text-[#3F5331]' : 'border-[#C8E6A0] text-[#C8E6A0]'
-                }`}
-              >
-                <Copy size={16} strokeWidth={2.25} className="shrink-0" aria-hidden />
-                <span className="truncate">{t('distribute.copyAgain')}</span>
-              </button>
-              {shareMessageReady ? (
-                <button
-                  type="button"
-                  disabled={sharingNative}
-                  onClick={() => void shareViaTelegramNative()}
-                  className="min-w-0 flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-semibold text-xs leading-none bg-[#C8E6A0] text-[#1a1a1a] disabled:opacity-60"
-                >
-                  {sharingNative ? (
-                    <Loader2 size={16} className="shrink-0 animate-spin" aria-hidden />
-                  ) : (
-                    <Share2 size={16} className="shrink-0" aria-hidden />
-                  )}
-                  <span className="truncate">{t('distribute.shareNative')}</span>
-                </button>
-              ) : null}
+            <div className="shrink-0">
+              <p className="text-sm font-semibold">{t('distribute.prepareGroupsTitle')}</p>
+              <p className={`text-xs leading-snug mt-1 ${muted}`}>{t('distribute.prepareGroupsHint')}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => void copyText()}
+              className={`w-full shrink-0 inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-semibold text-sm border-2 ${
+                isLight ? 'border-[#3F5331] text-[#3F5331]' : 'border-[#C8E6A0] text-[#C8E6A0]'
+              }`}
+            >
+              <Copy size={16} />
+              {t('distribute.copyAgain')}
+            </button>
 
             <div
               className={`flex p-1 rounded-xl shrink-0 ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}
@@ -580,14 +666,15 @@ export function DistributeListingModal({
               />
             </div>
 
+            {groupsTab === 'recommended' ? (
             <div className="flex items-stretch gap-2 shrink-0 w-full">
               <select
                 value={cityFilter || '__all__'}
                 onChange={(e) =>
                   setCityFilter(e.target.value === '__all__' ? '__all__' : e.target.value)
                 }
-                disabled={groupsTab === 'mine'}
-                className={`min-w-0 flex-1 h-9 text-xs rounded-xl px-2.5 border appearance-none ${inputCls} disabled:opacity-50`}
+                className={`min-w-0 flex-1 h-9 text-xs rounded-xl px-2.5 border appearance-none ${inputCls}`}
+                style={{ colorScheme: isLight ? 'light' : 'dark' }}
               >
                 <option value="__all__">{t('distribute.allCities')}</option>
                 {cityOptions
@@ -601,8 +688,8 @@ export function DistributeListingModal({
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                disabled={groupsTab === 'mine'}
-                className={`min-w-0 flex-1 h-9 text-xs rounded-xl px-2.5 border appearance-none ${inputCls} disabled:opacity-50`}
+                className={`min-w-0 flex-1 h-9 text-xs rounded-xl px-2.5 border appearance-none ${inputCls}`}
+                style={{ colorScheme: isLight ? 'light' : 'dark' }}
               >
                 <option value="all">{t('distribute.allCategories')}</option>
                 {categories.map((cat) => (
@@ -612,7 +699,9 @@ export function DistributeListingModal({
                 ))}
               </select>
             </div>
+            ) : null}
 
+            {groupsTab === 'mine' ? (
             <button
               type="button"
               onClick={() => setShowAddChat((v) => !v)}
@@ -623,22 +712,25 @@ export function DistributeListingModal({
               <Plus size={14} />
               {t('distribute.addYourChat')}
             </button>
+            ) : null}
 
-            {showAddChat ? (
+            {groupsTab === 'mine' && showAddChat ? (
               <div
-                className={`shrink-0 space-y-2 p-3 rounded-2xl ${isLight ? 'bg-gray-50' : 'bg-white/5'}`}
+                className={`shrink-0 space-y-2 p-3 rounded-2xl ${isLight ? 'bg-gray-100' : 'bg-[#1c1c1c]'}`}
               >
                 <input
                   value={newChatTitle}
                   onChange={(e) => setNewChatTitle(e.target.value)}
+                  onFocus={(e) => e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
                   placeholder={t('distribute.chatNamePlaceholder')}
-                  className={`w-full rounded-xl px-3 py-2 text-sm border ${inputCls}`}
+                  className={`w-full rounded-xl px-3 py-3 text-base border ${fieldCls}`}
                 />
                 <input
                   value={newChatLink}
                   onChange={(e) => setNewChatLink(e.target.value)}
+                  onFocus={(e) => e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
                   placeholder={t('distribute.chatLinkPlaceholder')}
-                  className={`w-full rounded-xl px-3 py-2 text-sm border ${inputCls}`}
+                  className={`w-full rounded-xl px-3 py-3 text-base border ${fieldCls}`}
                 />
                 <button
                   type="button"
@@ -700,6 +792,7 @@ export function DistributeListingModal({
                         </div>
                         <button
                           type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => void toggleSaved(chat, e)}
                           className={`p-2 rounded-full shrink-0 relative z-[1] ${
                             chat.isSaved
@@ -710,7 +803,7 @@ export function DistributeListingModal({
                           }`}
                           aria-label={t('distribute.saveChat')}
                         >
-                          <Bookmark
+                          <Mail
                             size={18}
                             className={chat.isSaved ? 'fill-[#7CB342] text-[#7CB342]' : undefined}
                             strokeWidth={chat.isSaved ? 2.25 : 2}
@@ -728,10 +821,6 @@ export function DistributeListingModal({
               )}
             </div>
 
-            <p className={`flex gap-2 text-[11px] leading-snug shrink-0 pb-1 ${muted}`}>
-              <Info size={14} className="shrink-0 mt-0.5" />
-              <span className="line-clamp-3">{t('distribute.joinThenShareHint')}</span>
-            </p>
           </div>
         )}
 
@@ -752,34 +841,72 @@ export function DistributeListingModal({
               </button>
               <button
                 type="button"
-                disabled={sending}
-                onClick={() => void sendToBot()}
-                className="flex-[1.5] py-3 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a] disabled:opacity-60 flex items-center justify-center gap-2"
+                onClick={() => setStep(2)}
+                className="flex-[1.5] py-3 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a] flex items-center justify-center gap-2"
               >
-                {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                {t('distribute.saveInBot')}
+                {t('distribute.continue')}
+                <ChevronRight size={18} />
               </button>
             </>
           ) : (
-            <>
+            <div className="flex flex-col gap-2 w-full">
               <button
                 type="button"
-                onClick={() => setStep(1)}
-                className={`flex-1 py-3 rounded-2xl font-semibold border-2 flex items-center justify-center gap-1 ${
-                  isLight ? 'border-gray-300 text-gray-800' : 'border-white/25 text-white'
-                }`}
+                disabled={sharingNative}
+                onClick={() => void shareViaTelegramNative()}
+                className="w-full py-3.5 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a] flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                <ChevronLeft size={18} />
-                {t('distribute.backToStep1')}
+                {sharingNative ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Share2 size={18} />
+                )}
+                {t('distribute.forwardToTelegram')}
               </button>
               <button
                 type="button"
-                onClick={handleClose}
-                className="flex-1 py-3 rounded-2xl font-semibold bg-[#C8E6A0] text-[#1a1a1a]"
+                onClick={() => setOtherWaysOpen((v) => !v)}
+                className={`w-full py-2 text-sm font-medium flex items-center justify-center gap-1 ${muted}`}
               >
-                {t('distribute.done')}
+                {t('distribute.otherWays')}
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform ${otherWaysOpen ? 'rotate-180' : ''}`}
+                />
               </button>
-            </>
+              {otherWaysOpen ? (
+                <div className="flex flex-col gap-2 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => void copyText()}
+                    className={`w-full py-2.5 rounded-xl font-semibold text-sm border-2 flex items-center justify-center gap-2 ${
+                      isLight ? 'border-gray-300 text-gray-800' : 'border-white/20 text-white'
+                    }`}
+                  >
+                    <Copy size={16} />
+                    {t('distribute.copy')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendToBot()}
+                    className={`w-full py-2.5 rounded-xl font-semibold text-sm border-2 flex items-center justify-center gap-2 disabled:opacity-60 ${
+                      isLight ? 'border-gray-300 text-gray-800' : 'border-white/20 text-white'
+                    }`}
+                  >
+                    {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                    {t('distribute.saveInBot')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className={`w-full py-2 text-sm ${muted}`}
+                  >
+                    {t('distribute.backToStep1')}
+                  </button>
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       </div>
