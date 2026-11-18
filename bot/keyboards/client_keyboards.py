@@ -270,13 +270,13 @@ def get_about_us_rules_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_support_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    support_manager = os.getenv('SUPPORT_MANAGER', 'https://t.me/your_support_manager')
-    
+    from config import SUPPORT_MANAGER
+
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
                 text=t(user_id, 'support.contact_manager'),
-                url=support_manager
+                url=SUPPORT_MANAGER
             )
         ]
     ])

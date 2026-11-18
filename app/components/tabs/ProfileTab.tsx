@@ -14,6 +14,7 @@ import dynamic from 'next/dynamic';
 import { Listing, Category } from '@/types';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getCategories } from '@/constants/categories';
+import { SUPPORT_MANAGER_URL } from '@/constants/support';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { Toast } from '@/components/ui/Toast';
 import { useLongPress } from '@/features/ui/hooks/useLongPress';
@@ -1535,7 +1536,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
         
         <button
           onClick={() => {
-            const supportManager = process.env.NEXT_PUBLIC_SUPPORT_MANAGER || 'https://t.me/tradeground_seller2';
+            const supportManager = SUPPORT_MANAGER_URL;
             if (tg && tg.openTelegramLink) {
               tg.openTelegramLink(supportManager);
               tg.HapticFeedback?.impactOccurred('medium');

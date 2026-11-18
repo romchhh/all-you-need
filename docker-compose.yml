@@ -47,7 +47,6 @@ services:
         NEXT_PUBLIC_WEBAPP_URL: ${WEBAPP_URL:-}
         NEXT_PUBLIC_BOT_URL: ${NEXT_PUBLIC_BOT_URL:-}
         NEXT_PUBLIC_BOT_USERNAME: ${BOT_USERNAME:-TradeGroundBot}
-        NEXT_PUBLIC_SUPPORT_MANAGER: ${SUPPORT_MANAGER:-}
         NEXT_PUBLIC_MARKETPLACE_TELEGRAM_ONLY: ${NEXT_PUBLIC_MARKETPLACE_TELEGRAM_ONLY:-}
     image: allyouneed-app:latest
     container_name: allyouneed-app
