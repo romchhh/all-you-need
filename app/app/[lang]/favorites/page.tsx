@@ -817,7 +817,7 @@ const FavoritesPage = () => {
       </div>
 
       <BottomNavigation
-        activeTab="favorites"
+        activeTab={isCreateListingModalOpen ? 'add' : 'favorites'}
         openListingId={selectedListing?.id ?? null}
         onTabChange={(tab) => {
           // Закриваємо деталі товару перед переходом

@@ -294,10 +294,16 @@ export const BottomNavigation = ({
             tg?.HapticFeedback.impactOccurred('medium');
           }}
           className={`group flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-1 ${
-            isLight ? 'text-[#5A6B52] hover:text-[#3F5331]' : 'text-white hover:text-[#C8E6A0]'
+            currentActiveTab === 'add'
+              ? isLight
+                ? 'font-semibold text-[#3F5331]'
+                : 'font-semibold text-[#C8E6A0]'
+              : isLight
+                ? 'text-[#5A6B52] hover:text-[#3F5331]'
+                : 'text-white hover:text-[#C8E6A0]'
           }`}
         >
-          <div className="shrink-0">
+          <div className={`shrink-0 ${currentActiveTab === 'add' ? 'scale-105' : ''}`}>
             <NavIcon icon="add" />
           </div>
           <span className="mt-1 max-w-full truncate font-montserrat text-[clamp(8px,2.2vw,11px)] font-medium">

@@ -74,7 +74,10 @@ export function AddListingHub({
   }, [telegramId, businessOpen]);
 
   const showDrafts = draftsReady && drafts.length > 0;
-  const pageBg = isLight ? 'bg-[#f3f4f6] text-gray-900' : 'bg-black text-white';
+  const pageBg = isLight ? 'text-gray-900' : 'text-white';
+  const pageBackground = isLight
+    ? 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(63,83,49,0.14) 0%, transparent 45%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(63,83,49,0.1) 0%, transparent 45%), #f3f4f6'
+    : 'radial-gradient(ellipse 80% 100% at 20% 0%, rgba(200, 230, 160, 0.28) 0%, transparent 40%), radial-gradient(ellipse 80% 100% at 80% 100%, rgba(200, 230, 160, 0.20) 0%, transparent 40%), #000000';
   const card = isLight
     ? 'border-gray-200 bg-white'
     : 'border-white/12 bg-white/[0.04]';
@@ -92,7 +95,10 @@ export function AddListingHub({
     <>
       <div
         className={`fixed inset-0 z-[900] flex flex-col font-montserrat ${pageBg}`}
-        style={{ paddingBottom: 'calc(4.75rem + env(safe-area-inset-bottom, 0px))' }}
+        style={{
+          background: pageBackground,
+          paddingBottom: 'calc(4.75rem + env(safe-area-inset-bottom, 0px))',
+        }}
       >
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
           <div className={`${FIXED_LOGO_SPACER_CLASS} relative`}>

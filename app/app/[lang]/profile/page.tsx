@@ -633,7 +633,7 @@ const ProfilePage = () => {
       </div>
 
       <BottomNavigation
-        activeTab="profile"
+        activeTab={isCreateListingModalOpen ? 'add' : 'profile'}
         openListingId={selectedListing?.id ?? null}
         onTabChange={(tab) => {
           // Закриваємо деталі товару перед переходом

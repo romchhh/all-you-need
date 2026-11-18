@@ -986,7 +986,7 @@ const CategoriesPage = () => {
       </div>
 
       <BottomNavigation
-        activeTab="categories"
+        activeTab={isCreateListingModalOpen ? 'add' : 'categories'}
         openListingId={selectedListing?.id ?? null}
         onTabChange={(tab) => {
           // Закриваємо деталі товару перед переходом

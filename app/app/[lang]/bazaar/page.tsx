@@ -181,7 +181,7 @@ const BazaarPage = () => {
       </div>
 
       <BottomNavigation
-        activeTab="bazaar"
+        activeTab={isCreateListingModalOpen ? 'add' : 'bazaar'}
         openListingId={selectedListing?.id ?? null}
         onTabChange={(tab) => {
           const hasOpenDetails = selectedListing || selectedSeller;
