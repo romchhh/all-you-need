@@ -105,6 +105,85 @@ export async function sendTelegramMessage(
   }
 }
 
+/** Фото з підписом і кнопками. Caption у Telegram — до 1024 символів. */
+export async function sendTelegramPhoto(
+  chatId: number | string,
+  photoUrl: string,
+  caption: string,
+  options: Partial<TelegramMessageOptions> = {}
+): Promise<boolean> {
+  try {
+    const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    if (!BOT_TOKEN || !photoUrl) return false;
+
+    const payload: Record<string, unknown> = {
+      chat_id: chatId,
+      photo: photoUrl,
+      caption: caption.slice(0, 1024),
+      parse_mode: options.parse_mode || 'HTML',
+      disable_notification: options.disable_notification ?? false,
+    };
+    if (options.reply_markup) {
+      payload.reply_markup = options.reply_markup;
+    }
+
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.error('Telegram sendPhoto error:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error sending Telegram photo:', error);
+    return false;
+  }
+}
+
+/** PRO закінчився — профіль лишається на безкоштовному Business. */
+export async function sendBusinessProEndedNotification(
+  telegramId: number | string,
+  endedAt: Date | null
+): Promise<boolean> {
+  const webappUrl = process.env.WEBAPP_URL || 'http://localhost:3000';
+  const { getUserLanguage } = await import('@/utils/userHelpers');
+  const lang = await getUserLanguage(telegramId);
+  const tid = typeof telegramId === 'string' ? telegramId : String(telegramId);
+  const profileUrl = `${webappUrl}/${lang}/profile?telegramId=${tid}`;
+  const locale = lang === 'ru' ? 'ru-RU' : 'uk-UA';
+  const endedLabel = endedAt
+    ? endedAt.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
+
+  const message =
+    lang === 'ru'
+      ? `⏳ <b>Подписка Business PRO закончилась</b>\n\n${
+          endedLabel ? `PRO закончился ${endedLabel}.\n\n` : ''
+        }Профиль перешёл на бесплатный тариф <b>BUSINESS</b>. Основные инструменты остаются доступны без ограничения по времени. Скидка на продвижение — 10%.`
+      : `⏳ <b>Підписка Business PRO закінчилась</b>\n\n${
+          endedLabel ? `PRO закінчився ${endedLabel}.\n\n` : ''
+        }Профіль перейшов на безкоштовний тариф <b>BUSINESS</b>. Основні інструменти лишаються доступними без обмеження в часі. Знижка на просування — 10%.`;
+
+  return sendTelegramMessage(telegramId, message, {
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: lang === 'ru' ? 'Открыть профиль' : 'Відкрити профіль',
+            web_app: { url: profileUrl },
+          },
+        ],
+      ],
+    },
+  });
+}
+
 /**
  * Повідомлення про схвалення оголошення
  */
@@ -198,18 +277,31 @@ export async function sendListingExpiredNotification(
   listingTitle: string,
   listingId: number
 ): Promise<boolean> {
-  const message = `⏰ <b>Термін дії оголошення закінчився</b>
+  const webappUrl = process.env.WEBAPP_URL || 'http://localhost:3000';
+  const { getUserLanguage } = await import('@/utils/userHelpers');
+  const lang = await getUserLanguage(telegramId);
+  const tid = typeof telegramId === 'string' ? telegramId : String(telegramId);
+  const profileUrl = `${webappUrl}/${lang}/profile?telegramId=${tid}`;
+  const safeTitle = escapeHtmlTelegram(listingTitle || '—');
 
-Ваше оголошення "<b>${listingTitle}</b>" більше не активне.
+  const message =
+    lang === 'ru'
+      ? `🕐 <b>Объявление деактивировано</b>\n\n«<b>${safeTitle}</b>» больше не показывается: закончился срок размещения.\n\nЭто касается и личного профиля, и Business-витрины. Откройте «Мои объявления» и нажмите «Активировать», чтобы вернуть его на 30 дней.`
+      : `🕐 <b>Оголошення деактивовано</b>\n\n«<b>${safeTitle}</b>» більше не показується: закінчився термін розміщення.\n\nЦе стосується і особистого профілю, і Business-вітрини. Відкрийте «Мої оголошення» і натисніть «Активувати», щоб повернути його на 30 днів.`;
 
-Щоб поновити оголошення:
-1. Перейдіть у розділ "Мої оголошення"
-2. Натисніть "Активувати знову"
-3. Оплатіть поновлення
-
-Оголошення буде активним ще 30 днів після реактивації.`;
-
-  return await sendTelegramMessage(telegramId, message);
+  return sendTelegramMessage(telegramId, message, {
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: lang === 'ru' ? 'Открыть объявление' : 'Відкрити оголошення',
+            web_app: { url: profileUrl },
+          },
+        ],
+      ],
+    },
+  });
 }
 
 /**

@@ -1,8 +1,43 @@
 import { prisma } from '@/lib/prisma';
 import { ensureSearchSubscriptionTable } from '@/lib/prisma';
 import { listingMatchesSearchQuery } from '@/lib/listings/searchVariants';
-import { sendTelegramMessage } from '@/lib/telegram/telegramNotifications';
+import { sendTelegramMessage, sendTelegramPhoto } from '@/lib/telegram/telegramNotifications';
 import { getUserLanguage } from '@/utils/userHelpers';
+import { buildListingImageUrl } from '@/lib/listings/imageUrl';
+
+function parseImageList(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function absoluteListingPhoto(path: string): string {
+  const built = buildListingImageUrl(path);
+  if (!built) return '';
+  if (built.startsWith('http://') || built.startsWith('https://')) return built;
+  const base = (process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  if (!base) return '';
+  return `${base}${built.startsWith('/') ? built : `/${built}`}`;
+}
+
+async function firstListingPhotoUrl(listingId: number): Promise<string> {
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT images, optimizedImages FROM Listing WHERE id = ?`,
+    listingId
+  )) as Array<{ images: string | null; optimizedImages: string | null }>;
+  const row = rows[0];
+  if (!row) return '';
+  const candidates = [...parseImageList(row.optimizedImages), ...parseImageList(row.images)];
+  for (const path of candidates) {
+    const url = absoluteListingPhoto(path);
+    if (url) return url;
+  }
+  return '';
+}
 
 function escapeHtmlTelegram(text: string): string {
   return text
@@ -54,6 +89,7 @@ export async function notifySearchSubscribersOfNewMarketplaceListing(params: {
     return;
   }
 
+  const photoUrl = await firstListingPhotoUrl(params.listingId);
   const webappUrl = process.env.WEBAPP_URL || 'http://localhost:3000';
   const safeTitle = escapeHtmlTelegram(params.title);
 
@@ -76,20 +112,28 @@ export async function notifySearchSubscribersOfNewMarketplaceListing(params: {
         ? `🔎 <b>Новое объявление по запросу «${safeQuery}»</b>\n\n«${safeTitle}»\n\nОткройте витрину, чтобы посмотреть детали.`
         : `🔎 <b>Нове оголошення за запитом «${safeQuery}»</b>\n\n«${safeTitle}»\n\nВідкрийте вітрину, щоб переглянути деталі.`;
 
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          {
+            text: lang === 'ru' ? '🔗 Открыть' : '🔗 Відкрити',
+            web_app: { url: listingUrl },
+          },
+        ],
+      ],
+    };
+
     try {
-      const ok = await sendTelegramMessage(tid, message, {
-        disable_web_page_preview: true,
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: lang === 'ru' ? '🔗 Открыть' : '🔗 Відкрити',
-                web_app: { url: listingUrl },
-              },
-            ],
-          ],
-        },
-      });
+      const ok = photoUrl
+        ? (await sendTelegramPhoto(tid, photoUrl, message, { reply_markup: replyMarkup })) ||
+          (await sendTelegramMessage(tid, message, {
+            disable_web_page_preview: true,
+            reply_markup: replyMarkup,
+          }))
+        : await sendTelegramMessage(tid, message, {
+            disable_web_page_preview: true,
+            reply_markup: replyMarkup,
+          });
       if (!ok) {
         console.error('[SearchSubscription] sendTelegramMessage returned false for', tid);
       }

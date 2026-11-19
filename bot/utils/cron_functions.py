@@ -5,9 +5,54 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
+from config import token
 from database_functions.telegram_listing_db import get_connection, get_telegram_listing_by_id
 from utils.moderation_manager import ModerationManager
+from utils.translations import get_user_lang, t
+
+
+def _auto_renew_on(value) -> bool:
+    if value is True or value == 1:
+        return True
+    if isinstance(value, str) and value.strip().lower() in {"1", "t", "true", "yes"}:
+        return True
+    return False
+
+
+async def _notify_listing_auto_renewed(bot: Bot, telegram_id, title: str, listing_id: int, until: datetime):
+    msg = t(
+        int(telegram_id),
+        "my_listings.listing_auto_renewed_marketplace",
+        title=title or "—",
+        until=until.strftime("%d.%m.%Y"),
+    )
+    lang = get_user_lang(int(telegram_id)) or "uk"
+    webapp = (os.getenv("WEBAPP_URL") or "").rstrip("/")
+    reply_markup = None
+    if webapp:
+        open_label = "Открыть объявление" if lang == "ru" else "Відкрити оголошення"
+        promo_label = "Купить рекламу" if lang == "ru" else "Купити рекламу"
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=open_label,
+                        web_app=WebAppInfo(
+                            url=f"{webapp}/{lang}/bazaar?listing={listing_id}&telegramId={telegram_id}"
+                        ),
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=promo_label,
+                        web_app=WebAppInfo(url=f"{webapp}/{lang}/profile?telegramId={telegram_id}"),
+                    )
+                ],
+            ]
+        )
+    await bot.send_message(telegram_id, msg, parse_mode="HTML", reply_markup=reply_markup)
 
 
 async def deactivate_old_listings(bot: Optional[Bot] = None):
@@ -20,8 +65,12 @@ async def deactivate_old_listings(bot: Optional[Bot] = None):
     cursor = conn.cursor()
 
     try:
-        thirty_days_ago = datetime.now() - timedelta(days=30)
+        now = datetime.now()
+        now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+        thirty_days_ago = now - timedelta(days=30)
         thirty_days_ago_str = thirty_days_ago.strftime('%Y-%m-%d %H:%M:%S')
+        renewed_until = now + timedelta(days=30)
+        renewed_until_str = renewed_until.strftime('%Y-%m-%d %H:%M:%S')
 
         parser_bot_ids = []
         try:
@@ -44,16 +93,21 @@ async def deactivate_old_listings(bot: Optional[Bot] = None):
             parser_bot_ids.append(8590825131)
 
         cursor.execute('''
-            SELECT l.id, l.userId, l.title, l.createdAt, l.publishedAt,
+            SELECT l.id, l.userId, l.title, l.createdAt, l.publishedAt, l.expiresAt, l.autoRenew,
                    u.telegramId, u.username
             FROM Listing l
             JOIN User u ON l.userId = u.id
             WHERE l.status = 'active'
             AND (
-                (l.publishedAt IS NOT NULL AND l.publishedAt < ?) OR
-                (l.publishedAt IS NULL AND l.createdAt < ?)
+                (l.expiresAt IS NOT NULL AND datetime(l.expiresAt) <= datetime(?))
+                OR (
+                    l.expiresAt IS NULL AND (
+                        (l.publishedAt IS NOT NULL AND datetime(l.publishedAt) < datetime(?))
+                        OR (l.publishedAt IS NULL AND datetime(l.createdAt) < datetime(?))
+                    )
+                )
             )
-        ''', (thirty_days_ago_str, thirty_days_ago_str))
+        ''', (now_str, thirty_days_ago_str, thirty_days_ago_str))
 
         old_listings = cursor.fetchall()
 
@@ -61,12 +115,14 @@ async def deactivate_old_listings(bot: Optional[Bot] = None):
             conn.close()
             return
 
-        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         sold_ids: List[int] = []
         expired_rows: List = []
+        renew_rows: List = []
 
         for row in old_listings:
-            listing_id, user_id, title, created_at, published_at, telegram_id, username = row
+            listing_id = row[0]
+            telegram_id = row[7]
+            username = row[8]
             is_parser = False
             try:
                 tid = int(telegram_id) if telegram_id is not None else 0
@@ -86,13 +142,25 @@ async def deactivate_old_listings(bot: Optional[Bot] = None):
                     )
                     if cursor.fetchone():
                         is_parser = True
-                except sqlite3.OperationalError:
+                except Exception:
                     pass
 
             if is_parser:
                 sold_ids.append(listing_id)
+            elif _auto_renew_on(row[6]):
+                renew_rows.append(row)
             else:
                 expired_rows.append(row)
+
+        if renew_rows:
+            renew_ids = [r[0] for r in renew_rows]
+            placeholders = ','.join(['?'] * len(renew_ids))
+            cursor.execute(f'''
+                UPDATE Listing
+                SET expiresAt = ?, updatedAt = ?
+                WHERE id IN ({placeholders})
+            ''', [renewed_until_str, now_str] + renew_ids)
+            print(f"[deactivate_old_listings] user → auto-renewed +30d: {len(renew_ids)}")
 
         if sold_ids:
             placeholders = ','.join(['?'] * len(sold_ids))
@@ -116,14 +184,49 @@ async def deactivate_old_listings(bot: Optional[Bot] = None):
         conn.commit()
         conn.close()
 
+        if bot and renew_rows:
+            for row in renew_rows:
+                listing_id = row[0]
+                title = row[2]
+                telegram_id = row[7]
+                if not telegram_id:
+                    continue
+                try:
+                    await _notify_listing_auto_renewed(bot, telegram_id, title, listing_id, renewed_until)
+                except Exception as e:
+                    print(f"Не вдалося надіслати повідомлення про автопродовження користувачу {telegram_id}: {e}")
+
         if bot and expired_rows:
             for row in expired_rows:
-                listing_id, user_id, title, created_at, published_at, telegram_id, username = row
+                listing_id = row[0]
+                title = row[2]
+                telegram_id = row[7]
+                username = row[8]
                 if not telegram_id:
                     continue
                 try:
                     msg = t(telegram_id, 'my_listings.listing_expired_marketplace', title=title or '—')
-                    await bot.send_message(telegram_id, msg, parse_mode='HTML')
+                    lang = get_user_lang(int(telegram_id)) or 'uk'
+                    webapp = (os.getenv('WEBAPP_URL') or '').rstrip('/')
+                    reply_markup = None
+                    if webapp:
+                        open_label = 'Открыть объявление' if lang == 'ru' else 'Відкрити оголошення'
+                        reply_markup = InlineKeyboardMarkup(
+                            inline_keyboard=[[
+                                InlineKeyboardButton(
+                                    text=open_label,
+                                    web_app=WebAppInfo(
+                                        url=f"{webapp}/{lang}/profile?telegramId={telegram_id}"
+                                    ),
+                                )
+                            ]]
+                        )
+                    await bot.send_message(
+                        telegram_id,
+                        msg,
+                        parse_mode='HTML',
+                        reply_markup=reply_markup,
+                    )
                 except Exception as e:
                     print(f"Не вдалося надіслати повідомлення про деактивацію маркетплейсу користувачу {telegram_id}: {e}")
 

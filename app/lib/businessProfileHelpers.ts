@@ -77,16 +77,6 @@ export async function upsertBusinessProfileDraft(
   const listingIdsJson = (() => {
     if (data.listingDisplayMode !== undefined) {
       let ids = data.listingIds ?? [];
-      if (
-        data.listingDisplayMode === 'manual' &&
-        ids.length === 0 &&
-        existing?.linkedListingIds
-      ) {
-        const prev = parseListingDisplayConfig(existing.linkedListingIds);
-        if (prev.mode === 'manual' && prev.ids.length > 0) {
-          ids = prev.ids;
-        }
-      }
       return serializeListingDisplayConfig(data.listingDisplayMode, ids);
     }
     if (data.listingIds !== undefined) {
@@ -176,7 +166,11 @@ function normalizeIdList(ids: unknown[]): number[] {
   return out;
 }
 
-/** ID оголошень, які показуються на Business-вітрині (режим «усі» або ручний вибір). */
+/**
+ * ID оголошень Business-вітрини.
+ * Ручний вибір — лише відмічені. Режим «усі» більше не забирає приватні оголошення:
+ * лишаються ті, що вже позначені profileType = business.
+ */
 export async function resolveBusinessListingIds(
   userId: number,
   linkedListingIdsRaw: string | null | undefined
@@ -189,7 +183,7 @@ export async function resolveBusinessListingIds(
   const rows = (await prisma.$queryRawUnsafe(
     `SELECT id FROM Listing
      WHERE userId = ?
-       AND status IN ('active', 'pending_moderation')
+       AND COALESCE(profileType, 'personal') = 'business'
      ORDER BY id DESC`,
     userId
   )) as Array<{ id: unknown }>;
@@ -322,6 +316,23 @@ export async function downgradeProToFreeBusiness(
   });
 
   await syncBusinessListingProfileTypes(userId);
+
+  void notifyBusinessProEnded(userId, endedAt ?? null);
+}
+
+async function notifyBusinessProEnded(userId: number, endedAt: Date | null): Promise<void> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { telegramId: true },
+    });
+    const telegramId = user?.telegramId;
+    if (telegramId == null) return;
+    const { sendBusinessProEndedNotification } = await import('@/lib/telegram/telegramNotifications');
+    await sendBusinessProEndedNotification(String(telegramId), endedAt);
+  } catch (error) {
+    console.error('[business] PRO ended notification failed', error);
+  }
 }
 
 export async function deactivateBusinessProfile(
@@ -839,8 +850,7 @@ export async function consumeBusinessPromotionCredit(
 export type { BusinessProfileStatsPayload };
 
 async function queryBusinessVitrineListingStats(
-  userId: number,
-  listingIds: number[]
+  userId: number
 ): Promise<{
   totalListings: bigint | number;
   activeListings: bigint | number;
@@ -855,10 +865,8 @@ async function queryBusinessVitrineListingStats(
     inactiveListings: 0,
     favoritesTotal: 0,
   };
-  if (listingIds.length === 0) return empty;
 
   const { rawQuery } = await import('@/lib/dbSql');
-  const placeholders = listingIds.map(() => '?').join(',');
 
   return (
     (await rawQuery<Array<typeof empty>>(
@@ -871,11 +879,14 @@ async function queryBusinessVitrineListingStats(
           COALESCE((
             SELECT COUNT(*)
             FROM Favorite f
-            WHERE f.listingId IN (${placeholders})
+            INNER JOIN Listing lf ON lf.id = f.listingId
+            WHERE lf.userId = ?
+              AND COALESCE(lf.profileType, 'personal') = 'business'
           ), 0) as favoritesTotal
         FROM Listing
-        WHERE userId = ? AND id IN (${placeholders})`,
-      [...listingIds, userId, ...listingIds]
+        WHERE userId = ?
+          AND COALESCE(profileType, 'personal') = 'business'`,
+      [userId, userId]
     ))[0] ?? empty
   );
 }
@@ -907,10 +918,8 @@ export async function getBusinessProfileStatsForUserId(
     favoritesTotal: bigint | number | null;
   } | undefined;
 
-  const vitrineIds = await resolveBusinessListingIds(userId, profile.linkedListingIds);
-
   try {
-    listingStats = await queryBusinessVitrineListingStats(userId, vitrineIds);
+    listingStats = await queryBusinessVitrineListingStats(userId);
   } catch (error) {
     console.error('[BusinessProfile stats] listing query failed', error);
   }

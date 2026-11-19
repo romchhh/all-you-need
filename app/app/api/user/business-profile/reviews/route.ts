@@ -5,6 +5,7 @@ import {
   ensureReviewExtraColumns,
   listOwnerBusinessReviews,
 } from '@/lib/reviews/reviewService';
+import { notifyReviewAuthorCompanyReply } from '@/lib/reviews/reviewNotify';
 import { logApiError } from '@/lib/server/logApiError';
 
 /** GET — відгуки для власника бізнес-профілю */
@@ -70,6 +71,29 @@ export async function POST(request: NextRequest) {
         ownerRepliedAt: new Date(),
       } as Parameters<typeof prisma.review.update>[0]['data'],
     });
+
+    try {
+      const [author, profile] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: review.userId },
+          select: { telegramId: true },
+        }),
+        prisma.businessProfile.findUnique({
+          where: { userId: user.id },
+          select: { businessName: true },
+        }),
+      ]);
+      if (author?.telegramId && String(author.telegramId) !== String(user.telegramId ?? telegramId)) {
+        await notifyReviewAuthorCompanyReply({
+          authorTelegramId: author.telegramId,
+          businessName: profile?.businessName?.trim() || 'Business',
+          sellerTelegramId: telegramId,
+          reply,
+        });
+      }
+    } catch (notifyError) {
+      console.error('[business-profile/reviews] reply notify', notifyError);
+    }
 
     return NextResponse.json({
       success: true,

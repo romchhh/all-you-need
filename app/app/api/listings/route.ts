@@ -27,6 +27,7 @@ import {
   parseOptionalInt,
 } from '@/lib/listings/catalogFilters';
 import { appendListingTextSearch, listingMatchesSearchQuery } from '@/lib/listings/searchVariants';
+import { sendListingAutoRenewedNotification } from '@/lib/telegram/telegramNotifications';
 
 // force-dynamic: Next route cache off; каталог прискорюємо in-memory bazaarCatalogServerCache
 export const dynamic = 'force-dynamic';
@@ -282,20 +283,18 @@ export async function GET(request: NextRequest) {
         ...countParams
       ) as Array<{ count: bigint }>;
 
-      // Оголошення з минулим expiresAt — platform → sold, user → expired
+      // Оголошення з минулим expiresAt: автопродовження → +30 днів, platform → sold, user → expired
       const now = Date.now();
-      const expiredIds: number[] = [];
       const soldIdSet = new Set<number>();
-      for (const listing of userListings) {
+      const dueListings = userListings.filter((listing: any) => {
         const s = listing.status ?? 'active';
-        if (s !== 'active' || !listing.expiresAt) continue;
+        if (s !== 'active' || !listing.expiresAt) return false;
+        const expTime = new Date(listing.expiresAt).getTime();
+        return !Number.isNaN(expTime) && expTime <= now;
+      });
+      if (dueListings.length > 0) {
         try {
-          const expTime = new Date(listing.expiresAt).getTime();
-          if (!Number.isNaN(expTime) && expTime <= now) expiredIds.push(listing.id);
-        } catch (_) {}
-      }
-      if (expiredIds.length > 0) {
-        try {
+          const dueIds = dueListings.map((listing: any) => listing.id);
           const parserRows = (await prisma.$queryRawUnsafe(
             `SELECT l.id,
                     CAST(u.telegramId AS TEXT) as telegramId,
@@ -303,8 +302,8 @@ export async function GET(request: NextRequest) {
                     EXISTS(SELECT 1 FROM parsed_items pi WHERE pi.marketplace_listing_id = l.id) as fromParser
              FROM Listing l
              JOIN User u ON u.id = l.userId
-             WHERE l.id IN (${expiredIds.map(() => '?').join(',')})`,
-            ...expiredIds
+             WHERE l.id IN (${dueIds.map(() => '?').join(',')})`,
+            ...dueIds
           )) as Array<{
             id: number;
             telegramId: number | null;
@@ -321,19 +320,49 @@ export async function GET(request: NextRequest) {
               .map((v) => parseInt(String(v || ''), 10))
               .filter((n) => n > 0)
           );
+          const parserMeta = new Map(parserRows.map((row) => [row.id, row]));
           const soldIds: number[] = [];
+          const renewListings: any[] = [];
           const userExpiredIds: number[] = [];
-          for (const row of parserRows) {
+          for (const listing of dueListings) {
+            const row = parserMeta.get(listing.id);
             const isParser =
-              Number(row.fromParser) === 1 ||
-              (row.telegramId != null && parserBotIds.has(Number(row.telegramId))) ||
+              Number(row?.fromParser) === 1 ||
+              (row?.telegramId != null && parserBotIds.has(Number(row.telegramId))) ||
               ['parser_bot', 'tradeground_seller', 'tradeground_seller2'].includes(
-                (row.username || '').toLowerCase()
+                (row?.username || '').toLowerCase()
               );
-            if (isParser) soldIds.push(row.id);
-            else userExpiredIds.push(row.id);
+            const autoRenewOn =
+              listing.autoRenew === true || Number(listing.autoRenew) === 1;
+            if (isParser) soldIds.push(listing.id);
+            else if (autoRenewOn) renewListings.push(listing);
+            else userExpiredIds.push(listing.id);
           }
           for (const id of soldIds) soldIdSet.add(id);
+          if (renewListings.length) {
+            const newExpires = new Date();
+            newExpires.setDate(newExpires.getDate() + 30);
+            const newExpiresIso = newExpires.toISOString();
+            await prisma.$executeRawUnsafe(
+              `UPDATE Listing SET expiresAt = ?, updatedAt = datetime('now') WHERE id IN (${renewListings.map(() => '?').join(',')})`,
+              newExpiresIso,
+              ...renewListings.map((listing) => listing.id)
+            );
+            for (const listing of renewListings) {
+              listing.expiresAt = newExpiresIso;
+            }
+            await Promise.allSettled(
+              renewListings.map(async (listing) => {
+                if (!listing.sellerTelegramId) return;
+                await sendListingAutoRenewedNotification(
+                  listing.sellerTelegramId,
+                  listing.title,
+                  listing.id,
+                  newExpires
+                );
+              })
+            );
+          }
           if (soldIds.length) {
             await executeInClause(
               `UPDATE Listing SET status = 'sold', updatedAt = datetime('now') WHERE id IN (?)`,

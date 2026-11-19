@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, ensureListingApiRawColumns } from '@/lib/prisma';
+import { isPostgres, sqlNow } from '@/lib/dbSql';
 
 /**
  * Увімкнути / вимкнути автопродовження оголошення на +30 днів при закінченні expiresAt.
@@ -53,10 +54,11 @@ export async function POST(
       );
     }
 
-    const ar = autoRenew ? 1 : 0;
+    const flag = isPostgres() ? autoRenew : autoRenew ? 1 : 0;
+    const flagSql = isPostgres() ? '?::boolean' : '?';
     await prisma.$executeRawUnsafe(
-      `UPDATE Listing SET autoRenew = ?, updatedAt = datetime('now') WHERE id = ?`,
-      ar,
+      `UPDATE Listing SET autoRenew = ${flagSql}, updatedAt = ${sqlNow()} WHERE id = ?`,
+      flag,
       listingId
     );
 

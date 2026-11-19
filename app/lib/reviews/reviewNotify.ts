@@ -42,6 +42,35 @@ export async function notifyBusinessOwnerNewReview(params: {
   }).catch((err) => console.error('[notifyBusinessOwnerNewReview]', err));
 }
 
+/** Автор відгуку: компанія залишила відповідь. */
+export async function notifyReviewAuthorCompanyReply(params: {
+  authorTelegramId: string | number | bigint;
+  businessName: string;
+  sellerTelegramId: string;
+  reply: string;
+}): Promise<void> {
+  const webappUrl = process.env.WEBAPP_URL || 'https://tradeground.app';
+  const lang = await getUserLanguage(params.authorTelegramId);
+  const profileUrl = `${webappUrl}/${lang}/bazaar?user=${encodeURIComponent(
+    params.sellerTelegramId
+  )}&tab=reviews&telegramId=${params.authorTelegramId}`;
+
+  const name = escapeHtml(params.businessName || 'Business');
+  const text = escapeHtml(params.reply.trim().slice(0, 700));
+  const message =
+    lang === 'ru'
+      ? `💬 <b>${name}</b> ответила на ваш отзыв\n\n${text}`
+      : `💬 <b>${name}</b> відповіла на ваш відгук\n\n${text}`;
+  const btn = lang === 'ru' ? 'Посмотреть ответ →' : 'Подивитися відповідь →';
+
+  await sendTelegramMessage(String(params.authorTelegramId), message, {
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [[{ text: btn, web_app: { url: profileUrl } }]],
+    },
+  }).catch((err) => console.error('[notifyReviewAuthorCompanyReply]', err));
+}
+
 /** Запрошення користувачу залишити відгук через 3 дні після контакту. */
 export async function notifyUserReviewInvite(params: {
   viewerTelegramId: string | number | bigint;

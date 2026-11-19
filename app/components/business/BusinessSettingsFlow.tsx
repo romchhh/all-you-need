@@ -347,6 +347,7 @@ export default function BusinessSettingsFlow({
   );
   const [loading, setLoading] = useState(false);
   const [userListings, setUserListings] = useState<Listing[]>([]);
+  const listingsSelectionSeeded = useRef(false);
   const [cityQuery, setCityQuery] = useState('');
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -380,15 +381,17 @@ export default function BusinessSettingsFlow({
     [t]
   );
 
-  const activeUserListings = useMemo(
-    () => userListings.filter((listing) => listing.status === 'active'),
-    [userListings]
+  const pickerListings = userListings;
+
+  const selectedListingIdSet = useMemo(
+    () => new Set(form.selectedListingIds.map((id) => Number(id)).filter((id) => id > 0)),
+    [form.selectedListingIds]
   );
 
-  const selectedListingsCount = useMemo(() => {
-    if (form.listingDisplayMode === 'all') return activeUserListings.length;
-    return form.selectedListingIds.length;
-  }, [form.listingDisplayMode, form.selectedListingIds, activeUserListings.length]);
+  const selectedListingsCount = useMemo(
+    () => pickerListings.filter((listing) => selectedListingIdSet.has(Number(listing.id))).length,
+    [pickerListings, selectedListingIdSet]
+  );
 
   const inputCls = isLight
     ? 'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder:text-gray-400'
@@ -411,6 +414,7 @@ export default function BusinessSettingsFlow({
   useEffect(() => {
     if (!isOpen) {
       openedRef.current = false;
+      listingsSelectionSeeded.current = false;
       setScreen('hub');
       setCopiedLink(false);
       return;
@@ -429,24 +433,25 @@ export default function BusinessSettingsFlow({
 
   useEffect(() => {
     if (!isOpen || !telegramId) return;
-    fetch(`/api/listings?userId=${telegramId}&viewerId=${telegramId}&limit=50&offset=0`)
+    fetch(`/api/listings?userId=${telegramId}&viewerId=${telegramId}&limit=200&offset=0`)
       .then((r) => (r.ok ? r.json() : { listings: [] }))
       .then((data) => setUserListings(data.listings || []))
       .catch(() => setUserListings([]));
   }, [isOpen, telegramId]);
 
   useEffect(() => {
-    if (!isOpen || screen !== 'listings' || activeUserListings.length === 0) return;
-    if (form.listingDisplayMode === 'all') {
-      const ids = activeUserListings.map((listing) => listing.id);
-      const same =
-        ids.length === form.selectedListingIds.length &&
-        ids.every((id) => form.selectedListingIds.includes(id));
-      if (!same) {
-        patch({ selectedListingIds: ids });
-      }
-    }
-  }, [isOpen, screen, activeUserListings, form.listingDisplayMode, form.selectedListingIds]);
+    if (!isOpen || screen !== 'listings' || userListings.length === 0 || listingsSelectionSeeded.current) return;
+    listingsSelectionSeeded.current = true;
+    const loaded = new Set(userListings.map((listing) => Number(listing.id)).filter((id) => id > 0));
+    const ids =
+      form.listingDisplayMode === 'manual'
+        ? form.selectedListingIds.map((id) => Number(id)).filter((id) => loaded.has(id))
+        : userListings
+            .filter((listing) => listing.profileType === 'business')
+            .map((listing) => Number(listing.id))
+            .filter((id) => id > 0);
+    patch({ listingDisplayMode: 'manual', selectedListingIds: ids });
+  }, [isOpen, screen, userListings, form.listingDisplayMode, form.selectedListingIds]);
 
   const validateScreen = (target: SettingsScreen): string | null => {
     if (target === 'editProfile') {
@@ -474,10 +479,9 @@ export default function BusinessSettingsFlow({
     const syncListings = options?.syncListings ?? false;
     setLoading(true);
     try {
-      const listingIdsToAssign =
-        form.listingDisplayMode === 'all'
-          ? activeUserListings.map((listing) => listing.id)
-          : form.selectedListingIds;
+      const listingIdsToAssign = form.selectedListingIds
+        .map((id) => Number(id))
+        .filter((id) => id > 0);
       const workingHours = serializeWorkingHoursSettings(form.workingHoursSettings);
       const activity = businessActivityToLegacyFields(form.sphere, form.directions);
       const hasNewFiles = Boolean(form.logoFile || form.coverFile);
@@ -500,7 +504,7 @@ export default function BusinessSettingsFlow({
         fd.append('website', form.website);
         fd.append('workingHours', workingHours);
         if (syncListings) {
-          fd.append('listingDisplayMode', form.listingDisplayMode);
+          fd.append('listingDisplayMode', 'manual');
           fd.append('listingIds', JSON.stringify(listingIdsToAssign));
         }
         if (form.logoFile) fd.append('logo', form.logoFile);
@@ -527,7 +531,7 @@ export default function BusinessSettingsFlow({
             workingHours,
             ...(syncListings
               ? {
-                  listingDisplayMode: form.listingDisplayMode,
+                  listingDisplayMode: 'manual',
                   listingIds: listingIdsToAssign,
                 }
               : {}),
@@ -564,7 +568,7 @@ export default function BusinessSettingsFlow({
     } finally {
       setLoading(false);
     }
-  }, [activeUserListings, form, onSuccess, showToast, t, telegramId, tg]);
+  }, [form, onSuccess, showToast, t, telegramId, tg]);
 
   const savePortfolio = useCallback(async () => {
     setLoading(true);
@@ -648,23 +652,6 @@ export default function BusinessSettingsFlow({
         ? { logoFile: prepared, logoPreview: preview }
         : { coverFile: prepared, coverPreview: preview }
     );
-  };
-
-  const setListingDisplayMode = (mode: ListingDisplayMode) => {
-    if (mode === 'all') {
-      patch({
-        listingDisplayMode: 'all',
-        selectedListingIds: activeUserListings.map((listing) => listing.id),
-      });
-      return;
-    }
-    patch({
-      listingDisplayMode: 'manual',
-      selectedListingIds:
-        form.selectedListingIds.length > 0
-          ? form.selectedListingIds
-          : activeUserListings.map((listing) => listing.id),
-    });
   };
 
   const patchWorkingHoursDay = (key: WeekdayKey, partial: Partial<WorkingHoursSettings['days'][WeekdayKey]>) => {
@@ -1348,52 +1335,7 @@ export default function BusinessSettingsFlow({
             {screen === 'listings' && (
               <div className="space-y-4 pb-28">
                 <p className={`text-sm ${ac.mutedText}`}>{t('businessProfile.settings.listingsIntro')}</p>
-
-                <div className="space-y-2">
-                  {(['all', 'manual'] as ListingDisplayMode[]).map((mode) => {
-                    const selected = form.listingDisplayMode === mode;
-                    return (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setListingDisplayMode(mode)}
-                        className={`w-full rounded-2xl border p-4 text-left transition-colors ${
-                          selected
-                            ? `${ui.limeBorder} ${ui.limeBgSoft}`
-                            : isLight
-                              ? 'border-gray-200 bg-white'
-                              : 'border-white/15 bg-white/[0.03]'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <span
-                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                              selected
-                                ? isLight
-                                  ? 'border-[#C8E6A0] bg-[#C8E6A0]'
-                                  : 'border-[#C8E6A0] bg-[#C8E6A0]'
-                                : isLight
-                                  ? 'border-gray-300'
-                                  : 'border-white/30'
-                            }`}
-                          >
-                            {selected ? (
-                              <span className={`h-2 w-2 rounded-full ${isLight ? 'bg-white' : 'bg-[#141414]'}`} />
-                            ) : null}
-                          </span>
-                          <span>
-                            <span className={`block text-sm font-semibold ${ac.pageHeading}`}>
-                              {t(`businessProfile.settings.listingsMode.${mode}.title`)}
-                            </span>
-                            <span className={`mt-0.5 block text-xs ${ac.mutedText}`}>
-                              {t(`businessProfile.settings.listingsMode.${mode}.subtitle`)}
-                            </span>
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <p className={`text-sm ${ac.mutedText}`}>{t('businessProfile.settings.listingsToggleHint')}</p>
 
                 <p className={`text-sm font-semibold ${ac.pageHeading}`}>
                   {t('businessProfile.settings.selectedListingsCount', {
@@ -1401,17 +1343,31 @@ export default function BusinessSettingsFlow({
                   })}
                 </p>
 
-                {activeUserListings.length === 0 ? (
+                {pickerListings.length === 0 ? (
                   <div className={`rounded-2xl border p-6 text-center ${isLight ? 'border-gray-200 bg-gray-50' : 'border-white/15 bg-white/5'}`}>
                     <Package size={28} className={`mx-auto mb-2 ${ac.mutedText}`} />
                     <p className={`text-sm ${ac.mutedText}`}>{t('businessProfile.steps.step5.empty')}</p>
                   </div>
                 ) : (
                   <div className={`${ui.cardShell} divide-y ${ui.divider}`}>
-                    {activeUserListings.map((listing) => {
-                      const enabled =
-                        form.listingDisplayMode === 'all' || form.selectedListingIds.includes(listing.id);
+                    {pickerListings.map((listing) => {
+                      const listingId = Number(listing.id);
+                      const enabled = selectedListingIdSet.has(listingId);
                       const thumb = listing.images?.[0] || listing.image || '';
+                      const statusLabel =
+                        listing.status === 'active'
+                          ? ''
+                          : listing.status === 'pending_moderation'
+                            ? t('sales.pending')
+                            : listing.status === 'expired'
+                              ? t('sales.expired')
+                              : listing.status === 'deactivated' || listing.status === 'hidden'
+                                ? t('sales.deactivated')
+                                : listing.status === 'sold'
+                                  ? t('sales.sold')
+                                  : listing.status === 'rejected'
+                                    ? t('sales.rejected')
+                                    : '';
                       return (
                         <div key={listing.id} className="flex items-center gap-3 px-4 py-3.5">
                           <div className={`h-12 w-12 shrink-0 overflow-hidden rounded-xl ${isLight ? 'bg-gray-100' : 'bg-white/10'}`}>
@@ -1424,16 +1380,22 @@ export default function BusinessSettingsFlow({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{listing.title}</p>
                             <p className={`text-xs ${ui.limeText}`}>{formatListingPrice(listing)}</p>
+                            <p className={`text-xs ${ac.mutedText}`}>
+                              {enabled
+                                ? t('businessProfile.settings.listingsPlaceBusiness')
+                                : t('businessProfile.settings.listingsPlacePersonal')}
+                              {statusLabel ? ` · ${statusLabel}` : ''}
+                            </p>
                           </div>
                           <ToggleSwitch
                             checked={enabled}
-                            disabled={form.listingDisplayMode === 'all'}
                             onChange={(checked) => {
-                              if (form.listingDisplayMode !== 'manual') return;
+                              const next = checked
+                                ? [...selectedListingIdSet, listingId]
+                                : [...selectedListingIdSet].filter((id) => id !== listingId);
                               patch({
-                                selectedListingIds: checked
-                                  ? [...form.selectedListingIds, listing.id]
-                                  : form.selectedListingIds.filter((id) => id !== listing.id),
+                                listingDisplayMode: 'manual',
+                                selectedListingIds: next,
                               });
                             }}
                           />
