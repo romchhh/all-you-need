@@ -538,7 +538,10 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
   }, [profileViewMode]);
 
   useEffect(() => {
-    if (!isBusinessActive || profileViewMode !== 'business') return;
+    if (!isBusinessActive || profileViewMode !== 'business') {
+      setSelectedStatus((current) => (current === 'inactive' ? 'all' : current));
+      return;
+    }
     const status =
       businessListingTab === 'active'
         ? 'active'
@@ -1292,7 +1295,8 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                  selectedStatus === 'pending_moderation' ? t('profile.onModeration') :
                  selectedStatus === 'rejected' ? t('sales.rejected') :
                  selectedStatus === 'deactivated' ? t('sales.deactivated') :
-                 selectedStatus === 'sold' ? t('listing.sold') : selectedStatus}
+                 selectedStatus === 'inactive' ? t('businessProfile.owner.tabInactive') :
+                 selectedStatus === 'sold' ? t('listing.sold') : t('sales.allStatuses')}
               </span>
               <ChevronDown size={16} className={`${ac.profileCardChevron} transition-transform ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -1385,7 +1389,7 @@ export const ProfileTab = ({ tg, onSelectListing, onCreateListing, onEditModalCh
                    status === 'pending_moderation' ? t('profile.onModeration') :
                    status === 'rejected' ? t('sales.rejected') :
                    status === 'deactivated' ? t('sales.deactivated') :
-                   status === 'sold' ? t('listing.sold') : status}
+                   status === 'sold' ? t('listing.sold') : t('sales.allStatuses')}
                   {selectedStatus === status && (
                     <span className={`ml-2 ${isLight ? 'text-[#3F5331]' : 'text-[#C8E6A0]'}`}>✓</span>
                   )}

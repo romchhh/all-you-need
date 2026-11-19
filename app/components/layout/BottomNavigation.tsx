@@ -27,6 +27,8 @@ interface BottomNavigationProps {
   onTabChange?: (tab: string) => void;
   onCloseDetail?: () => void;
   onCreateListing?: () => void;
+  /** Закрити екран «Додати», щоб меню знову відкривало розділи. */
+  onLeaveCreateListing?: () => void;
   favoritesCount?: number;
   /** Відкрита картка товару на поточній вкладці — щоб повернутись у неї з меню. */
   openListingId?: number | null;
@@ -38,6 +40,7 @@ export const BottomNavigation = ({
   onTabChange,
   onCloseDetail,
   onCreateListing,
+  onLeaveCreateListing,
   openListingId = null,
   tg,
 }: BottomNavigationProps) => {
@@ -180,7 +183,20 @@ export const BottomNavigation = ({
     });
   }, [lang, currentActiveTab, router]);
 
+  const routeTab = (): NavTab => {
+    if (pathname?.includes('/favorites')) return 'favorites';
+    if (pathname?.includes('/profile')) return 'profile';
+    if (pathname?.includes('/categories')) return 'categories';
+    return 'bazaar';
+  };
+
   const handleTabChange = (tab: string) => {
+    const leavingAdd = currentActiveTab === 'add';
+    if (leavingAdd) {
+      onLeaveCreateListing?.();
+      if (tab === routeTab()) return;
+    }
+
     if (tab === currentActiveTab) {
       if (tab === 'bazaar' && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('tradeground-home-refresh'));
@@ -199,7 +215,7 @@ export const BottomNavigation = ({
     pendingTabNavRef.current = true;
     showPageLoader({ minMs: 350 });
 
-    const sourceTab = currentActiveTab as NavTab;
+    const sourceTab = (leavingAdd ? routeTab() : currentActiveTab) as NavTab;
     if (typeof window !== 'undefined') {
       const scrollY = window.scrollY || document.documentElement.scrollTop;
       const listingOpen = Boolean(
